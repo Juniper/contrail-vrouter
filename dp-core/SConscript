@@ -1,0 +1,34 @@
+#
+# Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv.Clone()
+
+dpcore_sources = [
+                    'vnsw_ip4_mtrie.c',
+                    'vr_btable.c',
+                    'vr_datapath.c',
+                    'vr_flow.c',
+                    'vr_index_table.c',
+                    'vr_interface.c',
+                    'vr_mcast.c',
+                    'vr_message.c',
+                    'vr_mirror.c',
+                    'vr_mpls.c',
+                    'vr_nexthop.c',
+                    'vr_packet.c',
+                    'vr_proto_ip.c',
+                    'vr_queue.c',
+                    'vr_response.c',
+                    'vr_route.c',
+                    'vr_sandesh.c',
+                    'vr_stats.c',
+                    'vr_vrf_assign.c',
+                    'vrouter.c',
+                  ]
+
+env.Library('dp_core', dpcore_sources)
+# Local Variables:
+# mode: python
+# End:

@@ -1,0 +1,680 @@
+/*
+ * vif.c -- 'vrouter' interface utility
+ *
+ * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+ */
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <malloc.h>
+#include <inttypes.h>
+#include <getopt.h>
+#include <stdbool.h>
+
+#include <asm/types.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <asm/types.h>
+
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <linux/if_ether.h>
+
+#include <net/if.h>
+#include <net/ethernet.h>
+#ifdef __linux__
+#include <netinet/ether.h>
+#endif
+
+#include "vr_types.h"
+#include "vr_message.h"
+#include "vr_interface.h"
+#include "vhost.h"
+#include "vr_genetlink.h"
+#include "nl_util.h"
+
+#define VHOST_TYPE_STRING       "vhost"
+#define AGENT_TYPE_STRING       "agent"
+#define PHYSICAL_TYPE_STRING    "physical"
+#define VIRTUAL_TYPE_STRING     "virtual"
+#define XEN_LL_TYPE_STRING      "xenll"
+
+static struct nl_client *cl;
+static char flag_string[32], if_name[IFNAMSIZ];
+static int if_kindex = -1, vrf_id, vr_ifindex = -1;
+static short vlan_id = -1;
+static int vr_ifflags;
+
+static int add_set, create_set, get_set, list_set;
+static int kindex_set, type_set, help_set, set_set, vlan_set;
+static int vrf_set, mac_set, delete_set, mode_set, policy_set;
+
+static unsigned int vr_op, vr_if_type;
+static bool ignore_error = false, dump_pending = false;
+static bool vr_vrf_assign_dump = false;
+static int dump_marker = -1, var_marker = -1;
+
+static int8_t vr_ifmac[6];
+static struct ether_addr *mac_opt;
+
+static void Usage(void);
+
+static char *
+vr_get_if_type_string(int t)
+{
+    switch (t) {
+    case VIF_TYPE_HOST:
+        return "Host";
+    case VIF_TYPE_AGENT:
+        return "Agent";
+    case VIF_TYPE_PHYSICAL:
+        return "Physical";
+    case VIF_TYPE_VIRTUAL:
+        return "Virtual";
+    case VIF_TYPE_XEN_LL_HOST:
+        return "XenLL";
+    default:
+        return "Invalid";
+    }
+
+    return NULL;
+}
+
+static unsigned int
+vr_get_if_type(char *type_str)
+{
+    if (!strncmp(type_str, VHOST_TYPE_STRING,
+                strlen(VHOST_TYPE_STRING)))
+        return VIF_TYPE_HOST;
+    else if (!strncmp(type_str, AGENT_TYPE_STRING,
+                strlen(AGENT_TYPE_STRING)))
+        return VIF_TYPE_AGENT;
+    else if (!strncmp(type_str, PHYSICAL_TYPE_STRING,
+                strlen(PHYSICAL_TYPE_STRING)))
+        return VIF_TYPE_PHYSICAL;
+    else if (!strncmp(type_str, VIRTUAL_TYPE_STRING,
+                strlen(VIRTUAL_TYPE_STRING)))
+        return VIF_TYPE_VIRTUAL;
+    else if (!strncmp(type_str, XEN_LL_TYPE_STRING,
+                strlen(XEN_LL_TYPE_STRING)))
+        return VIF_TYPE_XEN_LL_HOST;
+    else
+        Usage();
+
+    return 0;
+}
+
+static char *
+vr_if_flags(int flags)
+{
+    bzero(flag_string, sizeof(flag_string));
+    if (flags & VIF_FLAG_POLICY_ENABLED)
+        strcat(flag_string, "P");
+    if (flags & VIF_FLAG_XCONNECT)
+        strcat(flag_string, "X");
+    if (flags & VIF_FLAG_SERVICE_IF)
+        strcat(flag_string, "S");
+    if (flags & VIF_FLAG_MIRROR_TX)
+        strcat(flag_string, "Mt");
+    if (flags & VIF_FLAG_MIRROR_RX)
+        strcat(flag_string, "Mr");
+
+    return flag_string;
+}
+
+void
+vr_vrf_assign_req_process(void *s)
+{
+    vr_vrf_assign_req *req = (vr_vrf_assign_req *)s;
+
+    printf("%d:%d, ", req->var_vlan_id, req->var_vif_vrf);
+    var_marker = req->var_vlan_id;
+
+    return;
+}
+
+void
+vr_interface_req_process(void *s)
+{
+    char name[50];
+    vr_interface_req *req = (vr_interface_req *)s;
+
+    if (add_set)
+        vr_ifindex = req->vifr_idx;
+
+    if (!get_set && !list_set)
+        return;
+
+    printf("vif%d/%d\tOS: %s", req->vifr_rid, req->vifr_idx,
+            req->vifr_os_idx ? if_indextoname(req->vifr_os_idx, name): "NULL");
+    if (req->vifr_speed >= 0) {
+        printf(" (Speed %d,", req->vifr_speed);
+        if (req->vifr_duplex >= 0)
+            printf(" Duplex %d", req->vifr_duplex);
+        printf(")");
+    }
+    printf("\n");
+
+    printf("\tType:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
+            vr_get_if_type_string(req->vifr_type),
+            MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
+    printf("\tVrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
+            req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
+            req->vifr_mtu, req->vifr_ref_cnt);
+    printf("\tRX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
+            req->vifr_ipackets,
+            req->vifr_ibytes, req->vifr_ierrors);
+    printf("\tTX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
+            req->vifr_opackets,
+            req->vifr_obytes, req->vifr_oerrors);
+    printf("\n");
+
+    if (list_set)
+        dump_marker = req->vifr_idx;
+
+    if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
+        vr_vrf_assign_dump = true;
+        printf("VRF table(vlan:vrf):\n");
+        vr_ifindex = req->vifr_idx;
+    }
+
+    return;
+}
+
+
+void
+vr_response_process(void *s)
+{
+    vr_response *resp = (vr_response *)s;
+
+    if (resp->resp_code < 0 && !ignore_error)
+        printf("%s\n", strerror(-resp->resp_code));
+
+    if (vr_op == SANDESH_OP_DUMP) {
+            if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
+                dump_pending = true;
+            else
+                dump_pending = false;
+    } else if (vr_op == SANDESH_OP_GET && vr_vrf_assign_dump) {
+        if (!(resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)) {
+            vr_vrf_assign_dump = false;
+        }
+    }
+
+    return;
+}
+
+/*
+ * create vhost interface in linux
+ */
+static int
+vhost_create(void)
+{
+    int ret;
+    struct vn_if vhost;
+    struct nl_response *resp;
+
+    bzero(&vhost, sizeof(vhost));
+    strncpy(vhost.if_name, if_name, sizeof(vhost.if_name));
+    strncpy(vhost.if_kind, VHOST_KIND, sizeof(vhost.if_kind));
+    memcpy(vhost.if_mac, vr_ifmac, sizeof(vhost.if_mac));
+
+    ret = nl_build_if_create_msg(cl, &vhost, 0);
+    if (ret)
+        return ret;
+
+    ret = nl_sendmsg(cl);
+    if (ret <= 0)
+        return ret;
+
+    while ((ret = nl_recvmsg(cl)) > 0) {
+        resp = nl_parse_reply(cl);
+        if (resp && resp->nl_op)
+            printf("%s\n", strerror(resp->nl_op));
+    }
+
+    return ret;
+}
+
+static int
+vr_intf_send_msg(void *request, char *request_string)
+{
+    int ret, error, attr_len; 
+    struct nl_response *resp;
+
+    /* nlmsg header */
+    ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
+    if (ret) {
+        return ret;
+    }
+
+    /* Generic nlmsg header */
+    ret = nl_build_genlh(cl, SANDESH_REQUEST, 0);
+    if (ret) {
+        return ret;
+    }
+
+    attr_len = nl_get_attr_hdr_size();
+
+    error = 0;
+    ret = sandesh_encode(request, request_string, vr_find_sandesh_info,
+                             (nl_get_buf_ptr(cl) + attr_len),
+                             (nl_get_buf_len(cl) - attr_len), &error);
+    if (ret <= 0) {
+        return ret;
+    }
+
+    /* Add sandesh attribute */
+    nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
+    nl_update_nlh(cl);
+
+    /* Send the request to kernel */
+    ret = nl_sendmsg(cl);
+
+    while ((ret = nl_recvmsg(cl)) > 0) {
+        resp = nl_parse_reply(cl);
+        if (resp->nl_op == SANDESH_REQUEST) {
+            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+        }
+    }
+
+    return 0;
+}
+
+static int
+vr_intf_set(void)
+{
+    vr_vrf_assign_req va_req;
+
+    va_req.h_op = SANDESH_OP_ADD;
+    va_req.var_rid = 0;
+    va_req.var_vif_index = vr_ifindex;
+    va_req.var_vif_vrf = vrf_id;
+    va_req.var_vlan_id = vlan_id;
+
+    return vr_intf_send_msg(&va_req, "vr_vrf_assign_req");
+}
+
+
+static int
+vr_vrf_assign_dump_request(void)
+{
+    vr_vrf_assign_req va_req;
+
+    va_req.h_op = SANDESH_OP_DUMP;
+    va_req.var_vif_index = vr_ifindex;
+    va_req.var_marker = var_marker;
+
+    while (vr_vrf_assign_dump)
+        vr_intf_send_msg(&va_req, "vr_vrf_assign_req");
+
+    printf("\n");
+
+    return 0;
+}
+ 
+static int 
+vr_intf_op(unsigned int op)
+{
+    int ret; 
+    vr_interface_req intf_req;
+
+    if (create_set)
+        return vhost_create();
+
+op_retry:
+    memset(&intf_req, 0 , sizeof(intf_req));
+    memset(if_name, 0, sizeof(if_name));
+
+    if (set_set)
+        intf_req.vifr_vrf = -1;
+    else
+        intf_req.vifr_vrf = vrf_id;
+
+    intf_req.h_op = op;
+    intf_req.vifr_mac_size = 6;
+    intf_req.vifr_mac = vr_ifmac;
+    intf_req.vifr_ip = 0;
+    intf_req.vifr_name = if_name;
+    if (op == SANDESH_OP_DUMP)
+        intf_req.vifr_marker = dump_marker;
+
+    switch (op) {
+    case SANDESH_OP_ADD:
+        intf_req.vifr_os_idx = if_kindex;
+        if (vr_ifindex < 0)
+            vr_ifindex = if_kindex;
+        intf_req.vifr_idx = vr_ifindex;
+        intf_req.vifr_rid = 0;
+        intf_req.vifr_type = vr_if_type;
+        intf_req.vifr_flags = vr_ifflags;
+        break;
+
+    case SANDESH_OP_DELETE:
+        intf_req.vifr_idx = vr_ifindex;
+        break;
+
+    case SANDESH_OP_GET:
+        /*
+         * this logic is slightly complicated. if --kernel option is set
+         * for get or when if_kindex is set for add doing a get, we should
+         * get true in the first if. else it is a regular get with vr ifindex
+         */
+        if (kindex_set || if_kindex != -1) {
+            intf_req.vifr_idx = -1;
+            if (vr_ifindex >= 0)
+                intf_req.vifr_os_idx = vr_ifindex;
+            else
+                intf_req.vifr_os_idx = if_kindex;
+        } else
+            intf_req.vifr_idx = vr_ifindex;
+        break;
+
+    case SANDESH_OP_DUMP:
+        break;
+    }
+
+    ret = vr_intf_send_msg(&intf_req, "vr_interface_req");
+    if (ret < 0)
+        return ret;
+
+    if (set_set)
+        ret = vr_intf_set();
+    else if (get_set)
+        if (vr_vrf_assign_dump)
+            ret = vr_vrf_assign_dump_request();
+
+    if (dump_pending)
+        goto op_retry;
+
+    return 0;
+}
+
+static void
+Usage()
+{
+    printf("Usage: vif [--create <intf_name> --mac <mac>]\n");
+    printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
+    printf("\t   \t--type [vhost|agent|physical|virtual]");
+    printf( "[--policy, --mode <mode:x>]]\n");
+    printf("\t   [--delete <intf_id>]\n");
+    printf("\t   [--get <intf_id>][--kernel]\n");
+    printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
+    printf("\t   [--list]\n");
+    printf("\t   [--help]\n");
+
+    exit(0);
+}
+
+
+enum if_opt_index {
+    ADD_OPT_INDEX,
+    CREATE_OPT_INDEX,
+    GET_OPT_INDEX,
+    LIST_OPT_INDEX,
+    VRF_OPT_INDEX,
+    MAC_OPT_INDEX,
+    DELETE_OPT_INDEX,
+    MODE_OPT_INDEX,
+    POLICY_OPT_INDEX,
+    KINDEX_OPT_INDEX,
+    TYPE_OPT_INDEX,
+    SET_OPT_INDEX,
+    VLAN_OPT_INDEX,
+    HELP_OPT_INDEX,
+};
+
+static struct option long_options[] = {
+    [ADD_OPT_INDEX]     =   {"add",     required_argument,  &add_set,       1},
+    [CREATE_OPT_INDEX]  =   {"create",  required_argument,  &create_set,    1},
+    [GET_OPT_INDEX]     =   {"get",     required_argument,  &get_set,       1},
+    [LIST_OPT_INDEX]    =   {"list",    no_argument,        &list_set,      1},
+    [VRF_OPT_INDEX]     =   {"vrf",     required_argument,  &vrf_set,       1},
+    [MAC_OPT_INDEX]     =   {"mac",     required_argument,  &mac_set,       1},
+    [DELETE_OPT_INDEX]  =   {"delete",  required_argument,  &delete_set,    1},
+    [MODE_OPT_INDEX]    =   {"mode",    required_argument,  &mode_set,      1},
+    [POLICY_OPT_INDEX]  =   {"policy",  no_argument,        &policy_set,    1},
+    [KINDEX_OPT_INDEX]  =   {"kernel",  no_argument,        &kindex_set,    1},
+    [TYPE_OPT_INDEX]    =   {"type",    required_argument,  &type_set,      1},
+    [SET_OPT_INDEX]     =   {"set",     required_argument,  &set_set,       1},
+    [VLAN_OPT_INDEX]    =   {"vlan",    required_argument,  &vlan_set,      1},
+    [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
+};
+
+static void
+parse_long_opts(int option_index, char *opt_arg)
+{
+    errno = 0;
+
+    if (!*(long_options[option_index].flag))
+        *(long_options[option_index].flag) = 1;
+
+    switch (option_index) {
+    case ADD_OPT_INDEX:
+        strncpy(if_name, opt_arg, sizeof(if_name));
+        if_kindex = if_nametoindex(opt_arg);
+        vr_op = SANDESH_OP_ADD;
+        break;
+
+    case CREATE_OPT_INDEX:
+        strncpy(if_name, opt_arg, sizeof(if_name));
+        break;
+
+    case VRF_OPT_INDEX:
+        vrf_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case MAC_OPT_INDEX:
+        mac_opt = ether_aton(opt_arg);
+        if (mac_opt)
+            memcpy(vr_ifmac, mac_opt, sizeof(vr_ifmac));
+        break;
+
+    case DELETE_OPT_INDEX:
+        vr_op = SANDESH_OP_DELETE;
+        vr_ifindex = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case GET_OPT_INDEX:
+        vr_op = SANDESH_OP_GET;
+        vr_ifindex = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case MODE_OPT_INDEX:
+        if (opt_arg[0] == 'x')
+            vr_ifflags |= VIF_FLAG_XCONNECT;
+        break;
+
+    case POLICY_OPT_INDEX:
+        vr_ifflags |= VIF_FLAG_POLICY_ENABLED;
+        break;
+
+    case LIST_OPT_INDEX:
+        vr_op = SANDESH_OP_DUMP;
+        break;
+
+    case TYPE_OPT_INDEX:
+        vr_if_type = vr_get_if_type(optarg);
+        break;
+
+    case SET_OPT_INDEX:
+        vr_op = SANDESH_OP_ADD;
+        vr_ifindex = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case VLAN_OPT_INDEX:
+        vr_ifflags |= VIF_FLAG_SERVICE_IF;
+        vlan_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    default:
+        break;
+    }
+
+    return;
+}
+
+static void
+validate_options(void)
+{
+    unsigned int sum_opt = 0, i;
+
+    for (i = 0; i < (sizeof(long_options) / sizeof(long_options[0]));
+                i++)
+        sum_opt += *(long_options[i].flag);
+
+    if (!sum_opt || help_set)
+        Usage();
+
+    if (create_set) {
+        if ((sum_opt > 1) && (sum_opt != 2 || !mac_set))
+            Usage();
+        return;
+    }
+
+    if (get_set) {
+        if ((sum_opt > 1) && (sum_opt != 2 || !kindex_set))
+            Usage();
+        return;
+    }
+
+    if ((delete_set || list_set)) {
+        if (sum_opt > 1)
+            Usage();
+        return;
+    }
+
+    if (add_set) {
+        if (get_set || list_set)
+            Usage();
+        if (!vrf_set || !mac_set || !type_set)
+            Usage();
+        return;
+    }
+
+    if (set_set) {
+        if (sum_opt != 3 || !vrf_set || !vlan_set)
+            Usage();
+        return;
+    }
+
+    return;
+}
+
+int
+main(int argc, char *argv[])
+{
+    int ret, opt, option_index;
+    /* 
+     * the proto of the socket changes based on whether we are creating an
+     * interface in linux or doing an operation in vrouter
+     */
+    unsigned int sock_proto = NETLINK_GENERIC;
+
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:",
+                    long_options, &option_index)) >= 0) {
+            switch (opt) {
+            case 'a':
+                add_set = 1;
+                parse_long_opts(ADD_OPT_INDEX, optarg);
+                break;
+
+            case 'c':
+                create_set = 1;
+                parse_long_opts(CREATE_OPT_INDEX, optarg);
+                break;
+
+            case 'd':
+                delete_set = 1;
+                parse_long_opts(DELETE_OPT_INDEX, optarg);
+                break;
+
+            case 'g':
+                get_set = 1;
+                parse_long_opts(GET_OPT_INDEX, optarg);
+                break;
+
+            case 'k':
+                parse_long_opts(KINDEX_OPT_INDEX, optarg);
+                kindex_set = 1;
+                break;
+
+            case 'l':
+            case 'b':
+                list_set = 1;
+                parse_long_opts(LIST_OPT_INDEX, NULL);
+                break;
+
+            case 'm':
+                mac_set = 1;
+                parse_long_opts(MAC_OPT_INDEX, optarg);
+                break;
+
+            case 'v':
+                vrf_set = 1;
+                parse_long_opts(VRF_OPT_INDEX, optarg);
+                break;
+
+            case 'p':  
+                policy_set = 1;
+                parse_long_opts(POLICY_OPT_INDEX, NULL);
+                break;
+
+            case 't':
+                type_set = 1;
+                parse_long_opts(TYPE_OPT_INDEX, optarg);
+                break;
+
+            case 0:
+                parse_long_opts(option_index, optarg);
+                break;
+
+            case '?':
+            default:
+                Usage();
+            }
+    }
+
+    validate_options();
+
+    cl = nl_register_client();
+    if (!cl)
+        exit(-ENOMEM);
+
+    if (create_set)
+        sock_proto = NETLINK_ROUTE;
+
+    ret = nl_socket(cl, sock_proto);
+    if (ret <= 0)
+       exit(ret);
+
+    if (sock_proto == NETLINK_GENERIC)
+        if (vrouter_get_family_id(cl) <= 0)
+            return -1;
+
+    if (add_set) {
+        /*
+         * for addition, we need to see whether the interface already
+         * exists in vrouter or not. so, get can return error if the
+         * interface does not exist in vrouter
+         */
+        ignore_error = true;
+        vr_intf_op(SANDESH_OP_GET);
+        ignore_error = false;
+    }
+
+    vr_intf_op(vr_op);
+
+    return 0;
+}

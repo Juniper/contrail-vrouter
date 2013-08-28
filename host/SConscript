@@ -1,0 +1,31 @@
+#
+# Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv.Clone()
+
+vr_root = '../'
+
+libvrouter_sources = [
+                        'vr_host_interface.c',
+                        'vr_host_message.c',
+                        'vr_host_mtransport.c',
+                        'vr_host_packet.c',
+                        'vr_host_io.c',
+                        'vrouter_host_mod.c'
+                     ]
+# CFLAGS
+env.Append(CCFLAGS = '-g')
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['.', '../sandesh', '../dp-core'])
+env.Replace(LIBS = ['sandesh-c', 'dp_core', 'dp_sandesh_c'])
+
+libvrouter = env.StaticLibrary('vrouter', source = libvrouter_sources)
+
+# to make sure that all are built when you do 'scons' @ the top level
+env.Default(libvrouter)
+# Local Variables:
+# mode: python
+# End:

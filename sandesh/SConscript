@@ -1,0 +1,14 @@
+#
+# Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv
+
+DpSandeshFiles = env.SandeshGenC('vr.sandesh')
+DpSandeshFilesSrc = env.ExtractC(DpSandeshFiles)
+libdp_sandesh = env.Library('dp_sandesh_c', DpSandeshFilesSrc)
+
+# Local Variables:
+# mode: python
+# End:

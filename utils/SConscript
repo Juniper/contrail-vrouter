@@ -1,0 +1,56 @@
+#
+# Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv
+ 
+vr_root = '../'
+
+kernel_dir = GetOption('kernel-dir')
+if kernel_dir:
+    env.Append(CPPPATH = kernel_dir + '/include')
+
+# CFLAGS
+env.Append(CCFLAGS = '-g')
+
+
+# Build libvrutil
+libvrutil = 'vrutil'
+libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c')]
+env.StaticLibrary(libvrutil, libvrutil_objs)
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['.', '../sandesh'])
+env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
+
+# Build individual utils
+vif_sources = ['vif.c']
+vif = env.Program(target = 'vif', source = vif_sources)
+
+rt_sources = ['rt.c']
+rt = env.Program(target = 'rt', source = rt_sources)
+
+nh_sources = ['nh.c']
+nh = env.Program(target = 'nh', source = nh_sources)
+
+mirror_sources = ['mirror.c']
+mirror = env.Program(target = 'mirror', source = mirror_sources)
+
+mpls_sources = ['mpls.c']
+mpls = env.Program(target = 'mpls', source = mpls_sources)
+
+flow_sources = ['flow.c']
+flow = env.Program(target = 'flow', source = flow_sources)
+
+vrfstats_sources = ['vrfstats.c']
+vrfstats = env.Program(target = 'vrfstats', source = vrfstats_sources)
+
+dropstats_sources = ['dropstats.c']
+dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
+
+# to make sure that all are built when you do 'scons' @ the top level
+env.Default(vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats)
+# Local Variables:
+# mode: python
+# End:
