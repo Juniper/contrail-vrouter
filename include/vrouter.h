@@ -32,6 +32,8 @@ extern int vr_perfs;
 extern int vr_perfp;
 extern int vr_perfr1, vr_perfr2, vr_perfr3;
 extern int vr_perfq1, vr_perfq2, vr_perfq3;
+extern int vr_from_vm_mss_adj;
+extern int vr_to_vm_mss_adj;
 
 #define CONTAINER_OF(member, struct_type, pointer) \
     ((struct_type *)((unsigned long)pointer - \
@@ -75,6 +77,7 @@ struct host_os {
                                         unsigned char, int *);
     __u16 (*hos_get_udp_src_port)(struct vr_packet *, 
                                   struct vr_forwarding_md *, unsigned short);
+    int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *);
 };
 
 #define vr_malloc               vrouter_host->hos_malloc
@@ -105,6 +108,7 @@ struct host_os {
 #define vr_pcow                 vrouter_host->hos_pcow
 #define vr_pull_inner_headers_fast vrouter_host->hos_pull_inner_headers_fast
 #define vr_get_udp_src_port     vrouter_host->hos_get_udp_src_port
+#define vr_pkt_from_vm_tcp_mss_adj vrouter_host->hos_pkt_from_vm_tcp_mss_adj
 
 struct vrouter {
     unsigned int vr_num_if;

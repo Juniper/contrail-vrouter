@@ -366,19 +366,22 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     captured_len = htonl(pkt_len(pkt));
     if (mirror_md_len) 
         memcpy(buf, mirror_md, mirror_md_len);
-    /* Add the pcap header */
-    pcap = (struct vr_pcap *)pkt_push(pkt, sizeof(struct vr_pcap));
-    if (!pcap)
-        goto fail;
 
-    pcap->pcap_incl_len = captured_len;
-    pcap->pcap_orig_len = captured_len;
-
-    /* Get the time stamp in seconds and nanoseconds*/
-    vr_get_time(&pcap->pcap_ts_sec, &pcap->pcap_ts_usec);
-    pcap->pcap_ts_sec = htonl(pcap->pcap_ts_sec);
-    /* Convert nanoseconds to usec */
-    pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec/1000);
+    if (mirror->mir_flags & VR_MIRROR_PCAP) {
+        /* Add the pcap header */
+        pcap = (struct vr_pcap *)pkt_push(pkt, sizeof(struct vr_pcap));
+        if (!pcap)
+            goto fail;
+        
+        pcap->pcap_incl_len = captured_len;
+        pcap->pcap_orig_len = captured_len;
+        
+        /* Get the time stamp in seconds and nanoseconds*/
+        vr_get_time(&pcap->pcap_ts_sec, &pcap->pcap_ts_usec);
+        pcap->pcap_ts_sec = htonl(pcap->pcap_ts_sec);
+        /* Convert nanoseconds to usec */
+        pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec/1000);
+    }
 
     nh_output((unsigned short)nh->nh_vrf, pkt, nh, fmd);
     return 0;

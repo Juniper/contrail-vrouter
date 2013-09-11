@@ -147,6 +147,7 @@ vr_get_flow_key(struct vr_flow_key *key, unsigned short vrf,
                 struct vr_ip *ip)
 {
     unsigned short *t_hdr;
+    struct vr_icmp *icmph;
 
     /* copy both source and destinations */
     memcpy(&key->key_src_ip, &ip->ip_saddr, 2 * sizeof(ip->ip_saddr));
@@ -162,6 +163,19 @@ vr_get_flow_key(struct vr_flow_key *key, unsigned short vrf,
     case VR_IP_PROTO_UDP:
         key->key_src_port = *(t_hdr);
         key->key_dst_port = *(t_hdr + 1);
+        break;
+
+    case VR_IP_PROTO_ICMP:
+        icmph = (struct vr_icmp *)t_hdr;
+        if (icmph->icmp_type == VR_ICMP_TYPE_ECHO ||
+                icmph->icmp_type == VR_ICMP_TYPE_ECHO_REPLY) {
+            key->key_src_port = icmph->icmp_eid;
+            key->key_dst_port = VR_ICMP_TYPE_ECHO_REPLY;
+        } else {
+            key->key_src_port = 0;
+            key->key_dst_port = icmph->icmp_type;
+        }
+
         break;
 
     default:

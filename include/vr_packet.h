@@ -24,13 +24,17 @@
 #define VR_IP_PROTO_TCP         6
 #define VR_IP_PROTO_UDP         17
 #define	VR_IP_PROTO_GRE         47
-#define VR_GRE_FLAG_CSUM        ntohs(0x8000)
+#define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
+#define VR_GRE_FLAG_KEY         (ntohs(0x2000)) 
 
 /* Size of basic GRE header */
 #define VR_GRE_BASIC_HDR_LEN    4
 
 /* Size of GRE header with checksum */
 #define VR_GRE_CKSUM_HDR_LEN    8
+
+/* Size of GRE header with key */
+#define VR_GRE_KEY_HDR_LEN      8
 
 /* packets originated by DP. For eg: mirrored packets */
 #define VP_FLAG_FROM_DP         (1 << 0)
@@ -294,6 +298,18 @@ struct vr_udp {
     unsigned short udp_dport;
     unsigned short udp_length;
     unsigned short udp_csum;
+} __attribute__((packed));
+
+#define VR_ICMP_TYPE_ECHO_REPLY     0
+#define VR_ICMP_TYPE_ECHO           8
+
+struct vr_icmp {
+    uint8_t icmp_type;
+    uint8_t icmp_code;
+    uint16_t icmp_csum;
+    /* now only for icmp echo */
+    uint16_t icmp_eid;
+    uint16_t icmp_eseq;
 } __attribute__((packed));
 
 struct vr_gre {

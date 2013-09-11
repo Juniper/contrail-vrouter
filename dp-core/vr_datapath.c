@@ -214,6 +214,7 @@ vr_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_vlan_hdr *vlan;
     struct vrouter *router = vif->vif_router;
     struct vr_forwarding_md fmd;
+    int reason;
 
     if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
         vr_init_forwarding_md(&fmd);
@@ -246,9 +247,17 @@ vr_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
 
     pkt_set_network_header(pkt, pkt->vp_data);
     pkt_set_inner_network_header(pkt, pkt->vp_data);
-    if (eth_proto == VR_ETH_PROTO_IP)
+    if (eth_proto == VR_ETH_PROTO_IP) {
+        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
+                         (vif->vif_type == VIF_TYPE_VIRTUAL)) {
+            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt))) {
+                vr_pfree(pkt, reason);
+                return 0;
+            }
+        }
+
         return vr_flow_inet_input(router, vrf, pkt, eth_proto, &fmd);
-    else if (eth_proto == VR_ETH_PROTO_ARP)
+    } else if (eth_proto == VR_ETH_PROTO_ARP)
         return vr_arp_input(router, vrf, pkt);
 
     /* rest of the stuff is for slow path and we should be ok doing this */

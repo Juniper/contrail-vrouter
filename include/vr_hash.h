@@ -66,8 +66,16 @@
 struct __unaligned_u32 { __u32 x; } __attribute__((packed));
 static inline __u32 __get_unaligned_word(const void *p)
 {
-    const struct __unaligned_u32 *ptr = (const struct __unaligned_u32 *)p;
-    return ptr->x;
+    union {
+        uint8_t bytes[sizeof(__u32)];
+        struct __unaligned_u32 u32;
+    } word;
+
+    size_t i;
+    for (i = 0; i < sizeof(struct __unaligned_u32); i++) {
+        word.bytes[i] = ((uint8_t *) p)[i];
+    }
+    return word.u32.x;
 }
 
 

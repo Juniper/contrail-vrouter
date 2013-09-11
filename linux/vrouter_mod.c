@@ -16,6 +16,7 @@
 #include <linux/highmem.h>
 #include <linux/version.h>
 #include <linux/if_vlan.h>
+#include <linux/icmp.h>
 
 #include "vr_packet.h"
 #include "vr_sandesh.h"
@@ -23,6 +24,15 @@
 #include "vr_linux.h"
 #include "vr_os.h"
 #include "vr_compat.h"
+
+/*
+ * Overlay length used for TCP MSS adjust. For UDP outer header, overlay
+ * len is 20 (IP header) + 8 (UDP) + 4 (MPLS). For GRE, it is 20 (IP header)
+ * + 8 (GRE header + key) + 4 (MPLS). Instead of allowing for only one
+ * label, we will allow a maximum of 3 labels, so we end up with 40 bytes
+ * of overleay headers.
+ */
+#define VROUTER_OVERLAY_LEN 40 
 
 unsigned int vr_num_cpus = 1;
 
@@ -485,6 +495,162 @@ error:
     lh_reset_skb_fields(pkt);
     return 0;
 }
+
+/*
+ * lh_adjust_tcp_mss - adjust the TCP MSS in the given packet based on
+ * vrouter physical interface MTU. Returns 0 on success, non-zero
+ * otherwise.
+ */
+static void 
+lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb)
+{
+    int opt_off = sizeof(struct tcphdr);
+    u8 *opt_ptr = (u8 *) tcph;
+    u16 pkt_mss, max_mss;
+    struct net_device *dev;
+    struct vrouter *router = vrouter_get(0);
+
+    if ((tcph == NULL) || (!tcph->syn) || (router == NULL)) {
+        return;
+    }
+
+    /*
+     * At the moment, we only support one physical interface in vrouter.
+     * Need to listen for MTU changes when we support more than one interface
+     * in vrouter and pick the smallest MTU to set MSS.
+     */
+    if (router->vr_eth_if == NULL) {
+        return;
+    }
+
+    while (opt_off < (tcph->doff*4)) {
+        switch (opt_ptr[opt_off]) {
+            case TCPOPT_EOL:
+                return;
+
+            case TCPOPT_NOP:
+                opt_off++;
+                continue;
+
+            case TCPOPT_MSS:
+                if ((opt_off + TCPOLEN_MSS) > (tcph->doff*4)) {
+                    return;
+                }
+
+                if (opt_ptr[opt_off+1] != TCPOLEN_MSS) {
+                    return;
+                }
+
+                pkt_mss = (opt_ptr[opt_off+2] << 8) | opt_ptr[opt_off+3];
+                dev = (struct net_device *) router->vr_eth_if->vif_os;
+                if (dev == NULL) {
+                    return;
+                }
+
+                max_mss = dev->mtu -
+                             (VROUTER_OVERLAY_LEN + sizeof(struct vr_ip) +
+                              sizeof(struct tcphdr));
+
+                if (pkt_mss > max_mss) {
+                    opt_ptr[opt_off+2] = (max_mss & 0xff00) >> 8;
+                    opt_ptr[opt_off+3] = max_mss & 0xff;
+
+                    inet_proto_csum_replace2(&tcph->check, skb,
+                                             htons(pkt_mss),
+                                             htons(max_mss), 0);
+                }
+
+                return;
+
+            default:
+
+                if ((opt_off + 1) == (tcph->doff*4)) {
+                    return;
+                }
+
+                if (opt_ptr[opt_off+1]) {
+                    opt_off += opt_ptr[opt_off+1];
+                } else {
+                    opt_off++;
+                }
+
+                continue;
+        } /* switch */
+    } /* while */
+
+    return;
+}
+
+/*
+ * lh_pkt_from_vm_tcp_mss_adj - perform TCP MSS adjust, if required, for packets
+ * that are sent by a VM. Returns 0 on success, non-zero otherwise.
+ */
+static int
+lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt)
+{
+    struct sk_buff *skb = vp_os_packet(pkt);
+    int hlen, pull_len;
+    struct vr_ip *iph;
+    struct tcphdr *tcph;
+
+    /*
+     * Pull enough of the header into the linear part of the skb to be
+     * able to inspect/modify the TCP header MSS value.
+     */
+    pull_len = pkt->vp_data - (skb_headroom(skb));
+    pull_len += sizeof(struct vr_ip);
+
+    if (!pskb_may_pull(skb, pull_len)) {
+        return VP_DROP_PULL; 
+    }
+
+    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+
+    if (iph->ip_proto != VR_IP_PROTO_TCP) {
+        goto out;
+    }
+
+    /*
+     * If this is a fragment and not the first one, it can be ignored
+     */
+    if (iph->ip_frag_off & htons(IP_OFFSET)) {
+        goto out;
+    }
+
+    hlen = iph->ip_hl * 4;
+    pull_len += (hlen - sizeof(struct vr_ip));
+    pull_len += sizeof(struct tcphdr);
+
+    if (!pskb_may_pull(skb, pull_len)) {
+        return VP_DROP_PULL;
+    }
+
+    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+    tcph = (struct tcphdr *) ((char *) iph +  hlen);
+
+    if ((tcph->doff << 2) <= (sizeof(struct tcphdr))) {
+        /*
+         * Nothing to do if there are no TCP options
+         */
+        return 0;
+    }
+
+    pull_len += ((tcph->doff << 2) - (sizeof(struct tcphdr)));
+
+    if (!pskb_may_pull(skb, pull_len)) {
+        return VP_DROP_PULL;
+    }
+
+    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+    tcph = (struct tcphdr *) ((char *) iph +  hlen);
+
+    lh_adjust_tcp_mss(tcph, skb);
+
+out:
+    lh_reset_skb_fields(pkt);
+
+    return 0;
+}
     
 /*
  * lh_reset_skb_fields - if the skb changes, possibley due to pskb_may_pull,
@@ -665,6 +831,8 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
             pull_len += sizeof(struct tcphdr);
         } else if (iph->ip_proto == VR_IP_PROTO_UDP) {
             pull_len += sizeof(struct udphdr);
+        } else if (iph->ip_proto == VR_IP_PROTO_ICMP) {
+            pull_len += sizeof(struct icmphdr);
         }
 
         if (frag_size < pull_len) {
@@ -676,6 +844,14 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
              * Account for TCP options
              */
             tcph = (struct tcphdr *) ((char *) iph +  hlen);
+
+            /*
+             * If SYN, send it to the slow path for possible TCP MSS adjust.
+             */
+            if (tcph->syn && vr_to_vm_mss_adj) {
+                goto slow_path;
+            }
+
             if ((tcph->doff << 2) > (sizeof(struct tcphdr))) {
                 pull_len += ((tcph->doff << 2) - (sizeof(struct tcphdr)));
 
@@ -783,6 +959,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
                 hdr_len += (VR_GRE_CKSUM_HDR_LEN - VR_GRE_BASIC_HDR_LEN);
             }
 
+            if (gre_hdr && (*gre_hdr & VR_GRE_FLAG_KEY)) {
+                hdr_len += (VR_GRE_KEY_HDR_LEN - VR_GRE_BASIC_HDR_LEN);
+            }
+
             if (pkt_headlen > hdr_len) {
                 /*
                  * If the packet has more than the GRE header in the linear part
@@ -809,7 +989,7 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
          */
         if (gre_hdr == NULL) {
             gre_hdr = (unsigned short *) pkt_data(pkt);
-            if (gre_hdr && (*gre_hdr & VR_GRE_FLAG_CSUM)) {
+            if (gre_hdr && (*gre_hdr & (VR_GRE_FLAG_CSUM | VR_GRE_FLAG_KEY))) {
                 goto slow_path;
             }
         }
@@ -846,6 +1026,13 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
             hdr_len += (VR_GRE_CKSUM_HDR_LEN - VR_GRE_BASIC_HDR_LEN);
         }
 
+        if (gre_hdr && (*gre_hdr & VR_GRE_FLAG_KEY)) {
+            hdr_len += (VR_GRE_KEY_HDR_LEN - VR_GRE_BASIC_HDR_LEN);
+            if (frag_size < hdr_len) {
+                goto slow_path;
+            }
+        }
+
         pull_len = hdr_len + VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
         iph = (struct vr_ip *) (va + hdr_len + VR_MPLS_HDR_LEN);
     } else {
@@ -875,6 +1062,8 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
             pull_len += sizeof(struct tcphdr);
         } else if (iph->ip_proto == VR_IP_PROTO_UDP) {
             pull_len += sizeof(struct udphdr);
+        } else if (iph->ip_proto == VR_IP_PROTO_ICMP) {
+            pull_len += sizeof(struct icmphdr);
         }
 
         if (frag_size < pull_len) {
@@ -886,6 +1075,14 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
              * Account for TCP options
              */
             tcph = (struct tcphdr *) ((char *) iph +  hlen);
+
+            /*
+             * If SYN, send it to the slow path for possible TCP MSS adjust.
+             */
+            if (tcph->syn && vr_to_vm_mss_adj) {
+                goto slow_path;
+            }
+
             if ((tcph->doff << 2) > (sizeof(struct tcphdr))) {
                 pull_len += ((tcph->doff << 2) - (sizeof(struct tcphdr)));
 
@@ -918,7 +1115,9 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
      * Verify the checksum if the NIC didn't already do it. Only verify the
      * checksum if the inner packet is TCP as we only do GRO for TCP (and
      * GRO requires that checksum has been verified). For all other protocols,
-     * we will let the guest verify the checksum.
+     * we will let the guest verify the checksum if the outer header is
+     * GRE. If the outer header is UDP, we will always verify the checksum
+     * of the outer packet and this covers the inner packet too.
      */
     if (!skb_csum_unnecessary(skb) && thdr_valid) {
         if (iph->ip_proto == VR_IP_PROTO_TCP) {
@@ -1053,6 +1252,8 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
             pull_len += sizeof(struct tcphdr);
         } else if (iph->ip_proto == VR_IP_PROTO_UDP) {
             pull_len += sizeof(struct udphdr);
+        } else if (iph->ip_proto == VR_IP_PROTO_ICMP) {
+            pull_len += sizeof(struct icmphdr);
         }
 
         if (!pskb_may_pull(skb, pull_len)) {
@@ -1110,6 +1311,11 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
              * unchanged from the time it is received by vrouter.
              */
             skb_push(skb, skb_pull_len);
+
+            if (tcph && vr_to_vm_mss_adj) {
+                lh_adjust_tcp_mss(tcph, skb);
+            }
+             
         } else {
             if (iph->ip_proto == VR_IP_PROTO_TCP && thdr_valid) {
                 tcpoff = (char *)tcph - (char *) skb->data;
@@ -1119,6 +1325,10 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                     goto cksum_err;
                 }
                 skb_push(skb, tcpoff);
+
+                if (vr_to_vm_mss_adj) {
+                    lh_adjust_tcp_mss(tcph, skb);
+                }
             }
         }
     }
@@ -1218,7 +1428,8 @@ struct host_os linux_host = {
     .hos_pull_inner_headers         =       lh_pull_inner_headers,
     .hos_pcow                       =       lh_pcow,
     .hos_pull_inner_headers_fast    =       lh_pull_inner_headers_fast,
-    .hos_get_udp_src_port           =       lh_get_udp_src_port
+    .hos_get_udp_src_port           =       lh_get_udp_src_port,
+    .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj
 };
     
 struct host_os *
@@ -1340,6 +1551,20 @@ static ctl_table vrouter_table[] =
     {
         .procname       = "r6",
         .data           = &vr_perfq3,
+        .maxlen         = sizeof(int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "from_vm_mss_adj",
+        .data           = &vr_from_vm_mss_adj,
+        .maxlen         = sizeof(int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "to_vm_mss_adj",
+        .data           = &vr_to_vm_mss_adj,
         .maxlen         = sizeof(int),
         .mode           = 0644,
         .proc_handler   = proc_dointvec,

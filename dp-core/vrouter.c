@@ -109,6 +109,8 @@ int vr_perfr1 = 0;   /* RPS after pulling inner headers */
 int vr_perfr2 = 1;   /* RPS after GRO on pkt1 interface */
 int vr_perfr3 = 1;   /* RPS from physical interface rx handler */
 int vr_perfp = 1;    /* pull inner headers, faster version */
+int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
+int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
 
 #else
 
@@ -116,6 +118,8 @@ int vr_perfr1 = 0;
 int vr_perfr2 = 0;
 int vr_perfr3 = 0;
 int vr_perfp = 0;
+int vr_from_vm_mss_adj = 1;
+int vr_to_vm_mss_adj = 1;
 
 #endif
 

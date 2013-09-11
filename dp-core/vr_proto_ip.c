@@ -174,8 +174,11 @@ vr_gre_input(struct vrouter *router, struct vr_packet *pkt,
     if (*gre_hdr & VR_GRE_FLAG_CSUM)
             hdr_len += 4;
 
+    if (*gre_hdr & VR_GRE_FLAG_KEY)
+            hdr_len += 4;
+
     /* we are not RFC 1701 compliant receiver */
-    if (*gre_hdr & ~VR_GRE_FLAG_CSUM)
+    if (*gre_hdr & (~(VR_GRE_FLAG_CSUM | VR_GRE_FLAG_KEY)))
             goto unhandled;
 
     /*

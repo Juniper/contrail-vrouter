@@ -800,7 +800,7 @@ linux_rx_handler(struct sk_buff **pskb)
     struct vrouter *router;
 
     /*
-     * If we did RPS immediately after packet was received from the
+     * If we did RPS immediately after the packet was received from the
      * physical interface (vr_perfr3 is set), we are now running on a
      * new core. Extract the vif information that was saved in the skb
      * on the previous core.
