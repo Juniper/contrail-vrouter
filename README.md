@@ -4,11 +4,13 @@ contrail-vrouter
 Contrail Virtual Router
 
 The Contrail Virtual Router implements the data-plane functionality that allows a virtual interface to be associated
-with a [VRF](http://en.wikipedia.org/wiki/Virtual_Routing_and_Forwarding). The implementation is split into a generic
-"dp-core" directory as well as a linux directory which interfaces with the Linux kernel.
+with a [VRF](http://en.wikipedia.org/wiki/Virtual_Routing_and_Forwarding).
 
-While currently only the only supported "hypervisor" is the linux kernel the intent is to be able to use the
-"dp-core" module in other configurations in the future.
+The Contrail Virtual Router is distributed under the terms of the BSD 2-Clause License and the GPLv2.
+
+The implementation is split into a generic "dp-core" directory used by
+multiple operating systems and OS-specific glue. The "linux" directory
+contains the Linux specific code.
 
 The code has been tested with both 2.6.32 and 3.0 kernel series and
 with both KVM and Xen as hypervisors.
