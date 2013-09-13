@@ -439,9 +439,6 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 
     /* 
      * header checksum 
-     *
-     * FIXME - this may not be needed if this is a GSO packet as 
-     * linux_xmit_segment will calculate the checksum.
      */
     ip->ip_csum = 0;
     ip->ip_csum = vr_ip_csum(ip);    

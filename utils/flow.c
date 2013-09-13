@@ -323,9 +323,17 @@ flow_validate(int flow_index, char action)
 
     memset(&flow_req, 0, sizeof(flow_req));
 
+    fe = flow_get(flow_index);
+
     flow_req.fr_op = FLOW_OP_FLOW_SET;
     flow_req.fr_index = flow_index;
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
+    flow_req.fr_flow_sip = fe->fe_key.key_src_ip;
+    flow_req.fr_flow_dip = fe->fe_key.key_dest_ip;
+    flow_req.fr_flow_proto = fe->fe_key.key_proto;
+    flow_req.fr_flow_sport = fe->fe_key.key_src_port;
+    flow_req.fr_flow_dport = fe->fe_key.key_dst_port;
+    flow_req.fr_flow_vrf = fe->fe_key.key_vrf_id;
 
     switch (action) {
     case 'd':
@@ -342,7 +350,6 @@ flow_validate(int flow_index, char action)
         break;
 
     case 'n':
-        fe = flow_get(flow_index);
         flow_req.fr_rindex = -1;
         flow_req.fr_action = VR_FLOW_ACTION_NAT;
 

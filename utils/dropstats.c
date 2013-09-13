@@ -1,6 +1,5 @@
 /*
- * dropstats.c -- I wanted the name to be pdrops, but figured that people
- * will not appreciate the humour when vrouter is droping p's 
+ * dropstats.c - drop statistics
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */

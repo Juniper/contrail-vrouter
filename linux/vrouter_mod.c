@@ -459,16 +459,6 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     lh_reset_skb_fields(pkt);
 
-    /*
-     * FIXME - The hash should include the ports in the inner packet if it is
-     * TCP/UDP. However, if the inner packet is a fragment, it may not have
-     * the L4 header if it is not the first fragment. To handle this case, 
-     * we will use the flow table index as an input to the hash if it is
-     * valid. In the future, we will implement an overflow hash table to 
-     * deal with IP fragments. When that happens, we will set the flow table
-     * index appropriately when an IP fragment is detected and it will
-     * be used as an input to jhash_3words() below.
-     */
     if (fmd->fmd_flow_index != -1) {
         flow_index = fmd->fmd_flow_index;
     }
@@ -514,11 +504,6 @@ lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb)
         return;
     }
 
-    /*
-     * At the moment, we only support one physical interface in vrouter.
-     * Need to listen for MTU changes when we support more than one interface
-     * in vrouter and pick the smallest MTU to set MSS.
-     */
     if (router->vr_eth_if == NULL) {
         return;
     }
@@ -875,12 +860,6 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
     lh_reset_skb_fields(pkt);
 
     /*
-     * FIXME - inner and outer IP header checksums should be verified
-     * by vrouter, if required. Also handle cases where skb->ip_summed
-     * is CHECKSUM_COMPLETE.
-     */
-
-    /*
      * Verify the checksum if the NIC didn't already do it. If the outer
      * header is UDP, it is expected that it contains a valid checksum, so
      * we don't need to verify the inner packet's checksum.
@@ -1106,12 +1085,6 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int *ret)
     lh_reset_skb_fields(pkt);
 
     /*
-     * FIXME - inner and outer IP header checksums should be verified
-     * by vrouter, if required. Also handle cases where skb->ip_summed
-     * is CHECKSUM_COMPLETE.
-     */
-
-    /*
      * Verify the checksum if the NIC didn't already do it. Only verify the
      * checksum if the inner packet is TCP as we only do GRO for TCP (and
      * GRO requires that checksum has been verified). For all other protocols,
@@ -1284,12 +1257,6 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
     }
 
     lh_reset_skb_fields(pkt);
-
-    /*
-     * FIXME - inner and outer IP header checksums should be verified
-     * by vrouter, if required. Also handle cases where skb->ip_summed
-     * is CHECKSUM_COMPLETE.
-     */
 
     /*
      * Verify the checksum if the NIC didn't already do it. Only verify the
@@ -1535,21 +1502,21 @@ static ctl_table vrouter_table[] =
         .proc_handler   = proc_dointvec,
     },
     {
-        .procname       = "r4",
+        .procname       = "q1",
         .data           = &vr_perfq1,
         .maxlen         = sizeof(int),
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
     {
-        .procname       = "r5",
+        .procname       = "q2",
         .data           = &vr_perfq2,
         .maxlen         = sizeof(int),
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
     {
-        .procname       = "r6",
+        .procname       = "q3",
         .data           = &vr_perfq3,
         .maxlen         = sizeof(int),
         .mode           = 0644,

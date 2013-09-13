@@ -22,11 +22,6 @@ pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
 {
     struct vr_packet *pkt_c;
     unsigned short head_space;
-    unsigned int check;
-
-    check = pkt->vp_data + off + len;
-    if (check > pkt->vp_tail)
-        return NULL;
 
     head_space = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
     pkt_c = vr_palloc(head_space + len);
@@ -35,7 +30,10 @@ pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
 
     pkt_c->vp_data += head_space;
     pkt_c->vp_tail += head_space;
-    memcpy(pkt_data(pkt_c), pkt_data(pkt) + off, len);
+    if (vr_pcopy(pkt_data(pkt_c), pkt, off, len) < 0) {
+        vr_pfree(pkt_c, VP_DROP_MISC);
+        return NULL;
+    }
     pkt_pull_tail(pkt_c, len);
 
     pkt_c->vp_if = pkt->vp_if;

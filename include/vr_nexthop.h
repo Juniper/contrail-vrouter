@@ -26,8 +26,6 @@ enum nexthop_type {
 
 #define NH_FLAG_VALID                   0x01
 #define NH_FLAG_POLICY_ENABLED          0x02
-/* TODO: maybe we should move these to types of NH? if you do, take
- * care of reducing the size of nh_flags */
 #define NH_FLAG_TUNNEL_GRE              0x04
 #define NH_FLAG_TUNNEL_UDP              0x08
 #define NH_FLAG_COMPOSITE_ECMP          0x10

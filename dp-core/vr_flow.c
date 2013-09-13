@@ -785,6 +785,15 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (!(flags & VR_FLOW_FLAG_ACTIVE))
         flow_delete = 1;
 
+    if ((unsigned int)req->fr_flow_sip != fe->fe_key.key_src_ip ||
+        (unsigned int)req->fr_flow_dip != fe->fe_key.key_dest_ip ||
+        (unsigned short)req->fr_flow_sport != fe->fe_key.key_src_port ||
+        (unsigned short)req->fr_flow_dport != fe->fe_key.key_dst_port||
+        (unsigned short)req->fr_flow_vrf != fe->fe_key.key_vrf_id ||
+        (unsigned char)req->fr_flow_proto != fe->fe_key.key_proto) {
+        return -EBADF;
+    }
+
     if (flags & VR_FLOW_FLAG_VRFT)
         if ((unsigned short)req->fr_flow_dvrf >= VR_MAX_VRFS ||
                 (unsigned short)req->fr_rflow_dvrf >= VR_MAX_VRFS)

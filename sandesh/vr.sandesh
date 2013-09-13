@@ -134,6 +134,12 @@ buffer sandesh vr_flow_req {
    24: i16          fr_rflow_mir_vrf;
    25: i16          fr_ecmp_nh_index;
    26: i16          fr_rflow_ecmp_nh_index;
+   27: i32          fr_flow_sip;
+   28: i32          fr_flow_dip;
+   29: i16          fr_flow_sport;
+   30: i16          fr_flow_dport;
+   31: byte         fr_flow_proto;
+   32: i16          fr_flow_vrf;
 }
 
 buffer sandesh vr_vrf_assign_req {

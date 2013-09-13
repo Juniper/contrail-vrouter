@@ -198,10 +198,6 @@ linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
      * for packets that need checksum help, checksum has to be
      * calculated here, since post fragmentation, checksum of
      * individual fragments will be wrong
-     *
-     * FIXME - we may not need to calculate checksum of inner packet if
-     * outer encap is UDP (as the UDP checksum will be calculated by
-     * the NIC and this should cover the inner packet too).
      */
     if (skb->ip_summed == CHECKSUM_PARTIAL) {
         if (skb_checksum_help(skb)) {
@@ -261,13 +257,13 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     struct vr_ip *iph;
     unsigned short iphlen;
     struct udphdr *udph;
+    netdev_features_t features;
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
             || type != VP_TYPE_IPOIP)
         return linux_xmit(vif, seg, type);
 
-    /* FIXME - this assumes MAC header length is ETH_HLEN */
     if (!pskb_may_pull(seg, ETH_HLEN + sizeof(struct vr_ip))) {
         goto exit_xmit;
     }
@@ -305,6 +301,13 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     } else if (iph->ip_proto == VR_IP_PROTO_GRE) {
         iph->ip_csum = 0;
         iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
+
+        features = netif_skb_features(seg);
+        if ((features & NETIF_F_HW_CSUM) == 0) {
+            if (seg->ip_summed == CHECKSUM_PARTIAL) {
+                skb_checksum_help(seg);
+            }
+        }
     }
 
     return linux_xmit(vif, seg, type);
@@ -381,11 +384,7 @@ linux_gso_xmit(struct vr_interface *vif, struct sk_buff *skb,
     }
 
     /*
-     * avoid fragmentation after segmentation. please note that this
-     * can potentially lead to duplicate IP id problem, since we are
-     * messing with protocol stack's idea of the number of segments for
-     * a given GSO size to accomodate our tunnel headers,  one that was
-     * deemed OK for the time being.
+     * avoid fragmentation after segmentation. 
      */ 
     if (seg_size > ndev->mtu + ndev->hard_header_len) {
         skb_shinfo(skb)->gso_size -= (seg_size - ndev->mtu -
@@ -489,8 +488,6 @@ linux_get_rxq(struct sk_buff *skb, u16 *rxq, unsigned int curr_cpu,
 /*
  * linux_enqueue_pkt_for_gro - enqueue packet on a list of skbs and schedule a
  * NAPI event on the NAPI structure of the vif.
- *
- * FIXME - the length of this queue needs to be bounded.
  *
  */
 void
@@ -1221,7 +1218,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     struct vr_interface *vif;
     struct sk_buff *skb = *pskb;
     struct vr_packet *pkt;
-    struct vrouter *router = vrouter_get(0);   // FIXME
+    struct vrouter *router = vrouter_get(0);  
 
     label = ntohl(*((unsigned int *) skb_mac_header(skb)));
     label >>= VR_MPLS_LABEL_SHIFT;
@@ -1271,7 +1268,7 @@ pkt_rps_dev_rx_handler(struct sk_buff **pskb)
     unsigned int label;
     struct vr_nexthop *nh;
     struct vr_interface *vif;
-    struct vrouter *router = vrouter_get(0);   // FIXME
+    struct vrouter *router = vrouter_get(0);  
 
     if (vr_perfr3) {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
