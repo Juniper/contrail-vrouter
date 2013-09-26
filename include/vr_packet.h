@@ -171,7 +171,6 @@ struct vr_packet {
 
 struct vr_packet_node {
     struct vr_list_node pl_node;
-    unsigned int pl_cpu;
     unsigned short pl_proto;
     struct vr_packet *pl_packet;
 };

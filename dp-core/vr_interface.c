@@ -620,6 +620,10 @@ static struct vr_interface_driver {
         .drv_add        =   vhost_drv_add,
         .drv_delete     =   vhost_drv_del,
     },
+    [VIF_TYPE_GATEWAY] = {
+        .drv_add        =   vhost_drv_add,
+        .drv_delete     =   vhost_drv_del,
+    },
     [VIF_TYPE_AGENT] = {
         .drv_add        =   agent_drv_add,
         .drv_delete     =   agent_drv_del,

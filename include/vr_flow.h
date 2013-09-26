@@ -22,6 +22,7 @@
 #define VR_FLOW_FLAG_MIRROR     0x2000
 #define VR_FLOW_FLAG_VRFT       0x4000
 #define VR_FLOW_FLAG_UNUSABLE   0x8000
+#define VR_FLOW_FLAG_FLUSH      0x0800
 
 /* rest of the flags are action specific */
 
@@ -95,12 +96,13 @@ struct vr_flow_entry {
 
 #define VR_DNS_SERVER_PORT  htons(53)
 
-struct vr_flow_work {
-    unsigned int flow_index;
-    struct vrouter *router;
+struct vr_flow_defer_data {
+    unsigned int def_index;
+    unsigned short def_action;
 };
 
 struct vr_packet;
+struct vrouter;
 
 extern int vr_flow_init(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);

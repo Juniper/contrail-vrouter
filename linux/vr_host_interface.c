@@ -1049,8 +1049,7 @@ linux_if_get_settings(struct vr_interface *vif,
 static int
 linux_if_del(struct vr_interface *vif)
 {
-    if (vif->vif_type == VIF_TYPE_HOST ||
-            vif->vif_type == VIF_TYPE_XEN_LL_HOST)
+    if (vif_is_vhost(vif))
         vhost_if_del((struct net_device *)vif->vif_os);
 
     if (vif->vif_type == VIF_TYPE_VIRTUAL) {
@@ -1080,8 +1079,7 @@ linux_if_add(struct vr_interface *vif)
         vif->vif_os = (void *)dev;
     }
 
-    if (vif->vif_type == VIF_TYPE_HOST ||
-            vif->vif_type == VIF_TYPE_XEN_LL_HOST)
+    if (vif_is_vhost(vif))
         vhost_if_add(vif);
 
     if (vif->vif_type == VIF_TYPE_VIRTUAL) {

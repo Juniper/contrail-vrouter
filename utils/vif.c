@@ -39,6 +39,7 @@
 #define PHYSICAL_TYPE_STRING    "physical"
 #define VIRTUAL_TYPE_STRING     "virtual"
 #define XEN_LL_TYPE_STRING      "xenll"
+#define GATEWAY_TYPE_STRING     "gateway"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
@@ -74,6 +75,8 @@ vr_get_if_type_string(int t)
         return "Virtual";
     case VIF_TYPE_XEN_LL_HOST:
         return "XenLL";
+    case VIF_TYPE_GATEWAY:
+        return "Gateway";
     default:
         return "Invalid";
     }
@@ -99,6 +102,9 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, XEN_LL_TYPE_STRING,
                 strlen(XEN_LL_TYPE_STRING)))
         return VIF_TYPE_XEN_LL_HOST;
+    else if (!strncmp(type_str, GATEWAY_TYPE_STRING,
+                strlen(GATEWAY_TYPE_STRING)))
+        return VIF_TYPE_GATEWAY;
     else
         Usage();
 

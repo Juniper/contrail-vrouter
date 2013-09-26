@@ -39,6 +39,9 @@ extern int vr_to_vm_mss_adj;
     ((struct_type *)((unsigned long)pointer - \
                 (size_t)&(((struct_type *)0)->member)))
 
+
+typedef void(*vr_defer_cb)(struct vrouter *router, void *user_data);
+
 struct vr_ip;
 
 struct host_os {
@@ -64,6 +67,9 @@ struct host_os {
     unsigned int (*hos_get_cpu)(void);
     void (*hos_schedule_work)(unsigned int, void (*)(void *), void *);
     void (*hos_delay_op)(void);
+    void (*hos_defer)(struct vrouter *, vr_defer_cb, void *);
+    void *(*hos_get_defer_data)(unsigned int);
+    void (*hos_put_defer_data)(void *);
     void (*hos_get_time)(unsigned int*, unsigned int *);
     void *(*hos_network_header)(struct vr_packet *);
     void *(*hos_inner_network_header)(struct vr_packet *);
@@ -80,35 +86,38 @@ struct host_os {
     int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *);
 };
 
-#define vr_malloc               vrouter_host->hos_malloc
-#define vr_zalloc               vrouter_host->hos_zalloc
-#define vr_free                 vrouter_host->hos_free
-#define vr_vtop                 vrouter_host->hos_vtop
-#define vr_page_alloc           vrouter_host->hos_page_alloc
-#define vr_page_free            vrouter_host->hos_page_free
-#define vr_palloc               vrouter_host->hos_palloc
-#define vr_palloc_head          vrouter_host->hos_palloc_head
-#define vr_pexpand_head          vrouter_host->hos_pexpand_head
-#define vr_pfree                vrouter_host->hos_pfree
-#define vr_pclone               vrouter_host->hos_pclone
-#define vr_preset               vrouter_host->hos_preset
-#define vr_pcopy                vrouter_host->hos_pcopy
-#define vr_pfrag_len            vrouter_host->hos_pfrag_len
-#define vr_phead_len            vrouter_host->hos_phead_len
-#define vr_pset_data            vrouter_host->hos_pset_data
-#define vr_get_cpu              vrouter_host->hos_get_cpu
-#define vr_schedule_work        vrouter_host->hos_schedule_work
-#define vr_delay_op             vrouter_host->hos_delay_op
-#define vr_get_time             vrouter_host->hos_get_time
-#define vr_network_header       vrouter_host->hos_network_header
-#define vr_inner_network_header vrouter_host->hos_inner_network_header
-#define vr_data_at_offset       vrouter_host->hos_data_at_offset
-#define vr_pheader_pointer      vrouter_host->hos_pheader_pointer
-#define vr_pull_inner_headers   vrouter_host->hos_pull_inner_headers
-#define vr_pcow                 vrouter_host->hos_pcow
-#define vr_pull_inner_headers_fast vrouter_host->hos_pull_inner_headers_fast
-#define vr_get_udp_src_port     vrouter_host->hos_get_udp_src_port
-#define vr_pkt_from_vm_tcp_mss_adj vrouter_host->hos_pkt_from_vm_tcp_mss_adj
+#define vr_malloc                       vrouter_host->hos_malloc
+#define vr_zalloc                       vrouter_host->hos_zalloc
+#define vr_free                         vrouter_host->hos_free
+#define vr_vtop                         vrouter_host->hos_vtop
+#define vr_page_alloc                   vrouter_host->hos_page_alloc
+#define vr_page_free                    vrouter_host->hos_page_free
+#define vr_palloc                       vrouter_host->hos_palloc
+#define vr_palloc_head                  vrouter_host->hos_palloc_head
+#define vr_pexpand_head                 vrouter_host->hos_pexpand_head
+#define vr_pfree                        vrouter_host->hos_pfree
+#define vr_pclone                       vrouter_host->hos_pclone
+#define vr_preset                       vrouter_host->hos_preset
+#define vr_pcopy                        vrouter_host->hos_pcopy
+#define vr_pfrag_len                    vrouter_host->hos_pfrag_len
+#define vr_phead_len                    vrouter_host->hos_phead_len
+#define vr_pset_data                    vrouter_host->hos_pset_data
+#define vr_get_cpu                      vrouter_host->hos_get_cpu
+#define vr_schedule_work                vrouter_host->hos_schedule_work
+#define vr_delay_op                     vrouter_host->hos_delay_op
+#define vr_defer                        vrouter_host->hos_defer
+#define vr_get_defer_data               vrouter_host->hos_get_defer_data
+#define vr_put_defer_data               vrouter_host->hos_put_defer_data
+#define vr_get_time                     vrouter_host->hos_get_time
+#define vr_network_header               vrouter_host->hos_network_header
+#define vr_inner_network_header         vrouter_host->hos_inner_network_header
+#define vr_data_at_offset               vrouter_host->hos_data_at_offset
+#define vr_pheader_pointer              vrouter_host->hos_pheader_pointer
+#define vr_pull_inner_headers           vrouter_host->hos_pull_inner_headers
+#define vr_pcow                         vrouter_host->hos_pcow
+#define vr_pull_inner_headers_fast      vrouter_host->hos_pull_inner_headers_fast
+#define vr_get_udp_src_port             vrouter_host->hos_get_udp_src_port
+#define vr_pkt_from_vm_tcp_mss_adj      vrouter_host->hos_pkt_from_vm_tcp_mss_adj
 
 struct vrouter {
     unsigned int vr_num_if;

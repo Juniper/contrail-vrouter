@@ -426,7 +426,8 @@ vr_should_proxy(struct vr_interface *vif, unsigned int dip,
         return true;
     }
 
-    if (vif->vif_type == VIF_TYPE_XEN_LL_HOST)
+    if (vif->vif_type == VIF_TYPE_XEN_LL_HOST ||
+            vif->vif_type == VIF_TYPE_GATEWAY)
         return true;
 
     /* rest of the cases are for type physical & vhost */

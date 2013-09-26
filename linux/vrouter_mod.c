@@ -49,6 +49,13 @@ struct work_arg {
     void *wa_arg;
 };
 
+struct rcu_cb_data {
+    struct rcu_head rcd_rcu;
+    vr_defer_cb rcd_user_cb;
+    struct vrouter *rcd_router;
+    unsigned char rcd_user_data[0];
+};
+
 extern int vrouter_init(void);
 extern void vrouter_exit(bool);
 extern int vr_genetlink_init(void);
@@ -383,6 +390,61 @@ lh_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
      */
     offset = pkt->vp_data - (skb->data - skb->head);
     return skb_header_pointer(skb, offset, hdr_len, buf);
+}
+
+static void
+rcu_cb(struct rcu_head *rh)
+{
+    struct rcu_cb_data *cb_data = (struct rcu_cb_data *)rh;
+
+    /* Call the user call back */
+    cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
+    lh_free(cb_data);
+
+    return;
+}
+
+static void
+lh_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
+{
+    struct rcu_cb_data *cb_data;
+
+    cb_data = container_of(data, struct rcu_cb_data, rcd_user_data);
+    cb_data->rcd_user_cb = user_cb;
+    cb_data->rcd_router = router;
+    call_rcu(&cb_data->rcd_rcu, rcu_cb);
+
+    return;
+}
+
+static void *
+lh_get_defer_data(unsigned int len)
+{
+    struct rcu_cb_data *cb_data;
+
+    if (!len)
+        return NULL;
+
+    cb_data = lh_malloc(sizeof(*cb_data) + len);
+    if (!cb_data) {
+        return NULL;
+    }
+
+    return cb_data->rcd_user_data;
+}
+
+static void
+lh_put_defer_data(void *data)
+{
+    struct rcu_cb_data *cb_data;
+
+    if (!data)
+        return;
+
+    cb_data = container_of(data, struct rcu_cb_data, rcd_user_data);
+    lh_free(cb_data);
+
+    return;
 }
 
 static int
@@ -1386,6 +1448,9 @@ struct host_os linux_host = {
     .hos_get_cpu                    =       lh_get_cpu,
     .hos_schedule_work              =       lh_schedule_work,
     .hos_delay_op                   =       lh_delay_op,
+    .hos_defer                      =       lh_defer,
+    .hos_get_defer_data             =       lh_get_defer_data,
+    .hos_put_defer_data             =       lh_put_defer_data,
     .hos_get_time                   =       lh_get_time,
 
     .hos_network_header             =       lh_network_header,
@@ -1396,7 +1461,7 @@ struct host_os linux_host = {
     .hos_pcow                       =       lh_pcow,
     .hos_pull_inner_headers_fast    =       lh_pull_inner_headers_fast,
     .hos_get_udp_src_port           =       lh_get_udp_src_port,
-    .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj
+    .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj,
 };
     
 struct host_os *
@@ -1572,7 +1637,7 @@ vrouter_linux_exit(void)
     vr_message_exit();
     vr_mem_exit();
     vrouter_exit(false);
-
+    rcu_barrier();
     return;
 }
 
