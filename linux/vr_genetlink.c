@@ -9,6 +9,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/netlink.h>
 #include <linux/genetlink.h>
+#include <linux/version.h>
 
 #include <net/genetlink.h>
 
@@ -88,6 +89,7 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
     struct nlattr *nla;
     struct vr_message request, *response;
     struct sk_buff *skb;
+    uint32_t netlink_id;
 
     if (!aap || !(nla = aap[NL_ATTR_VR_MESSAGE_PROTOCOL]))
         return -EINVAL;
@@ -110,8 +112,12 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
         len = response->vr_message_len;
         len += GENL_HDRLEN + NLA_HDRLEN;
         len = NLMSG_ALIGN(len);
-
-        rep = __nlmsg_put(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,10))
+        netlink_id =  NETLINK_CB(in_skb).pid;
+#else
+        netlink_id =  NETLINK_CB(in_skb).portid;
+#endif
+        rep = __nlmsg_put(skb, netlink_id, nlh->nlmsg_seq,
                         nlh->nlmsg_type, len, multi_flag);
         genlh = nlmsg_data(rep);
         memcpy(genlh, info->genlhdr, sizeof(*genlh));
@@ -120,8 +126,7 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
         nla->nla_len = response->vr_message_len;
         nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
 
-        netlink_unicast(in_skb->sk, skb,
-                        NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
+        netlink_unicast(in_skb->sk, skb, netlink_id, MSG_DONTWAIT);
 
         response->vr_message_buf = NULL;
         vr_message_free(response);
@@ -132,10 +137,8 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
         if (!skb)
             return 0;
 
-        __nlmsg_put(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
-                                                NLMSG_DONE, 0, 0);
-        netlink_unicast(in_skb->sk, skb,
-                        NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
+        __nlmsg_put(skb, netlink_id, nlh->nlmsg_seq, NLMSG_DONE, 0, 0);
+        netlink_unicast(in_skb->sk, skb, netlink_id, MSG_DONTWAIT);
     }
 
 
