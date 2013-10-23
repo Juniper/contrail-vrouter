@@ -313,7 +313,14 @@ __mtrie_add(struct ip4_mtrie *mtrie, struct vr_route_req *rt)
              * cover all the indices for which this route is the best
              * prefix match
              */
-             fin = 1 << (ip4_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+            if ((rt->rtr_req.rtr_prefix_len >
+                        (ip4_bkt_info[level].bi_pfx_len - ip4_bkt_info[level].bi_bits)) &&
+                    (rt->rtr_req.rtr_prefix_len <= ip4_bkt_info[level].bi_pfx_len)) {
+                fin = 1 << (ip4_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+            } else {
+                fin = ip4_bkt_info[level].bi_size;
+            }
+
              fin += index;
              if (fin > ip4_bkt_info[level].bi_size)
                  fin = ip4_bkt_info[level].bi_size;
@@ -396,7 +403,14 @@ __mtrie_delete(struct vr_route_req *rt, struct ip4_bucket_entry *ent,
         tmp_ent = index_to_entry(bkt, index);
         __mtrie_delete(rt, tmp_ent, level + 1);
     } else {
-         fin = 1 << (ip4_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+        if ((rt->rtr_req.rtr_prefix_len >
+                (ip4_bkt_info[level].bi_pfx_len - ip4_bkt_info[level].bi_bits)) &&
+                (rt->rtr_req.rtr_prefix_len <= ip4_bkt_info[level].bi_pfx_len)) {
+            fin = 1 << (ip4_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+        } else {
+            fin = ip4_bkt_info[level].bi_size;
+        }
+
          fin += index;
          if (fin > ip4_bkt_info[level].bi_size)
              fin = ip4_bkt_info[level].bi_size;
@@ -408,6 +422,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip4_bucket_entry *ent,
                 set_entry_to_nh(tmp_ent, rt->rtr_nh);
                 tmp_ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
                 tmp_ent->entry_label = rt->rtr_req.rtr_label;
+                tmp_ent->entry_prefix_len = rt->rtr_req.rtr_replace_plen;
             } else 
                 __mtrie_delete(rt, tmp_ent, level + 1);
         }
@@ -417,9 +432,11 @@ __mtrie_delete(struct vr_route_req *rt, struct ip4_bucket_entry *ent,
     for (i = 1; i < ip4_bkt_info[level].bi_size; i++) {
         if ((bkt->bkt_data[i].entry_long_i == bkt->bkt_data[0].entry_long_i) &&
                 (bkt->bkt_data[i].entry_label_flags ==
-                 bkt->bkt_data[0].entry_label_flags) &&
-                    (bkt->bkt_data[i].entry_label ==
-                     bkt->bkt_data[0].entry_label)) {
+                	bkt->bkt_data[0].entry_label_flags) &&
+                (bkt->bkt_data[i].entry_label ==
+                	bkt->bkt_data[0].entry_label) && 
+                (bkt->bkt_data[i].entry_prefix_len == 
+			bkt->bkt_data[0].entry_prefix_len)) {
             continue;
         } else
             return 0;
@@ -443,8 +460,7 @@ mtrie_dumper_route_encode(struct vr_message_dumper *dumper, vr_route_req *resp)
 
 static void
 mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
-        struct ip4_bucket_entry *ent, unsigned int prefix,
-        unsigned int prefix_len)
+        struct ip4_bucket_entry *ent, unsigned int prefix, unsigned int prefix_len)
 {
     vr_route_req *req = (vr_route_req *)dumper->dump_req;
 
@@ -457,6 +473,9 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
     resp->rtr_label = ent->entry_label;
     resp->rtr_nh_id = ent->entry_nh_p->nh_id;
     resp->rtr_rt_type = RT_UCAST;
+    resp->rtr_mac_size = 0;
+    resp->rtr_mac = NULL;
+    resp->rtr_replace_plen = ent->entry_prefix_len;
 
     return;
 }
@@ -631,8 +650,16 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_discards += stats->vrf_discards;
             response->vsr_resolves += stats->vrf_resolves;
             response->vsr_receives += stats->vrf_receives;
-            response->vsr_tunnels  += stats->vrf_tunnels;
-            response->vsr_composites += stats->vrf_composites;
+            response->vsr_ecmp_composites += stats->vrf_ecmp_composites;
+            response->vsr_l3_mcast_composites += stats->vrf_l3_mcast_composites;
+            response->vsr_l2_mcast_composites += stats->vrf_l2_mcast_composites;
+            response->vsr_fabric_composites += stats->vrf_fabric_composites;
+            response->vsr_multi_proto_composites +=
+                stats->vrf_multi_proto_composites;
+            response->vsr_udp_tunnels  += stats->vrf_udp_tunnels;
+            response->vsr_udp_mpls_tunnels  += stats->vrf_udp_mpls_tunnels;
+            response->vsr_gre_mpls_tunnels  += stats->vrf_gre_mpls_tunnels;
+            response->vsr_l2_encaps += stats->vrf_l2_encaps;
             response->vsr_encaps += stats->vrf_encaps;
         }
     }
@@ -641,11 +668,14 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
 }
 
 static bool
-mtrie_stats_empty(vr_vrf_stats_req *response)
+mtrie_stats_empty(vr_vrf_stats_req *r)
 {
-    if (response->vsr_discards || response->vsr_resolves ||
-            response->vsr_receives || response->vsr_tunnels ||
-            response->vsr_composites || response->vsr_encaps)
+    if (r->vsr_discards || r->vsr_resolves || r->vsr_receives || 
+            r->vsr_ecmp_composites || r->vsr_l3_mcast_composites ||
+            r->vsr_l2_mcast_composites || r->vsr_fabric_composites ||
+            r->vsr_multi_proto_composites || r->vsr_udp_tunnels || 
+            r->vsr_udp_mpls_tunnels || r->vsr_gre_mpls_tunnels || 
+            r->vsr_l2_encaps || r->vsr_encaps)
         return false;
 
     return true;
@@ -768,6 +798,13 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
     if (!rt->rtr_nh)
         return -ENOENT;
+
+
+    if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
+                 (rt->rtr_nh->nh_type == NH_TUNNEL)) {
+        vrouter_put_nexthop(rt->rtr_nh);
+        return -EINVAL;
+    }
     ret = __mtrie_add(mtrie, rt);
     vrouter_put_nexthop(rt->rtr_nh);
     return ret;

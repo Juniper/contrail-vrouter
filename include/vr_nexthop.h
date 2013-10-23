@@ -21,17 +21,27 @@ enum nexthop_type {
     NH_RESOLVE,
     NH_DISCARD,
     NH_COMPOSITE,
+    NH_VXLAN_VRF,
     NH_MAX,
 };
 
-#define NH_FLAG_VALID                   0x01
-#define NH_FLAG_POLICY_ENABLED          0x02
-#define NH_FLAG_TUNNEL_GRE              0x04
-#define NH_FLAG_TUNNEL_UDP              0x08
-#define NH_FLAG_COMPOSITE_ECMP          0x10
-#define NH_FLAG_COMPOSITE_MCAST         0x20
-#define NH_FLAG_ENCAP_MCAST             0x40
-#define NH_FLAG_TUNNEL_UDP_MPLS         0x80
+#define NH_FLAG_VALID                       0x0001
+#define NH_FLAG_POLICY_ENABLED              0x0002
+#define NH_FLAG_ENCAP_L2                    0x0004
+#define NH_FLAG_TUNNEL_GRE                  0x0008
+#define NH_FLAG_TUNNEL_UDP                  0x0010
+/*
+ * Mcast flag can be appended to any type of nexthop, either an Encap,
+ * composite etc
+ */
+#define NH_FLAG_MCAST                       0x0020
+#define NH_FLAG_TUNNEL_UDP_MPLS             0x0040
+#define NH_FLAG_COMPOSITE_ECMP              0x0080
+#define NH_FLAG_COMPOSITE_L2                0x0100
+#define NH_FLAG_COMPOSITE_L3                0x0200
+#define NH_FLAG_COMPOSITE_FABRIC            0x0400
+#define NH_FLAG_COMPOSITE_MULTI_PROTO       0x0800
+#define NH_FLAG_TUNNEL_VXLAN                0x1000
 
 struct vr_packet;
 struct vr_forwarding_md;
@@ -43,6 +53,11 @@ struct vr_component_nh {
 
 struct vr_nexthop {
     __u8            nh_type;
+    /*
+     * nh_family is going to be AF_INET for L3 nexthops, AF_BRIDGE for L2
+     * nexthops and AF_UNSPEC for composite multiprotocol nexthops. For
+     * an eg, an L2 Encap nexthop would contail family as AF_BRIDGE
+     */
     __u8            nh_family;
     __u16           nh_flags;
     int             nh_vrf;
@@ -72,10 +87,13 @@ struct vr_nexthop {
          struct {
             unsigned short cnt;
             struct vr_component_nh *component;
+            int (*cnh_validate_src)(unsigned short vrf, struct vr_packet *,
+                    struct vr_nexthop *, struct vr_forwarding_md *);
          } nh_composite;
 
     } nh_u;
 
+    __u16               nh_data_size;
     struct vrouter      *nh_router;
     int                 (*nh_reach_nh)(unsigned short vrf, 
                                        struct vr_packet *,
@@ -98,6 +116,7 @@ struct vr_nexthop {
 #define nh_udp_tun_encap_len    nh_u.nh_udp_tun.tun_encap_len
 #define nh_component_cnt        nh_u.nh_composite.cnt
 #define nh_component_nh         nh_u.nh_composite.component
+#define nh_validate_src         nh_u.nh_composite.cnh_validate_src
 
 extern int vr_nexthop_init(struct vrouter *);
 extern void vr_nexthop_exit(struct vrouter *, bool);
@@ -110,6 +129,10 @@ extern int nh_output(unsigned short, struct vr_packet *,
 extern int vr_nexthop_add(vr_nexthop_req *);
 extern int vr_nexthop_get(vr_nexthop_req *);
 extern int vr_nexthop_dump(vr_nexthop_req *);
+
+extern struct vr_nexthop *vr_discard_nh;
+
+extern struct vr_nexthop *vr_discard_nh;
 
 #ifdef __cplusplus
 }

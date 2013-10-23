@@ -5,82 +5,90 @@
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include <vr_mcast.h>
+#include <vr_htable.h>
 
-struct mcast_entry {
+struct vr_mcast_entry_key {
     unsigned int src_ip; /* In network byte order */
     unsigned int dst_ip; /* This too */
-    struct vr_nexthop *nh;
-    struct mcast_entry *next;
-};
+    unsigned short vrf_id;
+}__attribute__((packed));
 
-typedef vr_itable_t mcast_tbl_t;
-static mcast_tbl_t *vn_rtable;
+struct vr_dummy_mcast_entry {
+    struct vr_mcast_entry_key key;
+    struct vr_nexthop *nh;
+    unsigned short flags;
+}__attribute__((packed));
+#define VR_MCAST_ENTRY_PACK (32 - sizeof(struct vr_dummy_mcast_entry))
+
+struct vr_mcast_entry {
+    struct vr_mcast_entry_key key;
+    struct vr_nexthop *nh;
+    unsigned short flags;
+    unsigned short pack[VR_MCAST_ENTRY_PACK];
+}__attribute__((packed));
+
+#define VR_DEF_MCAST_ENTRIES          (1 * 1024)
+#define VR_DEF_MCAST_OENTRIES         (512)
+#define VR_MCAST_FLAG_VALID           1
+
+unsigned int vr_mcast_entries = VR_DEF_MCAST_ENTRIES;
+unsigned int vr_mcast_oentries = VR_DEF_MCAST_OENTRIES;
+
+static vr_htable_t vn_rtable;
 extern struct vr_nexthop *ip4_default_nh;
 
-static mcast_tbl_t
-vrfid_to_mcast_tbl(unsigned int id)
+static bool
+mcast_entry_valid(vr_htable_t htable, vr_hentry_t hentry,
+                                              unsigned int index)
 {
-    if (id >= VR_MAX_VRFS)
+    struct vr_mcast_entry *ent = (struct vr_mcast_entry *)hentry;
+    if (!htable || !ent)
+        return false;
+
+    if (ent->flags & VR_MCAST_FLAG_VALID)
+        return true;
+
+    return false;
+}
+
+struct vr_mcast_entry *
+vr_find_mcast_entry(struct vr_mcast_entry_key *key)
+{
+    if (!vn_rtable || !key)
         return NULL;
 
-    return vn_rtable[id];
+    return vr_find_hentry(vn_rtable, key, NULL);
 }
 
-static mcast_tbl_t
-mcast_table_alloc_vrf(unsigned int vrf_id)
+struct vr_mcast_entry *
+vr_find_free_mcast_entry(struct vr_mcast_entry_key *key)
 {
-    mcast_tbl_t table;
 
-    /* Create an index table of 12 bits with 3 strides */
-    table = vr_itable_create(MCAST_INDEX_LEN, 3, 4, 4, 4);
-    if (table) {
-        vn_rtable[vrf_id] = table;
-    }
+    if (!vn_rtable || !key)
+        return NULL;
 
-    return table;
-}
-
-static struct mcast_entry *
-mcast_lookup_in_hash_bucket(struct mcast_entry *head, struct vr_route_req *rt)
-{
-    struct mcast_entry *ent;
-
-    ent = head;
-    while (ent) {
-        if ((ent->src_ip == (unsigned int)rt->rtr_req.rtr_src) &&
-                (ent->dst_ip == (unsigned int)rt->rtr_req.rtr_prefix)) {
-            return ent;
-        }
-        ent = ent->next;
-    }
-
-    return NULL;
+    return vr_find_free_hentry(vn_rtable, key, NULL);
 }
 
 static struct vr_nexthop *
 mcast_lookup(unsigned int vrf_id, struct vr_route_req *rt,
         struct vr_packet *pkt) 
 {
-    mcast_tbl_t table = vrfid_to_mcast_tbl(vrf_id);
-    unsigned int hash;
-    struct mcast_entry *ent;
+    struct vr_mcast_entry *ent;
+    struct vr_mcast_entry_key key;
 
-    if (!table)
-        return NULL;
+    key.vrf_id = rt->rtr_req.rtr_vrf_id;
+    key.src_ip = rt->rtr_req.rtr_src;
+    key.dst_ip = rt->rtr_req.rtr_prefix;
 
-    hash = vr_hash_3words(rt->rtr_req.rtr_src, rt->rtr_req.rtr_prefix, 0, 0);
-    hash %= MCAST_HASH_SIZE;
-
-    ent = vr_itable_get(table, hash);
-    if (!ent) {
-        return NULL;
+    ent = vr_find_mcast_entry(&key);
+    if (ent) {
+        rt->rtr_req.rtr_label_flags = ent->flags;
+        rt->rtr_nh = ent->nh;
+        return ent->nh;
     }
 
-    ent = mcast_lookup_in_hash_bucket(ent, rt);
-    if (!ent)
-        return NULL;
-
-    return ent->nh;
+    return NULL;
 }
 
 static int
@@ -88,193 +96,130 @@ mcast_get(unsigned int vrf_id, struct vr_route_req *rt)
 {
     struct vr_nexthop *nh;
 
+    rt->rtr_req.rtr_nh_id = NH_DISCARD_ID;
     nh = mcast_lookup(vrf_id, rt, NULL);
     if (nh)
         rt->rtr_req.rtr_nh_id = nh->nh_id;
-    else
-        rt->rtr_req.rtr_nh_id = -1;
     return 0;
 }
 
-
-static int
-__mcast_delete(mcast_tbl_t table, struct vr_route_req *rt)
-{
-    unsigned int hash;
-    struct mcast_entry *ent;
-    struct mcast_entry *prev;
-
-    hash = vr_hash_3words(rt->rtr_req.rtr_src, rt->rtr_req.rtr_prefix, 0, 0);
-    hash %= MCAST_HASH_SIZE;
-
-    ent = vr_itable_get(table, hash);
-    if (!ent) {
-        return -ENOENT;
-    }
-
-    prev = NULL;
-    while(ent) {
-        if ((ent->src_ip == (unsigned int)rt->rtr_req.rtr_src) &&
-                (ent->dst_ip == (unsigned int)rt->rtr_req.rtr_prefix)) {
-            break;
-        }
-
-        prev = ent;
-        ent = ent->next;
-    }
-
-    if (!ent) {
-        return -ENOENT;
-    }
-
-    /* 
-     * Delete the entry now. Ensure that ent is delinked 
-     */
-    if (prev) {
-        prev->next = ent->next;
-    } else {
-        if (vr_itable_set(table, hash, ent->next) == VR_ITABLE_ERR_PTR) {
-            return -1;
-        }
-    }
-    ent->next = NULL;
-
-    /* Let everyone see this */
-    vr_delay_op();
-
-    /* Delete now */
-    vrouter_put_nexthop(ent->nh);
-    vr_free(ent);
-
-    return 0;
-}
 
 static int
 mcast_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
-    unsigned int vrf_id = rt->rtr_req.rtr_vrf_id;
-    mcast_tbl_t table = vrfid_to_mcast_tbl(vrf_id);
+    struct vr_mcast_entry *ent;
+    struct vr_mcast_entry_key key;
 
-    if (!table)
+    key.vrf_id = rt->rtr_req.rtr_vrf_id;
+    key.src_ip = rt->rtr_req.rtr_src;
+    key.dst_ip = rt->rtr_req.rtr_prefix;
+   
+    ent = vr_find_mcast_entry(&key);
+    if (!ent)
         return -ENOENT;
 
-    return __mcast_delete(table, rt);
+    ent->flags &= ~VR_MCAST_FLAG_VALID;
+    vr_delay_op();
+    vrouter_put_nexthop(ent->nh);
+    ent->nh = NULL;
+    return 0;
 }
 
 static int
-__mcast_add(mcast_tbl_t table, struct vr_route_req *rt) 
+__mcast_add(struct vr_route_req *rt) 
 {
-    struct vr_nexthop *nh;
-    unsigned int hash;
-    struct mcast_entry *ent;
-    struct mcast_entry *head;
+    struct vr_nexthop *old_nh;
+    struct vr_mcast_entry *ent;
+    struct vr_mcast_entry_key key;
 
-    hash = vr_hash_3words(rt->rtr_req.rtr_src, rt->rtr_req.rtr_prefix, 0, 0);
-    hash %= MCAST_HASH_SIZE;
+    key.vrf_id = rt->rtr_req.rtr_vrf_id;
+    key.src_ip = rt->rtr_req.rtr_src;
+    key.dst_ip = rt->rtr_req.rtr_prefix;
 
-    head = vr_itable_get(table, hash);
-    if (head) {
-        /* If the entry already exists, just replace with new nexthop */
-        ent = mcast_lookup_in_hash_bucket(head, rt);
-        if (ent) {
-            if (ent->nh != rt->rtr_nh) {
-                nh = ent->nh;
-                ent->nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-
-                /*Stop using old nexthop */
-                vrouter_put_nexthop(nh);
-            }
-            return 0;
-        }
-    }
-
-    /* Create a new entry */
-    ent = vr_zalloc(sizeof(struct mcast_entry));
+    ent = vr_find_mcast_entry(&key);
     if (!ent) {
-        return -1;
+        ent = vr_find_free_mcast_entry(&key);
+        if (!ent)
+            return -ENOMEM;
+        ent->key.vrf_id = key.vrf_id;
+        ent->key.src_ip = key.src_ip;
+        ent->key.dst_ip = key.dst_ip;
+        ent->flags |= VR_MCAST_FLAG_VALID;
     }
 
-    ent->src_ip = rt->rtr_req.rtr_src;
-    ent->dst_ip = rt->rtr_req.rtr_prefix;
-    ent->nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-    
-    ent->next = head;
-    head = ent;
+    /* The nexthop can be changed though entry exits */
+    if (ent->nh != rt->rtr_nh) {
 
-    if (vr_itable_set(table, hash, head) != VR_ITABLE_ERR_PTR) {
-        return 0;
+        old_nh = ent->nh;
+        ent->nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid,
+                                        rt->rtr_req.rtr_nh_id);
+        if (old_nh)
+            vrouter_put_nexthop(old_nh);
     }
 
-    vr_free(ent);
-    return -1;
+    return 0;
 }
 
 static int
 mcast_add(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
     int ret;
-    unsigned int vrf_id = rt->rtr_req.rtr_vrf_id;
-    mcast_tbl_t table = vrfid_to_mcast_tbl(vrf_id);
-
-    table = (table ? : mcast_table_alloc_vrf(vrf_id));
-    if (!table)
-        return -ENOMEM;
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
     if (!rt->rtr_nh)
         return -ENOENT;
 
-    ret = __mcast_add(table, rt);
+    ret = __mcast_add(rt);
     vrouter_put_nexthop(rt->rtr_nh);
     return ret;
 }
 
 static void
-mcast_make_req(struct vr_route_req *resp, struct mcast_entry *ent)
+mcast_make_req(struct vr_route_req *resp, struct vr_mcast_entry *ent)
 {
     memset(resp, 0, sizeof(struct vr_route_req));
-    resp->rtr_req.rtr_prefix = ent->dst_ip;
-    resp->rtr_req.rtr_src = ent->src_ip;
-    resp->rtr_req.rtr_nh_id = ent->nh->nh_id;
+    resp->rtr_req.rtr_prefix = ent->key.dst_ip;
+    resp->rtr_req.rtr_src = ent->key.src_ip;
+    if (ent->nh)
+        resp->rtr_req.rtr_nh_id = ent->nh->nh_id;
     resp->rtr_req.rtr_rt_type =  RT_MCAST;
+    resp->rtr_req.rtr_family = AF_INET;
     return;
 }
 
 
 static int
-mcast_dump_cb(unsigned int index, void *data, void *udata)
+__mcast_dump(struct vr_message_dumper *dumper)
 {
-    struct mcast_entry *ent = (struct mcast_entry *)data;
-    struct vr_message_dumper *dumper = (struct vr_message_dumper *)udata;
     struct vr_route_req *req = (struct vr_route_req *)(dumper->dump_req);
     struct vr_route_req resp;
     int ret;
+    struct vr_mcast_entry *ent;
+    unsigned int i;
 
-    while(ent) {
-        /* Wait till the marker is reached */
-        if (dumper->dump_been_to_marker == 0) {
-            if (ent->src_ip == (unsigned int)req->rtr_req.rtr_src && 
-                    ent->dst_ip == (unsigned int)req->rtr_req.rtr_prefix) {
-                dumper->dump_been_to_marker = 1;
-            }
-        } else {
-
-            /* As marker reached, create response message */
-            mcast_make_req(&resp, ent); 
-            vr_printf("Index %d: (%x, %x) Nh:%d\n", index, 
-                    resp.rtr_req.rtr_src, resp.rtr_req.rtr_prefix, 
-                    resp.rtr_req.rtr_nh_id);
-
-            /* If no memory for next route return -ve, other wise continue */
-            ret = vr_message_dump_object(dumper, VR_ROUTE_OBJECT_ID, &resp);
-            if (ret <= 0) {
-                return ret;
+    for(i = 0; i < (vr_mcast_entries + vr_mcast_oentries); i++) {
+        ent = (struct vr_mcast_entry *) vr_get_hentry_by_index(vn_rtable, i);
+        if (!ent)
+            continue;
+        if (ent->flags & VR_MCAST_FLAG_VALID) {
+            if (ent->key.vrf_id != req->rtr_req.rtr_vrf_id)
+                continue;
+            if (dumper->dump_been_to_marker == 0) {
+                if ((ent->key.src_ip == (unsigned int)req->rtr_req.rtr_src) &&
+                        (ent->key.dst_ip == (unsigned int)req->rtr_req.rtr_prefix) &&
+                        (ent->key.vrf_id == req->rtr_req.rtr_vrf_id)) {
+                    dumper->dump_been_to_marker = 1;
+                }
+            } else {
+                mcast_make_req(&resp, ent);
+                ret = vr_message_dump_object(dumper, VR_ROUTE_OBJECT_ID, &resp);
+                if (ret <= 0) 
+                    return ret;
             }
         }
-        ent = ent->next;
     }
 
-    return 1;
+    return 0;
 }
 
 static int
@@ -282,8 +227,6 @@ mcast_dump(struct vr_rtable * __unsued, struct vr_route_req *rt)
 {
     int ret = 0;
     struct vr_message_dumper *dumper;
-    mcast_tbl_t table;
-
 
     dumper = vr_message_dump_init(&rt->rtr_req);
     if (!dumper) {
@@ -294,13 +237,7 @@ mcast_dump(struct vr_rtable * __unsued, struct vr_route_req *rt)
     if (!((vr_route_req *)(dumper->dump_req))->rtr_marker)
         dumper->dump_been_to_marker = 1;
 
-    table = vrfid_to_mcast_tbl(rt->rtr_req.rtr_vrf_id);
-    if (!table) {
-        return -EINVAL;
-    }
-
-    ret = vr_itable_trav(table, mcast_dump_cb, 0, dumper);
-
+    __mcast_dump(dumper);
 generate_response:
     vr_message_dump_exit(dumper, ret);
 
@@ -308,75 +245,24 @@ generate_response:
 
 }
 
-
-static void
-mcast_free_table_cb(unsigned int index, void *data)
-{
-    struct mcast_entry *ent = (struct mcast_entry *)data;
-    struct mcast_entry *next;
-
-    while(ent) {
-        next = ent->next;
-        vrouter_put_nexthop(ent->nh);
-        vr_free(ent);
-        ent = next;
-    }
-
-    return;
-}
-
-static void
-mcast_free_table(mcast_tbl_t table)
-{
-    vr_itable_delete(table, mcast_free_table_cb);
-    return;
-}
-
-static void
-mcast_free_vrf(struct vr_rtable *rtable, unsigned int vrf_id)
-{
-    mcast_tbl_t *vrf_tables;
-    mcast_tbl_t table;
-
-    vrf_tables = (mcast_tbl_t *)(rtable->algo_data);
-    table = vrf_tables[vrf_id];
-    if (!table) 
-        return;
-
-    /* Delete the whole table entries */
-    mcast_free_table(table);
-
-    /* Make the vrf null and free its memory */
-    vrf_tables[vrf_id] = NULL;
-    return;
-}
-
 void
 mcast_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
-   unsigned int i;
+    if (vn_rtable) {
+        vr_htable_delete(vn_rtable);
+    }
 
-   /* 
-    * Invoked by disabling the packet path. We are free to delete
-    * in our own order 
-    */
-    if (!vn_rtable)
-        return;
-
-    vn_rtable = NULL;
-
-    for (i = 0; i < fs->rtb_max_vrfs; i++)
-        mcast_free_vrf(rtable, i);
-
-    vr_free(rtable->algo_data);
     rtable->algo_data = NULL;
-    return;
+    vn_rtable = NULL;
 }
 
 int
 mcast_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
-   rtable->algo_data = vr_zalloc(sizeof(mcast_tbl_t) * fs->rtb_max_vrfs);
+    rtable->algo_data = vr_htable_create(vr_mcast_entries,
+            vr_mcast_oentries, sizeof(struct vr_mcast_entry),
+            sizeof(struct vr_mcast_entry_key), mcast_entry_valid);
+
     if (!rtable->algo_data)
         return -ENOMEM;
 
@@ -387,7 +273,7 @@ mcast_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     rtable->algo_dump = mcast_dump;
 
     /* local cache */
-    vn_rtable = (mcast_tbl_t *)(rtable->algo_data);
+    vn_rtable = rtable->algo_data;
 
     return 0;
 }

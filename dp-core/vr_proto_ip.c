@@ -5,6 +5,7 @@
  */
 #include <vr_os.h>
 #include "vr_mpls.h"
+#include "vr_vxlan.h"
 #include "vr_mcast.h"
 
 extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
@@ -67,15 +68,12 @@ vr_forward(struct vrouter *router, unsigned short vrf,
         fmd->fmd_label = rt.rtr_req.rtr_label;
     } 
     
-    if (ip->ip_csum == VR_DIAG_IP_CSUM)
-        pkt->vp_flags |= VP_FLAG_DIAG;
-
     return nh_output(vrf, pkt, nh, fmd);
 }
 
 /*
  * vr_udp_input - handle incoming UDP packets. If the UDP destination
- * port is for MPLS over UDP, decap the packet and forward the inner
+ * port is for MPLS over UDP or VXLAN, decap the packet and forward the inner
  * packet. Returns 1 if the packet was not handled, 0 otherwise.
  */
 unsigned int
@@ -85,15 +83,17 @@ vr_udp_input(struct vr_ip *iph, struct vrouter *router, struct vr_packet *pkt,
     struct vr_udp *udph, udp;
     int handled = 0, ret = PKT_RET_FAST_PATH;
     unsigned short reason;
+    int encap_type = PKT_ENCAP_MPLS;
 
     if (vr_perfp && vr_pull_inner_headers_fast) {
-        handled = vr_pull_inner_headers_fast(iph, pkt, VR_IP_PROTO_UDP, &ret);
+        handled = vr_pull_inner_headers_fast(iph, pkt, VR_IP_PROTO_UDP,
+                vr_mpls_tunnel_type, &ret, &encap_type);
         if (!handled) {
             return 1;
         }
 
         if (ret == PKT_RET_FAST_PATH) {
-            goto mpls_input;
+            goto next_encap;
         }
 
         if (ret == PKT_RET_ERROR) {
@@ -112,7 +112,11 @@ vr_udp_input(struct vr_ip *iph, struct vrouter *router, struct vr_packet *pkt,
         return 0;
     }
 
-    if (ntohs(udph->udp_dport) != VR_MPLS_OVER_UDP_DST_PORT) {
+    if (ntohs(udph->udp_dport) == VR_MPLS_OVER_UDP_DST_PORT) {
+        encap_type = PKT_ENCAP_MPLS;
+    } else if (ntohs(udph->udp_dport) == VR_VXLAN_UDP_DST_PORT) {
+        encap_type = PKT_ENCAP_VXLAN;
+    } else {
         return 1;
     }
 
@@ -121,17 +125,20 @@ vr_udp_input(struct vr_ip *iph, struct vrouter *router, struct vr_packet *pkt,
      * as required into the contiguous part of the pkt.
      */
     if (vr_pull_inner_headers) {
-        if (!vr_pull_inner_headers(iph, pkt, sizeof(struct vr_udp), &reason)) {
+        if (!vr_pull_inner_headers(iph, pkt, VR_IP_PROTO_UDP,
+                    &reason, vr_mpls_tunnel_type)) {
             vr_pfree(pkt, reason);
             return 0;
         }
     }
 
     pkt_pull(pkt, sizeof(struct vr_udp));
-
-mpls_input:
-
-    vr_mpls_input(router, pkt, fmd);
+next_encap:
+    if (encap_type == PKT_ENCAP_MPLS) {
+        vr_mpls_input(router, pkt, fmd);
+    } else {
+        vr_vxlan_input(router, pkt, fmd);
+    }
 
     return 0;
 }
@@ -143,9 +150,11 @@ vr_gre_input(struct vrouter *router, struct vr_packet *pkt,
     unsigned short *gre_hdr, gre_proto, hdr_len, reason;
     char buf[4];
     int handled = 0, ret = PKT_RET_FAST_PATH;
+    int encap_type;
 
     if (vr_perfp && vr_pull_inner_headers_fast) {
-        handled = vr_pull_inner_headers_fast(NULL, pkt, VR_IP_PROTO_GRE, &ret);
+        handled = vr_pull_inner_headers_fast(NULL, pkt, VR_IP_PROTO_GRE,
+                vr_mpls_tunnel_type, &ret, &encap_type);
         if (!handled) {
             goto unhandled;
         }
@@ -194,7 +203,8 @@ vr_gre_input(struct vrouter *router, struct vr_packet *pkt,
      * as required into the contiguous part of the pkt.
      */
     if (vr_pull_inner_headers) {
-        if (!vr_pull_inner_headers(NULL, pkt, hdr_len, &reason)) {
+        if (!vr_pull_inner_headers(NULL, pkt, VR_IP_PROTO_GRE, &reason,
+                    vr_mpls_tunnel_type)) {
             vr_pfree(pkt, reason);
             return 0;
         }
@@ -202,9 +212,7 @@ vr_gre_input(struct vrouter *router, struct vr_packet *pkt,
 
     /* pull and junk the GRE header */
     pkt_pull(pkt, hdr_len);
-
 mpls_input:
-
     vr_mpls_input(router, pkt, fmd);
 
     return 0;

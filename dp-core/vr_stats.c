@@ -50,6 +50,10 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_misc = stats->vds_misc;
     response->vds_invalid_packet = stats->vds_invalid_packet;
     response->vds_cksum_err = stats->vds_cksum_err;
+    response->vds_clone_fail = stats->vds_clone_fail;
+    response->vds_no_fmd = stats->vds_no_fmd;
+    response->vds_cloned_original =
+        stats->vds_cloned_original;
 
     return;
 }
@@ -111,6 +115,9 @@ vr_drop_stats_get(void)
         stats->vds_misc += stats_block->vds_misc;
         stats->vds_invalid_packet += stats_block->vds_invalid_packet;
         stats->vds_cksum_err += stats_block->vds_cksum_err;
+        stats->vds_clone_fail += stats_block->vds_clone_fail;
+        stats->vds_no_fmd += stats_block->vds_no_fmd;
+        stats->vds_cloned_original += stats_block->vds_cloned_original;
     }
 
     vr_drop_stats_fill_response(&response, stats);

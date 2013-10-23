@@ -140,6 +140,16 @@ dump_table(struct flow_table *ft)
 
                 break;
 
+            case VR_FLOW_ACTION_TRAP:
+                fi = 0;
+                action = 'T';
+                if (fe->fe_flags & VR_FLOW_FLAG_TRAP_ECMP) {
+                    need_flag_print = 1;
+                    flag_string[fi++] = 'E';
+                }
+
+                break;
+
             default:
                 action = 'U';
             }
@@ -349,6 +359,11 @@ flow_validate(int flow_index, char action)
         flow_req.fr_action = VR_FLOW_ACTION_DROP;
         break;
 
+    case 't':
+        flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_TRAP_ECMP;
+        flow_req.fr_action = VR_FLOW_ACTION_TRAP;
+        break;
+
     case 'n':
         flow_req.fr_rindex = -1;
         flow_req.fr_action = VR_FLOW_ACTION_NAT;
@@ -406,7 +421,7 @@ flow_validate(int flow_index, char action)
 static void
 Usage(void)
 {
-    printf("flow [-f flow_index][-d flow_index][-i flow_index]\n");
+    printf("flow [-f flow_index][-d flow_index][-i flow_index][-t flow_index]\n");
     printf("     [-n flow_index [--snat=x.x.x.x] [--dnat=x.x.x.x]");
     printf("[--spat=sport][--dpat=dport]] \n");
     printf("     [--mirror=mirror table index]\n");
@@ -525,13 +540,14 @@ main(int argc, char *argv[])
     int ret;
     int option_index;
 
-    while ((opt = getopt_long(argc, argv, "d:f:i:ln:",
+    while ((opt = getopt_long(argc, argv, "d:f:i:t:ln:",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
         case 'd':
         case 'n':
         case 'i':
+        case 't':
             flow_cmd = opt;
             flow_index = strtoul(optarg, NULL, 0);
             break;

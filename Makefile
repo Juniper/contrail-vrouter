@@ -34,6 +34,8 @@ SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_fake_transport.
 	vrouter-y += dp-core/vr_mirror.o dp-core/vr_vrf_assign.o
 	vrouter-y += dp-core/vr_index_table.o dp-core/vr_mcast.o
 	vrouter-y += dp-core/vr_stats.o dp-core/vr_btable.o
+	vrouter-y += dp-core/vr_bridge.o dp-core/vr_htable.o
+	vrouter-y += dp-core/vr_vxlan.o
 
 	ccflags-y += -I$(src)/include -I$(BUILD_DIR)/vrouter/sandesh/gen-c -I$(src)/../tools -I$(SANDESH_ROOT)/library/c -g
 	ccflags-y += -I$(src)/sandesh/gen-c/ -Wall 

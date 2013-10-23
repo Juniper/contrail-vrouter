@@ -34,6 +34,8 @@ extern int vr_perfr1, vr_perfr2, vr_perfr3;
 extern int vr_perfq1, vr_perfq2, vr_perfq3;
 extern int vr_from_vm_mss_adj;
 extern int vr_to_vm_mss_adj;
+extern int hashrnd_inited;
+extern __u32 vr_hashrnd;
 
 #define CONTAINER_OF(member, struct_type, pointer) \
     ((struct_type *)((unsigned long)pointer - \
@@ -77,13 +79,18 @@ struct host_os {
     void *(*hos_pheader_pointer)(struct vr_packet *, unsigned short,
                                  void *);
     int  (*hos_pull_inner_headers)(struct vr_ip *, struct vr_packet *,
-                                   unsigned short, unsigned short *);
+                                   unsigned short, unsigned short *,
+                                   int (*is_label_l2)(unsigned int,
+                                       unsigned int, unsigned short *));
     int  (*hos_pcow)(struct vr_packet *, unsigned short); 
-    int  (*hos_pull_inner_headers_fast)(struct vr_ip *, struct vr_packet *,
-                                        unsigned char, int *);
     __u16 (*hos_get_udp_src_port)(struct vr_packet *, 
                                   struct vr_forwarding_md *, unsigned short);
     int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *);
+    int  (*hos_pull_inner_headers_fast)(struct vr_ip *, struct vr_packet *,
+                                        unsigned char, int
+                                        (*is_label_l2)(unsigned int,
+                                            unsigned int, unsigned short *), 
+                                        int *, int *);
 };
 
 #define vr_malloc                       vrouter_host->hos_malloc
@@ -132,6 +139,7 @@ struct vrouter {
     struct vr_rtable *vr_inet_rtable;
     struct vr_rtable *vr_inet6_rtable;
     struct vr_rtable *vr_inet_mcast_rtable;
+    struct vr_rtable *vr_bridge_rtable;
 
     struct vr_btable *vr_flow_table;
     struct vr_btable *vr_oflow_table;
@@ -142,6 +150,7 @@ struct vrouter {
     unsigned int vr_max_mirror_indices;
     struct vr_mirror_entry **vr_mirrors;
     vr_itable_t vr_mirror_md;
+    vr_itable_t vr_vxlan_table;
 
     uint64_t **vr_pdrop_stats;
 

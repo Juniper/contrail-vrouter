@@ -49,8 +49,11 @@ vrfstats = env.Program(target = 'vrfstats', source = vrfstats_sources)
 dropstats_sources = ['dropstats.c']
 dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
 
+vxlan_sources = ['vxlan.c']
+vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
-env.Default(vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats)
+env.Default(vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan)
 # Local Variables:
 # mode: python
 # End:

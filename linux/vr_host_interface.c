@@ -12,16 +12,18 @@
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
 #include <linux/if_arp.h>
+#include <linux/ip.h>
+#include <linux/jhash.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 #include <linux/if_bridge.h>
 #endif
 
 #include <net/rtnetlink.h>
-#include "vr_compat.h"
-#include "vr_packet.h"
-#include "vr_interface.h"
 #include "vrouter.h"
+#include "vr_packet.h"
+#include "vr_compat.h"
+#include "vr_interface.h"
 #include "vr_linux.h"
 #include "vr_os.h"
 
@@ -34,6 +36,7 @@ static int vr_napi_poll(struct napi_struct *, int);
 static rx_handler_result_t pkt_gro_dev_rx_handler(struct sk_buff **);
 static int linux_xmit_segments(struct vr_interface *, struct sk_buff *,
         unsigned short);
+static rx_handler_result_t pkt_rps_dev_rx_handler(struct sk_buff **pskb);
 
 /*
  * Structure to store information required to be sent across CPU cores
@@ -80,7 +83,8 @@ void
 vr_skb_set_rxhash(struct sk_buff *skb, __u32 val)
 {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
-#ifndef CONFIG_XEN
+#if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
     skb->rxhash = val;
 #endif
 #else
@@ -96,7 +100,8 @@ __u32
 vr_skb_get_rxhash(struct sk_buff *skb)
 {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
-#ifndef CONFIG_XEN
+#if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
     return skb->rxhash;
 #else
     return 0;
@@ -261,7 +266,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
-            || type != VP_TYPE_IPOIP)
+            || (type != VP_TYPE_IPOIP && type!= VP_TYPE_L2OIP))
         return linux_xmit(vif, seg, type);
 
     if (!pskb_may_pull(seg, ETH_HLEN + sizeof(struct vr_ip))) {
@@ -450,7 +455,11 @@ linux_get_rxq(struct sk_buff *skb, u16 *rxq, unsigned int curr_cpu,
 
     if (num_cpus) {
         rxhash = skb_get_rxhash(skb);
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32)) 
+        next_cpu = ((u32)rxhash * num_cpus) >> 16;
+#else
         next_cpu = ((u64)rxhash * num_cpus) >> 32;
+#endif
 
         /*
          * next_cpu is between 0 and (num_cpus - 1). Find the CPU corresponding
@@ -496,6 +505,7 @@ linux_enqueue_pkt_for_gro(struct sk_buff *skb, struct vr_interface *vif)
 #ifdef CONFIG_RPS
     u16 rxq;
     unsigned int curr_cpu = 0;
+    __u32 prev_cpu;
 
     /*
      * vr_perfr1 only takes effect if vr_perfr3 is not set. Also, if we are
@@ -538,9 +548,11 @@ linux_enqueue_pkt_for_gro(struct sk_buff *skb, struct vr_interface *vif)
              * If RPS happened earlier (perfr1 or perfr3 is set),
              * prev_cpu was already been set in skb->rxhash.
              */
+            prev_cpu = vr_skb_get_rxhash(skb);
+            vr_skb_set_rxhash(skb, 0);   
             linux_get_rxq(skb, &rxq, vr_get_cpu(),
                           (vr_perfr1 || vr_perfr3) ? 
-                              vr_skb_get_rxhash(skb)+1 : 0);
+                              prev_cpu+1 : 0);
         }
 
         skb_record_rx_queue(skb, rxq);
@@ -781,6 +793,66 @@ linux_to_vr(struct vr_interface *vif, struct sk_buff *skb)
     return 0;
 }
 
+/*
+ * vr_do_rps_outer - perform RPS based on the outer header immediately after
+ * the packet is received from the physical interface.
+ */
+static void
+vr_do_rps_outer(struct sk_buff *skb, struct vr_interface *vif)
+{
+#ifdef CONFIG_RPS
+    unsigned int curr_cpu;
+    u16 rxq;
+
+    curr_cpu = vr_get_cpu();
+    if (vr_perfq3) {
+        rxq = vr_perfq3;
+    } else {
+        linux_get_rxq(skb, &rxq, curr_cpu, 0);
+    }
+
+    skb_record_rx_queue(skb, rxq);
+    vr_skb_set_rxhash(skb, curr_cpu);
+    skb->dev = pkt_rps_dev;
+
+    /*
+     * Store vif information in skb for later retrieval
+     */
+    ((vr_rps_t *)skb->cb)->vif_idx = vif->vif_idx;
+    ((vr_rps_t *)skb->cb)->vif_rid = vif->vif_rid;
+
+    netif_receive_skb(skb);
+#endif
+
+    return;
+}
+
+/*
+ * vr_post_rps_get_phys_dev - get the physical interface that the packet
+ * arrived on, after RPS is performed based on the outer header. Returns
+ * the interface pointer on success, NULL otherwise.
+ */
+static struct net_device *
+vr_post_rps_outer_get_phys_dev(struct sk_buff *skb)
+{
+    struct net_device *dev = NULL;
+    struct vrouter *router;
+    struct vr_interface *vif;
+
+    router = vrouter_get(((vr_rps_t *)skb->cb)->vif_rid);
+    if (router == NULL) {
+        return NULL;
+    }
+
+    vif = __vrouter_get_interface(router,
+              ((vr_rps_t *)skb->cb)->vif_idx);
+    if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL) && vif->vif_os) {
+        dev = (struct net_device *) vif->vif_os;
+    }
+
+    return dev;
+}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 rx_handler_result_t
 linux_rx_handler(struct sk_buff **pskb)
@@ -893,6 +965,8 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
     struct vr_interface *vif;
     struct vr_packet *pkt;
     struct vlan_hdr *vhdr;
+    int rpsdev = 0;
+    struct net_device *dev;
 
     /*
      * LACP packets should go to the protocol handler. Hence do not
@@ -906,9 +980,22 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
     if (skb->dev == pkt_gro_dev) {
         pkt_gro_dev_rx_handler(&skb);
         return NULL;
-    }
+    } else if (skb->dev == pkt_rps_dev) {
+        if (!vr_perfr3) {
+            pkt_rps_dev_rx_handler(&skb);
+            return NULL;
+        }
 
-    vif = (struct vr_interface *)port;
+        dev = vr_post_rps_outer_get_phys_dev(skb);
+        if (dev == NULL) {
+            goto error;
+        }
+
+        rpsdev = 1;
+        vif = (struct vr_interface *) rcu_dereference(dev->br_port);
+    } else {
+        vif = (struct vr_interface *)port;
+    }
 
 #if 0
     if(vrouter_dbg) {
@@ -918,6 +1005,20 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
 
     if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
         return skb;
+
+#ifdef CONFIG_RPS
+    /*
+     * Send the packet to another CPU core if vr_perfr3 is set. The new
+     * CPU core is chosen based on a hash of the outer header. This only needs
+     * to be done for packets arriving on a physical interface. Also, we
+     * only need to do this if RPS hasn't already happened.
+     */
+    if (vr_perfr3 && (!rpsdev) && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+        vr_do_rps_outer(skb, vif);
+        
+        return NULL;
+    }
+#endif
 
     if (skb->protocol == htons(ETH_P_8021Q)) {
         vhdr = (struct vlan_hdr *)skb->data;
@@ -931,6 +1032,13 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
         return NULL;
 
     vif->vif_rx(vif, pkt, vlan_id);
+    return NULL;
+
+error:
+
+    pkt = (struct vr_packet *)skb->cb;
+    vr_pfree(pkt, VP_DROP_MISC);
+
     return NULL;
 }
 #endif
@@ -1192,6 +1300,8 @@ linux_pkt_dev_init(char *name, void (*setup)(struct net_device *),
             vr_module_error(err, __FUNCTION__, __LINE__, 0);
             unregister_netdev(pdev);
         }
+#else
+        rcu_assign_pointer(pdev->br_port, (void *) pdev);
 #endif
     }
 
@@ -1270,8 +1380,7 @@ pkt_rps_dev_rx_handler(struct sk_buff **pskb)
 
     if (vr_perfr3) {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
-        vr_interface_bridge_hook(NULL, *pskb);
-        return RX_HANDLER_CONSUMED;
+        ASSERT(0);
 #else
         return linux_rx_handler(&skb);
 #endif

@@ -52,8 +52,17 @@ vr_vrf_stats_req_process(void *s_req)
     printf("Vrf: %d\n", stats->vsr_vrf);
     printf("Discards %" PRIu64 ", Resolves %" PRIu64 ", Receives %" PRIu64 "\n",
             stats->vsr_discards, stats->vsr_resolves, stats->vsr_receives);
-    printf("Tunnels %" PRIu64 ", Composites %" PRIu64 ", Encaps %" PRIu64 "\n",
-            stats->vsr_tunnels, stats->vsr_composites, stats->vsr_encaps);
+    printf("Ecmp Composites %" PRIu64 ", L3 Mcast Composites %" PRIu64
+            ", L2 Mcast Composites %" PRIu64 ", Fabric Composites %"
+            PRIu64 ", Multi Proto Composites %" PRIu64 "\n",
+            stats->vsr_ecmp_composites, stats->vsr_l3_mcast_composites,
+            stats->vsr_l2_mcast_composites, stats->vsr_fabric_composites,
+            stats->vsr_multi_proto_composites);
+    printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64 
+            ", Gre Mpls Tunnels %" PRIu64 "\n", stats->vsr_udp_tunnels,
+            stats->vsr_udp_mpls_tunnels, stats->vsr_gre_mpls_tunnels);
+    printf("L2 Encaps %" PRIu64 ", Encaps %" PRIu64 "\n",
+            stats->vsr_l2_encaps, stats->vsr_encaps);
 
     printf("\n");
     return;

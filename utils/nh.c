@@ -35,7 +35,7 @@
 static struct nl_client *cl;
 static char src_mac[50], dst_mac[50];
 static int smac_set, dmac_set;
-static uint32_t nh_id, if_id, vrf_id;
+static uint32_t nh_id, if_id, vrf_id ;
 static int nh_set, oif_set, dvrf_set;
 static uint16_t flags;
 static int pol_set;
@@ -45,13 +45,22 @@ static uint16_t sport, dport;
 static int sport_set, dport_set;
 static int command;
 static int udp_set;
+static int vxlan_set;
 static int type, type_set;
 static bool dump_pending = false;
 static int dump_marker = -1;
 static int comp_nh[10];
+static int lbl[10];
 static int comp_nh_ind = 0;
+static int lbl_ind = 0;
 static int cni_set;
-static int encap_mcast_set;
+static int cmp_set;
+static int cl3_set;
+static int cl2_set;
+static int cfa_set;
+static int mcast_set;
+static int el2_set;
+static int lbl_set;
 
 static int 
 str_to_encap(char *str, char *mac)
@@ -110,6 +119,8 @@ nh_type(uint32_t type)
            return "Resolve";
        case NH_COMPOSITE:
            return "Composite";
+       case NH_VXLAN_VRF:
+           return "Vxlan Vrf";
        default:
            return "Invalid";
     }
@@ -152,19 +163,42 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
                 strcat(ptr, "Udp, ");
             break;
 
+        case NH_FLAG_COMPOSITE_L3:
+            if (type == NH_COMPOSITE)
+                strcat(ptr, "L3, ");
+            break;
+
+        case NH_FLAG_COMPOSITE_L2:
+            if (type == NH_COMPOSITE)
+                strcat(ptr, "L2, ");
+            break;
+
         case NH_FLAG_COMPOSITE_ECMP:
             if (type == NH_COMPOSITE)
-                strcat(ptr, "ECMP, ");
+                strcat(ptr, "Ecmp, ");
             break;
 
-        case NH_FLAG_COMPOSITE_MCAST:
+        case NH_FLAG_COMPOSITE_FABRIC:
             if (type == NH_COMPOSITE)
-                strcat(ptr, "Multicast Composite, ");
+                strcat(ptr, "Fabric, ");
             break;
 
-        case NH_FLAG_ENCAP_MCAST:
+        case NH_FLAG_COMPOSITE_MULTI_PROTO:
             if (type == NH_COMPOSITE)
-                strcat(ptr, "Multicast Encap, ");
+                strcat(ptr, "Multi Proto, ");
+            break;
+
+        case NH_FLAG_MCAST:
+            strcat(ptr, "Multicast, ");
+            break;
+
+        case NH_FLAG_ENCAP_L2:
+            if (type == NH_ENCAP)
+                strcat(ptr, "L2, ");
+            break;
+
+        case NH_FLAG_TUNNEL_VXLAN:
+                strcat(ptr, "Vxlan, ");
             break;
         }
     }
@@ -177,11 +211,21 @@ vr_nexthop_req_process(void *s_req)
     unsigned int i;
     struct in_addr a;
     char flags_mem[500];
+    char fam[100];
 
     vr_nexthop_req *req = (vr_nexthop_req *)(s_req);
 
+    if (req->nhr_family == AF_INET)
+        strcpy(fam, "AF_INET");
+    else if (req->nhr_family == AF_BRIDGE)
+        strcpy(fam, "AF_BRIDGE");
+    else if (req->nhr_family == AF_UNSPEC)
+        strcpy(fam, "AF_UNSPEC");
+    else 
+        strcpy(fam, "N/A");
+
     printf("Id:%03d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d\n", 
-                req->nhr_id, nh_type(req->nhr_type), (req->nhr_family == AF_INET) ? "AF_INET" : "N/A", 
+                req->nhr_id, nh_type(req->nhr_type), fam,
                 nh_flags(req->nhr_flags, req->nhr_type, flags_mem), req->nhr_rid, req->nhr_ref_cnt);
 
     if (req->nhr_type == NH_RCV)
@@ -211,6 +255,10 @@ vr_nexthop_req_process(void *s_req)
             printf("        Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport), 
                                                   ntohs(req->nhr_tun_dport));
         }
+    }
+
+    if (req->nhr_type == NH_VXLAN_VRF) {
+        printf("\tVrf:%d\n", req->nhr_vrf);
     }
 
     if (req->nhr_type == NH_COMPOSITE) {
@@ -273,7 +321,8 @@ op_retry:
         nh_req.nhr_tun_sport = htons(sport);
         nh_req.nhr_tun_dport = htons(dport);
         nh_req.nhr_nh_list_size = 0;
-        if (mode == NH_TUNNEL || mode == NH_ENCAP) {
+        if ((mode == NH_TUNNEL) || 
+                ((mode == NH_ENCAP) && !(flags & NH_FLAG_ENCAP_L2))) {
             nh_req.nhr_encap_size = 14;
             buf = calloc(1, nh_req.nhr_encap_size);
             str_to_encap(dst, buf);
@@ -283,11 +332,17 @@ op_retry:
         }
 
         if (mode == NH_COMPOSITE) {
-            nh_req.nhr_flags |= NH_FLAG_COMPOSITE_MCAST;
             nh_req.nhr_nh_list_size = comp_nh_ind;
+            nh_req.nhr_label_list_size = comp_nh_ind;
             nh_req.nhr_nh_list = calloc(comp_nh_ind, sizeof(uint32_t));
+            nh_req.nhr_label_list = calloc(comp_nh_ind, sizeof(uint32_t));
             for (i = 0; i < comp_nh_ind; i++) {
                 nh_req.nhr_nh_list[i] = comp_nh[i];
+                if (i < lbl_ind)
+                    nh_req.nhr_label_list[i] = lbl[i];
+                else
+                    nh_req.nhr_label_list[i] = (i + 100);
+
             }
         }
 
@@ -302,7 +357,14 @@ op_retry:
 
     nh_req.nhr_id = nh_id;
     nh_req.nhr_rid = 0;
-    nh_req.nhr_family = AF_INET;
+    if ((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2)) 
+        nh_req.nhr_family = AF_BRIDGE;
+    else if ((mode == NH_COMPOSITE) && (flags &
+                NH_FLAG_COMPOSITE_MULTI_PROTO))
+        nh_req.nhr_family = AF_UNSPEC;
+    else 
+        nh_req.nhr_family = AF_INET;
+
     nh_req.nhr_type = mode;
     /* nlmsg header */
     ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
@@ -358,13 +420,24 @@ usage()
            "       [--oif = out going interface index]\n"
            "       [--smac = source mac ]\n"
            "       [--dmac = destination ]\n"
-           "       [--type = type of the tunnel 1 - rcv, 2 - encap, 3 - tunnel, 4 - resolve, 5 - discard, 6 - Composite] \n"
+           "       [--type = type of the tunnel 1 - rcv, 2 - encap, 3 - tunnel, 4 - resolve, 5 - discard, 6 - Composite, 7 - Vxlan VRF] \n"
            "       [--sip = x.x.x.x source ip of tunnel] \n"
+           "       [--dip = x.x.x.x destination ip of tunnel ]\n"
+           "       [--sport = src_port of udp tunnel]\n"
+           "       [--dport = dsr_port of udp tunnel]\n"
            "       [--dip = x.x.x.x destination ip of tunnel ]\n"
            "       [--vrf = vrf_id]\n"
            "       [--pol = policy flag on interface ]\n"
            "       [--cni = composite nexthop member id]\n"
-           "       [--emc = encap multicast nh]\n");
+           "       [--cl3 = composite l3 nexhop]\n"
+           "       [--cl2 = composite l2 nexhop]\n"
+           "       [--cmp = composit multiprotocol ]\n"
+           "       [--udp = udp tunnel ]\n"
+           "       [--vxlan = vxlan tunnel ]\n"
+           "       [--el2 = encap L2 ]\n"
+           "       [--cfa = composit fabric ]\n"
+           "       [--lbl = ilabel for composit fabric ]\n"
+           "       [--mc = multicast nh]\n");
     exit(-EINVAL);
                       
 
@@ -383,8 +456,15 @@ enum opt_index {
     SPORT_OPT_IND,
     DPORT_OPT_IND,
     UDP_OPT_IND,
+    VXLAN_OPT_IND,
     CNI_OPT_IND,
-    EMC_OPT_IND,
+    CMP_OPT_IND,
+    CL3_OPT_IND,
+    CL2_OPT_IND,
+    CFA_OPT_IND,
+    MC_OPT_IND,
+    EL2_OPT_IND,
+    LBL_OPT_IND,
     MAX_OPT_IND
 };
 
@@ -401,8 +481,15 @@ static struct option long_options[] = {
     [SPORT_OPT_IND]  = {"sport", required_argument, &sport_set, 1},
     [DPORT_OPT_IND]  = {"dport", required_argument, &dport_set, 1},
     [UDP_OPT_IND]  = {"udp", no_argument, &udp_set, 1},
+    [VXLAN_OPT_IND]  = {"vxlan", no_argument, &vxlan_set, 1},
     [CNI_OPT_IND]  = {"cni", required_argument, &cni_set, 1},
-    [EMC_OPT_IND]  = {"emc", no_argument, &encap_mcast_set, 1},
+    [CMP_OPT_IND]  = {"cmp", no_argument, &cmp_set, 1},
+    [CL3_OPT_IND]  = {"cl3", no_argument, &cl3_set, 1},
+    [CL2_OPT_IND]  = {"cl2", no_argument, &cl2_set, 1},
+    [CFA_OPT_IND]  = {"cfa", no_argument, &cfa_set, 1},
+    [MC_OPT_IND]  = {"mc", no_argument, &mcast_set, 1},
+    [EL2_OPT_IND]  = {"el2", no_argument, &el2_set, 1},
+    [LBL_OPT_IND] = {"lbl", required_argument, &lbl_set, 1},
     [MAX_OPT_IND]     = { NULL,  0,                 0        , 0}
 };
 
@@ -456,6 +543,10 @@ parse_long_opts(int ind, char *opt_arg)
             if (errno)
                 usage();
             break;
+        case LBL_OPT_IND:
+            lbl[lbl_ind++] = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                usage();
         case DPORT_OPT_IND:
             dport = strtoul(opt_arg, NULL, 0);
             if (errno) 
@@ -476,12 +567,20 @@ validate_options()
             if (type == NH_RCV) {
                 if (oif_set || smac_set || dmac_set || dvrf_set || 
                             sip_set || dip_set || pol_set || 
-                            sport_set || dport_set || udp_set) {
+                            sport_set || dport_set || udp_set ||
+                            vxlan_set) {
                     usage();
                 }
             } else if (type == NH_ENCAP) {
-                if (!oif_set || !smac_set || !dmac_set || sip_set ||
-                        dip_set || sport_set || dport_set || udp_set) {
+                
+                if (el2_set && (!oif_set || smac_set || dmac_set || sip_set ||
+                        dip_set || sport_set || dport_set || udp_set ||
+                        vxlan_set)) 
+                    usage();
+
+                    if (!el2_set && (!oif_set || !smac_set || !dmac_set || sip_set ||
+                        dip_set || sport_set || dport_set || udp_set ||
+                        vxlan_set)) {
                     usage();
                 }
             } else if (type == NH_TUNNEL) {
@@ -495,25 +594,29 @@ validate_options()
                     usage();
 
                 }
+
             } else if (type == NH_RESOLVE) {
                 if (oif_set || smac_set || dmac_set || dvrf_set || 
                             sip_set || dip_set || pol_set || 
-                            sport_set || dport_set || udp_set) {
+                            sport_set || dport_set || udp_set ||
+                            vxlan_set) {
                     usage();
                 }
             } else if (type == NH_DISCARD) {
                 if (oif_set || smac_set || dmac_set || dvrf_set || 
                             sip_set || dip_set || pol_set || 
-                            sport_set || dport_set || udp_set) {
+                            sport_set || dport_set || udp_set ||
+                            vxlan_set) {
                     usage();
                 }
             } else if (type == NH_COMPOSITE) {
                 if (!cni_set || oif_set || smac_set || 
                             dmac_set || dvrf_set || sip_set || dip_set || 
-                            pol_set || sport_set || dport_set || udp_set) {
+                            pol_set || sport_set || dport_set || udp_set
+                            || vxlan_set) {
                         usage();
                  }
-            } else {
+            } else if (type != NH_VXLAN_VRF) {
                 usage();
             }
             break;
@@ -521,7 +624,8 @@ validate_options()
         case 2:
             if (!nh_set || oif_set || smac_set || dmac_set || dvrf_set || 
                             sip_set || dip_set || pol_set || 
-                            sport_set || dport_set || udp_set) {
+                            sport_set || dport_set || udp_set ||
+                            vxlan_set) {
                     usage();
             }
             break;
@@ -529,14 +633,16 @@ validate_options()
         case 3:
             if (nh_set || oif_set || smac_set || dmac_set || dvrf_set || 
                             sip_set || dip_set || pol_set || 
-                            sport_set || dport_set || udp_set) {
+                            sport_set || dport_set || udp_set ||
+                            vxlan_set) {
                     usage();
             }
             break;
         case 4:
             if (!nh_set || oif_set || smac_set || dmac_set || dvrf_set || 
                             sip_set || dip_set || pol_set || 
-                            sport_set || dport_set || udp_set) {
+                            sport_set || dport_set || udp_set ||
+                            vxlan_set) {
                     usage();
             }
             break;
@@ -595,16 +701,35 @@ int main(int argc, char *argv[])
 
     if (command == 1) {
         flags = NH_FLAG_VALID;
+
+        if (mcast_set)
+            flags |= NH_FLAG_MCAST;
+
         if (type == NH_TUNNEL) {
-            if (udp_set) {
+            if (udp_set)
                 flags |= NH_FLAG_TUNNEL_UDP;
-            } else {
+            else if (vxlan_set)
+                flags |= NH_FLAG_TUNNEL_VXLAN;
+            else
                 flags |= NH_FLAG_TUNNEL_GRE;
-            }
         }
-        if (encap_mcast_set) {
-            flags |= NH_FLAG_ENCAP_MCAST;
+
+        if (type == NH_COMPOSITE) {
+            if (cl3_set)
+                flags |= NH_FLAG_COMPOSITE_L3;
+            if (cl2_set)
+                flags |= NH_FLAG_COMPOSITE_L2;
+            if (cfa_set)
+                flags |= NH_FLAG_COMPOSITE_FABRIC;
+            if (cmp_set)
+                flags |= NH_FLAG_COMPOSITE_MULTI_PROTO;
         }
+
+        if (type == NH_ENCAP) {
+            if (el2_set)
+                flags |= NH_FLAG_ENCAP_L2;
+        }
+
     }
 
     vr_nh_op(command, type, nh_id, if_id, vrf_id, dst_mac,

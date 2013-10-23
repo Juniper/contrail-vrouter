@@ -180,67 +180,49 @@ vr_mpls_req_process(void *s_req)
     }
 }
 
-static int
-vr_mcast_mpls_input(struct vrouter *router, struct vr_packet *pkt,
-        struct vr_forwarding_md *fmd) 
+int
+vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
+        short *reason)
 {
-    unsigned int ttl;
-    unsigned int label;
-    unsigned short drop_reason = 0;
-    int i;
-    int found;
     struct vr_nexthop *nh;
-    struct vr_nexthop *dir_nh;
-    struct vr_ip *ip;
+    struct vrouter *router = vrouter_get(0);
+    unsigned short res;
 
-    label = ntohl(*(unsigned int *)pkt_data(pkt));
-    ttl = label & 0xFF;
+    if (!router) {
+        res = VP_DROP_MISC;
+        goto fail;
+    }
+
     label >>= VR_MPLS_LABEL_SHIFT;
-
-    if (--ttl == 0) {
-        drop_reason = VP_DROP_TTL_EXCEEDED;
-        goto dropit;
+    if (label >= router->vr_max_labels) {
+        res = VP_DROP_INVALID_LABEL;
+        goto fail;
     }
 
     nh = router->vr_ilm[label];
-    if (!nh || nh->nh_type != NH_COMPOSITE) {
-        drop_reason = VP_DROP_INVALID_NH;
-        goto dropit;
+    if(!nh) {
+        res = VP_DROP_INVALID_NH;
+        goto fail;
     }
 
-    if (!pkt_pull(pkt, VR_MPLS_HDR_LEN)) {
-        drop_reason = VP_DROP_PUSH;
-        goto dropit;
+    switch(nh->nh_family) {
+    case AF_INET:
+        return PKT_MPLS_TUNNEL_L3;
+    case AF_BRIDGE:
+        return PKT_MPLS_TUNNEL_L2_UCAST;
+    case AF_UNSPEC:
+        if (control_data == 0)
+            return PKT_MPLS_TUNNEL_L2_MCAST;
+        else 
+            return PKT_MPLS_TUNNEL_L3;
+    default:
+        res = VP_DROP_INVALID_NH;
     }
 
-    ip = (struct vr_ip *)pkt_network_header(pkt);
-
-    /* Ensure that the packet is received from one of the tree descendants */
-    for (i = 0, found = 0; i < nh->nh_component_cnt; i++) {
-        dir_nh = nh->nh_component_nh[i].cnh;
-        if (dir_nh->nh_type == NH_TUNNEL) {
-            if (ip->ip_saddr == dir_nh->nh_gre_tun_dip) {
-                found = 1;
-                break;
-            }
-        }
-    }
-
-    if (found == 0) {
-        drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
-        goto dropit;
-    }
-
-    /* Update the ttl to be used for the subsequent nh processing */
-    pkt->vp_ttl = ttl;
-
-    /* If from valid descndant, start replicating */
-    nh_output(pkt->vp_if->vif_vrf, pkt, nh, fmd);
-    return 0;
-
-dropit:
-    vr_pfree(pkt, drop_reason);
-    return 0;
+fail:
+    if (reason)
+        *reason = res;
+    return -1;
 }
 
 int
@@ -253,19 +235,29 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     unsigned char *data;
     struct vr_ip *ip;
     unsigned short drop_reason = 0;
+    struct vr_forwarding_md c_fmd;
+    int ttl;
+
+    if (!fmd) {
+        vr_init_forwarding_md(&c_fmd);
+        fmd = &c_fmd;
+    }
 
     label = ntohl(*(unsigned int *)pkt_data(pkt));
+    ttl = label & 0xFF;
     label >>= VR_MPLS_LABEL_SHIFT;
     if (label >= router->vr_max_labels) {
         drop_reason = VP_DROP_INVALID_LABEL;
         goto dropit;
     }
 
-    /* Set network header to inner ip header only if unicast */
-    if (vr_mpls_is_label_mcast(label) == true) {
-        vr_mcast_mpls_input(router, pkt, fmd);
-        return 0;
+    if (--ttl <= 0) {
+        drop_reason = VP_DROP_TTL_EXCEEDED;
+        goto dropit;
     }
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    fmd->fmd_outer_src_ip = ip->ip_saddr;
 
     /* drop the TOStack label */
     data = pkt_pull(pkt, VR_MPLS_HDR_LEN);
@@ -277,7 +269,6 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     /* this is the new network header and inner network header too*/
     pkt_set_network_header(pkt, pkt->vp_data);
     pkt_set_inner_network_header(pkt, pkt->vp_data);
-    pkt->vp_type = VP_TYPE_IP;
 
     nh = router->vr_ilm[label];
     if (!nh) {
@@ -299,12 +290,12 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     else
         vrf = pkt->vp_if->vif_vrf;
 
-    ip = (struct vr_ip *)pkt_data(pkt);
-    if (ip->ip_csum == VR_DIAG_IP_CSUM) {
-        pkt->vp_flags |= VP_FLAG_DIAG;
-    } else if (vr_perfr) {
+    /*
+     * Mark it for GRO. Diag, L2 and multicast nexthops unmark if
+     * required
+     */
+    if (vr_perfr) 
         pkt->vp_flags |= VP_FLAG_GRO;
-    }
 
     nh_output(vrf, pkt, nh, fmd);
 

@@ -45,14 +45,12 @@
 #define VP_FLAG_FLOW_SET        (1 << 3)
 /* The native packet is multicast packet */
 #define VP_FLAG_MULTICAST       (1 << 4)
-/* Diag packet, trap to agent at last step of processing */
-#define VP_FLAG_DIAG            (1 << 5)  
 /* Partially checksummed by VM */
-#define VP_FLAG_CSUM_PARTIAL    (1 << 6)
+#define VP_FLAG_CSUM_PARTIAL    (1 << 5)
 /* Attempt to do receive offload on inner packet */
-#define VP_FLAG_GRO             (1 << 7)
+#define VP_FLAG_GRO             (1 << 6)
 /* Attempt to do segmentation on inner packet */
-#define VP_FLAG_GSO             (1 << 8)
+#define VP_FLAG_GSO             (1 << 7)
 
 /* 
  * possible 256 values of what a packet can be. currently, this value is
@@ -62,7 +60,10 @@
 #define VP_TYPE_IP              1
 #define VP_TYPE_IPOIP           2
 #define VP_TYPE_IP6             3
-#define VP_TYPE_MAX             4
+#define VP_TYPE_L2              4
+#define VP_TYPE_L2OIP           5
+#define VP_TYPE_VXLAN           6
+#define VP_TYPE_MAX             7
 
 /*
  * Values to define how to proceed with handling a packet.
@@ -70,6 +71,19 @@
 #define PKT_RET_FAST_PATH 1
 #define PKT_RET_SLOW_PATH 2
 #define PKT_RET_ERROR     3
+
+/*
+ * Values to define the MPLS tunnel type
+ */
+#define PKT_MPLS_TUNNEL_L3          0x01
+#define PKT_MPLS_TUNNEL_L2_UCAST    0x02
+#define PKT_MPLS_TUNNEL_L2_MCAST    0x03
+
+/*
+ * Values to define the encap type of outgoing packet
+ */
+#define PKT_ENCAP_MPLS  0x01
+#define PKT_ENCAP_VXLAN 0x02
 
 /* packet drop reasons */
 #define VP_DROP_DISCARD                     0
@@ -108,7 +122,11 @@
 #define VP_DROP_MISC                        33
 #define VP_DROP_INVALID_PACKET              34
 #define VP_DROP_CKSUM_ERR                   35
-#define VP_DROP_MAX                         36
+#define VP_DROP_CLONE_FAIL                  36
+#define VP_DROP_NO_FMD                      37
+#define VP_DROP_CLONED_ORIGINAL             38
+#define VP_DROP_INVALID_VNID                39
+#define VP_DROP_MAX                         40
 
 struct vr_drop_stats {
     uint64_t vds_discard;
@@ -147,6 +165,10 @@ struct vr_drop_stats {
     uint64_t vds_misc;
     uint64_t vds_invalid_packet;
     uint64_t vds_cksum_err;
+    uint64_t vds_clone_fail;
+    uint64_t vds_no_fmd;
+    uint64_t vds_cloned_original;
+    uint64_t vds_invalid_vnid;
 };
 
 /*
@@ -173,6 +195,7 @@ struct vr_packet_node {
     struct vr_list_node pl_node;
     unsigned short pl_proto;
     struct vr_packet *pl_packet;
+    uint32_t pl_outer_src_ip;
 };
 
 extern void pkt_reset(struct vr_packet *);
@@ -327,6 +350,11 @@ struct vr_pcap {
     unsigned int pcap_orig_len;
 };
 
+struct vr_vxlan {
+    unsigned int res;
+    unsigned int vnid;
+} __attribute__((packed));
+
 #define VR_UDP_HEAD_SPACE           62 /* eth + Ip + iP + udp */
 #define VR_MIRROR_PKT_HEAD_SPACE    (VR_UDP_HEAD_SPACE + sizeof(struct vr_pcap) + \
                                      VR_MPLS_HDR_LEN + sizeof(struct vr_gre))
@@ -335,15 +363,17 @@ struct vr_pcap {
  * Mcast packet adds the following before replicating
  * Original Transport + IP Header
  * New Mpls header (4 bytes)
- * New GRE header
+ * New Udp header (It could be GRE Mpls or Udp Mpls tunnel. Wee need to
+ * take the maximum of two )
  * New IP header
  * New L2 header (eth + vlan)
+ * 4 bytes of control information to identify whther Label is L2 or L3
  */
 
 #define VR_MCAST_PKT_HEAD_SPACE        (sizeof(struct vr_eth) + \
                                         sizeof(struct vr_vlan_hdr) + \
                                         sizeof(struct vr_ip) + \
-                                        sizeof(struct vr_gre) + 4)
+                                        sizeof(struct vr_udp) + 4 + 4)
 
 extern unsigned short vr_ip_csum(struct vr_ip *);
 extern unsigned short vr_generate_unique_ip_id(void);
@@ -359,10 +389,11 @@ extern unsigned short vr_ip_partial_csum(struct vr_ip *);
  * this variable
  */
 struct vr_forwarding_md {
-    int32_t	fmd_flow_index;
-    int32_t	fmd_label;
-    int16_t	fmd_ecmp_nh_index;
+    int32_t	    fmd_flow_index;
+    int32_t	    fmd_label;
+    int16_t	    fmd_ecmp_nh_index;
     int16_t     fmd_dvrf;
+    uint32_t    fmd_outer_src_ip;
 };
 
 static inline void
@@ -372,6 +403,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_ecmp_nh_index = -1;
     fmd->fmd_label = -1;
     fmd->fmd_dvrf = -1;
+    fmd->fmd_outer_src_ip = 0;
     return;
 }
 

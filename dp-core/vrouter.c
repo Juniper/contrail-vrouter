@@ -66,6 +66,11 @@ static struct vr_module modules[] = {
         .init           =       vr_mirror_init,
         .exit           =       vr_mirror_exit,
     },
+    {
+        .mod_name       =       "Vxlan",
+        .init           =       vr_vxlan_init,
+        .exit           =       vr_vxlan_exit,
+    },
     
 };
 
@@ -82,6 +87,12 @@ int vr_perfs = 1;    /* segmentation in software */
  * Enable MPLS over UDP globally
  */
 int vr_mudp = 0;
+
+/*
+ * TCP MSS adjust settings
+ */
+int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
+int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
 
 /*
  * Following sysctls are to enable RPS. Based on empirical results,
@@ -109,8 +120,16 @@ int vr_perfr1 = 0;   /* RPS after pulling inner headers */
 int vr_perfr2 = 1;   /* RPS after GRO on pkt1 interface */
 int vr_perfr3 = 1;   /* RPS from physical interface rx handler */
 int vr_perfp = 1;    /* pull inner headers, faster version */
-int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
-int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
+
+#else
+
+#if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+
+int vr_perfr1 = 0;
+int vr_perfr2 = 1;
+int vr_perfr3 = 1;
+int vr_perfp = 1;
 
 #else
 
@@ -118,9 +137,8 @@ int vr_perfr1 = 0;
 int vr_perfr2 = 0;
 int vr_perfr3 = 0;
 int vr_perfp = 0;
-int vr_from_vm_mss_adj = 1;
-int vr_to_vm_mss_adj = 1;
 
+#endif
 #endif
 
 /*

@@ -7,7 +7,7 @@
 #ifndef __VRCOMPAT_H__
 #define __VRCOMPAT_H__
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,2,43))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,2,54))
 typedef u64 netdev_features_t;
 #endif
 
@@ -15,8 +15,54 @@ typedef u64 netdev_features_t;
 static inline __u32
 skb_get_rxhash(struct sk_buff *skb)
 {
-#ifndef CONFIG_XEN
+#if defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+    struct iphdr *ip;
+    u32 ports = 0;
+
+    if (skb->rxhash) {
+        return skb->rxhash;
+    }
+
+    if (skb->protocol != (htons(ETH_P_IP))) {
+        return 0;
+    }
+
+    if (!pskb_may_pull(skb, sizeof(*ip))) {
+        return 0;
+    }
+
+    ip = (struct iphdr *) skb->data;
+    switch (ip->protocol) {
+        case IPPROTO_TCP:
+        case IPPROTO_UDP:
+            if (vr_ip_transport_header_valid((struct vr_ip *) ip)) {
+                /*
+                 * Not a fragment, so pull in the source and dest ports
+                 */
+                if (pskb_may_pull(skb, ip->ihl*4 + 4)) {
+                    ports = *((u32 *) (skb->data + (ip->ihl*4)));
+                }
+            }
+
+            break;
+
+        default:
+            break;
+    }
+
+    if (hashrnd_inited == 0) {
+        get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
+        hashrnd_inited = 1;
+    }
+
+    skb->rxhash = jhash_3words(ip->saddr, ip->daddr, ports, vr_hashrnd) >> 16;
+    if (!skb->rxhash) {
+        skb->rxhash = 1;
+    }
+
     return skb->rxhash;
+
 #else
     return 0;
 #endif
@@ -56,10 +102,10 @@ typedef enum rx_handler_result rx_handler_result_t;
 #define VLAN_TAG_PRESENT VLAN_CFI_MASK
 #define ARPHRD_VOID	0xFFFF
 
-#define alloc_netdev_mqs(sizeof_priv, name, setup, count1, count2) \
-	alloc_netdev_mq(sizeof_priv, name, setup, count1)
-
 #if (RHEL_MAJOR != 6) && (RHEL_MINOR != 4) 
+
+#define alloc_netdev_mqs(sizeof_priv, name, setup, count1, count2) \
+        alloc_netdev_mq(sizeof_priv, name, setup, count1)
 
 static inline void skb_reset_mac_len(struct sk_buff *skb)
 {

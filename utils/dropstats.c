@@ -90,6 +90,10 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_ttl_exceeded);
     printf("Mcast Clone Fail              %" PRIu64 "\n",
             stats->vds_mcast_clone_fail);
+    printf("Clone Fail                    %" PRIu64 "\n",
+            stats->vds_clone_fail);
+    printf("Cloned Original               %" PRIu64 "\n",
+            stats->vds_cloned_original);
     printf("Composite Invalid Interface   %" PRIu64 "\n",
             stats->vds_composite_invalid_interface);
     printf("\n");
@@ -128,7 +132,10 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_nowhere_to_go);
     printf("Checksum errors               %" PRIu64 "\n",
             stats->vds_cksum_err);
-
+    printf("No Fmd                        %" PRIu64 "\n",
+            stats->vds_no_fmd);
+    printf("Ivalid VNID                   %" PRIu64 "\n",
+            stats->vds_invalid_vnid);
     printf("\n");
     return;
 }

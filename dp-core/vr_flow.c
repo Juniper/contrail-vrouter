@@ -297,7 +297,7 @@ vr_find_flow(struct vr_flow_key *key, struct vr_btable *table,
 
 static int
 vr_enqueue_flow(struct vr_flow_entry *fe, struct vr_packet *pkt,
-        unsigned short proto)
+        unsigned short proto, struct vr_forwarding_md *fmd)
 {
     unsigned int i = 0;
     unsigned short drop_reason = 0;
@@ -319,10 +319,10 @@ vr_enqueue_flow(struct vr_flow_entry *fe, struct vr_packet *pkt,
         goto drop;
     }
 
-    pkt->vp_nh = NULL;
-
     pnode->pl_packet = pkt;
     pnode->pl_proto = proto;
+    if (fmd)
+        pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
     *head = &pnode->pl_node;
 
     return 0;
@@ -405,6 +405,27 @@ drop:
     return 0;
 }
 
+unsigned int
+vr_flow_trap(unsigned short vrf, struct vr_packet *pkt, unsigned short flags,
+        struct vr_forwarding_md *fmd)
+{
+    unsigned int trap_reason;
+
+    vr_preset(pkt);
+
+    switch (flags & VR_FLOW_FLAG_TRAP_MASK) {
+    case VR_FLOW_FLAG_TRAP_ECMP:
+        trap_reason = AGENT_TRAP_ECMP_RESOLVE;
+        break;
+
+    default:
+        vr_pfree(pkt, VP_DROP_FLOW_ACTION_INVALID);
+        return 0;
+    }
+
+    return vr_trap(pkt, vrf, trap_reason, &fmd->fmd_flow_index);
+}
+
 static void
 vr_flow_set_forwarding_md(struct vr_flow_entry *fe, unsigned int index, 
         struct vr_forwarding_md *md)
@@ -455,6 +476,10 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         ret = vr_flow_nat(vrf, fe, pkt, proto, fmd);
         break;
 
+    case VR_FLOW_ACTION_TRAP:
+        ret = vr_flow_trap(vrf, pkt, fe->fe_flags, fmd);
+        break;
+
     default:
         vr_pfree(pkt, VP_DROP_FLOW_ACTION_INVALID);
         break;
@@ -481,8 +506,15 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index, struct vr_packet *pkt,
         unsigned short proto, struct vr_forwarding_md *fmd)
 {
-    fe->fe_stats.flow_bytes += pkt_len(pkt);
-    fe->fe_stats.flow_packets++;
+    uint32_t new_stats;
+
+    new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_bytes, pkt_len(pkt));
+    if (new_stats < pkt_len(pkt))
+        fe->fe_stats.flow_bytes_oflow++;
+
+    new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_packets, 1);
+    if (!new_stats) 
+        fe->fe_stats.flow_packets_oflow++;
 
     if (fe->fe_flags & VR_FLOW_FLAG_UNUSABLE) {
         vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
@@ -490,7 +522,7 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     }
 
     if (fe->fe_action == VR_FLOW_ACTION_HOLD)
-        return vr_enqueue_flow(fe, pkt, proto);
+        return vr_enqueue_flow(fe, pkt, proto, fmd);
 
     return vr_flow_action(router, fe, index, pkt, proto, fmd);
 }
@@ -635,14 +667,13 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
     struct vr_list_node **head;
     struct vr_packet_node *pnode;
 
-    if (fe->fe_flags & VR_FLOW_FLAG_FLUSH) {
-        fe->fe_flags &= ~VR_FLOW_FLAG_FLUSH;
-        fe->fe_action = fe_action;
-    }
+    fe->fe_action = fe_action;
 
     head = &fe->fe_hold_list.node_p;
     while (*head) {
         pnode = (struct vr_packet_node *)*head;
+        if (fmd)
+            fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
         vr_flow_action(router, fe, index, pnode->pl_packet,
                 pnode->pl_proto, fmd);
         *head = pnode->pl_node.node_n;
@@ -762,7 +793,6 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (!fe)
         return -EINVAL;
 
-
     flags = req->fr_flags;
     orig_action = req->fr_action;
     action = VR_FLOW_ACTION_DROP;
@@ -783,8 +813,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
             }
         }
     } else {
-        flags |= VR_FLOW_FLAG_FLUSH;
-        if ((orig_action & VR_FLOW_ACTION_NAT) || (flags & VR_RFLOW_VALID)) {
+        if ((fe->fe_rflow >= 0) || (orig_action & VR_FLOW_ACTION_NAT) || 
+                (flags & VR_RFLOW_VALID)) {
             rev_defer_data = vr_get_defer_data(sizeof(*rev_defer_data));
             if (!rev_defer_data) {
                 ret = -ENOMEM;
@@ -792,8 +822,6 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
             }
         }
     }
-
-
 
     if ((unsigned int)req->fr_flow_sip != fe->fe_key.key_src_ip ||
         (unsigned int)req->fr_flow_dip != fe->fe_key.key_dest_ip ||
@@ -892,8 +920,12 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
 
     if (fe->fe_rflow >= 0) {
         rfe = vr_get_flow_entry(router, fe->fe_rflow);
-        rflags = flags & ~VR_FLOW_FLAG_NAT_MASK;
-        if (orig_action == VR_FLOW_ACTION_NAT) {
+        rflags = flags;
+
+        if (orig_action == VR_FLOW_ACTION_NAT || 
+                req->fr_rflow_action == VR_FLOW_ACTION_NAT) {
+            rflags = flags & ~VR_FLOW_FLAG_NAT_MASK;
+
             if (flags & VR_FLOW_FLAG_SNAT)
                 rflags |= VR_FLOW_FLAG_DNAT;
 
@@ -912,6 +944,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
 
         rfe->fe_ecmp_nh_index = req->fr_rflow_ecmp_nh_index;
         rfe->fe_action = action;
+
+
         /* do not change the mirror flags for the reverse entry */
         if (rflags & VR_FLOW_FLAG_MIRROR) {
             rfe->fe_mirror_id = req->fr_mir_id;
@@ -926,19 +960,15 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         rfe->fe_flags = rflags;
     }
 
-    if (rfe && rfe->fe_flags & (VR_FLOW_FLAG_FLUSH |
-                VR_FLOW_FLAG_UNUSABLE)) {
+    if (rfe) {
         rev_defer_data->def_index = fe->fe_rflow;
-        rev_defer_data->def_action = orig_action;
+        rev_defer_data->def_action = req->fr_rflow_action;
         vr_defer(router, vr_flow_flush, rev_defer_data);
     }
 
-    if (fe->fe_flags & (VR_FLOW_FLAG_FLUSH | 
-                 VR_FLOW_FLAG_UNUSABLE)) {
-        defer_data->def_index = req->fr_index;
-        defer_data->def_action = orig_action;
-        vr_defer(router, vr_flow_flush, defer_data);
-    }
+    defer_data->def_index = req->fr_index;
+    defer_data->def_action = orig_action;
+    vr_defer(router, vr_flow_flush, defer_data);
 
     return 0;
 

@@ -180,21 +180,6 @@ vr_trap(struct vr_packet *pkt, unsigned short trap_vrf,
     return 0;
 }
     
-static int
-vr_default_input(struct vr_packet *pkt)
-{
-    struct vr_interface *vif = pkt->vp_if;
-    struct vrouter *router = vif->vif_router;
-
-    if (router->vr_host_if && (vif != router->vr_host_if)) {
-        vr_preset(pkt);
-        return router->vr_host_if->vif_tx(router->vr_host_if, pkt);
-    }
-    
-    vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
-    return 0;
-}
-
 /*
  * vr_input is called from linux(host) ingress path. we are not allowed to
  * sleep here. return value should indicate whether the router consumed the
@@ -215,6 +200,7 @@ vr_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
     struct vrouter *router = vif->vif_router;
     struct vr_forwarding_md fmd;
     int reason;
+    unsigned short pull_len = 0;
 
     if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
         vr_init_forwarding_md(&fmd);
@@ -231,6 +217,7 @@ vr_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
         vif_drop_pkt(vif, pkt, 1);
         return 0;
     }
+    pull_len += VR_ETHER_HLEN;
 
     eth_proto = ntohs(*(unsigned short *)(eth + VR_ETHER_PROTO_OFF));
     while (eth_proto == VR_ETH_PROTO_VLAN) {
@@ -241,10 +228,10 @@ vr_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
             vif_drop_pkt(vif, pkt, 1);
             return 0;
         }
+        pull_len += sizeof(*vlan);
     }
 
     vr_init_forwarding_md(&fmd);
-
     pkt_set_network_header(pkt, pkt->vp_data);
     pkt_set_inner_network_header(pkt, pkt->vp_data);
     if (eth_proto == VR_ETH_PROTO_IP) {
@@ -264,6 +251,11 @@ vr_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
     if (well_known_mac(dmac))
         return vr_trap(pkt, vrf,  AGENT_TRAP_L2_PROTOCOLS, NULL);
 
+    /* Get the complete ethernet packet and do the bridging */
+    if (!pkt_push(pkt, pull_len)) {
+        vif_drop_pkt(vif, pkt, 1);
+        return 0;
+    }
 
-    return vr_default_input(pkt);
+    return vr_bridge_input(router, vrf, pkt, &fmd);
 }

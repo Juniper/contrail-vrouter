@@ -12,6 +12,9 @@ extern int mtrie4_algo_init(struct vr_rtable *, struct rtable_fspec *);
 extern void mtrie4_algo_deinit(struct vr_rtable *, struct rtable_fspec *);
 extern int mcast_algo_init(struct vr_rtable *, struct rtable_fspec *);
 extern void mcast_algo_deinit(struct vr_rtable *, struct rtable_fspec *);
+extern int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
+extern void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *);
+
 
 static struct rtable_fspec *
 vr_get_family(unsigned int family)
@@ -19,6 +22,8 @@ vr_get_family(unsigned int family)
     switch (family) {
     case AF_INET:
         return &rtable_families[0];
+    case AF_BRIDGE:
+        return &rtable_families[1];
 
     default:
         return NULL;
@@ -116,7 +121,7 @@ vr_route_dump(vr_route_req *req)
 {
     struct vr_route_req vr_req;
     struct vrouter *router;
-    struct vr_rtable *rtable;
+    struct vr_rtable *rtable = NULL;
     int ret;
    
     vr_req.rtr_req = *req;
@@ -126,7 +131,12 @@ vr_route_dump(vr_route_req *req)
         goto generate_error;
     } else {
 
-        rtable = vr_get_inet_table(router, req->rtr_rt_type);
+        if (req->rtr_family == AF_INET) {
+            rtable = vr_get_inet_table(router, req->rtr_rt_type);
+        } else if (req->rtr_family == AF_BRIDGE) {
+            rtable = router->vr_bridge_rtable;
+        }
+
         if (!rtable) {
             ret = -ENOENT;
             goto generate_error;
@@ -383,6 +393,78 @@ inet_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
     return 0;
 }
 
+int
+bridge_entry_add(struct rtable_fspec *fs, struct vr_route_req *req)
+{
+    struct vrouter *router;
+
+    router = vrouter_get(req->rtr_req.rtr_rid);
+    if (!router)
+        return -EINVAL;
+
+    if (!router->vr_bridge_rtable ||
+            ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
+            ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN))
+        return -EINVAL;
+
+    return router->vr_bridge_rtable->algo_add(router->vr_bridge_rtable, req);
+}
+
+int
+bridge_entry_del(struct rtable_fspec *fs, struct vr_route_req *req)
+{
+    struct vrouter *router;
+
+    if ((unsigned int)(req->rtr_req.rtr_mac_size) > 6 ||
+            (unsigned int)(req->rtr_req.rtr_vrf_id) >= VR_MAX_VRFS)
+        return -EINVAL;
+
+    router = vrouter_get(req->rtr_req.rtr_rid);
+    if (!router)
+        return -EINVAL;
+
+    if (!router->vr_bridge_rtable || req->rtr_req.rtr_vrf_id >= (int)fs->rtb_max_vrfs)
+        return -EINVAL;
+
+    return router->vr_bridge_rtable->algo_del(router->vr_bridge_rtable, req);
+}
+
+static int
+bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
+{
+    int ret;
+    struct vr_rtable *table = NULL;
+    
+    if (router->vr_bridge_rtable)
+        return vr_module_error(-EEXIST, __FUNCTION__, __LINE__, 0);
+
+    if (fs->algo_init[RT_UCAST]) {
+        table = vr_zalloc(sizeof(struct vr_rtable));
+        if (!table)
+            return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
+                    RT_UCAST);
+
+        ret = fs->algo_init[RT_UCAST](table, fs);
+        if (ret)
+            return vr_module_error(ret, __FUNCTION__, __LINE__, RT_UCAST);
+    }
+
+    router->vr_bridge_rtable = table;
+    return 0;
+}
+
+static void
+bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router)
+{
+
+    if (router->vr_bridge_rtable) {
+        fs->algo_deinit[RT_UCAST](router->vr_bridge_rtable, fs);
+        vr_free(router->vr_bridge_rtable);
+    }
+
+    router->vr_bridge_rtable = NULL;
+    return;
+}
 
 /* hopefully we can afford a bit of bloat while loading ? */
 static struct rtable_fspec rtable_families[] = {
@@ -397,6 +479,16 @@ static struct rtable_fspec rtable_families[] = {
         .algo_deinit[RT_UCAST]          =   mtrie4_algo_deinit,
         .algo_init[RT_MCAST]            =   mcast_algo_init,
         .algo_deinit[RT_MCAST]          =   mcast_algo_deinit,
+    },
+    {
+        .rtb_family                     =   AF_BRIDGE,
+        .rtb_max_vrfs                   =   VR_MAX_VRFS,
+        .rtb_family_init                =   bridge_rtb_family_init,
+        .rtb_family_deinit              =   bridge_rtb_family_deinit,
+        .route_add                      =   bridge_entry_add,
+        .route_del                      =   bridge_entry_del,
+        .algo_init[RT_UCAST]            =   bridge_table_init,
+        .algo_deinit[RT_UCAST]          =   bridge_table_deinit,
     }
 };
 
