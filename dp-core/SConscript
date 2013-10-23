@@ -7,9 +7,11 @@ env = VRouterEnv.Clone()
 
 dpcore_sources = [
                     'vnsw_ip4_mtrie.c',
+                    'vr_bridge.c',
                     'vr_btable.c',
                     'vr_datapath.c',
                     'vr_flow.c',
+                    'vr_htable.c',
                     'vr_index_table.c',
                     'vr_interface.c',
                     'vr_mcast.c',
@@ -25,6 +27,7 @@ dpcore_sources = [
                     'vr_sandesh.c',
                     'vr_stats.c',
                     'vr_vrf_assign.c',
+                    'vr_vxlan.c',
                     'vrouter.c',
                   ]
 
