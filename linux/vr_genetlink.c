@@ -112,7 +112,7 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
         len = response->vr_message_len;
         len += GENL_HDRLEN + NLA_HDRLEN;
         len = NLMSG_ALIGN(len);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,10))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0))
         netlink_id =  NETLINK_CB(in_skb).pid;
 #else
         netlink_id =  NETLINK_CB(in_skb).portid;
