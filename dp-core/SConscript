@@ -11,6 +11,7 @@ dpcore_sources = [
                     'vr_btable.c',
                     'vr_datapath.c',
                     'vr_flow.c',
+                    'vr_fragment.c',
                     'vr_htable.c',
                     'vr_index_table.c',
                     'vr_interface.c',

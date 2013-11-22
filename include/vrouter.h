@@ -46,6 +46,13 @@ typedef void(*vr_defer_cb)(struct vrouter *router, void *user_data);
 
 struct vr_ip;
 
+struct vr_timer {
+    void (*vt_timer)(void *);
+    void *vt_vr_arg;
+    void *vt_os_arg;
+    unsigned int vt_msecs;
+};
+
 struct host_os {
     void *(*hos_malloc)(unsigned int);
     void *(*hos_zalloc)(unsigned int);
@@ -73,6 +80,10 @@ struct host_os {
     void *(*hos_get_defer_data)(unsigned int);
     void (*hos_put_defer_data)(void *);
     void (*hos_get_time)(unsigned int*, unsigned int *);
+    void (*hos_get_mono_time)(unsigned int*, unsigned int *);
+    int (*hos_create_timer)(struct vr_timer *);
+    void (*hos_delete_timer)(struct vr_timer *);
+
     void *(*hos_network_header)(struct vr_packet *);
     void *(*hos_inner_network_header)(struct vr_packet *);
     void *(*hos_data_at_offset)(struct vr_packet *, unsigned short);
@@ -116,6 +127,9 @@ struct host_os {
 #define vr_get_defer_data               vrouter_host->hos_get_defer_data
 #define vr_put_defer_data               vrouter_host->hos_put_defer_data
 #define vr_get_time                     vrouter_host->hos_get_time
+#define vr_get_mono_time                vrouter_host->hos_get_mono_time
+#define vr_create_timer                 vrouter_host->hos_create_timer
+#define vr_delete_timer                 vrouter_host->hos_delete_timer
 #define vr_network_header               vrouter_host->hos_network_header
 #define vr_inner_network_header         vrouter_host->hos_inner_network_header
 #define vr_data_at_offset               vrouter_host->hos_data_at_offset
@@ -151,6 +165,11 @@ struct vrouter {
     struct vr_mirror_entry **vr_mirrors;
     vr_itable_t vr_mirror_md;
     vr_itable_t vr_vxlan_table;
+
+    struct vr_btable *vr_fragment_table;
+    struct vr_btable *vr_fragment_otable;
+    struct vr_timer *vr_fragment_table_scanner;
+    struct vr_timer *vr_fragment_otable_scanner;
 
     uint64_t **vr_pdrop_stats;
 

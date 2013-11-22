@@ -25,7 +25,7 @@ LIB_FLAGS = -shared -Wl,-$(SONAME),$@.so.$(LIB_MAJOR_VERSION)\
 
 LIBOBJS = vrouter_host_mod.lo
 LIBOBJS += vr_host_mtransport.lo vr_host_message.lo
-LIBOBJS += vr_host_interface.lo vr_host_packet.lo
+LIBOBJS += vr_host_interface.lo vr_host_packet.lo ulinux.lo
 LIBOBJS += $(DP_CORE)/vr_message.lo
 LIBOBJS += $(DP_CORE)/vr_queue.lo
 LIBOBJS += $(DP_CORE)/vrouter.lo $(DP_CORE)/vr_route.lo $(DP_CORE)/vr_nexthop.lo

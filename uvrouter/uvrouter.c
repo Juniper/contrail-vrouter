@@ -144,9 +144,9 @@ main(int argc, const char *argv[])
     int ret;
 
     /* daemonize... */
-    if (daemon(0, 0) < 0)
+    if (daemon(0, 0) < 0) {
         return -1;
-
+	}
     vr_host_io_init();
 
     /* init the vrouter */

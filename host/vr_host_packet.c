@@ -84,6 +84,7 @@ vr_hpacket_alloc(unsigned int size)
 {
     struct vr_hpacket *hpkt;
     struct vr_hpacket_tail *hpkt_tail;
+    struct vr_packet *pkt;
 
     hpkt = (struct vr_hpacket *)malloc(sizeof(*hpkt));
     if (!hpkt)
@@ -100,6 +101,12 @@ vr_hpacket_alloc(unsigned int size)
     hpkt->hp_end = size - 1;
     hpkt_tail = (struct vr_hpacket_tail *)hpkt_end(hpkt);
     hpkt_tail->hp_users = 1;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_head = hpkt->hp_head;
+    pkt->vp_data = hpkt->hp_data;
+    pkt->vp_end = hpkt->hp_end;
+    pkt->vp_len = 0;
+    pkt->vp_if = NULL;
 
     return hpkt;
 }
@@ -128,10 +135,13 @@ struct vr_hpacket *
 vr_hpacket_pool_alloc(struct vr_hpacket_pool *pool)
 {
     struct vr_hpacket *hpkt;
+    struct vr_packet *pkt;
 
     hpkt = pool->pool_head;
     pool->pool_head = hpkt->hp_next;
     hpkt->hp_next = NULL;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_data = hpkt->hp_data;
     return hpkt;
 }
 
@@ -139,9 +149,14 @@ void
 vr_hpacket_pool_free(struct vr_hpacket *hpkt)
 {
     struct vr_hpacket_pool *pool = hpkt->hp_pool;
+    struct vr_packet *pkt;
 
     hpkt->hp_next = pool->pool_head;
     pool->pool_head = hpkt;
+    pkt = &hpkt->hp_packet;
+    pkt->vp_data = hpkt->hp_data;
+    pkt->vp_len = 0;
+    pkt->vp_if = NULL;
 
     return;
 }
@@ -188,6 +203,7 @@ vr_hpacket_pool_create(unsigned int pool_size, unsigned int psize)
             hpkt->hp_next = pool->pool_head->hp_next;
             pool->pool_head->hp_next = hpkt;
         }
+        hpkt->hp_pool = pool;
     }
 
     return pool;

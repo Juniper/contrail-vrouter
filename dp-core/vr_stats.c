@@ -54,6 +54,9 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_no_fmd = stats->vds_no_fmd;
     response->vds_cloned_original =
         stats->vds_cloned_original;
+    response->vds_invalid_vnid = stats->vds_invalid_vnid;
+    response->vds_frag_err = stats->vds_frag_err;
+    response->vds_invalid_source = stats->vds_invalid_source;
 
     return;
 }
@@ -118,6 +121,9 @@ vr_drop_stats_get(void)
         stats->vds_clone_fail += stats_block->vds_clone_fail;
         stats->vds_no_fmd += stats_block->vds_no_fmd;
         stats->vds_cloned_original += stats_block->vds_cloned_original;
+        stats->vds_invalid_vnid += stats_block->vds_invalid_vnid;
+        stats->vds_frag_err += stats_block->vds_frag_err;
+        stats->vds_invalid_source += stats_block->vds_invalid_source;
     }
 
     vr_drop_stats_fill_response(&response, stats);
@@ -126,9 +132,6 @@ exit_get:
     vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : &response, ret);
     return;
 }
-
-
-
 
 void
 vr_drop_stats_req_process(void *s_req)

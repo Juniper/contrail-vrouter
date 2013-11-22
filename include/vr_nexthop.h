@@ -43,7 +43,12 @@ enum nexthop_type {
 #define NH_FLAG_COMPOSITE_MULTI_PROTO       0x0800
 #define NH_FLAG_TUNNEL_VXLAN                0x1000
 
+#define NH_SOURCE_INVALID                   0
+#define NH_SOURCE_VALID                     1
+#define NH_SOURCE_MISMATCH                  2
+
 struct vr_packet;
+
 struct vr_forwarding_md;
 
 struct vr_component_nh {
@@ -87,15 +92,17 @@ struct vr_nexthop {
          struct {
             unsigned short cnt;
             struct vr_component_nh *component;
-            int (*cnh_validate_src)(unsigned short vrf, struct vr_packet *,
-                    struct vr_nexthop *, struct vr_forwarding_md *);
          } nh_composite;
 
     } nh_u;
 
     __u16               nh_data_size;
     struct vrouter      *nh_router;
-    int                 (*nh_reach_nh)(unsigned short vrf, 
+    int                 (*nh_validate_src)(unsigned short,
+                                           struct vr_packet *,
+                                           struct vr_nexthop *,
+                                           struct vr_forwarding_md *);
+    int                 (*nh_reach_nh)(unsigned short, 
                                        struct vr_packet *,
                                        struct vr_nexthop *,
                                        struct vr_forwarding_md *);
@@ -116,10 +123,10 @@ struct vr_nexthop {
 #define nh_udp_tun_encap_len    nh_u.nh_udp_tun.tun_encap_len
 #define nh_component_cnt        nh_u.nh_composite.cnt
 #define nh_component_nh         nh_u.nh_composite.component
-#define nh_validate_src         nh_u.nh_composite.cnh_validate_src
 
 extern int vr_nexthop_init(struct vrouter *);
 extern void vr_nexthop_exit(struct vrouter *, bool);
+extern struct vr_nexthop *__vrouter_get_nexthop(struct vrouter *, unsigned int);
 extern struct vr_nexthop *vrouter_get_nexthop(unsigned int, unsigned int);
 extern void vrouter_put_nexthop(struct vr_nexthop *);
 extern int vr_ip_rcv(struct vrouter *, struct vr_packet *,

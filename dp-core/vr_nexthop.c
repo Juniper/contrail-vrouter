@@ -18,11 +18,9 @@ struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *, struct vr_
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 struct vr_nexthop *ip4_default_nh;
 
-static struct vr_nexthop *
-__vrouter_get_nexthop(unsigned int rid, unsigned int index)
+struct vr_nexthop *
+__vrouter_get_nexthop(struct vrouter *router, unsigned int index)
 {
-    struct vrouter *router = vrouter_get(rid);
-
     if (!router || index >= router->vr_max_nexthops)
         return NULL;
 
@@ -33,8 +31,10 @@ struct vr_nexthop *
 vrouter_get_nexthop(unsigned int rid, unsigned int index) 
 {
     struct vr_nexthop *nh;
+    struct vrouter *router;
 
-    nh = __vrouter_get_nexthop(rid, index);
+    router = vrouter_get(rid);
+    nh = __vrouter_get_nexthop(router, index);
     if (nh)
         nh->nh_users++;
 
@@ -194,6 +194,53 @@ nh_mcast_clone(struct vr_packet *pkt, unsigned short head_room)
 }
 
 static int
+nh_composite_ecmp_validate_src(unsigned short vrf, struct vr_packet *pkt,
+        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
+{
+    int i;
+    struct vr_nexthop *cnh;
+
+    /* the first few checks are straight forward */
+    if (!fmd || (uint8_t)fmd->fmd_ecmp_src_nh_index >= nh->nh_component_cnt)
+        return NH_SOURCE_INVALID;
+
+    cnh = nh->nh_component_nh[fmd->fmd_ecmp_src_nh_index].cnh;
+    if (cnh && !cnh->nh_validate_src)
+        return NH_SOURCE_INVALID;
+
+    /*
+     * when the 'supposed' source goes down, cnh is null, in which
+     * case validate the source against other present nexthops. follow
+     * the same logic if the component validate source returns invalid
+     * source, which could mean that source has moved
+     */
+    if (!cnh ||
+            (NH_SOURCE_INVALID == cnh->nh_validate_src(vrf, pkt, cnh, fmd))) {
+        for (i = 0; i < nh->nh_component_cnt; i++) {
+            if (i == fmd->fmd_ecmp_src_nh_index)
+                continue;
+
+            cnh = nh->nh_component_nh[fmd->fmd_ecmp_src_nh_index].cnh;
+            if (!cnh || !cnh->nh_validate_src)
+                continue;
+
+            /*
+             * if the source has moved to a present and valid source,
+             * return mismatch
+             */
+            if ((NH_SOURCE_VALID == cnh->nh_validate_src(vrf, pkt, cnh, fmd)))
+                return NH_SOURCE_MISMATCH;
+        }
+
+        /* if everything else fails, source is indeed invalid */
+        return NH_SOURCE_INVALID;
+    }
+
+    /* source is validated by validate_src */
+    return NH_SOURCE_VALID;
+}
+
+static int
 nh_composite_ecmp(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
@@ -206,7 +253,7 @@ nh_composite_ecmp(unsigned short vrf, struct vr_packet *pkt,
     if (stats)
         stats->vrf_ecmp_composites++;
 
-    if (!fmd || fmd->fmd_ecmp_nh_index >= nh->nh_component_cnt)
+    if (!fmd || (uint8_t)fmd->fmd_ecmp_nh_index >= nh->nh_component_cnt)
         goto drop;
 
     if (fmd->fmd_ecmp_nh_index >= 0)
@@ -231,25 +278,22 @@ drop:
  */
 
 static int
-nh_validate_mcast_fabric_src(unsigned short vrf, struct vr_packet *pkt,
+nh_composite_mcast_l3_validate_src(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd) 
 {
-    int i, found;
+    int i;
     struct vr_nexthop *dir_nh;
 
-    found = -1;
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
 
         /* Dont forward to same source */
         if (fmd->fmd_outer_src_ip && 
-                fmd->fmd_outer_src_ip == dir_nh->nh_gre_tun_dip) {
-            found = 0;
-            break;
-        }
+                fmd->fmd_outer_src_ip == dir_nh->nh_gre_tun_dip)
+            return NH_SOURCE_VALID;
     }
 
-    return found;
+    return NH_SOURCE_INVALID;
 }
 
 static int
@@ -288,7 +332,8 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
              (nh->nh_component_nh[0].cnh->nh_type == NH_COMPOSITE) && 
              (nh->nh_component_nh[0].cnh->nh_flags &
               NH_FLAG_COMPOSITE_FABRIC)) {
-            if (nh->nh_validate_src(vrf, pkt, nh->nh_component_nh[0].cnh, fmd)) {
+            if (nh->nh_validate_src(vrf, pkt,
+                        nh->nh_component_nh[0].cnh, fmd) == NH_SOURCE_INVALID) {
                 drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
                 goto drop;
             }
@@ -378,7 +423,8 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
              (nh->nh_component_nh[0].cnh->nh_type == NH_COMPOSITE) && 
              (nh->nh_component_nh[0].cnh->nh_flags &
               NH_FLAG_COMPOSITE_FABRIC)) {
-            if (nh->nh_validate_src(vrf, pkt, nh->nh_component_nh[0].cnh, fmd)) {
+            if (nh->nh_validate_src(vrf, pkt,
+                        nh->nh_component_nh[0].cnh, fmd) == NH_SOURCE_INVALID) {
                 drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
                 goto drop;
             }
@@ -573,7 +619,7 @@ nh_discard(unsigned short vrf, struct vr_packet *pkt,
     if (stats)
         stats->vrf_discards++;
 
-    vr_pfree(pkt,VP_DROP_DISCARD);
+    vr_pfree(pkt, VP_DROP_DISCARD);
     return 0;
 }
 
@@ -656,7 +702,7 @@ nh_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     }
 
     /* 
-     * Incase of mirroring set the innert network header to the newly added 
+     * Incase of mirroring set the inner network header to the newly added 
      * header so that this is fragmented and checksummed
      */
     pkt_set_inner_network_header(pkt, pkt->vp_data);
@@ -760,6 +806,17 @@ send_fail:
 
 }
 
+static int
+nh_mpls_udp_tunnel_validate_src(unsigned short vrf, struct vr_packet *pkt,
+        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_outer_src_ip == nh->nh_udp_tun_dip)
+        return NH_SOURCE_VALID;
+
+    return NH_SOURCE_INVALID;
+}
+
+
 /*
  * nh_mpls_udp_tunnel - tunnel packet with MPLS label in UDP.
  */
@@ -854,6 +911,16 @@ send_fail:
     vr_pfree(pkt, reason);
     return 0;
 
+}
+
+static int
+nh_gre_tunnel_validate_src(unsigned short vrf, struct vr_packet *pkt,
+        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_outer_src_ip == nh->nh_gre_tun_dip)
+        return NH_SOURCE_VALID;
+
+    return NH_SOURCE_INVALID;
 }
 
 static int
@@ -1078,6 +1145,16 @@ nh_encap_l2_unicast(unsigned short vrf, struct vr_packet *pkt,
 }
 
 static int
+nh_encap_l3_validate_src(unsigned short vrf, struct vr_packet *pkt,
+        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
+{
+    if (pkt->vp_if == nh->nh_dev)
+        return NH_SOURCE_VALID;
+
+    return NH_SOURCE_INVALID;
+}
+
+static int
 nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *md)
 {
@@ -1257,13 +1334,14 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     if ((req->nhr_flags & NH_FLAG_COMPOSITE_L3) && 
             (req->nhr_flags & NH_FLAG_MCAST)) {
         nh->nh_reach_nh = nh_composite_mcast_l3;
-        nh->nh_validate_src = nh_validate_mcast_fabric_src;
+        nh->nh_validate_src = nh_composite_mcast_l3_validate_src;
     } else if ((req->nhr_flags & NH_FLAG_COMPOSITE_L2) && 
             (req->nhr_flags & NH_FLAG_MCAST)) {
         nh->nh_reach_nh = nh_composite_mcast_l2;
-        nh->nh_validate_src = nh_validate_mcast_fabric_src;
+        nh->nh_validate_src = nh_composite_mcast_l3_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
         nh->nh_reach_nh = nh_composite_ecmp;
+        nh->nh_validate_src = nh_composite_ecmp_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_FABRIC) {
         nh->nh_reach_nh = nh_composite_fabric;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_MULTI_PROTO) {
@@ -1287,6 +1365,7 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_gre_tun_dip = req->nhr_tun_dip;
         nh->nh_gre_tun_encap_len = req->nhr_encap_size;
         nh->nh_reach_nh = nh_gre_tunnel;
+        nh->nh_validate_src = nh_gre_tunnel_validate_src;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
@@ -1299,6 +1378,7 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_reach_nh = nh_mpls_udp_tunnel;
+        nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) {
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
@@ -1333,6 +1413,7 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
             nh->nh_reach_nh = nh_encap_mcast;
         } else {
             nh->nh_reach_nh = nh_encap_l3_unicast;
+            nh->nh_validate_src = nh_encap_l3_validate_src;
         }
     }
 
@@ -1406,11 +1487,12 @@ vr_nexthop_add(vr_nexthop_req *req)
 {
     int ret = 0, len = 0;
     struct vr_nexthop *nh;
+    struct vrouter *router = vrouter_get(req->nhr_rid);
 
     if (!vr_nexthop_valid_request(req) && (ret = -EINVAL))
         goto generate_resp;
 
-    nh = __vrouter_get_nexthop(req->nhr_rid, req->nhr_id);
+    nh = __vrouter_get_nexthop(router, req->nhr_id);
     if (!nh) {
         ret = vr_nexthop_size(req);
         if (ret < 0)
@@ -1665,7 +1747,7 @@ vr_nexthop_get(vr_nexthop_req *req)
         goto generate_response;
     } 
 
-    nh = __vrouter_get_nexthop(req->nhr_rid, req->nhr_id);
+    nh = __vrouter_get_nexthop(router, req->nhr_id);
     if (nh) {
         resp = vr_nexthop_req_get();
         if (resp)

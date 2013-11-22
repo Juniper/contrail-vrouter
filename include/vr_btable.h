@@ -31,6 +31,12 @@ void vr_btable_free(struct vr_btable *);
 struct vr_btable *vr_btable_alloc(unsigned int, unsigned int);
 
 static inline unsigned int
+vr_btable_entries(struct vr_btable *table)
+{
+    return table->vb_entries;
+}
+
+static inline unsigned int
 vr_btable_size(struct vr_btable *table)
 {
     return table->vb_entries * table->vb_esize;

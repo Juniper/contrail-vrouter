@@ -329,30 +329,31 @@ vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
         return;
     }
 
-    /*
-     * for partial checksums, the actual value is stored rather
-     * than the complement
-     */
-    if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
+    if (vr_ip_transport_header_valid(ip)) {
+        /*
+         * for partial checksums, the actual value is stored rather
+         * than the complement
+         */
+        if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
+            csum = (*csump) & 0xffff;
+            inc = ip_inc; 
+        } else {
+            csum = ~(*csump) & 0xffff;
+        }
 
-        csum = (*csump) & 0xffff;
-        inc = ip_inc; 
-    } else {
-        csum = ~(*csump) & 0xffff;
-    }
+        csum += inc;
+        if (csum < inc)
+            csum += 1;
 
-    csum += inc;
-    if (csum < inc)
-        csum += 1;
+        csum = (csum & 0xffff) + (csum >> 16);
+        if (csum >> 16)
+            csum = (csum & 0xffff) + 1;
 
-    csum = (csum & 0xffff) + (csum >> 16);
-    if (csum >> 16)
-        csum = (csum & 0xffff) + 1;
-
-    if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
-        *csump = csum & 0xffff;
-    } else {
-        *csump = ~(csum) & 0xffff;
+        if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
+            *csump = csum & 0xffff;
+        } else {
+            *csump = ~(csum) & 0xffff;
+        }
     }
 
     return;
@@ -491,4 +492,3 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
 
     return 1;
 }
-

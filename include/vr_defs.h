@@ -28,7 +28,8 @@
 #define AGENT_TRAP_L3_PROTOCOLS     7
 #define AGENT_TRAP_DIAG             8
 #define AGENT_TRAP_ECMP_RESOLVE     9
-#define MAX_AGENT_HDR_COMMANDS      10
+#define AGENT_TRAP_SOURCE_MISMATCH  10
+#define MAX_AGENT_HDR_COMMANDS      11
 
 enum rt_type{
     RT_UCAST = 0,

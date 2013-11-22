@@ -12,7 +12,6 @@
 #define VR_FLOW_ACTION_HOLD         0x1
 #define VR_FLOW_ACTION_FORWARD      0x2
 #define VR_FLOW_ACTION_NAT          0x4
-#define VR_FLOW_ACTION_TRAP         0x8
 
 #define VR_FLOW_LOOKUP              0x0
 #define VR_FLOW_BYPASS              0x1
@@ -22,7 +21,6 @@
 #define VR_RFLOW_VALID              0x1000
 #define VR_FLOW_FLAG_MIRROR         0x2000
 #define VR_FLOW_FLAG_VRFT           0x4000
-#define VR_FLOW_FLAG_UNUSABLE       0x8000
 
 /* rest of the flags are action specific */
 
@@ -73,6 +71,7 @@ struct vr_dummy_flow_entry {
     unsigned short fe_flags;
     int fe_rflow;
     unsigned short fe_dvrf;
+    uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
     uint8_t fe_sec_mirror_id;
     int8_t fe_ecmp_nh_index;
@@ -91,6 +90,7 @@ struct vr_flow_entry {
     unsigned short fe_flags;
     int fe_rflow;
     unsigned short fe_dvrf;
+    uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
     uint8_t fe_sec_mirror_id;
     int8_t fe_ecmp_nh_index;
@@ -106,9 +106,11 @@ struct vr_flow_entry {
 
 #define VR_DNS_SERVER_PORT  htons(53)
 
-struct vr_flow_defer_data {
-    unsigned int def_index;
-    unsigned short def_action;
+struct vr_flow_md {
+    struct vrouter *flmd_router;
+    unsigned int flmd_index;
+    unsigned short flmd_action;
+    unsigned short flmd_flags;
 };
 
 struct vr_packet;

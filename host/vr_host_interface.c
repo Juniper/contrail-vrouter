@@ -45,7 +45,7 @@ vr_netif_rx(struct vr_hinterface *hif, struct vr_hpacket *hpkt)
     if (vif)
         vif->vif_rx(vif, &hpkt->hp_packet, VLAN_ID_INVALID);
     else
-        vr_hpacket_free(hpkt);
+        vr_hpacket_pool_free(hpkt);
 
     return;
 }
@@ -56,6 +56,7 @@ hif_udp_rx(void *arg)
     int ret = 0;
     struct vr_hinterface *hif = (struct vr_hinterface *)arg;
     struct vr_hpacket *hpkt;
+    struct vr_packet *pkt;
 
     hpkt = vr_hpacket_pool_alloc(hif->hif_pkt_pool);
     if (!hpkt)
@@ -64,7 +65,13 @@ hif_udp_rx(void *arg)
     ret = read(hif->hif_fd, hpkt_data(hpkt), hpkt_size(hpkt));
     if (ret > 0) {
         hpkt->hp_tail += ret;
+        pkt = &hpkt->hp_packet;
+        pkt->vp_len = ret;
+        pkt->vp_tail = hpkt->hp_tail;
+        pkt->vp_if = hif->hif_vif;
         vr_netif_rx(hif, hpkt);
+    } else {
+        vr_hpacket_pool_free(hpkt);
     }
 
     return ret;
@@ -82,7 +89,7 @@ hif_udp_tx(struct vr_hinterface *hif, struct vr_hpacket *hpkt)
     msg.msg_iov = msg_iov;
     while (hpkt_tmp && i < 64) {
         msg_iov[i].iov_base = hpkt_data(hpkt);
-        msg_iov[i].iov_len = hpkt_head_len(hpkt);
+        msg_iov[i].iov_len = hpkt->hp_packet.vp_len;
         i++;
         hpkt_tmp = hpkt_tmp->hp_next;
     }
@@ -198,6 +205,7 @@ vr_hinterface_create(unsigned int index, unsigned int hif_type,
         goto cleanup;
     }
 
+    hif->hif_type = hif_type;
     hif->hif_index = index;
     hif->hif_users++;
     hif_table[index] = hif;

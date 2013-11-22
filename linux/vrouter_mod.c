@@ -323,6 +323,19 @@ lh_get_cpu(void)
 }
 
 static void
+lh_get_mono_time(unsigned int *sec, unsigned int *nsec)
+{
+    struct timespec t;
+    uint64_t jiffies = get_jiffies_64();
+
+    jiffies_to_timespec(jiffies, &t);
+    *sec = t.tv_sec;
+    *nsec = t.tv_nsec;
+
+    return;
+}
+
+static void
 lh_work(struct work_struct *work)
 {
     struct work_arg *wa = container_of(work, struct work_arg, wa_work);
@@ -1292,7 +1305,7 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
      * GRE. If the outer header is UDP, we will always verify the checksum
      * of the outer packet and this covers the inner packet too.
      */
-    if (iph && !skb_csum_unnecessary(skb) && thdr_valid) {
+    if (iph && !skb_csum_unnecessary(skb) && !vr_ip_fragment(iph)) {
         if (iph->ip_proto == VR_IP_PROTO_TCP) {
             if (skb_shinfo(skb)->nr_frags == 1) {
                 tcp_size = frag_size - ((unsigned char *) tcph - va);
@@ -1558,7 +1571,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                         lh_adjust_tcp_mss(tcph, skb);
                     }
                 } else {
-                    if (iph->ip_proto == VR_IP_PROTO_TCP && thdr_valid) {
+                    if (iph->ip_proto == VR_IP_PROTO_TCP && !vr_ip_fragment(iph)) {
                         tcpoff = (char *)tcph - (char *) skb->data;
 
                         skb_pull(skb, tcpoff);
@@ -1686,6 +1699,52 @@ lh_network_header(struct vr_packet *pkt)
     return NULL;
 }
 
+static void
+linux_timer(unsigned long arg)
+{
+    struct vr_timer *vtimer = (struct vr_timer *)arg;
+    struct timer_list *timer = (struct timer_list *)vtimer->vt_os_arg;
+
+    vtimer->vt_timer(vtimer->vt_vr_arg);
+    mod_timer(timer, get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs));
+
+    return;
+}
+
+static void
+lh_delete_timer(struct vr_timer *vtimer)
+{
+    struct timer_list *timer = (struct timer_list *)vtimer->vt_os_arg;
+
+    if (timer) {
+        del_timer_sync(timer);
+        vr_free(vtimer->vt_os_arg);
+        vtimer->vt_os_arg = NULL;
+    }
+
+    return;
+}
+
+static int
+lh_create_timer(struct vr_timer *vtimer)
+{
+    struct timer_list *timer;
+
+    timer = vr_zalloc(sizeof(*timer));
+    if (!timer)
+        return -ENOMEM;
+    init_timer(timer);
+
+    vtimer->vt_os_arg = (void *)timer;
+    timer->data = (unsigned long)vtimer;
+    timer->function = linux_timer;
+    timer->expires = get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs);
+    timer->expires = get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs);
+    add_timer(timer);
+
+    return 0;
+}
+
 struct host_os linux_host = {
     .hos_malloc                     =       lh_malloc,
     .hos_zalloc                     =       lh_zalloc,
@@ -1712,6 +1771,9 @@ struct host_os linux_host = {
     .hos_get_defer_data             =       lh_get_defer_data,
     .hos_put_defer_data             =       lh_put_defer_data,
     .hos_get_time                   =       lh_get_time,
+    .hos_get_mono_time              =       lh_get_mono_time,
+    .hos_create_timer               =       lh_create_timer,
+    .hos_delete_timer               =       lh_delete_timer,
 
     .hos_network_header             =       lh_network_header,
     .hos_inner_network_header       =       lh_inner_network_header,
@@ -1897,6 +1959,7 @@ vrouter_linux_exit(void)
     vr_message_exit();
     vr_mem_exit();
     vrouter_exit(false);
+    flush_scheduled_work();
     rcu_barrier();
     return;
 }

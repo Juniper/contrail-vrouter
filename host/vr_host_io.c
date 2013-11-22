@@ -37,9 +37,9 @@ vr_host_io_unregister(int fd)
             vr_io_n_pollfds--;
 
             bzero((char *)&pollfd_to_cb[vr_io_n_pollfds],
-                    (VR_MAX_IO_CBS - vr_io_n_pollfds + 1) * sizeof(unsigned int));
+                    (VR_MAX_IO_CBS - vr_io_n_pollfds) * sizeof(unsigned int));
             bzero((char *)&vr_io_pollfds[vr_io_n_pollfds],
-                    (VR_MAX_IO_CBS - vr_io_n_pollfds + 1) * sizeof(struct pollfd));
+                    (VR_MAX_IO_CBS - vr_io_n_pollfds) * sizeof(struct pollfd));
             break;
         }
     }

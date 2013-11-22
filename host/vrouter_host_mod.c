@@ -10,7 +10,9 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "host/vr_host_packet.h"
+#include "ulinux.h"
 
+#define PAGE_SIZE	4096
 unsigned int vr_num_cpus = 1;
 
 static bool vr_host_inited = false;
@@ -21,6 +23,44 @@ extern int vr_oflow_entries;
 
 extern void vr_diet_message_proto_exit(void);
 extern int vr_diet_message_proto_init(void);
+
+static int
+vr_lib_create_timer(struct vr_timer *vtimer)
+{
+    struct dummy_timer_list *timer;
+
+    timer = vr_zalloc(sizeof(*timer));
+    if (!timer)
+        return -1;
+    init_timer(timer);
+
+    vtimer->vt_os_arg = (void *)timer;
+    timer->data = (unsigned long)vtimer;
+    timer->function = ulinux_timer;
+    timer->expires = get_time() + vtimer->vt_msecs;
+    add_timer(timer);
+
+    return 0;
+}
+
+static void
+vr_lib_delete_timer(struct vr_timer *vtimer)
+{
+	vr_free(vtimer->vt_os_arg);
+}
+
+static void *
+vr_lib_page_alloc(unsigned int size)
+{
+	return malloc(PAGE_SIZE);
+}
+
+static void
+vr_lib_page_free(void *address, unsigned int size)
+{
+	if (address)
+		free(address);
+}
 
 static void *
 vr_lib_malloc(unsigned int size)
@@ -52,6 +92,7 @@ vr_lib_get_packet(struct vr_hpacket *hpkt, struct vr_interface *vif)
     pkt->vp_data = hpkt->hp_data;
     pkt->vp_tail = hpkt->hp_tail;
     pkt->vp_end = hpkt->hp_end;
+    pkt->vp_len = hpkt_head_len(hpkt);
     pkt->vp_if = vif;
 
     return pkt;
@@ -194,6 +235,10 @@ struct host_os vr_lib_host = {
     .hos_schedule_work      =       vr_lib_schedule_work,
     .hos_delay_op           =       vr_lib_delay_op,
     .hos_get_time           =       vr_lib_get_time,
+	.hos_page_alloc			=		vr_lib_page_alloc,
+	.hos_page_free			=		vr_lib_page_free,
+	.hos_create_timer		=		vr_lib_create_timer,
+	.hos_delete_timer		=		vr_lib_delete_timer,
 };
 
 struct host_os *

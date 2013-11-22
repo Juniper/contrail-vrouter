@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
     vrf_id = 0;
     nh_id = -255;
     label = -1;
-    family = -1;
+    family = AF_INET;
 
     while ((opt = getopt(argc, argv, "cdbmPn:p:l:v:t:s:e:f:r:")) != -1) {
             switch (opt) {
@@ -402,11 +402,6 @@ int main(int argc, char *argv[])
                 usage();
                 exit(1);
         }
-    }
-
-    if (family == -1) {
-        usage();
-        exit(1);
     }
 
     if ((op == SANDESH_OP_DELETE) && (replace_plen < 0 || replace_plen > 32)) {

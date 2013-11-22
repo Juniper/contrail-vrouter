@@ -126,7 +126,9 @@
 #define VP_DROP_NO_FMD                      37
 #define VP_DROP_CLONED_ORIGINAL             38
 #define VP_DROP_INVALID_VNID                39
-#define VP_DROP_MAX                         40
+#define VP_DROP_FRAGMENTS                   40
+#define VP_DROP_INVALID_SOURCE              41
+#define VP_DROP_MAX                         42
 
 struct vr_drop_stats {
     uint64_t vds_discard;
@@ -169,6 +171,8 @@ struct vr_drop_stats {
     uint64_t vds_no_fmd;
     uint64_t vds_cloned_original;
     uint64_t vds_invalid_vnid;
+    uint64_t vds_frag_err;
+    uint64_t vds_invalid_source;
 };
 
 /*
@@ -273,13 +277,51 @@ struct vr_ip {
 } __attribute__((packed));
 
 static inline bool
+vr_ip_fragment_tail(struct vr_ip *iph)
+{
+    unsigned short frag = ntohs(iph->ip_frag_off);
+    bool more = (frag & VR_IP_MF) ? true : false;
+    unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
+
+    if (!more && offset)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_ip_fragment_head(struct vr_ip *iph)
+{
+    unsigned short frag = ntohs(iph->ip_frag_off);
+    bool more = (frag & VR_IP_MF) ? true : false;
+    unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
+
+    if (more && !offset)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_ip_fragment(struct vr_ip *iph)
+{
+    unsigned short frag = ntohs(iph->ip_frag_off);
+    bool more = (frag & VR_IP_MF) ? true : false;
+    unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
+
+    if (offset || more)
+        return true;
+
+    return false;
+}
+
+static inline bool
 vr_ip_transport_header_valid(struct vr_ip *iph)
 {
     unsigned short frag = ntohs(iph->ip_frag_off);
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
-    bool more = (frag & VR_IP_MF) ? true : false;
 
-    if (offset || more)
+    if (offset)
         return false;
 
     return true;
@@ -389,11 +431,12 @@ extern unsigned short vr_ip_partial_csum(struct vr_ip *);
  * this variable
  */
 struct vr_forwarding_md {
-    int32_t	    fmd_flow_index;
-    int32_t	    fmd_label;
-    int16_t	    fmd_ecmp_nh_index;
-    int16_t     fmd_dvrf;
-    uint32_t    fmd_outer_src_ip;
+    int32_t fmd_flow_index;
+    int32_t fmd_label;
+    int8_t fmd_ecmp_nh_index;
+    int8_t fmd_ecmp_src_nh_index;
+    int16_t fmd_dvrf;
+    uint32_t fmd_outer_src_ip;
 };
 
 static inline void
@@ -401,6 +444,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
 {
     fmd->fmd_flow_index = -1;
     fmd->fmd_ecmp_nh_index = -1;
+    fmd->fmd_ecmp_src_nh_index = -1;
     fmd->fmd_label = -1;
     fmd->fmd_dvrf = -1;
     fmd->fmd_outer_src_ip = 0;

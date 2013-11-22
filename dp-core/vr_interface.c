@@ -359,6 +359,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
     switch (params->trap_reason) {
     case AGENT_TRAP_FLOW_MISS:
     case AGENT_TRAP_ECMP_RESOLVE:
+    case AGENT_TRAP_SOURCE_MISMATCH:
         if (params->trap_param)
             hdr->hdr_cmd_param = htonl(*(unsigned int *)(params->trap_param));
         break;

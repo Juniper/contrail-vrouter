@@ -12,10 +12,12 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include <asm/types.h>
 
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -41,10 +43,10 @@
 #define TABLE_FLAG_VALID        0x1
 #define MEM_DEV                 "/dev/flow"
 
-static int snat_set, dnat_set, spat_set, dpat_set, dvrf_set, mir_set;
-static struct in_addr snat, dnat;
-static unsigned short spat, dpat, dvrf;
+static int dvrf_set, mir_set;
+static unsigned short dvrf;
 static int flow_index, list, flow_cmd, mirror = -1;
+static int rate;
 
 struct flow_table {
     struct vr_flow_entry *ft_entries;
@@ -140,16 +142,6 @@ dump_table(struct flow_table *ft)
 
                 break;
 
-            case VR_FLOW_ACTION_TRAP:
-                fi = 0;
-                action = 'T';
-                if (fe->fe_flags & VR_FLOW_FLAG_TRAP_ECMP) {
-                    need_flag_print = 1;
-                    flag_string[fi++] = 'E';
-                }
-
-                break;
-
             default:
                 action = 'U';
             }
@@ -163,6 +155,7 @@ dump_table(struct flow_table *ft)
             if (fe->fe_ecmp_nh_index >= 0)
                 printf("E:%d, ", fe->fe_ecmp_nh_index);
 
+            printf("S(nh):%u, ", fe->fe_src_nh_index);
             printf(" Statistics:%d/%d", fe->fe_stats.flow_packets,
                     fe->fe_stats.flow_bytes);
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
@@ -184,6 +177,56 @@ flow_list(void)
 {
     dump_table(&main_table);
     return;
+}
+
+static void
+flow_rate(void)
+{
+    struct flow_table *ft = &main_table;
+    unsigned int i;
+    struct vr_flow_entry *fe;
+    struct timeval now;
+    struct timeval last_time;
+    int active_entries = 0;
+    int prev_active_entries = 0;
+    int total_entries = 0;
+    int prev_total_entries = 0;
+    int diff_ms;
+    int rate;
+    int total_rate;
+
+    gettimeofday(&last_time, NULL);
+    while (1) {
+        active_entries = 0;
+        total_entries = 0;
+        usleep(500000);
+        for (i = 0; i < ft->ft_num_entries; i++) {
+            fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
+            if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
+                total_entries++;
+                if (fe->fe_action != VR_FLOW_ACTION_HOLD)
+                    active_entries++;
+            }
+        }
+        gettimeofday(&now, NULL);
+        /* calc time difference and rate */
+        diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
+        diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
+        assert(diff_ms > 0 );
+        rate = (active_entries - prev_active_entries) * 1000;
+        rate /= diff_ms;
+        total_rate = (total_entries - prev_total_entries) * 1000;
+        total_rate /= diff_ms;
+        if (rate != 0 || total_rate != 0) {
+            printf("New = %4d, Flow setup rate = %4d flows/sec, ",
+                   (active_entries - prev_active_entries), rate);
+            printf("Flow rate = %4d flows/sec, for last %4d ms\n", total_rate, diff_ms);
+        }
+
+        last_time = now;
+        prev_active_entries = active_entries;
+        prev_total_entries = total_entries;
+    }
 }
 
 void
@@ -359,50 +402,6 @@ flow_validate(int flow_index, char action)
         flow_req.fr_action = VR_FLOW_ACTION_DROP;
         break;
 
-    case 't':
-        flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_TRAP_ECMP;
-        flow_req.fr_action = VR_FLOW_ACTION_TRAP;
-        break;
-
-    case 'n':
-        flow_req.fr_rindex = -1;
-        flow_req.fr_action = VR_FLOW_ACTION_NAT;
-
-        flow_req.fr_rflow_dip = fe->fe_key.key_src_ip;
-        if (snat_set) {
-            flow_req.fr_flags |= VR_FLOW_FLAG_SNAT;
-            flow_req.fr_rflow_dip = snat.s_addr;
-        }
-
-        flow_req.fr_rflow_sip = fe->fe_key.key_dest_ip;
-        if (dnat_set) {
-            flow_req.fr_flags |= VR_FLOW_FLAG_DNAT;
-            flow_req.fr_rflow_sip = dnat.s_addr;
-        }
-
-        flow_req.fr_rflow_dport = fe->fe_key.key_src_port;
-        if (spat_set) {
-            flow_req.fr_flags |= VR_FLOW_FLAG_SPAT;
-            flow_req.fr_rflow_dport = spat;
-        }
-
-        flow_req.fr_rflow_sport = fe->fe_key.key_dst_port;
-        if (dpat_set) {
-            flow_req.fr_flags |= VR_FLOW_FLAG_DPAT;
-            flow_req.fr_rflow_sport = dpat;
-        }
-
-        flow_req.fr_rflow_vrf = fe->fe_key.key_vrf_id;
-        if (dvrf_set) {
-            flow_req.fr_flags |= VR_FLOW_FLAG_VRFT;
-            flow_req.fr_flow_dvrf = dvrf;
-            flow_req.fr_rflow_vrf = dvrf;
-        }
-
-        flow_req.fr_rflow_proto = fe->fe_key.key_proto;
-
-        break;
-
     default:
         return;
     }
@@ -422,8 +421,6 @@ static void
 Usage(void)
 {
     printf("flow [-f flow_index][-d flow_index][-i flow_index][-t flow_index]\n");
-    printf("     [-n flow_index [--snat=x.x.x.x] [--dnat=x.x.x.x]");
-    printf("[--spat=sport][--dpat=dport]] \n");
     printf("     [--mirror=mirror table index]\n");
     printf("     [-l]\n");
     printf("\n");
@@ -431,33 +428,21 @@ Usage(void)
     printf("-f <flow_index>\t Set forward action for flow at flow_index <flow_index>\n");
     printf("-d <flow_index>\t Set drop action for flow at flow_index <flow_index>\n");
     printf("-i <flow_index>\t Invalidate flow at flow_index <flow_index>\n");
-    printf("-n <flow_index>\t Set NAT action for flow at flow_index <flow_index>\n");
-    printf("\t\t --snat=source IP to change to,\n");
-    printf("\t\t --dnat=destination IP to change to,\n");
-    printf("\t\t --spat=source Port to change to,\n");
-    printf("\t\t --dpat=destination Port to change to,\n");
     printf("\t\t --dvrf=destination VRF to send the packet to,\n");
     printf("--mirror\tmirror index to mirror to\n");
     printf("-l\t\t List all flows\n");
+    printf("-r\t\t Start dumping flow setup rate\n");
 
     exit(-EINVAL);
 }
 
 enum opt_flow_index {
-    SNAT_OPT_INDEX,
-    DNAT_OPT_INDEX,
-    SPAT_OPT_INDEX,
-    DPAT_OPT_INDEX,
     DVRF_OPT_INDEX,
     MIRROR_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
-    [SNAT_OPT_INDEX]    = {"snat", required_argument, &snat_set, 1},
-    [DNAT_OPT_INDEX]    = {"dnat", required_argument, &dnat_set, 1},
-    [SPAT_OPT_INDEX]    = {"spat", required_argument, &spat_set, 1},
-    [DPAT_OPT_INDEX]    = {"dpat", required_argument, &dpat_set, 1},
     [DVRF_OPT_INDEX]    = {"dvrf", required_argument, &dvrf_set, 1},
     [MIRROR_OPT_INDEX]  = {"mirror", required_argument, &mir_set, 1},
     [MAX_OPT_INDEX]     = { NULL,  0,                 0        , 0}
@@ -466,20 +451,8 @@ static struct option long_options[] = {
 static void
 validate_options(void)
 {
-    if (!flow_index && !list)
+    if (!flow_index && !list && !rate)
         Usage();
-
-    switch (flow_cmd) {
-    case 'n':
-        if (!snat_set && !dnat_set && !spat_set && !dpat_set)
-            Usage();
-        break;
-
-    default:
-        if (snat_set || dnat_set || spat_set || dpat_set)
-            Usage();
-        break;
-    }
 
     return;
 }
@@ -487,33 +460,8 @@ validate_options(void)
 static void
 parse_long_opts(int opt_flow_index, char *opt_arg)
 {
-    int ret;
-
     errno = 0;
     switch (opt_flow_index) {
-
-    case SNAT_OPT_INDEX:
-        ret = inet_aton(opt_arg, &snat);
-        break;
-
-    case DNAT_OPT_INDEX:
-        ret = inet_aton(opt_arg, &dnat);
-        break;
-
-    case SPAT_OPT_INDEX:
-        ret = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        spat = htons(ret);
-        break;
-
-    case DPAT_OPT_INDEX:
-        ret = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        dpat = htons(ret);
-        break;
-
     case DVRF_OPT_INDEX:
         dvrf = strtoul(opt_arg, NULL, 0);
         if (errno)
@@ -540,14 +488,12 @@ main(int argc, char *argv[])
     int ret;
     int option_index;
 
-    while ((opt = getopt_long(argc, argv, "d:f:i:t:ln:",
+    while ((opt = getopt_long(argc, argv, "d:f:i:lr",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
         case 'd':
-        case 'n':
         case 'i':
-        case 't':
             flow_cmd = opt;
             flow_index = strtoul(optarg, NULL, 0);
             break;
@@ -556,6 +502,9 @@ main(int argc, char *argv[])
             list = 1;
             break;
 
+        case 'r':
+            rate = 1;
+            break;
         case 0:
             parse_long_opts(option_index, optarg);
             break;
@@ -577,6 +526,8 @@ main(int argc, char *argv[])
 
     if (list)
         flow_list();
+    else if (rate)
+        flow_rate();
     else
         flow_validate(flow_index, flow_cmd);
 
