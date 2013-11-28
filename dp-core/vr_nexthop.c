@@ -170,6 +170,95 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label)
     return 0;
 }
 
+/*
+ * nh_udp_tunnel_helper - helper function to use for UDP tunneling. Used
+ * by mirroring and MPLS over UDP. Returns true on success, false otherwise.
+ */
+static bool
+nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
+                     unsigned short dport, unsigned int sip, 
+                     unsigned int dip) 
+{
+    struct vr_ip *ip;
+    struct vr_udp *udp;
+
+    /* Udp Header */
+    udp = (struct vr_udp *)pkt_push(pkt, sizeof(struct vr_udp));
+    if (!udp) {
+        return false;
+    }
+
+    udp->udp_sport = sport;
+    udp->udp_dport = dport;
+    udp->udp_length = htons(pkt_len(pkt));
+    udp->udp_csum = 0;
+
+    /* And now the IP header */
+    ip = (struct vr_ip *)pkt_push(pkt, sizeof(struct vr_ip));
+    if (!ip) {
+        return false;
+    }
+
+    ip->ip_version = 4;
+    ip->ip_hl = 5;
+    ip->ip_tos = 0;
+    ip->ip_id = htons(vr_generate_unique_ip_id());
+    ip->ip_frag_off = 0;
+    ip->ip_ttl = 64;
+    ip->ip_proto = VR_IP_PROTO_UDP;
+    ip->ip_saddr = sip;
+    ip->ip_daddr = dip;
+    ip->ip_len = htons(pkt_len(pkt));
+
+    /* 
+     * header checksum 
+     */
+    ip->ip_csum = 0;
+    ip->ip_csum = vr_ip_csum(ip);    
+
+    pkt_set_network_header(pkt, pkt->vp_data);
+    return true;
+}
+
+static bool 
+nh_vxlan_tunnel_helper(unsigned short vrf, struct vr_packet *pkt, 
+                       struct vr_forwarding_md *fmd, unsigned int sip,
+                       unsigned int dip)
+{
+    unsigned short udp_src_port = VR_VXLAN_UDP_SRC_PORT;
+    struct vr_vxlan *vxlanh;
+    struct vr_packet *tmp_pkt;
+
+    if (pkt_head_space(pkt) < VR_VXLAN_HDR_LEN) {
+        tmp_pkt = vr_pexpand_head(pkt, VR_VXLAN_HDR_LEN - pkt_head_space(pkt));
+        if (!tmp_pkt) {
+            return false;
+        }
+        pkt = tmp_pkt;
+    }
+
+    /* Change the packet type to VXLAN as we added the vxlan header */
+    pkt->vp_type = VP_TYPE_VXLAN;
+   
+    /*
+     * The UDP source port is a hash of the inner headers
+     */
+    if (vr_get_udp_src_port) {
+        udp_src_port = vr_get_udp_src_port(pkt, fmd, vrf);
+        if (udp_src_port == 0) {
+            return false;
+        }
+    }
+
+    /* Add the vxlan header */
+    vxlanh = (struct vr_vxlan *)pkt_push(pkt, sizeof(struct vr_vxlan));
+    vxlanh->vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
+    vxlanh->res = 0;
+
+    return nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
+                             htons(VR_VXLAN_UDP_DST_PORT), sip, dip);
+}
+
 static struct vr_packet *
 nh_mcast_clone(struct vr_packet *pkt, unsigned short head_room)
 {
@@ -181,7 +270,7 @@ nh_mcast_clone(struct vr_packet *pkt, unsigned short head_room)
         return NULL;
     }
 
-    /* Increase the head space by the hear_room */
+    /* Increase the head space by the head_room */
     if (vr_pcow(clone_pkt, head_room)) {
         vr_pfree(clone_pkt, VP_DROP_PCOW_FAIL);
         return NULL;
@@ -278,18 +367,49 @@ drop:
  */
 
 static int
-nh_composite_mcast_l3_validate_src(unsigned short vrf, struct vr_packet *pkt,
+nh_composite_mcast_validate_src(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd) 
 {
     int i;
-    struct vr_nexthop *dir_nh;
+    struct vr_nexthop *dir_nh, *fabric_nh;
+    unsigned int tun_dip;
 
-    for (i = 0; i < nh->nh_component_cnt; i++) {
-        dir_nh = nh->nh_component_nh[i].cnh;
+    /*
+     * If multicast packet is received on fabric interface, we need to
+     * validate whether the source of this packet is in the distribution
+     * tree. If source is not in the list, packet needs to be dropped.
+     * It is assumed that L2 Multicast component's first member is
+     * always Fabric nexthop. Nexthop should reorder properly even if
+     * Agent adds in different order
+     */
+
+    if (pkt->vp_if->vif_type != VIF_TYPE_PHYSICAL)
+        return NH_SOURCE_VALID;
+
+    if ((!nh->nh_component_cnt) ||
+         (nh->nh_component_nh[0].cnh->nh_type != NH_COMPOSITE) ||
+         (!(nh->nh_component_nh[0].cnh->nh_flags &
+              NH_FLAG_COMPOSITE_FABRIC))) {
+        return NH_SOURCE_INVALID;
+    }
+
+    fabric_nh = nh->nh_component_nh[0].cnh;
+
+    for (i = 0; i < fabric_nh->nh_component_cnt; i++) {
+        dir_nh = fabric_nh->nh_component_nh[i].cnh;
+
+        if (dir_nh->nh_type != NH_TUNNEL)
+            continue;
+
+        tun_dip = 0;
+        if (dir_nh->nh_flags & NH_FLAG_TUNNEL_GRE)
+            tun_dip = dir_nh->nh_gre_tun_dip;
+        else if (dir_nh->nh_flags & NH_FLAG_TUNNEL_UDP)
+            tun_dip = dir_nh->nh_udp_tun_dip;
 
         /* Dont forward to same source */
-        if (fmd->fmd_outer_src_ip && 
-                fmd->fmd_outer_src_ip == dir_nh->nh_gre_tun_dip)
+        if (tun_dip && fmd->fmd_outer_src_ip && 
+                fmd->fmd_outer_src_ip == tun_dip)
             return NH_SOURCE_VALID;
     }
 
@@ -300,11 +420,10 @@ static int
 nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd) 
 {
-    int i;
+    int i, clone_size = 0;
     struct vr_nexthop *dir_nh;
     unsigned short drop_reason, pkt_vrf;
     struct vr_packet *new_pkt;
-    uint32_t *ptr;
     struct vr_vrf_stats *stats;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
@@ -318,35 +437,22 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
         goto drop;
     }
 
-    /*
-     * If multicast packet is received on fabric interface, we need to
-     * validate whether the source of this packet is in the distribution
-     * tree. If source is not in the list, packet needs to be dropped.
-     * It is assumed that L2 Multicast component's first member is
-     * always Fabric nexthop. Nexthop should reorder properly even if
-     * Agent adds in different order
-     */
-    if ((pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) &&
-            nh->nh_validate_src) {
-        if (nh->nh_component_cnt && 
-             (nh->nh_component_nh[0].cnh->nh_type == NH_COMPOSITE) && 
-             (nh->nh_component_nh[0].cnh->nh_flags &
-              NH_FLAG_COMPOSITE_FABRIC)) {
-            if (nh->nh_validate_src(vrf, pkt,
-                        nh->nh_component_nh[0].cnh, fmd) == NH_SOURCE_INVALID) {
-                drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
-                goto drop;
-            }
+    if (nh->nh_validate_src) {
+        if (nh->nh_validate_src(vrf, pkt, nh, fmd) == NH_SOURCE_INVALID) {
+            drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
+            goto drop;
         }
     }
 
-    /*
-     * Packet is always received here with no control information. L2
-     * control information needs to be added if we are forwarding only
-     * to Fabric. So push control flags in fabric case
+    /* 
+     * The packet can come to this nexthp either from Fabric or from VM.
+     * Incase of Fabric, the packet would contain the Vxlan header and
+     * control information. From VM, it contains neither of them
      */
+
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
+
 
         if (dir_nh->nh_type == NH_ENCAP) {
 
@@ -354,32 +460,47 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
             if (dir_nh->nh_dev == pkt->vp_if)
                 continue;
 
-            /* Create the head space for complete L2 header and process the nh */
-            if (!(new_pkt = nh_mcast_clone(pkt, VR_MCAST_PKT_HEAD_SPACE))) {
+            /* There would be enought head space to clone it with zero
+             * size */
+            if (!(new_pkt = nh_mcast_clone(pkt, 0))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
+            }
+
+            if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) {
+
+                /* 
+                 * No need to give the below headers to ENCAP NH. So
+                 * pull them off
+                 */
+                if (!pkt_pull(new_pkt, (VR_VXLAN_HDR_LEN +
+                                VR_L2_MCAST_CTRL_DATA_LEN))) {
+                    drop_reason = VP_DROP_PULL;
+                    break;
+                }
             }
 
             pkt_vrf = dir_nh->nh_dev->vif_vrf;
-        } else {
 
-            /* Create head space for L2 control information */
-            if (!(new_pkt = nh_mcast_clone(pkt, sizeof(uint32_t)))) {
+        } else if ((dir_nh->nh_type == NH_COMPOSITE) &&
+                (dir_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC)) {
+
+            /* Need to create extra head space only if packet is coming
+             * from VM */
+            if (pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)
+                clone_size = VR_L2_MCAST_PKT_HEAD_SPACE;
+
+            /* Create head space for L2 Mcast header */
+            if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
             }
-
-            /* Add L2 control information */
-            ptr = (uint32_t *)pkt_push(new_pkt, sizeof(uint32_t));
-            if (!ptr) {
-                drop_reason = VP_DROP_PUSH;
-                break;
-            }
-            *ptr = 0;
             pkt_vrf = vrf;
+
+        } else {
+            continue;
         }
 
-        fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
         nh_output(pkt_vrf, new_pkt, dir_nh, fmd);
     }
 
@@ -399,6 +520,7 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
     struct vr_nexthop *dir_nh;
     struct vr_packet *new_pkt;
     int i;
+    uint32_t mcast_clone_size = 0;
 
     drop_reason = VP_DROP_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
@@ -410,27 +532,12 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
         goto drop;
     }
 
-    /*
-     * If multicast packet is received on fabric interface, we need to
-     * validate whether the source of this packet is in the distribution
-     * tree. If source is not in the list, packet needs to be dropped.
-     * It is assumed that L3 Multicast component's first member is
-     * always Fabric nexthop. Nexthop should reorder properly even if
-     * Agent adds in different order
-     */
-    if ((pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) && nh->nh_validate_src) {
-        if (nh->nh_component_cnt && 
-             (nh->nh_component_nh[0].cnh->nh_type == NH_COMPOSITE) && 
-             (nh->nh_component_nh[0].cnh->nh_flags &
-              NH_FLAG_COMPOSITE_FABRIC)) {
-            if (nh->nh_validate_src(vrf, pkt,
-                        nh->nh_component_nh[0].cnh, fmd) == NH_SOURCE_INVALID) {
-                drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
-                goto drop;
-            }
+    if (nh->nh_validate_src) {
+        if (nh->nh_validate_src(vrf, pkt, nh, fmd) == NH_SOURCE_INVALID) {
+            drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
+            goto drop;
         }
     }
-
 
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
@@ -439,26 +546,23 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
             /* Dont give back the packet to same VM */
             if (dir_nh->nh_dev == pkt->vp_if) 
                 continue;
-            /* 
-             * Cow the packet as interface nexthop is not going to
-             * clone any more
-             */
-            if (!(new_pkt = nh_mcast_clone(pkt, VR_MCAST_PKT_HEAD_SPACE))) {
-                drop_reason = VP_DROP_MCAST_CLONE_FAIL;
-                break;
-            }
 
+            mcast_clone_size = sizeof(struct vr_eth);
             pkt_vrf = dir_nh->nh_dev->vif_vrf;
-        } else {
-            /* Just clone the packet as subsequent nexthops would create
-             * the required head space */
-            new_pkt = vr_pclone(pkt);
-            if (!new_pkt) {
-                drop_reason = VP_DROP_CLONE_FAIL;
-                break;
-            }
 
+        } else if ((dir_nh->nh_type == NH_COMPOSITE) &&
+                (dir_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC)) {
+
+            mcast_clone_size = VR_L3_MCAST_PKT_HEAD_SPACE;
             pkt_vrf = vrf;
+
+        } else {
+            continue;
+        }
+
+        if (!(new_pkt = nh_mcast_clone(pkt, mcast_clone_size))) {
+            drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+            break;
         }
 
         fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
@@ -480,6 +584,8 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
     struct vr_nexthop *dir_nh;
     unsigned short drop_reason;
     struct vr_packet *new_pkt;
+    unsigned int sip;
+    int32_t label;
 
     drop_reason = VP_DROP_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
@@ -497,6 +603,8 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
      * along with control inforation is in first buffer. So it can be
      * safely cow'd for the required length
      */
+
+    label = fmd->fmd_label;
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
 
@@ -508,12 +616,67 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
                 fmd->fmd_outer_src_ip == dir_nh->nh_gre_tun_dip) 
             continue;
 
-        new_pkt = nh_mcast_clone(pkt, VR_MCAST_PKT_HEAD_SPACE);
+        /* 
+         * Enough head spaces are created in the previous nexthop
+         * handling. Just cow the packet with zero size to get different
+         * buffer space 
+         */
+        new_pkt = nh_mcast_clone(pkt, 0);
         if (!new_pkt) {
             drop_reason = VP_DROP_MCAST_CLONE_FAIL;
             break;
         }
 
+
+        /* 
+         *  If L2 multicast packet from VM, we need to update Vxlan
+         * with right values 
+         */
+        if ((new_pkt->vp_type == VP_TYPE_L2) &&
+                 (new_pkt->vp_flags & VP_FLAG_MULTICAST) && 
+                (new_pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)) {
+
+            /*
+             * The L2 multicast bridge entry will have VNID as label. If fmd does not 
+             * valid label/vnid, skip the processing
+             */
+            if (label < 0) {
+                vr_pfree(new_pkt, VP_DROP_INVALID_LABEL);
+                break;
+            }
+                
+
+            /*
+             * Take the right tunnel source. The dst is also our own
+             * address
+             */
+            if (dir_nh->nh_flags & NH_FLAG_TUNNEL_GRE) {
+                sip = dir_nh->nh_gre_tun_sip;
+            } else if (dir_nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
+                sip = dir_nh->nh_udp_tun_sip;
+            } else {
+                vr_pfree(new_pkt, VP_DROP_INVALID_NH);
+                break;
+            }
+
+            /* 
+             * Add vxlan encapsulation. The vxlan id need to be taken 
+             * from Bridge entry
+             */
+            fmd->fmd_label = label;
+            if (nh_vxlan_tunnel_helper(dir_nh->nh_dev->vif_vrf, 
+                                        new_pkt, fmd, sip, sip) == false) {
+                vr_pfree(new_pkt, VP_DROP_PUSH);
+                break;
+            }
+
+            if (vr_l2_mcast_control_data_add(new_pkt) == false) {
+                vr_pfree(new_pkt, VP_DROP_PUSH);
+                break;
+            }
+        }
+
+        /* MPLS label for outer header encapsulation */
         fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
         nh_output(dir_nh->nh_dev->vif_vrf, new_pkt, dir_nh, fmd);
     }
@@ -548,7 +711,7 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
     /* Identify whether L2 or L3 packet */
     pkt_type_flag = NH_FLAG_COMPOSITE_L2;
     ctrl_data = (uint32_t *)pkt_data(pkt);
-    if (*ctrl_data != 0) {
+    if (*ctrl_data != VR_L2_MCAST_CTRL_DATA) {
         pkt_type_flag = NH_FLAG_COMPOSITE_L3;
         pkt->vp_type = VP_TYPE_IP;
 
@@ -569,7 +732,7 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
                 goto drop;
             }
 
-            new_pkt = vr_palloc_head(pkt, (cp + sizeof(uint32_t)));
+            new_pkt = vr_palloc_head(pkt, (cp));
             if (!new_pkt) {
                 drop_reason = VP_DROP_HEAD_ALLOC_FAIL;
                 goto drop;
@@ -588,9 +751,9 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
             pkt->vp_flags |= VP_FLAG_MULTICAST;
         }
     } else {
-        /* Pull the control flags */
+        /* Mark the packet as L2. Let the control information flow till
+         * the L2 mcast nexthop */
         pkt->vp_type = VP_TYPE_L2;
-        pkt_pull(pkt, sizeof(uint32_t));
     }
 
     /* 
@@ -623,56 +786,6 @@ nh_discard(unsigned short vrf, struct vr_packet *pkt,
     return 0;
 }
 
-/*
- * nh_udp_tunnel_helper - helper function to use for UDP tunneling. Used
- * by mirroring and MPLS over UDP. Returns 0 on success, 1 otherwise.
- */
-static int
-nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
-                     unsigned short dport, unsigned int sip, 
-                     unsigned int dip) 
-{
-    struct vr_ip *ip;
-    struct vr_udp *udp;
-
-    /* Udp Header */
-    udp = (struct vr_udp *)pkt_push(pkt, sizeof(struct vr_udp));
-    if (!udp) {
-        return 1;
-    }
-
-    udp->udp_sport = sport;
-    udp->udp_dport = dport;
-    udp->udp_length = htons(pkt_len(pkt));
-    udp->udp_csum = 0;
-
-    /* And now the IP header */
-    ip = (struct vr_ip *)pkt_push(pkt, sizeof(struct vr_ip));
-    if (!ip) {
-        return 1;
-    }
-
-    ip->ip_version = 4;
-    ip->ip_hl = 5;
-    ip->ip_tos = 0;
-    ip->ip_id = htons(vr_generate_unique_ip_id());
-    ip->ip_frag_off = 0;
-    ip->ip_ttl = 64;
-    ip->ip_proto = VR_IP_PROTO_UDP;
-    ip->ip_saddr = sip;
-    ip->ip_daddr = dip;
-    ip->ip_len = htons(pkt_len(pkt));
-
-    /* 
-     * header checksum 
-     */
-    ip->ip_csum = 0;
-    ip->ip_csum = vr_ip_csum(ip);    
-
-    pkt_set_network_header(pkt, pkt->vp_data);
-    return 0;
-}
-
 static int
 nh_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
@@ -697,7 +810,7 @@ nh_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
 
     if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
                              nh->nh_udp_tun_dport, nh->nh_udp_tun_sip,
-                             nh->nh_udp_tun_dip)) {
+                             nh->nh_udp_tun_dip) == false) {
         goto send_fail;
     }
 
@@ -736,12 +849,8 @@ static int
 nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt, 
                    struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
-    unsigned char *tun_encap;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
-    unsigned int head_space;
-    struct vr_vxlan *vxlanh;
-    __u16 udp_src_port = VR_VXLAN_UDP_SRC_PORT;
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
 
@@ -752,48 +861,23 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
     if (!fmd || fmd->fmd_label < 0)
         return vr_forward(nh->nh_router, vrf, pkt, fmd);
 
-    head_space = sizeof(struct vr_ip) + sizeof(struct vr_udp) +
-                                sizeof(struct vr_vxlan) +
-                                nh->nh_udp_tun_encap_len;
+    if (nh_vxlan_tunnel_helper(vrf, pkt, fmd, nh->nh_udp_tun_sip,
+                                            nh->nh_udp_tun_dip) == false) {
+        goto send_fail;
+    }
 
-    if (pkt_head_space(pkt) < head_space) {
-        tmp_pkt = vr_pexpand_head(pkt, head_space - pkt_head_space(pkt));
+    if (pkt_head_space(pkt) < nh->nh_udp_tun_encap_len) {
+        tmp_pkt = vr_pexpand_head(pkt, nh->nh_udp_tun_encap_len - pkt_head_space(pkt));
         if (!tmp_pkt) {
             goto send_fail;
         }
         pkt = tmp_pkt;
     }
 
-    /* Change the packet type to VXLAN as we added the vxlan header */
-    pkt->vp_type = VP_TYPE_VXLAN;
-   
-    /*
-     * The UDP source port is a hash of the inner headers
-     */
-    if (vr_get_udp_src_port) {
-        udp_src_port = vr_get_udp_src_port(pkt, fmd, vrf);
-        if (udp_src_port == 0) {
-            reason = VP_DROP_PULL;
-            goto send_fail;
-        }
-    }
-
-    /* Add the vxlan header */
-    vxlanh = (struct vr_vxlan *)pkt_push(pkt, sizeof(struct vr_vxlan));
-    vxlanh->vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
-    vxlanh->res = 0;
-
-    if (nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
-                             htons(VR_VXLAN_UDP_DST_PORT),
-                             nh->nh_udp_tun_sip, nh->nh_udp_tun_dip)) {
-        goto send_fail;
-    }
-
     /* slap l2 header */
     vif = nh->nh_dev;
-    tun_encap = vif->vif_set_rewrite(vif, pkt, nh->nh_data, 
-                                     nh->nh_udp_tun_encap_len);
-    if (!tun_encap) {
+    if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data, 
+                                     nh->nh_udp_tun_encap_len)) {
         goto send_fail;
     }
 
@@ -802,7 +886,6 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
     return 0;
 
 send_fail:
-
     vr_pfree(pkt, reason);
     return 0;
 
@@ -894,7 +977,7 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
                              htons(VR_MPLS_OVER_UDP_DST_PORT),
-                             tun_sip, tun_dip)) {
+                             tun_sip, tun_dip) == false) {
         goto send_fail;
     }
 
@@ -1344,11 +1427,11 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     if ((req->nhr_flags & NH_FLAG_COMPOSITE_L3) && 
             (req->nhr_flags & NH_FLAG_MCAST)) {
         nh->nh_reach_nh = nh_composite_mcast_l3;
-        nh->nh_validate_src = nh_composite_mcast_l3_validate_src;
+        nh->nh_validate_src = nh_composite_mcast_validate_src;
     } else if ((req->nhr_flags & NH_FLAG_COMPOSITE_L2) && 
             (req->nhr_flags & NH_FLAG_MCAST)) {
         nh->nh_reach_nh = nh_composite_mcast_l2;
-        nh->nh_validate_src = nh_composite_mcast_l3_validate_src;
+        nh->nh_validate_src = nh_composite_mcast_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
         nh->nh_reach_nh = nh_composite_ecmp;
         nh->nh_validate_src = nh_composite_ecmp_validate_src;

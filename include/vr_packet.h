@@ -410,13 +410,29 @@ struct vr_vxlan {
  * take the maximum of two )
  * New IP header
  * New L2 header (eth + vlan)
- * 4 bytes of control information to identify whther Label is L2 or L3
  */
-
-#define VR_MCAST_PKT_HEAD_SPACE        (sizeof(struct vr_eth) + \
+#define VR_L3_MCAST_PKT_HEAD_SPACE      (sizeof(struct vr_eth) + \
                                         sizeof(struct vr_vlan_hdr) + \
                                         sizeof(struct vr_ip) + \
-                                        sizeof(struct vr_udp) + 4 + 4)
+                                        sizeof(struct vr_udp) + 4)
+
+/*
+ * The complete VXlan header contains IP and UDP header
+ */
+#define VR_VXLAN_HDR_LEN        (sizeof(struct vr_vxlan) + \
+                                    sizeof(struct vr_ip) + sizeof(struct vr_udp))
+
+#define VR_L2_MCAST_CTRL_DATA           (0x0000)
+#define VR_L2_MCAST_CTRL_DATA_LEN       4
+
+/*
+ * The L2 mcast head space contains Vxlan header and 4 bytes of control
+ * word inaddtion to L3 mcast head space
+ */
+#define VR_L2_MCAST_PKT_HEAD_SPACE  (VR_L3_MCAST_PKT_HEAD_SPACE + \
+                                      VR_VXLAN_HDR_LEN + \
+                                        VR_L2_MCAST_CTRL_DATA_LEN)
+
 
 extern unsigned short vr_ip_csum(struct vr_ip *);
 extern unsigned short vr_generate_unique_ip_id(void);

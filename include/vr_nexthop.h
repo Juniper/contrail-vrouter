@@ -61,7 +61,7 @@ struct vr_nexthop {
     /*
      * nh_family is going to be AF_INET for L3 nexthops, AF_BRIDGE for L2
      * nexthops and AF_UNSPEC for composite multiprotocol nexthops. For
-     * an eg, an L2 Encap nexthop would contail family as AF_BRIDGE
+     * an eg, an L2 Encap nexthop would contain family as AF_BRIDGE
      */
     __u8            nh_family;
     __u16           nh_flags;

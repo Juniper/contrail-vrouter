@@ -975,6 +975,7 @@ vr_interface_add(vr_interface_req *req)
         !(vif->vif_flags & VIF_FLAG_MIRROR_TX)) {
         vif->vif_mirror_id = VR_MAX_MIRROR_INDICES;
     }
+
     vif->vif_vrf = req->vifr_vrf;
     vif->vif_mtu = req->vifr_mtu;
     vif->vif_idx = req->vifr_idx;
