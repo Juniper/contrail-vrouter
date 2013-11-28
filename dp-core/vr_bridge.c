@@ -373,3 +373,10 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     vr_pfree(pkt, VP_DROP_INVALID_NH);
     return 0;
 }
+
+unsigned int
+vr_l2_input(unsigned short vrf, struct vr_packet *pkt, 
+                              struct vr_forwarding_md *fmd)
+{
+    return vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
+}

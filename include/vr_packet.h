@@ -68,9 +68,10 @@
 /*
  * Values to define how to proceed with handling a packet.
  */
-#define PKT_RET_FAST_PATH 1
-#define PKT_RET_SLOW_PATH 2
-#define PKT_RET_ERROR     3
+#define PKT_RET_FAST_PATH 			1
+#define PKT_RET_SLOW_PATH 			2
+#define PKT_RET_ERROR     			3
+#define PKT_RET_FALLBACK_BRIDGING 		4
 
 /*
  * Values to define the MPLS tunnel type

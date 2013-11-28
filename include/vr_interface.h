@@ -35,6 +35,10 @@
 #define VIF_FLAG_SERVICE_IF         0x4
 #define VIF_FLAG_MIRROR_RX          0x8
 #define VIF_FLAG_MIRROR_TX          0x10
+#define VIF_FLAG_TX_CSUM_OFFLOAD    0x20
+#define VIF_FLAG_L3_ENABLED         0x40
+#define VIF_FLAG_L2_ENABLED         0x80
+
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)

@@ -968,8 +968,12 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
 
-    ip = (struct vr_ip *)pkt_network_header(pkt);
-    id = ip->ip_id;
+    if (pkt->vp_type != VP_TYPE_L2) {
+        ip = (struct vr_ip *)pkt_network_header(pkt);
+        id = ip->ip_id;
+    } else {
+        id = htons(vr_generate_unique_ip_id());
+    }
 
     gre_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_gre);
     gre_head_space += nh->nh_gre_tun_encap_len;
@@ -1084,7 +1088,7 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
 }
 
 static int
-nh_encap_mcast(unsigned short vrf, struct vr_packet *pkt,
+nh_encap_l3_mcast(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *md)
 {
     struct vr_interface *vif;
@@ -1416,7 +1420,7 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         memcpy(nh->nh_data, req->nhr_encap, nh->nh_encap_len);
 
         if (req->nhr_flags & NH_FLAG_MCAST) {
-            nh->nh_reach_nh = nh_encap_mcast;
+            nh->nh_reach_nh = nh_encap_l3_mcast;
         } else {
             nh->nh_reach_nh = nh_encap_l3_unicast;
             nh->nh_validate_src = nh_encap_l3_validate_src;
