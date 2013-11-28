@@ -963,6 +963,9 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
             goto unhandled;
         }
 
+        if (frag_size < pull_len) 
+            goto slow_path;
+
         if (pkt_type == PKT_MPLS_TUNNEL_L3) {
             /*
              * Account for IP options
@@ -1233,6 +1236,9 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
     } else {
         goto unhandled;
     }
+
+    if (frag_size < pull_len)
+        goto slow_path;
 
     if (pkt_type == PKT_MPLS_TUNNEL_L3) {
 

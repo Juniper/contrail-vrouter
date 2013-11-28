@@ -743,6 +743,7 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
     struct vr_vxlan *vxlanh;
     __u16 udp_src_port = VR_VXLAN_UDP_SRC_PORT;
     unsigned short reason = VP_DROP_PUSH;
+    struct vr_packet *tmp_pkt;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
     if (stats)
@@ -756,10 +757,11 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
                                 nh->nh_udp_tun_encap_len;
 
     if (pkt_head_space(pkt) < head_space) {
-        pkt = vr_pexpand_head(pkt, head_space - pkt_head_space(pkt));
-        if (!pkt) {
+        tmp_pkt = vr_pexpand_head(pkt, head_space - pkt_head_space(pkt));
+        if (!tmp_pkt) {
             goto send_fail;
         }
+        pkt = tmp_pkt;
     }
 
     /* Change the packet type to VXLAN as we added the vxlan header */
@@ -830,6 +832,7 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     unsigned int tun_sip, tun_dip, udp_head_space;
     __u16 tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT; 
     unsigned short reason = VP_DROP_PUSH;
+    struct vr_packet *tmp_pkt;
 
     /*
      * If we are testing MPLS over UDP using the vr_mudp sysctl, use the
@@ -874,10 +877,11 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     udp_head_space += tun_encap_len;
 
     if (pkt_head_space(pkt) < udp_head_space) {
-        pkt = vr_pexpand_head(pkt, udp_head_space - pkt_head_space(pkt));
-        if (!pkt) {
+        tmp_pkt = vr_pexpand_head(pkt, udp_head_space - pkt_head_space(pkt));
+        if (!tmp_pkt) 
             goto send_fail;
-        }
+
+        pkt = tmp_pkt;
     }
    
     /*
@@ -935,6 +939,7 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     unsigned char *tun_encap;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
+    struct vr_packet *tmp_pkt;
 
     if (vr_mudp && vr_perfs) {
         return nh_mpls_udp_tunnel(vrf, pkt, nh, fmd);
@@ -970,11 +975,12 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     gre_head_space += nh->nh_gre_tun_encap_len;
 
     if (pkt_head_space(pkt) < gre_head_space) {
-        pkt = vr_pexpand_head(pkt, gre_head_space - pkt_head_space(pkt));
-        if (!pkt) {
+        tmp_pkt = vr_pexpand_head(pkt, gre_head_space - pkt_head_space(pkt));
+        if (!tmp_pkt) {
             drop_reason = VP_DROP_HEAD_ALLOC_FAIL;
             goto send_fail;
         }
+        pkt = tmp_pkt;
     }
 
     if (nh_push_mpls_header(pkt, fmd->fmd_label) < 0)
