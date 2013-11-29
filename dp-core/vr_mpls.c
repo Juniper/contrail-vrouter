@@ -211,7 +211,7 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
     case AF_BRIDGE:
         return PKT_MPLS_TUNNEL_L2_UCAST;
     case AF_UNSPEC:
-        if (control_data == 0)
+        if (control_data == VR_L2_MCAST_CTRL_DATA)
             return PKT_MPLS_TUNNEL_L2_MCAST;
         else 
             return PKT_MPLS_TUNNEL_L3;
@@ -258,6 +258,9 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
     fmd->fmd_outer_src_ip = ip->ip_saddr;
+
+    /* Store the TTL in packet. Will be used for multicast replication */
+    pkt->vp_ttl = ttl;
 
     /* drop the TOStack label */
     data = pkt_pull(pkt, VR_MPLS_HDR_LEN);

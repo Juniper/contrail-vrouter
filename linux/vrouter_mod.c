@@ -544,7 +544,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
          * ahead 
          */
         if ((pkt->vp_flags & VP_FLAG_MULTICAST) && (!(*data))) {
-            pull_len += sizeof(unsigned int);
+            pull_len += VR_L2_MCAST_CTRL_DATA_LEN;
             if (!pskb_may_pull(skb, pull_len)) {
                 goto error;
             }
@@ -933,7 +933,8 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
         *encap_type = PKT_ENCAP_MPLS;
         /* Take into consideration, the MPLS header and 4 bytes of
          * control information that might exist for L2 packet */
-        if (frag_size < (pull_len + VR_MPLS_HDR_LEN + sizeof(uint32_t)))
+        if (frag_size < (pull_len + VR_MPLS_HDR_LEN + 
+                                VR_L2_MCAST_CTRL_DATA_LEN))
             goto slow_path;
 
         label = ntohl(*(uint32_t *)(va + pull_len));
@@ -950,11 +951,12 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
             iph = (struct vr_ip *) (va + pull_len + VR_MPLS_HDR_LEN);
             pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
-            /* L2 packet with control information */
+            /* L2 Multicast packet with control information and 
+             * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
             eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
-                 sizeof(uint32_t));
-            pull_len += VR_MPLS_HDR_LEN + sizeof(uint32_t) +
-                sizeof(struct vr_eth);
+                    VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
+            pull_len += VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN +
+                            VR_VXLAN_HDR_LEN + sizeof(struct vr_eth);
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) {
             /* L2 packet with no control information */
             eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN);
@@ -1207,7 +1209,8 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
 
     /* Take into consideration, the MPLS header and 4 bytes of
      * control information that might exist for L2 packet */
-    if (frag_size < (pull_len + VR_MPLS_HDR_LEN + sizeof(uint32_t)))
+    if (frag_size < (pull_len + VR_MPLS_HDR_LEN + 
+                            VR_L2_MCAST_CTRL_DATA_LEN))
         goto slow_path;
 
     label = ntohl(*(uint32_t *)(va + pull_len));
@@ -1224,11 +1227,12 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
         iph = (struct vr_ip *) (va + pull_len + VR_MPLS_HDR_LEN);
         pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
     } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
-        /* L2 packet with control information */
+        /* L2 Multicast packet with control information and 
+         * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
         eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
-                 sizeof(uint32_t));
-        pull_len += VR_MPLS_HDR_LEN + sizeof(uint32_t) +
-                sizeof(struct vr_eth);
+                VR_VXLAN_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN);
+        pull_len += VR_MPLS_HDR_LEN + VR_VXLAN_HDR_LEN +
+                    VR_L2_MCAST_CTRL_DATA_LEN + sizeof(struct vr_eth);
     } else if (pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) {
         /* L2 packet with no control information */
         eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN);
@@ -1447,7 +1451,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
     }
 
     pull_len = hdr_len;
-    pull_len += VR_MPLS_HDR_LEN + sizeof(uint32_t);
+    pull_len += VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN;
 
     /*
      * vp_data is currently the offset of the start of the GRE/UDP header
@@ -1467,7 +1471,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
             * assumption
             */
            mpls_pkt = false;
-           pull_len -= (VR_MPLS_HDR_LEN + sizeof(uint32_t));
+           pull_len -= (VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN);
            pull_len += sizeof(struct vr_vxlan) + sizeof(struct vr_eth);
            if (!pskb_may_pull(skb, pull_len))
                goto error;
@@ -1494,7 +1498,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
         if (ret == PKT_MPLS_TUNNEL_L3) {
 
             /* L3 packet */
-            pull_len = pull_len - sizeof(uint32_t) + sizeof(struct vr_ip);
+            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN + sizeof(struct vr_ip);
 
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
@@ -1594,11 +1598,12 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
         } else if (ret == PKT_MPLS_TUNNEL_L2_MCAST) {
 
             /* Pkt is L2 with control information */
-            pull_len += sizeof(struct vr_eth);
+            pull_len += VR_VXLAN_HDR_LEN + sizeof(struct vr_eth);
             if (!pskb_may_pull(skb, pull_len)) {
                 goto error;
             }
-            eth = (struct vr_eth *) (skb->head + hoff + sizeof(uint32_t)); 
+            eth = (struct vr_eth *) (skb->head + hoff +
+                    VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
             if (eth->eth_proto == VR_ETH_PROTO_VLAN) {
                 pull_len += sizeof(struct vr_vlan_hdr);
 
@@ -1609,7 +1614,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
             lh_reset_skb_fields(pkt);
         } else if (ret == PKT_MPLS_TUNNEL_L2_UCAST) {
             /* Pkt is L2 with no control information */
-            pull_len = pull_len - sizeof(uint32_t) + sizeof(struct vr_eth);
+            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN + sizeof(struct vr_eth);
             if (!pskb_may_pull(skb, pull_len)) {
                 goto error;
             }

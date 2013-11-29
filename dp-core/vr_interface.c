@@ -6,6 +6,7 @@
 #include <vr_os.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
+#include "vr_mirror.h"
 
 static struct vr_host_interface_ops *hif_ops;
 
@@ -14,11 +15,12 @@ static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
 extern void  vr_host_interface_exit(void);
+extern unsigned int vr_l3_input(unsigned short, struct vr_packet *, 
+                                              struct vr_forwarding_md *);
+extern unsigned int vr_l2_input(unsigned short, struct vr_packet *, 
+                                               struct vr_forwarding_md *);
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
-
-extern unsigned int vr_input(unsigned short, struct vr_interface *,
-        struct vr_packet *);
 
 static inline struct vr_interface_stats *
 vif_get_stats(struct vr_interface *vif, unsigned short cpu)
@@ -52,6 +54,37 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
         stats->vis_oerrors++;
     vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
     return;
+}
+
+/*
+ * vr_interface_input() is invoked if a packet ingresses an interface. 
+ * This function demultiplexes the packet to right input 
+ * function depending on the protocols enabled on the VIF
+ */
+static unsigned int
+vr_interface_input(unsigned short vrf, struct vr_interface *vif, struct vr_packet *pkt)
+{
+    struct vr_forwarding_md fmd;
+    unsigned int ret;
+
+    vr_init_forwarding_md(&fmd);
+
+    if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
+        fmd.fmd_dvrf = vif->vif_vrf;
+        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
+    }
+
+    if (vif->vif_flags & VIF_FLAG_L3_ENABLED) {
+        ret = vr_l3_input(vrf, pkt, &fmd);
+        if (ret != PKT_RET_FALLBACK_BRIDGING)
+            return ret;
+    }
+
+    if (vif->vif_flags & VIF_FLAG_L2_ENABLED)
+        return vr_l2_input(vrf, pkt, &fmd);
+
+    vif_drop_pkt(vif, pkt, 1);
+    return 0;
 }
 
 
@@ -265,7 +298,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
             agent_vif = vif;
         }
         pkt->vp_if = agent_vif;
-        vr_input(ntohs(hdr->hdr_vrf), agent_vif, pkt);
+        vr_interface_input(ntohs(hdr->hdr_vrf), agent_vif, pkt);
     } else {
         vif = __vrouter_get_interface(vrouter_get(0), ntohs(hdr->hdr_ifindex));
         if (!vif) {
@@ -434,7 +467,7 @@ vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif_mode_xconnect(vif))
         return vif_xconnect(vif, pkt);
 
-    return vr_input(vif->vif_vrf, vif, pkt);
+    return vr_interface_input(vif->vif_vrf, vif, pkt);
 }
 
 static int
@@ -497,7 +530,7 @@ eth_srx(struct vr_interface *vif, struct vr_packet *pkt,
     else
         vrf = vif->vif_vrf_table[vlan_id];
 
-    return vr_input(vrf, vif, pkt);
+    return vr_interface_input(vrf, vif, pkt);
 }
 
 static int
@@ -520,7 +553,7 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif_mode_xconnect(vif))
         pkt->vp_flags |= VP_FLAG_TO_ME;
 
-    return vr_input(vif->vif_vrf, vif, pkt);
+    return vr_interface_input(vif->vif_vrf, vif, pkt);
 }
 
 static int
@@ -927,11 +960,22 @@ vr_interface_add(vr_interface_req *req)
 
     vif->vif_type = req->vifr_type;
     vif->vif_flags = req->vifr_flags;
+
+    /* 
+     * If both L3 and L2 are disabled, enabled L3 with fallback bridging 
+     * by default to avoid total blackout of packets
+     */
+    if (!(vif->vif_flags & (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED))) {
+        vif->vif_flags |= (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED);
+    }
+
+
     vif->vif_mirror_id = req->vifr_mir_id;
     if (!(vif->vif_flags & VIF_FLAG_MIRROR_RX) &&
         !(vif->vif_flags & VIF_FLAG_MIRROR_TX)) {
         vif->vif_mirror_id = VR_MAX_MIRROR_INDICES;
     }
+
     vif->vif_vrf = req->vifr_vrf;
     vif->vif_mtu = req->vifr_mtu;
     vif->vif_idx = req->vifr_idx;
@@ -1260,6 +1304,7 @@ vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
 
     return 0;
 }
+
 
 /*
  * this makes sure that packets no longer enter the module when

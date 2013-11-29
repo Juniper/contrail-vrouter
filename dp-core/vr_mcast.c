@@ -278,6 +278,27 @@ mcast_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     return 0;
 }
 
+bool
+vr_l2_mcast_control_data_add(struct vr_packet *pkt)
+{
+
+    unsigned int *data;
+
+    if (pkt_head_space(pkt) < VR_L2_MCAST_CTRL_DATA_LEN) {
+        pkt = vr_pexpand_head(pkt, VR_L2_MCAST_CTRL_DATA_LEN - 
+                                                pkt_head_space(pkt));
+        if (!pkt)
+            return false;
+    }
+
+    data = (unsigned int *)pkt_push(pkt, VR_L2_MCAST_CTRL_DATA_LEN);
+    if (!data)
+        return false;
+
+    *data = VR_L2_MCAST_CTRL_DATA;
+    return true;
+}
+
 unsigned int
 vr_mcast_forward(struct vrouter *router, unsigned short vrf, 
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
