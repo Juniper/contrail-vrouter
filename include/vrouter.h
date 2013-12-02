@@ -157,6 +157,8 @@ struct vrouter {
 
     struct vr_btable *vr_flow_table;
     struct vr_btable *vr_oflow_table;
+    struct vr_flow_table_info *vr_flow_table_info;
+    unsigned int vr_flow_table_info_size;
 
     unsigned int vr_max_labels;
     struct vr_nexthop **vr_ilm;
