@@ -24,6 +24,9 @@
 
 #define VR_MAX_FLOW_QUEUE_ENTRIES   3U
 
+#define VR_MAX_FLOW_TABLE_HOLD_COUNT \
+                                    4096
+
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
 
@@ -575,6 +578,52 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     return vr_flow_action(router, fe, index, pkt, proto, fmd);
 }
 
+static unsigned int
+vr_flow_table_hold_count(struct vrouter *router)
+{
+    unsigned int i, num_cpus;
+    uint64_t hcount = 0, act_count;
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
+
+    num_cpus = vr_num_cpus;
+    for (i = 0; i < num_cpus; i++)
+        hcount += infop->vfti_hold_count[i];
+
+    act_count = infop->vfti_action_count;
+    if (hcount >= act_count)
+        return hcount - act_count;
+
+    return 0;
+}
+
+static void
+vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry *flow_e)
+{
+    unsigned int cpu;
+    uint64_t act_count;
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
+
+    cpu = vr_get_cpu();
+    flow_e->fe_action = VR_FLOW_ACTION_HOLD;
+
+    if (infop->vfti_hold_count[cpu] + 1 < infop->vfti_hold_count[cpu]) {
+        act_count = infop->vfti_action_count;
+        if (act_count > infop->vfti_hold_count[cpu]) {
+           (void)__sync_sub_and_fetch(&infop->vfti_action_count,
+                    infop->vfti_hold_count[cpu]);
+            infop->vfti_hold_count[cpu] = 0;
+        } else {
+            infop->vfti_hold_count[cpu] -= act_count;
+            (void)__sync_sub_and_fetch(&infop->vfti_action_count,
+                    act_count);
+        }
+    }
+
+    infop->vfti_hold_count[cpu]++;
+
+    return;
+}
+
 static int
 vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
         struct vr_packet *pkt, unsigned short proto,
@@ -587,6 +636,11 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
 
     flow_e = vr_find_flow(router, key, &fe_index);
     if (!flow_e) {
+        if (vr_flow_table_hold_count(router) > VR_MAX_FLOW_TABLE_HOLD_COUNT) {
+            vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
+            return 0;
+        }
+
         flow_e = vr_find_free_entry(router, key, &fe_index);
         if (!flow_e) {
             vr_pfree(pkt, VP_DROP_FLOW_TABLE_FULL);
@@ -595,6 +649,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
 
         /* mark as hold */
         flow_e->fe_action = VR_FLOW_ACTION_HOLD;
+        vr_flow_entry_set_hold(router, flow_e);
         vr_do_flow_action(router, flow_e, fe_index, pkt, proto, fmd);
         return 0;
     } 
@@ -956,6 +1011,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     int ret;
     unsigned int fe_index;
     struct vr_flow_entry *fe = NULL;
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
 
     router = vrouter_get(req->fr_rid);
     if (!router)
@@ -966,6 +1022,10 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if ((ret = vr_flow_req_is_invalid(router, req, fe)))
         return ret;
 
+    if (fe && (fe->fe_action == VR_FLOW_ACTION_HOLD) &&
+            ((req->fr_action != fe->fe_action) ||
+             !(req->fr_flags & VR_FLOW_FLAG_ACTIVE)))
+        __sync_fetch_and_add(&infop->vfti_action_count, 1);
     /* 
      * for delete, absence of the requested flow entry is caustic. so
      * handle that case first
@@ -1004,6 +1064,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     fe->fe_action = req->fr_action;
     fe->fe_flags = req->fr_flags; 
 
+
     return vr_flow_schedule_transition(router, req, fe);
 }
 
@@ -1040,6 +1101,49 @@ vr_flow_req_process(void *s_req)
 }
 
 static void
+vr_flow_table_info_destroy(struct vrouter *router)
+{
+    if (!router->vr_flow_table_info)
+        return;
+
+    vr_free(router->vr_flow_table_info);
+    router->vr_flow_table_info = NULL;
+    router->vr_flow_table_info_size = 0;
+
+    return;
+}
+
+static void
+vr_flow_table_info_reset(struct vrouter *router)
+{
+    if (!router->vr_flow_table_info)
+        return;
+
+    memset(router->vr_flow_table_info, 0, router->vr_flow_table_info_size);
+    return;
+}
+
+static int
+vr_flow_table_info_init(struct vrouter *router)
+{
+    unsigned int size;
+    struct vr_flow_table_info *infop;
+
+    if (router->vr_flow_table_info)
+        return 0;
+
+    size = sizeof(struct vr_flow_table_info) + sizeof(uint32_t) * vr_num_cpus;
+    infop = (struct vr_flow_table_info *)vr_zalloc(size);
+    if (!infop)
+        return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, size);
+
+    router->vr_flow_table_info = infop;
+    router->vr_flow_table_info_size = size;
+
+    return 0;
+}
+
+static void
 vr_flow_table_destroy(struct vrouter *router)
 {
     if (router->vr_flow_table) {
@@ -1052,32 +1156,84 @@ vr_flow_table_destroy(struct vrouter *router)
         router->vr_oflow_table = NULL;
     }
 
+    vr_flow_table_info_destroy(router);
+
     return;
 }
+
+static void
+vr_flow_table_reset(struct vrouter *router)
+{
+    unsigned int start, end, i;
+    struct vr_flow_entry *fe;
+    struct vr_forwarding_md fmd;
+    struct vr_flow_md flmd;
+
+    start = end = 0;
+    if (router->vr_flow_table)
+        end = vr_btable_entries(router->vr_flow_table);
+
+    if (router->vr_oflow_table) {
+        if (!end)
+            start = vr_flow_entries;
+        end += vr_btable_entries(router->vr_oflow_table);
+    }
+
+    if (end) {
+        vr_init_forwarding_md(&fmd);
+        flmd.flmd_action = VR_FLOW_ACTION_DROP;
+        for (i = start; i < end; i++) {
+            fe = vr_get_flow_entry(router, i);
+            if (fe) {
+                flmd.flmd_index = i;
+                flmd.flmd_flags = fe->fe_flags;
+                fe->fe_action = VR_FLOW_ACTION_DROP;
+                vr_flush_entry(router, fe, &flmd, &fmd);
+                vr_reset_flow_entry(router, fe, i);
+            }
+        }
+    }
+
+    vr_flow_table_info_reset(router);
+
+    return;
+}
+
+
+static int
+vr_flow_table_init(struct vrouter *router)
+{
+    if (!router->vr_flow_table) {
+        if (vr_flow_entries % VR_FLOW_ENTRIES_PER_BUCKET)
+            return vr_module_error(-EINVAL, __FUNCTION__,
+                    __LINE__, vr_flow_entries);
+
+        router->vr_flow_table = vr_btable_alloc(vr_flow_entries,
+                sizeof(struct vr_flow_entry));
+        if (!router->vr_flow_table) {
+            return vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, VR_DEF_FLOW_ENTRIES);
+        }
+    }
+
+    if (!router->vr_oflow_table) {
+        router->vr_oflow_table = vr_btable_alloc(vr_oflow_entries,
+                sizeof(struct vr_flow_entry));
+        if (!router->vr_oflow_table) {
+            return vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, VR_DEF_OFLOW_ENTRIES);
+        }
+    }
+
+    return vr_flow_table_info_init(router);
+}
+
 
 /* flow module exit and init */
 void
 vr_flow_exit(struct vrouter *router, bool soft_reset)
 {
-    unsigned int i;
-    struct vr_flow_entry *fe;
-    struct vr_forwarding_md fmd;
-    struct vr_flow_md flmd;
-
-    vr_init_forwarding_md(&fmd);
-
-    flmd.flmd_action = VR_FLOW_ACTION_DROP;
-    for (i = 0; i < vr_flow_entries + vr_oflow_entries; i++) {
-        fe = vr_get_flow_entry(router, i);
-        if (fe) {
-            flmd.flmd_index = i;
-            flmd.flmd_flags = fe->fe_flags;
-            fe->fe_action = VR_FLOW_ACTION_DROP;
-            vr_flush_entry(router, fe, &flmd, &fmd);
-            vr_reset_flow_entry(router, fe, i);
-        }
-    }
-
+    vr_flow_table_reset(router);
     if (!soft_reset) {
         vr_flow_table_destroy(router);
         vr_fragment_table_exit(router);
@@ -1094,30 +1250,8 @@ vr_flow_init(struct vrouter *router)
     if ((ret = vr_fragment_table_init(router) < 0))
         return ret;
 
-    if (!router->vr_flow_table) {
-        if (vr_flow_entries % VR_FLOW_ENTRIES_PER_BUCKET)
-            return vr_module_error(-EINVAL, __FUNCTION__,
-                    __LINE__, vr_flow_entries);
-
-        router->vr_flow_table = vr_btable_alloc(vr_flow_entries,
-                sizeof(struct vr_flow_entry));
-        if (!router->vr_flow_table && (ret = -ENOMEM)) {
-            vr_module_error(ret, __FUNCTION__, __LINE__, VR_DEF_FLOW_ENTRIES);
-            goto exit_init;
-        }
-    }
-
-    if (!router->vr_oflow_table) {
-        router->vr_oflow_table = vr_btable_alloc(vr_oflow_entries,
-                sizeof(struct vr_flow_entry));
-        if (!router->vr_oflow_table && (ret = -ENOMEM)) {
-            vr_module_error(ret, __FUNCTION__, __LINE__, VR_DEF_OFLOW_ENTRIES);
-            goto exit_init;
-        }
-    }
+    if ((ret = vr_flow_table_init(router)))
+        return ret;
 
     return 0;
-
-exit_init:
-    return ret;
 }
