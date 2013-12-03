@@ -252,8 +252,8 @@ nh_vxlan_tunnel_helper(unsigned short vrf, struct vr_packet *pkt,
 
     /* Add the vxlan header */
     vxlanh = (struct vr_vxlan *)pkt_push(pkt, sizeof(struct vr_vxlan));
-    vxlanh->vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
-    vxlanh->res = 0;
+    vxlanh->vxlan_vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
+    vxlanh->vxlan_flags = htonl(VR_VXLAN_IBIT);
 
     return nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
                              htons(VR_VXLAN_UDP_DST_PORT), sip, dip);

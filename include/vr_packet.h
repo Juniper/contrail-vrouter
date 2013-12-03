@@ -394,10 +394,11 @@ struct vr_pcap {
 };
 
 struct vr_vxlan {
-    unsigned int res;
-    unsigned int vnid;
+    unsigned int vxlan_flags;
+    unsigned int vxlan_vnid;
 } __attribute__((packed));
 
+#define VR_VXLAN_IBIT               0x08000000
 #define VR_UDP_HEAD_SPACE           62 /* eth + Ip + iP + udp */
 #define VR_MIRROR_PKT_HEAD_SPACE    (VR_UDP_HEAD_SPACE + sizeof(struct vr_pcap) + \
                                      VR_MPLS_HDR_LEN + sizeof(struct vr_gre))

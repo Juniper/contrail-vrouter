@@ -18,7 +18,10 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     unsigned short vrf;
 
     vxlan = (struct vr_vxlan *)pkt_data(pkt);
-    vnid = ntohl(vxlan->vnid) >> VR_VXLAN_VNID_SHIFT;
+    if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT)
+        goto fail;
+
+    vnid = ntohl(vxlan->vxlan_vnid) >> VR_VXLAN_VNID_SHIFT;
     if (!pkt_pull(pkt, sizeof(struct vr_vxlan))) {
         vr_pfree(pkt, VP_DROP_PULL);
         return 0;
@@ -37,6 +40,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         return nh_output(vrf, pkt, nh, fmd);
     }
 
+fail:
     vr_pfree(pkt, VP_DROP_INVALID_VNID);
     return 0;
 }
