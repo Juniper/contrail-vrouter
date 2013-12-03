@@ -894,6 +894,21 @@ del_fail:
     return ret;
 }
 
+static void
+vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
+{
+    vif->vif_flags = req->vifr_flags;
+
+    /*
+     * If both L3 and L2 are disabled, enabled L3 with fallback bridging
+     * by default to avoid total blackout of packets
+     */
+    if (!(vif->vif_flags & (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED))) {
+        vif->vif_flags |= (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED);
+    }
+    return;
+}
+
 static int
 vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 {
@@ -909,7 +924,8 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
         vr_interface_service_disable(vif);
     }
 
-    vif->vif_flags = req->vifr_flags;
+    vif_set_flags(vif, req);
+
     vif->vif_mirror_id = req->vifr_mir_id;
     if (!(vif->vif_flags & VIF_FLAG_MIRROR_RX) &&
         !(vif->vif_flags & VIF_FLAG_MIRROR_TX)) {
@@ -959,16 +975,8 @@ vr_interface_add(vr_interface_req *req)
     }
 
     vif->vif_type = req->vifr_type;
-    vif->vif_flags = req->vifr_flags;
 
-    /* 
-     * If both L3 and L2 are disabled, enabled L3 with fallback bridging 
-     * by default to avoid total blackout of packets
-     */
-    if (!(vif->vif_flags & (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED))) {
-        vif->vif_flags |= (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED);
-    }
-
+    vif_set_flags(vif, req);
 
     vif->vif_mirror_id = req->vifr_mir_id;
     if (!(vif->vif_flags & VIF_FLAG_MIRROR_RX) &&
