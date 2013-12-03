@@ -296,6 +296,8 @@ vr_l2_mcast_control_data_add(struct vr_packet *pkt)
         return false;
 
     *data = VR_L2_MCAST_CTRL_DATA;
+    pkt->vp_type = VP_TYPE_L2;
+    pkt->vp_flags |= VP_FLAG_MULTICAST;
     return true;
 }
 

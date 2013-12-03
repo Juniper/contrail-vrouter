@@ -523,32 +523,33 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     }
 
     if (pkt->vp_type == VP_TYPE_VXLAN) {
-        pull_len += ETH_HLEN;
-        if (!pskb_may_pull(skb, pull_len)) {
+
+        if (pkt_head_len(pkt) < ETH_HLEN)
             goto error;
-        }
+
         data = (unsigned int *)(skb->head + pkt->vp_data);
         hashval = vr_hash(data, ETH_HLEN, vr_hashrnd);
         /* Include the VRF to calculate the hash */
         hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
+
     } else if (pkt->vp_type == VP_TYPE_L2) {
         /* Lets assume the ethernet header without VLAN headers as of now */
-        pull_len += ETH_HLEN;
-        if (!pskb_may_pull(skb, pull_len)) {
-            goto error;
-        }
 
-        data = (unsigned int *)(skb->head + pkt->vp_data);
+        pull_len = ETH_HLEN;
+        if (pkt_head_len(pkt) < pull_len)
+            goto error;
+
+        data = (unsigned int *)pkt_data(pkt);
         /* 
-         * If L2 multicast and control data is zero, ethernet header is 4 bytes
-         * ahead 
+         * If L2 multicast and control data is zero, ethernet header is after
+         * VXLAN and control word
          */
         if ((pkt->vp_flags & VP_FLAG_MULTICAST) && (!(*data))) {
-            pull_len += VR_L2_MCAST_CTRL_DATA_LEN;
-            if (!pskb_may_pull(skb, pull_len)) {
+            pull_len += VR_VXLAN_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN;
+            if (pkt_head_len(pkt) < pull_len)
                 goto error;
-            }
-            data++;
+            data = (unsigned int *)(((unsigned char *)data) +
+                          VR_VXLAN_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN);
         }
 
         hashval = vr_hash(data, ETH_HLEN, vr_hashrnd);
