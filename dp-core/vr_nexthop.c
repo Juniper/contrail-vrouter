@@ -404,7 +404,7 @@ nh_composite_mcast_validate_src(unsigned short vrf, struct vr_packet *pkt,
         tun_dip = 0;
         if (dir_nh->nh_flags & NH_FLAG_TUNNEL_GRE)
             tun_dip = dir_nh->nh_gre_tun_dip;
-        else if (dir_nh->nh_flags & NH_FLAG_TUNNEL_UDP)
+        else if (dir_nh->nh_flags & NH_FLAG_TUNNEL_UDP_MPLS)
             tun_dip = dir_nh->nh_udp_tun_dip;
 
         /* Dont forward to same source */
@@ -912,7 +912,7 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     unsigned char *tun_encap;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
-    unsigned int tun_sip, tun_dip, udp_head_space;
+    unsigned int tun_sip, tun_dip, head_space;
     __u16 tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT; 
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
@@ -950,23 +950,24 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
         }
     }
 
-    if (nh_push_mpls_header(pkt, fmd->fmd_label) < 0)
-        goto send_fail;
+    /* Calculate the head space for mpls,udp ip and eth */
+    head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
+    head_space += tun_encap_len;
 
-    if (vr_perfs)
-        pkt->vp_flags |= VP_FLAG_GSO;
-   
-    udp_head_space = sizeof(struct vr_ip) + sizeof(struct vr_udp);
-    udp_head_space += tun_encap_len;
-
-    if (pkt_head_space(pkt) < udp_head_space) {
-        tmp_pkt = vr_pexpand_head(pkt, udp_head_space - pkt_head_space(pkt));
+    if (pkt_head_space(pkt) < head_space) {
+        tmp_pkt = vr_pexpand_head(pkt, head_space - pkt_head_space(pkt));
         if (!tmp_pkt) 
             goto send_fail;
 
         pkt = tmp_pkt;
     }
-   
+
+    if (nh_push_mpls_header(pkt, fmd->fmd_label) < 0)
+        goto send_fail;
+
+    if (vr_perfs)
+        pkt->vp_flags |= VP_FLAG_GSO;
+
     /*
      * Change the packet type
      */

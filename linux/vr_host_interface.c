@@ -266,7 +266,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
-            || (type != VP_TYPE_IPOIP && type!= VP_TYPE_L2OIP))
+            || (type != VP_TYPE_IPOIP && type != VP_TYPE_L2OIP))
         return linux_xmit(vif, seg, type);
 
     if (!pskb_may_pull(seg, ETH_HLEN + sizeof(struct vr_ip))) {
