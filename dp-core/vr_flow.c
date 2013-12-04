@@ -648,7 +648,6 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
         }
 
         /* mark as hold */
-        flow_e->fe_action = VR_FLOW_ACTION_HOLD;
         vr_flow_entry_set_hold(router, flow_e);
         vr_do_flow_action(router, flow_e, fe_index, pkt, proto, fmd);
         return 0;
