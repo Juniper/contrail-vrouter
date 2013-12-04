@@ -49,6 +49,44 @@ struct vr_flow_key {
 } __attribute__((packed));
 
 /* 
+ * Limit the number of outstanding flows in hold state. The flow rate can
+ * be much more than what agent can handle. In such cases, to make sure that
+ *
+ * . pkt0 is not overrun
+ * . too many packets are not cached in flow table
+ * . too many entries in hold state which will get serviced slowly (of the
+ * order of seconds)
+ * . and thus starving the table of new entries
+ *
+ * we limit the number of entries that are in hold state. In a simplistic
+ * scenario, all we would need is one variable that is incremented every
+ * time a hold entry is added, and decremented when agent changes the
+ * state of the entry from hold to any other state (including deletion).
+ * However, there will be contention for that variable from all cpus. To
+ * avoid the contention, we will make it a per-cpu variable. Once we make
+ * a per-cpu variable, there no longer can be a single variable whose
+ * value can be decremented. So, to work around that problem, we
+ * will have two monotonically incrementing objects, monitoring the hold
+ * count and the count of entries that went from hold to active/delete.
+ * The single variable that tracks the latter can't be 32 bit, but the
+ * former has to be 32 bit since the sum of all of them has to be compared
+ * against the latter, and hence can't be each 64bit.
+ *
+ * How do we solve overflows?
+ *
+ * We don't care for overflow of the first variable (since it is 64bit).
+ * Whenever any of the per-cpu variable (32bit) overflows, our strategy
+ * is to decrement the 64 bit variable from the 32 bit, if the former is
+ * lesser or to decrement the 64 bit variable by 32bit_max, if the former
+ * is greater. Only in those cases, lock is taken. It is guaranteed that
+ * no two values will differ by more than hold count.
+ */
+struct vr_flow_table_info {
+    uint64_t vfti_action_count;
+    uint32_t vfti_hold_count[0];
+};
+
+/* 
  * flow bytes and packets are of same width. this should be
  * ok since agent really has to take care of overflows. this
  * is also better probably because processor does not have to
