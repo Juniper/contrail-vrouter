@@ -262,7 +262,6 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     struct vr_ip *iph;
     unsigned short iphlen;
     struct udphdr *udph;
-    netdev_features_t features;
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
@@ -307,8 +306,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
         iph->ip_csum = 0;
         iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
 
-        features = netif_skb_features(seg);
-        if ((features & NETIF_F_HW_CSUM) == 0) {
+        if ((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) == 0) {
             if (seg->ip_summed == CHECKSUM_PARTIAL) {
                 skb_checksum_help(seg);
             }
@@ -1153,7 +1151,31 @@ linux_if_get_settings(struct vr_interface *vif,
     return ret;
 }
 
+/*
+ * linux_if_tx_csum_offload - returns 1 if the device supports checksum offload
+ * on transmit for tunneled packets. Devices which have NETIF_F_HW_CSUM set
+ * are capable of doing this, but there are some devices (such as ixgbe) which
+ * support it even though they don't set NETIF_F_HW_CSUM.
+ */
+static int
+linux_if_tx_csum_offload(struct net_device *dev)
+{
+    const char *driver_name;
 
+    if (dev->features & NETIF_F_HW_CSUM) {
+        return 1;
+    }
+
+    if (dev->dev.parent) {
+        driver_name = dev_driver_string(dev->dev.parent);
+        if (driver_name && (!strncmp(driver_name, "ixgbe", 6))) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+ 
 static int
 linux_if_del(struct vr_interface *vif)
 {
@@ -1185,6 +1207,11 @@ linux_if_add(struct vr_interface *vif)
         if (!dev)
             return -ENODEV;
         vif->vif_os = (void *)dev;
+        if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+            if (linux_if_tx_csum_offload(dev)) {
+                vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
+            }
+        }
     }
 
     if (vif_is_vhost(vif))

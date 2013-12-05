@@ -125,6 +125,8 @@ vr_if_flags(int flags)
         strcat(flag_string, "Mt");
     if (flags & VIF_FLAG_MIRROR_RX)
         strcat(flag_string, "Mr");
+    if (flags & VIF_FLAG_TX_CSUM_OFFLOAD)
+        strcat(flag_string, "Tc");
     if (flags & VIF_FLAG_L3_ENABLED)
         strcat(flag_string, "L3");
     if (flags & VIF_FLAG_L2_ENABLED)
