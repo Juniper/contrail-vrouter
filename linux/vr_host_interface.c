@@ -262,7 +262,6 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     struct vr_ip *iph;
     unsigned short iphlen;
     struct udphdr *udph;
-    netdev_features_t features;
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
@@ -308,11 +307,8 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
         iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
 
         if ((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) == 0) {
-            features = netif_skb_features(seg);
-            if ((features & NETIF_F_HW_CSUM) == 0) {
-                if (seg->ip_summed == CHECKSUM_PARTIAL) {
-                    skb_checksum_help(seg);
-                }
+            if (seg->ip_summed == CHECKSUM_PARTIAL) {
+                skb_checksum_help(seg);
             }
         }
     }
@@ -1165,6 +1161,10 @@ static int
 linux_if_tx_csum_offload(struct net_device *dev)
 {
     const char *driver_name;
+
+    if (dev->features & NETIF_F_HW_CSUM) {
+        return 1;
+    }
 
     if (dev->dev.parent) {
         driver_name = dev_driver_string(dev->dev.parent);
