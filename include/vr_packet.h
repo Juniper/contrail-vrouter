@@ -577,7 +577,7 @@ pkt_head_len(struct vr_packet *pkt)
     return pkt->vp_len;
 }
 
-static inline unsigned short
+static inline unsigned int
 pkt_len(struct vr_packet *pkt)
 {
     return pkt_head_len(pkt) + vr_pfrag_len(pkt);
