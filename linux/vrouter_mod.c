@@ -1016,8 +1016,9 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
         if (frag_size < (pull_len + sizeof(struct vr_vxlan) + ETH_HLEN))
             goto slow_path;
 
+        pull_len += sizeof(struct vr_vxlan) + ETH_HLEN; 
         /* If there is any vlan header */
-        eth = (struct vr_eth *)(va + pull_len + sizeof(struct vr_vxlan));
+        eth = (struct vr_eth *)(va + sizeof(struct vr_vxlan));
         if (eth && eth->eth_proto == VR_ETH_PROTO_VLAN)
             pull_len += sizeof(struct vlan_hdr);
 
@@ -1633,9 +1634,6 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
             goto error;
         }
     } else {
-        if (!pskb_may_pull(skb, pull_len)) {
-            goto error;
-        }
         hoff = pkt->vp_data + hdr_len + sizeof(struct vr_vxlan);
         eth = (struct vr_eth *) (skb->head + hoff);
         if (eth->eth_proto == VR_ETH_PROTO_VLAN) {
