@@ -814,6 +814,8 @@ nh_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
         goto send_fail;
     }
 
+    if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
+        goto send_fail;
     /* 
      * Incase of mirroring set the inner network header to the newly added 
      * header so that this is fragmented and checksummed

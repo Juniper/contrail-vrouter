@@ -651,6 +651,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     struct net_device *dev = (struct net_device *)vif->vif_os;
     struct sk_buff *skb = vp_os_packet(pkt);
+    struct skb_shared_info *sinfo;
     struct vr_ip *ip;
     unsigned short network_off, transport_off, cksum_off;
 
@@ -719,10 +720,27 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         /*
          * Invoke segmentation only incase of both vr_packet and skb having gso
          */
-        if ((pkt->vp_flags & VP_FLAG_GSO) && skb_is_gso(skb) &&
-                (vif->vif_type == VIF_TYPE_PHYSICAL)) {
-            linux_gso_xmit(vif, skb, pkt->vp_type);
-            return 0;
+        if ((pkt->vp_flags & VP_FLAG_GSO) && skb_is_gso(skb)) {
+            /*
+             * it is possible that when we mirrored the packet, the inner
+             * packet was meant to be GSO-ed, and that would have been a
+             * TCP packet. Since we carried over the gso type from the inner
+             * packet, the value will be wrong, and that's where the following
+             * check comes into picture
+             */
+            if (ip->ip_proto == VR_IP_PROTO_UDP) {
+                sinfo = skb_shinfo(skb);
+                if (!(sinfo->gso_type & SKB_GSO_UDP)) {
+                    sinfo->gso_type &= ~(SKB_GSO_TCPV4 | SKB_GSO_TCP_ECN |
+                            SKB_GSO_TCPV6 | SKB_GSO_FCOE);
+                    sinfo->gso_type |= SKB_GSO_UDP;
+                }
+            }
+
+            if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+                linux_gso_xmit(vif, skb, pkt->vp_type);
+                return 0;
+            }
         }
     }
 
