@@ -125,6 +125,18 @@ static bool can_checksum_protocol(netdev_features_t features, __be16 protocol)
                  protocol == htons(ETH_P_FCOE)));
 }
 
+static netdev_features_t harmonize_features(struct sk_buff *skb,
+        __be16 protocol, netdev_features_t features)
+{
+        if (skb->ip_summed != CHECKSUM_NONE &&
+            !can_checksum_protocol(features, protocol)) {
+                features &= ~NETIF_F_ALL_CSUM;
+                features &= ~NETIF_F_SG;
+        }
+
+        return features;
+}
+
 static inline
 netdev_features_t netif_skb_features(struct sk_buff *skb)
 {
@@ -151,17 +163,6 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
         }
 }
 
-static netdev_features_t harmonize_features(struct sk_buff *skb,
-        __be16 protocol, netdev_features_t features)
-{
-        if (skb->ip_summed != CHECKSUM_NONE &&
-            !can_checksum_protocol(features, protocol)) {
-                features &= ~NETIF_F_ALL_CSUM;
-                features &= ~NETIF_F_SG;
-        }
-
-        return features;
-}
 #endif
 
 #endif
