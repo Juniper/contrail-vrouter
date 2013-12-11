@@ -10,7 +10,6 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,2,54))
 typedef u64 netdev_features_t;
 #endif
-
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 static inline __u32
 skb_get_rxhash(struct sk_buff *skb)
@@ -114,6 +113,7 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 
 #endif
 
+#ifndef ISRHOSKERNEL
 static bool can_checksum_protocol(netdev_features_t features, __be16 protocol)
 {
         return ((features & NETIF_F_GEN_CSUM) ||
@@ -123,18 +123,6 @@ static bool can_checksum_protocol(netdev_features_t features, __be16 protocol)
                  protocol == htons(ETH_P_IPV6)) ||
                 ((features & NETIF_F_FCOE_CRC) &&
                  protocol == htons(ETH_P_FCOE)));
-}
-
-static netdev_features_t harmonize_features(struct sk_buff *skb,
-        __be16 protocol, netdev_features_t features)
-{
-        if (skb->ip_summed != CHECKSUM_NONE &&
-            !can_checksum_protocol(features, protocol)) {
-                features &= ~NETIF_F_ALL_CSUM;
-                features &= ~NETIF_F_SG;
-        }
-
-        return features;
 }
 
 static inline
@@ -162,6 +150,19 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
                 return harmonize_features(skb, protocol, features);
         }
 }
+
+static netdev_features_t harmonize_features(struct sk_buff *skb,
+        __be16 protocol, netdev_features_t features)
+{
+        if (skb->ip_summed != CHECKSUM_NONE &&
+            !can_checksum_protocol(features, protocol)) {
+                features &= ~NETIF_F_ALL_CSUM;
+                features &= ~NETIF_F_SG;
+        }
+
+        return features;
+}
+#endif
 
 #endif
 

@@ -39,6 +39,9 @@ SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_fake_transport.
 
 	ccflags-y += -I$(src)/include -I$(BUILD_DIR)/vrouter/sandesh/gen-c -I$(src)/../tools -I$(SANDESH_ROOT)/library/c -g
 	ccflags-y += -I$(src)/sandesh/gen-c/ -Wall 
+	ifeq ($(shell uname -r | grep 2.6.32|grep -c openstack),1)
+		ccflags-y += -DISRHOSKERNEL
+	endif
 else
 	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 	PWD := $(shell pwd)
