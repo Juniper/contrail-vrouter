@@ -71,6 +71,8 @@ buffer sandesh vr_interface_req {
    21: i16          vifr_mir_id;
    22: i32          vifr_speed;
    23: i32          vifr_duplex;
+   24: i16          vifr_vlan_id;
+   25: i32          vifr_parent_vif_idx;
 }
 
 buffer sandesh vr_vxlan_req {

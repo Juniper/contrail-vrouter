@@ -17,7 +17,8 @@
 #define VIF_TYPE_VIRTUAL            3
 #define VIF_TYPE_XEN_LL_HOST        4
 #define VIF_TYPE_GATEWAY            5
-#define VIF_TYPE_MAX                6
+#define VIF_TYPE_VLAN               6
+#define VIF_TYPE_MAX                7
 
 #define vif_is_tap(vif)             ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_AGENT))
