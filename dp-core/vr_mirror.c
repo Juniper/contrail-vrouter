@@ -327,6 +327,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     unsigned int mirror_md_len = 0;
     unsigned char default_mme[2] = {0xff, 0x0};
     void *mirror_md;
+    struct vr_nexthop *pkt_nh;
+    bool reset;
 
     mirror = router->vr_mirrors[mirror_id];
     if (!mirror)
@@ -350,10 +352,33 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     if (!pkt)
         return 0;
 
-    /* Get to the procesed headers */
-    vr_preset(pkt);
-    if (vr_pcow(pkt, VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len)) 
-        goto fail;
+    /* If packet is from fabric, mirror it by adding the required L2
+     * header. If not get the processed headers by resetting the packet
+     * and mirror it
+     */
+    reset = true;
+    if (pkt->vp_if && pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) {
+        pkt_nh = pkt->vp_nh;
+        if (pkt_nh && pkt_nh->nh_type == NH_ENCAP && pkt_nh->nh_dev &&
+            pkt_nh->nh_dev->vif_set_rewrite && pkt_nh->nh_encap_len) {
+
+            reset = false;
+            if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len +
+                    pkt_nh->nh_encap_len)) 
+                goto fail;
+
+            if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, 
+                    pkt_nh->nh_data, pkt_nh->nh_encap_len))
+                goto fail;
+        }
+    }
+
+    if (reset) {
+        vr_preset(pkt);
+        if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len))
+            goto fail;
+    }
+
 
     pkt->vp_flags |= VP_FLAG_FROM_DP;
     /* Set the GSO and partial checksum flag */

@@ -510,12 +510,6 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     __u16 port;
     int32_t flow_index = 0;
 
-    /*
-     * pkt->vp_data is currently the offset of the start of the inner header
-     * from skb->head. Convert this to an offset from skb->data as this
-     * is what pskb_may_pull() expects.
-     */
-    pull_len = pkt->vp_data - (skb_headroom(skb)); 
 
     if (hashrnd_inited == 0) {
         get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
@@ -556,9 +550,21 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         /* Include the VRF to calculate the hash */
         hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
     } else {
-        pull_len += sizeof(struct iphdr);
-        if (!pskb_may_pull(skb, pull_len)) {
-            goto error;
+
+
+        /*
+         * Lets pull only if ip hdr is beyond this skb
+         */
+        pull_len = sizeof(struct iphdr);
+        if ((pkt->vp_data + pull_len) > pkt->vp_tail) {
+            /* We dont handle if tails are different */
+            if (pkt->vp_tail != skb->tail)
+                goto error;
+            pull_len += pkt->vp_data;
+            pull_len -= skb_headroom(skb);
+            if (!pskb_may_pull(skb, pull_len)) {
+                goto error;
+            }
         }
 
         iph = (struct iphdr *) (skb->head + pkt->vp_data); 
