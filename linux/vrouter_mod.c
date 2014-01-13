@@ -466,7 +466,7 @@ lh_put_defer_data(void *data)
 static int
 lh_pcow(struct vr_packet *pkt, unsigned short head_room)
 {
-    sk_buff_data_t old_off;
+    unsigned int old_off, new_off;
 
     struct sk_buff *skb = vp_os_packet(pkt);
 
@@ -475,18 +475,26 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
     skb->len = pkt_len(pkt);
     skb_set_tail_pointer(skb, pkt_head_len(pkt));
 
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
     old_off = skb->network_header;
+#else
+	old_off = skb->network_header - skb->head;
+#endif
     if (skb_cow(skb, head_room)) 
         return -ENOMEM;
-
     /* Now manipulate the offsets as data pointers are modified */
     pkt->vp_head = skb->head;
     pkt->vp_tail = skb_tail_pointer(skb) - skb->head;
     pkt->vp_data = skb->data - skb->head;
     pkt->vp_end = skb_end_pointer(skb) - skb->head;
-    pkt->vp_len = skb_headlen(skb);
-    pkt->vp_network_h += (skb->network_header - old_off);
-    pkt->vp_inner_network_h  += (skb->network_header - old_off);
+	pkt->vp_len = skb_headlen(skb);
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
+	new_off = skb->network_header;
+#else
+	new_off = skb->network_header - skb->head;
+#endif
+    pkt->vp_network_h += new_off - old_off;
+    pkt->vp_inner_network_h += new_off - old_off;
 
     return 0;
 }
