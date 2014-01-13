@@ -309,7 +309,7 @@ nh_composite_ecmp_validate_src(unsigned short vrf, struct vr_packet *pkt,
             if (i == fmd->fmd_ecmp_src_nh_index)
                 continue;
 
-            cnh = nh->nh_component_nh[fmd->fmd_ecmp_src_nh_index].cnh;
+            cnh = nh->nh_component_nh[i].cnh;
             if (!cnh || !cnh->nh_validate_src)
                 continue;
 
