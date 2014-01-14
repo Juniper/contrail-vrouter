@@ -478,7 +478,7 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
     old_off = skb->network_header;
 #else
-	old_off = skb->network_header - skb->head;
+    old_off = skb->network_header - skb->head;
 #endif
     if (skb_cow(skb, head_room)) 
         return -ENOMEM;
@@ -487,11 +487,11 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
     pkt->vp_tail = skb_tail_pointer(skb) - skb->head;
     pkt->vp_data = skb->data - skb->head;
     pkt->vp_end = skb_end_pointer(skb) - skb->head;
-	pkt->vp_len = skb_headlen(skb);
+    pkt->vp_len = skb_headlen(skb);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
-	new_off = skb->network_header;
+    new_off = skb->network_header;
 #else
-	new_off = skb->network_header - skb->head;
+    new_off = skb->network_header - skb->head;
 #endif
     pkt->vp_network_h += new_off - old_off;
     pkt->vp_inner_network_h += new_off - old_off;
