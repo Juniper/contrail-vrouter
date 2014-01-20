@@ -712,9 +712,6 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 cksum_off = offsetof(struct vr_udp, udp_csum);
 
             skb_partial_csum_set(skb, (transport_off - skb_headroom(skb)), cksum_off);
-        } else {
-            skb->ip_summed = CHECKSUM_NONE;
-            skb->csum = 0;
         }
 
         /*
