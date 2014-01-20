@@ -7,6 +7,8 @@
 #include <vr_os.h>
 #include "vr_message.h"
 
+extern bool vr_not_ready;
+
 static char *
 vr_message_default_malloc(unsigned int size)
 {
@@ -54,6 +56,9 @@ vr_message_request(struct vr_message *message)
 {
     if (!message_h.vm_proto)
         return 0;
+
+    if (vr_not_ready)
+        return -EBADFD;
 
     message_h.vm_proto->mproto_decode(message->vr_message_buf,
             message->vr_message_len, NULL, NULL);

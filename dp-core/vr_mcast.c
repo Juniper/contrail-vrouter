@@ -85,7 +85,7 @@ mcast_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     if (ent) {
         rt->rtr_req.rtr_label_flags = ent->flags;
         rt->rtr_nh = ent->nh;
-        return ent->nh;
+        return rt->rtr_nh;
     }
 
     return NULL;
@@ -103,6 +103,24 @@ mcast_get(unsigned int vrf_id, struct vr_route_req *rt)
     return 0;
 }
 
+static void
+mcast_entry_free(vr_htable_t table, vr_hentry_t hentry, unsigned int
+        index, void *data)
+{
+    struct vr_mcast_entry *ent = (struct vr_mcast_entry *)hentry;
+
+    if (!ent)
+        return;
+
+    ent->flags &= ~VR_MCAST_FLAG_VALID;
+    if (ent->nh)
+        vrouter_put_nexthop(ent->nh);
+
+    memset(ent, 0, sizeof(struct vr_mcast_entry));
+    return;
+}
+
+
 
 static int
 mcast_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
@@ -118,10 +136,7 @@ mcast_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!ent)
         return -ENOENT;
 
-    ent->flags &= ~VR_MCAST_FLAG_VALID;
-    vr_delay_op();
-    vrouter_put_nexthop(ent->nh);
-    ent->nh = NULL;
+    mcast_entry_free(vn_rtable, (vr_hentry_t )ent, 0, NULL);
     return 0;
 }
 
@@ -180,6 +195,7 @@ mcast_make_req(struct vr_route_req *resp, struct vr_mcast_entry *ent)
     memset(resp, 0, sizeof(struct vr_route_req));
     resp->rtr_req.rtr_prefix = ent->key.dst_ip;
     resp->rtr_req.rtr_src = ent->key.src_ip;
+    resp->rtr_req.rtr_vrf_id = ent->key.vrf_id;
     if (ent->nh)
         resp->rtr_req.rtr_nh_id = ent->nh->nh_id;
     resp->rtr_req.rtr_rt_type =  RT_MCAST;
@@ -242,23 +258,31 @@ generate_response:
     vr_message_dump_exit(dumper, ret);
 
     return 0;
-
 }
 
 void
-mcast_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs)
+mcast_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs, bool soft_reset)
 {
-    if (vn_rtable) {
+    if (!vn_rtable)
+        return;
+
+    vr_htable_trav(vn_rtable, 0, mcast_entry_free, NULL);
+ 
+    if (!soft_reset) {
         vr_htable_delete(vn_rtable);
+        rtable->algo_data = NULL;
+        vn_rtable = NULL;
     }
 
-    rtable->algo_data = NULL;
-    vn_rtable = NULL;
 }
 
 int
 mcast_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
+
+    if (rtable->algo_data)
+        return 0;
+
     rtable->algo_data = vr_htable_create(vr_mcast_entries,
             vr_mcast_oentries, sizeof(struct vr_mcast_entry),
             sizeof(struct vr_mcast_entry_key), mcast_entry_valid);

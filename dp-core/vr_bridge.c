@@ -143,6 +143,24 @@ bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     return ret;
 }
 
+static void
+bridge_table_entry_free(vr_htable_t table, vr_hentry_t hentry,
+        unsigned int index, void *data)
+{
+    struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry; 
+    if (!be)
+        return;
+
+    /* Mark this entry as invalid */
+    be->be_flags &= ~VR_BE_FLAG_VALID;
+
+    if (be->be_nh)
+        vrouter_put_nexthop(be->be_nh);
+
+    memset(be, 0, sizeof(struct vr_bridge_entry));
+    return;
+}
+
 static int
 bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
@@ -159,12 +177,7 @@ bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!be)
         return -ENOENT;
 
-    /* Mark this entry as invalid */
-    be->be_flags = 0;
-
-    if (be->be_nh)
-        vrouter_put_nexthop(be->be_nh);
-    be->be_nh = NULL;
+    bridge_table_entry_free(vn_rtable, (vr_hentry_t )be, 0, NULL);
     return 0;
 }
 
@@ -293,6 +306,11 @@ generate_response:
 int
 bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
+
+    /* If table already exists, dont create again */
+    if (rtable->algo_data)
+        return 0;
+
     rtable->algo_data = vr_htable_create(vr_bridge_entries,
             vr_bridge_oentries, sizeof(struct vr_bridge_entry),
             sizeof(struct vr_bridge_entry_key), bridge_entry_valid);  
@@ -319,14 +337,20 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 }
 
 void
-bridge_table_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs)
+bridge_table_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs,
+        bool soft_reset)
 {
-    if (vn_rtable) {
+    if (!vn_rtable)
+        return;
+
+    vr_htable_trav(vn_rtable, 0, bridge_table_entry_free, NULL);
+
+    if (!soft_reset) {
         vr_htable_delete(vn_rtable);
+        rtable->algo_data = NULL;
+        vn_rtable = NULL;
     }
 
-    rtable->algo_data = NULL;
-    vn_rtable = NULL;
 }
 
 unsigned int
