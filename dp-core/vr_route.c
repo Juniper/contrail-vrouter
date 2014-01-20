@@ -9,11 +9,11 @@
 
 static struct rtable_fspec rtable_families[];
 extern int mtrie4_algo_init(struct vr_rtable *, struct rtable_fspec *);
-extern void mtrie4_algo_deinit(struct vr_rtable *, struct rtable_fspec *);
+extern void mtrie4_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 extern int mcast_algo_init(struct vr_rtable *, struct rtable_fspec *);
-extern void mcast_algo_deinit(struct vr_rtable *, struct rtable_fspec *);
+extern void mcast_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 extern int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
-extern void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *);
+extern void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 
 
 static struct rtable_fspec *
@@ -341,7 +341,8 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
 }
 
 static void
-inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router)
+inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
+                                                        bool soft_reset)
 {
 	struct vr_rtable *rtable;
     int i;
@@ -349,7 +350,7 @@ inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router)
     for (i = 0; i < RT_MAX; i++) {
         rtable = vr_get_inet_table(router, i);
         if (rtable) {
-            fs->algo_deinit[i](rtable, fs);
+            fs->algo_deinit[i](rtable, fs, soft_reset);
             vr_free(rtable);
         }
     }
@@ -454,11 +455,12 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
 }
 
 static void
-bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router)
+bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
+                                                            bool soft_reset)
 {
 
     if (router->vr_bridge_rtable) {
-        fs->algo_deinit[RT_UCAST](router->vr_bridge_rtable, fs);
+        fs->algo_deinit[RT_UCAST](router->vr_bridge_rtable, fs, soft_reset);
         vr_free(router->vr_bridge_rtable);
     }
 
@@ -500,7 +502,7 @@ vr_fib_exit(struct vrouter *router, bool soft_reset)
 
     for (i = 0; i < ARRAYSIZE(rtable_families); i++) {
         fs = &rtable_families[i];
-        fs->rtb_family_deinit(fs, router);
+        fs->rtb_family_deinit(fs, router, soft_reset);
     }
 
     return;
@@ -531,7 +533,7 @@ exit_init:
         return ret;
 
     for (--i, --fs; i >= 0; i--) {
-        fs->rtb_family_deinit(fs, router);
+        fs->rtb_family_deinit(fs, router, false);
     }
 
     return ret;

@@ -883,7 +883,7 @@ mtrie_stats_cleanup(struct vr_rtable *rtable)
 }
 
 void
-mtrie4_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs)
+mtrie4_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs, bool soft_reset)
 {
     unsigned int i;
 

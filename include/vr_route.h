@@ -71,13 +71,13 @@ struct vr_rtable {
 };
 
 typedef int (*algo_init_decl)(struct vr_rtable *, struct rtable_fspec *);
-typedef void (*algo_deinit_decl)(struct vr_rtable *, struct rtable_fspec *);
+typedef void (*algo_deinit_decl)(struct vr_rtable *, struct rtable_fspec *, bool);
 
 struct rtable_fspec {
     unsigned int rtb_family;
     unsigned int rtb_max_vrfs;
     int (*rtb_family_init)(struct rtable_fspec *, struct vrouter *);
-    void (*rtb_family_deinit)(struct rtable_fspec *, struct vrouter *);
+    void (*rtb_family_deinit)(struct rtable_fspec *, struct vrouter *, bool);
 
     int (*route_add)(struct rtable_fspec *, struct vr_route_req *);
     int (*route_del)(struct rtable_fspec *, struct vr_route_req *);

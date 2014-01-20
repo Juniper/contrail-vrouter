@@ -41,6 +41,10 @@ int hashrnd_inited = 0;
 
 extern int vr_flow_entries;
 extern int vr_oflow_entries;
+
+extern unsigned int vr_bridge_entries;
+extern unsigned int vr_bridge_oentries;
+
 int vrouter_dbg;
 
 extern struct vr_packet *linux_get_packet(struct sk_buff *,
@@ -2025,6 +2029,10 @@ init_fail:
 
 module_param(vr_flow_entries, int, 0);
 module_param(vr_oflow_entries, int, 0);
+
+module_param(vr_bridge_entries, int, 0);
+module_param(vr_bridge_oentries, int, 0);
+
 module_param(vrouter_dbg, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(vrouter_dbg, "Set 1 for pkt dumping and 0 to disable, default value is 0");
 
