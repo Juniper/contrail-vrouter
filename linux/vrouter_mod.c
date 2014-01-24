@@ -570,8 +570,12 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         pull_len = sizeof(struct iphdr);
         if ((pkt->vp_data + pull_len) > pkt->vp_tail) {
             /* We dont handle if tails are different */
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
             if (pkt->vp_tail != skb->tail)
+#else
+            if (pkt->vp_tail != (skb->tail - skb->head))
                 goto error;
+#endif
             pull_len += pkt->vp_data;
             pull_len -= skb_headroom(skb);
             if (!pskb_may_pull(skb, pull_len)) {
