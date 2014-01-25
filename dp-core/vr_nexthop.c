@@ -310,7 +310,9 @@ nh_composite_ecmp_validate_src(unsigned short vrf, struct vr_packet *pkt,
                 continue;
 
             cnh = nh->nh_component_nh[i].cnh;
-            if (!cnh || !cnh->nh_validate_src)
+            /* If direct nexthop is not valid, dont process it */
+            if (!cnh || !(cnh->nh_flags & NH_FLAG_VALID) || 
+                                            !cnh->nh_validate_src)
                 continue;
 
             /*
@@ -387,6 +389,7 @@ nh_composite_mcast_validate_src(unsigned short vrf, struct vr_packet *pkt,
         return NH_SOURCE_VALID;
 
     if ((!nh->nh_component_cnt) ||
+         (!(nh->nh_component_nh[0].cnh->nh_flags & NH_FLAG_VALID)) ||
          (nh->nh_component_nh[0].cnh->nh_type != NH_COMPOSITE) ||
          (!(nh->nh_component_nh[0].cnh->nh_flags &
               NH_FLAG_COMPOSITE_FABRIC))) {
@@ -397,6 +400,10 @@ nh_composite_mcast_validate_src(unsigned short vrf, struct vr_packet *pkt,
 
     for (i = 0; i < fabric_nh->nh_component_cnt; i++) {
         dir_nh = fabric_nh->nh_component_nh[i].cnh;
+
+        /* If direct nexthop is not valid, dont process it */
+        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+            continue;
 
         if (dir_nh->nh_type != NH_TUNNEL)
             continue;
@@ -453,6 +460,9 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
 
+        /* If direct nexthop is not valid, dont process it */
+        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+            continue;
 
         if (dir_nh->nh_type == NH_ENCAP) {
 
@@ -541,6 +551,11 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
 
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
+
+        /* If direct nexthop is not valid, dont process it */
+        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+            continue;
+
         if (dir_nh->nh_type == NH_ENCAP) {
 
             /* Dont give back the packet to same VM */
@@ -608,6 +623,10 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
 
+        /* If direct nexthop is not valid, dont process it */
+        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+            continue;
+
         if (dir_nh->nh_type != NH_TUNNEL)
             continue;
 
@@ -637,8 +656,8 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
                 (new_pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)) {
 
             /*
-             * The L2 multicast bridge entry will have VNID as label. If fmd does not 
-             * valid label/vnid, skip the processing
+             * The L2 multicast bridge entry will have VNID as label. If fmd 
+             * does not valid label/vnid, skip the processing
              */
             if (label < 0) {
                 vr_pfree(new_pkt, VP_DROP_INVALID_LABEL);
@@ -708,6 +727,9 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
         goto drop;
     }
 
+    /* Mark the packet as Multicast */
+    pkt->vp_flags |= VP_FLAG_MULTICAST;
+
     /* Identify whether L2 or L3 packet */
     pkt_type_flag = NH_FLAG_COMPOSITE_L2;
     ctrl_data = (uint32_t *)pkt_data(pkt);
@@ -747,8 +769,6 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
 
             memcpy(pkt_push(pkt, cp), ip, cp);
 
-            /* Mark it as L3 multicast packet */
-            pkt->vp_flags |= VP_FLAG_MULTICAST;
         }
     } else {
         /* Mark the packet as L2. Let the control information flow till
@@ -760,6 +780,11 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
      * Look for the same nexthop flags and forward to the first nexthop
      */
     for(i = 0; i < nh->nh_component_cnt; i++) {
+ 
+        /* If direct nexthop is not valid, dont process it */
+        if (!(nh->nh_component_nh[i].cnh->nh_flags & NH_FLAG_VALID))
+            continue;
+
         if (nh->nh_component_nh[i].cnh->nh_flags & pkt_type_flag) {
             nh_output(vrf, pkt, nh->nh_component_nh[i].cnh, fmd);
             return 0;
@@ -1135,6 +1160,12 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
 
     pkt->vp_nh = nh;
 
+    /* If nexthop does not have valid data, drop it */
+    if (!(nh->nh_flags & NH_FLAG_VALID)) {
+        vr_pfree(pkt, VP_DROP_INVALID_NH);
+        return 0;
+    }
+
     if (pkt->vp_type == VP_TYPE_IP) {
         /*
          * If the packet has not gone through flow lookup once
@@ -1470,12 +1501,16 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_reach_nh = nh_udp_tunnel;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP_MPLS) {
+        if (!nh->nh_dev)
+            return -ENODEV;
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_reach_nh = nh_mpls_udp_tunnel;
         nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) {
+        if (!nh->nh_dev)
+            return -ENODEV;
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
@@ -1612,6 +1647,8 @@ vr_nexthop_add(vr_nexthop_req *req)
             goto generate_resp;
         }
 
+        /* If nexthop is made invalid, change should be propogated */
+        nh->nh_flags = req->nhr_flags;
         nh->nh_reach_nh = nh_discard;
         vr_delay_op();
     }
@@ -1669,6 +1706,11 @@ vr_nexthop_add(vr_nexthop_req *req)
                 nh->nh_destructor(nh);
 
             goto generate_resp;
+        }
+    } else {
+        if (nh->nh_dev) {
+            vrouter_put_interface(nh->nh_dev);
+            nh->nh_dev = NULL;
         }
     }
 

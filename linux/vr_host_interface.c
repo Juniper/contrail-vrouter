@@ -741,7 +741,6 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         }
     }
 
-
     linux_xmit_segment(vif, skb, pkt->vp_type); 
 
     return 0;
