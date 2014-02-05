@@ -388,21 +388,21 @@ nh_composite_mcast_validate_src(unsigned short vrf, struct vr_packet *pkt,
     if (pkt->vp_if->vif_type != VIF_TYPE_PHYSICAL)
         return NH_SOURCE_VALID;
 
-    if ((!nh->nh_component_cnt) ||
-         (!(nh->nh_component_nh[0].cnh->nh_flags & NH_FLAG_VALID)) ||
-         (nh->nh_component_nh[0].cnh->nh_type != NH_COMPOSITE) ||
-         (!(nh->nh_component_nh[0].cnh->nh_flags &
-              NH_FLAG_COMPOSITE_FABRIC))) {
+    if (!nh->nh_component_cnt)
         return NH_SOURCE_INVALID;
-    }
 
     fabric_nh = nh->nh_component_nh[0].cnh;
+    if ((!fabric_nh) || (!(fabric_nh->nh_flags & NH_FLAG_VALID)) ||
+        (fabric_nh->nh_type != NH_COMPOSITE) || 
+        (!(fabric_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC))) {
+        return NH_SOURCE_INVALID;
+    }
 
     for (i = 0; i < fabric_nh->nh_component_cnt; i++) {
         dir_nh = fabric_nh->nh_component_nh[i].cnh;
 
         /* If direct nexthop is not valid, dont process it */
-        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+        if ((!dir_nh) || !(dir_nh->nh_flags & NH_FLAG_VALID))
             continue;
 
         if (dir_nh->nh_type != NH_TUNNEL)
@@ -461,7 +461,7 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
         dir_nh = nh->nh_component_nh[i].cnh;
 
         /* If direct nexthop is not valid, dont process it */
-        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+        if ((!dir_nh) || !(dir_nh->nh_flags & NH_FLAG_VALID))
             continue;
 
         if (dir_nh->nh_type == NH_ENCAP) {
@@ -485,7 +485,7 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
                  */
                 if (!pkt_pull(new_pkt, (VR_VXLAN_HDR_LEN +
                                 VR_L2_MCAST_CTRL_DATA_LEN))) {
-                    drop_reason = VP_DROP_PULL;
+                    vr_pfree(new_pkt, VP_DROP_PULL);
                     break;
                 }
             }
@@ -553,7 +553,7 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
         dir_nh = nh->nh_component_nh[i].cnh;
 
         /* If direct nexthop is not valid, dont process it */
-        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+        if ((!dir_nh) || !(dir_nh->nh_flags & NH_FLAG_VALID))
             continue;
 
         if (dir_nh->nh_type == NH_ENCAP) {
@@ -599,7 +599,7 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
     struct vr_nexthop *dir_nh;
     unsigned short drop_reason;
     struct vr_packet *new_pkt;
-    unsigned int sip;
+    unsigned int dip, sip;
     int32_t label;
 
     drop_reason = VP_DROP_CLONED_ORIGINAL;
@@ -624,21 +624,36 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
         dir_nh = nh->nh_component_nh[i].cnh;
 
         /* If direct nexthop is not valid, dont process it */
-        if (!(dir_nh->nh_flags & NH_FLAG_VALID))
+        if ((!dir_nh) || !(dir_nh->nh_flags & NH_FLAG_VALID))
             continue;
 
         if (dir_nh->nh_type != NH_TUNNEL)
             continue;
 
+        /*
+         * Take the right tunnel source. The dst is also our own
+         * address
+         */
+        sip = dip = 0;
+        if (dir_nh->nh_flags & NH_FLAG_TUNNEL_GRE) {
+            sip = dir_nh->nh_gre_tun_sip;
+            dip = dir_nh->nh_gre_tun_dip;
+        } else if (dir_nh->nh_flags & NH_FLAG_TUNNEL_UDP_MPLS) {
+            sip = dir_nh->nh_udp_tun_sip;
+            dip = dir_nh->nh_udp_tun_dip;
+        } else {
+            drop_reason = VP_DROP_INVALID_NH;
+            break;
+        }
+
         /* Dont forward to same source */
-        if (fmd->fmd_outer_src_ip && 
-                fmd->fmd_outer_src_ip == dir_nh->nh_gre_tun_dip) 
+        if (fmd->fmd_outer_src_ip && fmd->fmd_outer_src_ip == dip)
             continue;
 
-        /* 
+        /*
          * Enough head spaces are created in the previous nexthop
          * handling. Just cow the packet with zero size to get different
-         * buffer space 
+         * buffer space
          */
         new_pkt = nh_mcast_clone(pkt, 0);
         if (!new_pkt) {
@@ -646,44 +661,29 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
             break;
         }
 
-
-        /* 
-         *  If L2 multicast packet from VM, we need to update Vxlan
-         * with right values 
+        /*
+         * If L2 multicast packet from VM, we need to update Vxlan
+         * with right values
          */
         if ((new_pkt->vp_type == VP_TYPE_L2) &&
-                 (new_pkt->vp_flags & VP_FLAG_MULTICAST) && 
+                 (new_pkt->vp_flags & VP_FLAG_MULTICAST) &&
                 (new_pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)) {
 
             /*
-             * The L2 multicast bridge entry will have VNID as label. If fmd 
+             * The L2 multicast bridge entry will have VNID as label. If fmd
              * does not valid label/vnid, skip the processing
              */
             if (label < 0) {
                 vr_pfree(new_pkt, VP_DROP_INVALID_LABEL);
                 break;
             }
-                
-
-            /*
-             * Take the right tunnel source. The dst is also our own
-             * address
-             */
-            if (dir_nh->nh_flags & NH_FLAG_TUNNEL_GRE) {
-                sip = dir_nh->nh_gre_tun_sip;
-            } else if (dir_nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
-                sip = dir_nh->nh_udp_tun_sip;
-            } else {
-                vr_pfree(new_pkt, VP_DROP_INVALID_NH);
-                break;
-            }
 
             /* 
-             * Add vxlan encapsulation. The vxlan id need to be taken 
+             * Add vxlan encapsulation. The vxlan id need to be taken
              * from Bridge entry
              */
             fmd->fmd_label = label;
-            if (nh_vxlan_tunnel_helper(dir_nh->nh_dev->vif_vrf, 
+            if (nh_vxlan_tunnel_helper(dir_nh->nh_dev->vif_vrf,
                                         new_pkt, fmd, sip, sip) == false) {
                 vr_pfree(new_pkt, VP_DROP_PUSH);
                 break;
@@ -697,6 +697,23 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
 
         /* MPLS label for outer header encapsulation */
         fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
+        if (!dir_nh->nh_dev) {
+            struct vr_nexthop *sub_nh_db, *parent_nh_db;
+            sub_nh_db = __vrouter_get_nexthop(vrouter_get(dir_nh->nh_rid),
+                    dir_nh->nh_id);
+            parent_nh_db = __vrouter_get_nexthop(vrouter_get(nh->nh_rid),
+                    nh->nh_id);
+            vr_printf("Sub_nh ptr %p id %d type %d flags 0x%x ref_cnt %d"
+                    " NHdb_ptr %p nh_validate_src %p nh_reach_nh %p "
+                    " nh_data_size %d Parent_nh ptr %p id %d type %d flags 0x%x"
+                    " ref_cnt %d NHdb_ptr %p component_cnt %d component id %d \n",
+                    dir_nh, dir_nh->nh_id, dir_nh->nh_type, dir_nh->nh_flags,
+                    dir_nh->nh_users, sub_nh_db, dir_nh->nh_validate_src,
+                    dir_nh->nh_reach_nh, dir_nh->nh_data_size, nh, nh->nh_id,
+                    nh->nh_type, nh->nh_flags, nh->nh_users, parent_nh_db,
+                    nh->nh_component_cnt, i);
+        }
+
         nh_output(dir_nh->nh_dev->vif_vrf, new_pkt, dir_nh, fmd);
     }
 
@@ -717,6 +734,7 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
     struct vr_ip *ip;
     struct vr_packet *new_pkt;
     int i;
+    struct vr_nexthop *dir_nh;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
     if (stats)
@@ -780,13 +798,13 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
      * Look for the same nexthop flags and forward to the first nexthop
      */
     for(i = 0; i < nh->nh_component_cnt; i++) {
- 
         /* If direct nexthop is not valid, dont process it */
-        if (!(nh->nh_component_nh[i].cnh->nh_flags & NH_FLAG_VALID))
+        dir_nh = nh->nh_component_nh[i].cnh;
+        if ((!dir_nh) || (!(dir_nh->nh_flags & NH_FLAG_VALID)))
             continue;
 
-        if (nh->nh_component_nh[i].cnh->nh_flags & pkt_type_flag) {
-            nh_output(vrf, pkt, nh->nh_component_nh[i].cnh, fmd);
+        if (dir_nh->nh_flags & pkt_type_flag) {
+            nh_output(vrf, pkt, dir_nh, fmd);
             return 0;
         }
     }
@@ -994,7 +1012,8 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
 
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
-
+   
+   
     /*
      * Change the packet type
      */
@@ -1249,7 +1268,7 @@ nh_encap_l3_mcast(unsigned short vrf, struct vr_packet *pkt,
 }
 
 static int
-nh_encap_l2_unicast(unsigned short vrf, struct vr_packet *pkt, 
+nh_encap_l2(unsigned short vrf, struct vr_packet *pkt, 
         struct vr_nexthop *nh, struct vr_forwarding_md *md)
 {
     struct vr_interface *vif;
@@ -1375,11 +1394,19 @@ nh_resolve_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 static int
 nh_rcv_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    nh->nh_dev = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
-    if (!nh->nh_dev)
+    struct vr_interface  *vif, *old_vif;
+    vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
+    if (!vif)
         return -ENODEV;
-
+    /* 
+     *  We need to delete the reference to old_vif only after new vif is
+     * added to NH
+     */
+    old_vif = nh->nh_dev;
+    nh->nh_dev = vif;
     nh->nh_reach_nh = nh_rcv;
+    if (old_vif)
+        vrouter_put_interface(old_vif);
     return 0;
 }
 
@@ -1387,6 +1414,141 @@ static int
 nh_vxlan_vrf_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
     nh->nh_reach_nh = nh_vxlan_vrf;
+    return 0;
+}
+
+static int
+nh_composite_mcast_validate(struct vr_nexthop *nh, vr_nexthop_req *req)
+{
+    unsigned int i;
+    struct vr_nexthop *tmp_nh;
+
+    /* Fabric NH*/
+    if (req->nhr_flags & NH_FLAG_COMPOSITE_FABRIC) {
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+            tmp_nh = nh->nh_component_nh[i].cnh;
+            if (!tmp_nh)
+                continue;
+            if (tmp_nh->nh_type != NH_TUNNEL)
+                return -1;
+            if (tmp_nh->nh_flags & NH_FLAG_TUNNEL_UDP)
+                return -1;
+        }
+    }
+
+    /* Multi proto */
+    if (req->nhr_flags & NH_FLAG_COMPOSITE_MULTI_PROTO) {
+
+        bool l2_seen = false, l3_seen = false;
+
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+            tmp_nh = nh->nh_component_nh[i].cnh;
+            if (!tmp_nh)
+                continue;
+
+            if (tmp_nh->nh_type != NH_COMPOSITE)
+                return -1;
+
+            if (!(tmp_nh->nh_flags & NH_FLAG_MCAST))
+                return -1;
+
+            /* Only one instance of L2 and L3 is aloswed */
+            if (tmp_nh->nh_flags & NH_FLAG_COMPOSITE_L2) {
+                if (l2_seen)
+                    return -1;
+                l2_seen = true;
+            } else if (tmp_nh->nh_flags & NH_FLAG_COMPOSITE_L3) {
+                if (l3_seen)
+                    return -1;
+                l3_seen = true;
+            } else  {
+                return -1;
+            }
+        }
+    }
+
+    /* L2 multicast */
+    if (req->nhr_flags & NH_FLAG_COMPOSITE_L2) {
+
+        /* Composite L2 is only multicast */
+        if (!(req->nhr_flags & NH_FLAG_MCAST))
+            return -1;
+
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+            tmp_nh = nh->nh_component_nh[i].cnh;
+
+            /* NULL component NH is valid */
+            if (!tmp_nh)
+                continue;
+
+            /* Only ENCAP and Composite Fabric components are allowed */
+            if ((tmp_nh->nh_type != NH_ENCAP) && 
+                    (tmp_nh->nh_type != NH_COMPOSITE))
+                return -1;
+
+            if (tmp_nh->nh_type == NH_COMPOSITE && 
+                    (!(tmp_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC)))
+                return -1;
+
+            if (tmp_nh->nh_type == NH_ENCAP && 
+                    (!(tmp_nh->nh_flags & NH_FLAG_ENCAP_L2)))
+                return -1;
+        }
+    }
+
+    /* L3 multicast */
+    if (req->nhr_flags & NH_FLAG_COMPOSITE_L3) {
+
+        /* Composite L3 is only multicast */
+        if (!(req->nhr_flags & NH_FLAG_MCAST))
+            return -1;
+
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+            tmp_nh = nh->nh_component_nh[i].cnh;
+
+            /* NULL component NH is valid */
+            if (!tmp_nh)
+                continue;
+
+            /* Only ENCAP and Composite Fabric components are allowed */
+            if ((tmp_nh->nh_type != NH_ENCAP) && 
+                    (tmp_nh->nh_type != NH_COMPOSITE))
+                return -1;
+
+            if (tmp_nh->nh_type == NH_COMPOSITE && 
+                    (!(tmp_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC)))
+                return -1;
+
+            if (tmp_nh->nh_type == NH_ENCAP && 
+                    (!(tmp_nh->nh_flags & NH_FLAG_MCAST)))
+                return -1;
+        }
+    }
+
+    /*
+     * If L2 or L3 multicast nexthop, first nexthop should be Fabric 
+     * and subsequent should interface nexthops
+     */
+    if (req->nhr_flags & (NH_FLAG_COMPOSITE_L3 | NH_FLAG_COMPOSITE_L2)) {
+        tmp_nh = nh->nh_component_nh[0].cnh;
+        if (tmp_nh && ((tmp_nh->nh_type != NH_COMPOSITE) ||
+                 (!(tmp_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC)))) {
+            for (i = 1; i < nh->nh_component_cnt; i++) {
+                if ((nh->nh_component_nh[i].cnh->nh_type == NH_COMPOSITE) && 
+                        (nh->nh_component_nh[i].cnh->nh_flags & 
+                                        NH_FLAG_COMPOSITE_FABRIC)) {
+                    /* Swap the fabric nh with first nh */
+                    nh->nh_component_nh[0].cnh = nh->nh_component_nh[i].cnh;
+                    nh->nh_component_nh[0].cnh_label = 
+                                nh->nh_component_nh[i].cnh_label;
+                    nh->nh_component_nh[i].cnh = tmp_nh;
+                    nh->nh_component_nh[i].cnh_label = req->nhr_label_list[0];
+                    break;
+                }
+            }
+        }
+    }
+
     return 0;
 }
 
@@ -1408,7 +1570,8 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_component_cnt = 0;
     }
 
-    if ((req->nhr_nh_list_size < 0) || (req->nhr_nh_list_size != req->nhr_label_list_size))
+    if ((req->nhr_nh_list_size < 0) || 
+            (req->nhr_nh_list_size != req->nhr_label_list_size))
         return -EINVAL;
 
     /* Nh list of size 0 is valid */
@@ -1420,50 +1583,21 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     if (!nh->nh_component_nh) {
         return -ENOMEM;
     }
-
     for (i = 0; i < req->nhr_nh_list_size; i++) {
-        nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid, req->nhr_nh_list[i]);
+        nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid, 
+                                                    req->nhr_nh_list[i]);
         nh->nh_component_nh[i].cnh_label = req->nhr_label_list[i];
     }
     nh->nh_component_cnt = req->nhr_nh_list_size;
 
-    /*
-     * Some requirements if nexthop is multicast. If Multiproto, first
-     * subnexthop should be L2 and next should be L3. If L2 or L3 first
-     * nexthop should be Fabric and subsequent should interface nexthops
-     */
-
-    if ((req->nhr_flags & NH_FLAG_MCAST) && 
-           (req->nhr_flags & (NH_FLAG_COMPOSITE_L3 | NH_FLAG_COMPOSITE_L2))) {
-        tmp_nh = nh->nh_component_nh[0].cnh;
-
-        /* If first nh is not fabric nh */
-        if ((tmp_nh->nh_type != NH_COMPOSITE) ||
-                (!(tmp_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC))) {
-
-            for (i = 1; i < nh->nh_component_cnt; i++) {
-                if ((nh->nh_component_nh[i].cnh->nh_type == NH_COMPOSITE) && 
-                    (nh->nh_component_nh[i].cnh->nh_flags & 
-                                    NH_FLAG_COMPOSITE_FABRIC)) {
-                    /* Swap the fabric nh with first nh */
-                    nh->nh_component_nh[0].cnh = nh->nh_component_nh[i].cnh;
-                    nh->nh_component_nh[0].cnh_label =
-                            nh->nh_component_nh[i].cnh_label;
-                    nh->nh_component_nh[i].cnh = tmp_nh;
-                    nh->nh_component_nh[i].cnh_label = req->nhr_label_list[0];
-                    break;
-                }
-            }
-        }
-    }
+    if (nh_composite_mcast_validate(nh, req))
+        goto error;
 
     /* This needs to be the last */
-    if ((req->nhr_flags & NH_FLAG_COMPOSITE_L3) && 
-            (req->nhr_flags & NH_FLAG_MCAST)) {
+    if (req->nhr_flags & NH_FLAG_COMPOSITE_L3) {
         nh->nh_reach_nh = nh_composite_mcast_l3;
         nh->nh_validate_src = nh_composite_mcast_validate_src;
-    } else if ((req->nhr_flags & NH_FLAG_COMPOSITE_L2) && 
-            (req->nhr_flags & NH_FLAG_MCAST)) {
+    } else if (req->nhr_flags & NH_FLAG_COMPOSITE_L2) {
         nh->nh_reach_nh = nh_composite_mcast_l2;
         nh->nh_validate_src = nh_composite_mcast_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
@@ -1475,24 +1609,40 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_reach_nh = nh_composite_multi_proto;
     }
     return 0;
+
+error:
+    if (nh->nh_component_nh) {
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+             tmp_nh = nh->nh_component_nh[i].cnh;
+             if (tmp_nh)
+                vrouter_put_nexthop(tmp_nh);
+        }
+
+        vr_free(nh->nh_component_nh);
+        nh->nh_component_nh = NULL;
+        nh->nh_component_cnt = 0;
+    }
+    return -EINVAL;
 }
 
 static int
 nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
+    struct vr_interface *vif, *old_vif;
     if (!req->nhr_tun_sip || !req->nhr_tun_dip)
         return -EINVAL;
 
-    nh->nh_dev = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
-
+    old_vif = nh->nh_dev;
+    vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
     if (nh->nh_flags & NH_FLAG_TUNNEL_GRE) {
-        if (!nh->nh_dev)
+        if (!vif)
             return -ENODEV;
         nh->nh_gre_tun_sip = req->nhr_tun_sip;
         nh->nh_gre_tun_dip = req->nhr_tun_dip;
         nh->nh_gre_tun_encap_len = req->nhr_encap_size;
-        nh->nh_reach_nh = nh_gre_tunnel;
         nh->nh_validate_src = nh_gre_tunnel_validate_src;
+        nh->nh_dev = vif;
+        nh->nh_reach_nh = nh_gre_tunnel;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
@@ -1500,26 +1650,36 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_dport = req->nhr_tun_dport;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_reach_nh = nh_udp_tunnel;
+        /* VIF should be null, but lets clean if one is found */
+        if (vif)
+            vrouter_put_interface(vif);
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP_MPLS) {
-        if (!nh->nh_dev)
+        if (!vif)
             return -ENODEV;
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
-        nh->nh_reach_nh = nh_mpls_udp_tunnel;
         nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
+        nh->nh_dev = vif;
+        nh->nh_reach_nh = nh_mpls_udp_tunnel;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) {
-        if (!nh->nh_dev)
+        if (!vif)
             return -ENODEV;
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
+        nh->nh_dev = vif;
         nh->nh_reach_nh = nh_vxlan_tunnel;
     } else {
+        /* Reference to VIf should be cleaned */
+        if (vif)
+            vrouter_put_interface(vif);
         return -EINVAL;
     }
 
     memcpy(nh->nh_data, req->nhr_encap, req->nhr_encap_size);
+    if (old_vif)
+        vrouter_put_interface(old_vif);
 
     return 0;
 }
@@ -1528,13 +1688,24 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 static int
 nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    nh->nh_dev = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
-    if (!nh->nh_dev) {
+    struct vr_interface *vif, *old_vif;;
+
+    vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
+    if (!vif) 
         return -ENODEV;
-    }
+
+    /* 
+     *  We need to delete the reference to old_vif only after new vif is
+     * added to NH
+     */
+    old_vif = nh->nh_dev;
+    nh->nh_dev = vif;
+    if (old_vif)
+        vrouter_put_interface(old_vif);
+
 
     if (req->nhr_flags & NH_FLAG_ENCAP_L2) {
-         nh->nh_reach_nh = nh_encap_l2_unicast;
+         nh->nh_reach_nh = nh_encap_l2;
     } else {
         nh->nh_encap_family = req->nhr_encap_family;
         nh->nh_encap_len = req->nhr_encap_size;
@@ -1619,6 +1790,7 @@ vr_nexthop_add(vr_nexthop_req *req)
     int ret = 0, len = 0;
     struct vr_nexthop *nh;
     struct vrouter *router = vrouter_get(req->nhr_rid);
+    bool invalid_to_valid = false;
 
     if (!vr_nexthop_valid_request(req) && (ret = -EINVAL))
         goto generate_resp;
@@ -1647,8 +1819,17 @@ vr_nexthop_add(vr_nexthop_req *req)
             goto generate_resp;
         }
 
-        /* If nexthop is made invalid, change should be propogated */
-        nh->nh_flags = req->nhr_flags;
+        /* Lets track if invalid to valid change */
+        if ((req->nhr_flags & NH_FLAG_VALID) && 
+                !(nh->nh_flags & NH_FLAG_VALID))
+            invalid_to_valid = true;
+
+        /* If valid to invalid lets propogate flags immediagtely */
+        if (!(req->nhr_flags & NH_FLAG_VALID) && 
+                (nh->nh_flags & NH_FLAG_VALID))
+            nh->nh_flags = req->nhr_flags;
+
+        /* For a change lets always point to discard */
         nh->nh_reach_nh = nh_discard;
         vr_delay_op();
     }
@@ -1659,15 +1840,20 @@ vr_nexthop_add(vr_nexthop_req *req)
     nh->nh_id = req->nhr_id;
     nh->nh_rid = req->nhr_rid;
     nh->nh_router = vrouter_get(nh->nh_rid);
-    nh->nh_flags = req->nhr_flags;
     nh->nh_vrf = req->nhr_vrf;
-    /* 
-     * By default point it to discard. Individual NH 
-     * Handling will point to right nh processing
-     */
-    nh->nh_reach_nh = nh_discard;
 
-    if (nh->nh_flags & NH_FLAG_VALID) {
+    /* 
+     * If invalid to valid, lets make it valid after the whole nexthop
+     * is cookedup. For invalid to invalid, valid to valid, lets
+     * copy the flags as is
+     */
+    if (invalid_to_valid)
+        nh->nh_flags = (req->nhr_flags & ~NH_FLAG_VALID);
+    else
+        nh->nh_flags = req->nhr_flags;
+
+
+    if (req->nhr_flags & NH_FLAG_VALID) {
         switch (nh->nh_type) {
         case NH_ENCAP:
             ret = nh_encap_add(nh, req);
@@ -1707,13 +1893,13 @@ vr_nexthop_add(vr_nexthop_req *req)
 
             goto generate_resp;
         }
-    } else {
-        if (nh->nh_dev) {
-            vrouter_put_interface(nh->nh_dev);
-            nh->nh_dev = NULL;
-        }
     }
 
+    /* Mark he nexthop valid after whole nexthop is cooked incase of
+     * invalid to valid transition
+     */
+    if (invalid_to_valid)
+        nh->nh_flags |= NH_FLAG_VALID;
 
     ret = vrouter_add_nexthop(nh);
     if (ret)

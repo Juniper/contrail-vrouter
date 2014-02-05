@@ -86,6 +86,20 @@ vr_get_inet_table(struct vrouter *router, int id)
     return NULL;
 }
 
+static void
+vr_put_inet_table(struct vrouter *router, int id, struct vr_rtable *table)
+{
+    if (!router)
+        return;
+
+    if (id == RT_UCAST)
+        router->vr_inet_rtable = table;
+    else if (id == RT_MCAST)
+        router->vr_inet_mcast_rtable = table;
+
+    return;
+}
+
 
 int
 vr_route_get(vr_route_req *req)
@@ -351,13 +365,17 @@ inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
         rtable = vr_get_inet_table(router, i);
         if (rtable) {
             fs->algo_deinit[i](rtable, fs, soft_reset);
-            vr_free(rtable);
+            if (i == RT_UCAST) { 
+                vr_free(rtable);
+                vr_put_inet_table(router, i, NULL);
+            }
+            if ((i == RT_MCAST) && !soft_reset) {
+                vr_free(rtable);
+                vr_put_inet_table(router, i, NULL);
+            }
         }
     }
    
-    /* First unicast followed by multicast */
-    router->vr_inet_rtable = NULL;
-    router->vr_inet_mcast_rtable = NULL;
     return;
 }
 
@@ -368,27 +386,23 @@ inet_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
     struct vr_rtable *table = NULL;
     unsigned int i;
 
-    if (router->vr_inet_rtable || router->vr_inet_mcast_rtable)
-        return vr_module_error(-EEXIST, __FUNCTION__, __LINE__, 0);
-
     for (i = 0; i < RT_MAX; i++) {
-        if (fs->algo_init[i]) {
 
-            table = vr_zalloc(sizeof(struct vr_rtable));
-            if (!table) 
-                return vr_module_error(-ENOMEM, __FUNCTION__,
-                        __LINE__, i);
+        if (!fs->algo_init[i])
+            continue;
 
-            ret = fs->algo_init[i](table, fs);
-            if (ret)
-                return vr_module_error(ret, __FUNCTION__, __LINE__, i);
+        if (vr_get_inet_table(router, i))
+            continue;
 
-            if (i == RT_UCAST) 
-                router->vr_inet_rtable = table;
+        table = vr_zalloc(sizeof(struct vr_rtable));
+        if (!table) 
+            return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, i);
 
-            if (i == RT_MCAST)
-                router->vr_inet_mcast_rtable = table;
-        }
+        ret = fs->algo_init[i](table, fs);
+        if (ret)
+            return vr_module_error(ret, __FUNCTION__, __LINE__, i);
+
+        vr_put_inet_table(router, i, table);
     }
 
     return 0;
@@ -437,7 +451,7 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
     struct vr_rtable *table = NULL;
     
     if (router->vr_bridge_rtable)
-        return vr_module_error(-EEXIST, __FUNCTION__, __LINE__, 0);
+        return 0;
 
     if (fs->algo_init[RT_UCAST]) {
         table = vr_zalloc(sizeof(struct vr_rtable));
@@ -459,13 +473,16 @@ bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
                                                             bool soft_reset)
 {
 
-    if (router->vr_bridge_rtable) {
-        fs->algo_deinit[RT_UCAST](router->vr_bridge_rtable, fs, soft_reset);
-        vr_free(router->vr_bridge_rtable);
+    if (!router->vr_bridge_rtable) {
+        return;
     }
 
-    router->vr_bridge_rtable = NULL;
-    return;
+    fs->algo_deinit[RT_UCAST](router->vr_bridge_rtable, fs, soft_reset);
+
+    if (!soft_reset) {
+        vr_free(router->vr_bridge_rtable);
+        router->vr_bridge_rtable = NULL;
+    }
 }
 
 /* hopefully we can afford a bit of bloat while loading ? */
