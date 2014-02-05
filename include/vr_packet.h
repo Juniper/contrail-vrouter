@@ -76,6 +76,7 @@
 /*
  * Values to define the MPLS tunnel type
  */
+#define PKT_MPLS_TUNNEL_INVALID     0x00
 #define PKT_MPLS_TUNNEL_L3          0x01
 #define PKT_MPLS_TUNNEL_L2_UCAST    0x02
 #define PKT_MPLS_TUNNEL_L2_MCAST    0x03

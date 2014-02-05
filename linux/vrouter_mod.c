@@ -914,7 +914,7 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
     struct tcphdr *tcph = NULL;
     bool thdr_valid = false;
     unsigned int label, control_data;
-    int pkt_type;
+    int pkt_type = 0;
     struct vr_eth *eth = NULL;
 
     pkt_headlen = pkt_head_len(pkt);
@@ -1080,6 +1080,12 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
          * unchanged from the time it is received by vrouter.
          */
         skb_push(skb, skb_pull_len);
+    }
+
+    if ((*encap_type == PKT_ENCAP_VXLAN) ||
+            (pkt_type != PKT_MPLS_TUNNEL_L3)) {
+        if (skb->ip_summed == CHECKSUM_PARTIAL)
+            skb->ip_summed = CHECKSUM_UNNECESSARY;
     }
 
     pkt_pull(pkt, hdr_len);
@@ -1369,6 +1375,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
         }
     }
 
+    if (pkt_type != PKT_MPLS_TUNNEL_L3 && skb->ip_summed ==
+            CHECKSUM_PARTIAL)
+        skb->ip_summed = CHECKSUM_UNNECESSARY;
+
     /* What we handled is only GRE header, so pull 
      * only the GRE header 
      */
@@ -1451,7 +1461,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                       int (*tunnel_type_cb)(unsigned int, unsigned int,
                           unsigned short *))
 {
-    int pull_len, hlen, hoff, ret;
+    int pull_len, hlen, hoff, ret = 0;
     struct sk_buff *skb = vp_os_packet(pkt); 
     struct vr_ip *iph;
     struct tcphdr *tcph = NULL;
@@ -1522,7 +1532,8 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
         if (ret == PKT_MPLS_TUNNEL_L3) {
 
             /* L3 packet */
-            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN + sizeof(struct vr_ip);
+            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN + 
+                                                sizeof(struct vr_ip);
 
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
@@ -1552,8 +1563,8 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                 }
 
                 /*
-                 * pskb_may_pull could have freed and reallocated memory, thereby
-                 * invalidating the old iph pointer. Reinitialize it.
+                 * pskb_may_pull could have freed and reallocated memory, 
+                 * thereby invalidating the old iph pointer. Reinitialize it.
                  */
                 iph = (struct vr_ip *) (skb->head + hoff);
 
@@ -1563,7 +1574,8 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                 if (iph->ip_proto == VR_IP_PROTO_TCP) {
                     tcph = (struct tcphdr *) ((char *) iph +  hlen);
                     if ((tcph->doff << 2) > (sizeof(struct tcphdr))) {
-                        pull_len += ((tcph->doff << 2) - (sizeof(struct tcphdr)));
+                        pull_len += ((tcph->doff << 2) - 
+                                        (sizeof(struct tcphdr)));
                         if (!pskb_may_pull(skb, pull_len)) {
                             goto error;
                         }   
@@ -1582,10 +1594,11 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
              */
 
             /*
-             * Verify the checksum if the NIC didn't already do it. Only verify the
-             * checksum if the inner packet is TCP as we only do GRO for TCP (and
-             * GRO requires that checksum has been verified). For all other protocols,
-             * we will let the guest verify the checksum.
+             * Verify the checksum if the NIC didn't already do it. Only 
+             * verify the checksum if the inner packet is TCP as we only 
+             * do GRO for TCP (and GRO requires that checksum has been 
+             * verified). For all other protocols, we will let the 
+             * guest verify the checksum.
              */
             if (!skb_csum_unnecessary(skb)) {
                 if (outer_iph && outer_iph->ip_proto == VR_IP_PROTO_UDP) {
@@ -1596,16 +1609,18 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                         goto cksum_err;
                     }
                     /*
-                     * Restore the skb back to its original state. This is required as
-                     * p ackets that get trapped to the agent assume that the skb is
-                     * unchanged from the time it is received by vrouter.
+                     * Restore the skb back to its original state. This is 
+                     * required as packets that get trapped to the agent 
+                     * assume that the skb is unchanged from the time it 
+                     * is received by vrouter.
                      */
                     skb_push(skb, skb_pull_len);
                     if (tcph && vr_to_vm_mss_adj) {
                         lh_adjust_tcp_mss(tcph, skb);
                     }
                 } else {
-                    if (iph->ip_proto == VR_IP_PROTO_TCP && !vr_ip_fragment(iph)) {
+                    if (iph->ip_proto == VR_IP_PROTO_TCP && 
+                                            !vr_ip_fragment(iph)) {
                         tcpoff = (char *)tcph - (char *) skb->data;
 
                         skb_pull(skb, tcpoff);
@@ -1636,9 +1651,12 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                 }
             }
             lh_reset_skb_fields(pkt);
+
+
         } else if (ret == PKT_MPLS_TUNNEL_L2_UCAST) {
             /* Pkt is L2 with no control information */
-            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN + sizeof(struct vr_eth);
+            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN + 
+                                        sizeof(struct vr_eth);
             if (!pskb_may_pull(skb, pull_len)) {
                 goto error;
             }
@@ -1667,6 +1685,12 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
         }
         lh_reset_skb_fields(pkt);
     }
+
+    /* If vxlan packet or (mpls and L2 packet) no checksum please */
+    if ((!mpls_pkt || ret != PKT_MPLS_TUNNEL_L3) &&
+                            skb->ip_summed == CHECKSUM_PARTIAL)
+        skb->ip_summed = CHECKSUM_UNNECESSARY;
+
 
     return 1;
 
