@@ -1834,6 +1834,7 @@ vr_nexthop_add(vr_nexthop_req *req)
         vr_delay_op();
     }
 
+    nh->nh_reach_nh = nh_discard;
     nh->nh_destructor = nh_del;
     nh->nh_type = req->nhr_type;
     nh->nh_family = req->nhr_family;
