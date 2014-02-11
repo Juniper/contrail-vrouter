@@ -344,7 +344,9 @@ lh_work(struct work_struct *work)
 {
     struct work_arg *wa = container_of(work, struct work_arg, wa_work);
 
+    rcu_read_lock();
     wa->fn(wa->wa_arg);
+    rcu_read_unlock();
     kfree(wa);
 
     return;
