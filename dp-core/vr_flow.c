@@ -342,10 +342,25 @@ vr_enqueue_flow(struct vr_flow_entry *fe, struct vr_packet *pkt,
         goto drop;
     }
 
+    /*
+     * we cannot cache nexthop here. to cache, we need to hold reference
+     * to the nexthop. to hold a reference, we will have to hold a lock,
+     * which we cannot. the only known case of misbehavior if we do not
+     * cache is ECMP. when the packet comes from the fabric, the nexthop
+     * actually points to a local composite, whereas a route lookup actually
+     * returns a different nexthop, in which case the ecmp index will return
+     * a bad nexthop. to avoid that, we will cache the label, and reuse it
+     */
+    pkt->vp_nh = NULL;
+
     pnode->pl_packet = pkt;
     pnode->pl_proto = proto;
-    if (fmd)
+    pnode->pl_vif_idx = pkt->vp_if->vif_idx;
+    if (fmd) {
         pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
+        pnode->pl_label = fmd->fmd_label;
+    }
+
     *head = &pnode->pl_node;
 
     return 0;
@@ -790,16 +805,39 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
 {
     struct vr_list_node *head;
     struct vr_packet_node *pnode;
+    struct vr_packet *pkt;
+    struct vr_interface *vif;
 
     head = fe->fe_hold_list.node_p;
     fe->fe_hold_list.node_p = NULL;
 
     while (head) {
         pnode = (struct vr_packet_node *)head;
-        if (fmd)
+        if (fmd) {
             fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
+            fmd->fmd_label = pnode->pl_label;
+        }
 
-        vr_flow_action(router, fe, flmd->flmd_index, pnode->pl_packet,
+        pkt = pnode->pl_packet;
+        /* 
+         * this is only a security check and not a catch all check. one note
+         * of caution. please do not access pkt->vp_if till the if block is
+         * succesfully bypassed
+         */
+        vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
+        if (!vif || (pkt->vp_if != vif)) {
+            vr_pfree(pkt, VP_DROP_INVALID_IF);
+            continue;
+        }
+
+        if (!pkt->vp_nh) {
+            if (vif_is_fabric(pkt->vp_if) && fmd &&
+                    (fmd->fmd_label >= 0)) {
+                pkt->vp_nh = __vrouter_get_label(router, fmd->fmd_label);
+            }
+        }
+
+        vr_flow_action(router, fe, flmd->flmd_index, pkt,
                 pnode->pl_proto, fmd);
 
         head = pnode->pl_node.node_n;

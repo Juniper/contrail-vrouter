@@ -8,15 +8,21 @@
 #include "vr_sandesh.h"
 #include "vr_mpls.h"
 
+struct vr_nexthop *
+__vrouter_get_label(struct vrouter *router, unsigned int label)
+{
+    if (!router || label > router->vr_max_labels)
+        return NULL;
+
+    return router->vr_ilm[label];
+}
+
 static struct vr_nexthop *
 vrouter_get_label(unsigned int rid, unsigned int label)
 {
     struct vrouter *router = vrouter_get(rid);
 
-    if (!router || label > router->vr_max_labels)
-        return NULL;
-
-    return router->vr_ilm[label];
+    return __vrouter_get_label(router, label);
 }
 
 int
@@ -258,6 +264,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
     fmd->fmd_outer_src_ip = ip->ip_saddr;
+    fmd->fmd_label = label;
 
     /* Store the TTL in packet. Will be used for multicast replication */
     pkt->vp_ttl = ttl;
