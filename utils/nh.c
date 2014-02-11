@@ -148,6 +148,10 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
             strcat(ptr, "Policy, ");
             break;
         
+        case NH_FLAG_RELAXED_POLICY:
+            strcat(ptr, "Policy(R), ");
+            break;
+
         case NH_FLAG_TUNNEL_GRE:
             if (type == NH_TUNNEL)
                 strcat(ptr, "MPLSoGRE, ");

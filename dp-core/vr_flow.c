@@ -439,6 +439,13 @@ vr_flow_nat(unsigned short vrf, struct vr_flow_entry *fe, struct vr_packet *pkt,
     if (ip->ip_csum != VR_DIAG_IP_CSUM)
         vr_ip_update_csum(pkt, ip_inc, inc);
 
+    /*
+     * If VRF is translated lets chose a new nexthop
+     */
+    if ((fe->fe_flags & VR_FLOW_FLAG_VRFT) &&
+            pkt->vp_nh && pkt->vp_nh->nh_vrf != vrf)
+        pkt->vp_nh = NULL;
+
     return vr_flow_forward(vrf, pkt, proto, fmd);
 
 drop:
@@ -640,8 +647,8 @@ vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry *flow_e)
 }
 
 static int
-vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
-        struct vr_packet *pkt, unsigned short proto,
+vr_flow_lookup(struct vrouter *router, unsigned short vrf,
+        struct vr_flow_key *key, struct vr_packet *pkt, unsigned short proto,
         struct vr_forwarding_md *fmd)
 {
     unsigned int fe_index;
@@ -651,6 +658,10 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
 
     flow_e = vr_find_flow(router, key, &fe_index);
     if (!flow_e) {
+        if (pkt->vp_nh &&
+            (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY))
+            return vr_flow_forward(vrf, pkt, proto, fmd);
+
         if (vr_flow_table_hold_count(router) > VR_MAX_FLOW_TABLE_HOLD_COUNT) {
             vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
             return 0;
@@ -672,6 +683,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow_key *key,
     return vr_do_flow_action(router, flow_e, fe_index, pkt, proto, fmd);
 }
 
+
 /*
  * This inline function decides whether to trap the packet, or bypass 
  * flow table or not. 
@@ -691,12 +703,9 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
     if (pkt->vp_flags & VP_FLAG_FLOW_SET)
         return res;
 
-    /*
-     * if the interface is policy enabled, or if somebody else (eg:nexthop)
-     * has requested for a policy lookup, packet has to go through a lookup
-     */
-    if (pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED ||
-            pkt->vp_flags & VP_FLAG_FLOW_GET)
+    /* Check if policy is enabled */
+    if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
+            (pkt->vp_flags & VP_FLAG_FLOW_GET))
         res = VR_FLOW_LOOKUP;
 
     /*
@@ -789,7 +798,7 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
             return vr_trap(pkt, vrf, trap_res, NULL);
         }
 
-        return vr_flow_lookup(router, key_p, pkt, proto, fmd);
+        return vr_flow_lookup(router, vrf, key_p, pkt, proto, fmd);
     }
 
     /* 
