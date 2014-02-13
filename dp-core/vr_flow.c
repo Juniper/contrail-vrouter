@@ -703,7 +703,10 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
     if (pkt->vp_flags & VP_FLAG_FLOW_SET)
         return res;
 
-    /* Check if policy is enabled */
+    /*
+     * if the interface is policy enabled, or if somebody else (eg:nexthop)
+     * has requested for a policy lookup, packet has to go through a lookup
+     */
     if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
             (pkt->vp_flags & VP_FLAG_FLOW_GET))
         res = VR_FLOW_LOOKUP;
