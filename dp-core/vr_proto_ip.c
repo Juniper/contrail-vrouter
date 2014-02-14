@@ -254,10 +254,35 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
     }
 
     if (unhandled) {
-        if (pkt->vp_nh)
-            vif = pkt->vp_nh->nh_dev;
+        if (pkt->vp_nh) {
 
-        if (!vif && !(vif = pkt->vp_if->vif_bridge) && !(vif = router->vr_host_if))
+            /*
+             * If flow processing is already not done, relaxed policy
+             * enabled, not in cross connect mode, not mirror packet,
+             * lets subject it to flow processing.
+             */
+            if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
+                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) && 
+                    !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
+                    /* Force the flow lookup */
+                    pkt->vp_flags |= VP_FLAG_FLOW_GET;
+
+                    /* Get back the IP header */
+                    if (!pkt_push(pkt, hlen)) {
+                        drop_reason = VP_DROP_PUSH;
+                        goto drop_pkt;
+                    }
+
+                    /* Subject it to flow for Linklocal */
+                    return vr_flow_inet_input(pkt->vp_nh->nh_router,
+                                pkt->vp_nh->nh_vrf, pkt, VR_ETH_PROTO_IP, fmd);
+                }
+            }
+            vif = pkt->vp_nh->nh_dev;
+        }
+
+        if (!vif && !(vif = pkt->vp_if->vif_bridge) &&
+                                !(vif = router->vr_host_if))
             goto drop_pkt;
 
         if ((pkt->vp_flags & VP_FLAG_FROM_DP) ||

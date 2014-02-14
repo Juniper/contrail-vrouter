@@ -42,6 +42,7 @@ enum nexthop_type {
 #define NH_FLAG_COMPOSITE_FABRIC            0x0400
 #define NH_FLAG_COMPOSITE_MULTI_PROTO       0x0800
 #define NH_FLAG_TUNNEL_VXLAN                0x1000
+#define NH_FLAG_RELAXED_POLICY              0x2000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
