@@ -1699,14 +1699,14 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
      * added to NH
      */
     old_vif = nh->nh_dev;
-    nh->nh_dev = vif;
-    if (old_vif)
-        vrouter_put_interface(old_vif);
-
 
     if (req->nhr_flags & NH_FLAG_ENCAP_L2) {
-         nh->nh_reach_nh = nh_encap_l2;
+         if (req->nhr_encap_size)
+             return -EINVAL;
+        nh->nh_dev = vif;
+        nh->nh_reach_nh = nh_encap_l2;
     } else {
+        nh->nh_dev = vif;
         nh->nh_encap_family = req->nhr_encap_family;
         nh->nh_encap_len = req->nhr_encap_size;
         memcpy(nh->nh_data, req->nhr_encap, nh->nh_encap_len);
@@ -1718,6 +1718,9 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
             nh->nh_validate_src = nh_encap_l3_validate_src;
         }
     }
+
+    if (old_vif)
+        vrouter_put_interface(old_vif);
 
     return 0;
 }
