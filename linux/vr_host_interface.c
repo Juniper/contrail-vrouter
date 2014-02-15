@@ -865,6 +865,42 @@ vr_post_rps_outer_get_phys_dev(struct sk_buff *skb)
     return dev;
 }
 
+static int
+linux_pull_outer_headers(struct sk_buff *skb)
+{
+    struct vlan_hdr *vhdr;
+    uint16_t proto, offset;
+    struct iphdr *iph;
+
+    offset = 0;
+    proto = skb->protocol;
+    while (proto == htons(ETH_P_8021Q)) {
+        if (!pskb_may_pull(skb, offset + VLAN_HLEN))
+            goto pull_fail;
+        vhdr = (struct vlan_hdr *)(skb->data + offset);
+        proto = vhdr->h_vlan_encapsulated_proto;
+        offset += sizeof(struct vlan_hdr);
+    }
+
+    if (likely(proto == htons(ETH_P_IP))) {
+        skb_set_network_header(skb, offset);
+        if (!pskb_may_pull(skb, offset + sizeof(struct iphdr)))
+            goto pull_fail;
+        iph = ip_hdr(skb);
+        if (!pskb_may_pull(skb, offset + iph->ihl * 4))
+            goto pull_fail;
+    } else if (proto == htons(ETH_P_ARP)) {
+        if (!pskb_may_pull(skb, offset + sizeof(struct arphdr)))
+            goto pull_fail;
+    }
+
+
+    return 0;
+
+pull_fail:
+    return -1;
+}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 rx_handler_result_t
 linux_rx_handler(struct sk_buff **pskb)
@@ -937,6 +973,12 @@ linux_rx_handler(struct sk_buff **pskb)
     }
 #endif
 
+    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+        ret = linux_pull_outer_headers(skb);
+        if (ret < 0)
+            goto error;
+    }
+
     skb_push(skb, ETH_HLEN);
 
     pkt = linux_get_packet(skb, vif);
@@ -978,6 +1020,7 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
     struct vr_packet *pkt;
     struct vlan_hdr *vhdr;
     int rpsdev = 0;
+    int ret;
     struct net_device *dev;
 
     /*
@@ -1031,6 +1074,12 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
         return NULL;
     }
 #endif
+
+    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+        ret = linux_pull_outer_headers(skb);
+        if (ret < 0)
+            goto error;
+    }
 
     if (skb->protocol == htons(ETH_P_8021Q)) {
         vhdr = (struct vlan_hdr *)skb->data;
