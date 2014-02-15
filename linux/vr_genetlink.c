@@ -99,6 +99,12 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
 
     vr_message_request(&request);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0))
+    netlink_id =  NETLINK_CB(in_skb).pid;
+#else
+    netlink_id =  NETLINK_CB(in_skb).portid;
+#endif
+
     multi_flag = 0;
     while ((response = vr_message_dequeue_response())) {
         if ((multi_flag == 0) && (!vr_response_queue_empty()))
@@ -112,11 +118,6 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
         len = response->vr_message_len;
         len += GENL_HDRLEN + NLA_HDRLEN;
         len = NLMSG_ALIGN(len);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0))
-        netlink_id =  NETLINK_CB(in_skb).pid;
-#else
-        netlink_id =  NETLINK_CB(in_skb).portid;
-#endif
         rep = __nlmsg_put(skb, netlink_id, nlh->nlmsg_seq,
                         nlh->nlmsg_type, len, multi_flag);
         genlh = nlmsg_data(rep);

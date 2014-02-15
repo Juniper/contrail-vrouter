@@ -805,66 +805,6 @@ linux_to_vr(struct vr_interface *vif, struct sk_buff *skb)
     return 0;
 }
 
-/*
- * vr_do_rps_outer - perform RPS based on the outer header immediately after
- * the packet is received from the physical interface.
- */
-static void
-vr_do_rps_outer(struct sk_buff *skb, struct vr_interface *vif)
-{
-#ifdef CONFIG_RPS
-    unsigned int curr_cpu;
-    u16 rxq;
-
-    curr_cpu = vr_get_cpu();
-    if (vr_perfq3) {
-        rxq = vr_perfq3;
-    } else {
-        linux_get_rxq(skb, &rxq, curr_cpu, 0);
-    }
-
-    skb_record_rx_queue(skb, rxq);
-    vr_skb_set_rxhash(skb, curr_cpu);
-    skb->dev = pkt_rps_dev;
-
-    /*
-     * Store vif information in skb for later retrieval
-     */
-    ((vr_rps_t *)skb->cb)->vif_idx = vif->vif_idx;
-    ((vr_rps_t *)skb->cb)->vif_rid = vif->vif_rid;
-
-    netif_receive_skb(skb);
-#endif
-
-    return;
-}
-
-/*
- * vr_post_rps_get_phys_dev - get the physical interface that the packet
- * arrived on, after RPS is performed based on the outer header. Returns
- * the interface pointer on success, NULL otherwise.
- */
-static struct net_device *
-vr_post_rps_outer_get_phys_dev(struct sk_buff *skb)
-{
-    struct net_device *dev = NULL;
-    struct vrouter *router;
-    struct vr_interface *vif;
-
-    router = vrouter_get(((vr_rps_t *)skb->cb)->vif_rid);
-    if (router == NULL) {
-        return NULL;
-    }
-
-    vif = __vrouter_get_interface(router,
-              ((vr_rps_t *)skb->cb)->vif_idx);
-    if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL) && vif->vif_os) {
-        dev = (struct net_device *) vif->vif_os;
-    }
-
-    return dev;
-}
-
 static int
 linux_pull_outer_headers(struct sk_buff *skb)
 {
@@ -1005,6 +945,67 @@ error:
 
 }
 #else
+
+#ifdef CONFIG_RPS
+/*
+ * vr_do_rps_outer - perform RPS based on the outer header immediately after
+ * the packet is received from the physical interface.
+ */
+static void
+vr_do_rps_outer(struct sk_buff *skb, struct vr_interface *vif)
+{
+    unsigned int curr_cpu;
+    u16 rxq;
+
+    curr_cpu = vr_get_cpu();
+    if (vr_perfq3) {
+        rxq = vr_perfq3;
+    } else {
+        linux_get_rxq(skb, &rxq, curr_cpu, 0);
+    }
+
+    skb_record_rx_queue(skb, rxq);
+    vr_skb_set_rxhash(skb, curr_cpu);
+    skb->dev = pkt_rps_dev;
+
+    /*
+     * Store vif information in skb for later retrieval
+     */
+    ((vr_rps_t *)skb->cb)->vif_idx = vif->vif_idx;
+    ((vr_rps_t *)skb->cb)->vif_rid = vif->vif_rid;
+
+    netif_receive_skb(skb);
+
+    return;
+}
+#endif
+
+/*
+ * vr_post_rps_get_phys_dev - get the physical interface that the packet
+ * arrived on, after RPS is performed based on the outer header. Returns
+ * the interface pointer on success, NULL otherwise.
+ */
+static struct net_device *
+vr_post_rps_outer_get_phys_dev(struct sk_buff *skb)
+{
+    struct net_device *dev = NULL;
+    struct vrouter *router;
+    struct vr_interface *vif;
+
+    router = vrouter_get(((vr_rps_t *)skb->cb)->vif_rid);
+    if (router == NULL) {
+        return NULL;
+    }
+
+    vif = __vrouter_get_interface(router,
+              ((vr_rps_t *)skb->cb)->vif_idx);
+    if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL) && vif->vif_os) {
+        dev = (struct net_device *) vif->vif_os;
+    }
+
+    return dev;
+}
+
 /*
  * vr_interface_bridge_hook
  *

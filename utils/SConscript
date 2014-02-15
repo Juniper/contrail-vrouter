@@ -7,10 +7,6 @@ env = VRouterEnv
  
 vr_root = '../'
 
-kernel_dir = GetOption('kernel-dir')
-if kernel_dir:
-    env.Append(CPPPATH = kernel_dir + '/include')
-
 # CFLAGS
 env.Append(CCFLAGS = '-g')
 
