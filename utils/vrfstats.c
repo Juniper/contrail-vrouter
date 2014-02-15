@@ -40,7 +40,7 @@ static vr_vrf_stats_req stats_req;
 static unsigned int stats_op;
 static int vrf = -1;
 static int get_set, dump_set;
-static int verbose_set, help_set;
+static int help_set;
 static bool dump_pending = false;
 
 void
@@ -210,7 +210,6 @@ vr_stats_op(void)
 enum opt_index {
     GET_OPT_INDEX,
     DUMP_OPT_INDEX,
-    VERBOSE_OPT_INDEX,
     HELP_OPT_INDEX,
     MAX_OPT_INDEX
 };
@@ -218,7 +217,6 @@ enum opt_index {
 static struct option long_options[] = {
     [GET_OPT_INDEX]     =   {"get",     required_argument,  &get_set,       1},
     [DUMP_OPT_INDEX]    =   {"dump",    no_argument,        &dump_set,      1},
-    [VERBOSE_OPT_INDEX] =   {"verbose", no_argument,        &verbose_set,   1},
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
@@ -227,8 +225,13 @@ static void
 Usage()
 {
     printf("Usage: vrfstats --get <vrf>\n");
-    printf("                --dump --verbose\n");
+    printf("                --dump\n");
     printf("                --help\n");
+    printf("\n");
+
+    printf("--get <vrf>    Displays packet statistics for the vrf <vrf>\n");
+    printf("--dump         Displays packet statistics for all vrfs\n");
+    printf("--help         Displays this help message\n");
 
     exit(-EINVAL);
 }
@@ -263,17 +266,13 @@ validate_options(void)
 {
     int options;
 
-    options = get_set + dump_set + verbose_set + help_set;
+    options = get_set + dump_set + help_set;
 
     if (!options)
         Usage();
 
-    if (options > 1) {
-        if (verbose_set && dump_set)
-            return;
+    if (options > 1 || help_set)
         Usage();
-    }
-
 
     return;
 }

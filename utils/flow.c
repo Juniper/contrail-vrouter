@@ -43,7 +43,7 @@
 #define TABLE_FLAG_VALID        0x1
 #define MEM_DEV                 "/dev/flow"
 
-static int dvrf_set, mir_set;
+static int dvrf_set, mir_set, help_set;
 static unsigned short dvrf;
 static int flow_index, list, flow_cmd, mirror = -1;
 static int rate;
@@ -420,18 +420,20 @@ flow_validate(int flow_index, char action)
 static void
 Usage(void)
 {
-    printf("flow [-f flow_index][-d flow_index][-i flow_index][-t flow_index]\n");
-    printf("     [--mirror=mirror table index]\n");
-    printf("     [-l]\n");
+    printf("Usage:flow [-f flow_index]\n");
+    printf("           [-d flow_index]\n");
+    printf("           [-i flow_index]\n");
+    printf("           [--mirror=mirror table index]\n");
+    printf("           [-l]\n");
     printf("\n");
 
     printf("-f <flow_index>\t Set forward action for flow at flow_index <flow_index>\n");
     printf("-d <flow_index>\t Set drop action for flow at flow_index <flow_index>\n");
     printf("-i <flow_index>\t Invalidate flow at flow_index <flow_index>\n");
-    printf("\t\t --dvrf=destination VRF to send the packet to,\n");
-    printf("--mirror\tmirror index to mirror to\n");
+    printf("--mirror\t mirror index to mirror to\n");
     printf("-l\t\t List all flows\n");
     printf("-r\t\t Start dumping flow setup rate\n");
+    printf("--help\t\t Print this help\n");
 
     exit(-EINVAL);
 }
@@ -439,13 +441,15 @@ Usage(void)
 enum opt_flow_index {
     DVRF_OPT_INDEX,
     MIRROR_OPT_INDEX,
+    HELP_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
-    [DVRF_OPT_INDEX]    = {"dvrf", required_argument, &dvrf_set, 1},
-    [MIRROR_OPT_INDEX]  = {"mirror", required_argument, &mir_set, 1},
-    [MAX_OPT_INDEX]     = { NULL,  0,                 0        , 0}
+    [DVRF_OPT_INDEX]    = {"dvrf",   required_argument, &dvrf_set, 1},
+    [MIRROR_OPT_INDEX]  = {"mirror", required_argument, &mir_set,  1},
+    [HELP_OPT_INDEX]    = {"help",   no_argument,       &help_set, 1},
+    [MAX_OPT_INDEX]     = { NULL,    0,                 0,         0}
 };
 
 static void
@@ -474,6 +478,7 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
             Usage();
         break;
 
+    case HELP_OPT_INDEX:
     default:
         Usage();
     }
