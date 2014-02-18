@@ -831,12 +831,26 @@ static int
 lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
 {
     skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
-                                   skb->len, IPPROTO_TCP, 0);
+                                   ntohs(iph->ip_len) - (iph->ip_hl * 4), 
+                                   IPPROTO_TCP, 0);
     if (__skb_checksum_complete(skb)) {
         return -1;
     }
 
     return 0;
+}
+
+/*
+ * lh_handle_checksum_complete_skb - if the skb has CHECKSUM_COMPLETE set,
+ * set it to CHECKSUM_NONE. 
+ */
+static void
+lh_handle_checksum_complete_skb(struct sk_buff *skb)
+{
+    if (skb->ip_summed == CHECKSUM_COMPLETE) {
+        skb->csum = 0;
+        skb->ip_summed = CHECKSUM_NONE;
+    }
 }
 
 /*
@@ -846,6 +860,14 @@ lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
 static int
 lh_csum_verify_udp(struct sk_buff *skb, struct vr_ip *iph)
 {
+    if (skb->ip_summed == CHECKSUM_COMPLETE) {
+        if (!csum_tcpudp_magic(iph->ip_saddr, iph->ip_daddr,
+                               skb->len, IPPROTO_UDP, skb->csum)) {
+            skb->ip_summed = CHECKSUM_UNNECESSARY;
+            return 0;
+        }
+    }
+
     skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
                                    skb->len, IPPROTO_UDP, 0);
     if (__skb_checksum_complete(skb)) {
@@ -1349,8 +1371,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
      */
     if (iph && !skb_csum_unnecessary(skb) && !vr_ip_fragment(iph)) {
         if (iph->ip_proto == VR_IP_PROTO_TCP) {
+            lh_handle_checksum_complete_skb(skb);
+
             if (skb_shinfo(skb)->nr_frags == 1) {
-                tcp_size = frag_size - ((unsigned char *) tcph - va);
+                tcp_size = ntohs(iph->ip_len) - hlen;
                 if (lh_csum_verify_fast(iph, tcph, tcp_size)) {
                     goto cksum_err;
                 }
@@ -1623,6 +1647,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
                 } else {
                     if (iph->ip_proto == VR_IP_PROTO_TCP && 
                                             !vr_ip_fragment(iph)) {
+                        lh_handle_checksum_complete_skb(skb);
                         tcpoff = (char *)tcph - (char *) skb->data;
 
                         skb_pull(skb, tcpoff);

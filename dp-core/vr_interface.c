@@ -307,6 +307,10 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
             return 0;
         }
 
+        pkt->vp_type = VP_TYPE_AGENT;
+        pkt_set_network_header(pkt, pkt->vp_data + sizeof(struct vr_eth));
+        pkt_set_inner_network_header(pkt, 
+                                     pkt->vp_data + sizeof(struct vr_eth));
         return vif->vif_tx(vif, pkt);
     }
 

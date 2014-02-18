@@ -167,7 +167,6 @@ vr_get_flow_key(struct vr_flow_key *key, unsigned short vrf, struct vr_ip *ip,
         unsigned short sport, unsigned short dport)
 {
     unsigned short *t_hdr;
-    struct vr_icmp *icmph;
 
     /* copy both source and destinations */
     memcpy(&key->key_src_ip, &ip->ip_saddr, 2 * sizeof(ip->ip_saddr));
@@ -181,21 +180,9 @@ vr_get_flow_key(struct vr_flow_key *key, unsigned short vrf, struct vr_ip *ip,
     switch (ip->ip_proto) {
     case VR_IP_PROTO_TCP:
     case VR_IP_PROTO_UDP:
+    case VR_IP_PROTO_ICMP:
         key->key_src_port = sport;
         key->key_dst_port = dport;
-        break;
-
-    case VR_IP_PROTO_ICMP:
-        icmph = (struct vr_icmp *)t_hdr;
-        if (icmph->icmp_type == VR_ICMP_TYPE_ECHO ||
-                icmph->icmp_type == VR_ICMP_TYPE_ECHO_REPLY) {
-            key->key_src_port = icmph->icmp_eid;
-            key->key_dst_port = VR_ICMP_TYPE_ECHO_REPLY;
-        } else {
-            key->key_src_port = 0;
-            key->key_dst_port = icmph->icmp_type;
-        }
-
         break;
 
     default:
@@ -748,6 +735,7 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
     unsigned int flow_parse_res;
     unsigned int trap_res  = 0;
     unsigned short *t_hdr, sport, dport;
+    struct vr_icmp *icmph;
 
     /*
      * interface is in a mode where it wants all packets to be received
@@ -761,8 +749,20 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
     /* if the packet is not a fragment, we easily know the sport, and dport */
     if (vr_ip_transport_header_valid(ip)) {
         t_hdr = (unsigned short *)((char *)ip + (ip->ip_hl * 4));
-        sport = *t_hdr;
-        dport = *(t_hdr + 1);
+        if (ip->ip_proto == VR_IP_PROTO_ICMP) {
+            icmph = (struct vr_icmp *)t_hdr;
+            if (icmph->icmp_type == VR_ICMP_TYPE_ECHO ||
+                    icmph->icmp_type == VR_ICMP_TYPE_ECHO_REPLY) {
+                sport = icmph->icmp_eid;
+                dport = VR_ICMP_TYPE_ECHO_REPLY;
+            } else {
+                sport = 0;
+                dport = icmph->icmp_type;
+            }
+        } else {
+            sport = *t_hdr;
+            dport = *(t_hdr + 1);
+        }
     } else {
         /* ...else, we need to get it from somewhere */
         flow_parse_res = vr_flow_parse(router, NULL, pkt, &trap_res);
