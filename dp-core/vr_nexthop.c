@@ -1701,8 +1701,10 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     old_vif = nh->nh_dev;
 
     if (req->nhr_flags & NH_FLAG_ENCAP_L2) {
-         if (req->nhr_encap_size)
+         if (req->nhr_encap_size) {
+             vrouter_put_interface(vif);
              return -EINVAL;
+         }
         nh->nh_dev = vif;
         nh->nh_reach_nh = nh_encap_l2;
     } else {
