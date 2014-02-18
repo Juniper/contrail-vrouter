@@ -687,9 +687,18 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     /*
      * Set the network header and trasport header of skb only if the type is
      * IP (tunnel or non tunnel). This is required for those packets where
-     * a new buffer is added at the head
+     * a new buffer is added at the head. Also, set it for packets from the
+     * agent, which get sent to the NIC driver (to handle cases where the
+     * NIC has hw vlan acceleration enabled).
      */
-    if (pkt->vp_type == VP_TYPE_IPOIP || pkt->vp_type == VP_TYPE_IP) {
+    if ((pkt->vp_type == VP_TYPE_AGENT) &&
+            (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+        network_off = pkt_get_inner_network_header_off(pkt);
+        if (network_off) {
+            skb_set_network_header(skb, (network_off - skb_headroom(skb)));
+            skb_reset_mac_len(skb);
+        }
+    } else if (pkt->vp_type == VP_TYPE_IPOIP || pkt->vp_type == VP_TYPE_IP) {
         network_off = pkt_get_inner_network_header_off(pkt);
         ip = (struct vr_ip *)(pkt_data_at_offset(pkt, network_off));
         transport_off = network_off + (ip->ip_hl * 4);
