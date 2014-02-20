@@ -3,18 +3,18 @@
 #
 
 ifneq ($(KERNELRELEASE), )
-SANDESH_ROOT := $(M)/../tools/sandesh
-MOD_OUTPUT_DIR = ../build/linux-$(KERNELRELEASE)
+	PREFIX ?= ./
+	SANDESH_ROOT ?= $(src)/
+	BUILD_DIR ?= $(src)/
 
-PREFIX=../build/kbuild
-SANDESH_BINS := $(PREFIX)/sandesh/gen-c/vr_types.o
+	SANDESH_BINS := $(PREFIX)/sandesh/gen-c/vr_types.o
 
-SANDESH_LIB_BINS := $(PREFIX)/sandesh/library/c/sandesh.o 
-SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/protocol/thrift_protocol.o 
-SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/protocol/thrift_binary_protocol.o
-SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_transport.o
-SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_memory_buffer.o
-SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_fake_transport.o
+	SANDESH_LIB_BINS := $(PREFIX)/sandesh/library/c/sandesh.o 
+	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/protocol/thrift_protocol.o 
+	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/protocol/thrift_binary_protocol.o
+	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_transport.o
+	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_memory_buffer.o
+	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_fake_transport.o
 
 	obj-m := vrouter.o
 	vrouter-y += $(SANDESH_BINS)
@@ -37,7 +37,7 @@ SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_fake_transport.
 	vrouter-y += dp-core/vr_bridge.o dp-core/vr_htable.o
 	vrouter-y += dp-core/vr_vxlan.o dp-core/vr_fragment.o
 
-	ccflags-y += -I$(src)/include -I$(BUILD_DIR)/vrouter/sandesh/gen-c -I$(src)/../tools -I$(SANDESH_ROOT)/library/c -g
+	ccflags-y += -I$(src)/include -I$(BUILD_DIR)/sandesh/gen-c -I$(SANDESH_ROOT) -I$(SANDESH_ROOT)/sandesh/library/c -g
 	ccflags-y += -I$(src)/sandesh/gen-c/ -Wall 
 	ifeq ($(shell uname -r | grep 2.6.32|grep -c openstack),1)
 		ccflags-y += -DISRHOSKERNEL
@@ -47,12 +47,13 @@ else
 	PWD := $(shell pwd)
 
 default:
-	$(MAKE) -C $(KERNELDIR) M=$(PWD) BUILD_DIR=$(BUILD_DIR) modules
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) ${ARGS} modules
 
 clean:
-	$(RM) $(SANDESH_BINS) $(SANDESH_LIB_BINS)
 	$(RM) cscope* tags
+ifneq ($(wildcard sandesh/Makefile), )
 	$(MAKE) --quiet -C sandesh/ clean
+endif
 	$(MAKE) --quiet -C $(KERNELDIR) M=$(PWD) clean
 
 cscope:

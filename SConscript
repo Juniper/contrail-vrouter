@@ -32,7 +32,10 @@ if sys.platform != 'darwin':
     make_cmd = 'make'
     if GetOption('kernel-dir'):
         make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
-    make_cmd += ' BUILD_DIR=' + Dir(env['TOP']).abspath
+    make_cmd += ' BUILD_DIR=' + Dir(env['TOP'] + '/vrouter/').abspath
+    make_cmd += ' PREFIX=' + '../build/kbuild/'
+    make_cmd += ' SANDESH_ROOT=' + Dir('#tools/').abspath
+
     kern = env.Command('vrouter.ko', makefile, make_cmd, chdir=dp_dir)
     env.Default('vrouter.ko')
 
