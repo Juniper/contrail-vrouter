@@ -7,6 +7,12 @@ env = VRouterEnv
  
 vr_root = '../'
 
+import platform
+import os
+
+if platform.system().startswith('Linux'):
+	if platform.linux_distribution()[0].startswith('XenServer'):
+		env.Append(CPPPATH = os.environ.get('XENBUILDER_KERN_DIR') + '/include/')
 # CFLAGS
 env.Append(CCFLAGS = '-g')
 
