@@ -2,6 +2,7 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
+import subprocess
 import sys
 import os
 
@@ -56,6 +57,19 @@ if sys.platform != 'darwin':
 
     if GetOption('clean'):
         os.system('cd ' + dp_dir + '; make clean')
+
+    libmod_dir = GetOption('install_root')
+
+    if GetOption('kernel-dir'):
+        kern_version = subprocess.check_output(
+            'cat %s/include/config/kernel.release' % GetOption('kernel-dir'),
+            shell=True)
+    else:
+        kern_version = subprocess.check_output('uname -r', shell=True)
+
+    kern_version = kern_version.strip()
+    libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
+    env.Alias('install', env.Install(libmod_dir, kern))
 
 # Local Variables:
 # mode: python
