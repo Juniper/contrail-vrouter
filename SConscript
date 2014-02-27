@@ -22,6 +22,16 @@ vr_root = './'
 makefile = vr_root + 'Makefile'
 dp_dir = Dir(vr_root).srcnode().abspath
 
+
+def shellCommand(cmd):
+    """ Return the output of a shell command
+        This wrapper is required since check_output is not supported in
+        python 2.6
+    """
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    (output, _) = proc.communicate()
+    return output.strip()
+
 if sys.platform != 'darwin':
     subdirs = ['dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
     for sdir in  subdirs:
@@ -63,11 +73,10 @@ if sys.platform != 'darwin':
         libmod_dir = ''
 
     if GetOption('kernel-dir'):
-        kern_version = subprocess.check_output(
-            'cat %s/include/config/kernel.release' % GetOption('kernel-dir'),
-            shell=True)
+        kern_version = shellCommand(
+            'cat %s/include/config/kernel.release' % GetOption('kernel-dir'))
     else:
-        kern_version = subprocess.check_output('uname -r', shell=True)
+        kern_version = shellCommand('uname -r')
 
     kern_version = kern_version.strip()
     libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
