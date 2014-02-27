@@ -59,6 +59,8 @@ if sys.platform != 'darwin':
         os.system('cd ' + dp_dir + '; make clean')
 
     libmod_dir = GetOption('install_root')
+    if libmod_dir == None:
+        libmod_dir = ''
 
     if GetOption('kernel-dir'):
         kern_version = subprocess.check_output(
