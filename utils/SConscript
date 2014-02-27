@@ -49,7 +49,9 @@ vxlan_sources = ['vxlan.c']
 vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
-env.Default(vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan)
+binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan]
+env.Default(binaries)
+env.Alias('install', env.Install(env['INSTALL_BIN'], binaries))
 # Local Variables:
 # mode: python
 # End:
