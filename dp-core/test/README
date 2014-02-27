@@ -1,0 +1,14 @@
+vrouter_test.sh file contains envrironment set and then executes the test case. After each test case we are rolling back the entire configuration 
+to empty except(vrouter) kernel module . And each test case is independent from the rest of the other. Each test case has two python script files,
+one script is to write frame on to the TAP interface and second one reads from a different TAP interface 
+
+
+Steps to run Vrouter testcases: 
+1. Load  kernel using fab command
+	ex: fab all_reimage@LATEST
+2.Run "fab install_contrail" command to for stting up the environment
+3.Copy SCAPY rpm to the host if it is not there as part of the package  and then install scapy
+4.Copy all the test scripts  including python and bash
+    
+
+
