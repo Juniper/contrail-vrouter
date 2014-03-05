@@ -5,6 +5,7 @@
 import subprocess
 import sys
 import os
+import platform
 
 AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
           help='Linux kernel source directory for vrouter.ko')
@@ -41,8 +42,12 @@ if sys.platform != 'darwin':
                        duplicate = 0)
 
     make_cmd = 'make'
-    if GetOption('kernel-dir'):
-        make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
+    if platform.system().startswith('Linux'):
+       if platform.linux_distribution()[0].startswith('XenServer'):
+          make_cmd += ' KERNELDIR=' + os.environ.get('XENBUILDER_KERN_DIR')
+       else:
+          if GetOption('kernel-dir'):
+            make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
     make_cmd += ' BUILD_DIR=' + Dir(env['TOP']).abspath
     kern = env.Command('vrouter.ko', makefile, make_cmd, chdir=dp_dir)
     env.Default('vrouter.ko')
