@@ -32,6 +32,9 @@ extern void vhost_exit(void);
 extern void vhost_if_add(struct vr_interface *);
 extern void vhost_if_del(struct net_device *dev);
 
+extern void vif_attach(struct vr_interface *);
+extern void vif_detach(struct vr_interface *);
+
 static int vr_napi_poll(struct napi_struct *, int);
 static rx_handler_result_t pkt_gro_dev_rx_handler(struct sk_buff **);
 static int linux_xmit_segments(struct vr_interface *, struct sk_buff *,
@@ -1142,6 +1145,9 @@ linux_if_del_tap(struct vr_interface *vif)
 {
     struct net_device *dev = (struct net_device *) vif->vif_os;
 
+    if (!dev)
+        return -EINVAL;
+
     rcu_assign_pointer(dev->br_port, NULL);
 
     return 0;
@@ -1176,6 +1182,9 @@ static int
 linux_if_add_tap(struct vr_interface *vif)
 {
     struct net_device *dev = (struct net_device *) vif->vif_os;
+
+    if (!dev)
+        return -EINVAL;
 
     rcu_assign_pointer(dev->br_port, (void *) vif);
 
@@ -1275,6 +1284,9 @@ linux_if_add(struct vr_interface *vif)
             if (linux_if_tx_csum_offload(dev)) {
                 vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
             }
+
+            strncpy(vif->vif_name, dev->name, sizeof(vif->vif_name));
+            vif->vif_name[sizeof(vif->vif_name) - 1] = '\0';
         }
     }
 
@@ -1582,20 +1594,37 @@ linux_if_notifier(struct notifier_block * __unused,
     struct net_device *dev = (struct net_device *)arg;
     /* for now, get router id 0 */
     struct vrouter *router = vrouter_get(0);
-    struct vr_interface *agent_if;
+    struct vr_interface *agent_if, *eth_if;
 
     if (!router)
         return NOTIFY_DONE;
 
+    eth_if = router->vr_eth_if;
     agent_if = router->vr_agent_if;
-    if (!agent_if)
-        return NOTIFY_DONE;
 
-    if ((event == NETDEV_UNREGISTER) && (dev ==
-            (struct net_device *)agent_if->vif_os)) {
-        vif_delete(agent_if);
-        return NOTIFY_OK;
+    if (event == NETDEV_UNREGISTER) {
+        if (eth_if) {
+            if (dev == (struct net_device *)eth_if->vif_os) {
+                vif_detach(eth_if);
+                return NOTIFY_OK;
+            }
+        }
+
+        if (agent_if) {
+            if (dev == (struct net_device *)agent_if->vif_os) {
+                vif_delete(agent_if);
+                return NOTIFY_OK;
+            }
+        }
+    } else if (event == NETDEV_REGISTER) {
+        if (eth_if) {
+            if (!strncmp(dev->name, eth_if->vif_name, sizeof(eth_if->vif_name))) {
+                eth_if->vif_os_idx = dev->ifindex;
+                vif_attach(eth_if);
+            }
+        }
     }
+
 
     return NOTIFY_DONE;
 }
