@@ -1010,6 +1010,8 @@ vr_interface_add(vr_interface_req *req)
      * that vif_router is not set. to avoid checks such as !vif_router in
      * datapath, the order has to be what is below.
      */
+    vif->vif_rx = vif_discard_rx;
+    vif->vif_tx = vif_discard_tx;
     ret = vrouter_add_interface(vif);
     if (ret)
         goto generate_resp;
