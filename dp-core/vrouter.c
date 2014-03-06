@@ -262,7 +262,9 @@ vrouter_ops_process(void *s_req)
 
     switch (ops->h_op) {
     case SANDESH_OP_RESET:
+        vr_printf("vrouter soft reset start\n");
         ret = vrouter_soft_reset();        
+        vr_printf("vrouter soft reset done(%d)\n", ret);
         break;
     default:
         ret = -EOPNOTSUPP;

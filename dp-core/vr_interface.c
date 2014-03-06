@@ -428,6 +428,10 @@ static int
 agent_drv_del(struct vr_interface *vif)
 {
     hif_ops->hif_del_tap(vif);
+
+    vif->vif_tx = vif_discard_tx;
+    vif->vif_rx = vif_discard_rx;
+
     return hif_ops->hif_del(vif);
 }
 
@@ -498,6 +502,10 @@ vhost_tx(struct vr_interface *vif, struct vr_packet *pkt)
 static int
 vhost_drv_del(struct vr_interface *vif)
 {
+
+    vif->vif_tx = vif_discard_tx;
+    vif->vif_rx = vif_discard_rx;
+
     return hif_ops->hif_del(vif);
 }
 
@@ -597,6 +605,10 @@ eth_drv_del(struct vr_interface *vif)
     int ret;
 
     hif_ops->hif_del_tap(vif);
+
+    vif->vif_tx = vif_discard_tx;
+    vif->vif_rx = vif_discard_rx;
+
     ret = hif_ops->hif_del(vif);
     if (vif->vif_flags & VIF_FLAG_SERVICE_IF)
         vr_interface_service_disable(vif);
@@ -869,6 +881,24 @@ vrouter_add_interface(struct vr_interface *vif)
     return 0;
 }
 
+void
+vif_attach(struct vr_interface *vif)
+{
+    if (drivers[vif->vif_type].drv_add)
+        drivers[vif->vif_type].drv_add(vif);
+
+    return;
+}
+
+void
+vif_detach(struct vr_interface *vif)
+{
+    if (drivers[vif->vif_type].drv_delete)
+        drivers[vif->vif_type].drv_delete(vif);
+
+    return; 
+}
+
 int
 vif_delete(struct vr_interface *vif)
 {
@@ -1003,17 +1033,14 @@ vr_interface_add(vr_interface_req *req)
     memcpy(vif->vif_rewrite, req->vifr_mac, sizeof(vif->vif_mac));
     vif->vif_ip = req->vifr_ip;
 
-    if (req->vifr_name) {
-        strncpy((char *)vif->vif_name, req->vifr_name, VR_INTERFACE_NAME_LEN);
-        vif->vif_name[VR_INTERFACE_NAME_LEN - 1] = '\0';
-    }
-
     /*
      * the order below is probably not intuitive, but we do this because
      * the moment we do a drv_add, packets will start coming in and find
      * that vif_router is not set. to avoid checks such as !vif_router in
      * datapath, the order has to be what is below.
      */
+    vif->vif_rx = vif_discard_rx;
+    vif->vif_tx = vif_discard_tx;
     ret = vrouter_add_interface(vif);
     if (ret)
         goto generate_resp;
