@@ -18,7 +18,8 @@
 #define VIF_TYPE_XEN_LL_HOST        4
 #define VIF_TYPE_GATEWAY            5
 #define VIF_TYPE_VLAN               6
-#define VIF_TYPE_MAX                7
+#define VIF_TYPE_STATS              7
+#define VIF_TYPE_MAX                8
 
 #define vif_is_fabric(vif)          ((vif->vif_type == VIF_TYPE_PHYSICAL) ||\
                                         (vif->vif_type == VIF_TYPE_VLAN))
@@ -140,7 +141,7 @@ extern struct vr_interface *vrouter_get_interface(unsigned int, unsigned int);
 extern struct vr_interface *__vrouter_get_interface(struct vrouter *, unsigned int);
 extern void vrouter_put_interface(struct vr_interface *);
 extern int vr_interface_dump_wrapper(vr_interface_req *);
-extern int vr_interface_add(vr_interface_req *);
+extern int vr_interface_add(vr_interface_req *, bool);
 
 extern int vif_delete(struct vr_interface *);
 extern void vif_set_xconnect(struct vr_interface *);

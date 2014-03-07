@@ -1309,14 +1309,24 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
     struct vr_ip *ip;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
-    if (stats)
-        stats->vrf_encaps++;
 
     vif = nh->nh_dev;
     pkt->vp_type = VP_TYPE_IP;
     ip = (struct vr_ip *)pkt_network_header(pkt);
+
     if (ip->ip_csum == VR_DIAG_IP_CSUM) {
         pkt->vp_flags &= ~VP_FLAG_GRO;
+        if (stats)
+            stats->vrf_diags++;
+    } else {
+        if (stats) {
+            if ((pkt->vp_flags & VP_FLAG_GRO) &&
+                    (vif->vif_type == VIF_TYPE_VIRTUAL)) {
+                stats->vrf_gros++;
+            } else {
+                stats->vrf_encaps++;
+            }
+        }
     }
 
     /*

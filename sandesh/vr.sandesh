@@ -173,6 +173,8 @@ buffer sandesh vr_vrf_stats_req {
    17:  i64                 vsr_l2_encaps;
    18:  i64                 vsr_encaps;
    19:  i16                 vsr_marker;
+   20:  i64                 vsr_gros;
+   21:  i64                 vsr_diags;
 }
 
 buffer sandesh vr_response {

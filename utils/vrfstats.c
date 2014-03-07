@@ -63,6 +63,8 @@ vr_vrf_stats_req_process(void *s_req)
             stats->vsr_udp_mpls_tunnels, stats->vsr_gre_mpls_tunnels);
     printf("L2 Encaps %" PRIu64 ", Encaps %" PRIu64 "\n",
             stats->vsr_l2_encaps, stats->vsr_encaps);
+    printf("GROs %" PRIu64 ", Diags %" PRIu64 "\n",
+            stats->vsr_gros, stats->vsr_diags);
 
     printf("\n");
     return;
@@ -80,9 +82,12 @@ vr_response_process(void *s)
         printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
         exit(-1);
     } else {
-        if (stats_op == SANDESH_OP_DUMP)
+        if (stats_op == SANDESH_OP_DUMP) {
             if (resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
                 dump_pending = true;
+            else 
+                dump_pending = false;
+        }
     }
 
     return;
