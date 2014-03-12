@@ -214,7 +214,7 @@ linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
      */
     if (skb->ip_summed == CHECKSUM_PARTIAL) {
         if (skb_checksum_help(skb)) {
-            lh_pfree_skb(skb, VP_DROP_CKSUM_ERR);
+            lh_pfree_skb(skb, VP_DROP_MISC);
             return 0;
         }
     }
