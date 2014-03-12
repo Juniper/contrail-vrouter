@@ -423,8 +423,13 @@ vr_flow_nat(unsigned short vrf, struct vr_flow_entry *fe, struct vr_packet *pkt,
         }
     }
 
+#ifdef VROUTER_CONFIG_DIAG
     if (ip->ip_csum != VR_DIAG_IP_CSUM)
         vr_ip_update_csum(pkt, ip_inc, inc);
+#else
+    vr_ip_update_csum(pkt, ip_inc, inc);
+#endif
+
 
     /*
      * If VRF is translated lets chose a new nexthop

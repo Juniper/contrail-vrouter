@@ -266,6 +266,20 @@ lh_pfree(struct vr_packet *pkt, unsigned short reason)
     return;
 }
 
+void
+lh_pfree_skb(struct sk_buff *skb, unsigned short reason)
+{
+    struct vrouter *router = vrouter_get(0);
+    unsigned int cpu;
+
+    cpu = vr_get_cpu();
+    if ((cpu < vr_num_cpus) && (router))
+        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
+
+    kfree_skb(skb);
+    return;
+}
+
 static int
 lh_pcopy(unsigned char *dst, struct vr_packet *p_src,
         unsigned int offset, unsigned int len)

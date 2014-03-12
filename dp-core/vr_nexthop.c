@@ -1306,18 +1306,35 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
 {
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
+#ifdef VROUTER_CONFIG_DIAG
     struct vr_ip *ip;
+#endif
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
-    if (stats)
-        stats->vrf_encaps++;
 
     vif = nh->nh_dev;
     pkt->vp_type = VP_TYPE_IP;
+#ifdef VROUTER_CONFIG_DIAG
     ip = (struct vr_ip *)pkt_network_header(pkt);
+
     if (ip->ip_csum == VR_DIAG_IP_CSUM) {
         pkt->vp_flags &= ~VP_FLAG_GRO;
+        if (stats)
+            stats->vrf_diags++;
+    } else {
+#else
+        if (stats) {
+            if ((pkt->vp_flags & VP_FLAG_GRO) &&
+                    (vif->vif_type == VIF_TYPE_VIRTUAL)) {
+                stats->vrf_gros++;
+            } else {
+                stats->vrf_encaps++;
+            }
+        }
+#endif
+#ifdef VROUTER_CONFIG_DIAG
     }
+#endif
 
     /*
      * For packets being sent up a tap interface, retain the MPLS label
@@ -1350,6 +1367,7 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
         }
     }
 
+#ifdef VROUTER_CONFIG_DIAG
     /*
      * Look if this is the Diag packet to trap to agent
      */
@@ -1358,6 +1376,7 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
         vr_pset_data(pkt, pkt->vp_data);
         return vr_trap(pkt, vrf, AGENT_TRAP_DIAG, &vif->vif_idx);
     }
+#endif
 
     vif->vif_tx(vif, pkt);
 

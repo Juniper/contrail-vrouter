@@ -661,6 +661,8 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_gre_mpls_tunnels  += stats->vrf_gre_mpls_tunnels;
             response->vsr_l2_encaps += stats->vrf_l2_encaps;
             response->vsr_encaps += stats->vrf_encaps;
+            response->vsr_gros += stats->vrf_gros;
+            response->vsr_diags += stats->vrf_diags;
         }
     }
 
@@ -675,7 +677,8 @@ mtrie_stats_empty(vr_vrf_stats_req *r)
             r->vsr_l2_mcast_composites || r->vsr_fabric_composites ||
             r->vsr_multi_proto_composites || r->vsr_udp_tunnels || 
             r->vsr_udp_mpls_tunnels || r->vsr_gre_mpls_tunnels || 
-            r->vsr_l2_encaps || r->vsr_encaps)
+            r->vsr_l2_encaps || r->vsr_encaps || r->vsr_gros ||
+            r->vsr_diags)
         return false;
 
     return true;
