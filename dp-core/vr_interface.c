@@ -15,6 +15,7 @@ static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
 extern void  vr_host_interface_exit(void);
+extern void vr_host_vif_init(struct vrouter *);
 extern unsigned int vr_l3_input(unsigned short, struct vr_packet *, 
                                               struct vr_forwarding_md *);
 extern unsigned int vr_l2_input(unsigned short, struct vr_packet *, 
@@ -22,7 +23,7 @@ extern unsigned int vr_l2_input(unsigned short, struct vr_packet *,
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
 
-static inline struct vr_interface_stats *
+struct vr_interface_stats *
 vif_get_stats(struct vr_interface *vif, unsigned short cpu)
 {
     return &vif->vif_stats[cpu & VR_CPU_MASK];
@@ -428,6 +429,10 @@ static int
 agent_drv_del(struct vr_interface *vif)
 {
     hif_ops->hif_del_tap(vif);
+
+    vif->vif_tx = vif_discard_tx;
+    vif->vif_rx = vif_discard_rx;
+
     return hif_ops->hif_del(vif);
 }
 
@@ -498,6 +503,10 @@ vhost_tx(struct vr_interface *vif, struct vr_packet *pkt)
 static int
 vhost_drv_del(struct vr_interface *vif)
 {
+
+    vif->vif_tx = vif_discard_tx;
+    vif->vif_rx = vif_discard_rx;
+
     return hif_ops->hif_del(vif);
 }
 
@@ -597,6 +606,10 @@ eth_drv_del(struct vr_interface *vif)
     int ret;
 
     hif_ops->hif_del_tap(vif);
+
+    vif->vif_tx = vif_discard_tx;
+    vif->vif_rx = vif_discard_rx;
+
     ret = hif_ops->hif_del(vif);
     if (vif->vif_flags & VIF_FLAG_SERVICE_IF)
         vr_interface_service_disable(vif);
@@ -619,8 +632,11 @@ eth_drv_add(struct vr_interface *vif)
     }
 
     vif->vif_set_rewrite = vif_cmn_rewrite;
-    vif->vif_tx = eth_tx;
-    vif->vif_rx = eth_rx;
+
+    if (vif->vif_type != VIF_TYPE_STATS) {
+        vif->vif_tx = eth_tx;
+        vif->vif_rx = eth_rx;
+    }
 
     if (vif->vif_flags & VIF_FLAG_SERVICE_IF) {
         ret = vr_interface_service_enable(vif);
@@ -671,6 +687,10 @@ static struct vr_interface_driver {
         .drv_delete     =   eth_drv_del,
     },
     [VIF_TYPE_VIRTUAL] = {
+        .drv_add        =   eth_drv_add,
+        .drv_delete     =   eth_drv_del,
+    },
+    [VIF_TYPE_STATS] = {
         .drv_add        =   eth_drv_add,
         .drv_delete     =   eth_drv_del,
     },
@@ -869,6 +889,24 @@ vrouter_add_interface(struct vr_interface *vif)
     return 0;
 }
 
+void
+vif_attach(struct vr_interface *vif)
+{
+    if (drivers[vif->vif_type].drv_add)
+        drivers[vif->vif_type].drv_add(vif);
+
+    return;
+}
+
+void
+vif_detach(struct vr_interface *vif)
+{
+    if (drivers[vif->vif_type].drv_delete)
+        drivers[vif->vif_type].drv_delete(vif);
+
+    return; 
+}
+
 int
 vif_delete(struct vr_interface *vif)
 {
@@ -881,7 +919,7 @@ vif_delete(struct vr_interface *vif)
 
 
 static int
-vr_interface_delete(vr_interface_req *req)
+vr_interface_delete(vr_interface_req *req, bool need_response)
 {
     int ret = 0;
     struct vr_interface *vif;
@@ -892,8 +930,10 @@ vr_interface_delete(vr_interface_req *req)
         goto del_fail;
 
     vif_delete(vif);
+
 del_fail:
-    vr_send_response(ret);
+    if (need_response)
+        vr_send_response(ret);
 
     return ret;
 }
@@ -945,7 +985,7 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 }
 
 int
-vr_interface_add(vr_interface_req *req)
+vr_interface_add(vr_interface_req *req, bool need_response)
 {
     int ret;
     struct vr_interface *vif = NULL;
@@ -1003,17 +1043,14 @@ vr_interface_add(vr_interface_req *req)
     memcpy(vif->vif_rewrite, req->vifr_mac, sizeof(vif->vif_mac));
     vif->vif_ip = req->vifr_ip;
 
-    if (req->vifr_name) {
-        strncpy((char *)vif->vif_name, req->vifr_name, VR_INTERFACE_NAME_LEN);
-        vif->vif_name[VR_INTERFACE_NAME_LEN - 1] = '\0';
-    }
-
     /*
      * the order below is probably not intuitive, but we do this because
      * the moment we do a drv_add, packets will start coming in and find
      * that vif_router is not set. to avoid checks such as !vif_router in
      * datapath, the order has to be what is below.
      */
+    vif->vif_rx = vif_discard_rx;
+    vif->vif_tx = vif_discard_tx;
     ret = vrouter_add_interface(vif);
     if (ret)
         goto generate_resp;
@@ -1028,7 +1065,9 @@ vr_interface_add(vr_interface_req *req)
 
 
 generate_resp:
-    vr_send_response(ret);
+    if (need_response)
+        vr_send_response(ret);
+
     if (ret && vif)
         vif_free(vif);
 
@@ -1205,10 +1244,11 @@ vr_interface_req_process(void *s_req)
 {
     int ret;
     vr_interface_req *req = (vr_interface_req *)s_req;
+    bool need_response = true;
 
     switch (req->h_op) {
     case SANDESH_OP_ADD:
-        ret = vr_interface_add(req);
+        ret = vr_interface_add(req, need_response);
         break;
 
     case SANDESH_OP_GET:
@@ -1216,7 +1256,7 @@ vr_interface_req_process(void *s_req)
         break;
 
     case SANDESH_OP_DELETE:
-        ret = vr_interface_delete(req);
+        ret = vr_interface_delete(req, need_response);
         break;
 
     case SANDESH_OP_DUMP:
@@ -1318,6 +1358,30 @@ vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
 }
 
 
+int
+vr_gro_vif_add(struct vrouter *router, unsigned int os_idx)
+{
+    int ret = 0;
+    vr_interface_req *req = vr_interface_req_get();
+
+    if (!req)
+        return -ENOMEM;
+
+    req->h_op = SANDESH_OP_ADD;
+    req->vifr_type = VIF_TYPE_STATS;
+    req->vifr_flags = 0;
+    req->vifr_vrf = 65535;
+    req->vifr_idx = router->vr_max_interfaces - 1;
+    req->vifr_rid = 0;
+    req->vifr_os_idx = os_idx;
+    req->vifr_mtu = 9136;
+
+    ret = vr_interface_add(req, false);
+    vr_interface_req_destroy(req);
+
+    return ret;
+}
+
 /*
  * this makes sure that packets no longer enter the module when
  * we remove the module
@@ -1400,6 +1464,8 @@ vr_interface_init(struct vrouter *router)
             goto cleanup;
         }
     }
+
+    vr_host_vif_init(router);
 
     return 0;
 
