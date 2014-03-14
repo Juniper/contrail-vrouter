@@ -515,6 +515,7 @@ linux_enqueue_pkt_for_gro(struct sk_buff *skb, struct vr_interface *vif)
 {
     struct vr_interface *gro_vif;
     struct vr_interface_stats *gro_vif_stats;
+    int in_intr_context;
 
 #ifdef CONFIG_RPS
     u16 rxq;
@@ -588,7 +589,24 @@ linux_enqueue_pkt_for_gro(struct sk_buff *skb, struct vr_interface *vif)
     
 
     skb_queue_tail(&vif->vr_skb_inputq, skb);
+
+
+    /*
+     * napi_schedule may raise a softirq, so if we are not already in
+     * interrupt context (which is the case when we get here as a result of 
+     * the agent enabling a flow for forwarding), ensure that the softirq is 
+     * handled immediately.
+     */
+    in_intr_context = in_interrupt();
+    if (!in_intr_context) {
+        local_bh_disable();
+    }
+
     napi_schedule(&vif->vr_napi);
+
+    if (!in_intr_context) {
+        local_bh_enable();
+    }
 
     return;
 }
