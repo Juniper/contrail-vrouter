@@ -27,6 +27,8 @@ struct vr_mirror_meta_entry {
     unsigned short mirror_vrf;
 };
 
+struct vr_forwarding_md;
+
 extern int vr_mirror_init(struct vrouter *);
 extern void vr_mirror_exit(struct vrouter *, bool);
 extern int vr_mirror(struct vrouter *, uint8_t, struct vr_packet *,

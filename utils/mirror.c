@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <malloc.h>
+#include <getopt.h>
 #include <stdbool.h>
 
 #include <asm/types.h>
@@ -27,69 +28,86 @@
 
 #include "vr_types.h"
 #include "vr_message.h"
-#include "vr_mpls.h"
+#include "vr_mirror.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
 
 static struct nl_client *cl;
 static bool dump_pending = false;
 static int dump_marker = -1;
-static int op;
+
+static int create_set, delete_set, dump_set;
+static int get_set, nh_set, mirror_set;
+static int pcap_set, help_set, cmd_set;
+static int mirror_op = -1, mirror_nh;
+static int mirror_index = -1, mirror_flags;
 
 void
 vr_mirror_req_process(void *s_req)
 {
    vr_mirror_req *req = (vr_mirror_req *)s_req;
+   unsigned char flags[12];
 
 
-   printf("Mirror Index : %d\n", req->mirr_index);
-   printf("       Nhid  : %d\n", req->mirr_nhid);
-   printf("       flags : %x\n", req->mirr_flags);
-   printf("       Ref   : %d\n", req->mirr_users);
+   memset(flags, 0, sizeof(flags));
+   if (req->mirr_flags & VR_MIRROR_PCAP)
+       strcat(flags, "P");
+   if (req->mirr_flags & VR_MIRROR_FLAG_MARKED_DELETE)
+       strcat(flags, "Md");
 
-   if (op == 4)
+   printf("%5d    %7d", req->mirr_index, req->mirr_nhid);
+   printf("    %4s", flags);
+   printf("    %10u\n", req->mirr_users);
+
+   if (mirror_op == SANDESH_OP_DUMP)
        dump_marker = req->mirr_index;
 
+   return;
 }
 
 void
 vr_response_process(void *s)
 {
    vr_response *resp = (vr_response *)s;
+
     if (resp->resp_code < 0) {
-        printf("Error %s in kernel operation\n", strerror(-resp->resp_code));
+        printf("Error: %s\n", strerror(-resp->resp_code));
     } else {
-        if (op == 4) {
+        if (mirror_op == SANDESH_OP_DUMP) {
             if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
                 dump_pending = true;
             else
                 dump_pending = false; 
         }
     }
+
+    return;
 }
 
-int 
-vr_mirror_op(int opt, uint32_t index, uint32_t nh_id)
+static int 
+vr_mirror_op(void)
 {
     vr_mirror_req mirror_req;
     int ret, error, attr_len;
     struct nl_response *resp;
 
 op_retry:
+    mirror_req.h_op = mirror_op;
+    mirror_req.mirr_index = mirror_index;
 
-    if (opt == 1) {
-        mirror_req.h_op = SANDESH_OP_ADD;
-        mirror_req.mirr_nhid = nh_id;
-    } else if (opt == 2) {
-        mirror_req.h_op = SANDESH_OP_DELETE;
-    } else if (opt == 3) {
-        mirror_req.h_op = SANDESH_OP_GET;
-    } else if (opt == 4) {
-        mirror_req.h_op = SANDESH_OP_DUMP;
+    switch (mirror_op) {
+    case SANDESH_OP_ADD:
+        mirror_req.mirr_nhid = mirror_nh;
+        mirror_req.mirr_flags = mirror_flags;
+        break;
+
+    case SANDESH_OP_DUMP:
         mirror_req.mirr_marker = dump_marker;
-    }
+        break;
 
-    mirror_req.mirr_index = index;
+    default:
+        break;
+    }
 
     /* nlmsg header */
     ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
@@ -133,25 +151,202 @@ op_retry:
     return 0;
 }
 
-void
-usage()
-{
-    printf("Usage: b - bulk dump\n"
-           "       c - create\n"
-           "       d - delete\n"
-           "       g - get\n"
-           "       n - <nhop_id>\n"
-           "       m - <mirror index>\n");
-                      
+enum opt_mirror_index {
+    COMMAND_OPT_INDEX,
+    CREATE_OPT_INDEX,
+    DELETE_OPT_INDEX,
+    DUMP_OPT_INDEX,
+    GET_OPT_INDEX,
+    HELP_OPT_INDEX,
+    NEXTHOP_OPT_INDEX,
+    PCAP_OPT_INDEX,
+    MAX_OPT_INDEX
+};
 
+static struct option long_options[] = {
+    [COMMAND_OPT_INDEX]     =       {"cmd",     no_argument,        &cmd_set,       1},
+    [CREATE_OPT_INDEX]      =       {"create",  required_argument,  &create_set,    1},
+    [DELETE_OPT_INDEX]      =       {"delete",  required_argument,  &delete_set,    1},
+    [DUMP_OPT_INDEX]        =       {"dump",    no_argument,        &dump_set,      1},
+    [GET_OPT_INDEX]         =       {"get",     required_argument,  &get_set,       1},
+    [HELP_OPT_INDEX]        =       {"help",    no_argument,        &help_set,      1},
+    [NEXTHOP_OPT_INDEX]     =       {"nh",      required_argument,  &nh_set,        1},
+    [PCAP_OPT_INDEX]        =       {"pcap",    no_argument,        &pcap_set,      1},
+    [MAX_OPT_INDEX]         =       { NULL,     0,                  0,              0},
+};
+
+static void
+usage_internal()
+{
+    printf("Usage:      mirror --create <index> --nh <nh index> <--pcap>\n");
+    printf("            mirror --delete <index>\n");
+    printf("\n");
+    printf("--create    Create a mirror entry for <index> with nexthop set to <nh index>\n");
+    printf("--delete    Delete the entry corresponding to <index>\n");
+
+    exit(1);
+}
+
+static void
+Usage(void)
+{
+    printf("Usage:  mirror --dump\n");
+    printf("        mirror --get <index>\n");
+    printf("        mirror --help\n");
+    printf("\n");
+    printf("--dump  Dumps the mirror table\n");
+    printf("--get   Dumps the mirror entry corresponding to index <index>\n");
+    printf("--help  Prints this help message\n");
+
+    exit(1);
+}
+
+
+static void
+parse_long_opts(int opt_index, char *opt_arg)
+{
+    errno = 0;
+
+    switch (opt_index) {
+    case COMMAND_OPT_INDEX:
+        usage_internal();
+        break;
+
+    case CREATE_OPT_INDEX:
+        mirror_op = SANDESH_OP_ADD;
+        mirror_index = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage_internal();
+        break;
+
+    case DELETE_OPT_INDEX:
+        mirror_op = SANDESH_OP_DELETE;
+        mirror_index = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage_internal();
+        break;
+
+    case DUMP_OPT_INDEX:
+        mirror_op = SANDESH_OP_DUMP;
+        break;
+
+    case GET_OPT_INDEX:
+        mirror_op = SANDESH_OP_GET;
+        mirror_index = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case HELP_OPT_INDEX:
+        Usage();
+        break;
+
+    case NEXTHOP_OPT_INDEX:
+        mirror_nh = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage_internal();
+        break;
+
+    case PCAP_OPT_INDEX:
+        mirror_flags = VR_MIRROR_PCAP;
+        break;
+
+    default:
+        Usage();
+        break;
+    }
+
+    return;
+}
+
+
+static void
+validate_options(void)
+{
+    int sum_op = create_set + delete_set + dump_set + get_set;
+
+    if (sum_op > 1 || mirror_op < 0)
+        Usage();
+
+    if (create_set)
+        if (!nh_set)
+            usage_internal();
+
+    if (mirror_set)
+        if (!create_set || !delete_set || !get_set)
+            usage_internal();
+
+    return;
 }
 
 int main(int argc, char *argv[])
 {
-    int ret;
-    int opt;
-    uint32_t nh_id;
-    int32_t index;
+    int ret, opt, option_index;
+
+    while ((opt = getopt_long(argc, argv, "bcdgn:m:",
+                    long_options, &option_index)) >= 0) {
+            switch (opt) {
+            case 'c':
+                if (mirror_op >= 0)
+                    Usage();
+
+                create_set = 1;
+                mirror_op = SANDESH_OP_ADD;
+                break;
+
+            case 'd':
+                if (mirror_op >= 0)
+                    Usage();
+
+                delete_set = 1;
+                mirror_op = SANDESH_OP_DELETE;
+                break;
+
+            case 'g':
+                if (mirror_op >= 0)
+                    Usage();
+
+                get_set = 1;
+                mirror_op = SANDESH_OP_GET;
+                break;
+
+            case 'b':
+                if (mirror_op >= 0)
+                    Usage();
+
+                dump_set = 1;
+                mirror_op = SANDESH_OP_DUMP;
+                break;
+
+            case 'n':
+                mirror_nh = atoi(optarg);
+                nh_set = 1;
+                break;
+
+            case 'm':
+                mirror_index = atoi(optarg);
+                mirror_set = 1;
+                break;
+
+            case 0:
+                parse_long_opts(option_index, optarg);
+                break;
+
+            case '?':
+            default:
+                Usage();
+                break;
+        }
+    }
+
+    validate_options();
+
+    if ((mirror_op == SANDESH_OP_DUMP) ||
+            (mirror_op == SANDESH_OP_GET)) {
+        printf("Mirror Table\n\n");
+        printf("Index    NextHop    Flags    References\n");
+        printf("---------------------------------------\n");
+    }
 
     cl = nl_register_client();
     if (!cl) {
@@ -167,52 +362,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    nh_id = 0;
-    index = -1;
-    while ((opt = getopt(argc, argv, "bcdgn:m:")) != -1) {
-            switch (opt) {
-            case 'c':
-                op = 1;
-                break;
-            case 'd':
-                op = 2;
-                break;
-            case 'g':
-                op = 3;
-                break;
-            case 'b':
-                op = 4;
-                break;
-            case 'n':
-                nh_id = atoi(optarg);
-                break;
-            case 'm':
-                index = atoi(optarg);
-                break;
-            case '?':
-            default:
-                usage();
-                exit(0);
-        }
-    }
-
-    if (opt == 0 ) {
-        usage();
-        exit(1);
-    }
-
-    if (op != 4 && index == -1) {
-        usage();
-        exit(1);
-    }
-
-    if (op == 1 && nh_id == 0) {
-        usage();
-        exit(1);
-    }
-
-
-    vr_mirror_op(op, index, nh_id);
+    vr_mirror_op();
 
     return 0;
 }
