@@ -99,6 +99,7 @@ vr_mirror_change(struct vr_mirror_entry *mirror, vr_mirror_req *req,
         mirror->mir_users++;
     }
 
+    mirror->mir_flags |= req->mirr_flags;
     mirror->mir_nh = nh_new;
     vrouter_put_nexthop(nh_old);
 
@@ -124,6 +125,8 @@ vr_mirror_add(vr_mirror_req *req)
         goto generate_resp;
     }
 
+    req->mirr_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
+
     nh = vrouter_get_nexthop(req->mirr_rid, req->mirr_nhid);
     if (!nh)  {
         ret = -EINVAL;
@@ -138,6 +141,7 @@ vr_mirror_add(vr_mirror_req *req)
         mirror->mir_users++;
         mirror->mir_nh = nh;
         mirror->mir_rid = req->mirr_rid;
+        mirror->mir_flags = req->mirr_flags;
         router->vr_mirrors[req->mirr_index] = mirror;
     }
 
