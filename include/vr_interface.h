@@ -27,6 +27,8 @@
 #define vif_is_tap(vif)             ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_AGENT))
 
+#define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL))
+
 #define vif_is_vhost(vif)           ((vif->vif_type == VIF_TYPE_HOST) ||\
                                         (vif->vif_type == VIF_TYPE_XEN_LL_HOST) ||\
                                         (vif->vif_type == VIF_TYPE_GATEWAY))
