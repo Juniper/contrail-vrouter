@@ -180,6 +180,12 @@ struct vrouter {
     struct vr_interface *vr_eth_if;
 };
 
+struct vr_defer_data {
+    void *vdd_data;
+};
+
+extern volatile bool vr_not_ready;
+
 extern struct host_os *vrouter_host;
 
 extern struct vrouter *vrouter_get(unsigned int);

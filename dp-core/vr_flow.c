@@ -844,7 +844,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
         if (!vif || (pkt->vp_if != vif)) {
             vr_pfree(pkt, VP_DROP_INVALID_IF);
-            continue;
+            goto loop_continue;
         }
 
         if (!pkt->vp_nh) {
@@ -857,6 +857,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         vr_flow_action(router, fe, flmd->flmd_index, pkt,
                 pnode->pl_proto, fmd);
 
+loop_continue:
         head = pnode->pl_node.node_n;
         vr_free(pnode);
     }

@@ -16,7 +16,7 @@ extern struct host_os *vrouter_get_host(void);
 extern int vr_stats_init(struct vrouter *);
 extern void vr_stats_exit(struct vrouter *, bool);
 
-bool vr_not_ready = true;
+volatile bool vr_not_ready = true;
 
 struct vr_module {
     char *mod_name;
