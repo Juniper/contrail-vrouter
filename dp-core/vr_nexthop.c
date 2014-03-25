@@ -52,7 +52,10 @@ vrouter_put_nexthop(struct vr_nexthop *nh)
     }
 
     if (!nh->nh_users ) {
-        vr_delay_op();
+
+        if (!vr_not_ready)
+            vr_delay_op();
+
         /* If composite de-ref the internal nexthops */
         if (nh->nh_type == NH_COMPOSITE) {
             for (i = 0; i < nh->nh_component_cnt; i++) {

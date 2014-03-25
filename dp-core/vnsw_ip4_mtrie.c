@@ -251,7 +251,8 @@ mtrie_reset_entry(struct ip4_bucket_entry *ent, int level,
         set_entry_to_nh(ent, nh);
 
     /* wait for all cores to see it */
-    vr_delay_op();
+    if (!vr_not_ready)
+        vr_delay_op();
 
     /* ...and then work with the copy */
     mtrie_free_entry(&cp_ent, level);
@@ -358,7 +359,9 @@ ip4_bucket_sched_for_free(struct ip4_bucket *bkt, int level)
     unsigned int i;
     struct ip4_bucket_entry *tmp_ent;
 
-    vr_delay_op();
+    if (!vr_not_ready)
+        vr_delay_op();
+
     for (i = 0; i < ip4_bkt_info[level].bi_size; i++) {
         tmp_ent = &bkt->bkt_data[i];
         if (tmp_ent->entry_nh_p) {
