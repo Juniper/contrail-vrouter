@@ -11,6 +11,7 @@
 #define VR_MIRROR_PCAP 0x2
 
 struct vrouter;
+struct vr_packet;
 
 struct vr_mirror_entry {
     unsigned int mir_users:20;
