@@ -153,7 +153,8 @@ vr_interface_service_disable(struct vr_interface *vif)
      * once everybody sees the change, we are free to do whatever
      * we want with the vrf assign table
      */
-    vr_delay_op();
+    if (!vr_not_ready)
+        vr_delay_op();
 
     /*
      * it is possible that when this function is called from
@@ -809,7 +810,9 @@ vrouter_del_interface(struct vr_interface *vif)
         break;
     }
 
-    vr_delay_op();
+    if (!vr_not_ready)
+        vr_delay_op();
+
     vrouter_put_interface(vif);
 
     return;

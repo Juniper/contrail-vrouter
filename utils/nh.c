@@ -409,12 +409,12 @@ cmd_usage()
 void
 usage()
 {
-    printf("Usage: --list\n"
-           "       --get <nh_id>\n"
-           "       --help\n\n"
-           "    --list Lists All Nexthops\n"
-           "    --get  <nh_id> Displays nexthop corresponding to <nh_id>\n"
-           "    --help Displays this help message\n\n");
+    printf("Usage: nh --list\n"
+           "       nh --get <nh_id>\n"
+           "       nh --help\n\n"
+           "--list Lists All Nexthops\n"
+           "--get  <nh_id> Displays nexthop corresponding to <nh_id>\n"
+           "--help Displays this help message\n\n");
 
     exit(-EINVAL);
 }
@@ -462,34 +462,34 @@ bool opt_set(int ind)
     return false;
 }
 static struct option long_options[] = {
-    [OIF_OPT_IND]    = {"oif", required_argument, &opt[OIF_OPT_IND], 1},
-    [SMAC_OPT_IND]    = {"smac", required_argument, &opt[SMAC_OPT_IND], 1},
-    [DMAC_OPT_IND]    = {"dmac", required_argument, &opt[DMAC_OPT_IND], 1},
-    [VRF_OPT_IND]    = {"vrf", required_argument, &opt[VRF_OPT_IND], 1},
-    [TYPE_OPT_IND]  = {"type", required_argument, &opt[TYPE_OPT_IND], 1},
-    [SIP_OPT_IND]  = {"sip", required_argument, &opt[SIP_OPT_IND], 1},
-    [DIP_OPT_IND]  = {"dip", required_argument, &opt[DIP_OPT_IND], 1},
-    [POL_OPT_IND]  = {"pol", no_argument, &opt[POL_OPT_IND], 1},
-    [RPOL_OPT_IND]  = {"rpol", no_argument, &opt[RPOL_OPT_IND], 1},
-    [SPORT_OPT_IND]  = {"sport", required_argument, &opt[SPORT_OPT_IND], 1},
-    [DPORT_OPT_IND]  = {"dport", required_argument, &opt[DPORT_OPT_IND], 1},
-    [UDP_OPT_IND]  = {"udp", no_argument, &opt[UDP_OPT_IND], 1},
-    [VXLAN_OPT_IND]  = {"vxlan", no_argument, &opt[VXLAN_OPT_IND], 1},
-    [CNI_OPT_IND]  = {"cni", required_argument, &opt[CNI_OPT_IND], 1},
-    [CMP_OPT_IND]  = {"cmp", no_argument, &opt[CMP_OPT_IND], 1},
-    [CL3_OPT_IND]  = {"cl3", no_argument, &opt[CL3_OPT_IND], 1},
-    [CL2_OPT_IND]  = {"cl2", no_argument, &opt[CL2_OPT_IND], 1},
-    [CFA_OPT_IND]  = {"cfa", no_argument, &opt[CFA_OPT_IND], 1},
-    [MC_OPT_IND]  = {"mc", no_argument, &opt[MC_OPT_IND], 1},
-    [EL2_OPT_IND]  = {"el2", no_argument, &opt[EL2_OPT_IND], 1},
-    [LBL_OPT_IND] = {"lbl", required_argument, &opt[LBL_OPT_IND], 1},
-    [LST_OPT_IND] = {"list", no_argument, &opt[LST_OPT_IND], 1},
-    [GET_OPT_IND] = {"get", required_argument, &opt[GET_OPT_IND], 1},
-    [CRT_OPT_IND] = {"create", required_argument, &opt[CRT_OPT_IND], 1},
-    [DEL_OPT_IND] = {"delete", required_argument, &opt[DEL_OPT_IND], 1},
-    [CMD_OPT_IND] = {"cmd", no_argument, &opt[CMD_OPT_IND], 1},
-    [HLP_OPT_IND] = {"help", no_argument, &opt[HLP_OPT_IND], 1},
-    [MAX_OPT_IND]     = { NULL,  0,                 0        , 0}
+    [OIF_OPT_IND]       = {"oif",   required_argument,  &opt[OIF_OPT_IND],      1},
+    [SMAC_OPT_IND]      = {"smac",  required_argument,  &opt[SMAC_OPT_IND],     1},
+    [DMAC_OPT_IND]      = {"dmac",  required_argument,  &opt[DMAC_OPT_IND],     1},
+    [VRF_OPT_IND]       = {"vrf",   required_argument,  &opt[VRF_OPT_IND],      1},
+    [TYPE_OPT_IND]      = {"type",  required_argument,  &opt[TYPE_OPT_IND],     1},
+    [SIP_OPT_IND]       = {"sip",   required_argument,  &opt[SIP_OPT_IND],      1},
+    [DIP_OPT_IND]       = {"dip",   required_argument,  &opt[DIP_OPT_IND],      1},
+    [POL_OPT_IND]       = {"pol",   no_argument,        &opt[POL_OPT_IND],      1},
+    [RPOL_OPT_IND]      = {"rpol",  no_argument,        &opt[RPOL_OPT_IND],     1},
+    [SPORT_OPT_IND]     = {"sport", required_argument,  &opt[SPORT_OPT_IND],    1},
+    [DPORT_OPT_IND]     = {"dport", required_argument,  &opt[DPORT_OPT_IND],    1},
+    [UDP_OPT_IND]       = {"udp",   no_argument,        &opt[UDP_OPT_IND],      1},
+    [VXLAN_OPT_IND]     = {"vxlan", no_argument,        &opt[VXLAN_OPT_IND],    1},
+    [CNI_OPT_IND]       = {"cni",   required_argument,  &opt[CNI_OPT_IND],      1},
+    [CMP_OPT_IND]       = {"cmp",   no_argument,        &opt[CMP_OPT_IND],      1},
+    [CL3_OPT_IND]       = {"cl3",   no_argument,        &opt[CL3_OPT_IND],      1},
+    [CL2_OPT_IND]       = {"cl2",   no_argument,        &opt[CL2_OPT_IND],      1},
+    [CFA_OPT_IND]       = {"cfa",   no_argument,        &opt[CFA_OPT_IND],      1},
+    [MC_OPT_IND]        = {"mc",    no_argument,        &opt[MC_OPT_IND],       1},
+    [EL2_OPT_IND]       = {"el2",   no_argument,        &opt[EL2_OPT_IND],      1},
+    [LBL_OPT_IND]       = {"lbl",   required_argument,  &opt[LBL_OPT_IND],      1},
+    [LST_OPT_IND]       = {"list",  no_argument,        &opt[LST_OPT_IND],      1},
+    [GET_OPT_IND]       = {"get",   required_argument,  &opt[GET_OPT_IND],      1},
+    [CRT_OPT_IND]       = {"create", required_argument, &opt[CRT_OPT_IND],      1},
+    [DEL_OPT_IND]       = {"delete", required_argument, &opt[DEL_OPT_IND],      1},
+    [CMD_OPT_IND]       = {"cmd",   no_argument,        &opt[CMD_OPT_IND],      1},
+    [HLP_OPT_IND]       = {"help",  no_argument,        &opt[HLP_OPT_IND],      1},
+    [MAX_OPT_IND]       = { NULL,   0,                  0,                      0}
 };
 
 static void
