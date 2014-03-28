@@ -423,8 +423,13 @@ vr_flow_nat(unsigned short vrf, struct vr_flow_entry *fe, struct vr_packet *pkt,
         }
     }
 
+#ifdef VROUTER_CONFIG_DIAG
     if (ip->ip_csum != VR_DIAG_IP_CSUM)
         vr_ip_update_csum(pkt, ip_inc, inc);
+#else
+    vr_ip_update_csum(pkt, ip_inc, inc);
+#endif
+
 
     /*
      * If VRF is translated lets chose a new nexthop
@@ -708,16 +713,24 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
            /* no flow lookup for multicast or broadcast ip */
            res = VR_FLOW_BYPASS;
            pkt->vp_flags |= VP_FLAG_MULTICAST | VP_FLAG_FLOW_SET;
-        }
 
-        proto_port = (key->key_proto << VR_FLOW_PROTO_SHIFT) |
-                                                key->key_dst_port;
-        if (proto_port == VR_UDP_DHCP_SPORT ||
-                proto_port == VR_UDP_DHCP_CPORT) {
-            res = VR_FLOW_TRAP;
-            pkt->vp_flags |= VP_FLAG_FLOW_SET;
-            if (trap_res)
-                *trap_res = AGENT_TRAP_L3_PROTOCOLS;
+           /*
+            * dhcp packet handling:
+            *
+            * for now we handle dhcp requests from only VMs and that too only
+            * for VMs that are not in the fabric VRF. dhcp refresh packets will
+            * anyway hit the route entry and get trapped from there.
+            */
+            if (vif_is_virtual(pkt->vp_if)) {
+                proto_port = (key->key_proto << VR_FLOW_PROTO_SHIFT) |
+                    key->key_src_port;
+                if (proto_port == VR_UDP_DHCP_CPORT) {
+                    res = VR_FLOW_TRAP;
+                    pkt->vp_flags |= VP_FLAG_FLOW_SET;
+                    if (trap_res)
+                        *trap_res = AGENT_TRAP_L3_PROTOCOLS;
+                }
+            }
         }
     }
 
@@ -839,7 +852,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
         if (!vif || (pkt->vp_if != vif)) {
             vr_pfree(pkt, VP_DROP_INVALID_IF);
-            continue;
+            goto loop_continue;
         }
 
         if (!pkt->vp_nh) {
@@ -852,6 +865,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         vr_flow_action(router, fe, flmd->flmd_index, pkt,
                 pnode->pl_proto, fmd);
 
+loop_continue:
         head = pnode->pl_node.node_n;
         vr_free(pnode);
     }

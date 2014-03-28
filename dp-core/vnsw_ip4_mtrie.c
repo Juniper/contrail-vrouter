@@ -251,7 +251,8 @@ mtrie_reset_entry(struct ip4_bucket_entry *ent, int level,
         set_entry_to_nh(ent, nh);
 
     /* wait for all cores to see it */
-    vr_delay_op();
+    if (!vr_not_ready)
+        vr_delay_op();
 
     /* ...and then work with the copy */
     mtrie_free_entry(&cp_ent, level);
@@ -358,7 +359,9 @@ ip4_bucket_sched_for_free(struct ip4_bucket *bkt, int level)
     unsigned int i;
     struct ip4_bucket_entry *tmp_ent;
 
-    vr_delay_op();
+    if (!vr_not_ready)
+        vr_delay_op();
+
     for (i = 0; i < ip4_bkt_info[level].bi_size; i++) {
         tmp_ent = &bkt->bkt_data[i];
         if (tmp_ent->entry_nh_p) {
@@ -661,6 +664,8 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_gre_mpls_tunnels  += stats->vrf_gre_mpls_tunnels;
             response->vsr_l2_encaps += stats->vrf_l2_encaps;
             response->vsr_encaps += stats->vrf_encaps;
+            response->vsr_gros += stats->vrf_gros;
+            response->vsr_diags += stats->vrf_diags;
         }
     }
 
@@ -675,7 +680,8 @@ mtrie_stats_empty(vr_vrf_stats_req *r)
             r->vsr_l2_mcast_composites || r->vsr_fabric_composites ||
             r->vsr_multi_proto_composites || r->vsr_udp_tunnels || 
             r->vsr_udp_mpls_tunnels || r->vsr_gre_mpls_tunnels || 
-            r->vsr_l2_encaps || r->vsr_encaps)
+            r->vsr_l2_encaps || r->vsr_encaps || r->vsr_gros ||
+            r->vsr_diags)
         return false;
 
     return true;
