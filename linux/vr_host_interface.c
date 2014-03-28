@@ -19,6 +19,10 @@
 #include <linux/if_bridge.h>
 #endif
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32)) && defined (CONFIG_XEN)
+#include <linux/netpoll.h>
+#endif
+
 #include <net/rtnetlink.h>
 #include "vrouter.h"
 #include "vr_packet.h"
@@ -1629,6 +1633,51 @@ vif_from_napi(struct napi_struct *napi)
     return vif;
 }
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32)) && defined (CONFIG_XEN)
+
+static void
+gro_list_prepare(struct napi_struct *napi, struct sk_buff *skb)
+{
+    struct sk_buff *p;
+    unsigned int maclen = skb->dev->hard_header_len;
+
+    for (p = napi->gro_list; p; p = p->next) {
+        unsigned long diffs;
+
+        NAPI_GRO_CB(p)->flush = 0;
+
+        diffs = (unsigned long)p->dev ^ (unsigned long)skb->dev;
+        diffs |= p->vlan_tci ^ skb->vlan_tci;
+        if (maclen == ETH_HLEN)
+                diffs |= compare_ether_header(skb_mac_header(p),
+                                              skb_gro_mac_header(skb));
+        else if (!diffs)
+                diffs = memcmp(skb_mac_header(p),
+                               skb_gro_mac_header(skb),
+                               maclen);
+        NAPI_GRO_CB(p)->same_flow = !diffs;
+    }
+}
+
+static int
+__contr_napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
+{
+        if (netpoll_rx_on(skb))
+                return GRO_NORMAL;
+
+	gro_list_prepare(napi, skb);
+        return dev_gro_receive(napi, skb);
+}
+
+static int
+contr_napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
+{
+	skb_gro_reset_offset(skb);
+	return napi_skb_finish(__contr_napi_gro_receive(napi, skb), skb);
+}
+
+#endif
+
 /*
  * vr_napi_poll - NAPI poll routine to receive packets and perform
  * GRO.
@@ -1654,7 +1703,11 @@ vr_napi_poll(struct napi_struct *napi, int budget)
     while ((skb = skb_dequeue(&vif->vr_skb_inputq))) {
         vr_skb_set_rxhash(skb, 0);
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32)) && defined (CONFIG_XEN)
+	ret = contr_napi_gro_receive(napi, skb);
+#else
         ret = napi_gro_receive(napi, skb);
+#endif
         if (ret == NET_RX_DROP) {
             if (gro_vif_stats)
                 gro_vif_stats->vis_ierrors++;
