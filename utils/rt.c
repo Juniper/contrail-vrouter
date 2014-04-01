@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <malloc.h>
 #include <stdbool.h>
+#include <getopt.h>
 
 #include <asm/types.h>
 
@@ -37,13 +38,60 @@
 static struct nl_client *cl;
 static int resp_code;
 static vr_route_req rt_req;
-static bool proxy_set = false;
+static bool cmd_proxy_set = false;
+
+static int cmd_set, dump_set;
+static int family_set, help_set;
+static int table_set;
+
+static int cmd_prefix_set;
+static int cmd_dst_mac_set;
+
+static int cmd_vrf_id = -1, cmd_family_id;
+static int cmd_op = -1;
+
+static int cmd_nh_id = -1;
+static uint32_t cmd_prefix = 0, cmd_plen = 0, cmd_src = 0xffffffff;
+static int32_t cmd_label;
+static int cmd_rt_type = RT_UCAST;
+static uint32_t cmd_replace_plen = 100;
+static char cmd_dst_mac[6];
+
+static void Usage(void);
+static void usage_internal(void);
+
+#define INET_FAMILY_STRING      "inet"
+#define BRIDGE_FAMILY_STRING    "bridge"
+
+#define UCST_TABLE_STRING       "ucst"
+#define MCST_TABLE_STRING       "mcst"
+
+static int
+table_string_to_id(char *tname)
+{
+    if (!strncmp(tname, UCST_TABLE_STRING, strlen(UCST_TABLE_STRING)))
+        return RT_UCAST;
+    else if (!strncmp(tname, MCST_TABLE_STRING, strlen(MCST_TABLE_STRING)))
+        return RT_MCAST;
+    return -1;
+}
+static int
+family_string_to_id(char *fname)
+{
+    if (!strncmp(fname, INET_FAMILY_STRING, strlen(INET_FAMILY_STRING)))
+        return AF_INET;
+    else if (!strncmp(fname, BRIDGE_FAMILY_STRING, strlen(BRIDGE_FAMILY_STRING)))
+        return AF_BRIDGE;
+
+    return -1;
+}
 
 void
 vr_route_req_process(void *s_req)
 {
     int ret, i;
     struct in_addr addr;
+    char flags[4];
     vr_route_req *rt = (vr_route_req *)s_req;
 
     rt_req.rtr_marker = rt->rtr_prefix;
@@ -64,23 +112,46 @@ vr_route_req_process(void *s_req)
     if (rt->rtr_family == AF_INET) {
         if (rt->rtr_rt_type == RT_UCAST) {
             addr.s_addr = htonl(rt->rtr_prefix);
-            ret = printf("%s/%-2d	%-2d", inet_ntoa(addr), rt->rtr_prefix_len, rt->rtr_replace_plen);
-
-            for (i = ret; i < 20; i++)
+            ret = printf("%s/%-2d", inet_ntoa(addr), rt->rtr_prefix_len);
+            for (i = ret; i < 21; i++)
                 printf(" ");
-            printf("%5d        ", rt->rtr_label_flags);
+
+            printf("  ");
+            printf("%4d", rt->rtr_replace_plen);
+
+            for (i = 0; i < 8; i++)
+                printf(" ");
+
+            bzero(flags, sizeof(flags));
             if (rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
-                printf("%5d        ", rt->rtr_label);
+                strcat(flags, "L");
+            if (rt->rtr_label_flags & VR_RT_HOSTED_FLAG)
+                strcat(flags, "H");
+
+            printf("%5s", flags);
+
+            for (i = 0; i < 8; i++)
+                printf(" ");
+
+            if (rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
+                printf("%5d", rt->rtr_label);
             else
-                printf("%5c        ", '-');
+                printf("%5c", '-');
+
+            for (i = 0; i < 8; i++)
+                printf(" ");
+
             printf("%7d", rt->rtr_nh_id);
             printf("\n");
         } else {
             addr.s_addr = htonl(rt->rtr_src);
-            printf("%s, ", inet_ntoa(addr));
+            ret = printf("%s,", inet_ntoa(addr));
             addr.s_addr = htonl(rt->rtr_prefix);
-            printf("%s    ", inet_ntoa(addr));
-            printf("%8d", rt->rtr_nh_id);
+            ret += printf("%s", inet_ntoa(addr));
+            for (i = ret; i < 33; i++)
+                printf(" ");
+            printf(" ");
+            printf("%7d", rt->rtr_nh_id);
             printf("\n");
         }
     } else {
@@ -142,7 +213,7 @@ vr_build_route_request(unsigned int op, int family, unsigned int prefix, unsigne
         rt_req.rtr_rt_type = rt_type;
         rt_req.rtr_replace_plen = replace_plen;
 
-        if (proxy_set)
+        if (cmd_proxy_set)
             rt_req.rtr_label_flags |= VR_RT_HOSTED_FLAG;
 
         if (family == AF_INET) {
@@ -244,26 +315,25 @@ vr_do_route_op(int op)
 }
 
 static int 
-vr_route_op(int opt, int family, uint32_t prefix, uint32_t len, 
-                uint32_t nh_id, uint32_t vrf_id, int32_t label, 
-                uint32_t rt_type, uint32_t src, char *eth, uint32_t replace_plen)
+vr_route_op(void)
 {
     vr_route_req *req;
     int ret;
 
-    req = vr_build_route_request(opt, family, prefix, len, nh_id,
-            vrf_id, label, rt_type, src, eth, replace_plen);
+    req = vr_build_route_request(cmd_op, cmd_family_id, cmd_prefix, cmd_plen,
+            cmd_nh_id, cmd_vrf_id, cmd_label, cmd_rt_type,
+            cmd_src, cmd_dst_mac, cmd_replace_plen);
     if (!req)
         return -errno;
 
-    if (opt == SANDESH_OP_DUMP) {
-        if (family == AF_INET) {
-            if (rt_type == RT_UCAST) {
-                printf("Kernel IP routing table %d/%d/unicast\n", req->rtr_rid, vrf_id);
-                printf("Destination	PrefixLen         Flags        Label          Nexthop\n");
+    if (cmd_op == SANDESH_OP_DUMP) {
+        if (cmd_family_id == AF_INET) {
+            if (cmd_rt_type == RT_UCAST) {
+                printf("Kernel IP routing table %d/%d/unicast\n", req->rtr_rid, cmd_vrf_id);
+                printf("Destination	        PPL        Flags        Label        Nexthop\n");
             } else {
-                printf("Kernel IP routing table %d/%d/multicast\n", req->rtr_rid, vrf_id);
-                printf("(Src,Group)             Nexthop\n");
+                printf("Kernel IP routing table %d/%d/multicast\n", req->rtr_rid, cmd_vrf_id);
+                printf("(Src,Group)                       Nexthop\n");
             }
         } else {
                 printf("Kernel L2 Bridge table %d\n", req->rtr_rid);
@@ -275,17 +345,17 @@ vr_route_op(int opt, int family, uint32_t prefix, uint32_t len,
     if (ret < 0)
         return ret;
 
-    vr_do_route_op(opt);
+    vr_do_route_op(cmd_op);
 
     return 0;
 }
 
-void
-usage()
+static void
+usage_internal()
 {
     printf("Usage: c - create\n"
            "       d - delete\n"
-           "       b - dummp\n"
+           "       b - dump\n"
            "       n <nhop_id> \n"
            "       p <prefix in dotted decimal form> \n"
            "       P <do proxy arp for this route> \n"
@@ -295,122 +365,273 @@ usage()
            "       e <mac address in : format>\n"
            "       r <replacement route preifx length for delete>\n"
            "       v <vrfid>\n");
+
+    exit(1);
+}
+
+static void
+validate_options(void)
+{
+    unsigned int set = dump_set + family_set + cmd_set + help_set;
+
+    if (cmd_op < 0)
+        goto usage;
+
+    switch (cmd_op) {
+    case SANDESH_OP_DUMP:
+        if (cmd_vrf_id < 0)
+            goto usage;
+
+        if (set > 1 && !family_set)
+            goto usage;
+
+        if (cmd_family_id == AF_BRIDGE &&
+                cmd_rt_type == RT_MCAST) {
+            printf("There is no separate multicast table\n");
+            Usage();
+        }
+
+        break;
+
+    case SANDESH_OP_DELETE:
+        if (cmd_family_id == AF_INET) {
+            if (cmd_rt_type == RT_UCAST) {
+                if ((cmd_replace_plen < 0 || cmd_replace_plen > 32)) {
+                    goto usage_internal;
+                }
+
+                if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
+                    goto usage_internal;
+            }
+        } else if (cmd_family_id == AF_BRIDGE) {
+            if (!cmd_dst_mac_set || cmd_vrf_id < 0)
+                goto usage_internal;
+        }
+
+        break;
+
+    case SANDESH_OP_ADD:
+        if (cmd_family_id == AF_INET) {
+            if (cmd_rt_type == RT_UCAST) {
+                if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
+                    goto usage_internal;
+            }
+        } else if (cmd_family_id == AF_BRIDGE) {
+            if (!cmd_dst_mac_set || cmd_vrf_id < 0 || cmd_nh_id < 0)
+                goto usage_internal;
+        }
+
+        break;
+
+    default:
+        goto usage_internal;
+    }
+
+    return;
+
+usage:
+    Usage();
+    return;
+
+usage_internal:
+    usage_internal();
+    return;
+}
+
+enum opt_flow_index {
+    COMMAND_OPT_INDEX,
+    DUMP_OPT_INDEX,
+    FAMILY_OPT_INDEX,
+    HELP_OPT_INDEX,
+    TABLE_OPT_INDEX,
+    MAX_OPT_INDEX,
+};
+
+static struct option long_options[] = {
+    [COMMAND_OPT_INDEX]   = {"cmd",    no_argument,       &cmd_set,    1},
+    [DUMP_OPT_INDEX]      = {"dump",   required_argument, &dump_set,   1},
+    [FAMILY_OPT_INDEX]    = {"family", required_argument, &family_set, 1},
+    [HELP_OPT_INDEX]      = {"help",   no_argument,       &help_set,   1},
+    [TABLE_OPT_INDEX]     = {"table",  required_argument, &table_set,  1},
+    [MAX_OPT_INDEX]       = { NULL,    0,                 0,           0},
+};
+
+static void
+Usage(void)
+{
+    printf("Usage:   rt --dump <vrf_id> [--family <inet|bridge>][--table <ucst|mcst>\n");
+    printf("         rt --help\n");
+    printf("\n");
+    printf("--dump   Dumps the routing table corresponding to vrf_id\n");
+    printf("--family Optional family specification to --dump command\n");
+    printf("         Specification should be one of \"inet\" or \"bridge\"\n");
+    printf("--table  Specify the type of the table to dump. Valid only for inet\n");
+    printf("         Type can be one of \"ucst\" or \"mcst\"\n");
+    printf("--help   Prints this help message\n");
+
+    exit(1);
+}
+
+static void
+parse_long_opts(int opt_flow_index, char *opt_arg)
+{
+    errno = 0;
+    switch (opt_flow_index) {
+    case COMMAND_OPT_INDEX:
+        usage_internal();
+        break;
+
+    case DUMP_OPT_INDEX:
+        cmd_op = SANDESH_OP_DUMP;
+        cmd_vrf_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case FAMILY_OPT_INDEX:
+        cmd_family_id = family_string_to_id(opt_arg);
+        if (cmd_family_id != AF_INET &&
+                cmd_family_id != AF_BRIDGE)
+            Usage();
+        break;
+
+    case TABLE_OPT_INDEX:
+        cmd_rt_type = table_string_to_id(opt_arg);
+        if (cmd_rt_type != RT_UCAST &&
+                cmd_rt_type != RT_MCAST)
+            Usage();
+        break;
+
+    case HELP_OPT_INDEX:
+    default:
+        Usage();
+    }
+
+    return;
 }
 
 int main(int argc, char *argv[])
 {
     int ret;
     int opt;
-    int op = 0;
-    int nh_id, vrf_id;
-    uint32_t prefix = 0, plen = 0, src = 0xffffffff;
-    int32_t label;
-    int rt_type = RT_UCAST;
-    struct ether_addr *eth;
-    char dst_mac[6] = {0,0,0,0,0,0};
-    int family;
-    uint32_t replace_plen = 100;
+    int option_index;
+    struct ether_addr *cmd_eth;
 
-    cl = nl_register_client();
-    if (!cl) {
-        exit(1);
-    }
+    cmd_nh_id = -255;
+    cmd_label = -1;
+    cmd_family_id = AF_INET;
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
-    if (ret <= 0) {
-       exit(1);
-    }
-
-    if (vrouter_get_family_id(cl) <= 0) {
-        return -1;
-    }
-
-    vrf_id = 0;
-    nh_id = -255;
-    label = -1;
-    family = AF_INET;
-
-    while ((opt = getopt(argc, argv, "cdbmPn:p:l:v:t:s:e:f:r:")) != -1) {
+    while ((opt = getopt_long(argc, argv, "cdbmPn:p:l:v:t:s:e:f:r:",
+                    long_options, &option_index)) >= 0) { 
             switch (opt) {
             case 'c':
-                op = SANDESH_OP_ADD;
+                if (cmd_op >= 0) {
+                    usage_internal();
+                }
+                cmd_op = SANDESH_OP_ADD;
                 break;
 
             case 'd':
-                op = SANDESH_OP_DELETE;
+                if (cmd_op >= 0) {
+                    usage_internal();
+                }
+                cmd_op = SANDESH_OP_DELETE;
                 break;
 
             case 'b':
-                op = SANDESH_OP_DUMP;
-                src = 0;
+                if (cmd_op >= 0) {
+                    usage_internal();
+                }
+                cmd_op = SANDESH_OP_DUMP;
+                cmd_src = 0;
                 break;
 
             case 'v':
-                vrf_id = atoi(optarg);
+                cmd_vrf_id = atoi(optarg);
                 break;      
 
             case 'n':
-                nh_id = atoi(optarg);
+                cmd_nh_id = atoi(optarg);
                 break;
 
             case 'p':
-                prefix = inet_addr(optarg);
+                cmd_prefix = inet_addr(optarg);
+                cmd_prefix_set = 1;
                 break;
 
             case 'l':
-                plen = atoi(optarg);
+                cmd_plen = atoi(optarg);
                 break;
 
             case 'r':
-                replace_plen = atoi(optarg);
+                cmd_replace_plen = atoi(optarg);
                 break;
 
             case 't':
-                label = atoi(optarg);
+                cmd_label = atoi(optarg);
                 break;
 
             case 's':
-                src = inet_addr(optarg);
+                cmd_src = inet_addr(optarg);
                 break;
+
             case 'm':
-                rt_type = RT_MCAST;
+                cmd_rt_type = RT_MCAST;
                 break;
 
             case 'f':
-                family = atoi(optarg);
-                if (family == 0)
-                    family = AF_INET;
+                cmd_family_id = atoi(optarg);
+                if (cmd_family_id == 0)
+                    cmd_family_id = AF_INET;
                 else {
-                    family = AF_BRIDGE;
-                    rt_type = RT_UCAST;
+                    cmd_family_id = AF_BRIDGE;
+                    cmd_rt_type = RT_UCAST;
                 }
 
                 break;
 
             case 'e':
-                eth = ether_aton(optarg);
-                if (eth)
-                    memcpy(dst_mac, eth, 6);
+                cmd_eth = ether_aton(optarg);
+                if (cmd_eth)
+                    memcpy(cmd_dst_mac, cmd_eth, 6);
+                cmd_dst_mac_set = 1;
                 break;
 
             case 'P':
-                proxy_set = true;
+                cmd_proxy_set = true;
+                break;
+
+            case 0:
+                parse_long_opts(option_index, optarg);
                 break;
 
             case '?':
             default:
-                usage();
-                exit(1);
+                Usage();
+                break;
         }
     }
 
-    if ((op == SANDESH_OP_DELETE) && (replace_plen < 0 || replace_plen > 32)) {
-        usage();
+    validate_options();
+
+    cl = nl_register_client();
+    if (!cl) {
+        printf("nl_register_client failed\n");
         exit(1);
     }
 
-    vr_route_op(op, family, prefix, plen, nh_id, vrf_id, label, rt_type,
-            src, dst_mac, replace_plen);
+    ret = nl_socket(cl, NETLINK_GENERIC);    
+    if (ret <= 0) {
+        printf("nl_socket failed\n");
+        exit(1);
+    }
+
+    if (vrouter_get_family_id(cl) <= 0) {
+        printf("Unable to get vrouter family id\n");
+        return -1;
+    }
+
+    vr_route_op();
 
     return 0;
 }

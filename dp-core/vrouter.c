@@ -16,7 +16,7 @@ extern struct host_os *vrouter_get_host(void);
 extern int vr_stats_init(struct vrouter *);
 extern void vr_stats_exit(struct vrouter *, bool);
 
-bool vr_not_ready = true;
+volatile bool vr_not_ready = true;
 
 struct vr_module {
     char *mod_name;
@@ -262,7 +262,9 @@ vrouter_ops_process(void *s_req)
 
     switch (ops->h_op) {
     case SANDESH_OP_RESET:
+        vr_printf("vrouter soft reset start\n");
         ret = vrouter_soft_reset();        
+        vr_printf("vrouter soft reset done(%d)\n", ret);
         break;
     default:
         ret = -EOPNOTSUPP;

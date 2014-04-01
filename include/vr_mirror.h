@@ -11,6 +11,7 @@
 #define VR_MIRROR_PCAP 0x2
 
 struct vrouter;
+struct vr_packet;
 
 struct vr_mirror_entry {
     unsigned int mir_users:20;
@@ -20,12 +21,15 @@ struct vr_mirror_entry {
 };
 
 struct vr_mirror_meta_entry {
+    struct vrouter *mirror_router;
     void *mirror_md;
     unsigned int mirror_md_len;
     unsigned int mirror_sip;
     unsigned int mirror_sport;
     unsigned short mirror_vrf;
 };
+
+struct vr_forwarding_md;
 
 extern int vr_mirror_init(struct vrouter *);
 extern void vr_mirror_exit(struct vrouter *, bool);

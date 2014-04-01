@@ -40,6 +40,7 @@
 #define VIRTUAL_TYPE_STRING     "virtual"
 #define XEN_LL_TYPE_STRING      "xenll"
 #define GATEWAY_TYPE_STRING     "gateway"
+#define STATS_TYPE_STRING       "stats"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
@@ -77,6 +78,8 @@ vr_get_if_type_string(int t)
         return "XenLL";
     case VIF_TYPE_GATEWAY:
         return "Gateway";
+    case VIF_TYPE_STATS:
+        return "Stats";
     default:
         return "Invalid";
     }
@@ -105,6 +108,9 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, GATEWAY_TYPE_STRING,
                 strlen(GATEWAY_TYPE_STRING)))
         return VIF_TYPE_GATEWAY;
+    else if (!strncmp(type_str, STATS_TYPE_STRING,
+                strlen(STATS_TYPE_STRING)))
+        return VIF_TYPE_STATS;
     else
         Usage();
 
@@ -147,11 +153,22 @@ vr_vrf_assign_req_process(void *s)
     return;
 }
 
+static void
+vr_interface_print_header(void)
+{
+    int i;
+
+    for (i = 0; i < 12; i++)
+        printf(" ");
+    return;
+}
+
 void
 vr_interface_req_process(void *s)
 {
     char name[50];
     vr_interface_req *req = (vr_interface_req *)s;
+    unsigned int printed = 0;
 
     if (add_set)
         vr_ifindex = req->vifr_idx;
@@ -159,8 +176,11 @@ vr_interface_req_process(void *s)
     if (!get_set && !list_set)
         return;
 
-    printf("vif%d/%d\tOS: %s", req->vifr_rid, req->vifr_idx,
-            req->vifr_os_idx ? if_indextoname(req->vifr_os_idx, name): "NULL");
+    printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
+    for (; printed < 12; printed++)
+        printf(" ");
+    printf("OS: %s", req->vifr_os_idx ?
+            if_indextoname(req->vifr_os_idx, name): "NULL");
     if (req->vifr_speed >= 0) {
         printf(" (Speed %d,", req->vifr_speed);
         if (req->vifr_duplex >= 0)
@@ -169,16 +189,20 @@ vr_interface_req_process(void *s)
     }
     printf("\n");
 
-    printf("\tType:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
+    vr_interface_print_header();
+    printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
             vr_get_if_type_string(req->vifr_type),
             MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
-    printf("\tVrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
+    vr_interface_print_header();
+    printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
             req->vifr_mtu, req->vifr_ref_cnt);
-    printf("\tRX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
+    vr_interface_print_header();
+    printf("RX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_ipackets,
             req->vifr_ibytes, req->vifr_ierrors);
-    printf("\tTX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
+    vr_interface_print_header();
+    printf("TX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors);
     printf("\n");

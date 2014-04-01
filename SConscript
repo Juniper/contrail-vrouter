@@ -2,6 +2,7 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
+import subprocess
 import sys
 import os
 
@@ -20,6 +21,16 @@ env.Append(CPPPATH = ['#tools/sandesh/library/c'])
 vr_root = './'
 makefile = vr_root + 'Makefile'
 dp_dir = Dir(vr_root).srcnode().abspath
+
+
+def shellCommand(cmd):
+    """ Return the output of a shell command
+        This wrapper is required since check_output is not supported in
+        python 2.6
+    """
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    (output, _) = proc.communicate()
+    return output.strip()
 
 if sys.platform != 'darwin':
     subdirs = ['dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
@@ -59,6 +70,20 @@ if sys.platform != 'darwin':
 
     if GetOption('clean'):
         os.system('cd ' + dp_dir + '; make clean')
+
+    libmod_dir = GetOption('install_root')
+    if libmod_dir == None:
+        libmod_dir = ''
+
+    if GetOption('kernel-dir'):
+        kern_version = shellCommand(
+            'cat %s/include/config/kernel.release' % GetOption('kernel-dir'))
+    else:
+        kern_version = shellCommand('uname -r')
+
+    kern_version = kern_version.strip()
+    libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
+    env.Alias('install', env.Install(libmod_dir, kern))
 
 # Local Variables:
 # mode: python

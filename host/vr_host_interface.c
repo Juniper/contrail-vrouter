@@ -346,6 +346,12 @@ struct vr_host_interface_ops vr_lib_interface_ops = {
 };
 
 void
+vr_host_vif_init(struct vrouter *router)
+{
+    return;
+}
+
+void
 vr_host_interface_exit(void)
 {
     return;

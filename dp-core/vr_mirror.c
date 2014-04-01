@@ -44,7 +44,10 @@ vrouter_put_mirror(struct vrouter *router, unsigned int index)
 
     if (!--mirror->mir_users) {
         router->vr_mirrors[index] = NULL;
-        vr_delay_op();    
+
+        if (!vr_not_ready)
+            vr_delay_op();
+
         vrouter_put_nexthop(mirror->mir_nh);
         vr_free(mirror);
     }
@@ -99,6 +102,7 @@ vr_mirror_change(struct vr_mirror_entry *mirror, vr_mirror_req *req,
         mirror->mir_users++;
     }
 
+    mirror->mir_flags |= req->mirr_flags;
     mirror->mir_nh = nh_new;
     vrouter_put_nexthop(nh_old);
 
@@ -124,6 +128,8 @@ vr_mirror_add(vr_mirror_req *req)
         goto generate_resp;
     }
 
+    req->mirr_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
+
     nh = vrouter_get_nexthop(req->mirr_rid, req->mirr_nhid);
     if (!nh)  {
         ret = -EINVAL;
@@ -138,6 +144,7 @@ vr_mirror_add(vr_mirror_req *req)
         mirror->mir_users++;
         mirror->mir_nh = nh;
         mirror->mir_rid = req->mirr_rid;
+        mirror->mir_flags = req->mirr_flags;
         router->vr_mirrors[req->mirr_index] = mirror;
     }
 
@@ -256,14 +263,50 @@ vr_mirror_req_process(void *s_req)
 }
 
 static void
+vr_mirror_meta_destroy(struct vr_mirror_meta_entry *me)
+{
+    if (!me)
+        return;
+
+    if (me->mirror_md)
+        vr_free(me->mirror_md);
+
+    vr_free(me);
+    return;
+}
+
+static void
+vr_mirror_meta_destructor(struct vrouter *router, void *arg)
+{
+    struct vr_defer_data *defer = (struct vr_defer_data *)arg;
+    struct vr_mirror_meta_entry *me;
+
+    if (!defer)
+        return;
+
+    me = (struct vr_mirror_meta_entry *)defer->vdd_data;
+    vr_mirror_meta_destroy(me);
+
+    return;
+}
+
+static void
 vr_mirror_meta_entry_destroy(unsigned int index, void *arg)
 {
     struct vr_mirror_meta_entry *me = (struct vr_mirror_meta_entry *)arg;
+    struct vr_defer_data *defer;
+
     if (me && me != VR_ITABLE_ERR_PTR) {
-        vr_delay_op();
-        if (me->mirror_md)
-            vr_free(me->mirror_md);
-        vr_free(me);
+        if (!vr_not_ready) {
+            defer = vr_get_defer_data(sizeof(*defer));
+            if (!defer) {
+                vr_delay_op();
+                vr_mirror_meta_destroy(me);
+                return;
+            }
+            defer->vdd_data = (void *)me;
+            vr_defer(me->mirror_router, vr_mirror_meta_destructor, (void *)defer);
+        }
     }
 
     return;
@@ -289,6 +332,7 @@ vr_mirror_meta_entry_set(struct vrouter *router, unsigned int index,
     }
 
     memcpy(buf, meta_data, meta_data_len);
+    me->mirror_router = router;
     me->mirror_md = buf;
     me->mirror_md_len = meta_data_len;
     me->mirror_sip = mir_sip;

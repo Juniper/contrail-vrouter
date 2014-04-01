@@ -101,7 +101,7 @@ vr_handle_arp_request(struct vrouter *router, unsigned short vrf,
         vif->vif_tx(vif, pkt);
     } else {
         /* requests for which vr doesn't have to do anything */
-        vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        vr_pfree(pkt, VP_DROP_ARP_NOT_ME);
     }
 
     return 0;
