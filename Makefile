@@ -3,18 +3,18 @@
 #
 
 ifneq ($(KERNELRELEASE), )
-	PREFIX ?= ./
-	SANDESH_ROOT ?= $(src)/
-	BUILD_DIR ?= $(src)/
+	SANDESH_SRC_ROOT ?= ./
+	SANDESH_HEADER_PATH ?= $(src)/
+	SANDESH_EXTRA_HEADER_PATH ?= $(src)/
 
-	SANDESH_BINS := $(PREFIX)/sandesh/gen-c/vr_types.o
+	SANDESH_BINS := $(SANDESH_SRC_ROOT)/sandesh/gen-c/vr_types.o
 
-	SANDESH_LIB_BINS := $(PREFIX)/sandesh/library/c/sandesh.o 
-	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/protocol/thrift_protocol.o 
-	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/protocol/thrift_binary_protocol.o
-	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_transport.o
-	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_memory_buffer.o
-	SANDESH_LIB_BINS += $(PREFIX)/sandesh/library/c/transport/thrift_fake_transport.o
+	SANDESH_LIB_BINS := $(SANDESH_SRC_ROOT)/sandesh/library/c/sandesh.o
+	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/protocol/thrift_protocol.o
+	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/protocol/thrift_binary_protocol.o
+	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/transport/thrift_transport.o
+	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/transport/thrift_memory_buffer.o
+	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/transport/thrift_fake_transport.o
 
 	obj-m := vrouter.o
 	vrouter-y += $(SANDESH_BINS)
@@ -30,15 +30,18 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += dp-core/vr_datapath.o dp-core/vr_interface.o
 	vrouter-y += dp-core/vr_packet.o dp-core/vr_proto_ip.o
 	vrouter-y += dp-core/vr_mpls.o dp-core/vnsw_ip4_mtrie.o
-	vrouter-y += dp-core/vr_response.o dp-core/vr_flow.o 
+	vrouter-y += dp-core/vr_response.o dp-core/vr_flow.o
 	vrouter-y += dp-core/vr_mirror.o dp-core/vr_vrf_assign.o
 	vrouter-y += dp-core/vr_index_table.o dp-core/vr_mcast.o
 	vrouter-y += dp-core/vr_stats.o dp-core/vr_btable.o
 	vrouter-y += dp-core/vr_bridge.o dp-core/vr_htable.o
 	vrouter-y += dp-core/vr_vxlan.o dp-core/vr_fragment.o
 
-	ccflags-y += -I$(src)/include -I$(BUILD_DIR)/sandesh/gen-c -I$(SANDESH_ROOT) -I$(SANDESH_ROOT)/sandesh/library/c -g
-	ccflags-y += -I$(src)/sandesh/gen-c/ -Wall 
+	ccflags-y += -I$(src)/include -I$(SANDESH_HEADER_PATH)/sandesh/gen-c
+	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)
+	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)/sandesh/library/c
+	ccflags-y += -g -Wall
+
 	ifeq ($(shell uname -r | grep 2.6.32|grep -c openstack),1)
 		ccflags-y += -DISRHOSKERNEL
 	endif
