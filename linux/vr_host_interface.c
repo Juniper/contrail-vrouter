@@ -1409,6 +1409,13 @@ static void
 pkt_gro_dev_setup(struct net_device *dev)
 {
     /*
+     * Initializing the interfaces with basic parameters to setup address
+     * families.
+     */
+    random_ether_addr(dev->dev_addr);
+    dev->addr_len = ETH_ALEN;
+
+    /*
      * The hard header length is used by the GRO code to compare the
      * MAC header of the incoming packet with the MAC header of packets
      * undergoing GRO at the moment. In our case, each vif will have a
@@ -1431,6 +1438,13 @@ pkt_gro_dev_setup(struct net_device *dev)
 static void
 pkt_rps_dev_setup(struct net_device *dev)
 {
+    /*
+     * Initializing the interfaces with basic parameters to setup address
+     * families.
+     */
+    random_ether_addr(dev->dev_addr);
+    dev->addr_len = ETH_ALEN;
+
     dev->hard_header_len = ETH_HLEN;
 
     dev->type = ARPHRD_VOID;
