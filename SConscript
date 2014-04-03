@@ -43,7 +43,10 @@ if sys.platform != 'darwin':
     make_cmd = 'make'
     if GetOption('kernel-dir'):
         make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
-    make_cmd += ' BUILD_DIR=' + Dir(env['TOP']).abspath
+    make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
+    make_cmd += ' SANDESH_SRC_ROOT=' + '../build/kbuild/'
+    make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#tools/').abspath
+
     kern = env.Command('vrouter.ko', makefile, make_cmd, chdir=dp_dir)
     env.Default('vrouter.ko')
 
@@ -66,7 +69,7 @@ if sys.platform != 'darwin':
                 env['TOP'] + '/tools/sandesh/library/c/' + src))
 
     if GetOption('clean'):
-        os.system('cd ' + dp_dir + '; make clean')
+        os.system('cd ' + dp_dir + ';' + make_cmd + ' clean')
 
     libmod_dir = GetOption('install_root')
     if libmod_dir == None:
