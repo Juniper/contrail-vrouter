@@ -2,21 +2,52 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
+#
+# This Makefile is used in a couple of contexts. One context is is obviously
+# when you compile the vrouter module from the repository. Another context
+# is when the sources get distributed as a package (for e.g.: dkms).
+#
+# In the second context, all sandesh source files needed for compilation will
+# be under the sandesh/ directory.
+#
+# 'SANDESH_SRC_ROOT' points to where the make can find the sandesh files
+# needed for compiling the module. If not set by command line, path will be
+# relative.
+#
+# 'SANDESH_HEADER_PATH' will point to a place where we can find most of the
+# header files needed for compilation of sandesh sources whereas
+#
+# 'SANDESH_EXTRA_HEADER_PATH' points to a place where additional header files
+# can be found
+#
+# When the sources are ditributed, the sandesh compiler will not be present
+# and hence the generated files (vr_types.c,h) will be packaged rather than
+# the vr.sandesh file. Hence, the makefile in the sandesh directory is not
+# packaged
+#
+# Since we want standalone make to work when the source is distributed, default
+# values will point to the vrouter source root and when invoked from 'scons',
+# the parent 'SConscript' will provide the paths through command line arguments
+#
+# Also, please note that if you add more source files, you will also need to
+# add those files in RPM spec file and the rules file in the dkms package
+#
+
+SANDESH_HEADER_PATH ?= $(src)/
+SANDESH_EXTRA_HEADER_PATH ?= $(src)/
+
+SANDESH_BINS := $(SANDESH_SRC_ROOT)/sandesh/gen-c/vr_types.o
+
+SANDESH_LIB_BINS := $(SANDESH_SRC_ROOT)sandesh/library/c/sandesh.o
+SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/protocol/thrift_protocol.o
+SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/protocol/thrift_binary_protocol.o
+SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_transport.o
+SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_memory_buffer.o
+SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_fake_transport.o
+
 ifneq ($(KERNELRELEASE), )
-	SANDESH_SRC_ROOT ?= ./
-	SANDESH_HEADER_PATH ?= $(src)/
-	SANDESH_EXTRA_HEADER_PATH ?= $(src)/
-
-	SANDESH_BINS := $(SANDESH_SRC_ROOT)/sandesh/gen-c/vr_types.o
-
-	SANDESH_LIB_BINS := $(SANDESH_SRC_ROOT)/sandesh/library/c/sandesh.o
-	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/protocol/thrift_protocol.o
-	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/protocol/thrift_binary_protocol.o
-	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/transport/thrift_transport.o
-	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/transport/thrift_memory_buffer.o
-	SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)/sandesh/library/c/transport/thrift_fake_transport.o
-
 	obj-m := vrouter.o
+
 	vrouter-y += $(SANDESH_BINS)
 	vrouter-y += $(SANDESH_LIB_BINS)
 
@@ -50,14 +81,17 @@ else
 	PWD := $(shell pwd)
 
 default:
-	$(MAKE) -C $(KERNELDIR) M=$(PWD) ${ARGS} modules
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 clean:
 	$(RM) cscope* tags
 ifneq ($(wildcard sandesh/Makefile), )
 	$(MAKE) --quiet -C sandesh/ clean
 endif
-	$(MAKE) --quiet -C $(KERNELDIR) M=$(PWD) clean
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
+ifneq ($(SANDESH_SRC_ROOT),)
+	$(RM) $(SANDESH_BINS) $(SANDESH_LIB_BINS)
+endif
 
 cscope:
 	find -L . -name "*.[cChHyYSsmM]" > cscope.files

@@ -69,7 +69,7 @@ if sys.platform != 'darwin':
                 env['TOP'] + '/tools/sandesh/library/c/' + src))
 
     if GetOption('clean'):
-        os.system('cd ' + dp_dir + '; make clean')
+        os.system('cd ' + dp_dir + ';' + make_cmd + ' clean')
 
     libmod_dir = GetOption('install_root')
     if libmod_dir == None:
