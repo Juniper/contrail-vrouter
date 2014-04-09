@@ -9,6 +9,9 @@ import os
 AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
           help='Linux kernel source directory for vrouter.ko')
 
+AddOption('--system-header-path', dest = 'system-header-path', action='store',
+          help='Linux kernel headers for applications')
+
 env = DefaultEnvironment().Clone()
 VRouterEnv = env
 
