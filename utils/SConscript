@@ -7,6 +7,10 @@ env = VRouterEnv
  
 vr_root = '../'
 
+system_header_path = GetOption('system-header-path')
+if system_header_path:
+    env.Append(CPPPATH = system_header_path + '/include/')
+
 # CFLAGS
 env.Append(CCFLAGS = '-g')
 
