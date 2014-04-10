@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <time.h>
 
 #include <asm/types.h>
 
@@ -47,6 +48,7 @@ static int dvrf_set, mir_set, help_set;
 static unsigned short dvrf;
 static int flow_index, list, flow_cmd, mirror = -1;
 static int rate;
+static int stats;
 
 struct flow_table {
     struct vr_flow_entry *ft_entries;
@@ -177,6 +179,121 @@ flow_list(void)
 {
     dump_table(&main_table);
     return;
+}
+
+static void
+flow_stats(void)
+{
+    struct flow_table *ft = &main_table;
+    unsigned int i;
+    struct vr_flow_entry *fe;
+    struct timeval now;
+    struct timeval last_time;
+    int active_entries = 0;
+    int hold_entries = 0;
+    int prev_active_entries = 0;
+    int prev_hold_entries = 0;
+    int total_entries = 0;
+    int prev_total_entries = 0;
+    int diff_ms;
+    int rate;
+    int avg_setup_rate = 0;
+    int avg_teardown_rate = 0;
+    uint64_t setup_time = 0;
+    uint64_t teardown_time = 0;
+    int total_rate;
+    int flow_action_drop = 0;
+    int flow_action_fwd = 0;
+    int flow_action_nat = 0;
+
+    gettimeofday(&last_time, NULL);
+    while (1) {
+        active_entries = 0;
+        total_entries = 0;
+        hold_entries = 0;
+        flow_action_drop = 0;
+        flow_action_fwd = 0;
+        flow_action_nat = 0;
+        usleep(500000);
+        for (i = 0; i < ft->ft_num_entries; i++) {
+            fe = (struct vr_flow_entry *)((char *)ft->ft_entries +
+                                          (i * sizeof(*fe)));
+            if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
+                total_entries++;
+                if (fe->fe_action != VR_FLOW_ACTION_HOLD) {
+                    active_entries++;
+                } else {
+                    hold_entries++;
+                }
+                if (fe->fe_action == VR_FLOW_ACTION_DROP) {
+                    flow_action_drop++;
+                } else if (fe->fe_action == VR_FLOW_ACTION_FORWARD) {
+                    flow_action_fwd++;
+                } else if (fe->fe_action == VR_FLOW_ACTION_NAT) {
+                    flow_action_nat++;
+                }
+            }
+        }
+        gettimeofday(&now, NULL);
+        /* calc time difference and rate */
+        diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
+        diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
+        assert(diff_ms > 0 );
+        rate = (active_entries - prev_active_entries) * 1000;
+        rate /= diff_ms;
+        total_rate = (total_entries - prev_total_entries) * 1000;
+        total_rate /= diff_ms;
+        if (rate != 0 || total_rate != 0) {
+            if (rate < -1000) {
+                avg_teardown_rate = avg_teardown_rate * teardown_time -
+                    (active_entries - prev_active_entries) * 1000;
+                teardown_time += diff_ms;
+                avg_teardown_rate /= teardown_time;
+            }
+
+            if (rate > 1000) {
+                avg_setup_rate = avg_setup_rate * setup_time +
+                    (active_entries - prev_active_entries) * 1000;
+                setup_time += diff_ms;
+                avg_setup_rate /= setup_time;
+            }
+        }
+
+        system("clear");
+        struct tm *tm;
+        char fmt[64], buf[64];
+        if((tm = localtime(&now.tv_sec)) != NULL)
+        {
+            strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S %z", tm);
+            snprintf(buf, sizeof buf, fmt, now.tv_usec);
+            printf("%s\n", buf); 
+        }
+
+        printf("Flow Statistics\n");
+        printf("---------------\n");
+        printf("    Total  Entries  --- Total = %7d, new = %7d \n",
+                total_entries, (total_entries - prev_total_entries));
+        printf("    Active Entries  --- Total = %7d, new = %7d \n",
+                active_entries, (active_entries - prev_active_entries));
+        printf("    Hold   Entries  --- Total = %7d, new = %7d \n",
+                hold_entries, (hold_entries - prev_hold_entries));
+        printf("    Fwd flow Entries  - Total = %7d\n", flow_action_fwd);
+        printf("    drop flow Entries - Total = %7d\n", flow_action_drop);
+        printf("    NAT flow Entries  - Total = %7d\n\n", flow_action_nat);
+        printf("    Rate of change of Active Entries\n");
+        printf("    --------------------------------\n");
+        printf("        current rate      = %8d\n", rate);
+        printf("        Avg setup rate    = %8d\n", avg_setup_rate);
+        printf("        Avg teardown rate = %8d\n", avg_teardown_rate);
+        printf("    Rate of change of Flow Entries\n");
+        printf("    ------------------------------\n");
+        printf("        current rate      = %8d\n", total_rate);
+
+        last_time = now;
+        prev_active_entries = active_entries;
+        prev_total_entries = total_entries;
+        prev_hold_entries = hold_entries;
+    }
 }
 
 static void
@@ -425,6 +542,8 @@ Usage(void)
     printf("           [-i flow_index]\n");
     printf("           [--mirror=mirror table index]\n");
     printf("           [-l]\n");
+    printf("           [-r]\n");
+    printf("           [-s]\n");
     printf("\n");
 
     printf("-f <flow_index>\t Set forward action for flow at flow_index <flow_index>\n");
@@ -433,6 +552,7 @@ Usage(void)
     printf("--mirror\t mirror index to mirror to\n");
     printf("-l\t\t List all flows\n");
     printf("-r\t\t Start dumping flow setup rate\n");
+    printf("-s\t\t Start dumping flow stats\n");
     printf("--help\t\t Print this help\n");
 
     exit(-EINVAL);
@@ -455,7 +575,7 @@ static struct option long_options[] = {
 static void
 validate_options(void)
 {
-    if (!flow_index && !list && !rate)
+    if (!flow_index && !list && !rate && !stats)
         Usage();
 
     return;
@@ -493,7 +613,7 @@ main(int argc, char *argv[])
     int ret;
     int option_index;
 
-    while ((opt = getopt_long(argc, argv, "d:f:i:lr",
+    while ((opt = getopt_long(argc, argv, "d:f:i:lrs",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
@@ -509,6 +629,9 @@ main(int argc, char *argv[])
 
         case 'r':
             rate = 1;
+            break;
+        case 's':
+            stats = 1;
             break;
         case 0:
             parse_long_opts(option_index, optarg);
@@ -533,6 +656,8 @@ main(int argc, char *argv[])
         flow_list();
     else if (rate)
         flow_rate();
+    else if (stats)
+        flow_stats();
     else
         flow_validate(flow_index, flow_cmd);
 
