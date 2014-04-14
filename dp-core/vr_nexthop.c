@@ -347,7 +347,7 @@ nh_composite_ecmp(unsigned short vrf, struct vr_packet *pkt,
     if (stats)
         stats->vrf_ecmp_composites++;
 
-    if (!fmd || (fmd->fmd_ecmp_nh_index >= (short)nh->nh_component_cnt))
+    if (!fmd || (uint8_t)fmd->fmd_ecmp_nh_index >= nh->nh_component_cnt)
         goto drop;
 
     if (fmd->fmd_ecmp_nh_index >= 0)
