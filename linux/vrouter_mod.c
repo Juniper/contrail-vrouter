@@ -774,7 +774,7 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt)
         /*
          * Nothing to do if there are no TCP options
          */
-        return 0;
+        goto out;
     }
 
     pull_len += ((tcph->doff << 2) - (sizeof(struct tcphdr)));
@@ -806,11 +806,7 @@ lh_reset_skb_fields(struct vr_packet *pkt)
     pkt->vp_head = skb->head;
     pkt->vp_tail = skb_tail_pointer(skb) - skb->head;
     pkt->vp_end = skb_end_pointer(skb) - skb->head;
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
-    pkt->vp_len = skb->tail - pkt->vp_data;
-#else
     pkt->vp_len = pkt->vp_tail - pkt->vp_data;
-#endif
 
    return;
 }
