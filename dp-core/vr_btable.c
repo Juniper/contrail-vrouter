@@ -34,7 +34,7 @@
 struct vr_btable_partition *
 vr_btable_get_partition(struct vr_btable *table, unsigned int partition)
 {
-    if (partition >= VR_MAX_BTABLE_ENTRIES)
+    if (partition >= table->vb_partitions)
         return NULL;
 
     return &table->vb_table_info[partition];
@@ -71,12 +71,23 @@ vr_btable_free(struct vr_btable *table)
     if (!table)
         return;
 
-    for (i = 0; i < VR_MAX_BTABLE_ENTRIES; i++) {
-        if (table->vb_mem[i])
-            vr_page_free(table->vb_mem[i], table->vb_table_info[i].vb_mem_size);
+    if (table->vb_mem) {
+        for (i = 0; i < table->vb_partitions; i++) {
+            if (table->vb_mem[i]) {
+                vr_page_free(table->vb_mem[i],
+                        table->vb_table_info[i].vb_mem_size);
+            }
+        }
     }
 
+    if (table->vb_table_info)
+        vr_free(table->vb_table_info);
+
+    if (table->vb_mem)
+        vr_free(table->vb_mem);
+
     vr_free(table);
+
     return;
 }
 
@@ -84,23 +95,17 @@ struct vr_btable *
 vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
 {
     unsigned int i = 0, num_parts, remainder;
+    unsigned int total_parts;
     uint64_t total_mem;
     struct vr_btable *table;
     unsigned int offset = 0;
 
     total_mem = num_entries * entry_size;
-    /* need more testing. that's all */
-    if (total_mem > VR_KNOWN_BIG_MEM_LIMIT)
-        return NULL;
-
-    table = vr_zalloc(sizeof(*table));
-    if (!table)
-        return NULL;
 
     num_parts = total_mem / VR_SINGLE_ALLOC_LIMIT;
     remainder = total_mem % VR_SINGLE_ALLOC_LIMIT;
-    if (num_parts + !!remainder > VR_MAX_BTABLE_ENTRIES)
-        return NULL;
+
+    total_parts = num_parts + !!remainder;
 
     if (num_parts) {
         /*
@@ -112,6 +117,19 @@ vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
             return NULL;
     }
 
+    if (!total_parts)
+        return NULL;
+
+    table = vr_zalloc(sizeof(*table));
+    if (!table)
+        return NULL;
+
+    table->vb_mem = vr_zalloc(total_parts * sizeof(void *));
+    table->vb_table_info = vr_zalloc(total_parts *
+            sizeof(struct vr_btable_partition));
+    if (!table->vb_mem || !table->vb_table_info)
+        goto exit_alloc;
+
     if (num_parts) {
         for (i = 0; i < num_parts; i++) {
             table->vb_mem[i] = vr_page_alloc(VR_SINGLE_ALLOC_LIMIT);
@@ -120,8 +138,8 @@ vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
             table->vb_table_info[i].vb_mem_size = VR_SINGLE_ALLOC_LIMIT;
             table->vb_table_info[i].vb_offset = offset;
             offset += table->vb_table_info[i].vb_mem_size;
+            table->vb_partitions++;
         }
-        table->vb_partitions = num_parts;
     }
 
     if (remainder) {
