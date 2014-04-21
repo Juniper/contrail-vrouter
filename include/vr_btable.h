@@ -6,9 +6,7 @@
 #ifndef __VR_BTABLE_H__
 #define __VR_BTABLE_H__
 
-#define VR_MAX_BTABLE_ENTRIES   8
 #define VR_SINGLE_ALLOC_LIMIT   (4  * 1024 * 1024)
-#define VR_KNOWN_BIG_MEM_LIMIT  (32 * 1024 * 1024)
 
 struct vr_btable_partition {
     unsigned int vb_offset;
@@ -17,10 +15,10 @@ struct vr_btable_partition {
 
 struct vr_btable {
     unsigned int    vb_entries;
-    unsigned short    vb_esize;
-    unsigned short    vb_partitions;
-    void *vb_mem[VR_MAX_BTABLE_ENTRIES];
-    struct vr_btable_partition vb_table_info[VR_MAX_BTABLE_ENTRIES];
+    unsigned short  vb_esize;
+    unsigned short  vb_partitions;
+    void            **vb_mem;
+    struct vr_btable_partition *vb_table_info;
 };
 
 struct vr_btable_partition *vr_btable_get_partition(struct vr_btable *,
