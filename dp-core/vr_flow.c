@@ -1280,7 +1280,7 @@ vr_flow_table_init(struct vrouter *router)
                 sizeof(struct vr_flow_entry));
         if (!router->vr_flow_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__,
-                    __LINE__, VR_DEF_FLOW_ENTRIES);
+                    __LINE__, vr_flow_entries);
         }
     }
 
@@ -1289,7 +1289,7 @@ vr_flow_table_init(struct vrouter *router)
                 sizeof(struct vr_flow_entry));
         if (!router->vr_oflow_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__,
-                    __LINE__, VR_DEF_OFLOW_ENTRIES);
+                    __LINE__, vr_oflow_entries);
         }
     }
 

@@ -105,7 +105,14 @@ vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
     num_parts = total_mem / VR_SINGLE_ALLOC_LIMIT;
     remainder = total_mem % VR_SINGLE_ALLOC_LIMIT;
 
-    total_parts = num_parts + !!remainder;
+    total_parts = num_parts;
+    /*
+     * anything left over that is not a multiple of VR_SINGLE_ALLOC_LIMIT
+     * gets accomodated in the remainder, and hence an extra partition has
+     * to be given
+     */
+    if (remainder)
+        total_parts++;
 
     if (num_parts) {
         /*
