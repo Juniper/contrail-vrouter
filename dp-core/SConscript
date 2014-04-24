@@ -6,7 +6,7 @@ Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
 dpcore_sources = [
-                    'vnsw_ip4_mtrie.c',
+                    'vr_ip4_mtrie.c',
                     'vr_bridge.c',
                     'vr_btable.c',
                     'vr_datapath.c',
