@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-#include "vnsw_utils.h"
+#include "vr_utils.h"
 #define NL_RESP_DEFAULT_SIZE        512
 #define NL_MSG_DEFAULT_SIZE         4096
 

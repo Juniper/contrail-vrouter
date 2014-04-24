@@ -1,10 +1,10 @@
 /*
- * vnsw_ip4_mtrie.h -- 
+ * vr_ip4_mtrie.h -- 
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
-#ifndef __VNSW_IP4_MTRIE_H__
-#define __VNSW_IP4_MTRIE_H__
+#ifndef __VR_IP4_MTRIE_H__
+#define __VR_IP4_MTRIE_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,4 +98,4 @@ struct mtrie_bkt_info {
 #ifdef __cplusplus
 }
 #endif
-#endif /* __VNSW_IP4_MTRIE_H__ */
+#endif /* __VR_IP4_MTRIE_H__ */
