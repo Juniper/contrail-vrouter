@@ -36,7 +36,19 @@ def shellCommand(cmd):
     return output.strip()
 
 if sys.platform != 'darwin':
-    subdirs = ['dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
+
+    target = '#build/usr/src/vrouter/'
+    package_type = ARGUMENTS.get('package', 'None')
+    package_version = ARGUMENTS.get('version', 0)
+    if (package_type == 'debian'):
+        target = '#build/debian/contrail-vrouter-src-dkms/usr/src/vrouter'
+        target = target + '-' + package_version + '/'
+
+    env.Replace(DKMS_BUILD_TARGET = target)
+    env.Install(target, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
+    env.Alias('build-dkms', target)
+
+    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
     for sdir in  subdirs:
         env.SConscript(sdir + '/SConscript',
                        exports='VRouterEnv',
@@ -51,11 +63,11 @@ if sys.platform != 'darwin':
     make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#tools/').abspath
 
     kern = env.Command('vrouter.ko', makefile, make_cmd, chdir=dp_dir)
-    env.Default('vrouter.ko')
+    env.Default(kern)
 
     env.Depends(kern, env.Install(
-            '#build/kbuild/sandesh/gen-c',
-            env['TOP'] + '/vrouter/sandesh/gen-c/vr_types.c'))
+                '#build/kbuild/sandesh/gen-c',
+                env['TOP'] + '/vrouter/sandesh/gen-c/vr_types.c'))
     sandesh_lib = [
         'protocol/thrift_binary_protocol.c',
         'protocol/thrift_protocol.c',
@@ -67,11 +79,11 @@ if sys.platform != 'darwin':
     for src in sandesh_lib:
         dirname = os.path.dirname(src)
         env.Depends(kern,
-                    env.Install(
-                '#build/kbuild/sandesh/library/c/' + dirname,
-                env['TOP'] + '/tools/sandesh/library/c/' + src))
+                env.Install(
+                    '#build/kbuild/sandesh/library/c/' + dirname,
+                    env['TOP'] + '/tools/sandesh/library/c/' + src))
 
-    if GetOption('clean'):
+    if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
         os.system('cd ' + dp_dir + ';' + make_cmd + ' clean')
 
     libmod_dir = GetOption('install_root')
