@@ -5,10 +5,8 @@
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
-env.Library('dp_core', Glob('*.c'))
-
 if 'build-dkms' in COMMAND_LINE_TARGETS:
-    env.Append(DKMS_BUILD_TARGET = '/dp-core/')
+    env.Append(DKMS_BUILD_TARGET = '/linux/')
     env.Install(env['DKMS_BUILD_TARGET'], Glob('*.c'))
     env.Alias('build-dkms', env['DKMS_BUILD_TARGET'])
 

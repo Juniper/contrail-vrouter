@@ -23,7 +23,6 @@
 #include <net/if.h>
 #include "nl_util.h"
 #include "vr_genetlink.h"
-#include "vnsw_utils.h"
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
 

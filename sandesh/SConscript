@@ -3,11 +3,46 @@
 #
 
 Import('VRouterEnv')
-env = VRouterEnv
+env = VRouterEnv.Clone()
 
 DpSandeshFiles = env.SandeshGenC('vr.sandesh')
 DpSandeshFilesSrc = env.ExtractC(DpSandeshFiles)
 libdp_sandesh = env.Library('dp_sandesh_c', DpSandeshFilesSrc)
+
+sandesh_sources = [
+                    '#tools/sandesh/library/c/sandesh.c',
+                    '#tools/sandesh/library/c/sandesh.h',
+                    '#tools/sandesh/library/c/thrift.h',
+                  ]
+
+sandesh_protocol_sources = [
+                    '#tools/sandesh/library/c/protocol/thrift_binary_protocol.c',
+                    '#tools/sandesh/library/c/protocol/thrift_binary_protocol.h',
+                    '#tools/sandesh/library/c/protocol/thrift_protocol.c',
+                    '#tools/sandesh/library/c/protocol/thrift_protocol.h',
+                  ]
+
+sandesh_transport_sources = [
+                    '#tools/sandesh/library/c/transport/thrift_fake_transport.h',
+                    '#tools/sandesh/library/c/transport/thrift_fake_transport.c',
+                    '#tools/sandesh/library/c/transport/thrift_memory_buffer.c',
+                    '#tools/sandesh/library/c/transport/thrift_memory_buffer.h',
+                    '#tools/sandesh/library/c/transport/thrift_transport.c',
+                    '#tools/sandesh/library/c/transport/thrift_transport.h',
+                 ]
+
+sandesh_generateds = [
+                      'gen-c/vr_types.c',
+                      'gen-c/vr_types.h'
+                     ]
+
+if 'build-dkms' in COMMAND_LINE_TARGETS:
+    env.Append(DKMS_BUILD_TARGET = '/sandesh/')
+    env.Install(env['DKMS_BUILD_TARGET'] + 'gen-c/', sandesh_generateds)
+    env.Install(env['DKMS_BUILD_TARGET'] + 'library/c/', sandesh_sources)
+    env.Install(env['DKMS_BUILD_TARGET'] + 'library/c/protocol/', sandesh_protocol_sources)
+    env.Install(env['DKMS_BUILD_TARGET'] + 'library/c/transport/', sandesh_transport_sources)
+    env.Alias('build-dkms', env['DKMS_BUILD_TARGET'])
 
 # Local Variables:
 # mode: python

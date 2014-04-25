@@ -31,7 +31,7 @@ LIBOBJS += $(DP_CORE)/vr_queue.lo
 LIBOBJS += $(DP_CORE)/vrouter.lo $(DP_CORE)/vr_route.lo $(DP_CORE)/vr_nexthop.lo
 LIBOBJS += $(DP_CORE)/vr_datapath.lo $(DP_CORE)/vr_interface.lo
 LIBOBJS += $(DP_CORE)/vr_packet.lo $(DP_CORE)/vr_proto_ip.lo
-LIBOBJS += $(DP_CORE)/vr_mpls.lo $(DP_CORE)/vnsw_ip4_mtrie.lo
+LIBOBJS += $(DP_CORE)/vr_mpls.lo $(DP_CORE)/vr_ip4_mtrie.lo
 LIBOBJS += $(DP_CORE)/vr_flow.lo $(DP_CORE)/vr_mirror.lo
 LIBOBJS += $(DP_CORE)/vr_mcast.lo $(DP_CORE)/vr_index_table.lo
 

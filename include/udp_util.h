@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#include "vnsw_utils.h"
+#include "vr_utils.h"
 #define UDP_RESP_DEFAULT_SIZE        512
 #define UDP_MSG_DEFAULT_SIZE         4096
 
