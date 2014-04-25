@@ -37,16 +37,14 @@ def shellCommand(cmd):
 
 if sys.platform != 'darwin':
 
-    target = '#build/usr/src/vrouter/'
-    package_type = ARGUMENTS.get('package', 'None')
-    package_version = ARGUMENTS.get('version', 0)
-    if (package_type == 'debian'):
-        target = '#build/debian/contrail-vrouter-src-dkms/usr/src/vrouter'
-        target = target + '-' + package_version + '/'
+    install_root = GetOption('install_root')
+    if install_root == None:
+        install_root = ''
 
-    env.Replace(DKMS_BUILD_TARGET = target)
-    env.Install(target, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
-    env.Alias('build-dkms', target)
+    src_root = install_root + '/usr/src/vrouter/'
+    env.Replace(DKMS_BUILD_TARGET = src_root)
+    env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
+    env.Alias('build-dkms', src_root)
 
     subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
     for sdir in  subdirs:
@@ -86,10 +84,6 @@ if sys.platform != 'darwin':
     if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
         os.system('cd ' + dp_dir + ';' + make_cmd + ' clean')
 
-    libmod_dir = GetOption('install_root')
-    if libmod_dir == None:
-        libmod_dir = ''
-
     if GetOption('kernel-dir'):
         kern_version = shellCommand(
             'cat %s/include/config/kernel.release' % GetOption('kernel-dir'))
@@ -97,7 +91,7 @@ if sys.platform != 'darwin':
         kern_version = shellCommand('uname -r')
 
     kern_version = kern_version.strip()
-    libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
+    libmod_dir = install_root + '/lib/modules/%s/extra/net/vrouter' % kern_version
     env.Alias('install', env.Install(libmod_dir, kern))
 
 # Local Variables:
