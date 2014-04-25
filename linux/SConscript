@@ -5,10 +5,10 @@
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
-if 'build-dkms' in COMMAND_LINE_TARGETS:
-    env.Append(DKMS_BUILD_TARGET = '/linux/')
-    env.Install(env['DKMS_BUILD_TARGET'], Glob('*.c'))
-    env.Alias('build-dkms', env['DKMS_BUILD_TARGET'])
+if 'install' in COMMAND_LINE_TARGETS:
+    env.Append(SRC_INSTALL_TARGET = '/linux/')
+    env.Install(env['SRC_INSTALL_TARGET'], Glob('*.c'))
+    env.Alias('install', env['SRC_INSTALL_TARGET'])
 
 # Local Variables:
 # mode: python
