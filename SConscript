@@ -42,9 +42,9 @@ if sys.platform != 'darwin':
         install_root = ''
 
     src_root = install_root + '/usr/src/vrouter/'
-    env.Replace(DKMS_BUILD_TARGET = src_root)
+    env.Replace(SRC_INSTALL_TARGET = src_root)
     env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
-    env.Alias('build-dkms', src_root)
+    env.Alias('install', src_root)
 
     subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
     for sdir in  subdirs:
