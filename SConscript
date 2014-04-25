@@ -86,7 +86,7 @@ if sys.platform != 'darwin':
 
     kern_version = kern_version.strip()
     libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
-    env.Alias('install', env.Install(libmod_dir, kern))
+    env.Alias('build-kmodule', env.Install(libmod_dir, kern))
 
 # Local Variables:
 # mode: python
