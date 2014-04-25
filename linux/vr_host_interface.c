@@ -697,6 +697,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct skb_shared_info *sinfo;
     struct vr_ip *ip;
     unsigned short network_off, transport_off, cksum_off;
+    uint8_t gro_mac_hdr = 0;
 
     skb->data = pkt_data(pkt);
     skb->len = pkt_len(pkt);
@@ -710,10 +711,17 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if ((pkt->vp_flags & VP_FLAG_GRO) &&
             (vif->vif_type == VIF_TYPE_VIRTUAL)) {
-
+#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+	gro_mac_hdr = ETH_HLEN - VR_MPLS_HDR_LEN;
+	if (unlikely(skb_headlen(skb) < gro_mac_hdr))
+		goto non_gro_path;
+	skb->mac_header -= gro_mac_hdr;
+	memset(skb->mac_header, 0xFE, gro_mac_hdr);
+	skb_push(skb, ETH_HLEN);
+#else
         skb_push(skb, VR_MPLS_HDR_LEN);
+#endif
         skb_reset_mac_header(skb);
-
         if (!skb_pull(skb, pkt->vp_network_h - (skb->data - skb->head))) {
             vif_drop_pkt(vif, pkt, false);
             return 0;
@@ -724,6 +732,8 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         linux_enqueue_pkt_for_gro(skb, vif);
         return 0;
     }
+
+non_gro_path:
 
     skb_reset_mac_header(skb);
 
@@ -1527,6 +1537,10 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
             gro_vif_stats->vis_ibytes += skb->len;
         }
     }
+
+#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+    skb->mac_header += ETH_HLEN - VR_MPLS_HDR_LEN;
+#endif
 
     label = ntohl(*((unsigned int *) skb_mac_header(skb)));
     label >>= VR_MPLS_LABEL_SHIFT;
