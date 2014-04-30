@@ -7,7 +7,7 @@
 #ifndef __VRCOMPAT_H__
 #define __VRCOMPAT_H__
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,2,54))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0))
 typedef u64 netdev_features_t;
 #endif
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))

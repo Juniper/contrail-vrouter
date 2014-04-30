@@ -1466,7 +1466,7 @@ linux_pkt_dev_init(char *name, void (*setup)(struct net_device *),
     struct net_device *pdev = NULL;
 
     if (!(pdev = alloc_netdev_mqs(0, name, setup,
-                                  1, num_possible_cpus()))) {
+                                  1, num_present_cpus()))) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
         return NULL;
     }
