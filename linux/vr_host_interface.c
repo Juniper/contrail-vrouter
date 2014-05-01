@@ -697,6 +697,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct skb_shared_info *sinfo;
     struct vr_ip *ip;
     unsigned short network_off, transport_off, cksum_off;
+    unsigned char *data;
 
     skb->data = pkt_data(pkt);
     skb->len = pkt_len(pkt);
@@ -710,10 +711,30 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if ((pkt->vp_flags & VP_FLAG_GRO) &&
             (vif->vif_type == VIF_TYPE_VIRTUAL)) {
-
+#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+	if (unlikely(skb_headroom(skb) < ETH_HLEN)) {
+		struct sk_buff *nskb = skb_realloc_headroom(skb, LL_RESERVED_SPACE(dev));
+		if (!nskb) {
+			vif_drop_pkt(vif, pkt, false);
+			if (net_ratelimit())
+				printk(KERN_WARNING
+					 "Insufficient memory: %s %d\n",
+					__FUNCTION__, __LINE__);
+			kfree_skb(skb);
+			return -ENOMEM;
+		}
+		memcpy(nskb->data - VR_MPLS_HDR_LEN, skb->data - VR_MPLS_HDR_LEN,
+			VR_MPLS_HDR_LEN);
+		kfree_skb(skb);
+		skb = nskb;
+	}
+	data = skb_push(skb, ETH_HLEN);
+	memset(data, 0xFE, ETH_HLEN - VR_MPLS_HDR_LEN);
+        skb_reset_mac_header(skb);
+#else
         skb_push(skb, VR_MPLS_HDR_LEN);
         skb_reset_mac_header(skb);
-
+#endif
         if (!skb_pull(skb, pkt->vp_network_h - (skb->data - skb->head))) {
             vif_drop_pkt(vif, pkt, false);
             return 0;
@@ -1528,7 +1549,11 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
         }
     }
 
+#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+    label = ntohl(*((unsigned int *) (skb_mac_header(skb) + ETH_HLEN - VR_MPLS_HDR_LEN)));
+#else
     label = ntohl(*((unsigned int *) skb_mac_header(skb)));
+#endif
     label >>= VR_MPLS_LABEL_SHIFT;
 
     if (label >= router->vr_max_labels) {
