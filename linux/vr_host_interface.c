@@ -697,7 +697,9 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct skb_shared_info *sinfo;
     struct vr_ip *ip;
     unsigned short network_off, transport_off, cksum_off;
+#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
     unsigned char *data;
+#endif
 
     skb->data = pkt_data(pkt);
     skb->len = pkt_len(pkt);
