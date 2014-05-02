@@ -36,6 +36,22 @@
 /* Size of GRE header with key */
 #define VR_GRE_KEY_HDR_LEN      8
 
+
+/*
+ * Overlay length used for TCP MSS adjust. For UDP outer header, overlay
+ * len is 20 (IP header) + 8 (UDP) + 4 (MPLS). For GRE, it is 20 (IP header)
+ * + 8 (GRE header + key) + 4 (MPLS). Instead of allowing for only one
+ * label, we will allow a maximum of 3 labels, so we end up with 40 bytes
+ * of overleay headers.
+ */
+#define VROUTER_OVERLAY_LEN 40
+
+/*
+ * Over lay length is going to be ethernet header bytes more incase of L2 packet
+ */
+#define VROUTER_OVERLAY_LEN_IN_L2_MODE  62
+
+
 /* packets originated by DP. For eg: mirrored packets */
 #define VP_FLAG_FROM_DP         (1 << 0)
 #define VP_FLAG_TO_ME           (1 << 1)
@@ -289,6 +305,17 @@ vr_ip_fragment_tail(struct vr_ip *iph)
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
     if (!more && offset)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_pkt_is_ip(struct vr_packet *pkt)
+{
+    if (pkt->vp_type == VP_TYPE_IPOIP || pkt->vp_type == VP_TYPE_IP ||
+                pkt->vp_type == VP_TYPE_L2 || pkt->vp_type == VP_TYPE_L2OIP ||
+                pkt->vp_type == VP_TYPE_VXLAN)
         return true;
 
     return false;
