@@ -180,29 +180,20 @@ vr_trap(struct vr_packet *pkt, unsigned short trap_vrf,
     return 0;
 }
 
-unsigned int
-vr_l3_input(unsigned short vrf, struct vr_packet *pkt, 
-                              struct vr_forwarding_md *fmd)    
+int
+vr_reach_l3_hdr(struct vr_packet *pkt, unsigned short *eproto)
 {
-
     unsigned char *data = pkt_data(pkt);
     unsigned char *eth = data;
-    unsigned char *dmac = &eth[VR_ETHER_DMAC_OFF];
     unsigned short eth_proto;
     struct vr_vlan_hdr *vlan;
-    int reason;
     unsigned short pull_len = 0;
-    struct vr_interface *vif = pkt->vp_if;
-    struct vrouter *router = vif->vif_router;
-    /*
-     * we will optimise for the most likely case i.e that of IPv4. need
-     * to see what needs to happen for v6 when it comes
-     */
+
     data = pkt_pull(pkt, VR_ETHER_HLEN);
     if (!data) {
-        vif_drop_pkt(vif, pkt, 1);
-        return 0;
+        return -1;
     }
+
     pull_len += VR_ETHER_HLEN;
 
     eth_proto = ntohs(*(unsigned short *)(eth + VR_ETHER_PROTO_OFF));
@@ -211,10 +202,45 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
         eth_proto = ntohs(vlan->vlan_proto);
         data = pkt_pull(pkt, sizeof(*vlan));
         if (!data) {
-            vif_drop_pkt(vif, pkt, 1);
-            return 0;
+            return -1;
         }
         pull_len += sizeof(*vlan);
+    }
+
+    if (eproto)
+        *eproto = eth_proto;
+
+    return pull_len;
+}
+
+unsigned int
+vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
+                              struct vr_forwarding_md *fmd)
+{
+
+    unsigned char *data = pkt_data(pkt);
+    unsigned char *eth = data;
+    unsigned char *dmac = &eth[VR_ETHER_DMAC_OFF];
+    unsigned short eth_proto = 0;
+    int reason;
+    unsigned short pull_len;
+    struct vr_interface *vif = pkt->vp_if;
+    struct vrouter *router = vif->vif_router;
+    /*
+     * we will optimise for the most likely case i.e that of IPv4. need
+     * to see what needs to happen for v6 when it comes
+     */
+
+    pull_len = vr_reach_l3_hdr(pkt, &eth_proto);
+    if (pull_len < 0) {
+        vif_drop_pkt(vif, pkt, 1);
+        return 0;
+    }
+
+    data = pkt_data(pkt);
+    if (!data) {
+        vif_drop_pkt(vif, pkt, 1);
+        return 0;
     }
 
     pkt_set_network_header(pkt, pkt->vp_data);
@@ -222,7 +248,7 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
     if (eth_proto == VR_ETH_PROTO_IP) {
         if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
                             (vif->vif_type == VIF_TYPE_VIRTUAL)) {
-            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt))) {
+            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN))) {
                 vr_pfree(pkt, reason);
                 return 0;
             }

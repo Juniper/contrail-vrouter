@@ -7,6 +7,7 @@
 #include "vr_bridge.h"
 #include "vr_htable.h"
 #include "vr_nexthop.h"
+#include "vr_defs.h"
 
 struct vr_bridge_entry_key {
     unsigned char be_mac[VR_ETHER_ALEN];
@@ -38,6 +39,7 @@ unsigned int vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
 static vr_htable_t vn_rtable;
 struct vr_nexthop *(*vr_bridge_lookup)(unsigned int, struct vr_route_req *, 
         struct vr_packet *);
+extern unsigned short vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
 
 static bool
 bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry, 
@@ -71,7 +73,7 @@ vr_find_free_bridge_entry(unsigned int vrf_id, char *mac)
         return NULL;
 
     key.be_vrf_id = vrf_id;
-    VR_MAC_CPY(key.be_mac, mac);
+    VR_MAC_COPY(key.be_mac, mac);
     return vr_find_free_hentry(vn_rtable, &key, NULL);
 }
 
@@ -82,7 +84,7 @@ __bridge_table_add(struct vr_route_req *rt)
     struct vr_nexthop *old_nh;
     struct vr_bridge_entry_key key;
 
-    VR_MAC_CPY(key.be_mac, rt->rtr_req.rtr_mac); 
+    VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
     key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
 
     be = vr_find_bridge_entry(&key);
@@ -92,8 +94,8 @@ __bridge_table_add(struct vr_route_req *rt)
                                         (char *)rt->rtr_req.rtr_mac);
         if (!be)
             return -ENOMEM;
-    
-        VR_MAC_CPY(be->be_key.be_mac, rt->rtr_req.rtr_mac);
+
+        VR_MAC_COPY(be->be_key.be_mac, rt->rtr_req.rtr_mac);
         be->be_key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
         be->be_flags |= VR_BE_FLAG_VALID;
     }
@@ -170,7 +172,7 @@ bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!vn_rtable)
         return -EINVAL;
 
-    VR_MAC_CPY(key.be_mac, rt->rtr_req.rtr_mac); 
+    VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
     key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
 
     be = vr_find_bridge_entry(&key);
@@ -188,7 +190,7 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     struct vr_bridge_entry *be;
     struct vr_bridge_entry_key key;
 
-    VR_MAC_CPY(key.be_mac, rt->rtr_req.rtr_mac); 
+    VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
     key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
 
     be = vr_find_bridge_entry(&key);
@@ -223,7 +225,7 @@ bridge_entry_make_req(struct vr_route_req *resp, struct vr_bridge_entry *ent)
     resp->rtr_req.rtr_mac = vr_zalloc(VR_ETHER_ALEN);
     if (!resp->rtr_req.rtr_mac)
         return -ENOMEM;
-    VR_MAC_CPY(resp->rtr_req.rtr_mac, ent->be_key.be_mac);
+    VR_MAC_COPY(resp->rtr_req.rtr_mac, ent->be_key.be_mac);
     resp->rtr_req.rtr_vrf_id = ent->be_key.be_vrf_id;
     if (ent->be_nh)
         resp->rtr_req.rtr_nh_id = ent->be_nh->nh_id;
@@ -400,7 +402,55 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
 
 unsigned int
 vr_l2_input(unsigned short vrf, struct vr_packet *pkt, 
-                              struct vr_forwarding_md *fmd)
+                struct vr_forwarding_md *fmd, unsigned short vlan_id)
 {
+    unsigned char *new_hdr, *old_hdr;
+    struct vr_vlan_hdr *vlanh;
+    struct vr_eth *eth;
+    unsigned short pull_len, eth_proto;
+    int reason;
+
+    /* If vlan_id is present insert the vlan tag */
+    if (vlan_id != VLAN_ID_INVALID) {
+        old_hdr = pkt_data(pkt);
+        new_hdr = pkt_push(pkt, VR_VLAN_HLEN);
+        if (!new_hdr) {
+             vr_pfree(pkt, VP_DROP_PUSH);
+             return 0;
+        }
+
+        VR_ETH_COPY(new_hdr, old_hdr);
+        eth = (struct vr_eth *)(new_hdr);
+        eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
+        vlanh = (struct vr_vlan_hdr *)(new_hdr + sizeof(struct vr_eth));
+        vlanh->vlan_tag = htons(vlan_id);
+    }
+
+    /* Mark the network header if an L3 packet */
+    pull_len = vr_reach_l3_hdr(pkt, &eth_proto);
+    if (pull_len < 0) {
+        vif_drop_pkt(pkt->vp_if, pkt, 1);
+        return 0;
+    }
+
+    /* Even in L2 mode we will have to adjust the MSS for TCP*/
+    if (eth_proto == VR_ETH_PROTO_IP) {
+        pkt_set_network_header(pkt, pkt->vp_data);
+        pkt_set_inner_network_header(pkt, pkt->vp_data);
+        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
+                            (pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)) {
+            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN_IN_L2_MODE))) {
+                vr_pfree(pkt, reason);
+                return 0;
+            }
+        }
+    }
+
+    /* Restore back the L2 headers */
+    if (!pkt_push(pkt, pull_len)) {
+        vif_drop_pkt(pkt->vp_if, pkt, 1);
+        return 0;
+    }
+
     return vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
 }

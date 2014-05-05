@@ -13,7 +13,8 @@
 #define ARRAYSIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 #define VR_ETHER_HLEN           14
-#define VR_ETHER_ALEN           6
+#define VR_ETHER_ALEN            6
+#define VR_VLAN_HLEN             4
 
 #define VR_GRE_PROTO_MPLS       0x8847
 #define VR_GRE_PROTO_MPLS_NO    htons(0x8847)

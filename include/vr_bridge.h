@@ -6,10 +6,16 @@
 
 #include "vr_defs.h"
 
-#define VR_MAC_CPY(dst, src) { \
-    ((uint16_t *)dst)[0] = ((uint16_t *)src)[0]; \
-    ((uint16_t *)dst)[1] = ((uint16_t *)src)[1]; \
-    ((uint16_t *)dst)[2] = ((uint16_t *)src)[2]; \
+#define VR_MAC_COPY(dst, src) { \
+    ((uint16_t *)(dst))[0] = ((uint16_t *)(src))[0]; \
+    ((uint16_t *)(dst))[1] = ((uint16_t *)(src))[1]; \
+    ((uint16_t *)(dst))[2] = ((uint16_t *)(src))[2]; \
+}
+
+#define VR_ETH_COPY(dst, src) { \
+    VR_MAC_COPY((unsigned char *)(dst), (unsigned char *)(src)); \
+    VR_MAC_COPY(((unsigned char *)(dst) + 6), ((unsigned char *)(src) + 6)); \
+    ((uint16_t *)(dst))[6] = ((uint16_t *)(src))[6]; \
 }
 
 #define VR_MAC_CMP(dst, src)  \
