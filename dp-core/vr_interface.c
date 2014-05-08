@@ -76,8 +76,8 @@ vr_interface_input(unsigned short vrf, struct vr_interface *vif,
         vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
     }
 
-    /* If vlan_id is present L3 packet needs to be treated as L2 packet */
-    if (vlan_id == VLAN_ID_INVALID) {
+    /* If vlan tagged from VM, packet needs to be treated as L2 packet */
+    if ((vif->vif_type == VIF_TYPE_PHYSICAL) ||  (vlan_id == VLAN_ID_INVALID)) {
         if (vif->vif_flags & VIF_FLAG_L3_ENABLED) {
             ret = vr_l3_input(vrf, pkt, &fmd);
             if (ret != PKT_RET_FALLBACK_BRIDGING)
