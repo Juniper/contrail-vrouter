@@ -23,19 +23,19 @@ static bool vhost_drv_inited;
 static void vhost_ethtool_get_info(struct net_device *netdev,
 	struct ethtool_drvinfo *info)
 {
-	strcpy(info->driver, "vrouter");
-	strcpy(info->version, "N/A");
-	strcpy(info->fw_version, "N/A");
-	strcpy(info->bus_info, "N/A");
+    strcpy(info->driver, "vrouter");
+    strcpy(info->version, "N/A");
+    strcpy(info->fw_version, "N/A");
+    strcpy(info->bus_info, "N/A");
 }
 
 static const struct ethtool_ops vhost_ethtool_ops = {
-	.get_drvinfo	= vhost_ethtool_get_info,
-	.get_link		= ethtool_op_get_link,
+    .get_drvinfo	= vhost_ethtool_get_info,
+    .get_link		= ethtool_op_get_link,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) && defined(CONFIG_XEN)
-	.get_tso		= ethtool_op_get_tso,
-	.set_tso		= ethtool_op_set_tso,
-	.get_flags		= ethtool_op_get_flags,
+    .get_tso		= ethtool_op_get_tso,
+    .set_tso		= ethtool_op_set_tso,
+    .get_flags		= ethtool_op_get_flags,
 #endif
 };
 
@@ -156,8 +156,8 @@ vhost_setup(struct net_device *dev)
     dev->netdev_ops = &vhost_dev_ops;
     dev->destructor = vhost_dev_destructor;
 #ifdef CONFIG_XEN
-	SET_ETHTOOL_OPS(dev, &vhost_ethtool_ops);
-	dev->features |= NETIF_F_GRO;
+    SET_ETHTOOL_OPS(dev, &vhost_ethtool_ops);
+    dev->features |= NETIF_F_GRO;
 #endif
     return;
 }
