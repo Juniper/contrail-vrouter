@@ -223,7 +223,7 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
     unsigned char *dmac = &eth[VR_ETHER_DMAC_OFF];
     unsigned short eth_proto = 0;
     int reason;
-    unsigned short pull_len;
+    int pull_len;
     struct vr_interface *vif = pkt->vp_if;
     struct vrouter *router = vif->vif_router;
     /*
