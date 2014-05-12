@@ -39,7 +39,7 @@ unsigned int vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
 static vr_htable_t vn_rtable;
 struct vr_nexthop *(*vr_bridge_lookup)(unsigned int, struct vr_route_req *, 
         struct vr_packet *);
-extern unsigned short vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
+extern int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
 
 static bool
 bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry, 
@@ -407,7 +407,7 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
     unsigned char *new_hdr, *old_hdr;
     struct vr_vlan_hdr *vlanh;
     struct vr_eth *eth;
-    unsigned short pull_len, eth_proto;
+    int pull_len, eth_proto;
     int reason;
 
     /* If vlan_id is present insert the vlan tag */
