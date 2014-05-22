@@ -721,7 +721,8 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
             * for VMs that are not in the fabric VRF. dhcp refresh packets will
             * anyway hit the route entry and get trapped from there.
             */
-            if (vif_is_virtual(pkt->vp_if) && vif_dhcp_enabled(pkt->vp_if)) {
+            /* if (vif_is_virtual(pkt->vp_if) && vif_dhcp_enabled(pkt->vp_if)) { */
+            if (vif_is_virtual(pkt->vp_if)) {
                 proto_port = (key->key_proto << VR_FLOW_PROTO_SHIFT) |
                     key->key_src_port;
                 if (proto_port == VR_UDP_DHCP_CPORT) {
