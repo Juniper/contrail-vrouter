@@ -49,7 +49,7 @@ static short vlan_id = -1;
 static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
-static int kindex_set, type_set, help_set, set_set, vlan_set;
+static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, mode_set, policy_set;
 
 static unsigned int vr_op, vr_if_type;
@@ -137,6 +137,8 @@ vr_if_flags(int flags)
         strcat(flag_string, "L3");
     if (flags & VIF_FLAG_L2_ENABLED)
         strcat(flag_string, "L2");
+    if (flags & VIF_FLAG_DHCP_ENABLED)
+        strcat(flag_string, "D");
 
 
     return flag_string;
@@ -434,7 +436,7 @@ Usage()
     printf("Usage: vif [--create <intf_name> --mac <mac>]\n");
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
     printf("\t   \t--type [vhost|agent|physical|virtual]");
-    printf( "[--policy, --mode <mode:x>]]\n");
+    printf( "[--policy, --mode <mode:x>, --dhcp-disable]]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -459,6 +461,7 @@ enum if_opt_index {
     TYPE_OPT_INDEX,
     SET_OPT_INDEX,
     VLAN_OPT_INDEX,
+    DHCP_OPT_INDEX,
     HELP_OPT_INDEX,
 };
 
@@ -476,6 +479,7 @@ static struct option long_options[] = {
     [TYPE_OPT_INDEX]    =   {"type",    required_argument,  &type_set,      1},
     [SET_OPT_INDEX]     =   {"set",     required_argument,  &set_set,       1},
     [VLAN_OPT_INDEX]    =   {"vlan",    required_argument,  &vlan_set,      1},
+    [DHCP_OPT_INDEX]    =   {"dhcp-disable", no_argument,   &dhcp_set,      1},
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
 };
 
@@ -483,6 +487,7 @@ static void
 parse_long_opts(int option_index, char *opt_arg)
 {
     errno = 0;
+    vr_ifflags |= VIF_FLAG_DHCP_ENABLED;
 
     if (!*(long_options[option_index].flag))
         *(long_options[option_index].flag) = 1;
@@ -553,6 +558,10 @@ parse_long_opts(int option_index, char *opt_arg)
         vlan_id = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
+        break;
+
+    case DHCP_OPT_INDEX:
+        vr_ifflags &= ~VIF_FLAG_DHCP_ENABLED;
         break;
 
     default:
