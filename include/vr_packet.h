@@ -134,14 +134,14 @@
 #define VP_DROP_HEAD_ALLOC_FAIL             26
 #define VP_DROP_HEAD_SPACE_RESERVE_FAIL     27
 #define VP_DROP_PCOW_FAIL                   28
-#define VP_DROP_FLOOD                       29
+/* #define VP_DROP_FLOOD                    29 - UNUSED */
 #define VP_DROP_MCAST_CLONE_FAIL            30
-#define VP_DROP_COMPOSITE_INVALID_INTERFACE 31
+/* #define VP_DROP_COMPOSITE_INVALID_INTERFACE 31 - UNUSED */
 #define VP_DROP_REWRITE_FAIL                32
 #define VP_DROP_MISC                        33
 #define VP_DROP_INVALID_PACKET              34
 #define VP_DROP_CKSUM_ERR                   35
-#define VP_DROP_CLONE_FAIL                  36
+/* #define VP_DROP_CLONE_FAIL               36 - UNUSED */
 #define VP_DROP_NO_FMD                      37
 #define VP_DROP_CLONED_ORIGINAL             38
 #define VP_DROP_INVALID_VNID                39

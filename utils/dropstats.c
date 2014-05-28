@@ -81,21 +81,14 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_flow_queue_limit_exceeded);
     printf("\n");
 
-
-    printf("Flood                         %" PRIu64 "\n",
-            stats->vds_flood);
     printf("Discards                      %" PRIu64 "\n",
             stats->vds_discard);
     printf("TTL Exceeded                  %" PRIu64 "\n",
             stats->vds_ttl_exceeded);
     printf("Mcast Clone Fail              %" PRIu64 "\n",
             stats->vds_mcast_clone_fail);
-    printf("Clone Fail                    %" PRIu64 "\n",
-            stats->vds_clone_fail);
     printf("Cloned Original               %" PRIu64 "\n",
             stats->vds_cloned_original);
-    printf("Composite Invalid Interface   %" PRIu64 "\n",
-            stats->vds_composite_invalid_interface);
     printf("\n");
 
     printf("Invalid NH                    %" PRIu64 "\n",
