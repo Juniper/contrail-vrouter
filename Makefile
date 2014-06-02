@@ -84,7 +84,6 @@ default:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 clean:
-	$(RM) cscope* tags
 ifneq ($(wildcard sandesh/Makefile), )
 	$(MAKE) --quiet -C sandesh/ clean
 endif
