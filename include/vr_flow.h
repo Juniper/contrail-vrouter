@@ -44,6 +44,7 @@ struct vr_flow_key {
     unsigned int key_dest_ip;
     unsigned short key_dst_port;
     unsigned short key_vrf_id;
+    unsigned short key_nh_id;
     unsigned char key_proto;
     unsigned char key_zero;
 } __attribute__((packed));
@@ -108,6 +109,7 @@ struct vr_dummy_flow_entry {
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
+    unsigned short fe_vrf;
     unsigned short fe_dvrf;
     uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
@@ -127,6 +129,7 @@ struct vr_flow_entry {
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
+    unsigned short fe_vrf;
     unsigned short fe_dvrf;
     uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
