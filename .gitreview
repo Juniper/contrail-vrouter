@@ -12,5 +12,5 @@
 [gerrit]
 host=review.opencontrail.org
 port=29418
-project=Juniper/contrail-controller.git
+project=Juniper/contrail-vrouter.git
 defaultbranch=R1.04
