@@ -73,7 +73,6 @@ buffer sandesh vr_interface_req {
    23: i32          vifr_duplex;
    24: i16          vifr_vlan_id;
    25: i32          vifr_parent_vif_idx;
-   26: i16          vifr_nh_id;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -143,7 +142,6 @@ buffer sandesh vr_flow_req {
    21: i16          fr_mir_vrf;
    22: i16          fr_ecmp_nh_index;
    23: i32          fr_src_nh_index;
-   24: i16          fr_flow_nh_id;
 }
 
 buffer sandesh vr_vrf_assign_req {
@@ -153,7 +151,6 @@ buffer sandesh vr_vrf_assign_req {
     4:  i16                 var_vif_vrf;
     5:  i16                 var_vlan_id;
     6:  i16                 var_marker;
-    7:  i16                 var_nh_id;
 }
 
 buffer sandesh vr_vrf_stats_req {
