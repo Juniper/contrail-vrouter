@@ -40,17 +40,21 @@
 #define VIRTUAL_TYPE_STRING     "virtual"
 #define XEN_LL_TYPE_STRING      "xenll"
 #define GATEWAY_TYPE_STRING     "gateway"
+#define VIRTUAL_VLAN_TYPE_STRING    "virtual-vlan"
 #define STATS_TYPE_STRING       "stats"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
 static int if_kindex = -1, vrf_id, vr_ifindex = -1;
+static bool need_xconnect_if = false;
+static int if_xconnect_kindex = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set;
 static int vrf_set, mac_set, delete_set, mode_set, policy_set;
+static int xconnect_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -80,6 +84,8 @@ vr_get_if_type_string(int t)
         return "Gateway";
     case VIF_TYPE_STATS:
         return "Stats";
+    case VIF_TYPE_VIRTUAL_VLAN:
+        return "Virtual(Vlan)";
     default:
         return "Invalid";
     }
@@ -111,6 +117,9 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, STATS_TYPE_STRING,
                 strlen(STATS_TYPE_STRING)))
         return VIF_TYPE_STATS;
+    else if (!strncmp(type_str, VIRTUAL_VLAN_TYPE_STRING,
+                strlen(VIRTUAL_VLAN_TYPE_STRING)))
+        return VIF_TYPE_VIRTUAL_VLAN;
     else
         Usage();
 
@@ -176,17 +185,23 @@ vr_interface_req_process(void *s)
     if (!get_set && !list_set)
         return;
 
-    printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
-    for (; printed < 12; printed++)
-        printf(" ");
-    printf("OS: %s", req->vifr_os_idx ?
-            if_indextoname(req->vifr_os_idx, name): "NULL");
-    if (req->vifr_speed >= 0) {
-        printf(" (Speed %d,", req->vifr_speed);
-        if (req->vifr_duplex >= 0)
-            printf(" Duplex %d", req->vifr_duplex);
-        printf(")");
+    printf("vif%d/%d\tOS: %s", req->vifr_rid, req->vifr_idx,
+            req->vifr_os_idx ? if_indextoname(req->vifr_os_idx, name): "NULL");
+
+    if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+        if (req->vifr_speed >= 0) {
+            printf(" (Speed %d,", req->vifr_speed);
+            if (req->vifr_duplex >= 0)
+                printf(" Duplex %d", req->vifr_duplex);
+            printf(")");
+        }
+    } else if (req->vifr_type == VIF_TYPE_VIRTUAL_VLAN) {
+        printf(" Vlan Id: %d", req->vifr_vlan_id);
     }
+
+    if (req->vifr_parent_vif_idx >= 0)
+        printf(" Parent:vif0/%d", req->vifr_parent_vif_idx);
+
     printf("\n");
 
     vr_interface_print_header();
@@ -385,6 +400,8 @@ op_retry:
         intf_req.vifr_idx = vr_ifindex;
         intf_req.vifr_rid = 0;
         intf_req.vifr_type = vr_if_type;
+        if (vr_if_type == VIF_TYPE_HOST)
+            intf_req.vifr_cross_connect_idx = if_xconnect_kindex;
         intf_req.vifr_flags = vr_ifflags;
         break;
 
@@ -433,7 +450,8 @@ Usage()
 {
     printf("Usage: vif [--create <intf_name> --mac <mac>]\n");
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
-    printf("\t   \t--type [vhost|agent|physical|virtual]");
+    printf("\t   \t--type [vhost|agent|physical|virtual]\n");
+    printf("\t   \t--xconnect <physical interface name>\n");
     printf( "[--policy, --mode <mode:x>]]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
@@ -459,6 +477,7 @@ enum if_opt_index {
     TYPE_OPT_INDEX,
     SET_OPT_INDEX,
     VLAN_OPT_INDEX,
+    XCONNECT_OPT_INDEX,
     HELP_OPT_INDEX,
 };
 
@@ -476,6 +495,7 @@ static struct option long_options[] = {
     [TYPE_OPT_INDEX]    =   {"type",    required_argument,  &type_set,      1},
     [SET_OPT_INDEX]     =   {"set",     required_argument,  &set_set,       1},
     [VLAN_OPT_INDEX]    =   {"vlan",    required_argument,  &vlan_set,      1},
+    [XCONNECT_OPT_INDEX] =  {"xconnect", required_argument, &xconnect_set,  1},
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
 };
 
@@ -539,6 +559,8 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case TYPE_OPT_INDEX:
         vr_if_type = vr_get_if_type(optarg);
+        if (vr_if_type == VIF_TYPE_HOST)
+            need_xconnect_if = true;
         break;
 
     case SET_OPT_INDEX:
@@ -553,6 +575,16 @@ parse_long_opts(int option_index, char *opt_arg)
         vlan_id = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
+        break;
+
+    case XCONNECT_OPT_INDEX:
+        if_xconnect_kindex = if_nametoindex(opt_arg);
+        if (!if_xconnect_kindex) {
+            printf("%s does not seem to be a  valid physical interface name\n",
+                    opt_arg);
+            Usage();
+        }
+
         break;
 
     default:
@@ -596,6 +628,8 @@ validate_options(void)
         if (get_set || list_set)
             Usage();
         if (!vrf_set || !mac_set || !type_set)
+            Usage();
+        if (need_xconnect_if && !xconnect_set)
             Usage();
         return;
     }

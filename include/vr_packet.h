@@ -237,6 +237,8 @@ struct vr_eth {
 } __attribute__((packed));
 
 #define VLAN_ID_INVALID         0xFFFF
+#define VLAN_ID_MAX             0xFFFF
+
 struct vr_vlan_hdr {
     unsigned short vlan_tag;
     unsigned short vlan_proto;

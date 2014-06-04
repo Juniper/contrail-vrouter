@@ -592,7 +592,6 @@ linux_enqueue_pkt_for_gro(struct sk_buff *skb, struct vr_interface *vif)
 
     skb_queue_tail(&vif->vr_skb_inputq, skb);
 
-
     /*
      * napi_schedule may raise a softirq, so if we are not already in
      * interrupt context (which is the case when we get here as a result of 

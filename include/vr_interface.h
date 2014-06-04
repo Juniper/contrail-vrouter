@@ -9,7 +9,8 @@
 #include "vr_defs.h"
 #include "vr_types.h"
 
-#define VR_MAX_INTERFACES           256
+/* 2 interfaces/VM + maximum vlan interfaces */
+#define VR_MAX_INTERFACES           (256 + 4096)
 
 #define VIF_TYPE_HOST               0
 #define VIF_TYPE_AGENT              1
@@ -17,17 +18,18 @@
 #define VIF_TYPE_VIRTUAL            3
 #define VIF_TYPE_XEN_LL_HOST        4
 #define VIF_TYPE_GATEWAY            5
-#define VIF_TYPE_VLAN               6
+#define VIF_TYPE_VIRTUAL_VLAN       6
 #define VIF_TYPE_STATS              7
-#define VIF_TYPE_MAX                8
+#define VIF_TYPE_VLAN               8
+#define VIF_TYPE_MAX                9
 
-#define vif_is_fabric(vif)          ((vif->vif_type == VIF_TYPE_PHYSICAL) ||\
-                                        (vif->vif_type == VIF_TYPE_VLAN))
-
+#define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
+                                        (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
+#define vif_is_fabric(vif)          (vif->vif_type == VIF_TYPE_PHYSICAL) 
+#define vif_is_vlan(vif)            ((vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
+                                        
 #define vif_is_tap(vif)             ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_AGENT))
-
-#define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL))
 
 #define vif_is_vhost(vif)           ((vif->vif_type == VIF_TYPE_HOST) ||\
                                         (vif->vif_type == VIF_TYPE_XEN_LL_HOST) ||\
@@ -70,11 +72,24 @@ struct agent_send_params {
     void *trap_param;
 };
 
+struct vr_interface;
+
+struct vr_interface_driver {
+    int     (*drv_add)(struct vr_interface *, vr_interface_req *);
+    int     (*drv_change)(struct vr_interface *);
+    int     (*drv_delete)(struct vr_interface *);
+    int     (*drv_add_sub_interface)(struct vr_interface *,
+            struct vr_interface *);
+    int     (*drv_delete_sub_interface)(struct vr_interface *,
+            struct vr_interface *);
+};
+
 struct vr_interface {
     unsigned short vif_type;
     unsigned short vif_vrf;
     unsigned short vif_rid;
     unsigned short vif_mtu;
+    unsigned short vif_vlan_id;
 
     unsigned int vif_flags;
     unsigned int vif_idx;
@@ -109,6 +124,9 @@ struct vr_interface {
      * for sure...
      */
     int (*vif_rx)(struct vr_interface *, struct vr_packet *, unsigned short);
+
+    struct vr_interface **vif_sub_interfaces;
+    struct vr_interface_driver *vif_driver;
 
     unsigned char vif_rewrite[VR_ETHER_HLEN];
     unsigned char vif_mac[VR_ETHER_ALEN];
