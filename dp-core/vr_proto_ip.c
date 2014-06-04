@@ -450,7 +450,7 @@ vr_should_proxy(struct vr_interface *vif, unsigned int dip,
      * in the same system. so, VR should always proxy for those
      * requests
      */
-    if (vif->vif_type == VIF_TYPE_VIRTUAL) {
+    if (vif_is_virtual(vif)) {
         /* 
          * some OSes send arp queries with zero SIP before taking ownership
          * of the DIP

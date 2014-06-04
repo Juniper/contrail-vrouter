@@ -500,7 +500,7 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
 
             /* Need to create extra head space only if packet is coming
              * from VM */
-            if (pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)
+            if (vif_is_virtual(pkt->vp_if))
                 clone_size = VR_L2_MCAST_PKT_HEAD_SPACE;
 
             /* Create head space for L2 Mcast header */
@@ -669,9 +669,8 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
          * with right values
          */
         if ((new_pkt->vp_type == VP_TYPE_L2) &&
-                 (new_pkt->vp_flags & VP_FLAG_MULTICAST) &&
-                (new_pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)) {
-
+                 (new_pkt->vp_flags & VP_FLAG_MULTICAST) && 
+                (vif_is_virtual(new_pkt->vp_if))) {
             /*
              * The L2 multicast bridge entry will have VNID as label. If fmd
              * does not valid label/vnid, skip the processing
