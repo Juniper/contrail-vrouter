@@ -173,6 +173,7 @@ vr_get_flow_key(struct vr_flow_key *key, unsigned short vrf, struct vr_ip *ip,
     key->key_proto = ip->ip_proto;
     key->key_zero = 0;
     key->key_vrf_id = vrf;
+    key->key_nh_id = 0;
 
     /* extract port information */
     t_hdr = (unsigned short *)((char *)ip + (ip->ip_hl * 4));
@@ -985,6 +986,7 @@ vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
     key.key_vrf_id = req->fr_flow_vrf;
     key.key_proto = req->fr_flow_proto;
     key.key_zero = 0;
+    key.key_nh_id = 0;
 
     fe = vr_add_flow(req->fr_rid, &key, fe_index);
     if (fe)

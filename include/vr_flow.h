@@ -39,11 +39,12 @@ struct vr_forwarding_md;
 
 struct vr_flow_key {
     unsigned short key_src_port;
+    unsigned short key_dst_port;
     /* we should be doing memcpy for the two ips */
     unsigned int key_src_ip;
     unsigned int key_dest_ip;
-    unsigned short key_dst_port;
     unsigned short key_vrf_id;
+    unsigned short key_nh_id;
     unsigned char key_proto;
     unsigned char key_zero;
 } __attribute__((packed));
@@ -100,18 +101,17 @@ struct vr_flow_stats {
 } __attribute__((packed));
 
 struct vr_dummy_flow_entry {
-    struct vr_flow_stats fe_stats;
-     /* not used. if you are in need of a byte, please use this field */
-    uint8_t fe_dummy;
-    struct vr_list_head fe_hold_list;
     struct vr_flow_key fe_key;
+    struct vr_list_head fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
+    unsigned short fe_vrf;
     unsigned short fe_dvrf;
     uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
     uint8_t fe_sec_mirror_id;
+    struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
 } __attribute__((packed));
 
@@ -119,18 +119,17 @@ struct vr_dummy_flow_entry {
 
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
-    struct vr_flow_stats fe_stats;
-    /* not used. if you are in need of a byte, please use this field */
-    uint8_t fe_dummy;
-    struct vr_list_head fe_hold_list;
     struct vr_flow_key fe_key;
+    struct vr_list_head fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
+    unsigned short fe_vrf;
     unsigned short fe_dvrf;
     uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
     uint8_t fe_sec_mirror_id;
+    struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
