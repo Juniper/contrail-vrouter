@@ -251,6 +251,10 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
 {
     unsigned short proto = ntohs(skb->protocol);
 
+    if (vif->vif_type == VIF_TYPE_VIRTUAL &&
+            skb->ip_summed == CHECKSUM_NONE)
+        skb->ip_summed = CHECKSUM_UNNECESSARY;
+
     if (vif->vif_type != VIF_TYPE_PHYSICAL ||
             skb->len <= skb->dev->mtu + skb->dev->hard_header_len) {
         return dev_queue_xmit(skb);
@@ -1170,6 +1174,9 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
     pkt = linux_get_packet(skb, vif);
     if (!pkt)
         return NULL;
+
+    if (vif->vif_type == VIF_TYPE_VIRTUAL && skb->ip_summed != CHECKSUM_PARTIAL)
+        printk("vif %d checksum %d\n", vif->vif_idx, skb->ip_summed);
 
     vif->vif_rx(vif, pkt, vlan_id);
     return NULL;

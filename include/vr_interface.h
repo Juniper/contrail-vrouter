@@ -34,6 +34,7 @@
 #define vif_is_vhost(vif)           ((vif->vif_type == VIF_TYPE_HOST) ||\
                                         (vif->vif_type == VIF_TYPE_XEN_LL_HOST) ||\
                                         (vif->vif_type == VIF_TYPE_GATEWAY))
+#define vif_is_service(vif)         (vif->vif_flags & VIF_FLAG_SERVICE_IF)
 
 #define VR_INTERFACE_NAME_LEN       64
 
@@ -84,6 +85,11 @@ struct vr_interface_driver {
             struct vr_interface *);
 };
 
+struct vr_vrf_assign {
+    short va_vrf;
+    unsigned short va_nh_id;
+};
+
 struct vr_interface {
     unsigned short vif_type;
     unsigned short vif_vrf;
@@ -96,20 +102,20 @@ struct vr_interface {
     unsigned int vif_users;
     unsigned int vif_os_idx;
 
-    uint8_t vif_mirror_id;
-
     struct vrouter *vif_router;
     struct vr_interface *vif_parent;
     struct vr_interface *vif_bridge;
     struct vr_interface_stats *vif_stats;
 
+    unsigned short vif_nh_id;
     unsigned short vif_vrf_table_users;
+    uint8_t vif_mirror_id; /* best placed here for now - less space wasted */
     /*
      * unsigned short does not cut it, because initial value for
      * each entry in the table is -1. negative value of table
      * entries is also vital for table_users calculation.
      */
-    short *vif_vrf_table;
+    struct vr_vrf_assign *vif_vrf_table;
 
     void *vif_os;
     int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
@@ -169,6 +175,8 @@ extern void vif_remove_xconnect(struct vr_interface *);
 extern int vif_xconnect(struct vr_interface *, struct vr_packet *);
 extern void vif_drop_pkt(struct vr_interface *, struct vr_packet *, bool);
 extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
-extern int vif_vrf_table_set(struct vr_interface *, unsigned int, short);
+extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
+extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
+        short, unsigned short);
 
 #endif /* __VR_INTERFACE_H__ */

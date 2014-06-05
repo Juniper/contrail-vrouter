@@ -43,7 +43,6 @@ struct vr_flow_key {
     /* we should be doing memcpy for the two ips */
     unsigned int key_src_ip;
     unsigned int key_dest_ip;
-    unsigned short key_vrf_id;
     unsigned short key_nh_id;
     unsigned char key_proto;
     unsigned char key_zero;
@@ -148,6 +147,11 @@ struct vr_flow_md {
     unsigned int flmd_index;
     unsigned short flmd_action;
     unsigned short flmd_flags;
+};
+
+struct vr_flow_trap_arg {
+    unsigned int vfta_index;
+    unsigned int vfta_nh_index;
 };
 
 struct vr_packet;

@@ -83,7 +83,8 @@ vr_vrf_assign_set(vr_vrf_assign_req *req)
         goto exit_set;
     }
 
-    ret = vif_vrf_table_set(vif, req->var_vlan_id, req->var_vif_vrf);
+    ret = vif_vrf_table_set(vif, req->var_vlan_id, req->var_vif_vrf,
+            req->var_nh_id);
 exit_set:
     if (vif)
         vrouter_put_interface(vif);

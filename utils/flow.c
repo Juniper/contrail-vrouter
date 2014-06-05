@@ -100,9 +100,9 @@ dump_table(struct flow_table *ft)
                     inet_ntoa(in_dest),
                     ntohs(fe->fe_key.key_dst_port),
                     fe->fe_key.key_proto,
-                    fe->fe_key.key_vrf_id);
+                    fe->fe_vrf);
 
-            if (fe->fe_rflow >= 0 && fe->fe_flags & VR_FLOW_FLAG_VRFT)
+            if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
                 printf("->%d", fe->fe_dvrf);
 
             printf(")\n");
@@ -148,7 +148,8 @@ dump_table(struct flow_table *ft)
                 action = 'U';
             }
 
-            printf("\t\t\t(");
+            printf("\t\t(");
+            printf("K(nh):%u, ", fe->fe_key.key_nh_id);
             printf("Action:%c", action);
             if (need_flag_print)
                 printf("(%s)", flag_string);
@@ -158,7 +159,7 @@ dump_table(struct flow_table *ft)
                 printf("E:%d, ", fe->fe_ecmp_nh_index);
 
             printf("S(nh):%u, ", fe->fe_src_nh_index);
-            printf(" Statistics:%d/%d", fe->fe_stats.flow_packets,
+            printf(" Statistics:%u/%u", fe->fe_stats.flow_packets,
                     fe->fe_stats.flow_bytes);
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
                 printf(" Mirror Index :");
@@ -503,7 +504,7 @@ flow_validate(int flow_index, char action)
     flow_req.fr_flow_proto = fe->fe_key.key_proto;
     flow_req.fr_flow_sport = fe->fe_key.key_src_port;
     flow_req.fr_flow_dport = fe->fe_key.key_dst_port;
-    flow_req.fr_flow_vrf = fe->fe_key.key_vrf_id;
+    flow_req.fr_flow_nh_id = fe->fe_key.key_nh_id;
 
     switch (action) {
     case 'd':
