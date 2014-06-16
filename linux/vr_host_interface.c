@@ -926,10 +926,14 @@ linux_rx_handler(struct sk_buff **pskb)
 {
     int ret;
     unsigned short vlan_id = VLAN_ID_INVALID;
+    unsigned short proto;
     struct sk_buff *skb = *pskb;
     struct vr_packet *pkt;
     struct net_device *dev = skb->dev;
     struct vr_interface *vif;
+    unsigned char *new_hdr, *old_hdr;
+    struct vr_vlan_hdr *vlanh;
+    struct vr_eth *eth;
     unsigned int curr_cpu;
     u16 rxq;
     int rpsdev = 0;
@@ -1007,6 +1011,21 @@ linux_rx_handler(struct sk_buff **pskb)
     if (skb->vlan_tci & VLAN_TAG_PRESENT) {
         vlan_id = skb->vlan_tci & 0xFFF;
         skb->vlan_tci = 0; 
+
+        old_hdr = pkt_data(pkt);
+        new_hdr = pkt_push(pkt, VR_VLAN_HLEN);
+        if (!new_hdr) {
+             vr_pfree(pkt, VP_DROP_PUSH);
+             return RX_HANDLER_CONSUMED;
+        }
+
+        VR_ETH_COPY(new_hdr, old_hdr);
+        eth = (struct vr_eth *)(new_hdr);
+        proto = eth->eth_proto;
+        eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
+        vlanh = (struct vr_vlan_hdr *)(new_hdr + sizeof(struct vr_eth));
+        vlanh->vlan_tag = htons(vlan_id);
+        vlanh->vlan_proto = proto;
     }
 
     ret = vif->vif_rx(vif, pkt, vlan_id);

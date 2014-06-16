@@ -404,27 +404,8 @@ unsigned int
 vr_l2_input(unsigned short vrf, struct vr_packet *pkt, 
                 struct vr_forwarding_md *fmd, unsigned short vlan_id)
 {
-    unsigned char *new_hdr, *old_hdr;
-    struct vr_vlan_hdr *vlanh;
-    struct vr_eth *eth;
     unsigned short pull_len, eth_proto;
     int reason;
-
-    /* If vlan_id is present insert the vlan tag */
-    if (vlan_id != VLAN_ID_INVALID) {
-        old_hdr = pkt_data(pkt);
-        new_hdr = pkt_push(pkt, VR_VLAN_HLEN);
-        if (!new_hdr) {
-             vr_pfree(pkt, VP_DROP_PUSH);
-             return 0;
-        }
-
-        VR_ETH_COPY(new_hdr, old_hdr);
-        eth = (struct vr_eth *)(new_hdr);
-        eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
-        vlanh = (struct vr_vlan_hdr *)(new_hdr + sizeof(struct vr_eth));
-        vlanh->vlan_tag = htons(vlan_id);
-    }
 
     /* Mark the network header if an L3 packet */
     pull_len = vr_reach_l3_hdr(pkt, &eth_proto);
