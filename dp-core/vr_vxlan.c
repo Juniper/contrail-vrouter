@@ -98,22 +98,26 @@ vr_vxlan_get(vr_vxlan_req *req)
     int ret = 0;
     struct vr_nexthop *nh = NULL;
     struct vrouter *router;
+    int offset=0;
 
    router = vrouter_get(req->vxlanr_rid);
     if (!router) {
         ret = -ENODEV;
     } else {
         nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, req->vxlanr_vnid); 
-        if (!nh)
+        if (!nh) {
+            req->offset=offsetof(vr_vxlan_req,vxlanr_vnid);
             ret = -ENOENT;
+        }
     }
 
+    offset=req->offset;
     if (!ret)
         vr_vxlan_make_req(req, nh, req->vxlanr_vnid);
     else
         req = NULL;
 
-    vr_message_response(VR_VXLAN_OBJECT_ID, req, ret);
+    vr_message_response(VR_VXLAN_OBJECT_ID, req, ret,offset);
 
     return 0;
 }
@@ -128,6 +132,7 @@ vr_vxlan_del(vr_vxlan_req *req)
     router = vrouter_get(req->vxlanr_rid);
     if (!router) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_vxlan_req,vxlanr_rid);
         goto generate_resp;
     }
 
@@ -136,7 +141,7 @@ vr_vxlan_del(vr_vxlan_req *req)
         vrouter_put_nexthop(nh);
 
 generate_resp:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
     return ret;
 }
 
@@ -150,18 +155,21 @@ vr_vxlan_add(vr_vxlan_req *req)
     router = vrouter_get(req->vxlanr_rid);
     if (!router) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_vxlan_req,vxlanr_rid);
         goto generate_resp;
     }
 
     nh = vrouter_get_nexthop(req->vxlanr_rid, req->vxlanr_nhid);
     if (!nh)  {
         ret = -EINVAL;
+        req->offset=offsetof(vr_vxlan_req,vxlanr_nhid);
         goto generate_resp;
     }
     
     nh_old = vr_itable_set(router->vr_vxlan_table, req->vxlanr_vnid, nh);
     if (nh_old) {
         if (nh_old == VR_ITABLE_ERR_PTR) {
+            req->offset=offsetof(vr_vxlan_req,vxlanr_vnid);
             ret = -EINVAL;
         } else {
             /* If there is any old nexthop, remove the reference */
@@ -170,7 +178,7 @@ vr_vxlan_add(vr_vxlan_req *req)
     }
 
 generate_resp:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
     return ret;
 }
 

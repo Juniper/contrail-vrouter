@@ -126,16 +126,21 @@ bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!vn_rtable)
         return -EINVAL;
 
-    if (IS_MAC_ZERO(rt->rtr_req.rtr_mac))
+    if (IS_MAC_ZERO(rt->rtr_req.rtr_mac)) {
+        rt->rtr_req.offset=offsetof(vr_route_req,rtr_mac);
         return -EINVAL;
+    }
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid,
             rt->rtr_req.rtr_nh_id);
-    if (!rt->rtr_nh)
+    if (!rt->rtr_nh) {
+        rt->rtr_req.offset=offsetof(vr_route_req,rtr_nh_id);
         return -ENOENT;
+    }
 
     if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
         (rt->rtr_nh->nh_type == NH_TUNNEL)) {
+        rt->rtr_req.offset=offsetof(vr_route_req,rtr_label_flags);
         vrouter_put_nexthop(rt->rtr_nh);
         return -EINVAL;
     }
@@ -176,8 +181,10 @@ bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
 
     be = vr_find_bridge_entry(&key);
-    if (!be)
+    if (!be) {
+        rt->rtr_req.offset=offsetof(vr_route_req,rtr_mac);
         return -ENOENT;
+    }
 
     bridge_table_entry_free(vn_rtable, (vr_hentry_t )be, 0, NULL);
     return 0;

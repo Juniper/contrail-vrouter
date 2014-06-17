@@ -270,7 +270,7 @@ vrouter_ops_process(void *s_req)
         ret = -EOPNOTSUPP;
     }
 
-    vr_send_response(ret);
+    vr_send_response(ret,0);
 
     return;
 }

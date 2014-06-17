@@ -129,7 +129,7 @@ vr_drop_stats_get(void)
     vr_drop_stats_fill_response(&response, stats);
 
 exit_get:
-    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : &response, ret);
+    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : &response, ret,0);
     return;
 }
 
@@ -140,7 +140,7 @@ vr_drop_stats_req_process(void *s_req)
     vr_drop_stats_req *req = (vr_drop_stats_req *)s_req;
 
     if ((req->h_op != SANDESH_OP_GET) && (ret = -EOPNOTSUPP))
-        vr_send_response(ret);
+        vr_send_response(ret,0);
     
     vr_drop_stats_get();
     return;

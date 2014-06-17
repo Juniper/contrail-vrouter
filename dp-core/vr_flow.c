@@ -1025,33 +1025,54 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
                 (unsigned short)req->fr_flow_dport != fe->fe_key.key_dst_port||
                 (unsigned short)req->fr_flow_nh_id != fe->fe_key.key_nh_id ||
                 (unsigned char)req->fr_flow_proto != fe->fe_key.key_proto) {
+
+	    if((unsigned int)req->fr_flow_sip != fe->fe_key.key_src_ip)
+                req->offset=offsetof(vr_flow_req,fr_flow_sip);
+	    else if ((unsigned int)req->fr_flow_dip != fe->fe_key.key_dest_ip)
+                req->offset=offsetof(vr_flow_req,fr_flow_dip);
+	    else if((unsigned short)req->fr_flow_sport != fe->fe_key.key_src_port)
+                req->offset=offsetof(vr_flow_req,fr_flow_sport);
+	    else if ((unsigned short)req->fr_flow_dport != fe->fe_key.key_dst_port)
+                req->offset=offsetof(vr_flow_req,fr_flow_dport);
+	    else if((unsigned short)req->fr_flow_nh_id != fe->fe_key.key_nh_id)
+                req->offset=offsetof(vr_flow_req,fr_flow_vrf);
+	    else
+                req->offset=offsetof(vr_flow_req,fr_flow_proto);
             return -EBADF;
         }
     }
 
     if (req->fr_flags & VR_FLOW_FLAG_VRFT) {
-        if ((unsigned short)req->fr_flow_dvrf >= VR_MAX_VRFS)
+        if ((unsigned short)req->fr_flow_dvrf >= VR_MAX_VRFS) {
+            req->offset=offsetof(vr_flow_req,fr_flow_dvrf);
             return -EINVAL;
+	}
     }
 
     if (req->fr_flags & VR_FLOW_FLAG_MIRROR) {
         if (((unsigned int)req->fr_mir_id >= router->vr_max_mirror_indices) &&
-                (unsigned int)req->fr_sec_mir_id >= router->vr_max_mirror_indices)
+                (unsigned int)req->fr_sec_mir_id >= router->vr_max_mirror_indices) {
+            req->offset=offsetof(vr_flow_req,fr_mir_id);
             return -EINVAL;
+	}
     }
 
     if (req->fr_flags & VR_RFLOW_VALID) {
         rfe = vr_get_flow_entry(router, req->fr_rindex);
-        if (!rfe)
+        if (!rfe) {
+            req->offset=offsetof(vr_flow_req,fr_rindex);
             return -EINVAL;
+	}
     }
 
     /* 
      * for delete, we need not validate nh_index from incoming request
      */
     if (req->fr_flags & VR_FLOW_FLAG_ACTIVE) {
-        if (!__vrouter_get_nexthop(router, req->fr_src_nh_index))
+        if (!__vrouter_get_nexthop(router, req->fr_src_nh_index)) {
+            req->offset=offsetof(vr_flow_req,fr_src_nh_index);
             return -EINVAL;
+	}
     }
 
     return 0;
@@ -1114,8 +1135,10 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
      * handle that case first
      */
     if (!(req->fr_flags & VR_FLOW_FLAG_ACTIVE)) {
-        if (!fe)
+        if (!fe) {
+            req->offset=offsetof(vr_flow_req,fr_flags);
             return -EINVAL;
+	}
         return vr_flow_delete(router, req, fe);
     }
 
@@ -1180,7 +1203,7 @@ vr_flow_req_process(void *s_req)
         ret = -EINVAL;
     }
 
-    vr_message_response(VR_FLOW_OBJECT_ID, req, ret);
+    vr_message_response(VR_FLOW_OBJECT_ID, req, ret,req->offset);
     return;
 }
 

@@ -73,6 +73,7 @@ vr_mirror_del(vr_mirror_req *req)
     mirror = __vrouter_get_mirror(req->mirr_rid, req->mirr_index);
     if (!mirror) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mirror_req,mirr_index);
         goto generate_resp;
     }
 
@@ -86,7 +87,7 @@ vr_mirror_del(vr_mirror_req *req)
     vrouter_put_mirror(router, req->mirr_index);
 
 generate_resp:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
 
     return ret;
 }
@@ -125,6 +126,7 @@ vr_mirror_add(vr_mirror_req *req)
 
     if ((unsigned int)req->mirr_index >= router->vr_max_mirror_indices) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mirror_req,mirr_index);
         goto generate_resp;
     }
 
@@ -132,6 +134,7 @@ vr_mirror_add(vr_mirror_req *req)
 
     nh = vrouter_get_nexthop(req->mirr_rid, req->mirr_nhid);
     if (!nh)  {
+        req->offset=offsetof(vr_mirror_req,mirr_nhid);
         ret = -EINVAL;
         goto generate_resp;
     }
@@ -149,7 +152,7 @@ vr_mirror_add(vr_mirror_req *req)
     }
 
 generate_resp:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
 
     return ret;
 }
@@ -211,26 +214,30 @@ static int
 vr_mirror_get(vr_mirror_req *req)
 {
     int ret = 0;
+    int offset=0;
     struct vrouter *router;
     struct vr_mirror_entry *mirror = NULL;
 
     router = vrouter_get(req->mirr_rid);
     if (!router ||
             (unsigned int)req->mirr_index >= router->vr_max_mirror_indices) {
+        req->offset=offsetof(vr_mirror_req,mirr_index);
         ret = -ENODEV;
     } else {
         mirror = __vrouter_get_mirror(req->mirr_rid, req->mirr_index);
-        if (!mirror)
+        if (!mirror) {
+            req->offset=offsetof(vr_mirror_req,mirr_index);
             ret = -ENOENT;
     }
 
-
+   }
+    offset=req->offset;
     if (mirror) {
         vr_mirror_make_req(req, mirror, req->mirr_index);
     } else
         req = NULL;
 
-    return vr_message_response(VR_MIRROR_OBJECT_ID, req, ret);
+    return vr_message_response(VR_MIRROR_OBJECT_ID, req, ret,offset);
 }
 
 void

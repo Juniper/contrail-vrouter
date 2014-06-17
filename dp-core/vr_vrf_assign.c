@@ -59,15 +59,17 @@ vr_vrf_assign_get(vr_vrf_assign_req *req)
 
     vif = vrouter_get_interface(req->var_rid, req->var_vif_index);
     if (!vif) {
+        req->offset=offsetof(vr_vrf_assign_req,var_vif_index);
         ret = -EINVAL;
         goto exit_get;
     }
 
     memcpy(&resp, req, sizeof(*req));
     ret = vif_vrf_table_get(vif, &resp);
+    req->offset=resp.offset;
     vrouter_put_interface(vif);
 exit_get:
-    vr_message_response(VR_VRF_ASSIGN_OBJECT_ID, ret ? NULL : &resp, ret);
+    vr_message_response(VR_VRF_ASSIGN_OBJECT_ID, ret ? NULL : &resp, ret,req->offset);
     return 0;
 }
 
@@ -79,17 +81,21 @@ vr_vrf_assign_set(vr_vrf_assign_req *req)
 
     vif = vrouter_get_interface(req->var_rid, req->var_vif_index);
     if (!vif) {
+        req->offset=offsetof(vr_vrf_assign_req,var_vif_index);
         ret = -EINVAL;
         goto exit_set;
     }
 
     ret = vif_vrf_table_set(vif, req->var_vlan_id, req->var_vif_vrf,
             req->var_nh_id);
+    if(ret && req->var_vlan_id> VIF_VRF_TABLE_ENTRIES)
+       req->offset=offsetof(vr_vrf_assign_req,var_vlan_id);
+
 exit_set:
     if (vif)
         vrouter_put_interface(vif);
 
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
     return ret;
 }
 
@@ -119,12 +125,13 @@ vr_vrf_assign_req_process(void *s_req)
 
     default:
         ret = -EINVAL;
+        req->offset=0;
         goto error;
     }
 
     return;
 
 error:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
     return;
 }

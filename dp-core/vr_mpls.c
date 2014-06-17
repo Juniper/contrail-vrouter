@@ -34,11 +34,13 @@ vr_mpls_del(vr_mpls_req *req)
     router = vrouter_get(req->mr_rid);
     if (!router) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mpls_req,mr_rid);
         goto generate_resp;
     }
 
     if (req->mr_label > (int)router->vr_max_labels) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mpls_req,mr_label);
         goto generate_resp;
     }
 
@@ -48,7 +50,8 @@ vr_mpls_del(vr_mpls_req *req)
     router->vr_ilm[req->mr_label] = NULL;
 
 generate_resp:
-    vr_send_response(ret);
+    req->ret=ret;
+    vr_send_response(ret,req->offset);
 
     return ret;
 }
@@ -63,24 +66,27 @@ vr_mpls_add(vr_mpls_req *req)
     router = vrouter_get(req->mr_rid);
     if (!router) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mpls_req,mr_rid);
         goto generate_resp;
     }
 
     if ((unsigned int)req->mr_label > router->vr_max_labels) {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mpls_req,mr_label);
         goto generate_resp;
     }
 
     nh = vrouter_get_nexthop(req->mr_rid, req->mr_nhid);
     if (!nh)  {
         ret = -EINVAL;
+        req->offset=offsetof(vr_mpls_req,mr_nhid);
         goto generate_resp;
     }
 
     router->vr_ilm[req->mr_label] = nh;
 
 generate_resp:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
 
     return ret;
 }
@@ -137,25 +143,30 @@ int
 vr_mpls_get(vr_mpls_req *req)
 {
     int ret = 0;
+    int offset=0;
     struct vr_nexthop *nh = NULL;
     struct vrouter *router;
 
     router = vrouter_get(req->mr_rid);
     if (!router || req->mr_label > (int)router->vr_max_labels) {
+        if(req->mr_label > (int)router->vr_max_labels)
+                req->offset=offsetof(vr_mpls_req,mr_label);
         ret = -ENODEV;
     } else {
         nh = vrouter_get_label(req->mr_rid, req->mr_label);
-        if (!nh)
+        if (!nh) {
+            req->offset=offsetof(vr_mpls_req,mr_label);
             ret = -ENOENT;
+        }
     }
 
+    offset=req->offset;
     if (!ret)
         vr_mpls_make_req(req, nh, req->mr_label);
     else
         req = NULL;
 
-    vr_message_response(VR_MPLS_OBJECT_ID, req, ret);
-
+    vr_message_response(VR_MPLS_OBJECT_ID, req, ret,offset);
     return 0;
 }
 

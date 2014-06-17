@@ -1113,14 +1113,17 @@ vr_interface_delete(vr_interface_req *req, bool need_response)
     struct vrouter *router = vrouter_get(req->vifr_rid);
 
     vif = __vrouter_get_interface(router, req->vifr_idx);
-    if (!vif && (ret = -ENODEV))
+	if (!vif && (ret = -ENODEV)) {
+        req->ret=ret;
+        req->offset=offsetof(vr_interface_req,vifr_idx);
         goto del_fail;
+	}
 
     vif_delete(vif);
 
 del_fail:
     if (need_response)
-        vr_send_response(ret);
+        vr_send_response(ret,req->offset);
 
     return ret;
 }
@@ -1181,12 +1184,17 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     struct vrouter *router = vrouter_get(req->vifr_rid);
 
     if (!router || ((unsigned int)req->vifr_idx >= router->vr_max_interfaces)) {
+        req->offset=offsetof(vr_interface_req,vifr_idx);
         ret = -EINVAL;
+        req->ret=ret;
         goto generate_resp;
     }
 
-    if (req->vifr_type >= VIF_TYPE_MAX && (ret = -EINVAL))
+    if (req->vifr_type >= VIF_TYPE_MAX && (ret = -EINVAL)) {
+        req->ret=ret;
+        req->offset=offsetof(vr_interface_req,vifr_type);
         goto generate_resp;
+	}
 
     vif = __vrouter_get_interface(router, req->vifr_idx);
     if (vif) {
@@ -1226,7 +1234,13 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
 
     if ((req->vifr_mac_size != sizeof(vif->vif_mac)) || !req->vifr_mac) {
+	if(req->vifr_mac_size != sizeof(vif->vif_mac))
+		req->offset=offsetof(vr_interface_req,vifr_mac_size);
+	else
+		req->offset=offsetof(vr_interface_req,vifr_mac);
+
         ret = -EINVAL;
+        req->ret=ret;
         goto generate_resp;
     }
 
@@ -1249,6 +1263,8 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (vif_drivers[vif->vif_type].drv_add) {
         ret = vif_drivers[vif->vif_type].drv_add(vif, req);
         if (ret) {
+            req->ret=ret;
+            req->offset=offsetof(vr_interface_req,vifr_os_idx);
             vrouter_del_interface(vif);
             vif = NULL;
         } else {
@@ -1259,7 +1275,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
 
 generate_resp:
     if (need_response)
-        vr_send_response(ret);
+        vr_send_response(ret,req->offset);
 
     if (ret && vif)
         vif_free(vif);
@@ -1382,11 +1398,14 @@ vr_interface_get(vr_interface_req *req)
         }
 
         vr_interface_make_req(resp, vif);
-    } else
+    } else {
         ret = -ENOENT;
+        req->ret=ret;
+        req->offset=offsetof(vr_interface_req,vifr_idx);
+    }
 
 generate_response:
-    vr_message_response(VR_INTERFACE_OBJECT_ID, resp, ret);
+    vr_message_response(VR_INTERFACE_OBJECT_ID, resp, ret,req->offset);
     if (resp)
         vr_interface_req_destroy(resp);
 
@@ -1446,6 +1465,8 @@ vr_interface_req_process(void *s_req)
     int ret;
     vr_interface_req *req = (vr_interface_req *)s_req;
     bool need_response = true;
+    req->offset=0;
+    req->ret=0;
 
     switch (req->h_op) {
     case SANDESH_OP_ADD:
@@ -1472,7 +1493,7 @@ vr_interface_req_process(void *s_req)
     return;
 
 error:
-    vr_send_response(ret);
+    vr_send_response(ret,req->offset);
     return;
 }
 
@@ -1497,8 +1518,11 @@ vif_vrf_table_get(struct vr_interface *vif, vr_vrf_assign_req *req)
     if (!vif->vif_vrf_table)
         return -ENOMEM;
 
-    if (req->var_vlan_id >= VIF_VRF_TABLE_ENTRIES)
+    if (req->var_vlan_id >= VIF_VRF_TABLE_ENTRIES) {
+        req->offset=offsetof(vr_vrf_assign_req,var_vlan_id);
+        req->ret=-EINVAL;
         return -EINVAL;
+	}
 
     req->var_vif_vrf = vif->vif_vrf_table[req->var_vlan_id].va_vrf;
     req->var_nh_id = vif->vif_vrf_table[req->var_vlan_id].va_nh_id;
