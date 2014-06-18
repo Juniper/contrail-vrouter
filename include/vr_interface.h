@@ -36,6 +36,8 @@
                                         (vif->vif_type == VIF_TYPE_GATEWAY))
 #define vif_is_service(vif)         (vif->vif_flags & VIF_FLAG_SERVICE_IF)
 
+#define vif_needs_dev(vif)          ((vif->vif_type != VIF_TYPE_VIRTUAL_VLAN))
+
 #define VR_INTERFACE_NAME_LEN       64
 
 #define VR_IF_ADD                   0
@@ -49,6 +51,7 @@
 #define VIF_FLAG_TX_CSUM_OFFLOAD    0x20
 #define VIF_FLAG_L3_ENABLED         0x40
 #define VIF_FLAG_L2_ENABLED         0x80
+#define VIF_FLAG_VHOST_PHYS         0x100
 
 
 #define VIF_VRF_TABLE_ENTRIES       1024
@@ -170,6 +173,7 @@ extern int vr_interface_dump_wrapper(vr_interface_req *);
 extern int vr_interface_add(vr_interface_req *, bool);
 
 extern int vif_delete(struct vr_interface *);
+extern struct vr_interface *vif_find(struct vrouter *, char *);
 extern void vif_set_xconnect(struct vr_interface *);
 extern void vif_remove_xconnect(struct vr_interface *);
 extern int vif_xconnect(struct vr_interface *, struct vr_packet *);
