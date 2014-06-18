@@ -21,6 +21,12 @@ struct pollfd vr_io_pollfds[VR_MAX_IO_CBS];
 unsigned int vr_io_n_pollfds;
 
 void
+vhost_remove_xconnect(void)
+{
+    return;
+}
+
+void
 vr_host_io_unregister(int fd)
 {
     int i;

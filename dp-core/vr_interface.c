@@ -8,6 +8,8 @@
 #include "vr_sandesh.h"
 #include "vr_mirror.h"
 
+volatile bool agent_alive = false;
+
 static struct vr_host_interface_ops *hif_ops;
 
 static int eth_srx(struct vr_interface *, struct vr_packet *, unsigned short);
@@ -20,6 +22,7 @@ extern unsigned int vr_l3_input(unsigned short, struct vr_packet *,
                                               struct vr_forwarding_md *);
 extern unsigned int vr_l2_input(unsigned short, struct vr_packet *, 
                                                struct vr_forwarding_md *, unsigned short);
+extern void vhost_remove_xconnect(void);
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -535,6 +538,8 @@ static int
 vhost_drv_add(struct vr_interface *vif,
         vr_interface_req *vifr __attribute__((unused)))
 {
+    int ret = 0;
+
     if (!vif->vif_os_idx)
         return -EINVAL;
 
@@ -545,7 +550,20 @@ vhost_drv_add(struct vr_interface *vif,
     vif->vif_tx = vhost_tx;
     vif->vif_rx = vhost_rx;
 
-    return hif_ops->hif_add(vif);
+    ret = hif_ops->hif_add(vif);
+    if (ret)
+        return ret;
+    /*
+     * add tap to the corresponding physical interface, now
+     * that vhost is functional
+     */
+    if (vif->vif_bridge) {
+        ret = hif_ops->hif_add_tap(vif->vif_bridge);
+        if (ret)
+            return ret;
+    }
+
+    return 0;
 }
 /* end vhost driver */
 
@@ -824,9 +842,20 @@ eth_drv_add(struct vr_interface *vif,
     if (ret)
         goto exit_add;
 
-    ret = hif_ops->hif_add_tap(vif);
-    if (ret)
-        hif_ops->hif_del(vif);
+    /*
+     * as soon as we add the tap, packets will start traversing vrouter.
+     * now, without a vhost interface getting added, such packets are
+     * useless. Also, once reset happens, the physical interface sends
+     * packets directly to vhost interface, bypassing vrouter. If we tap
+     * here, such packets will be blackholed. hence, do not tap the interface
+     * if the interface is set to be associated with a vhost interface.
+     */
+    if ((!(vif->vif_flags & VIF_FLAG_VHOST_PHYS)) ||
+            (vif->vif_bridge)) {
+        ret = hif_ops->hif_add_tap(vif);
+        if (ret)
+            hif_ops->hif_del(vif);
+    }
 
 exit_add:
     if (ret)
@@ -977,13 +1006,13 @@ vrouter_del_interface(struct vr_interface *vif)
         break;
 
     case VIF_TYPE_PHYSICAL:
-        if (router->vr_eth_if == vif) {
-            if (vif->vif_bridge) {
-                vif->vif_bridge->vif_bridge = NULL;
-                vif->vif_bridge = NULL;
-            }
-            router->vr_eth_if = NULL;
+        if (vif->vif_bridge) {
+            vif->vif_bridge->vif_bridge = NULL;
+            vif->vif_bridge = NULL;
         }
+
+        if (router->vr_eth_if == vif)
+            router->vr_eth_if = NULL;
 
         break;
 
@@ -998,6 +1027,35 @@ vrouter_del_interface(struct vr_interface *vif)
         vr_delay_op();
 
     vrouter_put_interface(vif);
+
+    return;
+}
+
+static void
+vrouter_setup_vif(struct vr_interface *vif)
+{
+    switch (vif->vif_type) {
+    case VIF_TYPE_AGENT:
+        agent_alive = true;
+        vhost_remove_xconnect();
+        break;
+
+    case VIF_TYPE_HOST:
+        if (!agent_alive) {
+            vif_set_xconnect(vif);
+            if (vif->vif_bridge)
+                vif_set_xconnect(vif->vif_bridge);
+        } else {
+            vif_remove_xconnect(vif);
+            if (vif->vif_bridge)
+                vif_remove_xconnect(vif->vif_bridge);
+        }
+
+        break;
+
+    default:
+        break;
+    }
 
     return;
 }
@@ -1097,6 +1155,19 @@ vif_detach(struct vr_interface *vif)
 int
 vif_delete(struct vr_interface *vif)
 {
+    /*
+     * setting name to NULL is important in preventing races. Races mainly
+     * come from interfaces going away/coming back (from OS. mainly virtual
+     * interfaces such as vlan, tap, bond etc.) and agent simultaneously
+     * trying to add/delete vif. vif_find will be used by the OS specific
+     * code when an interface goes away/comes back to find the vif corresponding
+     * to the name. Setting name to NULL partially makes sure that vif is
+     * not found in delete cases. the other safety we have is in the rtnl_lock.
+     * the hos_if_* (add/del/tap) does some jugglery (which involves, checking
+     * for name) under rtnl_lock to make sure that states are proper.
+     */
+    vif->vif_name[0] = '\0';
+
     if (vif_drivers[vif->vif_type].drv_delete)
         vif_drivers[vif->vif_type].drv_delete(vif);
 
@@ -1104,6 +1175,21 @@ vif_delete(struct vr_interface *vif)
     return 0;
 }
 
+
+struct vr_interface *
+vif_find(struct vrouter *router, char *name)
+{
+    int i;
+    struct vr_interface *vif;
+
+    for (i = 0; i < router->vr_max_interfaces; i++) {
+        vif = router->vr_interfaces[i];
+        if (vif && !strncmp(vif->vif_name, name, sizeof(vif->vif_name)))
+            return vif;
+    }
+
+    return NULL;
+}
 
 static int
 vr_interface_delete(vr_interface_req *req, bool need_response)
@@ -1234,6 +1320,11 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     memcpy(vif->vif_rewrite, req->vifr_mac, sizeof(vif->vif_mac));
     vif->vif_ip = req->vifr_ip;
 
+    if (req->vifr_name) {
+        strncpy(vif->vif_name, req->vifr_name, sizeof(vif->vif_name));
+        vif->vif_name[sizeof(vif->vif_name) - 1] = '\0';
+    }
+
     /*
      * the order below is probably not intuitive, but we do this because
      * the moment we do a drv_add, packets will start coming in and find
@@ -1249,13 +1340,16 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (vif_drivers[vif->vif_type].drv_add) {
         ret = vif_drivers[vif->vif_type].drv_add(vif, req);
         if (ret) {
-            vrouter_del_interface(vif);
+            vif_delete(vif);
             vif = NULL;
         } else {
             vif->vif_driver = &vif_drivers[vif->vif_type];
         }
     }
 
+
+    if (!ret)
+        vrouter_setup_vif(vif);
 
 generate_resp:
     if (need_response)
@@ -1338,6 +1432,8 @@ vr_interface_req_get(void)
     if (req->vifr_mac)
         req->vifr_mac_size = VR_ETHER_ALEN;
 
+    req->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN);
+
     return req;
 }
 
@@ -1350,6 +1446,9 @@ vr_interface_req_destroy(vr_interface_req *req)
 
     if (req->vifr_mac)
         vr_free(req->vifr_mac);
+
+    if (req->vifr_name)
+        vr_free(req->vifr_name);
 
     vr_free(req);
     return;
@@ -1574,7 +1673,7 @@ vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
 
 
 int
-vr_gro_vif_add(struct vrouter *router, unsigned int os_idx)
+vr_gro_vif_add(struct vrouter *router, unsigned int os_idx, char *name)
 {
     int ret = 0;
     vr_interface_req *req = vr_interface_req_get();
@@ -1590,6 +1689,11 @@ vr_gro_vif_add(struct vrouter *router, unsigned int os_idx)
     req->vifr_rid = 0;
     req->vifr_os_idx = os_idx;
     req->vifr_mtu = 9136;
+
+    if (req->vifr_name) {
+        strncpy(req->vifr_name, name, VR_INTERFACE_NAME_LEN);
+        req->vifr_name[VR_INTERFACE_NAME_LEN - 1] = '\0';
+    }
 
     ret = vr_interface_add(req, false);
     vr_interface_req_destroy(req);
@@ -1614,9 +1718,9 @@ vr_interface_shut(struct vrouter *router)
         if ((vif = router->vr_interfaces[i])) {
             vif->vif_tx = vif_discard_tx;
             vif->vif_rx = vif_discard_rx;
-            vif->vif_flags = 0;
             if (vif_drivers[vif->vif_type].drv_delete)
                 vif_drivers[vif->vif_type].drv_delete(vif);
+            vif->vif_flags = 0;
         }
     }
 
@@ -1642,7 +1746,7 @@ vr_interface_exit(struct vrouter *router, bool soft_reset)
     }
 
 
-    if (!soft_reset && hif_ops) {
+    if (!soft_reset) {
         vr_host_interface_exit();
         hif_ops = NULL;
     }
