@@ -49,12 +49,13 @@
 #define VIF_FLAG_TX_CSUM_OFFLOAD    0x20
 #define VIF_FLAG_L3_ENABLED         0x40
 #define VIF_FLAG_L2_ENABLED         0x80
-
+#define VIF_FLAG_DHCP_ENABLED       0x100
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
+#define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
 
 struct vr_interface_stats {
     uint64_t vis_ibytes;
