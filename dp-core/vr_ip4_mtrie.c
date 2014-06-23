@@ -616,9 +616,10 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
         return -ENOENT;
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-    if (!rt->rtr_nh)
+    if (!rt->rtr_nh) {
+        rt->rtr_req.offset = offsetof(vr_route_req, rtr_nh_id);
         return -ENOENT;
-
+    }
     __mtrie_delete(rt, &rtable->root, 0);
     vrouter_put_nexthop(rt->rtr_nh);
 
@@ -802,12 +803,15 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
         return -ENOMEM;
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-    if (!rt->rtr_nh)
+    if (!rt->rtr_nh) {
+        rt->rtr_req.offset = offsetof(vr_route_req, rtr_nh_id);
+        rt->rtr_req.ret=-ENOENT;
         return -ENOENT;
-
+    }
 
     if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
                  (rt->rtr_nh->nh_type == NH_TUNNEL)) {
+        rt->rtr_req.offset = offsetof(vr_route_req, rtr_label_flags);
         vrouter_put_nexthop(rt->rtr_nh);
         return -EINVAL;
     }

@@ -181,8 +181,10 @@ mcast_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     int ret;
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-    if (!rt->rtr_nh)
+    if (!rt->rtr_nh) {
+        rt->rtr_req.offset = offsetof(vr_route_req, rtr_nh_id);
         return -ENOENT;
+    }
 
     ret = __mcast_add(rt);
     vrouter_put_nexthop(rt->rtr_nh);

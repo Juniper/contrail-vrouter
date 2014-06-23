@@ -24,6 +24,7 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/genetlink.h>
+#include <linux/stddef.h>
 
 #include <asm/checksum.h>
 #include <asm/bug.h>
@@ -47,6 +48,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <sys/types.h>
+#include <stddef.h>
 
 #define vr_printf(format, arg...)   printf(format, ##arg)
 #define ASSERT(x) assert((x));

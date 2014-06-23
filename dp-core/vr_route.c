@@ -40,14 +40,19 @@ vr_route_delete(vr_route_req *req)
     int ret;
 
     fs = vr_get_family(req->rtr_family);
-    if (!fs)
+    if (!fs) {
         ret = -ENOENT;
+        req->ret = ret;
+        req->offset = offsetof(vr_route_req, rtr_family);
+    }
     else {
         vr_req.rtr_req = *req;
         ret = fs->route_del(fs, &vr_req);
+        req->offset = vr_req.rtr_req.offset;
+        req->ret=vr_req.rtr_req.ret;
     }
 
-    vr_send_response(ret);
+    vr_send_response(ret, req->offset);
 
     return ret;
 }
@@ -62,12 +67,16 @@ vr_route_add(vr_route_req *req)
     fs = vr_get_family(req->rtr_family);
     if (!fs) {
         ret = -ENOENT;
+        req->ret = ret;
+        req->offset = offsetof(vr_route_req, rtr_family);
     } else {
         vr_req.rtr_req = *req;
         ret = fs->route_add(fs, &vr_req);
+        req->offset = vr_req.rtr_req.offset;
+        req->ret=vr_req.rtr_req.ret;
     }
 
-    vr_send_response(ret);
+    vr_send_response(ret, req->offset);
 
     return ret;
 }
@@ -118,6 +127,7 @@ vr_route_get(vr_route_req *req)
 
         rtable = vr_get_inet_table(router, req->rtr_rt_type);
         if (!rtable) {
+            req->offset = offsetof(vr_route_req, rtr_rt_type);
             ret = -ENOENT;
             goto generate_response;
         }
@@ -126,7 +136,7 @@ vr_route_get(vr_route_req *req)
     }
 
 generate_response:
-    vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
+    vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret, req->offset);
     return ret;
 }
 
@@ -153,6 +163,7 @@ vr_route_dump(vr_route_req *req)
 
         if (!rtable) {
             ret = -ENOENT;
+            req->offset = offsetof(vr_route_req, rtr_family);
             goto generate_error;
         }
 
@@ -162,7 +173,7 @@ vr_route_dump(vr_route_req *req)
     return ret;
 
 generate_error:
-    vr_send_response(ret);
+    vr_send_response(ret, req->offset);
 
     return ret;
 }
@@ -205,6 +216,7 @@ vr_inet_vrf_stats_dump(struct vrouter *router, vr_vrf_stats_req *req)
     rtable = vr_get_inet_table(router, req->vsr_type);
     if (!rtable) {
         ret = -ENOENT;
+        req->offset = offsetof(vr_vrf_stats_req, vsr_type);
         goto generate_error;
     }
 
@@ -212,7 +224,7 @@ vr_inet_vrf_stats_dump(struct vrouter *router, vr_vrf_stats_req *req)
     return;
 
 generate_error:
-    vr_send_response(ret);
+    vr_send_response(ret, req->offset);
     return; 
 }
 
@@ -226,18 +238,20 @@ vr_inet_vrf_stats_get(struct vrouter *router, vr_vrf_stats_req *req)
     rtable = vr_get_inet_table(router, req->vsr_type);
     if (!rtable) {
         ret = -ENOENT;
+        req->offset = offsetof(vr_vrf_stats_req, vsr_type);
         goto generate_error;
     }
 
     if (req->vsr_vrf >= 0 && 
             (unsigned int)req->vsr_vrf >= rtable->algo_max_vrfs) {
+        req->offset = offsetof(vr_vrf_stats_req, vsr_vrf);
         ret = -EINVAL;
         goto generate_error;
     }
 
     ret = rtable->algo_stats_get(req, &response);
 generate_error:
-    vr_message_response(VR_VRF_STATS_OBJECT_ID, ret ? NULL : &response, ret);
+    vr_message_response(VR_VRF_STATS_OBJECT_ID, ret ? NULL : &response, ret, req->offset);
     return;
 }
 
@@ -276,13 +290,14 @@ vr_vrf_stats_op(vr_vrf_stats_req *req)
 
     default:
         ret = -EINVAL;
+        req->offset = offsetof(vr_vrf_stats_req, vsr_family);
         goto generate_error;
     }
 
     return; 
 
 generate_error:
-    vr_send_response(ret);
+    vr_send_response(ret, req->offset);
     return;
 }
 
@@ -322,8 +337,16 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
     if (!rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
             ((unsigned int)(req->rtr_req.rtr_prefix_len) > VR_INET_MAX_PLEN))
+        {
+        if (!rtable)
+                req->rtr_req.offset = offsetof(vr_route_req, rtr_rt_type);
+        else if ((unsigned int)(req->rtr_req.rtr_prefix_len) > VR_INET_MAX_PLEN)
+                req->rtr_req.offset = offsetof(vr_route_req, rtr_prefix_len);
+        else
+                req->rtr_req.offset = offsetof(vr_route_req, rtr_vrf_id);
+        req->rtr_req.ret=-EINVAL;
         return -EINVAL;
-
+        }
     if (req->rtr_req.rtr_prefix_len) {
         pmask = ~((1 << (32 - req->rtr_req.rtr_prefix_len)) - 1);
         req->rtr_req.rtr_prefix &= pmask;
@@ -340,16 +363,24 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
     struct vrouter *router;
 
     if ((unsigned int)(req->rtr_req.rtr_prefix_len) > VR_INET_MAX_PLEN ||
-            (unsigned int)(req->rtr_req.rtr_vrf_id) >= VR_MAX_VRFS)
+            (unsigned int)(req->rtr_req.rtr_vrf_id) >= VR_MAX_VRFS) {
+        if ((unsigned int)(req->rtr_req.rtr_prefix_len) > VR_INET_MAX_PLEN)
+                req->rtr_req.offset = offsetof(vr_route_req, rtr_prefix_len);
+        else
+                req->rtr_req.offset = offsetof(vr_route_req, rtr_vrf_id);
+        req->rtr_req.ret=-EINVAL;
         return -EINVAL;
+    } 
 
     router = vrouter_get(req->rtr_req.rtr_rid);
     if (!router)
         return -EINVAL;
 
     rtable = vr_get_inet_table(router, req->rtr_req.rtr_rt_type);
-    if (!rtable || req->rtr_req.rtr_vrf_id >= (int)fs->rtb_max_vrfs)
+    if (!rtable || req->rtr_req.rtr_vrf_id >= (int)fs->rtb_max_vrfs) {
+        req->rtr_req.offset = offsetof(vr_route_req, rtr_rt_type);
         return -EINVAL;
+    }
 
     return rtable->algo_del(rtable, req);
 }
@@ -358,7 +389,7 @@ static void
 inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
                                                         bool soft_reset)
 {
-	struct vr_rtable *rtable;
+       struct vr_rtable *rtable;
     int i;
 
     for (i = 0; i < RT_MAX; i++) {
@@ -419,8 +450,14 @@ bridge_entry_add(struct rtable_fspec *fs, struct vr_route_req *req)
 
     if (!router->vr_bridge_rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
-            ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN))
+            ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN)) {
+        if ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs)
+            req->rtr_req.offset = offsetof(vr_route_req, rtr_vrf_id);
+        else if ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN)
+            req->rtr_req.offset = offsetof(vr_route_req, rtr_mac_size);
+        req->rtr_req.ret=-EINVAL;
         return -EINVAL;
+    }
 
     return router->vr_bridge_rtable->algo_add(router->vr_bridge_rtable, req);
 }

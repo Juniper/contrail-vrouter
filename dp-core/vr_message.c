@@ -134,7 +134,7 @@ vr_message_make_request(unsigned int object_type, void *object)
         return -ENOMEM;
 
     ret = proto->mproto_encode(buf, len, object_type, object,
-            VR_MESSAGE_TYPE_REQUEST);
+            VR_MESSAGE_TYPE_REQUEST,0);
     if (ret < 0)
         goto request_fail;
 
@@ -175,7 +175,7 @@ vr_message_process_response(int (*cb)(void *, unsigned int, void *),
 }
 
 int
-vr_message_response(unsigned int object_type, void *object, int ret)
+vr_message_response(unsigned int object_type, void *object, int ret,int offset)
 {
     char *buf = NULL;
     unsigned int len = 0;
@@ -196,7 +196,7 @@ vr_message_response(unsigned int object_type, void *object, int ret)
         return -ENOMEM;
 
     ret = proto->mproto_encode_response(buf, len, object_type,
-            object, ret);
+            object, ret,offset);
     if (ret < 0)
         goto response_fail;
 
@@ -206,14 +206,14 @@ response_fail:
     if (buf)
         trans->mtrans_free(buf);
 
-    vr_send_response(ret);
+    vr_send_response(ret,offset);
     return ret;
 }
 
 int
-vr_send_response(int code)
+vr_send_response(int code,int offset)
 {
-    return vr_message_response(VR_NULL_OBJECT_ID, NULL, code);
+    return vr_message_response(VR_NULL_OBJECT_ID, NULL, code,offset);
 }
 
 int
@@ -231,7 +231,7 @@ vr_message_dump_object(void *arg, unsigned int object_type, void *object)
 
     ret = proto->mproto_encode(dumper->dump_buffer + dumper->dump_offset,
             dumper->dump_buf_len - dumper->dump_offset,
-            object_type, object, VR_MESSAGE_TYPE_RESPONSE);
+            object_type, object, VR_MESSAGE_TYPE_RESPONSE,0);
     if (ret < 0) {
         /* we have more to dump, but we have to exit early */
         dumper->dump_num_dumped |= VR_MESSAGE_DUMP_INCOMPLETE;
@@ -258,7 +258,7 @@ vr_message_dump_exit(void *context, int ret)
     if (dumper)
         ret = dumper->dump_num_dumped;
 
-    vr_send_response(ret);
+    vr_send_response(ret,0);
 
     if (dumper) {
         if (!dumper->dump_offset) {

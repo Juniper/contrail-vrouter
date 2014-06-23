@@ -1,0 +1,38 @@
+#
+# Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv
+ 
+vr_root = '../'
+
+# CFLAGS
+env.Append(CCFLAGS = '-g')
+
+
+# Build libvrutil
+libvrutil = 'vrutil'
+libvrutil_objs = [env.Object('nl_util.lo', '../utils/nl_util.c'), env.Object('udp_util.lo', '../utils/udp_util.c')]
+env.StaticLibrary(libvrutil, libvrutil_objs)
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['.', '../sandesh'])
+env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
+
+# Build individual utils
+#vr_nexthop_test_sources = ['vr_nexthop_test.c']
+#vr_nexthop_test=env.Program(target = 'vr_nexthop_test', source = vr_nexthop_test_sources)
+
+vr_test_sources = ['vr_interface_tests.c','vr_nexthop_tests.c','vr_route_tests.c','vr_vxlan_tests.c','vr_mpls_tests.c','vr_mirror_tests.c','vr_tests.c']
+vr_tests=env.Program(target = 'vr_tests', source = vr_test_sources) 
+
+soft_reset_sources = ['soft_reset.c']
+soft_reset = env.Program(target = 'soft_reset', source = soft_reset_sources)
+
+
+# to make sure that all are built when you do 'scons' @ the top level
+env.Default(soft_reset,vr_tests)
+# Local Variables:
+# mode: python
+# End:

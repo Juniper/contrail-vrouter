@@ -87,13 +87,14 @@ sandesh_proto_encode(char *buf, unsigned int len,
 
 static int
 sandesh_proto_encode_response(char *buf, unsigned int len,
-        unsigned int object_type, void *object, int ret)
+        unsigned int object_type, void *object, int ret,int offset)
 {
     int off, error;
     vr_response resp;
 
     resp.h_op = SANDESH_OP_RESPONSE;
     resp.resp_code = ret;
+    resp.offset = offset;
 
     off = sandesh_encode(&resp, "vr_response", vr_find_sandesh_info,
             (unsigned char *)buf, len, &error);
