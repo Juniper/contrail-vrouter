@@ -100,8 +100,8 @@ vr_handle_arp_request(struct vrouter *router, unsigned short vrf,
 
         vif->vif_tx(vif, pkt);
     } else {
-        /* requests for which vr doesn't have to do anything */
-        vr_pfree(pkt, VP_DROP_ARP_NOT_ME);
+        /* packets from fabric... */
+        vif_xconnect(vif, pkt);
     }
 
     return 0;
@@ -141,6 +141,11 @@ vr_arp_input(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt)
 {
     struct vr_arp sarp;
+
+    if (pkt_len(pkt) < sizeof(struct vr_arp)) {
+        vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        return 0;
+    }
 
     memcpy(&sarp, pkt_data(pkt), sizeof(struct vr_arp));
     switch (ntohs(sarp.arp_op)) {

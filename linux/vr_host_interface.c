@@ -909,7 +909,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
         if (!pskb_may_pull(skb, offset + iph->ihl * 4))
             goto pull_fail;
     } else if (proto == htons(ETH_P_ARP)) {
-        if (!pskb_may_pull(skb, offset + sizeof(struct arphdr)))
+        if (!pskb_may_pull(skb, offset + sizeof(struct vr_arp)))
             goto pull_fail;
     }
 
