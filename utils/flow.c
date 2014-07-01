@@ -339,6 +339,7 @@ flow_rate(void)
             printf("New = %4d, Flow setup rate = %4d flows/sec, ",
                    (active_entries - prev_active_entries), rate);
             printf("Flow rate = %4d flows/sec, for last %4d ms\n", total_rate, diff_ms);
+            fflush(stdout);
         }
 
         last_time = now;
