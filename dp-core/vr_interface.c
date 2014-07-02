@@ -21,7 +21,7 @@ extern void vr_host_vif_init(struct vrouter *);
 extern unsigned int vr_l3_input(unsigned short, struct vr_packet *, 
                                               struct vr_forwarding_md *);
 extern unsigned int vr_l2_input(unsigned short, struct vr_packet *, 
-                                               struct vr_forwarding_md *, unsigned short);
+                                               struct vr_forwarding_md *);
 extern void vhost_remove_xconnect(void);
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
@@ -94,7 +94,7 @@ vr_interface_input(unsigned short vrf, struct vr_interface *vif,
     }
 
     if (vif->vif_flags & VIF_FLAG_L2_ENABLED)
-        return vr_l2_input(vrf, pkt, &fmd, vlan_id);
+        return vr_l2_input(vrf, pkt, &fmd);
 
     vif_drop_pkt(vif, pkt, 1);
     return 0;
