@@ -471,6 +471,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     unsigned short vrf;
     struct vr_forwarding_md mirror_fmd;
     struct vr_nexthop *src_nh;
+    struct vr_packet *pkt_clone;
 
     vrf = fe->fe_key.key_vrf_id;
     if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
@@ -490,15 +491,19 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
             return 0;
         }
 
-#if 0
-        if (valid_src == NH_SOURCE_MISMATCH)
-            return vr_trap(pkt, vrf,
-                    AGENT_TRAP_SOURCE_MISMATCH, &fmd->fmd_flow_index);
-#else
-        if (valid_src == NH_SOURCE_MISMATCH)
-            return vr_trap(pkt, vrf,
-                    AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
-#endif
+        if (valid_src == NH_SOURCE_MISMATCH) {
+            pkt_clone = vr_pclone(pkt);
+            if (pkt_clone) {
+                vr_preset(pkt_clone);
+                if (vr_pcow(pkt_clone, sizeof(struct vr_eth) +
+                            sizeof(struct agent_hdr))) {
+                    vr_pfree(pkt_clone, VP_DROP_PCOW_FAIL);
+                } else {
+                    vr_trap(pkt_clone, vrf,
+                            AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
+                }
+            }
+        }
     }
 
 
