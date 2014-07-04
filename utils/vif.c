@@ -481,6 +481,7 @@ enum if_opt_index {
     DHCP_OPT_INDEX,
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
+    MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
@@ -500,6 +501,7 @@ static struct option long_options[] = {
     [XCONNECT_OPT_INDEX]    =   {"xconnect",    required_argument,  &xconnect_set,      1},
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
+    [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
 static void
@@ -606,8 +608,10 @@ validate_options(void)
     unsigned int sum_opt = 0, i;
 
     for (i = 0; i < (sizeof(long_options) / sizeof(long_options[0]));
-                i++)
-        sum_opt += *(long_options[i].flag);
+                i++) {
+        if (long_options[i].flag)
+            sum_opt += *(long_options[i].flag);
+    }
 
     if (!sum_opt || help_set)
         Usage();
