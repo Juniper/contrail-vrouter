@@ -10,6 +10,13 @@
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0))
 typedef u64 netdev_features_t;
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+#define skb_get_rxhash skb_get_hash
+#elif ((LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)) && \
+       (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)) && \
+       defined(OS_LSB_Ubuntu))
+#define skb_get_rxhash skb_get_hash
+#endif
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 static inline __u32
 skb_get_rxhash(struct sk_buff *skb)
