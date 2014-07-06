@@ -34,6 +34,7 @@ extern int vr_perfr1, vr_perfr2, vr_perfr3;
 extern int vr_perfq1, vr_perfq2, vr_perfq3;
 extern int vr_from_vm_mss_adj;
 extern int vr_to_vm_mss_adj;
+extern int vr_udp_coff;
 extern int hashrnd_inited;
 extern __u32 vr_hashrnd;
 
