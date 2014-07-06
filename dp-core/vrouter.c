@@ -151,6 +151,9 @@ int vr_perfq1 = 0;   /* CPU to send packets to if vr_perfr1 is 1 */
 int vr_perfq2 = 0;   /* CPU to send packets to if vr_perfr2 is 1 */
 int vr_perfq3 = 0;   /* CPU to send packets to if vr_perfr3 is 1 */
 
+/* Should NIC perform checksum offload for outer UDP header? */
+int vr_udp_coff = 0;
+
 int
 vr_module_error(int error, const char *func,
         int line, int mod_specific)
