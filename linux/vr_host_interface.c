@@ -1873,10 +1873,17 @@ static int
 linux_if_notifier(struct notifier_block * __unused,
         unsigned long event, void *arg)
 {
-    struct net_device *dev = (struct net_device *)arg;
     /* for now, get router id 0 */
     struct vrouter *router = vrouter_get(0);
     struct vr_interface *agent_if, *eth_if;
+    struct net_device *dev;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0))
+    struct netdev_notifier_info *info = (struct netdev_notifier_info *)arg;
+    dev = info->dev;
+#else
+    dev = (struct net_device *)arg;
+#endif
 
     if (!router)
         return NOTIFY_DONE;
