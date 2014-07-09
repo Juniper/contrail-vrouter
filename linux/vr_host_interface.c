@@ -17,6 +17,7 @@
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 #include <linux/if_bridge.h>
+#include <linux/openvswitch.h>
 #endif
 
 #include <net/rtnetlink.h>
@@ -1091,6 +1092,45 @@ vr_do_rps_outer(struct sk_buff *skb, struct vr_interface *vif)
 #endif
 
 /*
+ * vr_get_vif_ptr - gets a pointer to the vif structure from the netdevice
+ * structure depending on whether vrouter uses the bridge or OVS hook.
+ */
+static struct vr_interface *
+vr_get_vif_ptr(struct net_device *dev)
+{
+    struct vr_interface *vif;
+
+    if (vr_use_linux_br) {
+        vif = (struct vr_interface *) rcu_dereference(dev->br_port);
+    } else {
+        vif = (struct vr_interface *) rcu_dereference(dev->ax25_ptr);
+    }
+
+    return vif;
+}
+
+/*
+ * vr_set_vif_ptr - sets a pointer to the vif structure in the netdevice
+ * structure depending on whether vrouter uses the bridge or OVS hook.
+ */
+void
+vr_set_vif_ptr(struct net_device *dev, void *vif)
+{
+    if (vr_use_linux_br) {
+        rcu_assign_pointer(dev->br_port, vif);
+    } else {
+        rcu_assign_pointer(dev->ax25_ptr, vif);
+        if (vif) {
+            dev->priv_flags |= IFF_OVS_DATAPATH;
+        } else {
+            dev->priv_flags &= (~IFF_OVS_DATAPATH);
+        }
+    }
+
+    return;
+}
+
+/*
  * vr_post_rps_get_phys_dev - get the physical interface that the packet
  * arrived on, after RPS is performed based on the outer header. Returns
  * the interface pointer on success, NULL otherwise.
@@ -1117,14 +1157,12 @@ vr_post_rps_outer_get_phys_dev(struct sk_buff *skb)
 }
 
 /*
- * vr_interface_bridge_hook
+ * vr_interface_common_hook
  *
- * Intercept packets received on virtual interfaces in kernel versions that
- * do not support the netdev_rx_handler_register API. This makes the vrouter
- * module incompatible with the bridge module.
+ * Common function called by both bridge and OVS hooks in 2.6 kernels.
  */
 static struct sk_buff *
-vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
+vr_interface_common_hook(struct sk_buff *skb)
 {
     unsigned short vlan_id = VLAN_ID_INVALID;
     struct vr_interface *vif;
@@ -1143,7 +1181,11 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
     if (skb->protocol == __be16_to_cpu(ETH_P_SLOW))
         return skb;
 
-    if (port == (struct net_bridge_port *)&vr_reset_interface) {
+    if (skb->dev == NULL) {
+        goto error;
+    }
+
+    if (vr_get_vif_ptr(skb->dev) == (&vr_reset_interface)) {
         vdev = vhost_get_vhost_for_phys(skb->dev);
         if (!vdev)
             goto error;
@@ -1170,9 +1212,9 @@ vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
         }
 
         rpsdev = 1;
-        vif = (struct vr_interface *) rcu_dereference(dev->br_port);
+        vif = vr_get_vif_ptr(dev);
     } else {
-        vif = (struct vr_interface *)port;
+        vif = vr_get_vif_ptr(skb->dev);
     }
 
 #if 0
@@ -1225,6 +1267,33 @@ error:
 
     return NULL;
 }
+
+/*
+ * vr_interface_bridge_hook
+ *
+ * Intercept packets received on virtual interfaces in kernel versions that
+ * do not support the netdev_rx_handler_register API. This makes the vrouter
+ * module incompatible with the bridge module.
+ */
+static struct sk_buff *
+vr_interface_bridge_hook(struct net_bridge_port *port, struct sk_buff *skb)
+{
+    return vr_interface_common_hook(skb);
+}
+
+/*
+ * vr_interface_ovs_hook
+ *
+ * Intercept packets received on virtual interfaces in kernel versions that
+ * do not support the netdev_rx_handler_register API. This makes the vrouter
+ * module incompatible with the openvswitch module.
+ */
+static struct sk_buff *
+vr_interface_ovs_hook(struct sk_buff *skb)
+{
+    return vr_interface_common_hook(skb);
+}
+
 #endif
 /*
  * both add tap and del tap can come from multiple contexts. one is
@@ -1288,13 +1357,12 @@ linux_if_del_tap(struct vr_interface *vif)
         goto exit_del_tap;
     }
 
-    if (rcu_dereference(dev->br_port) == (void *)vif) {
+    if (vr_get_vif_ptr(dev) == (void *)vif) {
         if ((vif->vif_type == VIF_TYPE_PHYSICAL) &&
                 (vif->vif_flags & VIF_FLAG_VHOST_PHYS)) {
-            rcu_assign_pointer(dev->br_port,
-                    (struct net_bridge_port *)&vr_reset_interface);
+            vr_set_vif_ptr(dev, &vr_reset_interface);
         } else {
-            rcu_assign_pointer(dev->br_port, NULL);
+            vr_set_vif_ptr(dev, NULL); 
         }
     }
 
@@ -1375,7 +1443,7 @@ linux_if_add_tap(struct vr_interface *vif)
         goto exit_add_tap;
     }
 
-    rcu_assign_pointer(dev->br_port, (void *)vif);
+    vr_set_vif_ptr(dev, (void *) vif);
 
 exit_add_tap:
     if (i_locked)
@@ -1558,8 +1626,9 @@ static void
 linux_pkt_dev_free(void)
 {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
-    if (pkt_gro_dev)
-        rcu_assign_pointer(pkt_gro_dev->br_port, NULL);
+    if (pkt_gro_dev) {
+        vr_set_vif_ptr(pkt_gro_dev, NULL);
+    }
 #endif
     linux_pkt_dev_free_helper(&pkt_gro_dev);
     linux_pkt_dev_free_helper(&pkt_rps_dev);
@@ -1652,7 +1721,7 @@ linux_pkt_dev_init(char *name, void (*setup)(struct net_device *),
             unregister_netdev(pdev);
         }
 #else
-        rcu_assign_pointer(pdev->br_port, (void *) pdev);
+        vr_set_vif_ptr(pdev, (void *) pdev);
 #endif
     }
 
@@ -1935,7 +2004,11 @@ vr_host_interface_exit(void)
     linux_pkt_dev_free();
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
-    br_handle_frame_hook = NULL;
+    if (vr_use_linux_br) {
+        br_handle_frame_hook = NULL;
+    } else {
+        openvswitch_handle_frame_hook = NULL;
+    }
 #endif
 
     return;
@@ -1962,10 +2035,6 @@ linux_pkt_dev_alloc(void)
         }
     }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
-    rcu_assign_pointer(pkt_gro_dev->br_port, (void *) pkt_gro_dev);
-#endif
-
     return 0;
 }
 
@@ -1983,7 +2052,11 @@ vr_host_interface_init(void)
         return NULL;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
-    br_handle_frame_hook = vr_interface_bridge_hook;
+    if (vr_use_linux_br) {
+        br_handle_frame_hook = vr_interface_bridge_hook;
+    } else {
+        openvswitch_handle_frame_hook = vr_interface_ovs_hook;
+    }
 #endif
 
     vhost_init();

@@ -2110,6 +2110,8 @@ module_param(vr_oflow_entries, int, 0);
 module_param(vr_bridge_entries, int, 0);
 module_param(vr_bridge_oentries, int, 0);
 
+module_param(vr_use_linux_br, int, 0);
+
 module_param(vrouter_dbg, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(vrouter_dbg, "Set 1 for pkt dumping and 0 to disable, default value is 0");
 
