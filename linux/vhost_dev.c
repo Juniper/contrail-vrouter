@@ -158,7 +158,7 @@ vhost_del_tap_phys(struct net_device *pdev)
     if (rcu_dereference(pdev->rx_handler) == vhost_rx_handler)
         netdev_rx_handler_unregister(pdev);
 #else
-    rcu_assign_pointer(pdev->br_port, NULL);
+    vr_set_vif_ptr(pdev, NULL);
 #endif
 
     if (i_locked)
@@ -209,8 +209,7 @@ vhost_tap_phys(struct net_device *vdev, struct net_device *pdev)
         netdev_rx_handler_register(pdev, vhost_rx_handler, (void *)vdev);
 
 #else
-    rcu_assign_pointer(pdev->br_port,
-            (struct net_bridge_port *)&vr_reset_interface);
+    vr_set_vif_ptr(pdev, &vr_reset_interface);
 #endif
 
 exit_tap_phys:

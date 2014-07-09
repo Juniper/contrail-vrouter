@@ -123,6 +123,8 @@ int vr_perfr2 = 1;   /* RPS after GRO on pkt1 interface */
 int vr_perfr3 = 1;   /* RPS from physical interface rx handler */
 int vr_perfp = 1;    /* pull inner headers, faster version */
 
+int vr_use_linux_br = 0; /* nop if netdev_rx_handler_register() is used */
+
 #else
 
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
@@ -132,6 +134,7 @@ int vr_perfr1 = 0;
 int vr_perfr2 = 1;
 int vr_perfr3 = 1;
 int vr_perfp = 1;
+int vr_use_linux_br = 0; /* Centos 6.4 */
 
 #else
 
@@ -139,6 +142,7 @@ int vr_perfr1 = 0;
 int vr_perfr2 = 0;
 int vr_perfr3 = 0;
 int vr_perfp = 0;
+int vr_use_linux_br = 1; /* Xen */
 
 #endif
 #endif
