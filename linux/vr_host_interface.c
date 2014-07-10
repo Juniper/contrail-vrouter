@@ -308,28 +308,48 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     }
 
     if (iph->ip_proto == VR_IP_PROTO_UDP) {
-        skb_set_network_header(seg, ETH_HLEN);
-        iph->ip_csum = 0;
-
         if (!pskb_may_pull(seg, ETH_HLEN + iphlen +
                     sizeof(struct udphdr))) {
             reason = VP_DROP_PULL;
             goto exit_xmit;
         }
 
-        skb_set_transport_header(seg,  iphlen + ETH_HLEN);
-        if (!skb_partial_csum_set(seg, skb_transport_offset(seg),
-                    offsetof(struct udphdr, check))) {
-            reason = VP_DROP_MISC;
-            goto exit_xmit;
-        }
+        if (vr_udp_coff) {
+            skb_set_network_header(seg, ETH_HLEN);
+            iph->ip_csum = 0;
 
-        udph = (struct udphdr *) skb_transport_header(seg);
-        udph->len = htons(seg->len - skb_transport_offset(seg));
-        iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
-        udph->check = ~csum_tcpudp_magic(iph->ip_saddr, iph->ip_daddr,
-                                         htons(udph->len),
-                                         IPPROTO_UDP, 0);
+            skb_set_transport_header(seg,  iphlen + ETH_HLEN);
+            if (!skb_partial_csum_set(seg, skb_transport_offset(seg),
+                        offsetof(struct udphdr, check))) {
+                reason = VP_DROP_MISC;
+                goto exit_xmit;
+            }
+
+            udph = (struct udphdr *) skb_transport_header(seg);
+            udph->len = htons(seg->len - skb_transport_offset(seg));
+            iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
+            udph->check = ~csum_tcpudp_magic(iph->ip_saddr, iph->ip_daddr,
+                                             htons(udph->len),
+                                             IPPROTO_UDP, 0);
+        } else {
+            /*
+             * If we are encapsulating a L3/L2 packet in UDP, set the UDP
+             * checksum to 0 and let the NIC calculate the checksum of the
+             * inner packet (if the NIC supports it).
+             */
+            udph = (struct udphdr *) (((char *)iph) + iphlen);
+            udph->len = htons(seg->len - (ETH_HLEN + iphlen));
+            udph->check = 0;
+
+            iph->ip_csum = 0;
+            iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
+
+            if ((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) == 0) {
+                if (seg->ip_summed == CHECKSUM_PARTIAL) {
+                    skb_checksum_help(seg);
+                }
+            }
+        }
     } else if (iph->ip_proto == VR_IP_PROTO_GRE) {
         iph->ip_csum = 0;
         iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
