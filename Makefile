@@ -45,6 +45,8 @@ SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_transp
 SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_memory_buffer.o
 SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_fake_transport.o
 
+OS_LSB_ID = $(shell awk '{ print $$1; exit }' /etc/issue)
+
 ifneq ($(KERNELRELEASE), )
 	obj-m := vrouter.o
 
@@ -71,6 +73,7 @@ ifneq ($(KERNELRELEASE), )
 	ccflags-y += -I$(src)/include -I$(SANDESH_HEADER_PATH)/sandesh/gen-c
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)/sandesh/library/c
+	ccflags-y += -DOS_LSB_${OS_LSB_ID}
 	ccflags-y += -g -Wall
 
 	ifeq ($(shell uname -r | grep 2.6.32|grep -c openstack),1)
