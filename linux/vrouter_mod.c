@@ -42,6 +42,8 @@ int vrouter_dbg;
 extern struct vr_packet *linux_get_packet(struct sk_buff *,
         struct vr_interface *);
 
+extern bool linux_ip_proto_pull(struct iphdr *);
+
 struct work_arg {
     struct work_struct wa_work;
     void (*fn)(void *);
@@ -956,9 +958,10 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
     skb_frag_t *frag;
     unsigned int frag_size, pull_len, hdr_len, skb_pull_len, tcp_size;
     unsigned int  tcph_pull_len = 0, hlen = 0;
-    struct vr_ip *iph = NULL;
+    struct vr_ip *iph = NULL, *icmp_pl_iph = NULL;
     struct vr_udp *udph;
     struct tcphdr *tcph = NULL;
+    struct vr_icmp *icmph = NULL;
     bool thdr_valid = false;
     unsigned int label, control_data;
     int pkt_type = 0;
@@ -1109,6 +1112,23 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
                         goto slow_path;
                     }
                 }
+            } else if (iph->ip_proto == VR_IP_PROTO_ICMP) {
+                icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
+                if (vr_icmp_error(icmph)) {
+                    pull_len += sizeof(struct vr_ip);
+                    if (frag_size < pull_len)
+                        goto slow_path;
+                    icmp_pl_iph = (struct vr_ip *)(icmph + 1);
+                    pull_len += (icmp_pl_iph->ip_hl * 4) - sizeof(struct vr_ip);
+                    if (frag_size < pull_len)
+                        goto slow_path;
+                    if (linux_ip_proto_pull((struct iphdr *)icmp_pl_iph)) {
+                        /* for source and target ports in the transport header */
+                        pull_len += sizeof(struct vr_icmp);
+                        if (frag_size < pull_len)
+                            goto slow_path;
+                    }
+                }
             }
         }
     }
@@ -1251,8 +1271,9 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
     skb_frag_t *frag;
     unsigned int frag_size, pull_len, hlen = 0, tcp_size, skb_pull_len,
                  label, control_data, tcph_pull_len = 0;
-    struct vr_ip *iph  = NULL;
+    struct vr_ip *iph  = NULL, *icmp_pl_iph = NULL;
     struct tcphdr *tcph = NULL;
+    struct vr_icmp *icmph = NULL;
     bool thdr_valid = false;
     struct vr_eth *eth = NULL;
     int pkt_type;
@@ -1445,6 +1466,23 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                         goto slow_path;
                     }
                 }
+            } else if (iph->ip_proto == VR_IP_PROTO_ICMP) {
+                icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
+                if (vr_icmp_error(icmph)) {
+                    pull_len += sizeof(struct vr_ip);
+                    if (frag_size < pull_len)
+                        goto slow_path;
+                    icmp_pl_iph = (struct vr_ip *)(icmph + 1);
+                    pull_len += (icmp_pl_iph->ip_hl * 4) - sizeof(struct vr_ip);
+                    if (frag_size < pull_len)
+                        goto slow_path;
+                    if (linux_ip_proto_pull((struct iphdr *)icmp_pl_iph)) {
+                        /* for source and target ports in the transport header */
+                        pull_len += sizeof(struct vr_icmp);
+                        if (frag_size < pull_len)
+                            goto slow_path;
+                    }
+                }
             }
         }
     }
@@ -1578,6 +1616,7 @@ lh_pull_inner_headers_fast(struct vr_ip *iph, struct vr_packet *pkt,
     return 0;
 }
 
+
 /*
  * lh_pull_inner_headers - given a pkt pointing at an outer header of length
  * hdr_len, pull in the MPLS header and as much of the inner packet headers
@@ -1591,8 +1630,9 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
 {
     int pull_len, hlen, hoff, ret = 0;
     struct sk_buff *skb = vp_os_packet(pkt); 
-    struct vr_ip *iph = NULL;
+    struct vr_ip *iph = NULL, *icmp_pl_iph = NULL;
     struct tcphdr *tcph = NULL;
+    struct vr_icmp *icmph = NULL;
     unsigned int tcpoff, skb_pull_len;
     bool thdr_valid = false;
     uint32_t label, control_data;
@@ -1765,6 +1805,31 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
 
                     iph = (struct vr_ip *) (skb->head + hoff);
                     tcph = (struct tcphdr *) ((char *) iph +  hlen);
+                }
+            } else if (iph->ip_proto == VR_IP_PROTO_ICMP) {
+                icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
+                if (vr_icmp_error(icmph)) {
+                    pull_len += sizeof(struct vr_ip);
+                    if (!pskb_may_pull(skb, pull_len))
+                        goto error;
+                    iph = (struct vr_ip *)(skb->head + hoff);
+                    icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
+
+                    icmp_pl_iph = (struct vr_ip *)(icmph + 1);
+                    pull_len += (icmp_pl_iph->ip_hl * 4) - sizeof(struct vr_ip);
+                    if (!pskb_may_pull(skb, pull_len))
+                        goto error;
+
+                    /* for source and target ports in the transport header */
+                    pull_len += sizeof(struct vr_icmp);
+                    if (skb->len < pull_len)
+                        pull_len = skb->len;
+
+                    if (!pskb_may_pull(skb, pull_len)) {
+                        goto error;
+                    }
+
+                    iph = (struct vr_ip *)(skb->head + hoff);
                 }
             }
         }

@@ -399,7 +399,9 @@ struct vr_udp {
 } __attribute__((packed));
 
 #define VR_ICMP_TYPE_ECHO_REPLY     0
+#define VR_ICMP_TYPE_DEST_UNREACH   3
 #define VR_ICMP_TYPE_ECHO           8
+#define VR_ICMP_TYPE_TIME_EXCEEDED 11
 
 struct vr_icmp {
     uint8_t icmp_type;
@@ -409,6 +411,18 @@ struct vr_icmp {
     uint16_t icmp_eid;
     uint16_t icmp_eseq;
 } __attribute__((packed));
+
+static inline bool
+vr_icmp_error(struct vr_icmp *icmph)
+{
+    uint8_t type = icmph->icmp_type;
+
+    if ((type == VR_ICMP_TYPE_DEST_UNREACH) ||
+            (type == VR_ICMP_TYPE_TIME_EXCEEDED))
+        return true;
+
+    return false;
+}
 
 struct vr_gre {
     unsigned short gre_flags;
