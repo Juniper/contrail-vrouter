@@ -922,28 +922,60 @@ linux_pull_outer_headers(struct sk_buff *skb)
 {
     struct vlan_hdr *vhdr;
     uint16_t proto, offset;
-    struct iphdr *iph;
+    struct iphdr *iph = NULL;
 
     offset = 0;
     proto = skb->protocol;
     while (proto == htons(ETH_P_8021Q)) {
-        if (!pskb_may_pull(skb, offset + VLAN_HLEN))
+        offset += sizeof(struct vlan_hdr);
+        if (!pskb_may_pull(skb, offset))
             goto pull_fail;
         vhdr = (struct vlan_hdr *)(skb->data + offset);
         proto = vhdr->h_vlan_encapsulated_proto;
-        offset += sizeof(struct vlan_hdr);
     }
 
     if (likely(proto == htons(ETH_P_IP))) {
         skb_set_network_header(skb, offset);
-        if (!pskb_may_pull(skb, offset + sizeof(struct iphdr)))
+
+        offset += sizeof(struct iphdr);
+        if (!pskb_may_pull(skb, offset))
             goto pull_fail;
+
         iph = ip_hdr(skb);
-        if (!pskb_may_pull(skb, offset + iph->ihl * 4))
+        offset += (iph->ihl * 4) - sizeof(struct iphdr);
+        if (!pskb_may_pull(skb, offset))
             goto pull_fail;
     } else if (proto == htons(ETH_P_ARP)) {
-        if (!pskb_may_pull(skb, offset + sizeof(struct arphdr)))
+        offset += sizeof(struct vr_arp);
+        if (!pskb_may_pull(skb, offset))
             goto pull_fail;
+    }
+
+    if (iph && vr_ip_transport_header_valid((struct vr_ip *)iph)) {
+        /*
+         * this covers both regular port number offsets that come in
+         * the first 4 bytes and the icmp header
+         */
+        offset += sizeof(struct vr_icmp);
+        if (!pskb_may_pull(skb, offset))
+            goto pull_fail;
+
+
+        if (iph->protocol == VR_IP_PROTO_ICMP) {
+            if (vr_icmp_error((struct vr_icmp *)(skb->data +
+                            offset - sizeof(struct vr_icmp)))) {
+                iph = (struct iphdr *)(skb->data + offset);
+                offset += sizeof(struct iphdr);
+                if (!pskb_may_pull(skb, offset))
+                    goto pull_fail;
+
+                offset += (iph->ihl * 4) - sizeof(struct iphdr) +
+                    sizeof(struct vr_icmp);
+
+                if (!pskb_may_pull(skb, offset))
+                    goto pull_fail;
+            }
+        }
     }
 
 
@@ -1029,11 +1061,9 @@ linux_rx_handler(struct sk_buff **pskb)
     }
 #endif
 
-    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
-        ret = linux_pull_outer_headers(skb);
-        if (ret < 0)
-            goto error;
-    }
+    ret = linux_pull_outer_headers(skb);
+    if (ret < 0)
+        goto error;
 
     skb_push(skb, ETH_HLEN);
 
@@ -1260,11 +1290,9 @@ vr_interface_common_hook(struct sk_buff *skb)
     }
 #endif
 
-    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
-        ret = linux_pull_outer_headers(skb);
-        if (ret < 0)
-            goto error;
-    }
+    ret = linux_pull_outer_headers(skb);
+    if (ret < 0)
+        goto error;
 
     if (skb->protocol == htons(ETH_P_8021Q)) {
         vhdr = (struct vlan_hdr *)skb->data;
