@@ -503,6 +503,40 @@ vr_should_proxy(struct vr_interface *vif, unsigned int dip,
     return false;
 }
 
+bool
+vr_has_to_fragment(struct vr_interface *vif, struct vr_packet *pkt,
+        unsigned int tun_len)
+{
+    unsigned int len;
+    struct vr_ip *ip;
+    struct vr_tcp *tcp;
+    unsigned int mtu = vif_get_mtu(vif);
+
+    if (pkt_is_gso(pkt)) {
+        len = vr_pgso_size(pkt);
+        if (len > mtu)
+            return true;
+
+        ip = (struct vr_ip *)pkt_network_header(pkt);
+        if (!ip)
+            return false;
+
+        len += (ip->ip_hl * 4);
+
+        if (ip->ip_proto == VR_IP_PROTO_TCP) {
+            tcp = (struct vr_tcp *)((unsigned char *)ip + (ip->ip_hl * 4));
+            len += (tcp->tcp_offset * 4);
+        }
+    } else {
+        len = pkt_len(pkt);
+    }
+
+    if ((len + tun_len) > mtu)
+        return true;
+
+    return false;
+}
+
 int
 vr_myip(struct vr_interface *vif, unsigned int ip)
 {

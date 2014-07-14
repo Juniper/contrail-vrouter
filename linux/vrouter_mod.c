@@ -241,6 +241,14 @@ lh_pset_data(struct vr_packet *pkt, unsigned short offset)
     return;
 }
 
+static unsigned int
+lh_pgso_size(struct vr_packet *pkt)
+{
+    struct sk_buff *skb = vp_os_packet(pkt);
+
+    return skb_shinfo(skb)->gso_size;
+}
+
 static void
 lh_pfree(struct vr_packet *pkt, unsigned short reason)
 {
@@ -1954,6 +1962,7 @@ struct host_os linux_host = {
     .hos_pfrag_len                  =       lh_pfrag_len,
     .hos_phead_len                  =       lh_phead_len,
     .hos_pset_data                  =       lh_pset_data,  
+    .hos_pgso_size                  =       lh_pgso_size,
 
     .hos_get_cpu                    =       lh_get_cpu,
     .hos_schedule_work              =       lh_schedule_work,

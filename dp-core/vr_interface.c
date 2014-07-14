@@ -362,6 +362,7 @@ agent_trap_may_truncate(int trap_reason)
     case AGENT_TRAP_RESOLVE:
     case AGENT_TRAP_FLOW_MISS:
     case AGENT_TRAP_ECMP_RESOLVE:
+    case AGENT_TRAP_HANDLE_DF:
         return 1;
 
     case AGENT_TRAP_ARP:
@@ -385,10 +386,17 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
     struct agent_send_params *params =
         (struct agent_send_params *)ifspecific;
     struct vr_flow_trap_arg *fta;
+    struct vr_df_trap_arg *dta;
+    bool truncate = false;
 
     vr_preset(pkt);
 
-    if (pkt_head_space(pkt) < AGENT_PKT_HEAD_SPACE) {
+    if (params->trap_reason == AGENT_TRAP_HANDLE_DF) {
+        if (pkt_len(pkt) > VR_AGENT_MIN_PACKET_LEN)
+            truncate = true;
+    }
+
+    if (truncate || pkt_head_space(pkt) < AGENT_PKT_HEAD_SPACE) {
         len = pkt_len(pkt);
 
         if (agent_trap_may_truncate(params->trap_reason)) {
@@ -401,6 +409,11 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
             pkt = pkt_c;
         }
     }
+
+    pkt->vp_type = VP_TYPE_AGENT;
+    pkt_set_network_header(pkt, pkt->vp_data + sizeof(struct vr_eth));
+    pkt_set_inner_network_header(pkt,
+            pkt->vp_data + sizeof(struct vr_eth));
 
     hdr = (struct agent_hdr *)pkt_push(pkt, sizeof(struct agent_hdr));
     if (!hdr)
@@ -416,6 +429,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
             fta = (struct vr_flow_trap_arg *)(params->trap_param);
             hdr->hdr_cmd_param = htonl(fta->vfta_index);
             hdr->hdr_nh = htonl(fta->vfta_nh_index);
+            hdr->hdr_cmd_param_1 = htonl(fta->vfta_nh_index);
         }
         break;
 
@@ -430,6 +444,12 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
             hdr->hdr_cmd_param = htonl(*(unsigned int *)(params->trap_param));
         break;
 
+    case AGENT_TRAP_HANDLE_DF:
+        dta = (struct vr_df_trap_arg *)(params->trap_param);
+        hdr->hdr_cmd_param = htonl(dta->df_mtu);
+        hdr->hdr_cmd_param_1 = htonl(dta->df_flow_index);
+        break;
+
     default:
         hdr->hdr_cmd_param = 0;
         break;
@@ -440,6 +460,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
         goto drop;
 
     memcpy(rewrite, vif->vif_rewrite, VR_ETHER_HLEN);
+
     return vif->vif_tx(vif, pkt);
 
 drop:
@@ -903,6 +924,12 @@ static struct vr_interface_driver vif_drivers[VIF_TYPE_MAX] = {
     },
 };
 
+
+unsigned int
+vif_get_mtu(struct vr_interface *vif)
+{
+    return hif_ops->hif_get_mtu(vif);
+}
 
 static void
 vif_free(struct vr_interface *vif)

@@ -30,7 +30,8 @@
 #define AGENT_TRAP_DIAG             8
 #define AGENT_TRAP_ECMP_RESOLVE     9
 #define AGENT_TRAP_SOURCE_MISMATCH  10
-#define MAX_AGENT_HDR_COMMANDS      11
+#define AGENT_TRAP_HANDLE_DF        11
+#define MAX_AGENT_HDR_COMMANDS      12
 
 enum rt_type{
     RT_UCAST = 0,
@@ -48,6 +49,7 @@ struct agent_hdr {
     unsigned short hdr_cmd;
     unsigned int hdr_cmd_param;
     unsigned int hdr_nh;
+    unsigned int hdr_cmd_param_1;
 } __attribute__((packed));
     
 struct vr_list_node {

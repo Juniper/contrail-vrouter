@@ -265,6 +265,9 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
             skb->ip_summed == CHECKSUM_NONE)
         skb->ip_summed = CHECKSUM_UNNECESSARY;
 
+    if (vif->vif_type == VIF_TYPE_AGENT)
+        skb_shinfo(skb)->gso_size = 0;
+
     if (vif->vif_type != VIF_TYPE_PHYSICAL ||
             skb->len <= skb->dev->mtu + skb->dev->hard_header_len) {
         return dev_queue_xmit(skb);
@@ -791,8 +794,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * agent, which get sent to the NIC driver (to handle cases where the
      * NIC has hw vlan acceleration enabled).
      */
-    if ((pkt->vp_type == VP_TYPE_AGENT) &&
-            (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+    if (pkt->vp_type == VP_TYPE_AGENT) {
         network_off = pkt_get_inner_network_header_off(pkt);
         if (network_off) {
             skb_set_network_header(skb, (network_off - skb_headroom(skb)));
@@ -1504,6 +1506,17 @@ linux_if_get_settings(struct vr_interface *vif,
     return ret;
 }
 
+static unsigned int
+linux_if_get_mtu(struct vr_interface *vif)
+{
+    struct net_device *dev = (struct net_device *)vif->vif_os;
+
+    if (dev)
+        return dev->mtu;
+    else
+        return vif->vif_mtu;
+}
+
 /*
  * linux_if_tx_csum_offload - returns 1 if the device supports checksum offload
  * on transmit for tunneled packets. Devices which have NETIF_F_HW_CSUM set
@@ -1956,6 +1969,7 @@ struct vr_host_interface_ops vr_linux_interface_ops = {
     .hif_tx             =       linux_if_tx,
     .hif_rx             =       linux_if_rx,
     .hif_get_settings   =       linux_if_get_settings,
+    .hif_get_mtu        =       linux_if_get_mtu,
 };
 
 static int
