@@ -3,7 +3,12 @@
  */
 #include <vr_index_table.h>
 #include <vr_os.h>
+#include <vrouter.h>
+#if defined(__linux__)
 #include <stdarg.h>
+#elif defined(__FreeBSD__)
+#include <machine/stdarg.h>
+#endif
 
 struct vr_itbl {
     unsigned int stride_cnt;
@@ -12,6 +17,8 @@ struct vr_itbl {
     unsigned int *stride_shift;
     void **data;
 };
+
+void vr_print_table_struct(vr_itable_t);
 
 static int
 vr_stride_empty(void **ptr, unsigned int cnt)

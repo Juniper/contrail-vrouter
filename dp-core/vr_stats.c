@@ -5,7 +5,12 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
 #include "vr_message.h"
+
+void vr_stats_exit(struct vrouter *, bool);
+int vr_stats_init(struct vrouter *);
 
 static void
 vr_drop_stats_fill_response(vr_drop_stats_req *response,

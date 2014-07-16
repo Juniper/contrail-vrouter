@@ -7,6 +7,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vrouter.h>
 #include "vr_btable.h"
 
 /*
@@ -57,7 +58,7 @@ vr_btable_get_address(struct vr_btable *table, unsigned int offset)
 
         if (offset >= partition->vb_offset && 
                 offset < partition->vb_offset + partition->vb_mem_size)
-            return table->vb_mem[i] + (offset - partition->vb_offset);
+            return (char *)table->vb_mem[i] + (offset - partition->vb_offset);
     }
 
     return NULL;

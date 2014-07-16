@@ -4,6 +4,10 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
+#include <vr_nexthop.h>
+#include <vr_vxlan.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_mcast.h"
@@ -1087,7 +1091,7 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
     unsigned int tun_sip, tun_dip, head_space;
-    __u16 tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT; 
+    uint16_t tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT;
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
@@ -1692,7 +1696,7 @@ nh_composite_mcast_validate(struct vr_nexthop *nh, vr_nexthop_req *req)
     return 0;
 }
 
-static int 
+static int
 nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
     unsigned int i;
@@ -1710,8 +1714,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_component_cnt = 0;
     }
 
-    if ((req->nhr_nh_list_size < 0) || 
-            (req->nhr_nh_list_size != req->nhr_label_list_size))
+    if (req->nhr_nh_list_size != req->nhr_label_list_size)
         return -EINVAL;
 
     /* Nh list of size 0 is valid */

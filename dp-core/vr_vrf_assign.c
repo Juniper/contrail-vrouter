@@ -4,8 +4,11 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
+#include <vr_interface.h>
+#include <vr_response.h>
 
 static int
 vr_vrf_assign_dump(vr_vrf_assign_req *req)

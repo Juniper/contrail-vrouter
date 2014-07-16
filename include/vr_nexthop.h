@@ -64,28 +64,28 @@ struct vr_component_nh {
 };
 
 struct vr_nexthop {
-    __u8            nh_type;
+    uint8_t         nh_type;
     /*
      * nh_family is going to be AF_INET for L3 nexthops, AF_BRIDGE for L2
      * nexthops and AF_UNSPEC for composite multiprotocol nexthops. For
      * an eg, an L2 Encap nexthop would contain family as AF_BRIDGE
      */
-    __u8            nh_family;
-    __u16           nh_flags;
+    uint8_t         nh_family;
+    uint16_t        nh_flags;
     int             nh_vrf;
     unsigned int    nh_id;
     unsigned int    nh_rid;
     unsigned int    nh_users;
     union {
         struct {
-            __u16           encap_len;
-            __u16           encap_family;
+            uint16_t        encap_len;
+            uint16_t        encap_family;
         } nh_encap;
 
          struct {
             unsigned int    tun_sip;
             unsigned int    tun_dip;
-            __u16           tun_encap_len;
+            uint16_t        tun_encap_len;
          } nh_gre_tun;
 
          struct {
@@ -93,7 +93,7 @@ struct vr_nexthop {
             unsigned int    tun_dip;
             unsigned short  tun_sport;
             unsigned short  tun_dport;
-            __u16           tun_encap_len;
+            uint16_t        tun_encap_len;
          } nh_udp_tun;
 
          struct {
@@ -103,7 +103,7 @@ struct vr_nexthop {
 
     } nh_u;
 
-    __u16               nh_data_size;
+    uint16_t            nh_data_size;
     struct vrouter      *nh_router;
     int                 (*nh_validate_src)(unsigned short,
                                            struct vr_packet *,
@@ -116,7 +116,7 @@ struct vr_nexthop {
                                        struct vr_forwarding_md *);
     struct vr_interface *nh_dev;
     void                (*nh_destructor)(struct vr_nexthop *);
-    __u8                nh_data[0];
+    uint8_t             nh_data[0];
 };
 
 #define nh_encap_family         nh_u.nh_encap.encap_family

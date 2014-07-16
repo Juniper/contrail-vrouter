@@ -4,6 +4,9 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
+#include <vr_interface.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_mirror.h"
@@ -17,6 +20,12 @@ static struct vr_host_interface_ops *hif_ops;
 static int vm_srx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int vm_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
+
+void vif_attach(struct vr_interface *);
+void vif_detach(struct vr_interface *);
+int vr_gro_vif_add(struct vrouter *, unsigned int, char *);
+struct vr_interface_stats *vif_get_stats(struct vr_interface *, unsigned short);
+struct vr_interface *__vrouter_get_interface_os(struct vrouter *, unsigned int);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
 extern void  vr_host_interface_exit(void);
@@ -561,7 +570,7 @@ vhost_drv_add(struct vr_interface *vif,
 static int
 vlan_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
-    int ret;
+    int ret = 0;
     struct vr_interface *pvif;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 

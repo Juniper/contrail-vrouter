@@ -2,6 +2,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_packet.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_bridge.h"
@@ -38,9 +39,18 @@ struct vr_bridge_entry {
 unsigned int vr_bridge_entries = VR_DEF_BRIDGE_ENTRIES;
 unsigned int vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
 static vr_htable_t vn_rtable;
+
+extern int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
+
 struct vr_nexthop *(*vr_bridge_lookup)(unsigned int, struct vr_route_req *, 
         struct vr_packet *);
-extern int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
+struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
+int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
+void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
+unsigned int vr_l2_input(unsigned short, struct vr_packet *,
+                struct vr_forwarding_md *);
+struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
+struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
 
 static bool
 bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry, 

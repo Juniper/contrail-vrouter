@@ -53,7 +53,7 @@ vr_btable_get(struct vr_btable *table, unsigned int entry)
     if (t_index >= table->vb_partitions)
         return NULL;
 
-    return (table->vb_mem[t_index] + t_offset);
+    return ((char *)table->vb_mem[t_index] + t_offset);
 }
 
 #endif /* __VR_BTABLE_H__ */

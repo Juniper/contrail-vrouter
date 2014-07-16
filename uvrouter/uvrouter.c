@@ -8,7 +8,9 @@
 
 #include "vr_types.h"
 #include "vr_os.h"
+#include "vr_packet.h"
 #include "vr_message.h"
+#include "vr_interface.h"
 
 #include "host/vr_host.h"
 #include "host/vr_host_packet.h"

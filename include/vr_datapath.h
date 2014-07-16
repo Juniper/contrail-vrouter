@@ -6,6 +6,7 @@
 #ifndef __VR_DATAPATH_H__
 #define __VR_DATAPATH_H__
 
+#include "vr_packet.h"
 
 static inline bool
 well_known_mac(unsigned char *dmac)
@@ -26,7 +27,7 @@ unsigned int vr_fabric_input(struct vr_interface *, struct vr_packet *,
 int vr_arp_input(unsigned short, struct vr_packet *, struct vr_forwarding_md *);
 int vr_trap(struct vr_packet *, unsigned short ,
         unsigned short , void *);
-unsigned int vr_l3_input(unsigned short , struct vr_packet *,
+int vr_l3_input(unsigned short , struct vr_packet *,
                               struct vr_forwarding_md *);
 unsigned int vr_l2_input(unsigned short , struct vr_packet *,
                               struct vr_forwarding_md *);

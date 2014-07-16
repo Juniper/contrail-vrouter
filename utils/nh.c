@@ -9,14 +9,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <getopt.h>
 
-#include <asm/types.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
+#if defined(__linux__)
 #include <asm/types.h>
 
 #include <linux/netlink.h>
@@ -24,16 +23,17 @@
 #include <linux/if_ether.h>
 
 #include <net/if.h>
-#include <net/ethernet.h>
-#ifdef __linux__
 #include <netinet/ether.h>
+#elif defined(__FreeBSD__)
+#include <net/if.h>
 #endif
-
+#include <net/ethernet.h>
 
 #include "vr_types.h"
 #include "vr_message.h"
 #include "vr_nexthop.h"
 #include "vr_genetlink.h"
+#include "vr_os.h"
 #include "nl_util.h"
 
 static nh_set;
@@ -279,7 +279,11 @@ op_retry:
         nh_req.nhr_flags = flags;
         nh_req.nhr_encap_oif_id = if_id;
         nh_req.nhr_encap_size = 0;
+#if defined(__linux__)
         nh_req.nhr_encap_family = ETH_P_ARP;
+#elif defined(__FreeBSD__)
+    nh_req.nhr_encap_family = ETHERTYPE_ARP;
+#endif
         nh_req.nhr_vrf = vrf_id;
         nh_req.nhr_tun_sip = sip.s_addr;
         nh_req.nhr_tun_dip = dip.s_addr;
@@ -321,12 +325,13 @@ op_retry:
 
     nh_req.nhr_id = nh_id;
     nh_req.nhr_rid = 0;
+
     if ((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2)) 
         nh_req.nhr_family = AF_BRIDGE;
     else if ((mode == NH_COMPOSITE) && (flags &
                 NH_FLAG_COMPOSITE_MULTI_PROTO))
         nh_req.nhr_family = AF_UNSPEC;
-    else 
+    else
         nh_req.nhr_family = AF_INET;
 
     nh_req.nhr_type = mode;
