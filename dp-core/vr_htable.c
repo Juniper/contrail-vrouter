@@ -2,8 +2,10 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vrouter.h>
 #include <vr_htable.h>
 #include <vr_btable.h>
+#include <vr_hash.h>
 
 #define VR_HENTRIES_PER_BUCKET 4
 struct vr_htable {
@@ -88,7 +90,7 @@ vr_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
 
-    if (!table || index < 0)
+    if (!table)
         return NULL;
 
     if (index < table->hentries)

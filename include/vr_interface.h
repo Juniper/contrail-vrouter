@@ -145,8 +145,13 @@ struct vr_interface {
     unsigned char vif_name[VR_INTERFACE_NAME_LEN];
     unsigned int  vif_ip;
 #ifdef __KERNEL__
+#if defined(__linux__)
     struct napi_struct vr_napi;
     struct sk_buff_head vr_skb_inputq;
+#elif defined(__FreeBSD__)
+    struct mbuf;
+    void (*saved_if_input) (struct ifnet *, struct mbuf *);
+#endif
 #endif
 };
 
@@ -185,6 +190,8 @@ extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
         short, unsigned short);
+#if defined(__linux__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
+#endif
 
 #endif /* __VR_INTERFACE_H__ */

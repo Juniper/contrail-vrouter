@@ -9,14 +9,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <getopt.h>
 
-#include <asm/types.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
+#if defined(__linux__)
 #include <asm/types.h>
 
 #include <linux/netlink.h>
@@ -25,6 +24,10 @@
 
 #include <net/if.h>
 #include <netinet/ether.h>
+#elif defined(__FreeBSD__)
+#include <net/if.h>
+#include <net/ethernet.h>
+#endif
 
 #include "vr_types.h"
 #include "vr_nexthop.h"
@@ -34,6 +37,7 @@
 #include "vr_defs.h"
 #include "vr_route.h"
 #include "vr_bridge.h"
+#include "vr_os.h"
 
 static struct nl_client *cl;
 static int resp_code;

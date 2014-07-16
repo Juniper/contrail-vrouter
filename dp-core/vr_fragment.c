@@ -5,8 +5,10 @@
  * All rights reserved
  */
 #include <vr_os.h>
+#include <vr_packet.h>
 #include "vr_btable.h"
 #include "vr_fragment.h"
+#include "vr_hash.h"
 
 #define FRAG_TABLE_ENTRIES  1024
 #define FRAG_TABLE_BUCKETS  4

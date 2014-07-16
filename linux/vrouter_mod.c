@@ -24,6 +24,7 @@
 #include "vr_linux.h"
 #include "vr_os.h"
 #include "vr_compat.h"
+#include "vr_hash.h"
 #include "vr_fragment.h"
 
 unsigned int vr_num_cpus = 1;

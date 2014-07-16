@@ -3,9 +3,14 @@
  */
 
 #include "vr_os.h"
+#include "vr_types.h"
+#include "vr_packet.h"
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include "vr_mirror.h"
+
+int vr_mirror_add(vr_mirror_req *);
+int vr_mirror_del(vr_mirror_req *);
 
 static struct vr_mirror_entry *
 __vrouter_get_mirror(unsigned int rid, unsigned int index)

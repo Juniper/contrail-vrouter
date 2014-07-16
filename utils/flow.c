@@ -8,14 +8,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <assert.h>
 #include <time.h>
-
-#include <asm/types.h>
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -24,11 +22,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/mman.h>
+#if defined(__linux__)
 #include <asm/types.h>
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_ether.h>
+#endif
 
 #include <net/if.h>
 #ifdef __KERNEL__
@@ -40,6 +40,7 @@
 #include "vr_mirror.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+#include "vr_os.h"
 
 #define TABLE_FLAG_VALID        0x1
 #define MEM_DEV                 "/dev/flow"

@@ -37,7 +37,7 @@ extern int vr_to_vm_mss_adj;
 extern int vr_udp_coff;
 extern int vr_use_linux_br;
 extern int hashrnd_inited;
-extern __u32 vr_hashrnd;
+extern uint32_t vr_hashrnd;
 
 #define CONTAINER_OF(member, struct_type, pointer) \
     ((struct_type *)((unsigned long)pointer - \
@@ -96,7 +96,7 @@ struct host_os {
                                    int (*is_label_l2)(unsigned int,
                                        unsigned int, unsigned short *));
     int  (*hos_pcow)(struct vr_packet *, unsigned short); 
-    __u16 (*hos_get_udp_src_port)(struct vr_packet *, 
+    uint16_t (*hos_get_udp_src_port)(struct vr_packet *,
                                   struct vr_forwarding_md *, unsigned short);
     int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *, unsigned short);
     int  (*hos_pull_inner_headers_fast)(struct vr_ip *, struct vr_packet *,
@@ -193,6 +193,7 @@ extern struct host_os *vrouter_host;
 extern struct vrouter *vrouter_get(unsigned int);
 extern int vrouter_init(void);
 extern int vr_module_error(int, const char *, int, int);
+extern int vhost_init(void);
 
 #ifdef __cplusplus
 }

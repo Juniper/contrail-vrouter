@@ -5,6 +5,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vrouter.h>
 #include "vr_message.h"
 
 static char *
@@ -56,10 +57,14 @@ vr_message_request(struct vr_message *message)
         return 0;
 
     if (vr_not_ready)
-        return -EBADFD;
+        return -ENETRESET;
 
     if (vr_not_ready)
+#if defined(__FreeBSD__)
+        return -EBADF;
+#else
         return -EBADFD;
+#endif
 
     message_h.vm_proto->mproto_decode(message->vr_message_buf,
             message->vr_message_len, NULL, NULL);

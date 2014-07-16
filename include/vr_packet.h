@@ -271,11 +271,19 @@ struct vr_arp {
 #define VR_IP_FRAG_OFFSET_MASK (VR_IP_MF - 1)
 
 struct vr_ip {
-#ifdef __KERNEL__
+#if defined(__KERNEL__) && defined(__linux__)
 #if defined(__LITTLE_ENDIAN_BITFIELD)
    unsigned char ip_hl:4,
                  ip_version:4;
 #elif defined(__BIG_ENDIAN_BITFIELD)
+   unsigned char ip_version:4,
+                 ip_hl:4;
+#endif
+#elif defined(__KERNEL__) && defined(__FreeBSD__)
+#if BYTE_ORDER == LITTLE_ENDIAN
+   unsigned char ip_hl:4,
+                 ip_version:4;
+#elif BYTE_ORDER == BIG_ENDIAN
    unsigned char ip_version:4,
                  ip_hl:4;
 #endif

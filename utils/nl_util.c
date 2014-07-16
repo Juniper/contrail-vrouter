@@ -8,21 +8,24 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <errno.h>
 
+#if defined(__linux__)
 #include <asm/types.h>
 #include <sys/socket.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/genetlink.h>
 #include <linux/sockios.h>
+#endif
 
 #include <stdint.h>
 #include <net/if.h>
 #include "nl_util.h"
 #include "vr_genetlink.h"
+#include "vr_os.h"
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
 
@@ -203,7 +206,7 @@ nl_build_sandesh_attr_without_attr_len(struct nl_client *cl)
 }
 
 int
-nl_build_header(struct nl_client *cl, unsigned char **buf, __u32 *buf_len)
+nl_build_header(struct nl_client *cl, unsigned char **buf, uint32_t *buf_len)
 {
     int ret;
 
@@ -302,7 +305,7 @@ nl_build_get_family_id(struct nl_client *cl, char *family)
 }       
 
 int
-nl_build_genlh(struct nl_client *cl, __u8 cmd, __u8 version)
+nl_build_genlh(struct nl_client *cl, uint8_t cmd, uint8_t version)
 {
     struct genlmsghdr *genlh = (struct genlmsghdr *)
         ((char *)cl->cl_buf + cl->cl_buf_offset);
@@ -341,7 +344,7 @@ nl_update_nlh(struct nl_client *cl)
     return;
 }
 
-int 
+int
 nl_get_attr_hdr_size()
 {
     return NLA_HDRLEN;
@@ -374,7 +377,7 @@ nl_build_attr(struct nl_client *cl, int len, int attr)
 
 
 int
-nl_build_nlh(struct nl_client *cl, __u32 type, __u32 flags)
+nl_build_nlh(struct nl_client *cl, uint32_t type, uint32_t flags)
 {
     struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf);
 
@@ -418,19 +421,34 @@ nl_free(struct nl_client *cl)
 int
 nl_socket(struct nl_client *cl, unsigned int protocol)
 {
+#if defined(__linux__)
     struct sockaddr_nl sa;
+#endif
 
     if (cl->cl_sock >= 0)
         return -EEXIST;
 
+#if defined(__linux__)
     cl->cl_sock = socket(AF_NETLINK, SOCK_DGRAM, protocol);
+#elif defined(__FreeBSD__)
+    /*
+     * Fake Contrail socket has only one protocol for handling
+     * sandesh protocol, so zero must be passed as a parameter
+     */
+    cl->cl_sock = socket(AF_VENDOR00, SOCK_DGRAM, 0);
+#endif
     if (cl->cl_sock < 0)
         return cl->cl_sock;
 
+#if defined(__linux__)
+    /* In simple configuration we test on BSD, binding is not
+     * required. It will be implemented later.
+     */
     memset(&sa, 0, sizeof(sa));
     sa.nl_family = AF_NETLINK;
     sa.nl_pid = cl->cl_id;
     bind(cl->cl_sock, (struct sockaddr *)&sa, sizeof(sa));
+#endif
 
     cl->cl_sock_protocol = protocol;
 
@@ -442,16 +460,20 @@ int
 nl_recvmsg(struct nl_client *cl)
 {
     int ret;
+#if defined (__linux__)
     struct sockaddr_nl sa;
+#endif
     struct msghdr msg;
     struct iovec iov;
 
     memset(&msg, 0, sizeof(msg));
+#if defined(__linux__)
     memset(&sa, 0, sizeof(sa));
     sa.nl_family = AF_NETLINK;
 
     msg.msg_name = &sa;
     msg.msg_namelen = sizeof(sa);
+#endif
 
     iov.iov_base = (void *)(cl->cl_buf);
     iov.iov_len = cl->cl_buf_len;
@@ -475,16 +497,20 @@ nl_recvmsg(struct nl_client *cl)
 int
 nl_sendmsg(struct nl_client *cl)
 {
+#if defined (__linux__)
     struct sockaddr_nl sa;
+#endif
     struct msghdr msg;
     struct iovec iov;
 
     memset(&msg, 0, sizeof(msg));
+#if defined (__linux__)
     memset(&sa, 0, sizeof(sa));
     sa.nl_family = AF_NETLINK;
 
     msg.msg_name = &sa;
     msg.msg_namelen = sizeof(sa);
+#endif
 
     iov.iov_base = (void *)(cl->cl_buf);
     iov.iov_len = cl->cl_buf_offset;
@@ -629,6 +655,7 @@ vrouter_get_family_id(struct nl_client *cl)
     struct nl_response *resp;
     struct genl_ctrl_message *msg;
 
+#if defined(__linux__)
     if ((ret = nl_build_get_family_id(cl, VROUTER_GENETLINK_FAMILY_NAME)))
         return ret;
 
@@ -645,10 +672,15 @@ vrouter_get_family_id(struct nl_client *cl)
 
     msg = (struct genl_ctrl_message *)resp->nl_data;
     nl_set_genl_family_id(cl, msg->family_id);
+#elif defined(__FreeBSD__)
+    /* BSD doesn't check the value of family id, so set it to one */
+    nl_set_genl_family_id(cl, 1);
+#endif
 
-    return msg->family_id;
+    return cl->cl_genl_family_id;
 }
 
+#if defined(__linux__)
 int
 nl_build_attr_linkinfo(struct nl_client *cl, struct vn_if *ifp)
 {
@@ -743,10 +775,10 @@ nl_build_ifinfo(struct nl_client *cl, struct vn_if *ifp)
 }
 
 int
-nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, __u8 ack)
+nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, uint8_t ack)
 {
     int ret;
-    __u32 flags;
+    uint32_t flags;
 
     if (!cl->cl_buf || cl->cl_buf_offset || !ifp)
         return -EINVAL;
@@ -780,4 +812,4 @@ nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, __u8 ack)
 
     return 0;
 }
-
+#endif  /* __linux__ */

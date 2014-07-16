@@ -4,11 +4,15 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
+#include <vr_mirror.h>
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include "vr_mcast.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
+#include "vr_hash.h"
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
@@ -30,7 +34,7 @@
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
 
-#ifdef __KERNEL__
+#if defined(__linux__) && defined(__KERNEL__)
 extern unsigned short vr_flow_major;
 #endif
 
@@ -41,6 +45,10 @@ extern void vr_ip_update_csum(struct vr_packet *, unsigned int,
 
 static void vr_flush_entry(struct vrouter *, struct vr_flow_entry *,
         struct vr_flow_md *, struct vr_forwarding_md *);
+struct vr_flow_entry *vr_find_flow(struct vrouter *, struct vr_flow_key *,
+        unsigned int *);
+unsigned int vr_trap_flow(struct vrouter *, struct vr_flow_entry *,
+        struct vr_packet *, unsigned int);
 
 static void
 vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe, 
@@ -1234,7 +1242,7 @@ vr_flow_req_process(void *s_req)
     case FLOW_OP_FLOW_TABLE_GET:
         req->fr_ftable_size = vr_flow_table_size(router) +
             vr_oflow_table_size(router);
-#ifdef __KERNEL__
+#if defined(__linux__) && defined(__KERNEL__)
         req->fr_ftable_dev = vr_flow_major;
 #endif
         break;

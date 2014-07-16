@@ -4,9 +4,18 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
 
 unsigned char vr_bcast_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 unsigned char vr_well_known_mac_infix[] = { 0x80, 0xc2 };
+
+unsigned int vr_arp_input(struct vrouter *, unsigned short,
+        struct vr_packet *);
+int bridge_entry_del(struct rtable_fspec *, struct vr_route_req *);
+unsigned int vr_l3_input(unsigned short, struct vr_packet *,
+                              struct vr_forwarding_md *);
+int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
 
 extern unsigned int vr_route_flags(unsigned int, unsigned int);
 
