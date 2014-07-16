@@ -6,15 +6,16 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <inttypes.h>
 #include <getopt.h>
 #include <stdbool.h>
 
-#include <asm/types.h>
+#include "vr_os.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#if defined(__linux__)
 #include <asm/types.h>
 
 #include <linux/netlink.h>
@@ -23,8 +24,11 @@
 
 #include <net/if.h>
 #include <net/ethernet.h>
-#ifdef __linux__
 #include <netinet/ether.h>
+#elif defined(__FreeBSD__)
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <net/ethernet.h>
 #endif
 
 #include "vr_types.h"
@@ -33,6 +37,7 @@
 #include "vhost.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+
 
 #define VHOST_TYPE_STRING       "vhost"
 #define AGENT_TYPE_STRING       "agent"
@@ -272,6 +277,7 @@ static int
 vhost_create(void)
 {
     int ret;
+#if defined(__linux__)
     struct vn_if vhost;
     struct nl_response *resp;
 
@@ -279,7 +285,6 @@ vhost_create(void)
     strncpy(vhost.if_name, if_name, sizeof(vhost.if_name));
     strncpy(vhost.if_kind, VHOST_KIND, sizeof(vhost.if_kind));
     memcpy(vhost.if_mac, vr_ifmac, sizeof(vhost.if_mac));
-
     ret = nl_build_if_create_msg(cl, &vhost, 0);
     if (ret)
         return ret;
@@ -293,7 +298,50 @@ vhost_create(void)
         if (resp && resp->nl_op)
             printf("%s\n", strerror(resp->nl_op));
     }
+#elif defined(__FreeBSD__)
+    struct ifreq ifr = { 0 };
+    int s;
+    int errsv;
 
+    s = socket(PF_LOCAL, SOCK_DGRAM, 0);
+    if (s < 0) {
+        ret = s;
+        errsv = errno;
+        fprintf(stderr, "vhost_create: Failed to open socket.\n");
+        goto ending;
+    }
+
+    strncpy(ifr.ifr_name, if_name, sizeof(ifr.ifr_name));
+
+    ret = ioctl(s, SIOCIFCREATE, &ifr);
+    if (ret < 0) {
+        errsv = errno;
+        fprintf(stderr, "vhost_create: Failed to create interface.\n");
+        goto ending;
+    }
+
+    if (mac_set) {
+        memcpy(ifr.ifr_addr.sa_data, vr_ifmac, ETHER_ADDR_LEN);
+        ifr.ifr_addr.sa_len = ETHER_ADDR_LEN;
+        ifr.ifr_addr.sa_family = AF_LOCAL;
+
+        ret = ioctl(s, SIOCSIFLLADDR, &ifr);
+        if (ret < 0) {
+            errsv = errno;
+            fprintf(stderr, "vhost_create: Failed to set MAC address.\n");
+            goto ending;
+        }
+    }
+
+ending:
+    if (ret < 0)
+        fprintf(stderr, "vhost_create: %s.\n", strerror(errsv));
+
+    if (s >=0)
+        close(s);
+#else
+#error "Unsupported platform"
+#endif
     return ret;
 }
 
@@ -379,10 +427,8 @@ vr_intf_op(unsigned int op)
 {
     int ret; 
     vr_interface_req intf_req;
-
     if (create_set)
         return vhost_create();
-
 op_retry:
     memset(&intf_req, 0 , sizeof(intf_req));
 
@@ -742,8 +788,10 @@ main(int argc, char *argv[])
     if (!cl)
         exit(-ENOMEM);
 
+#if defined(__linux__)
     if (create_set)
         sock_proto = NETLINK_ROUTE;
+#endif
 
     ret = nl_socket(cl, sock_proto);
     if (ret <= 0)

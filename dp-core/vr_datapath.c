@@ -6,9 +6,21 @@
 #include <vr_os.h>
 #include <vr_bridge.h>
 #include <vr_datapath.h>
+#include <vr_packet.h>
+#include <vr_mirror.h>
 
 extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
                 struct vr_route_req *, struct vr_packet *);
+
+unsigned char vr_bcast_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+int vr_arp_input(unsigned short, struct vr_packet *, struct vr_forwarding_md *);
+
+int vr_l3_input(unsigned short, struct vr_packet *,
+                              struct vr_forwarding_md *);
+int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
+
+extern unsigned int vr_route_flags(unsigned int, unsigned int);
 
 static inline bool
 vr_grat_arp(struct vr_arp *sarp)
@@ -378,7 +390,7 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 
-unsigned int
+int
 vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
                               struct vr_forwarding_md *fmd)
 {

@@ -19,7 +19,6 @@ extern "C" {
 #define NL_MSG_TYPE_GEN_CTRL        2
 #define NL_MSG_TYPE_FMLY            3
 
-
 struct nl_response {
     unsigned int nl_type;
     unsigned int nl_op;
@@ -36,19 +35,18 @@ struct nl_client {
     unsigned int cl_sock_protocol;
     unsigned int cl_genl_family_id;
 
-    __u32 cl_buf_offset;
-    __u32 cl_msg_start;
+    uint32_t cl_buf_offset;
+    uint32_t cl_msg_start;
     /* netlink message length */
-    __u32 cl_msg_len;
+    uint32_t cl_msg_len;
     /* length of the message received from recvmsg */
-    __u32 cl_recv_len;
-    __u32 cl_id;
-    __u32 cl_seq;
+    uint32_t cl_recv_len;
+    uint32_t cl_id;
+    uint32_t cl_seq;
     struct nl_response resp;
     unsigned int cl_resp_buf_len;
     uint8_t *cl_resp_buf;
 };
-
 
 
 #define GENL_FAMILY_NAME_LEN            16
@@ -59,6 +57,7 @@ struct genl_ctrl_message {
 };
 
 #define NLA_DATA(nla)                   ((char *)nla + NLA_HDRLEN)
+#define NLA_LEN(nla)                    (nla->nla_len - NLA_HDRLEN)
 #define GENLMSG_DATA(buf)               ((char *)buf + GENL_HDRLEN)
 
 extern struct nl_client *nl_register_client(void);
@@ -79,11 +78,11 @@ extern int nl_init_generic_client_req(struct nl_client *nl, int family);
 extern void nl_free(struct nl_client *nl);
 extern void nl_init_generic_client_resp(struct nl_client *cl, char *resp,
                                         int resp_len);
-extern int nl_build_nlh(struct nl_client *, __u32, __u32);
+extern int nl_build_nlh(struct nl_client *, uint32_t, uint32_t);
 extern void nl_update_nlh(struct nl_client *);
-extern int nl_build_genlh(struct nl_client *, __u8, __u8);
-extern int nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, __u8 ack);
-extern int nl_build_header(struct nl_client *cl, unsigned char **buf, __u32 *buf_len);
+extern int nl_build_genlh(struct nl_client *, uint8_t, uint8_t);
+extern int nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, uint8_t ack);
+extern int nl_build_header(struct nl_client *cl, unsigned char **buf, uint32_t *buf_len);
 extern void nl_update_header(struct nl_client *cl, int data_len);
 extern int nl_build_family_name_attr(struct nl_client *cl, char *family);
 extern int nl_build_get_family_id(struct nl_client *cl, char *family);

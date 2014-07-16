@@ -6,8 +6,20 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#if defined(__linux__)
 #include <linux/version.h>
+#endif
+#include "vr_types.h"
 #include "vr_sandesh.h"
+#include <vr_interface.h>
+#include <vr_nexthop.h>
+#include <vr_route.h>
+#include <vr_mpls.h>
+#include <vr_flow.h>
+#include <vr_bridge.h>
+#include <vr_packet.h>
+#include <vr_mirror.h>
+#include <vr_vxlan.h>
 
 static struct vrouter router;
 struct host_os *vrouter_host;
@@ -15,6 +27,7 @@ struct host_os *vrouter_host;
 extern struct host_os *vrouter_get_host(void);
 extern int vr_stats_init(struct vrouter *);
 extern void vr_stats_exit(struct vrouter *, bool);
+void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
 
@@ -78,12 +91,20 @@ static struct vr_module modules[] = {
 
 
 #define VR_NUM_MODULES  (sizeof(modules) / sizeof(modules[0]))
-
+/*
+ * TODO For BSD we turn off all performance tweaks for now, it will
+ * be implemented later.
+ */
 /*
  * Enable changes for better performance
  */
+#if defined(__linux__)
 int vr_perfr = 1;    /* GRO */
 int vr_perfs = 1;    /* segmentation in software */
+#elif defined(__FreeBSD__)
+int vr_perfr = 0;    /* GRO */
+int vr_perfs = 0;    /* segmentation in software */
+#endif
 
 /*
  * Enable MPLS over UDP globally
@@ -93,9 +114,13 @@ int vr_mudp = 0;
 /*
  * TCP MSS adjust settings
  */
+#if defined(__linux__)
 int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
 int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
-
+#elif defined(__FreeBSD__)
+int vr_from_vm_mss_adj = 0; /* adjust TCP MSS on packets from VM */
+int vr_to_vm_mss_adj = 0;   /* adjust TCP MSS on packet sent to VM */
+#endif
 /*
  * Following sysctls are to enable RPS. Based on empirical results,
  * performing RPS immediately after packets arrive on a physical interface
@@ -116,6 +141,7 @@ int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
  * that enough cores are available). Also, hyper-thread siblings of the
  * above 3 cores are not used by vrouter for RX processing.
  */
+#if defined(__linux__)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 
 int vr_perfr1 = 0;   /* RPS after pulling inner headers */
@@ -146,7 +172,10 @@ int vr_use_linux_br = 1; /* Xen */
 
 #endif
 #endif
-
+#endif /* __linux__ */
+#if defined(__FreeBSD__)
+int vr_perfp = 0;
+#endif
 /*
  * Following sysctls can be set if vrouter shouldn't pick a CPU for RPS
  * core based on a hash of the received packet. Turned off by default.

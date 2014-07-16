@@ -4,6 +4,8 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
 #include "vr_mpls.h"
 #include "vr_vxlan.h"
 #include "vr_mcast.h"
@@ -12,6 +14,17 @@ extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
                 struct vr_route_req *, struct vr_packet *);
 extern int vr_mpls_input(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
+
+struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *, struct vr_packet *);
+int vr_forward(struct vrouter *, unsigned short, struct vr_packet *, struct vr_forwarding_md *);
+unsigned int vr_udp_input(struct vrouter *, struct vr_packet *,
+    struct vr_forwarding_md *);
+int vr_ip_input(struct vrouter *, unsigned short, struct vr_packet *,
+    struct vr_forwarding_md *);
+unsigned int vr_gre_input(struct vrouter *, struct vr_packet *,
+        struct vr_forwarding_md *);
+void vr_ip_update_csum(struct vr_packet *, unsigned int, unsigned int);
+unsigned int vr_route_flags(unsigned int, unsigned int);
 
 static unsigned short vr_ip_id;
 
@@ -262,7 +275,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
              * lets subject it to flow processing.
              */
             if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
-                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) && 
+                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) &&
                     !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
                     /* Force the flow lookup */
                     pkt->vp_flags |= VP_FLAG_FLOW_GET;
@@ -282,8 +295,10 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         }
 
         if (!vif && !(vif = pkt->vp_if->vif_bridge) &&
-                                !(vif = router->vr_host_if))
+                                !(vif = router->vr_host_if)) {
+            drop_reason = VP_DROP_TRAP_NO_IF;
             goto drop_pkt;
+        }
 
         if ((pkt->vp_flags & VP_FLAG_FROM_DP) ||
                 !vr_phead_len(pkt)) {

@@ -25,7 +25,6 @@ vr_root = './'
 makefile = vr_root + 'Makefile'
 dp_dir = Dir(vr_root).srcnode().abspath
 
-
 def shellCommand(cmd):
     """ Return the output of a shell command
         This wrapper is required since check_output is not supported in
@@ -34,6 +33,10 @@ def shellCommand(cmd):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
     (output, _) = proc.communicate()
     return output.strip()
+
+if sys.platform.startswith('freebsd'):
+    dp_dir = dp_dir + '/freebsd'
+    env['ENV']['MAKEOBJDIR'] = dp_dir
 
 if sys.platform != 'darwin':
 

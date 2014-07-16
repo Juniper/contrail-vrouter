@@ -4,9 +4,17 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_vxlan.h"
+
+int vr_vxlan_trav_cb(unsigned int, void *, void *);
+int vr_vxlan_dump(vr_vxlan_req *);
+int vr_vxlan_get(vr_vxlan_req *);
+int vr_vxlan_del(vr_vxlan_req *);
+int vr_vxlan_add(vr_vxlan_req *);
 
 int
 vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt, 

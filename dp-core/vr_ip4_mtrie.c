@@ -4,6 +4,8 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.	
  */
 #include <vr_os.h>
+#include <vr_types.h>
+#include <vr_packet.h>
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include "vr_ip4_mtrie.h"
@@ -18,6 +20,9 @@ struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int, struct vr_route_req *,
 struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 
 static struct ip4_mtrie *mtrie_alloc_vrf(unsigned int);
+
+int mtrie4_algo_init(struct vr_rtable *, struct rtable_fspec *);
+void mtrie4_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 
 /* mtrie specific */
 #define IP4_BKT_LEVELS  4 /* 8/8/8/8 */

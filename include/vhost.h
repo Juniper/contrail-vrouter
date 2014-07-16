@@ -16,7 +16,12 @@ extern "C" {
 #define VHOST_MAX_INTERFACES 64
 
 struct vhost_priv {
+#if defined(__linux__)
     struct net_device *vp_dev;
+#elif defined(__FreeBSD__)
+    struct ifnet *vp_ifp;
+    struct mtx vp_mtx;
+#endif
     struct net_device *vp_phys_dev;
     struct vrouter *vp_router;
     struct vr_interface *vp_vifp;

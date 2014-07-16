@@ -26,6 +26,7 @@
 #include "vr_compat.h"
 #include "vr_interface.h"
 #include "vr_linux.h"
+#include "vr_bridge.h"
 #include "vr_os.h"
 #include "vhost.h"
 

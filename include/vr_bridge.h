@@ -5,6 +5,7 @@
 #define __VR_BRIDGE_H__
 
 #include "vr_defs.h"
+#include "vrouter.h"
 
 #define VR_MAC_COPY(dst, src) { \
     ((uint16_t *)(dst))[0] = ((uint16_t *)(src))[0]; \
