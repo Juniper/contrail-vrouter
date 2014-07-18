@@ -537,6 +537,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         if (valid_src == NH_SOURCE_MISMATCH) {
             pkt_clone = vr_pclone(pkt);
             if (pkt_clone) {
+                vr_preset(pkt_clone);
                 if (vr_pcow(pkt_clone, sizeof(struct vr_eth) +
                             sizeof(struct agent_hdr))) {
                     vr_pfree(pkt_clone, VP_DROP_PCOW_FAIL);

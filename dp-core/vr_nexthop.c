@@ -119,11 +119,28 @@ nh_resolve(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
     struct vr_vrf_stats *stats;
+    struct vr_packet *pkt_clone;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_resolves++;
 
+    if (pkt->vp_if->vif_bridge) {
+        /*
+         * bridge is set only for vhost/physical interface, and this
+         * path will be hit only for packets from vhost, in which case
+         * we already know everything that has to be known i.e. we know
+         * the outgoing device and the mac address (which was already
+         * resolved as part of the arp request from host
+         */
+        pkt_clone = vr_pclone(pkt);
+        if (pkt_clone) {
+            vr_preset(pkt_clone);
+            vif_xconnect(pkt->vp_if, pkt_clone);
+        }
+    }
+
+    /* will trap the packet to agent to create a route */
     vr_trap(pkt, vrf, AGENT_TRAP_RESOLVE, NULL);
     return 0;
 }
