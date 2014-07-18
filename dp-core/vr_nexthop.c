@@ -14,7 +14,10 @@ static int nh_discard(unsigned short, struct vr_packet *,
 extern unsigned int vr_forward(struct vrouter *, unsigned short,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_init_forwarding_md(struct vr_forwarding_md *);
-struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *, struct vr_packet *);
+extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
+        unsigned int);
+struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *,
+        struct vr_packet *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 struct vr_nexthop *ip4_default_nh;
 
@@ -900,6 +903,7 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
     struct vr_vrf_stats *stats;
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
+    struct vr_df_trap_arg trap_arg;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
     if (stats)
@@ -910,6 +914,15 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
 
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        if (vr_has_to_fragment(nh->nh_dev, pkt, VR_VXLAN_HDR_LEN) &&
+                vr_ip_dont_fragment_set(pkt)) {
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - VR_VXLAN_HDR_LEN;
+            trap_arg.df_flow_index = fmd->fmd_flow_index;
+            return vr_trap(pkt, vrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+        }
+    }
 
     if (nh_vxlan_tunnel_helper(vrf, pkt, fmd, nh->nh_udp_tun_sip,
                                             nh->nh_udp_tun_dip) == false) {
@@ -966,6 +979,7 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     __u16 tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT; 
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
+    struct vr_df_trap_arg trap_arg;
 
     /*
      * If we are testing MPLS over UDP using the vr_mudp sysctl, use the
@@ -1002,6 +1016,16 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
 
     /* Calculate the head space for mpls,udp ip and eth */
     head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        if (vr_has_to_fragment(nh->nh_dev, pkt, head_space) &&
+                vr_ip_dont_fragment_set(pkt)) {
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - head_space;
+            trap_arg.df_flow_index = fmd->fmd_flow_index;
+            return vr_trap(pkt, vrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+        }
+    }
+
     head_space += tun_encap_len;
 
     if (pkt_head_space(pkt) < head_space) {
@@ -1075,6 +1099,7 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
     struct vr_packet *tmp_pkt;
+    struct vr_df_trap_arg trap_arg;
 
     if (vr_mudp && vr_perfs) {
         return nh_mpls_udp_tunnel(vrf, pkt, nh, fmd);
@@ -1110,7 +1135,19 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
         id = htons(vr_generate_unique_ip_id());
     }
 
-    gre_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_gre);
+
+    gre_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) +
+        sizeof(struct vr_gre);
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        if (vr_has_to_fragment(nh->nh_dev, pkt, gre_head_space) &&
+                vr_ip_dont_fragment_set(pkt)) {
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - gre_head_space;
+            trap_arg.df_flow_index = fmd->fmd_flow_index;
+            return vr_trap(pkt, vrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+        }
+    }
+
     gre_head_space += nh->nh_gre_tun_encap_len;
 
     if (pkt_head_space(pkt) < gre_head_space) {

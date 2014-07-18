@@ -299,6 +299,19 @@ struct vr_ip {
     unsigned int ip_daddr;
 } __attribute__((packed));
 
+static inline unsigned char *pkt_network_header(struct vr_packet *);
+
+static inline bool
+vr_ip_dont_fragment_set(struct vr_packet *pkt)
+{
+    struct vr_ip *ip;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (ntohs(ip->ip_frag_off) & VR_IP_DF)
+        return true;
+    return false;
+}
+
 static inline bool
 vr_ip_fragment_tail(struct vr_ip *iph)
 {
@@ -522,6 +535,14 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
 }
 
 #define VR_AGENT_MIN_PACKET_LEN     128
+
+static inline bool
+pkt_is_gso(struct vr_packet *pkt)
+{
+    if (vr_pgso_size(pkt))
+        return true;
+    return false;
+}
 
 static inline unsigned char *
 pkt_data_at_offset(struct vr_packet *pkt, unsigned short off)

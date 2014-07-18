@@ -79,6 +79,11 @@ struct agent_send_params {
     void *trap_param;
 };
 
+struct vr_df_trap_arg {
+    unsigned int df_mtu;
+    unsigned int df_flow_index;
+};
+
 struct vr_interface;
 
 struct vr_interface_driver {
@@ -164,6 +169,7 @@ struct vr_host_interface_ops {
     int (*hif_rx)(struct vr_interface *, struct vr_packet *);
     int (*hif_get_settings)(struct vr_interface *,
             struct vr_interface_settings *);
+    unsigned int (*hif_get_mtu)(struct vr_interface *);
 };
 
 extern int vr_interface_init(struct vrouter *);
@@ -186,5 +192,6 @@ extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
         short, unsigned short);
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
+extern unsigned int vif_get_mtu(struct vr_interface *);
 
 #endif /* __VR_INTERFACE_H__ */

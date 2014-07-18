@@ -74,6 +74,7 @@ struct host_os {
     unsigned short (*hos_pfrag_len)(struct vr_packet *);
     unsigned short (*hos_phead_len)(struct vr_packet *);
     void (*hos_pset_data)(struct vr_packet *, unsigned short);
+    unsigned int (*hos_pgso_size)(struct vr_packet *);
 
     unsigned int (*hos_get_cpu)(void);
     void (*hos_schedule_work)(unsigned int, void (*)(void *), void *);
@@ -121,6 +122,7 @@ struct host_os {
 #define vr_pcopy                        vrouter_host->hos_pcopy
 #define vr_pfrag_len                    vrouter_host->hos_pfrag_len
 #define vr_phead_len                    vrouter_host->hos_phead_len
+#define vr_pgso_size                    vrouter_host->hos_pgso_size
 #define vr_pset_data                    vrouter_host->hos_pset_data
 #define vr_get_cpu                      vrouter_host->hos_get_cpu
 #define vr_schedule_work                vrouter_host->hos_schedule_work
