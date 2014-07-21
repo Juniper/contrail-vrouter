@@ -83,6 +83,8 @@ static inline void skb_frag_size_sub(skb_frag_t *frag, int delta)
         frag->size -= delta;
 }
     
+#define IFF_OVS_DATAPATH	(1<<15)
+extern struct sk_buff *(*openvswitch_handle_frame_hook)(struct sk_buff *skb);
 #endif
     
 #endif
