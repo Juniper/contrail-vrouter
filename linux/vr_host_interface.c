@@ -17,7 +17,9 @@
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 #include <linux/if_bridge.h>
+#ifndef CONFIG_XEN
 #include <linux/openvswitch.h>
+#endif
 #endif
 
 #include <net/rtnetlink.h>
@@ -1161,6 +1163,7 @@ vr_do_rps_outer(struct sk_buff *skb, struct vr_interface *vif)
 
     return;
 }
+#endif
 
 /*
  * vr_get_vif_ptr - gets a pointer to the vif structure from the netdevice
@@ -1200,7 +1203,6 @@ vr_set_vif_ptr(struct net_device *dev, void *vif)
 
     return;
 }
-#endif
 
 /*
  * vr_post_rps_get_phys_dev - get the physical interface that the packet

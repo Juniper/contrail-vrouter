@@ -2277,7 +2277,10 @@ module_param(vr_oflow_entries, int, 0);
 module_param(vr_bridge_entries, int, 0);
 module_param(vr_bridge_oentries, int, 0);
 
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+#if CONFIG_XEN
+int vr_use_linux_br = 1;
+module_param(vr_use_linux_br, int, 0);
+#elif (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 module_param(vr_use_linux_br, int, 0);
 #endif
 
