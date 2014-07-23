@@ -48,7 +48,6 @@ struct agent_hdr {
     unsigned short hdr_vrf;
     unsigned short hdr_cmd;
     unsigned int hdr_cmd_param;
-    unsigned int hdr_nh;
     unsigned int hdr_cmd_param_1;
 } __attribute__((packed));
     

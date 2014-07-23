@@ -428,7 +428,6 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
         if (params->trap_param) {
             fta = (struct vr_flow_trap_arg *)(params->trap_param);
             hdr->hdr_cmd_param = htonl(fta->vfta_index);
-            hdr->hdr_nh = htonl(fta->vfta_nh_index);
             hdr->hdr_cmd_param_1 = htonl(fta->vfta_nh_index);
         }
         break;
