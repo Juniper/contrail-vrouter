@@ -533,7 +533,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                     unsigned short vrf)
 {
     struct sk_buff *skb = vp_os_packet(pkt);
-    unsigned int pull_len;
+    int pull_len;
     __u32 ip_src, ip_dst, hashval, port_range;
     struct vr_ip *iph;
     __u32 *data;
@@ -584,12 +584,16 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
     } else {
         /*
-         * Lets pull only if ip hdr is beyond this skb
+         * pull_len can be negative in the following calculation. This behavior
+         * will be true in case of mirroring. In mirroring, we do preset first
+         * which makes vp_data = skb->data, and then we push mirroring headers,
+         * which makes pull_len < 0 and thats why pull_len is an integer.
          */
         pull_len = sizeof(struct iphdr);
         pull_len += pkt->vp_data;
         pull_len -= skb_headroom(skb);
 
+        /* Lets pull only if ip hdr is beyond this skb */
         if ((pkt->vp_data + sizeof(struct iphdr)) > pkt->vp_tail) {
             /* We dont handle if tails are different */
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
@@ -598,20 +602,25 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             if (pkt->vp_tail != (skb->tail - skb->head))
                 goto error;
 #endif
-            if (!pskb_may_pull(skb, pull_len)) {
+            /*
+             * pull_len has to be +ve here and hence additional check is not
+             * needed
+             */
+            if (!pskb_may_pull(skb, (unsigned int)pull_len)) {
                 goto error;
             }
         }
 
-        iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+        iph = (struct vr_ip *)(skb->head + pkt->vp_data);
         if (vr_ip_transport_header_valid(iph)) {
             if ((iph->ip_proto == VR_IP_PROTO_TCP) ||
                     (iph->ip_proto == VR_IP_PROTO_UDP)) {
                 pull_len += ((iph->ip_hl * 4) - sizeof(struct vr_ip) + 4);
-                if (!pskb_may_pull(skb, pull_len)) {
+                if ((pull_len > 0) &&
+                        !pskb_may_pull(skb,(unsigned int)pull_len)) {
                     goto error;
                 }
-                iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+                iph = (struct vr_ip *)(skb->head + pkt->vp_data);
                 l4_hdr = (__u16 *) (((char *) iph) + (iph->ip_hl * 4));
                 sport = *l4_hdr;
                 dport = *(l4_hdr+1);
