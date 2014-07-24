@@ -136,7 +136,7 @@ int vr_perfr3 = 1;
 int vr_perfp = 1;
 int vr_use_linux_br = 0; /* Centos 6.4 */
 
-#else
+#elif CONFIG_XEN
 
 int vr_perfr1 = 0;
 int vr_perfr2 = 0;
