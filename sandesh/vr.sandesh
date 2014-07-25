@@ -145,6 +145,7 @@ buffer sandesh vr_flow_req {
    22: i16          fr_ecmp_nh_index;
    23: i32          fr_src_nh_index;
    24: i16          fr_flow_nh_id;
+   25: i16          fr_drop_reason;
 }
 
 buffer sandesh vr_vrf_assign_req {
