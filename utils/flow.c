@@ -69,12 +69,62 @@ flow_get(unsigned int flow_index)
     return &main_table.ft_entries[flow_index];
 }
 
+const char *
+flow_get_drop_reason(uint8_t drop_code)
+{
+    switch (drop_code) {
+    case VR_FLOW_DR_UNKNOWN:
+        return "Unknown";
+    case VR_FLOW_DR_UNAVIALABLE_INTF:
+        return "IntfErr";
+    case VR_FLOW_DR_IPv4_FWD_DIS:
+        return "Ipv4Dis";
+    case VR_FLOW_DR_UNAVAILABLE_VRF:
+        return "VrfErr";
+    case VR_FLOW_DR_NO_SRC_ROUTE:
+        return "NoSrcRt";
+    case VR_FLOW_DR_NO_DST_ROUTE:
+        return "NoDstRt";
+    case VR_FLOW_DR_AUDIT_ENTRY:
+        return "Audit";
+    case VR_FLOW_DR_VRF_CHANGE:
+        return "VrfChange";
+    case VR_FLOW_DR_NO_REVERSE_FLOW:
+        return "NoRevFlow";
+    case VR_FLOW_DR_REVERSE_FLOW_CHANGE:
+        return "RevFlowChng";
+    case VR_FLOW_DR_NAT_CHANGE:
+        return "NatChng";
+    case VR_FLOW_DR_FLOW_LIMIT:
+        return "FlowLim";
+    case VR_FLOW_DR_LINKLOCAL_SRC_NAT:
+        return "LinkSrcNatErr";
+    case VR_FLOW_DR_POLICY:
+        return "Policy";
+    case VR_FLOW_DR_OUT_POLICY:
+        return "OutPolicy";
+    case VR_FLOW_DR_SG:
+        return "SG";
+    case VR_FLOW_DR_OUT_SG:
+        return "OutSG";
+    case VR_FLOW_DR_REVERSE_SG:
+        return "RevSG";
+    case VR_FLOW_DR_REVERSE_OUT_SG:
+        return "RevOutSG";
+    default:
+        break;
+    }
+    return NULL;
+}
+
 static void
 dump_table(struct flow_table *ft)
 {
     unsigned int i, j, fi, need_flag_print = 0;
     struct vr_flow_entry *fe;
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
+    unsigned int need_drop_reason = 0;
+    const char *drop_reason = NULL;
     struct in_addr in_src, in_dest;
 
     printf("Flow table\n\n");
@@ -84,6 +134,7 @@ dump_table(struct flow_table *ft)
     for (i = 0; i < ft->ft_num_entries; i++) {
         bzero(flag_string, sizeof(flag_string));
         need_flag_print = 0;
+        need_drop_reason = 0;
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
             in_src.s_addr = fe->fe_key.key_src_ip;
@@ -118,6 +169,8 @@ dump_table(struct flow_table *ft)
 
             case VR_FLOW_ACTION_DROP:
                 action = 'D';
+                need_drop_reason = 1;
+                drop_reason = flow_get_drop_reason(fe->fe_drop_reason);
                 break;
 
             case VR_FLOW_ACTION_NAT:
@@ -148,11 +201,17 @@ dump_table(struct flow_table *ft)
                 action = 'U';
             }
 
-            printf("\t\t(");
+            printf("\t(");
             printf("K(nh):%u, ", fe->fe_key.key_nh_id);
             printf("Action:%c", action);
             if (need_flag_print)
                 printf("(%s)", flag_string);
+            if (need_drop_reason) {
+                if (drop_reason != NULL)
+                    printf("(%s)", drop_reason);
+                else
+                    printf("(%d)", fe->fe_drop_reason);
+            }
 
             printf(", ");
             if (fe->fe_ecmp_nh_index >= 0)
