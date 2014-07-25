@@ -1214,6 +1214,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     fe->fe_ecmp_nh_index = req->fr_ecmp_nh_index;
     fe->fe_src_nh_index = req->fr_src_nh_index;
     fe->fe_action = req->fr_action;
+    if (fe->fe_action == VR_FLOW_ACTION_DROP)
+        fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
     fe->fe_flags = req->fr_flags; 
 
 
