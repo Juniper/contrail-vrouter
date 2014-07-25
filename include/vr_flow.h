@@ -35,6 +35,28 @@
 /* for TRAP */
 #define VR_FLOW_FLAG_TRAP_ECMP      0x20
 #define VR_FLOW_FLAG_TRAP_MASK      (VR_FLOW_FLAG_TRAP_ECMP)
+
+/* Flow Action Reason code */
+#define VR_FLOW_DR_UNKNOWN              0x00
+#define VR_FLOW_DR_UNAVIALABLE_INTF     0x01
+#define VR_FLOW_DR_IPv4_FWD_DIS         0x02
+#define VR_FLOW_DR_UNAVAILABLE_VRF      0x03
+#define VR_FLOW_DR_NO_SRC_ROUTE         0x04
+#define VR_FLOW_DR_NO_DST_ROUTE         0x05
+#define VR_FLOW_DR_AUDIT_ENTRY          0x06
+#define VR_FLOW_DR_VRF_CHANGE           0x07
+#define VR_FLOW_DR_NO_REVERSE_FLOW      0x08
+#define VR_FLOW_DR_REVERSE_FLOW_CHANGE  0x09
+#define VR_FLOW_DR_NAT_CHANGE           0x0a
+#define VR_FLOW_DR_FLOW_LIMIT           0x0b
+#define VR_FLOW_DR_LINKLOCAL_SRC_NAT    0x0c
+#define VR_FLOW_DR_POLICY               0x0d
+#define VR_FLOW_DR_OUT_POLICY           0x0e
+#define VR_FLOW_DR_SG                   0x0f
+#define VR_FLOW_DR_OUT_SG               0x10
+#define VR_FLOW_DR_REVERSE_SG           0x11
+#define VR_FLOW_DR_REVERSE_OUT_SG       0x12
+
 struct vr_forwarding_md;
 
 struct vr_flow_key {
@@ -112,6 +134,7 @@ struct vr_dummy_flow_entry {
     uint8_t fe_sec_mirror_id;
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
+    int8_t fe_drop_reason;
 } __attribute__((packed));
 
 #define VR_FLOW_ENTRY_PACK (64 - sizeof(struct vr_dummy_flow_entry))
@@ -130,6 +153,7 @@ struct vr_flow_entry {
     uint8_t fe_sec_mirror_id;
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
+    int8_t fe_drop_reason;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 
