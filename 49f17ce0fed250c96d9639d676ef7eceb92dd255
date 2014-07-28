@@ -1,0 +1,11 @@
+Code-Review+1: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Code-Review+1: Numan Siddique <numan.siddique@enovance.com>
+Approved+1: Anand H. Krishnan <anandhk@juniper.net>
+Code-Review+2: Anand H. Krishnan <anandhk@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Sun, 27 Jul 2014 23:32:40 -0700
+Reviewed-on: https://review.opencontrail.org/948
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/R1.06
