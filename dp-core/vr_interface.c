@@ -1178,9 +1178,12 @@ vif_detach(struct vr_interface *vif)
     return; 
 }
 
-int
-vif_delete(struct vr_interface *vif)
+static void
+vif_drv_delete(struct vr_interface *vif)
 {
+    if (hif_ops->hif_lock)
+        hif_ops->hif_lock();
+
     /*
      * setting name to NULL is important in preventing races. Races mainly
      * come from interfaces going away/coming back (from OS. mainly virtual
@@ -1193,14 +1196,26 @@ vif_delete(struct vr_interface *vif)
      * for name) under rtnl_lock to make sure that states are proper.
      */
     vif->vif_name[0] = '\0';
-
     if (vif_drivers[vif->vif_type].drv_delete)
         vif_drivers[vif->vif_type].drv_delete(vif);
 
+    /*
+     * the check is right. If you haven't defined unlock, you deserve the
+     * crash
+     */
+    if (hif_ops->hif_lock)
+        hif_ops->hif_unlock();
+
+    return;
+}
+
+int
+vif_delete(struct vr_interface *vif)
+{
+    vif_drv_delete(vif);
     vrouter_del_interface(vif);
     return 0;
 }
-
 
 struct vr_interface *
 vif_find(struct vrouter *router, char *name)
@@ -1215,6 +1230,33 @@ vif_find(struct vrouter *router, char *name)
     }
 
     return NULL;
+}
+
+static int
+vif_drv_add(struct vr_interface *vif, vr_interface_req *req)
+{
+    int ret = 0;
+
+    if (vif_drivers[vif->vif_type].drv_add) {
+        if (hif_ops->hif_lock)
+            hif_ops->hif_lock();
+
+        ret = vif_drivers[vif->vif_type].drv_add(vif, req);
+
+        /*
+         * the check is right. If you haven't defined unlock, you deserve the
+         * crash
+         */
+        if (hif_ops->hif_lock)
+            hif_ops->hif_unlock();
+
+        if (ret)
+            return ret;
+    }
+
+    vif->vif_driver = &vif_drivers[vif->vif_type];
+    return 0;
+
 }
 
 static int
@@ -1363,16 +1405,11 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (ret)
         goto generate_resp;
 
-    if (vif_drivers[vif->vif_type].drv_add) {
-        ret = vif_drivers[vif->vif_type].drv_add(vif, req);
-        if (ret) {
-            vif_delete(vif);
-            vif = NULL;
-        } else {
-            vif->vif_driver = &vif_drivers[vif->vif_type];
-        }
+    ret = vif_drv_add(vif, req);
+    if (ret) {
+        vif_delete(vif);
+        vif = NULL;
     }
-
 
     if (!ret)
         vrouter_setup_vif(vif);
@@ -1744,8 +1781,7 @@ vr_interface_shut(struct vrouter *router)
         if ((vif = router->vr_interfaces[i])) {
             vif->vif_tx = vif_discard_tx;
             vif->vif_rx = vif_discard_rx;
-            if (vif_drivers[vif->vif_type].drv_delete)
-                vif_drivers[vif->vif_type].drv_delete(vif);
+            vif_drv_delete(vif);
             vif->vif_flags = 0;
         }
     }

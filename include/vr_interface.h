@@ -161,6 +161,8 @@ struct vr_interface_settings {
 };
 
 struct vr_host_interface_ops {
+    void (*hif_lock)(void);
+    void (*hif_unlock)(void);
     int (*hif_add)(struct vr_interface *);
     int (*hif_del)(struct vr_interface *);
     int (*hif_add_tap)(struct vr_interface *);
