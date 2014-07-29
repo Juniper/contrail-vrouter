@@ -166,6 +166,10 @@ exit_rx:
     return RX_HANDLER_CONSUMED;
 }
 
+struct vrouter_gso_cb {
+    void (*destructor)(struct sk_buff *skb);
+};
+
 static long
 linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
         unsigned short type)
@@ -223,6 +227,20 @@ linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
 
     /* pull till transport header */
     skb_pull(skb, skb->mac_len + ip_hlen);
+    /*
+     * in 2.6.32-358.123.2.openstack.el6 kernel (and I guess all openstack
+     * kernels), the first field in the skb->cb is an offset field that is
+     * used to calculate header length. In those kernels, skb->cb is a
+     * structure of type skb_gso_cb with one field. Need to set that field
+     * to zero.
+     *
+     * This is equivalent to doing
+     *
+     * pkt->vp_head = NULL
+     *
+     * and hence access to packet structure beyond this point is suicidal
+     */
+    memset(skb->cb, 0, sizeof(struct vrouter_gso_cb));
     segs = skb_segment(skb, features);
     if (IS_ERR(segs))
         return PTR_ERR(segs);
