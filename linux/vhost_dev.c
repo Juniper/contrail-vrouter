@@ -147,22 +147,12 @@ vhost_rx_handler(struct sk_buff **pskb)
 void
 vhost_del_tap_phys(struct net_device *pdev)
 {
-    bool i_locked = false;
-
-    if (!rtnl_is_locked()) {
-        i_locked = true;
-        rtnl_lock();
-    }
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
     if (rcu_dereference(pdev->rx_handler) == vhost_rx_handler)
         netdev_rx_handler_unregister(pdev);
 #else
     vr_set_vif_ptr(pdev, NULL);
 #endif
-
-    if (i_locked)
-        rtnl_unlock();
 
     return;
 }
@@ -176,16 +166,10 @@ vhost_del_tap_phys(struct net_device *pdev)
 void
 vhost_tap_phys(struct net_device *vdev, struct net_device *pdev)
 {
-    bool i_locked = false;
     struct vhost_priv *vp;
 
     if (!vdev || !pdev)
         return;
-
-    if (!rtnl_is_locked()) {
-        i_locked = true;
-        rtnl_lock();
-    }
 
     vp = netdev_priv(vdev);
     /*
@@ -213,8 +197,6 @@ vhost_tap_phys(struct net_device *vdev, struct net_device *pdev)
 #endif
 
 exit_tap_phys:
-    if (i_locked)
-        rtnl_unlock();
     return;
 }
 
