@@ -8,7 +8,10 @@
 #define __VRCOMPAT_H__
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0))
+#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR == 5)))
 typedef u64 netdev_features_t;
+#endif
 #endif
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 static inline __u32
@@ -114,6 +117,8 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 #endif
 
 #ifndef ISRHOSKERNEL
+#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR == 5)))
 static bool can_checksum_protocol(netdev_features_t features, __be16 protocol)
 {
         return ((features & NETIF_F_GEN_CSUM) ||
@@ -162,6 +167,7 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
                 return harmonize_features(skb, protocol, features);
         }
 }
+#endif
 
 #endif
 
