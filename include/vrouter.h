@@ -92,7 +92,7 @@ struct host_os {
     void *(*hos_data_at_offset)(struct vr_packet *, unsigned short);
     void *(*hos_pheader_pointer)(struct vr_packet *, unsigned short,
                                  void *);
-    int  (*hos_pull_inner_headers)(struct vr_ip *, struct vr_packet *,
+    int  (*hos_pull_inner_headers)(struct vr_packet *,
                                    unsigned short, unsigned short *,
                                    int (*is_label_l2)(unsigned int,
                                        unsigned int, unsigned short *));
@@ -100,7 +100,7 @@ struct host_os {
     __u16 (*hos_get_udp_src_port)(struct vr_packet *, 
                                   struct vr_forwarding_md *, unsigned short);
     int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *, unsigned short);
-    int  (*hos_pull_inner_headers_fast)(struct vr_ip *, struct vr_packet *,
+    int  (*hos_pull_inner_headers_fast)(struct vr_packet *,
                                         unsigned char, int
                                         (*is_label_l2)(unsigned int,
                                             unsigned int, unsigned short *), 

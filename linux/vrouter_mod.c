@@ -963,8 +963,7 @@ vr_kunmap_atomic(void *va)
  * lh_pull_inner_headers_fast for UDP packets.
  */
 static int
-lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
-                               struct vr_packet *pkt, int
+lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                                (*tunnel_type_cb)(unsigned int, unsigned
                                    int, unsigned short *), int *ret, 
                                int *encap_type)
@@ -983,6 +982,7 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
     unsigned int label, control_data;
     int pkt_type = 0;
     struct vr_eth *eth = NULL;
+    struct vr_ip *outer_iph = NULL;
     unsigned short eth_proto;
 
     pkt_headlen = pkt_head_len(pkt);
@@ -1173,6 +1173,7 @@ lh_pull_inner_headers_fast_udp(struct vr_ip *outer_iph,
             skb_pull_len = pkt_data(pkt) - skb->data;
 
             skb_pull(skb, skb_pull_len);
+            outer_iph = (struct vr_ip *)pkt_network_header(pkt);
             if (lh_csum_verify_udp(skb, outer_iph)) {
                 goto cksum_err;
             }
@@ -1616,7 +1617,7 @@ slow_path:
  * multicast
  */
 static int
-lh_pull_inner_headers_fast(struct vr_ip *iph, struct vr_packet *pkt,
+lh_pull_inner_headers_fast(struct vr_packet *pkt,
                            unsigned char proto, int
                            (*tunnel_type_cb)(unsigned int, unsigned int, 
                                                 unsigned short *),
@@ -1626,8 +1627,8 @@ lh_pull_inner_headers_fast(struct vr_ip *iph, struct vr_packet *pkt,
         return lh_pull_inner_headers_fast_gre(pkt, tunnel_type_cb, ret,
                 encap_type);
     } else if (proto == VR_IP_PROTO_UDP) {
-        return lh_pull_inner_headers_fast_udp(iph, pkt, tunnel_type_cb,
-                ret, encap_type);
+        return lh_pull_inner_headers_fast_udp(pkt, tunnel_type_cb, ret,
+                encap_type);
     }
 
     return 0;
@@ -1640,7 +1641,7 @@ lh_pull_inner_headers_fast(struct vr_ip *iph, struct vr_packet *pkt,
  * as required. 
  */
 static int
-lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
+lh_pull_inner_headers(struct vr_packet *pkt,
                       unsigned short ip_proto, unsigned short *reason,
                       int (*tunnel_type_cb)(unsigned int, unsigned int,
                           unsigned short *))
@@ -1656,6 +1657,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
     struct vr_eth *eth = NULL;
     unsigned short hdr_len, vrouter_overlay_len, eth_proto, udph_cksum = 0;
     struct udphdr *udph;
+    struct vr_ip *outer_iph = NULL;
     bool mpls_pkt = true;
 
     *reason = VP_DROP_PULL;
@@ -1866,6 +1868,7 @@ lh_pull_inner_headers(struct vr_ip *outer_iph, struct vr_packet *pkt,
           * guest verify the checksum.
           */
          if (!skb_csum_unnecessary(skb)) {
+             outer_iph = (struct vr_ip *)pkt_network_header(pkt);
              if (outer_iph && (outer_iph->ip_proto == VR_IP_PROTO_UDP) &&
                  udph_cksum) {
                  skb_pull_len = pkt_data(pkt) - skb->data;
