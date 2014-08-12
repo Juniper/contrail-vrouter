@@ -18,3 +18,16 @@ with both KVM and Xen as hypervisors.
 The utils directory contains user space applications that can be used
 to created interfaces (utils/vif) or display the state of the kernel
 module.
+
+building vrouter.ko for a specific OS
+==================================
+
+1. Initialize the repository
+$ repo init -u git@github.com:Juniper/contrail-vnc -m vrouter-manifest.xml
+
+2. Sync the repo. This will fetch vrouter, build and sandesh repositories.
+$ repo sync
+
+3. Build vrouter
+$ scons vrouter
+
