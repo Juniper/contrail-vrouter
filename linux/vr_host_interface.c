@@ -4,6 +4,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <linux/init.h>
+#include <generated/utsrelease.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
