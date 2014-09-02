@@ -750,11 +750,9 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd) 
 {
     uint32_t *ctrl_data;
-    unsigned short drop_reason, cp;
+    unsigned short drop_reason;
     struct vr_vrf_stats *stats;
     unsigned short pkt_type_flag;
-    struct vr_ip *ip;
-    struct vr_packet *new_pkt;
     int i;
     struct vr_nexthop *dir_nh;
 
@@ -776,40 +774,6 @@ nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
     if (*ctrl_data != VR_L2_MCAST_CTRL_DATA) {
         pkt_type_flag = NH_FLAG_COMPOSITE_L3;
         pkt->vp_type = VP_TYPE_IP;
-
-       /*
-        * We need to pull the inner network and transport
-        * headers to new head skb that we are going to add as
-        * checksum offload expects the headers to be in head skb
-        * The checksum offload would be enabled for multicast
-        * only incase of udp, so pull only incase of udp
-        */
-
-        ip = (struct vr_ip *)pkt_network_header(pkt);
-        if (ip->ip_proto == VR_IP_PROTO_UDP) {
-
-            cp = (ip->ip_hl * 4)  + sizeof(struct vr_udp);
-            if (!pkt_pull(pkt, cp)) {
-                drop_reason = VP_DROP_PULL;
-                goto drop;
-            }
-
-            new_pkt = vr_palloc_head(pkt, (cp));
-            if (!new_pkt) {
-                drop_reason = VP_DROP_HEAD_ALLOC_FAIL;
-                goto drop;
-            }
-            pkt = new_pkt;
-
-            /* Create enough head space */
-            if (!pkt_reserve_head_space(pkt, cp)) {
-                drop_reason = VP_DROP_HEAD_SPACE_RESERVE_FAIL; 
-                goto drop;
-            }
-
-            memcpy(pkt_push(pkt, cp), ip, cp);
-
-        }
     } else {
         /* Mark the packet as L2. Let the control information flow till
          * the L2 mcast nexthop */
