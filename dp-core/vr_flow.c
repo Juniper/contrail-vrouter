@@ -9,6 +9,7 @@
 #include "vr_mcast.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
+#include "vr_datapath.h"
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
@@ -528,7 +529,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     }
 
     if (src_nh->nh_validate_src) {
-        valid_src = src_nh->nh_validate_src(vrf, pkt, src_nh, fmd);
+        valid_src = src_nh->nh_validate_src(vrf, pkt, src_nh, fmd, NULL);
         if (valid_src == NH_SOURCE_INVALID) {
             vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
             return 0;

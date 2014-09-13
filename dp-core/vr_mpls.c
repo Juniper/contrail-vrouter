@@ -215,7 +215,13 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
     case AF_INET:
         return PKT_MPLS_TUNNEL_L3;
     case AF_BRIDGE:
-        return PKT_MPLS_TUNNEL_L2_UCAST;
+        if (nh->nh_type != NH_COMPOSITE) {
+            return PKT_MPLS_TUNNEL_L2_UCAST;
+        }
+        if (label < VR_MAX_UCAST_LABELS) {
+            return PKT_MPLS_TUNNEL_L2_MCAST_EVPN;
+        }
+        return PKT_MPLS_TUNNEL_L2_MCAST;
     case AF_UNSPEC:
         if (control_data == VR_L2_MCAST_CTRL_DATA)
             return PKT_MPLS_TUNNEL_L2_MCAST;

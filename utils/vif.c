@@ -105,6 +105,9 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, PHYSICAL_TYPE_STRING,
                 strlen(PHYSICAL_TYPE_STRING)))
         return VIF_TYPE_PHYSICAL;
+    else if (!strncmp(type_str, VIRTUAL_VLAN_TYPE_STRING,
+                strlen(VIRTUAL_VLAN_TYPE_STRING)))
+        return VIF_TYPE_VIRTUAL_VLAN;
     else if (!strncmp(type_str, VIRTUAL_TYPE_STRING,
                 strlen(VIRTUAL_TYPE_STRING)))
         return VIF_TYPE_VIRTUAL;
@@ -117,9 +120,6 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, STATS_TYPE_STRING,
                 strlen(STATS_TYPE_STRING)))
         return VIF_TYPE_STATS;
-    else if (!strncmp(type_str, VIRTUAL_VLAN_TYPE_STRING,
-                strlen(VIRTUAL_VLAN_TYPE_STRING)))
-        return VIF_TYPE_VIRTUAL_VLAN;
     else
         Usage();
 
@@ -201,7 +201,10 @@ vr_interface_req_process(void *s)
             printf(")");
         }
     } else if (req->vifr_type == VIF_TYPE_VIRTUAL_VLAN) {
-        printf(" Vlan Id: %d", req->vifr_vlan_id);
+        printf(" Vlan(o/i)(,S): %d/%d", req->vifr_ovlan_id, req->vifr_vlan_id);
+        if (req->vifr_src_mac_size && req->vifr_src_mac)
+            printf(", "MAC_FORMAT, MAC_VALUE((uint8_t *)req->vifr_src_mac));
+        printf(" Bridge Index: %d", req->vifr_bridge_idx);
     }
 
     if (req->vifr_parent_vif_idx >= 0)
@@ -398,6 +401,8 @@ op_retry:
 
     switch (op) {
     case SANDESH_OP_ADD:
+        if (if_kindex < 0)
+            if_kindex = 0;
         intf_req.vifr_os_idx = if_kindex;
         if (vr_ifindex < 0)
             vr_ifindex = if_kindex;
@@ -407,6 +412,7 @@ op_retry:
         if (vr_if_type == VIF_TYPE_HOST)
             intf_req.vifr_cross_connect_idx = if_xconnect_kindex;
         intf_req.vifr_flags = vr_ifflags;
+
         break;
 
     case SANDESH_OP_DELETE:
