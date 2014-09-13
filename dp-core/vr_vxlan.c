@@ -16,6 +16,16 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     unsigned int vnid;
     struct vr_nexthop *nh;
     unsigned short vrf;
+    struct vr_forwarding_md c_fmd;
+    struct vr_ip *ip;
+
+    if (!fmd) {
+        vr_init_forwarding_md(&c_fmd);
+        fmd = &c_fmd;
+    }
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    fmd->fmd_outer_src_ip = ip->ip_saddr;
 
     vxlan = (struct vr_vxlan *)pkt_data(pkt);
     if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT)

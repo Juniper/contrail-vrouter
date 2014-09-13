@@ -654,6 +654,8 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_resolves += stats->vrf_resolves;
             response->vsr_receives += stats->vrf_receives;
             response->vsr_ecmp_composites += stats->vrf_ecmp_composites;
+            response->vsr_encap_composites += stats->vrf_encap_composites;
+            response->vsr_evpn_composites += stats->vrf_evpn_composites;
             response->vsr_l3_mcast_composites += stats->vrf_l3_mcast_composites;
             response->vsr_l2_mcast_composites += stats->vrf_l2_mcast_composites;
             response->vsr_fabric_composites += stats->vrf_fabric_composites;

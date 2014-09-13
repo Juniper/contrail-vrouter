@@ -89,7 +89,7 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
 
 
     strcpy(ptr,"");
-    for(i = 1, mask = 1; (i < 16); i++, mask = mask << 1) { 
+    for(i = 0, mask = 1; (i < 16); i++, mask = mask << 1) {
         switch(flags & mask) {
         case NH_FLAG_VALID:
             strcat(ptr, "Valid, ");
@@ -136,6 +136,16 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
         case NH_FLAG_COMPOSITE_FABRIC:
             if (type == NH_COMPOSITE)
                 strcat(ptr, "Fabric, ");
+            break;
+
+        case NH_FLAG_COMPOSITE_EVPN:
+            if (type == NH_COMPOSITE)
+                strcat(ptr, "Evpn, ");
+            break;
+
+        case NH_FLAG_COMPOSITE_ENCAP:
+            if (type == NH_COMPOSITE)
+                strcat(ptr, "Encap, ");
             break;
 
         case NH_FLAG_COMPOSITE_MULTI_PROTO:
@@ -400,6 +410,8 @@ cmd_usage()
            "                    [--cl2 composite l2 nexhop]\n"
            "                    [--cmp composit multiprotocol ]\n"
            "                    [--cfa composit fabric ]\n"
+           "                    [--cen composit encap ]\n"
+           "                    [--cevpn composit evpn ]\n"
            "                        [--lbl <lbl> label for composit fabric ]\n"
            "                [VxlanVRF options]\n");
 
@@ -440,6 +452,8 @@ enum opt_index {
     CFA_OPT_IND,
     MC_OPT_IND,
     EL2_OPT_IND,
+    CEN_OPT_IND,
+    CEVPN_OPT_IND,
     LBL_OPT_IND,
     LST_OPT_IND,
     GET_OPT_IND,
@@ -482,6 +496,8 @@ static struct option long_options[] = {
     [CFA_OPT_IND]       = {"cfa",   no_argument,        &opt[CFA_OPT_IND],      1},
     [MC_OPT_IND]        = {"mc",    no_argument,        &opt[MC_OPT_IND],       1},
     [EL2_OPT_IND]       = {"el2",   no_argument,        &opt[EL2_OPT_IND],      1},
+    [CEN_OPT_IND]       = {"cen",   no_argument,        &opt[CEN_OPT_IND],      1},
+    [CEVPN_OPT_IND]     = {"cevpn", no_argument,        &opt[CEVPN_OPT_IND],    1},
     [LBL_OPT_IND]       = {"lbl",   required_argument,  &opt[LBL_OPT_IND],      1},
     [LST_OPT_IND]       = {"list",  no_argument,        &opt[LST_OPT_IND],      1},
     [GET_OPT_IND]       = {"get",   required_argument,  &opt[GET_OPT_IND],      1},
@@ -659,6 +675,10 @@ validate_options()
                     flags |= NH_FLAG_COMPOSITE_FABRIC;
                 if (opt_set(CMP_OPT_IND))
                     flags |= NH_FLAG_COMPOSITE_MULTI_PROTO;
+                if (opt_set(CEN_OPT_IND))
+                    flags |= NH_FLAG_COMPOSITE_ENCAP;
+                if (opt_set(CEVPN_OPT_IND))
+                    flags |= NH_FLAG_COMPOSITE_EVPN;
                 opt_set(LBL_OPT_IND);
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();

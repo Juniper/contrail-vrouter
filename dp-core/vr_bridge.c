@@ -7,6 +7,7 @@
 #include "vr_bridge.h"
 #include "vr_htable.h"
 #include "vr_nexthop.h"
+#include "vr_datapath.h"
 #include "vr_defs.h"
 
 struct vr_bridge_entry_key {
@@ -371,7 +372,7 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     mac = (char *)pkt_data(pkt);
     rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
     rt.rtr_req.rtr_mac =(int8_t *) mac;
-    /* If multicast L2 packet, user broadcast composite nexthop */
+    /* If multicast L2 packet, use broadcast composite nexthop */
     if (IS_MAC_BMCAST(mac)) {
         rt.rtr_req.rtr_mac = (int8_t *)bcast_mac;
         pkt->vp_flags |= VP_FLAG_MULTICAST;
@@ -400,39 +401,3 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     return 0;
 }
 
-unsigned int
-vr_l2_input(unsigned short vrf, struct vr_packet *pkt, 
-                struct vr_forwarding_md *fmd)
-{
-    unsigned short eth_proto;
-    int pull_len;
-    int reason;
-
-    /* Mark the network header if an L3 packet */
-    pull_len = vr_reach_l3_hdr(pkt, &eth_proto);
-    if (pull_len < 0) {
-        vif_drop_pkt(pkt->vp_if, pkt, 1);
-        return 0;
-    }
-
-    /* Even in L2 mode we will have to adjust the MSS for TCP*/
-    if (eth_proto == VR_ETH_PROTO_IP) {
-        pkt_set_network_header(pkt, pkt->vp_data);
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
-        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
-                            (pkt->vp_if->vif_type == VIF_TYPE_VIRTUAL)) {
-            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN_IN_L2_MODE))) {
-                vr_pfree(pkt, reason);
-                return 0;
-            }
-        }
-    }
-
-    /* Restore back the L2 headers */
-    if (!pkt_push(pkt, pull_len)) {
-        vif_drop_pkt(pkt->vp_if, pkt, 1);
-        return 0;
-    }
-
-    return vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
-}

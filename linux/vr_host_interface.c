@@ -321,13 +321,15 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
 
     iph = (struct vr_ip *)(seg->data + ETH_HLEN);
     iphlen = (iph->ip_hl << 2);
-    iph->ip_len = htons(seg->len - ETH_HLEN);
-    iph->ip_id = htons(vr_generate_unique_ip_id());
-
     if (!pskb_may_pull(seg, ETH_HLEN + iphlen)) {
         reason = VP_DROP_PULL;
         goto exit_xmit;
     }
+    iph = (struct vr_ip *)(seg->data + ETH_HLEN);
+    iph->ip_len = htons(seg->len - ETH_HLEN);
+    iph->ip_id = htons(vr_generate_unique_ip_id());
+    iph->ip_csum = 0;
+    iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
 
     if (iph->ip_proto == VR_IP_PROTO_UDP) {
         if (!pskb_may_pull(seg, ETH_HLEN + iphlen +
@@ -373,9 +375,6 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
             }
         }
     } else if (iph->ip_proto == VR_IP_PROTO_GRE) {
-        iph->ip_csum = 0;
-        iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
-
         if ((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) == 0) {
             if (seg->ip_summed == CHECKSUM_PARTIAL) {
                 skb_checksum_help(seg);
