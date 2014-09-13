@@ -7,21 +7,27 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_mirror.h"
+#include "vr_htable.h"
+#include "vr_datapath.h"
 
 volatile bool agent_alive = false;
 
 static struct vr_host_interface_ops *hif_ops;
 
-static int eth_srx(struct vr_interface *, struct vr_packet *, unsigned short);
+static int vm_srx(struct vr_interface *, struct vr_packet *, unsigned short);
+static int vm_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
 extern void  vr_host_interface_exit(void);
 extern void vr_host_vif_init(struct vrouter *);
-extern unsigned int vr_l3_input(unsigned short, struct vr_packet *, 
-                                              struct vr_forwarding_md *);
-extern unsigned int vr_l2_input(unsigned short, struct vr_packet *, 
-                                               struct vr_forwarding_md *);
+extern struct vr_interface *vif_bridge_get_sub_interface(vr_htable_t,
+        unsigned short, unsigned char *);
+extern int vif_bridge_get_index(struct vr_interface *, struct vr_interface *);
+extern int vif_bridge_init(struct vr_interface *);
+extern void vif_bridge_deinit(struct vr_interface *);
+extern int vif_bridge_delete(struct vr_interface *, struct vr_interface *);
+extern int vif_bridge_add(struct vr_interface *, struct vr_interface *);
 extern void vhost_remove_xconnect(void);
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
@@ -58,46 +64,6 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
         stats->vis_oerrors++;
     vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
     return;
-}
-
-/*
- * vr_interface_input() is invoked if a packet ingresses an interface. 
- * This function demultiplexes the packet to right input 
- * function depending on the protocols enabled on the VIF
- */
-static unsigned int
-vr_interface_input(unsigned short vrf, struct vr_interface *vif,
-                       struct vr_packet *pkt, unsigned short vlan_id)
-{
-    struct vr_forwarding_md fmd;
-    unsigned int ret;
-
-    vr_init_forwarding_md(&fmd);
-
-    if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
-        fmd.fmd_dvrf = vif->vif_vrf;
-        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
-    }
-
-    if (vif->vif_vrf_table) {
-        fmd.fmd_vlan = vlan_id;
-        vlan_id = VLAN_ID_INVALID;
-    }
-
-    /* If vlan tagged from VM, packet needs to be treated as L2 packet */
-    if ((vif->vif_type == VIF_TYPE_PHYSICAL) ||  (vlan_id == VLAN_ID_INVALID)) {
-        if (vif->vif_flags & VIF_FLAG_L3_ENABLED) {
-            ret = vr_l3_input(vrf, pkt, &fmd);
-            if (ret != PKT_RET_FALLBACK_BRIDGING)
-                return ret;
-        }
-    }
-
-    if (vif->vif_flags & VIF_FLAG_L2_ENABLED)
-        return vr_l2_input(vrf, pkt, &fmd);
-
-    vif_drop_pkt(vif, pkt, 1);
-    return 0;
 }
 
 
@@ -152,7 +118,7 @@ vr_interface_service_enable(struct vr_interface *vif)
         vif->vif_vrf_table_users = 0;
     }
 
-    vif->vif_rx = eth_srx;
+    vif->vif_rx = vm_srx;
 
     return 0;
 }
@@ -161,7 +127,11 @@ vr_interface_service_enable(struct vr_interface *vif)
 static void
 vr_interface_service_disable(struct vr_interface *vif)
 {
-    vif->vif_rx = eth_rx;
+
+    if (vif_is_virtual(vif))
+        vif->vif_rx = vm_rx;
+    else
+        vif->vif_rx = eth_rx;
 
     /*
      * once everybody sees the change, we are free to do whatever
@@ -314,7 +284,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
             agent_vif = vif;
         }
         pkt->vp_if = agent_vif;
-        vr_interface_input(ntohs(hdr->hdr_vrf), agent_vif, pkt, VLAN_ID_INVALID);
+        vr_virtual_input(ntohs(hdr->hdr_vrf), agent_vif, pkt, VLAN_ID_INVALID);
     } else {
         vif = __vrouter_get_interface(vrouter_get(0), ntohs(hdr->hdr_ifindex));
         if (!vif) {
@@ -520,7 +490,7 @@ vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif_mode_xconnect(vif))
         return vif_xconnect(vif, pkt);
 
-    return vr_interface_input(vif->vif_vrf, vif, pkt, VLAN_ID_INVALID);
+    return vr_fabric_input(vif, pkt, vlan_id);
 }
 
 static int
@@ -589,20 +559,6 @@ vhost_drv_add(struct vr_interface *vif,
 
 /* vlan driver */
 static int
-vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned short vlan_id __attribute__((unused)))
-{
-    struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
-
-    pkt->vp_if = vif;
-
-    stats->vis_ibytes += pkt_len(pkt);
-    stats->vis_ipackets++;
-
-    return vr_interface_input(vif->vif_vrf, vif, pkt, VLAN_ID_INVALID);
-}
-
-static int
 vlan_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     int ret;
@@ -657,22 +613,36 @@ vlan_drv_add(struct vr_interface *vif, vr_interface_req *vifr)
     if ((unsigned int)(vifr->vifr_parent_vif_idx) > VR_MAX_INTERFACES)
         return -EINVAL;
 
-    if ((unsigned short)(vifr->vifr_vlan_id) >= VLAN_ID_MAX)
+    if (((unsigned short)(vifr->vifr_vlan_id) >= VLAN_ID_MAX) ||
+            ((unsigned short)(vifr->vifr_ovlan_id) >= VLAN_ID_MAX))
         return -EINVAL;
+
+    if (vifr->vifr_src_mac_size && vifr->vifr_src_mac) {
+        if (vifr->vifr_src_mac_size != VR_ETHER_ALEN)
+            return -EINVAL;
+
+        vif->vif_src_mac = vr_malloc(VR_ETHER_ALEN);
+        if (!vif->vif_src_mac)
+            return -ENOMEM;
+
+        memcpy(vif->vif_src_mac, vifr->vifr_src_mac, VR_ETHER_ALEN);
+    }
 
     if (!vif->vif_mtu)
         vif->vif_mtu = 1514;
 
     vif->vif_set_rewrite = vif_cmn_rewrite;
     vif->vif_tx = vlan_tx;
-    vif->vif_rx = vlan_rx;
+    vif->vif_rx = vm_rx;
     vif->vif_vlan_id = vifr->vifr_vlan_id;
+    vif->vif_ovlan_id = vifr->vifr_ovlan_id;
 
     pvif = vrouter_get_interface(vifr->vifr_rid, vifr->vifr_parent_vif_idx);
     if (!pvif)
         return -EINVAL;
 
     vif->vif_parent = pvif;
+
     if (!pvif->vif_driver->drv_add_sub_interface) {
         ret = -EINVAL;
         goto add_fail;
@@ -696,7 +666,7 @@ add_fail:
 
 /* eth driver */
 static int
-eth_srx(struct vr_interface *vif, struct vr_packet *pkt,
+vm_srx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id)
 {
     unsigned short vrf;
@@ -710,8 +680,21 @@ eth_srx(struct vr_interface *vif, struct vr_packet *pkt,
     else
         vrf = vif->vif_vrf_table[vlan_id].va_vrf;
 
-    return vr_interface_input(vrf, vif, pkt, vlan_id);
+    return vr_virtual_input(vrf, vif, pkt, vlan_id);
 }
+
+static int
+vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
+      unsigned short vlan_id)
+{
+    struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
+
+    stats->vis_ibytes += pkt_len(pkt);
+    stats->vis_ipackets++;
+
+    return vr_virtual_input(vif->vif_vrf, vif, pkt, vlan_id);
+}
+
 
 static int
 eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
@@ -738,11 +721,11 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
         if (vif->vif_sub_interfaces) {
             sub_vif = vif->vif_sub_interfaces[vlan_id];
             if (sub_vif)
-                return sub_vif->vif_rx(sub_vif, pkt, vlan_id);
+                return sub_vif->vif_rx(sub_vif, pkt, VLAN_ID_INVALID);
         }
     }
 
-    return vr_interface_input(vif->vif_vrf, vif, pkt, vlan_id);
+    return vr_fabric_input(vif, pkt, vlan_id);
 }
 
 static int
@@ -797,6 +780,12 @@ eth_drv_del(struct vr_interface *vif)
 static int
 eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
+    if (vif->vif_src_mac) {
+        if (pvif->vif_btable)
+            return vif_bridge_delete(pvif, vif);
+        return -EINVAL;
+    }
+
     if (!pvif->vif_sub_interfaces)
         return -EINVAL;
 
@@ -813,6 +802,18 @@ eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 static int
 eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
+    int ret;
+
+    if (vif->vif_src_mac) {
+        if (!pvif->vif_btable) {
+            ret = vif_bridge_init(pvif);
+            if (ret)
+                return ret;
+        }
+
+        return vif_bridge_add(pvif, vif);
+    }
+
     if (!pvif->vif_sub_interfaces) {
         pvif->vif_sub_interfaces = vr_zalloc(VLAN_ID_MAX *
                 sizeof(struct vr_interface *));
@@ -849,7 +850,10 @@ eth_drv_add(struct vr_interface *vif,
 
     if (vif->vif_type != VIF_TYPE_STATS) {
         vif->vif_tx = eth_tx;
-        vif->vif_rx = eth_rx;
+        if (vif_is_virtual(vif))
+            vif->vif_rx = vm_rx;
+        else
+            vif->vif_rx = eth_rx;
     }
 
     if (vif->vif_flags & VIF_FLAG_SERVICE_IF) {
@@ -947,6 +951,10 @@ vif_free(struct vr_interface *vif)
     if (vif->vif_sub_interfaces) {
         vr_free(vif->vif_sub_interfaces);
         vif->vif_sub_interfaces = NULL;
+    }
+
+    if (vif->vif_btable) {
+        vif_bridge_deinit(vif);
     }
 
     vr_free(vif);
@@ -1386,6 +1394,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
 
     memcpy(vif->vif_mac, req->vifr_mac, sizeof(vif->vif_mac));
     memcpy(vif->vif_rewrite, req->vifr_mac, sizeof(vif->vif_mac));
+
     vif->vif_ip = req->vifr_ip;
 
     if (req->vifr_name) {
@@ -1450,8 +1459,23 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
     else
         req->vifr_parent_vif_idx = -1;
 
-    if (intf->vif_type == VIF_TYPE_VIRTUAL_VLAN)
+    if (intf->vif_type == VIF_TYPE_VIRTUAL_VLAN) {
         req->vifr_vlan_id = intf->vif_vlan_id;
+        req->vifr_ovlan_id = intf->vif_ovlan_id;
+    }
+
+    if (intf->vif_src_mac) {
+        memcpy(req->vifr_src_mac, intf->vif_src_mac, VR_ETHER_ALEN);
+        req->vifr_src_mac_size = VR_ETHER_ALEN;
+        req->vifr_bridge_idx = vif_bridge_get_index(intf->vif_parent, intf);
+    } else {
+        /*
+         * this is a small hack. we had already allocated the memory in
+         * req_get and it is common for all interfaces. how do we tell
+         * that the field is not valid - by setting the size to 0.
+         */
+        req->vifr_src_mac_size = 0;
+    }
 
     req->vifr_ibytes = 0;
     req->vifr_ipackets = 0;
@@ -1495,6 +1519,9 @@ vr_interface_req_get(void)
     if (req->vifr_mac)
         req->vifr_mac_size = VR_ETHER_ALEN;
 
+    req->vifr_src_mac = vr_zalloc(VR_ETHER_ALEN);
+    if (req->vifr_src_mac)
+        req->vifr_src_mac_size = 0;
     req->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN);
 
     return req;
@@ -1507,8 +1534,15 @@ vr_interface_req_destroy(vr_interface_req *req)
     if (!req)
         return;
 
-    if (req->vifr_mac)
+    if (req->vifr_mac) {
         vr_free(req->vifr_mac);
+        req->vifr_mac_size = 0;
+    }
+
+    if (req->vifr_src_mac) {
+        vr_free(req->vifr_src_mac);
+        req->vifr_src_mac_size = 0;
+    }
 
     if (req->vifr_name)
         vr_free(req->vifr_name);

@@ -32,6 +32,8 @@ struct vr_vrf_stats {
     uint64_t vrf_resolves;
     uint64_t vrf_receives;
     uint64_t vrf_ecmp_composites;
+    uint64_t vrf_encap_composites;
+    uint64_t vrf_evpn_composites;
     uint64_t vrf_l3_mcast_composites;
     uint64_t vrf_l2_mcast_composites;
     uint64_t vrf_fabric_composites;

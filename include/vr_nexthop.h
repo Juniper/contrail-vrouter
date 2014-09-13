@@ -29,24 +29,26 @@ enum nexthop_type {
     NH_MAX,
 };
 
-#define NH_FLAG_VALID                       0x0001
-#define NH_FLAG_POLICY_ENABLED              0x0002
-#define NH_FLAG_ENCAP_L2                    0x0004
-#define NH_FLAG_TUNNEL_GRE                  0x0008
-#define NH_FLAG_TUNNEL_UDP                  0x0010
+#define NH_FLAG_VALID                       0x00001
+#define NH_FLAG_POLICY_ENABLED              0x00002
+#define NH_FLAG_ENCAP_L2                    0x00004
+#define NH_FLAG_TUNNEL_GRE                  0x00008
+#define NH_FLAG_TUNNEL_UDP                  0x00010
 /*
  * Mcast flag can be appended to any type of nexthop, either an Encap,
  * composite etc
  */
-#define NH_FLAG_MCAST                       0x0020
-#define NH_FLAG_TUNNEL_UDP_MPLS             0x0040
-#define NH_FLAG_COMPOSITE_ECMP              0x0080
-#define NH_FLAG_COMPOSITE_L2                0x0100
-#define NH_FLAG_COMPOSITE_L3                0x0200
-#define NH_FLAG_COMPOSITE_FABRIC            0x0400
-#define NH_FLAG_COMPOSITE_MULTI_PROTO       0x0800
-#define NH_FLAG_TUNNEL_VXLAN                0x1000
-#define NH_FLAG_RELAXED_POLICY              0x2000
+#define NH_FLAG_MCAST                       0x00020
+#define NH_FLAG_TUNNEL_UDP_MPLS             0x00040
+#define NH_FLAG_COMPOSITE_ECMP              0x00080
+#define NH_FLAG_COMPOSITE_L2                0x00100
+#define NH_FLAG_COMPOSITE_L3                0x00200
+#define NH_FLAG_COMPOSITE_FABRIC            0x00400
+#define NH_FLAG_COMPOSITE_MULTI_PROTO       0x00800
+#define NH_FLAG_TUNNEL_VXLAN                0x01000
+#define NH_FLAG_RELAXED_POLICY              0x02000
+#define NH_FLAG_COMPOSITE_EVPN              0x04000
+#define NH_FLAG_COMPOSITE_ENCAP             0x08000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
@@ -106,7 +108,8 @@ struct vr_nexthop {
     int                 (*nh_validate_src)(unsigned short,
                                            struct vr_packet *,
                                            struct vr_nexthop *,
-                                           struct vr_forwarding_md *);
+                                           struct vr_forwarding_md *,
+                                           void *);
     int                 (*nh_reach_nh)(unsigned short, 
                                        struct vr_packet *,
                                        struct vr_nexthop *,

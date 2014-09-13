@@ -57,7 +57,8 @@ ifneq ($(KERNELRELEASE), )
 
 	vrouter-y += dp-core/vr_message.o dp-core/vr_sandesh.o
 	vrouter-y += dp-core/vr_queue.o dp-core/vr_index_table.o
-	vrouter-y += dp-core/vrouter.o dp-core/vr_route.o dp-core/vr_nexthop.o
+	vrouter-y += dp-core/vrouter.o dp-core/vr_route.o
+	vrouter-y += dp-core/vr_nexthop.o dp-core/vr_vif_bridge.o
 	vrouter-y += dp-core/vr_datapath.o dp-core/vr_interface.o
 	vrouter-y += dp-core/vr_packet.o dp-core/vr_proto_ip.o
 	vrouter-y += dp-core/vr_mpls.o dp-core/vr_ip4_mtrie.o
