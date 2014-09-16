@@ -86,6 +86,8 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
     rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
+    vr_free(rt.rtr_req.rtr_prefix);
+
     if (!nh || nh->nh_type == NH_DISCARD)
         return PKT_ARP_DROP;
 
