@@ -9,6 +9,9 @@
 #include "vr_mcast.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
+#ifdef __DPDK__
+#include "vr_shmem.h"
+#endif
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
@@ -122,6 +125,7 @@ vr_oflow_table_size(struct vrouter *router)
     return vr_btable_size(router->vr_oflow_table);
 }
 
+#ifndef __DPDK__
 /*
  * this is used by the mmap code. mmap sees the whole flow table
  * (including the overflow table) as one large table. so, given
@@ -141,6 +145,7 @@ vr_flow_get_va(struct vrouter *router, uint64_t offset)
 
     return vr_btable_get_address(table, offset);
 }
+#endif /* __DPDK__ */
 
 static struct vr_flow_entry *
 vr_get_flow_entry(struct vrouter *router, int index)
@@ -1300,6 +1305,19 @@ vr_flow_table_info_init(struct vrouter *router)
 static void
 vr_flow_table_destroy(struct vrouter *router)
 {
+#ifdef __DPDK__
+	size_t flow_size, oflow_size;
+	void * shmem;
+
+    if (router->vr_flow_table && router->vr_oflow_table) {
+		/* unmap shared memory */
+		flow_size = vr_flow_entries * sizeof(struct vr_flow_entry);
+		oflow_size = vr_oflow_entries * sizeof(struct vr_flow_entry);
+		shmem = router->vr_flow_table->vb_data;
+		vr_shmem_free(shmem, flow_size + oflow_size);
+	}
+#endif
+
     if (router->vr_flow_table) {
         vr_btable_free(router->vr_flow_table);
         router->vr_flow_table = NULL;
@@ -1357,6 +1375,51 @@ vr_flow_table_reset(struct vrouter *router)
 static int
 vr_flow_table_init(struct vrouter *router)
 {
+#ifdef __DPDK__
+	size_t flow_size, oflow_size;
+	void * shmem = NULL;
+
+    if (!router->vr_flow_table) {
+		flow_size = vr_flow_entries * sizeof(struct vr_flow_entry);
+		oflow_size = vr_oflow_entries * sizeof(struct vr_flow_entry);
+
+		/* create shared memory to share flows with the Agent */
+		shmem = vr_shmem_alloc(VR_FLOW_SHMEM_NAME, flow_size + oflow_size);
+		if (!shmem) {
+			goto fail;
+		}
+
+		/* create flow and oflow tables using shared memory */
+		router->vr_flow_table = vr_btable_alloc_shmem(vr_flow_entries,
+			sizeof(struct vr_flow_entry), shmem);
+		if (!router->vr_flow_table) {
+			goto fail;
+		}
+		/* oflows follow flow entries hence we use flow_size offset */
+		router->vr_oflow_table = vr_btable_alloc_shmem(vr_oflow_entries,
+			sizeof(struct vr_flow_entry), shmem + flow_size);
+		if (!router->vr_oflow_table) {
+			goto fail;
+		}
+	}
+
+    return vr_flow_table_info_init(router);
+
+fail:
+	/* free any memory before return */
+	if (shmem) {
+		vr_shmem_free(shmem, flow_size + oflow_size);
+	}
+	if (router->vr_flow_table) {
+		vr_btable_free(router->vr_flow_table);
+	}
+	if (router->vr_oflow_table) {
+		vr_btable_free(router->vr_oflow_table);
+	}
+
+	return vr_module_error(-ENOMEM, __FUNCTION__,
+		__LINE__, vr_flow_entries + vr_oflow_entries);
+#else
     if (!router->vr_flow_table) {
         if (vr_flow_entries % VR_FLOW_ENTRIES_PER_BUCKET)
             return vr_module_error(-EINVAL, __FUNCTION__,
@@ -1380,6 +1443,7 @@ vr_flow_table_init(struct vrouter *router)
     }
 
     return vr_flow_table_info_init(router);
+#endif /* __DPDK__ */
 }
 
 

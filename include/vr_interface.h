@@ -54,6 +54,8 @@
 #define VIF_FLAG_DHCP_ENABLED       0x100
 /* The physical interface corresponds to a vhost interface */
 #define VIF_FLAG_VHOST_PHYS         0x200
+/* The interface corresponds to a DPDK port */
+#define VIF_FLAG_PMD                0x400
 
 
 #define VIF_VRF_TABLE_ENTRIES       1024
@@ -193,7 +195,9 @@ extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
         short, unsigned short);
+#ifdef __KERNEL__
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
+#endif
 extern unsigned int vif_get_mtu(struct vr_interface *);
 
 #endif /* __VR_INTERFACE_H__ */

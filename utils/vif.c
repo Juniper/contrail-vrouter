@@ -45,7 +45,7 @@
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
-static int if_kindex = -1, vrf_id, vr_ifindex = -1;
+static int if_kindex = -1, vrf_id, vr_ifindex = -1, if_pmdindex = -1, vr_addindex = -1;
 static bool need_xconnect_if = false;
 static int if_xconnect_kindex = -1;
 static short vlan_id = -1;
@@ -53,7 +53,7 @@ static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
-static int vrf_set, mac_set, delete_set, policy_set;
+static int vrf_set, mac_set, delete_set, policy_set, pmd_set, addindex_set;
 static int xconnect_set, vhost_phys_set;
 
 static unsigned int vr_op, vr_if_type;
@@ -132,6 +132,8 @@ vr_if_flags(int flags)
     bzero(flag_string, sizeof(flag_string));
     if (flags & VIF_FLAG_POLICY_ENABLED)
         strcat(flag_string, "P");
+    if (flags & VIF_FLAG_PMD)
+        strcat(flag_string, "D");
     if (flags & VIF_FLAG_XCONNECT)
         strcat(flag_string, "X");
     if (flags & VIF_FLAG_SERVICE_IF)
@@ -190,8 +192,15 @@ vr_interface_req_process(void *s)
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
     for (; printed < 12; printed++)
         printf(" ");
-    printf("OS: %s", req->vifr_os_idx ?
-        if_indextoname(req->vifr_os_idx, name): "NULL");
+    if (req->vifr_flags & VIF_FLAG_PMD) {
+        if (req->vifr_type == VIF_TYPE_HOST)
+            printf("PMD: %s", req->vifr_os_idx ?
+                if_indextoname(req->vifr_os_idx, name): "NULL");
+		else
+            printf("PMD: %d", req->vifr_os_idx);
+	} else
+        printf("OS: %s", req->vifr_os_idx ?
+            if_indextoname(req->vifr_os_idx, name): "NULL");
 
     if (req->vifr_type == VIF_TYPE_PHYSICAL) {
         if (req->vifr_speed >= 0) {
@@ -299,6 +308,7 @@ vr_intf_send_msg(void *request, char *request_string)
 {
     int ret, error, attr_len; 
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
     /* nlmsg header */
     ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
@@ -334,6 +344,10 @@ vr_intf_send_msg(void *request, char *request_string)
         if (resp->nl_op == SANDESH_REQUEST) {
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
         }
+
+        nlh = (struct nlmsghdr *)cl->cl_buf;
+        if (!nlh->nlmsg_flags)
+            break;
     }
 
     return 0;
@@ -401,7 +415,10 @@ op_retry:
         intf_req.vifr_os_idx = if_kindex;
         if (vr_ifindex < 0)
             vr_ifindex = if_kindex;
-        intf_req.vifr_idx = vr_ifindex;
+        if (addindex_set)
+	    intf_req.vifr_idx = vr_addindex;
+        else
+            intf_req.vifr_idx = vr_ifindex;
         intf_req.vifr_rid = 0;
         intf_req.vifr_type = vr_if_type;
         if (vr_if_type == VIF_TYPE_HOST)
@@ -456,7 +473,7 @@ Usage()
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
     printf("\t   \t--type [vhost|agent|physical|virtual]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
-    printf( "[--policy, --vhost-phys, --dhcp-enable]]\n");
+    printf( "[--id <intf_id> --pmd --policy, --vhost-phys, --dhcp-enable]]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -476,6 +493,7 @@ enum if_opt_index {
     MAC_OPT_INDEX,
     DELETE_OPT_INDEX,
     POLICY_OPT_INDEX,
+    PMD_OPT_INDEX,
     KINDEX_OPT_INDEX,
     TYPE_OPT_INDEX,
     SET_OPT_INDEX,
@@ -484,11 +502,13 @@ enum if_opt_index {
     DHCP_OPT_INDEX,
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
+    ADDINDEX_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
     [ADD_OPT_INDEX]         =   {"add",         required_argument,  &add_set,           1},
+    [ADDINDEX_OPT_INDEX]    =   {"id",          required_argument,  &addindex_set,      1},
     [CREATE_OPT_INDEX]      =   {"create",      required_argument,  &create_set,        1},
     [GET_OPT_INDEX]         =   {"get",         required_argument,  &get_set,           1},
     [LIST_OPT_INDEX]        =   {"list",        no_argument,        &list_set,          1},
@@ -496,6 +516,7 @@ static struct option long_options[] = {
     [MAC_OPT_INDEX]         =   {"mac",         required_argument,  &mac_set,           1},
     [DELETE_OPT_INDEX]      =   {"delete",      required_argument,  &delete_set,        1},
     [POLICY_OPT_INDEX]      =   {"policy",      no_argument,        &policy_set,        1},
+    [PMD_OPT_INDEX]         =   {"pmd",         no_argument,        &pmd_set,           1},
     [KINDEX_OPT_INDEX]      =   {"kernel",      no_argument,        &kindex_set,        1},
     [TYPE_OPT_INDEX]        =   {"type",        required_argument,  &type_set,          1},
     [SET_OPT_INDEX]         =   {"set",         required_argument,  &set_set,           1},
@@ -519,6 +540,8 @@ parse_long_opts(int option_index, char *opt_arg)
     case ADD_OPT_INDEX:
         strncpy(if_name, opt_arg, sizeof(if_name));
         if_kindex = if_nametoindex(opt_arg);
+        if (isdigit(opt_arg[0]))
+            if_pmdindex = strtol(opt_arg, NULL, 10);
         vr_op = SANDESH_OP_ADD;
         break;
 
@@ -552,8 +575,18 @@ parse_long_opts(int option_index, char *opt_arg)
             Usage();
         break;
 
+    case ADDINDEX_OPT_INDEX:
+        vr_addindex = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
     case POLICY_OPT_INDEX:
         vr_ifflags |= VIF_FLAG_POLICY_ENABLED;
+        break;
+
+    case PMD_OPT_INDEX:
+        vr_ifflags |= VIF_FLAG_PMD;
         break;
 
     case LIST_OPT_INDEX:
@@ -582,7 +615,9 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case XCONNECT_OPT_INDEX:
         if_xconnect_kindex = if_nametoindex(opt_arg);
-        if (!if_xconnect_kindex) {
+        if (isdigit(opt_arg[0])) {
+            if_pmdindex = strtol(opt_arg, NULL, 10);
+        } else if (!if_xconnect_kindex) {
             printf("%s does not seem to be a  valid physical interface name\n",
                     opt_arg);
             Usage();
@@ -619,6 +654,11 @@ validate_options(void)
     if (!sum_opt || help_set)
         Usage();
 
+    if (pmd_set) {
+        if_kindex = if_pmdindex;
+        if_xconnect_kindex = if_pmdindex;
+    }
+
     if (create_set) {
         if ((sum_opt > 1) && (sum_opt != 2 || !mac_set))
             Usage();
@@ -653,6 +693,8 @@ validate_options(void)
         return;
     }
 
+
+
     return;
 }
 
@@ -666,7 +708,7 @@ main(int argc, char *argv[])
      */
     unsigned int sock_proto = NETLINK_GENERIC;
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:D:i:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'a':
@@ -715,9 +757,19 @@ main(int argc, char *argv[])
                 parse_long_opts(POLICY_OPT_INDEX, NULL);
                 break;
 
+            case 'D':  
+                pmd_set = 1;
+                parse_long_opts(PMD_OPT_INDEX, NULL);
+                break;
+
             case 't':
                 type_set = 1;
                 parse_long_opts(TYPE_OPT_INDEX, optarg);
+                break;
+
+            case 'i':  
+                addindex_set = 1;
+                parse_long_opts(ADDINDEX_OPT_INDEX, NULL);
                 break;
 
             case 0:

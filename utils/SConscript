@@ -5,6 +5,8 @@
 Import('VRouterEnv')
 env = VRouterEnv
  
+env.Append(CCFLAGS = '-D__DPDK__')
+
 vr_root = '../'
 
 system_header_path = GetOption('system-header-path')
@@ -22,7 +24,8 @@ env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh'])
-env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
+# added librt for shared memory
+env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'rt'])
 
 # Build individual utils
 vif_sources = ['vif.c']

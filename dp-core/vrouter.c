@@ -79,11 +79,16 @@ static struct vr_module modules[] = {
 
 #define VR_NUM_MODULES  (sizeof(modules) / sizeof(modules[0]))
 
+#if __DPDK__
+int vr_perfr = 0;    /* GRO */
+int vr_perfs = 0;    /* segmentation in software */
+#else
 /*
  * Enable changes for better performance
  */
 int vr_perfr = 1;    /* GRO */
 int vr_perfs = 1;    /* segmentation in software */
+#endif
 
 /*
  * Enable MPLS over UDP globally

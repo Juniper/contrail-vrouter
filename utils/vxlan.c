@@ -80,6 +80,7 @@ vr_vxlan_op(void)
     vr_vxlan_req vxlan_req;
     int ret, error, attr_len;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
 op_retry:
     vxlan_req.h_op = vxlan_op;
@@ -133,6 +134,10 @@ op_retry:
         if (resp->nl_op == SANDESH_REQUEST) {
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
         }
+
+        nlh = (struct nlmsghdr *)cl->cl_buf;
+        if (!nlh->nlmsg_flags)
+            break;
     }
 
     if (dump_pending)

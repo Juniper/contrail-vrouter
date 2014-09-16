@@ -93,6 +93,7 @@ extern uint8_t *nl_get_buf_ptr(struct nl_client *cl);
 extern uint32_t nl_get_buf_len(struct nl_client *cl);
 extern void nl_build_attr(struct nl_client *cl, int len, int attr);
 extern int vrouter_get_family_id(struct nl_client *cl);
+extern int get_vrouter_pid(void);
 
 #ifdef __cplusplus
 }

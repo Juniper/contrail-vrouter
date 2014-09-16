@@ -21,10 +21,12 @@
 
 #include <stdint.h>
 #include <net/if.h>
+#include "vr_types.h"
 #include "nl_util.h"
 #include "vr_genetlink.h"
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
+#define GENL_ID_VROUTER         (NLMSG_MIN_TYPE + 0x10)
 
 unsigned int nl_client_ids;
 
@@ -429,7 +431,11 @@ nl_socket(struct nl_client *cl, unsigned int protocol)
 
     memset(&sa, 0, sizeof(sa));
     sa.nl_family = AF_NETLINK;
+#if 0
     sa.nl_pid = cl->cl_id;
+#else
+    sa.nl_pid = getpid();
+#endif
     bind(cl->cl_sock, (struct sockaddr *)&sa, sizeof(sa));
 
     cl->cl_sock_protocol = protocol;
@@ -437,7 +443,7 @@ nl_socket(struct nl_client *cl, unsigned int protocol)
     return cl->cl_sock;
 }
 
-
+#if 0
 int
 nl_recvmsg(struct nl_client *cl)
 {
@@ -496,6 +502,63 @@ nl_sendmsg(struct nl_client *cl)
 
     return sendmsg(cl->cl_sock, &msg, 0);
 }
+#else
+int
+nl_recvmsg(struct nl_client *cl)
+{
+    struct sockaddr_nl sa;
+    socklen_t len;
+    int ret;
+
+    cl->cl_buf_offset = 0;
+    len = sizeof(sa);
+
+    ret = recvfrom(cl->cl_sock, cl->cl_buf, cl->cl_buf_len, 0,
+        (struct sockaddr *)&sa, &len);
+    if (ret < 0)
+        return ret;
+
+
+    cl->cl_recv_len = ret;
+    if (cl->cl_recv_len > cl->cl_buf_len)
+        return -EOPNOTSUPP;
+
+#ifdef VR_DPDK_NETLINK_DEBUG
+{
+    int i;
+    for(i = 0; i < cl->cl_recv_len; i++)
+        printf("%c%02hhx", (i % 8) ? ' ' : '\n', cl->cl_buf[i]);
+}
+#endif
+
+    return ret;
+}
+
+int
+nl_sendmsg(struct nl_client *cl)
+{
+    struct sockaddr_nl sa;
+    ssize_t len;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+    sa.nl_pid = cl->cl_id;
+
+#ifdef VR_DPDK_NETLINK_DEBUG
+{
+    int i;
+    for(i = 0; i < cl->cl_buf_offset; i++)
+        printf("%c%02hhx", (i % 8) ? ' ' : '\n', cl->cl_buf[i]);
+}
+#endif
+
+    len = cl->cl_buf_offset;
+    cl->cl_buf_offset = 0;
+
+    return sendto(cl->cl_sock, cl->cl_buf, len, 0,
+        (struct sockaddr *)&sa, sizeof(sa));
+}
+#endif
 
 void
 nl_set_buf(struct nl_client *cl, char *buf, unsigned int len)
@@ -529,10 +592,34 @@ nl_set_genl_family_id(struct nl_client *cl, unsigned int family_id)
     return;
 }
 
+#if 1
+#define PIDFILE "/tmp/vrouter.pid"
+
+int
+get_vrouter_pid(void)
+{
+    FILE *pid_file;
+    int pid;
+
+    pid_file = fopen("/tmp/vrouter.pid", "r");
+    if (!pid_file)
+	    return -1;
+
+    if (0 == fscanf(pid_file, "%u", &pid))
+	    pid = -1;
+    fclose(pid_file);
+
+    return pid;
+}
+#endif
+
 struct nl_client *
 nl_register_client(void)
 {
     struct nl_client *cl;
+#if 1
+    FILE *pid_file;
+#endif
 
     cl = calloc(sizeof(*cl), 1);
     if (!cl)
@@ -547,8 +634,12 @@ nl_register_client(void)
         goto exit_register;
     cl->cl_resp_buf_len = NL_RESP_DEFAULT_SIZE;
 
+#if 0
     /* this really is OK... */
     cl->cl_id = __sync_fetch_and_add(&nl_client_ids, 1);
+#else
+    cl->cl_id = get_vrouter_pid();
+#endif
 
     cl->cl_sock = -1;
 
@@ -625,6 +716,7 @@ nl_parse_reply(struct nl_client *cl)
 int
 vrouter_get_family_id(struct nl_client *cl)
 {
+#if 0
     int ret;
     struct nl_response *resp;
     struct genl_ctrl_message *msg;
@@ -647,6 +739,10 @@ vrouter_get_family_id(struct nl_client *cl)
     nl_set_genl_family_id(cl, msg->family_id);
 
     return msg->family_id;
+#else
+    nl_set_genl_family_id(cl, GENL_ID_VROUTER);
+    return GENL_ID_VROUTER;
+#endif
 }
 
 int

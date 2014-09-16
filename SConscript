@@ -20,6 +20,7 @@ env.Replace(CPPPATH = '#vrouter/include')
 env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
 env.Append(CPPPATH = ['#tools'])
 env.Append(CPPPATH = ['#tools/sandesh/library/c'])
+env.Append(CPPPATH = ['#dpdk/build/include'])
 
 vr_root = './'
 makefile = vr_root + 'Makefile'
@@ -46,7 +47,7 @@ if sys.platform != 'darwin':
     env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
     env.Alias('install', src_root)
 
-    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter']
+    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter', 'dpdk']
     for sdir in  subdirs:
         env.SConscript(sdir + '/SConscript',
                        exports='VRouterEnv',

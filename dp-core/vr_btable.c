@@ -1,3 +1,4 @@
+#ifndef __DPDK__
 /*
  * vr_btable.c -- Big tables. With (kernel)malloc, there is a limitation of
  * how much contiguous memory we will get (4M). So, for allocations more than
@@ -167,3 +168,4 @@ exit_alloc:
     vr_btable_free(table);
     return NULL;
 }
+#endif /* __DPDK__ */

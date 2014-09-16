@@ -258,6 +258,7 @@ vr_nh_op(int opt, int mode, uint32_t nh_id, uint32_t if_id, uint32_t vrf_id,
     char *buf;
     int ret, error, attr_len;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
     int i;
 
 op_retry:
@@ -354,6 +355,10 @@ op_retry:
         if (resp->nl_op == SANDESH_REQUEST) {
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
         }
+
+        nlh = (struct nlmsghdr *)cl->cl_buf;
+        if (!nlh->nlmsg_flags)
+            break;
     }
 
     if (dump_pending)

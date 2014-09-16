@@ -560,7 +560,8 @@ vhost_drv_add(struct vr_interface *vif,
 {
     int ret = 0;
 
-    if (!vif->vif_os_idx)
+    /* index 0 is ok for PMD devices */
+    if (!(vif->vif_flags & VIF_FLAG_PMD) && !vif->vif_os_idx)
         return -EINVAL;
 
     if (!vif->vif_mtu)
@@ -836,7 +837,8 @@ eth_drv_add(struct vr_interface *vif,
 {
     int ret = 0;
 
-    if (!vif->vif_os_idx)
+    /* index 0 is ok for PMD devices */
+    if (!(vif->vif_flags & VIF_FLAG_PMD) && !vif->vif_os_idx)
         return -EINVAL;
 
     if (!vif->vif_mtu) {

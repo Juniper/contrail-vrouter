@@ -5,6 +5,8 @@
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
+env.Append(CCFLAGS = '-D__DPDK__')
+
 env.Library('dp_core', Glob('*.c'))
 
 if 'install' in COMMAND_LINE_TARGETS:

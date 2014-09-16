@@ -40,9 +40,16 @@
 #include "vr_mirror.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+#ifdef __DPDK__
+#include "vr_shmem.h"
+#endif
 
 #define TABLE_FLAG_VALID        0x1
+
+#ifndef __DPDK__
 #define MEM_DEV                 "/dev/flow"
+int mem_fd;
+#endif
 
 static int dvrf_set, mir_set, help_set;
 static unsigned short dvrf;
@@ -58,7 +65,6 @@ struct flow_table {
     unsigned int ft_flags;
 } main_table;
 
-int mem_fd;
 struct nl_client *cl;
 vr_flow_req flow_req;
 
@@ -424,6 +430,10 @@ flow_table_map(vr_flow_req *req)
     int ret;
     struct flow_table *ft = &main_table;
 
+#ifdef __DPDK__
+    ft->ft_entries = (struct vr_flow_entry *)vr_shmem_alloc(
+		VR_FLOW_SHMEM_NAME, req->fr_ftable_size);
+#else
     if (req->fr_ftable_dev < 0)
         exit(ENODEV);
 
@@ -442,6 +452,7 @@ flow_table_map(vr_flow_req *req)
 
     ft->ft_entries = (struct vr_flow_entry *)mmap(NULL, req->fr_ftable_size,
             PROT_READ, MAP_SHARED, mem_fd, 0);
+#endif /* __DPDK__ */
     if (ft->ft_entries == MAP_FAILED) {
         printf("flow table: %s\n", strerror(errno));
         exit(errno);
@@ -478,6 +489,7 @@ make_flow_req(vr_flow_req *req)
 {
     int ret, attr_len, error;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
     ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
     if (ret)
@@ -509,6 +521,10 @@ make_flow_req(vr_flow_req *req)
         if (resp->nl_op == SANDESH_REQUEST) {
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
         }
+
+        nlh = (struct nlmsghdr *)cl->cl_buf;
+        if (!nlh->nlmsg_flags)
+            break;
     }
 
     if (errno == EAGAIN || errno == EWOULDBLOCK)

@@ -1,0 +1,44 @@
+#
+# Copyright (c) 2014 Semihalf. All rights reserved.
+#
+
+Import('VRouterEnv')
+
+env = VRouterEnv.Clone()
+
+# Include paths
+
+# CFLAGS
+env.Append(CCFLAGS = '-g -Werror')
+env.Append(CCFLAGS = '-D__DPDK__')
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
+env.Append(LIBPATH = ['#dpdk/build/lib'])
+env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
+
+
+
+# Add all dpdk libraries
+env.Append(LIBS = ['rte_pmd_pcap', 'rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
+    'rte_hash', 'rte_mempool', 'rte_ring', 'rte_mbuf', 'rte_eal', 'rte_malloc',
+    'rte_timer', 'ethdev'])
+
+# Add libraries required by dpdk
+env.Append(LIBS = ['rt', 'pcap', 'dl', 'pthread'])
+
+env.Append(LINKCOM =
+    ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
+
+sources = Split('dpdk_vrouter vr_dpdk vr_host_interface vr_netlink vr_port_bind'
+    + ' vrouter_mod')
+
+sources = [env.Object(f + '.o', f + '.c') for f in sources]
+
+dpdk_vrouter = env.Program(target = 'dpdk_vrouter', source = sources)
+
+# to make sure that all are built when you do 'scons' @ the top level
+env.Default(dpdk_vrouter)
+# Local Variables:
+# mode: python
+# End:

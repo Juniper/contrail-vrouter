@@ -24,6 +24,9 @@
 
 /* rest of the flags are action specific */
 
+/* for shared memory */
+#define VR_FLOW_SHMEM_NAME          "vr_flows"
+
 /* for NAT */
 #define VR_FLOW_FLAG_SNAT           0x2
 #define VR_FLOW_FLAG_SPAT           0x4
@@ -187,7 +190,9 @@ extern unsigned int vr_flow_inet_input(struct vrouter *, unsigned short,
         struct vr_packet *, unsigned short, struct vr_forwarding_md *);
 extern inline unsigned int
 vr_flow_bypass(struct vrouter *, struct vr_flow_key *, struct vr_packet *, unsigned int *);
+#ifndef __DPDK__
 void *vr_flow_get_va(struct vrouter *, uint64_t);
+#endif /* __DPDK__ */
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
 

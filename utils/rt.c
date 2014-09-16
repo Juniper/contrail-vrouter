@@ -276,6 +276,7 @@ vr_send_one_message(void)
 {
     int ret;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
     ret = nl_sendmsg(cl);
     if (ret <= 0)
@@ -285,6 +286,10 @@ vr_send_one_message(void)
         resp = nl_parse_reply(cl);
         if (resp->nl_op == SANDESH_REQUEST)
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+
+        nlh = (struct nlmsghdr *)cl->cl_buf;
+        if (!nlh->nlmsg_flags)
+            break;
     }
 
     return resp_code;
