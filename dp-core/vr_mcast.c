@@ -78,8 +78,15 @@ mcast_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     struct vr_mcast_entry_key key;
 
     key.vrf_id = rt->rtr_req.rtr_vrf_id;
-    key.src_ip = rt->rtr_req.rtr_src;
-    key.dst_ip = rt->rtr_req.rtr_prefix;
+    if (rt->rtr_req.rtr_src_size)
+        key.src_ip = ntohl(*(uint32_t*)rt->rtr_req.rtr_src);
+    else
+        key.src_ip = 0;
+
+    if (rt->rtr_req.rtr_prefix_size)
+        key.dst_ip = ntohl(*(uint32_t*)rt->rtr_req.rtr_prefix);
+    else
+        key.dst_ip = 0;
 
     ent = vr_find_mcast_entry(&key);
     if (ent) {
@@ -129,9 +136,16 @@ mcast_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     struct vr_mcast_entry_key key;
 
     key.vrf_id = rt->rtr_req.rtr_vrf_id;
-    key.src_ip = rt->rtr_req.rtr_src;
-    key.dst_ip = rt->rtr_req.rtr_prefix;
-   
+    if (rt->rtr_req.rtr_src_size)
+        key.src_ip = ntohl(*(uint32_t*)rt->rtr_req.rtr_src);
+    else
+        key.src_ip = 0;
+
+    if (rt->rtr_req.rtr_prefix_size)
+        key.dst_ip = ntohl(*(uint32_t*)rt->rtr_req.rtr_prefix);
+    else
+        key.dst_ip = 0;
+
     ent = vr_find_mcast_entry(&key);
     if (!ent)
         return -ENOENT;
@@ -148,8 +162,15 @@ __mcast_add(struct vr_route_req *rt)
     struct vr_mcast_entry_key key;
 
     key.vrf_id = rt->rtr_req.rtr_vrf_id;
-    key.src_ip = rt->rtr_req.rtr_src;
-    key.dst_ip = rt->rtr_req.rtr_prefix;
+    if (rt->rtr_req.rtr_src_size)
+        key.src_ip = ntohl(*(uint32_t*)rt->rtr_req.rtr_src);
+    else
+        key.src_ip = 0;
+
+    if (rt->rtr_req.rtr_prefix_size)
+        key.dst_ip = ntohl(*(uint32_t*)rt->rtr_req.rtr_prefix);
+    else
+        key.dst_ip = 0;
 
     ent = vr_find_mcast_entry(&key);
     if (!ent) {
@@ -192,9 +213,9 @@ mcast_add(struct vr_rtable * _unused, struct vr_route_req *rt)
 static void
 mcast_make_req(struct vr_route_req *resp, struct vr_mcast_entry *ent)
 {
-    memset(resp, 0, sizeof(struct vr_route_req));
-    resp->rtr_req.rtr_prefix = ent->key.dst_ip;
-    resp->rtr_req.rtr_src = ent->key.src_ip;
+    *(uint32_t*)resp->rtr_req.rtr_prefix = ntohl(ent->key.dst_ip);
+    *(uint32_t*)resp->rtr_req.rtr_src = ntohl(ent->key.src_ip);
+    resp->rtr_req.rtr_prefix_size = resp->rtr_req.rtr_src_size = 4;
     resp->rtr_req.rtr_vrf_id = ent->key.vrf_id;
     if (ent->nh)
         resp->rtr_req.rtr_nh_id = ent->nh->nh_id;
@@ -221,14 +242,20 @@ __mcast_dump(struct vr_message_dumper *dumper)
             if (ent->key.vrf_id != req->rtr_req.rtr_vrf_id)
                 continue;
             if (dumper->dump_been_to_marker == 0) {
-                if ((ent->key.src_ip == (unsigned int)req->rtr_req.rtr_src) &&
-                        (ent->key.dst_ip == (unsigned int)req->rtr_req.rtr_prefix) &&
+                if ((ent->key.src_ip == ntohl(*(unsigned int*)req->rtr_req.rtr_src)) &&
+                        (ent->key.dst_ip == ntohl(*(unsigned int*)req->rtr_req.rtr_prefix)) &&
                         (ent->key.vrf_id == req->rtr_req.rtr_vrf_id)) {
                     dumper->dump_been_to_marker = 1;
                 }
             } else {
+                memset(&resp, 0, sizeof(struct vr_route_req));
+                resp.rtr_req.rtr_src = vr_zalloc(4);
+                resp.rtr_req.rtr_prefix = vr_zalloc(4);
+
                 mcast_make_req(&resp, ent);
                 ret = vr_message_dump_object(dumper, VR_ROUTE_OBJECT_ID, &resp);
+                vr_free(resp.rtr_req.rtr_src);
+                vr_free(resp.rtr_req.rtr_prefix);
                 if (ret <= 0) 
                     return ret;
             }
@@ -338,18 +365,26 @@ vr_mcast_forward(struct vrouter *router, unsigned short vrf,
 
     rt.rtr_req.rtr_vrf_id = vrf;
     rt.rtr_req.rtr_prefix_len = 32;
+
+    rt.rtr_req.rtr_src = vr_zalloc(4);
+    rt.rtr_req.rtr_prefix = vr_zalloc(4);
+    rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_prefix_size = 4;
+    rt.rtr_req.rtr_marker_size = 0;
+  
     if (IS_MCAST_LINK_LOCAL(ip->ip_daddr) || IS_BCAST_IP(ip->ip_daddr)) {
-        rt.rtr_req.rtr_src = 0;
-        rt.rtr_req.rtr_prefix = 0xFFFFFFFF;
+        memset(rt.rtr_req.rtr_src, 0, 4);
+        *(uint32_t*)rt.rtr_req.rtr_prefix = 0xFFFFFFFF;
     } else {
-        rt.rtr_req.rtr_src = ip->ip_saddr;
-        rt.rtr_req.rtr_prefix = ip->ip_daddr;
+        *(uint32_t*)rt.rtr_req.rtr_prefix = ntohl(ip->ip_daddr);
+        *(uint32_t*)rt.rtr_req.rtr_src = ntohl(ip->ip_saddr);
     }
 
     nh = mcast_lookup(vrf, &rt, pkt);
     if (!nh) {
         nh = ip4_default_nh;
     }
+    vr_free(rt.rtr_req.rtr_src);
+    vr_free(rt.rtr_req.rtr_prefix);
 
     return nh_output(vrf, pkt, nh, fmd);
 }

@@ -8,8 +8,8 @@
 #include "vr_sandesh.h"
 
 static struct rtable_fspec rtable_families[];
-extern int mtrie4_algo_init(struct vr_rtable *, struct rtable_fspec *);
-extern void mtrie4_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
+extern int mtrie_algo_init(struct vr_rtable *, struct rtable_fspec *);
+extern void mtrie_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 extern int mcast_algo_init(struct vr_rtable *, struct rtable_fspec *);
 extern void mcast_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 extern int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
@@ -24,6 +24,8 @@ vr_get_family(unsigned int family)
         return &rtable_families[0];
     case AF_BRIDGE:
         return &rtable_families[1];
+    case AF_INET6:
+        return &rtable_families[2];
 
     default:
         return NULL;
@@ -44,9 +46,29 @@ vr_route_delete(vr_route_req *req)
         ret = -ENOENT;
     else {
         vr_req.rtr_req = *req;
+
+        if (req->rtr_family != AF_BRIDGE && !req->rtr_prefix_size) {
+            ret = -EINVAL;
+            goto error;
+        }
+
+        if (req ->rtr_family == AF_BRIDGE && 
+                (!req->rtr_mac_size  || !req->rtr_mac)) {
+            ret = -EINVAL;
+            goto error;
+        }
+
+        if (req ->rtr_family != AF_BRIDGE) {
+            vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+            memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
+        }
+        vr_req.rtr_req.rtr_src_size = vr_req.rtr_req.rtr_marker_size = 0;
         ret = fs->route_del(fs, &vr_req);
+        if (req ->rtr_family != AF_BRIDGE)
+            vr_free(vr_req.rtr_req.rtr_prefix);
     }
 
+error:
     vr_send_response(ret);
 
     return ret;
@@ -64,7 +86,18 @@ vr_route_add(vr_route_req *req)
         ret = -ENOENT;
     } else {
         vr_req.rtr_req = *req;
+        if (req->rtr_prefix_size) {
+            vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+            memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
+            vr_req.rtr_req.rtr_src_size = vr_req.rtr_req.rtr_marker_size = 0;
+            vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
+        } else {
+           vr_req.rtr_req.rtr_prefix = NULL;
+        }
+
         ret = fs->route_add(fs, &vr_req);
+        if (vr_req.rtr_req.rtr_prefix) 
+            vr_free(vr_req.rtr_req.rtr_prefix);
     }
 
     vr_send_response(ret);
@@ -110,6 +143,22 @@ vr_route_get(vr_route_req *req)
     int ret = 0;
    
     vr_req.rtr_req = *req;
+
+    vr_req.rtr_req.rtr_marker_size = 0;
+    vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
+    if (req->rtr_prefix_size) {
+        vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
+    } else
+        vr_req.rtr_req.rtr_prefix = NULL;
+
+    vr_req.rtr_req.rtr_src_size = req->rtr_src_size;
+    if (req->rtr_src_size) {
+        vr_req.rtr_req.rtr_src = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        memcpy(vr_req.rtr_req.rtr_src, req->rtr_src, RT_IP_ADDR_SIZE(req->rtr_family));
+    } else
+        vr_req.rtr_req.rtr_src = NULL;
+
     router = vrouter_get(req->rtr_rid);
     if (!router) {
         ret = -ENOENT;
@@ -127,6 +176,10 @@ vr_route_get(vr_route_req *req)
 
 generate_response:
     vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
+    if (vr_req.rtr_req.rtr_src)
+        vr_free(vr_req.rtr_req.rtr_src);
+    if (vr_req.rtr_req.rtr_prefix)
+        vr_free(vr_req.rtr_req.rtr_prefix);
     return ret;
 }
 
@@ -139,16 +192,40 @@ vr_route_dump(vr_route_req *req)
     int ret;
    
     vr_req.rtr_req = *req;
+    vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
+    if (req->rtr_prefix_size) {
+        vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
+    } else {
+        vr_req.rtr_req.rtr_prefix = NULL;
+    }
+        
+    vr_req.rtr_req.rtr_marker_size = req->rtr_marker_size;
+    vr_req.rtr_req.rtr_marker_plen = req->rtr_prefix_len;
+    if (req->rtr_marker_size) {
+        vr_req.rtr_req.rtr_marker = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        memcpy(vr_req.rtr_req.rtr_marker, req->rtr_marker, RT_IP_ADDR_SIZE(req->rtr_family));
+    } else {
+        vr_req.rtr_req.rtr_marker = NULL;
+    }
+        
+    vr_req.rtr_req.rtr_src_size = req->rtr_src_size;
+    if (req->rtr_src_size) {
+        vr_req.rtr_req.rtr_src = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        memcpy(vr_req.rtr_req.rtr_src, req->rtr_src, RT_IP_ADDR_SIZE(req->rtr_family));
+    } else
+        vr_req.rtr_req.rtr_src = NULL;
+
     router = vrouter_get(req->rtr_rid);
     if (!router) {
         ret = -ENOENT;
         goto generate_error;
     } else {
 
-        if (req->rtr_family == AF_INET) {
-            rtable = vr_get_inet_table(router, req->rtr_rt_type);
-        } else if (req->rtr_family == AF_BRIDGE) {
+        if (req->rtr_family == AF_BRIDGE) {
             rtable = router->vr_bridge_rtable;
+        } else  {
+            rtable = vr_get_inet_table(router, req->rtr_rt_type);
         }
 
         if (!rtable) {
@@ -158,11 +235,26 @@ vr_route_dump(vr_route_req *req)
 
         ret = rtable->algo_dump(NULL, &vr_req);
     }
+    if (vr_req.rtr_req.rtr_prefix)
+        vr_free(vr_req.rtr_req.rtr_prefix);
+
+    if (vr_req.rtr_req.rtr_src)
+        vr_free(vr_req.rtr_req.rtr_src);
+
+    if (vr_req.rtr_req.rtr_marker)
+        vr_free(vr_req.rtr_req.rtr_marker);
 
     return ret;
 
 generate_error:
     vr_send_response(ret);
+    if (vr_req.rtr_req.rtr_prefix)
+        vr_free(vr_req.rtr_req.rtr_prefix);
+    if (vr_req.rtr_req.rtr_src)
+        vr_free(vr_req.rtr_req.rtr_src);
+    if (vr_req.rtr_req.rtr_marker)
+        vr_free(vr_req.rtr_req.rtr_marker);
+
 
     return ret;
 }
@@ -304,15 +396,13 @@ vr_vrf_stats_req_process(void *s_req)
     return;
 }
 
-    
-#define VR_INET_MAX_PLEN    32
-
 int
 inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
 {
+    int i;
     struct vr_rtable *rtable;
     struct vrouter *router;
-    unsigned int pmask;
+    unsigned int pmask, pmask_byte;
 
     router = vrouter_get(req->rtr_req.rtr_rid);
     if (!router)
@@ -321,16 +411,36 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
     rtable = vr_get_inet_table(router, req->rtr_req.rtr_rt_type);
     if (!rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
-            ((unsigned int)(req->rtr_req.rtr_prefix_len) > VR_INET_MAX_PLEN))
+            ((unsigned int)(req->rtr_req.rtr_prefix_len) > 
+                            (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)))
         return -EINVAL;
 
-    if (req->rtr_req.rtr_prefix_len) {
-        pmask = ~((1 << (32 - req->rtr_req.rtr_prefix_len)) - 1);
-        req->rtr_req.rtr_prefix &= pmask;
-    } else
-        req->rtr_req.rtr_prefix = 0;
+    if (req->rtr_req.rtr_prefix) {
 
-    return rtable->algo_add(rtable, req);
+        if (req->rtr_req.rtr_family == AF_INET)
+            pmask = ~((1 << (32 - req->rtr_req.rtr_prefix_len)) - 1);
+        else
+            pmask = 0; //TBD: Assume V6 prefix length will be multiple of 8
+            
+        pmask_byte = req->rtr_req.rtr_prefix_len/8;
+        if (pmask_byte < (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)-1)) {
+            for (i=pmask_byte+1; i<RT_IP_ADDR_SIZE(req->rtr_req.rtr_family); i++) {
+                req->rtr_req.rtr_prefix[i] = 0;
+                pmask = pmask >> 8;
+            }
+            req->rtr_req.rtr_prefix[pmask_byte] = 
+                         req->rtr_req.rtr_prefix[pmask_byte] & (pmask & 0xff);
+        }
+    } 
+
+    if (rtable) {
+        if (rtable->algo_add)
+            return rtable->algo_add(rtable, req);
+        else
+            return -1;
+        } else {
+        return -1;
+    }
 }
 
 int
@@ -339,7 +449,8 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
     struct vr_rtable *rtable;
     struct vrouter *router;
 
-    if ((unsigned int)(req->rtr_req.rtr_prefix_len) > VR_INET_MAX_PLEN ||
+    if (((unsigned int)(req->rtr_req.rtr_prefix_len) > 
+                            (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)) ||
             (unsigned int)(req->rtr_req.rtr_vrf_id) >= VR_MAX_VRFS)
         return -EINVAL;
 
@@ -494,8 +605,8 @@ static struct rtable_fspec rtable_families[] = {
         .rtb_family_deinit              =   inet_rtb_family_deinit,
         .route_add                      =   inet_route_add,
         .route_del                      =   inet_route_del,
-        .algo_init[RT_UCAST]            =   mtrie4_algo_init,
-        .algo_deinit[RT_UCAST]          =   mtrie4_algo_deinit,
+        .algo_init[RT_UCAST]            =   mtrie_algo_init,
+        .algo_deinit[RT_UCAST]          =   mtrie_algo_deinit,
         .algo_init[RT_MCAST]            =   mcast_algo_init,
         .algo_deinit[RT_MCAST]          =   mcast_algo_deinit,
     },
@@ -508,6 +619,18 @@ static struct rtable_fspec rtable_families[] = {
         .route_del                      =   bridge_entry_del,
         .algo_init[RT_UCAST]            =   bridge_table_init,
         .algo_deinit[RT_UCAST]          =   bridge_table_deinit,
+    },
+    {
+        .rtb_family                     =   AF_INET6,
+        .rtb_max_vrfs                   =   VR_MAX_VRFS,
+        .rtb_family_init                =   inet_rtb_family_init,
+        .rtb_family_deinit              =   inet_rtb_family_deinit,
+        .route_add                      =   inet_route_add,
+        .route_del                      =   inet_route_del,
+        .algo_init[RT_UCAST]            =   mtrie_algo_init,
+        .algo_deinit[RT_UCAST]          =   mtrie_algo_deinit,
+        .algo_init[RT_MCAST]            =   mcast_algo_init,
+        .algo_deinit[RT_MCAST]          =   mcast_algo_deinit,
     }
 };
 
