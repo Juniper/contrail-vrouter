@@ -135,6 +135,7 @@ struct vr_dummy_flow_entry {
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
+    unsigned short fe_udp_src_port;
 } __attribute__((packed));
 
 #define VR_FLOW_ENTRY_PACK (64 - sizeof(struct vr_dummy_flow_entry))
@@ -154,6 +155,7 @@ struct vr_flow_entry {
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
+    unsigned short fe_udp_src_port;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 
@@ -190,5 +192,6 @@ vr_flow_bypass(struct vrouter *, struct vr_flow_key *, struct vr_packet *, unsig
 void *vr_flow_get_va(struct vrouter *, uint64_t);
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
+struct vr_flow_entry * vr_get_flow_entry(struct vrouter *, int );
 
 #endif /* __VR_FLOW_H__ */

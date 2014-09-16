@@ -227,6 +227,7 @@ dump_table(struct flow_table *ft)
                 if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
                     printf(", %d", fe->fe_sec_mirror_id);
             }
+            printf(" UdpSrcPort %d", fe->fe_udp_src_port);
             printf(")\n\n");
         }
     }

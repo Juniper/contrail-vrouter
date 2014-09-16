@@ -25,6 +25,7 @@
 #include "vr_os.h"
 #include "vr_compat.h"
 #include "vr_fragment.h"
+#include "vr_flow.h"
 
 unsigned int vr_num_cpus = 1;
 
@@ -546,6 +547,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     struct vrouter *router = vrouter_get(0);
     __u32 hash_key[5];
     __u16 *l4_hdr;
+    struct vr_flow_entry *fentry;
 
     if (hashrnd_inited == 0) {
         get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
@@ -639,6 +641,14 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             if (frag) {
                 sport = frag->f_sport;
                 dport = frag->f_dport;
+            }
+        }
+
+        if (fmd && fmd->fmd_flow_index >= 0) {
+            fentry = vr_get_flow_entry(router, fmd->fmd_flow_index);
+            if (fentry) {
+                lh_reset_skb_fields(pkt);
+                return fentry->fe_udp_src_port;
             }
         }
 

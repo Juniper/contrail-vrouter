@@ -143,7 +143,7 @@ vr_flow_get_va(struct vrouter *router, uint64_t offset)
     return vr_btable_get_address(table, offset);
 }
 
-static struct vr_flow_entry *
+struct vr_flow_entry *
 vr_get_flow_entry(struct vrouter *router, int index)
 {
     struct vr_btable *table;
@@ -1155,6 +1155,39 @@ vr_flow_delete(struct vrouter *router, vr_flow_req *req,
     return vr_flow_schedule_transition(router, req, fe);
 }
 
+static void
+vr_flow_udp_src_port (struct vrouter *router, struct vr_flow_entry *fe)
+{
+    __u32 hash_key[5], hashval, port_range;
+    __u16 port;
+
+    if (fe->fe_udp_src_port)
+        return;
+
+    if (hashrnd_inited == 0) {
+        get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
+        hashrnd_inited = 1;
+    }
+
+    hash_key[0] = fe->fe_key.key_src_ip;
+    hash_key[1] = fe->fe_key.key_dest_ip;
+    hash_key[2] = fe->fe_vrf;
+    hash_key[3] = fe->fe_key.key_src_port;
+    hash_key[4] = fe->fe_key.key_dst_port;
+
+    hashval = jhash(hash_key, 20, vr_hashrnd);
+    port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
+    port = (__u16) (((u64) hashval * port_range) >> 32);
+
+    if (port > port_range) {
+        /*
+         * Shouldn't happen...
+         */
+        port = 0;
+    }
+    fe->fe_udp_src_port = port + VR_MUDP_PORT_RANGE_START;
+}
+
 
 /* command from agent */
 static int
@@ -1218,7 +1251,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (fe->fe_action == VR_FLOW_ACTION_DROP)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
     fe->fe_flags = req->fr_flags; 
-
+    vr_flow_udp_src_port(router, fe);
 
     return vr_flow_schedule_transition(router, req, fe);
 }
