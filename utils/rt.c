@@ -51,17 +51,18 @@ static int cmd_vrf_id = -1, cmd_family_id;
 static int cmd_op = -1;
 
 static int cmd_nh_id = -1;
-static uint32_t cmd_prefix = 0, cmd_plen = 0, cmd_src = 0xffffffff;
+static uint8_t *cmd_prefix, *cmd_src;
+static uint32_t cmd_plen = 0;
 static int32_t cmd_label;
 static int cmd_rt_type = RT_UCAST;
 static uint32_t cmd_replace_plen = 100;
 static char cmd_dst_mac[6];
-
 static void Usage(void);
 static void usage_internal(void);
 
 #define INET_FAMILY_STRING      "inet"
 #define BRIDGE_FAMILY_STRING    "bridge"
+#define INET6_FAMILY_STRING      "inet6"
 
 #define UCST_TABLE_STRING       "ucst"
 #define MCST_TABLE_STRING       "mcst"
@@ -82,6 +83,8 @@ family_string_to_id(char *fname)
         return AF_INET;
     else if (!strncmp(fname, BRIDGE_FAMILY_STRING, strlen(BRIDGE_FAMILY_STRING)))
         return AF_BRIDGE;
+    else if (!strncmp(fname, INET6_FAMILY_STRING, strlen(INET6_FAMILY_STRING)))
+        return AF_INET6;
 
     return -1;
 }
@@ -89,16 +92,36 @@ family_string_to_id(char *fname)
 void
 vr_route_req_process(void *s_req)
 {
-    int ret, i;
-    struct in_addr addr;
+    int ret = 0, i;
+    int8_t addr[16];
     char flags[4];
     vr_route_req *rt = (vr_route_req *)s_req;
 
-    rt_req.rtr_marker = rt->rtr_prefix;
-    rt_req.rtr_marker_plen = rt->rtr_prefix_len;
-    rt_req.rtr_prefix = rt->rtr_prefix;
+    if (!rt_req.rtr_prefix) {
+        rt_req.rtr_prefix = calloc(1, 16);
+        rt_req.rtr_marker = calloc(1, 16);
+        rt_req.rtr_src    = calloc(1, 16);
+    }
+    rt_req.rtr_prefix_size = rt_req.rtr_marker_size = rt_req.rtr_src_size = 0;
+
+
+    if (rt->rtr_prefix_size) {
+        memcpy(rt_req.rtr_prefix, rt->rtr_prefix, RT_IP_ADDR_SIZE(rt->rtr_family));
+        memcpy(rt_req.rtr_marker, rt->rtr_prefix, RT_IP_ADDR_SIZE(rt->rtr_family));
+        rt_req.rtr_prefix_size = rt_req.rtr_marker_size = RT_IP_ADDR_SIZE(rt->rtr_family);
+    } else {
+        memset(rt_req.rtr_prefix, 0, 16);
+        memset(rt_req.rtr_marker, 0, 16);
+    }
+        
+    if (rt->rtr_src_size) {
+        memcpy(rt_req.rtr_src, rt->rtr_src, RT_IP_ADDR_SIZE(rt->rtr_family));
+        rt_req.rtr_src_size = RT_IP_ADDR_SIZE(rt->rtr_family);
+    } else {
+        memset(rt_req.rtr_src, 0, 16);
+    }
+
     rt_req.rtr_prefix_len = rt->rtr_prefix_len;
-    rt_req.rtr_src = rt->rtr_src;
     rt_req.rtr_rt_type = rt->rtr_rt_type;
     if (rt->rtr_mac) {
         if (!rt_req.rtr_mac) {
@@ -109,10 +132,14 @@ vr_route_req_process(void *s_req)
     }
     rt_req.rtr_vrf_id = rt->rtr_vrf_id;
 
-    if (rt->rtr_family == AF_INET) {
+    if ((rt->rtr_family == AF_INET) ||
+        (rt->rtr_family == AF_INET6)) {
         if (rt->rtr_rt_type == RT_UCAST) {
-            addr.s_addr = htonl(rt->rtr_prefix);
-            ret = printf("%s/%-2d", inet_ntoa(addr), rt->rtr_prefix_len);
+            
+            if (rt->rtr_prefix_size) {
+                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 16);
+                ret = printf("%s/%-2d", addr, rt->rtr_prefix_len);
+            }
             for (i = ret; i < 21; i++)
                 printf(" ");
 
@@ -143,11 +170,13 @@ vr_route_req_process(void *s_req)
 
             printf("%7d", rt->rtr_nh_id);
             printf("\n");
-        } else {
-            addr.s_addr = htonl(rt->rtr_src);
-            ret = printf("%s,", inet_ntoa(addr));
-            addr.s_addr = htonl(rt->rtr_prefix);
-            ret += printf("%s", inet_ntoa(addr));
+        } else { 
+            if (rt->rtr_src_size)
+                inet_ntop(rt->rtr_family, rt->rtr_src, addr, 16);
+            ret = printf("%s,", addr);
+            if (rt->rtr_prefix_size)
+                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 16);
+            ret += printf("%s", addr);
             for (i = ret; i < 33; i++)
                 printf(" ");
             printf(" ");
@@ -182,20 +211,42 @@ vr_response_process(void *s)
 
 
 static vr_route_req *
-vr_build_route_request(unsigned int op, int family, unsigned int prefix, unsigned int p_len,
-        unsigned int nh_id, unsigned int vrf, int label, 
-        unsigned int rt_type, unsigned int src, char *eth, uint32_t replace_plen)
+vr_build_route_request(unsigned int op, int family, int8_t *prefix, 
+        unsigned int p_len, unsigned int nh_id, unsigned int vrf, int label, 
+        unsigned int rt_type, int8_t *src, char *eth, uint32_t replace_plen)
 {
+    int i;
+    char buf[64];
     rt_req.rtr_family = family;
     rt_req.rtr_vrf_id = vrf;
     rt_req.rtr_rid = 0;
     rt_req.h_op = op;
 
+    if (!rt_req.rtr_prefix) {
+        rt_req.rtr_prefix = calloc(1, 16);
+        rt_req.rtr_marker = calloc(1, 16);
+        rt_req.rtr_src    = calloc(1, 16);
+    }
+    rt_req.rtr_prefix_size = rt_req.rtr_marker_size = rt_req.rtr_src_size = 0;
+
     switch (rt_req.h_op) {
     case SANDESH_OP_DUMP:
-        rt_req.rtr_marker = prefix;
+        if (prefix) {
+            memcpy(rt_req.rtr_prefix, prefix, RT_IP_ADDR_SIZE(family));
+            memcpy(rt_req.rtr_marker, prefix, RT_IP_ADDR_SIZE(family));
+            rt_req.rtr_marker_size = rt_req.rtr_prefix_size = RT_IP_ADDR_SIZE(family);
+        } else {
+            memset(rt_req.rtr_prefix, 0, 16);
+            memset(rt_req.rtr_marker, 0, 16);
+        }
+        if (src) {
+            memcpy(rt_req.rtr_src, src, RT_IP_ADDR_SIZE(family));
+            rt_req.rtr_src_size = RT_IP_ADDR_SIZE(family);
+        } else {
+            memset(rt_req.rtr_src, 0, 16);
+        }
+
         rt_req.rtr_marker_plen = p_len;
-        rt_req.rtr_src = src;
         rt_req.rtr_rt_type = rt_type;
         rt_req.rtr_vrf_id = vrf;
         if (!rt_req.rtr_mac) {
@@ -207,7 +258,20 @@ vr_build_route_request(unsigned int op, int family, unsigned int prefix, unsigne
 
     default:
         rt_req.rtr_nh_id = nh_id;
-        rt_req.rtr_prefix = ntohl(prefix);
+        if (prefix) {
+            memcpy(rt_req.rtr_prefix, prefix, RT_IP_ADDR_SIZE(family));
+            rt_req.rtr_prefix_size = RT_IP_ADDR_SIZE(family);
+
+            inet_ntop(family, rt_req.rtr_prefix, buf, sizeof(buf));
+            printf ("Adding prefix %s \n Prefix: ", buf);
+            for (i=0; i< RT_IP_ADDR_SIZE(family); i++) {
+                 printf("%x:", prefix[i]);
+            }
+            printf ("\n");
+        } else {
+            rt_req.rtr_prefix = NULL;
+        }
+            
         rt_req.rtr_prefix_len = p_len;
         rt_req.rtr_label_flags = 0;
         rt_req.rtr_rt_type = rt_type;
@@ -216,11 +280,13 @@ vr_build_route_request(unsigned int op, int family, unsigned int prefix, unsigne
         if (cmd_proxy_set)
             rt_req.rtr_label_flags |= VR_RT_HOSTED_FLAG;
 
-        if (family == AF_INET) {
+        if ((family == AF_INET) ||
+            (family == AF_INET6)) {
             if (rt_type == RT_UCAST) {
-                rt_req.rtr_src = 0;
+                *rt_req.rtr_src = 0;
             } else {
-                rt_req.rtr_src = src;
+                memcpy(rt_req.rtr_src, src, RT_IP_ADDR_SIZE(family));
+                rt_req.rtr_src_size = RT_IP_ADDR_SIZE(family);
             }
             if (label != -1) {
                 rt_req.rtr_label = label;
@@ -327,7 +393,7 @@ vr_route_op(void)
         return -errno;
 
     if (cmd_op == SANDESH_OP_DUMP) {
-        if (cmd_family_id == AF_INET) {
+        if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
             if (cmd_rt_type == RT_UCAST) {
                 printf("Kernel IP routing table %d/%d/unicast\n", req->rtr_rid, cmd_vrf_id);
                 printf("Destination	        PPL        Flags        Label        Nexthop\n");
@@ -361,7 +427,7 @@ usage_internal()
            "       P <do proxy arp for this route> \n"
            "       l <prefix_length>\n"
            "       t <label/vnid>\n"
-           "       f <family 0 - AF_INET 1 - AF_BRIDGE>\n"
+           "       f <family 0 - AF_INET 1 - AF_BRIDGE 2 - AF_INET6 >\n"
            "       e <mac address in : format>\n"
            "       r <replacement route preifx length for delete>\n"
            "       v <vrfid>\n");
@@ -394,9 +460,10 @@ validate_options(void)
         break;
 
     case SANDESH_OP_DELETE:
-        if (cmd_family_id == AF_INET) {
+        if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
             if (cmd_rt_type == RT_UCAST) {
-                if ((cmd_replace_plen < 0 || cmd_replace_plen > 32)) {
+                if ((cmd_replace_plen < 0 || 
+                    ( cmd_replace_plen > (RT_IP_ADDR_SIZE(cmd_family_id)*4)))) {
                     goto usage_internal;
                 }
 
@@ -411,7 +478,7 @@ validate_options(void)
         break;
 
     case SANDESH_OP_ADD:
-        if (cmd_family_id == AF_INET) {
+        if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
             if (cmd_rt_type == RT_UCAST) {
                 if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
                     goto usage_internal;
@@ -491,7 +558,8 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     case FAMILY_OPT_INDEX:
         cmd_family_id = family_string_to_id(opt_arg);
         if (cmd_family_id != AF_INET &&
-                cmd_family_id != AF_BRIDGE)
+                cmd_family_id != AF_BRIDGE &&
+                cmd_family_id != AF_INET6)
             Usage();
         break;
 
@@ -543,7 +611,12 @@ int main(int argc, char *argv[])
                     usage_internal();
                 }
                 cmd_op = SANDESH_OP_DUMP;
-                cmd_src = 0;
+                if (!cmd_src)
+                     cmd_src = calloc(1, 16);
+                *cmd_src = 0;
+                if (!cmd_prefix)
+                     cmd_prefix = calloc(1, 16);
+                *cmd_prefix = 0;
                 break;
 
             case 'v':
@@ -555,7 +628,14 @@ int main(int argc, char *argv[])
                 break;
 
             case 'p':
-                cmd_prefix = inet_addr(optarg);
+                if (!cmd_prefix)
+                     cmd_prefix = calloc(1, 16);
+                /* 
+                 * Note: Only one of the following 2 APIs will succeed and 
+                 * update cmd_prefix
+                 */
+                inet_pton(AF_INET, optarg, cmd_prefix);
+                inet_pton(AF_INET6, optarg, cmd_prefix);
                 cmd_prefix_set = 1;
                 break;
 
@@ -572,7 +652,14 @@ int main(int argc, char *argv[])
                 break;
 
             case 's':
-                cmd_src = inet_addr(optarg);
+                if (!cmd_src)
+                     cmd_src = calloc(1, 16);
+                /* 
+                 * Note: Only one of the following 2 APIs will succeed and 
+                 * update cmd_src
+                 */
+                inet_pton(AF_INET, optarg, cmd_src);
+                inet_pton(AF_INET6, optarg, cmd_src);
                 break;
 
             case 'm':
@@ -581,11 +668,13 @@ int main(int argc, char *argv[])
 
             case 'f':
                 cmd_family_id = atoi(optarg);
-                if (cmd_family_id == 0)
+                if (cmd_family_id == 0) {
                     cmd_family_id = AF_INET;
-                else {
+                } else if (cmd_family_id == 1) {
                     cmd_family_id = AF_BRIDGE;
                     cmd_rt_type = RT_UCAST;
+                } else {
+                    cmd_family_id = AF_INET6;
                 }
 
                 break;
@@ -612,6 +701,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    printf ("Calling validate_options \n");
     validate_options();
 
     cl = nl_register_client();
@@ -630,6 +720,8 @@ int main(int argc, char *argv[])
         printf("Unable to get vrouter family id\n");
         return -1;
     }
+
+    printf ("Calling vr_route_op \n");
 
     vr_route_op();
 
