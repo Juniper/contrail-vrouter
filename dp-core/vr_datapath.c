@@ -454,9 +454,6 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
                 return 1;
             }
         }
-    } else if (pkt->vp_type == VP_TYPE_IP6) {
-         vr_flow_inet6_input(vif->vif_router, vrf, pkt, VR_ETH_PROTO_IP6, fmd);
-         return 1;
     }
         
     /* Restore back the L2 headers */
@@ -492,7 +489,7 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
                 }
             }
         } else { //IPv6
-            ip6 = (struct vr_ip6 *)pkt_data(pkt);
+            ip6 = (struct vr_ip6 *)l3_hdr;
             if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
                 return true;
             }
