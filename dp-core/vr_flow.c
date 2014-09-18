@@ -1158,8 +1158,8 @@ vr_flow_delete(struct vrouter *router, vr_flow_req *req,
 static void
 vr_flow_udp_src_port (struct vrouter *router, struct vr_flow_entry *fe)
 {
-    __u32 hash_key[5], hashval, port_range;
-    __u16 port;
+    uint32_t hash_key[5], hashval, port_range;
+    uint16_t port;
 
     if (fe->fe_udp_src_port)
         return;
@@ -1177,7 +1177,7 @@ vr_flow_udp_src_port (struct vrouter *router, struct vr_flow_entry *fe)
 
     hashval = jhash(hash_key, 20, vr_hashrnd);
     port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
-    port = (__u16) (((u64) hashval * port_range) >> 32);
+    port = (uint16_t ) (((uint64_t ) hashval * port_range) >> 32);
 
     if (port > port_range) {
         /*
