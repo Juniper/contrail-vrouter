@@ -20,7 +20,7 @@ env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
 
 
 # Add all dpdk libraries
-env.Append(LIBS = ['rte_pmd_pcap', 'rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
+env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
     'rte_hash', 'rte_mempool', 'rte_ring', 'rte_mbuf', 'rte_eal', 'rte_malloc',
     'rte_timer', 'ethdev'])
 
@@ -30,7 +30,7 @@ env.Append(LIBS = ['rt', 'pcap', 'dl', 'pthread'])
 env.Append(LINKCOM =
     ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
 
-sources = Split('dpdk_vrouter vr_dpdk vr_host_interface vr_netlink vr_port_bind'
+sources = Split('dpdk_vrouter vr_dpdk vr_host_interface vr_netlink'
     + ' vrouter_mod')
 
 sources = [env.Object(f + '.o', f + '.c') for f in sources]

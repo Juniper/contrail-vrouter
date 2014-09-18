@@ -60,7 +60,6 @@ dpdk_phys_if_add(struct vr_interface *vif)
 {
     struct rte_pci_addr pci;
     struct rte_pci_device *dev;
-    int ret = 0;
     uint8_t port_id;
     struct vif_port *port;
     struct rte_eth_dev *eth;
@@ -71,38 +70,11 @@ dpdk_phys_if_add(struct vr_interface *vif)
         eth = &rte_eth_devices[port_id];
         port = &vr_dpdk.ports[port_id];
     } else {
-        /* Bind os interface to uio driver*/
-        if (vr_dpdk_port_bind(&pci, vif->vif_name)) {
-            RTE_LOG(ERR, VROUTER, "Error binding port for interface: %s\n",
-                vif->vif_name);
-            return -EFAULT;
-        }
-
-        /* Find pci device by bus addr */
-        dev = dpdk_pci_dev_get(&pci);
-        if (!dev) {
-            RTE_LOG(ERR, VROUTER, "Can't find pci dev: %hd:%hhd:%hhd.%hhd\n",
-                pci.domain, pci.bus, pci.devid, pci.function);
-            ret = -ENOENT;
-            goto fail;
-        }
-
-        /* Probe driver for the device if does not exist*/
-        if (!dev->driver && pci_probe_all_drivers(dev)) {
-            RTE_LOG(ERR, VROUTER, "Probing pci device failed\n");
-            ret = -ENODEV;
-            goto fail;
-        }
-
-        eth = dpdk_eth_dev_get(dev);
-        port_id = dpdk_port_id_get(dev);
-        port = &vr_dpdk.ports[port_id];
-
-        /* mark the port as binded */
-        port->vip_binded = true;
-        /* update vif */
-        vif->vif_flags |= VIF_FLAG_PMD;
-        vif->vif_os_idx = port_id;
+        RTE_LOG(ERR, VROUTER, "Error adding physical interface %s\n"
+            "This version of vRouter only supports DPDK ports.\n",
+            "Please use port index and --pmd flag.\n",
+            vif->vif_name);
+        return -EFAULT;
     } /* VIF_FLAG_PMD */
 
     strncpy(port->vip_name, vif->vif_name, sizeof(port->vip_name));
@@ -112,15 +84,10 @@ dpdk_phys_if_add(struct vr_interface *vif)
     vif->vif_os = port;
     port->vip_vif = vif;
 
-    if (unlikely(vr_dpdk_port_init(port_id))) {
-        ret = -ENOLINK;
-        goto fail;
-    }
+    if (unlikely(vr_dpdk_port_init(port_id)))
+        return -ENOLINK;
 
     return 0;
-fail:
-    vr_dpdk_port_unbind(&pci);
-    return ret;
 }
 
 static int
@@ -145,34 +112,8 @@ dpdk_kni_if_add(struct vr_interface *vif)
 static int
 dpdk_pcap_if_add(struct vr_interface *vif)
 {
-#ifdef RTE_LIBRTE_PMD_PCAP
-    int port_id;
-    struct vif_port *port;
-
-    /* add new pcap device */
-    port_id = rte_eth_from_pcaps_iface(vif->vif_name, rte_socket_id());
-    if(unlikely(0 > port_id)) {
-        return -ENODEV;
-    }
-
-    /* store interface info for further reference */
-    port = &vr_dpdk.ports[port_id];
-    strncpy(port->vip_name, vif->vif_name, sizeof(port->vip_name));
-    port->vip_id = port_id;
-    memset(&port->vip_addr, 0, sizeof(port->vip_addr));
-    port->vip_eth = NULL;
-    vif->vif_os = port;
-    port->vip_vif = vif;
-
-    if (unlikely(vr_dpdk_port_init(port_id))) {
-        return -ENOLINK;
-    }
-
-    return 0;
-#else
-    RTE_LOG(ERR, VROUTER, "Tap interfaces not supported\n");
+    RTE_LOG(ERR, VROUTER, "Tap interfaces are not supported\n");
     return -EINVAL;
-#endif
 }
 
 /* Schedule vif to one of the lcores */

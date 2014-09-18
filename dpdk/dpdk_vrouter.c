@@ -103,16 +103,6 @@ dpdk_exit(void)
 
         rte_eth_dev_stop(port_id);
         rte_eth_dev_close(port_id);
-        /* TODO: we need to unregister igb_uio driver before do the unbind.
-         * At the moment kernel panics here, so it's commented out.
-         */
-/*
-        if (port->vip_vif
-            && port->vip_binded) {
-            RTE_LOG(DEBUG, VROUTER, "\tunbinding %s\n", port->vip_name);
-            vr_dpdk_port_unbind(&port->vip_addr);
-        }
-*/
     }
 }
 
