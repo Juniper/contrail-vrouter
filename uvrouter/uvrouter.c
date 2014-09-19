@@ -23,6 +23,26 @@ extern int vrouter_host_init(unsigned int);
 static char *uvr_agent_buffer;
 static int uvr_agent_fd = -1;
 
+void
+get_random_bytes(void *buf, int nbytes)
+{
+}
+
+
+uint32_t
+jhash(void *key, uint32_t length, uint32_t interval)
+{
+    uint32_t ret;
+    int i;
+    unsigned char *data = (unsigned char *)key;
+
+    for (i = 0; i < length; i ++)
+        ret +=  data[i];
+
+    return ret;
+}
+
+
 static int
 uvrouter_agent_rx(void *arg)
 {

@@ -29,9 +29,6 @@
 
 unsigned int vr_num_cpus = 1;
 
-__u32 vr_hashrnd = 0;
-int hashrnd_inited = 0;
-
 extern int vr_flow_entries;
 extern int vr_oflow_entries;
 

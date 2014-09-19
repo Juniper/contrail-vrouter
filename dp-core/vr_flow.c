@@ -35,6 +35,10 @@ unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
 extern unsigned short vr_flow_major;
 #endif
 
+uint32_t vr_hashrnd = 0;
+int hashrnd_inited = 0;
+
+
 extern int vr_ip_input(struct vrouter *, unsigned short,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_ip_update_csum(struct vr_packet *, unsigned int,
