@@ -15,13 +15,9 @@
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
-#define VR_FLOW_TABLE_SIZE          (vr_flow_entries * \
-        sizeof(struct vr_flow_entry))
 
 #define VR_NUM_OFLOW_TABLES         1
 #define VR_DEF_OFLOW_ENTRIES        (8 * 1024)
-#define VR_OFLOW_TABLE_SIZE         (vr_oflow_entries *\
-        sizeof(struct vr_flow_entry))
 
 #define VR_FLOW_ENTRIES_PER_BUCKET  4U
 
@@ -32,6 +28,19 @@
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
+
+/*
+ * host can provide its own btables. Point in case is the DPDK. In DPDK,
+ * we allocate the table from hugepages and just ask the flow module to
+ * use those tables
+ */
+struct vr_btable *vr_flow_table;
+struct vr_btable *vr_oflow_table;
+/*
+ * The flow table memory can also be a file that could be mapped. The path
+ * is set by somebody and passed to agent for it to map
+ */
+unsigned char *vr_flow_path;
 
 #ifdef __KERNEL__
 extern unsigned short vr_flow_major;
@@ -125,7 +134,6 @@ vr_oflow_table_size(struct vrouter *router)
     return vr_btable_size(router->vr_oflow_table);
 }
 
-#ifndef __DPDK__
 /*
  * this is used by the mmap code. mmap sees the whole flow table
  * (including the overflow table) as one large table. so, given
@@ -145,7 +153,6 @@ vr_flow_get_va(struct vrouter *router, uint64_t offset)
 
     return vr_btable_get_address(table, offset);
 }
-#endif /* __DPDK__ */
 
 static struct vr_flow_entry *
 vr_get_flow_entry(struct vrouter *router, int index)
@@ -1227,6 +1234,50 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     return vr_flow_schedule_transition(router, req, fe);
 }
 
+static void
+vr_flow_req_destroy(vr_flow_req *req)
+{
+    if (!req)
+        return;
+
+    if (req->fr_file_path) {
+        vr_free(req->fr_file_path);
+        req->fr_file_path = NULL;
+    }
+
+    vr_free(req);
+
+    return;
+}
+
+vr_flow_req *
+vr_flow_req_get(vr_flow_req *ref_req)
+{
+    unsigned int len;
+    vr_flow_req *req = vr_zalloc(sizeof(*req));
+
+    if (!req)
+        return NULL;
+
+    if (ref_req) {
+        memcpy(req, ref_req, sizeof(*ref_req));
+        /* not intended */
+        req->fr_pcap_meta_data = NULL;
+        req->fr_pcap_meta_data_size = 0;
+    }
+
+    if (vr_flow_path) {
+        len = strlen(vr_flow_path) + 1;
+        req->fr_file_path = vr_zalloc(len);
+        if (!req->fr_file_path) {
+            vr_free(req);
+            return NULL;
+        }
+    }
+
+    return req;
+}
+
 /*
  * sandesh handler for vr_flow_req
  */
@@ -1234,28 +1285,48 @@ void
 vr_flow_req_process(void *s_req)
 {
     int ret = 0;
+    bool need_destroy = false;
     struct vrouter *router;
     vr_flow_req *req = (vr_flow_req *)s_req;
+    vr_flow_req *resp = NULL;
 
     router = vrouter_get(req->fr_rid);
     switch (req->fr_op) {
     case FLOW_OP_FLOW_TABLE_GET:
-        req->fr_ftable_size = vr_flow_table_size(router) +
+        resp = vr_flow_req_get(req);
+        if (!resp) {
+            ret = -ENOMEM;
+            goto send_response;
+        }
+
+        need_destroy = true;
+        resp->fr_op = req->fr_op;
+        resp->fr_ftable_size = vr_flow_table_size(router) +
             vr_oflow_table_size(router);
 #ifdef __KERNEL__
-        req->fr_ftable_dev = vr_flow_major;
+        resp->fr_ftable_dev = vr_flow_major;
 #endif
+        if (vr_flow_path) {
+            strcpy(resp->fr_file_path, vr_flow_path);
+        }
+
         break;
 
     case FLOW_OP_FLOW_SET:
         ret = vr_flow_set(router, req);
+        resp = req;
         break;
 
     default:
         ret = -EINVAL;
     }
 
-    vr_message_response(VR_FLOW_OBJECT_ID, req, ret);
+send_response:
+    vr_message_response(VR_FLOW_OBJECT_ID, resp, ret);
+    if (need_destroy) {
+        vr_flow_req_destroy(resp);
+    }
+
     return;
 }
 
@@ -1305,19 +1376,6 @@ vr_flow_table_info_init(struct vrouter *router)
 static void
 vr_flow_table_destroy(struct vrouter *router)
 {
-#ifdef __DPDK__
-	size_t flow_size, oflow_size;
-	void * shmem;
-
-    if (router->vr_flow_table && router->vr_oflow_table) {
-		/* unmap shared memory */
-		flow_size = vr_flow_entries * sizeof(struct vr_flow_entry);
-		oflow_size = vr_oflow_entries * sizeof(struct vr_flow_entry);
-		shmem = router->vr_flow_table->vb_data;
-		vr_shmem_free(shmem, flow_size + oflow_size);
-	}
-#endif
-
     if (router->vr_flow_table) {
         vr_btable_free(router->vr_flow_table);
         router->vr_flow_table = NULL;
@@ -1375,58 +1433,18 @@ vr_flow_table_reset(struct vrouter *router)
 static int
 vr_flow_table_init(struct vrouter *router)
 {
-#ifdef __DPDK__
-	size_t flow_size, oflow_size;
-	void * shmem = NULL;
-
-    if (!router->vr_flow_table) {
-		flow_size = vr_flow_entries * sizeof(struct vr_flow_entry);
-		oflow_size = vr_oflow_entries * sizeof(struct vr_flow_entry);
-
-		/* create shared memory to share flows with the Agent */
-		shmem = vr_shmem_alloc(VR_FLOW_SHMEM_NAME, flow_size + oflow_size);
-		if (!shmem) {
-			goto fail;
-		}
-
-		/* create flow and oflow tables using shared memory */
-		router->vr_flow_table = vr_btable_alloc_shmem(vr_flow_entries,
-			sizeof(struct vr_flow_entry), shmem);
-		if (!router->vr_flow_table) {
-			goto fail;
-		}
-		/* oflows follow flow entries hence we use flow_size offset */
-		router->vr_oflow_table = vr_btable_alloc_shmem(vr_oflow_entries,
-			sizeof(struct vr_flow_entry), shmem + flow_size);
-		if (!router->vr_oflow_table) {
-			goto fail;
-		}
-	}
-
-    return vr_flow_table_info_init(router);
-
-fail:
-	/* free any memory before return */
-	if (shmem) {
-		vr_shmem_free(shmem, flow_size + oflow_size);
-	}
-	if (router->vr_flow_table) {
-		vr_btable_free(router->vr_flow_table);
-	}
-	if (router->vr_oflow_table) {
-		vr_btable_free(router->vr_oflow_table);
-	}
-
-	return vr_module_error(-ENOMEM, __FUNCTION__,
-		__LINE__, vr_flow_entries + vr_oflow_entries);
-#else
     if (!router->vr_flow_table) {
         if (vr_flow_entries % VR_FLOW_ENTRIES_PER_BUCKET)
             return vr_module_error(-EINVAL, __FUNCTION__,
                     __LINE__, vr_flow_entries);
 
-        router->vr_flow_table = vr_btable_alloc(vr_flow_entries,
-                sizeof(struct vr_flow_entry));
+        if (vr_flow_table) {
+            router->vr_flow_table = vr_flow_table;
+        } else {
+            router->vr_flow_table = vr_btable_alloc(vr_flow_entries,
+                    sizeof(struct vr_flow_entry));
+        }
+
         if (!router->vr_flow_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, vr_flow_entries);
@@ -1434,8 +1452,13 @@ fail:
     }
 
     if (!router->vr_oflow_table) {
-        router->vr_oflow_table = vr_btable_alloc(vr_oflow_entries,
-                sizeof(struct vr_flow_entry));
+        if (vr_oflow_table) {
+            router->vr_oflow_table = vr_oflow_table;
+        } else {
+            router->vr_oflow_table = vr_btable_alloc(vr_oflow_entries,
+                    sizeof(struct vr_flow_entry));
+        }
+
         if (!router->vr_oflow_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, vr_oflow_entries);
@@ -1443,7 +1466,6 @@ fail:
     }
 
     return vr_flow_table_info_init(router);
-#endif /* __DPDK__ */
 }
 
 

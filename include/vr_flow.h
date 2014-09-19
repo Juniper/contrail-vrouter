@@ -169,6 +169,14 @@ struct vr_flow_entry {
 
 #define VR_DNS_SERVER_PORT  htons(53)
 
+extern unsigned int vr_flow_entries, vr_oflow_entries;
+
+#define VR_FLOW_TABLE_SIZE          (vr_flow_entries * \
+                sizeof(struct vr_flow_entry))
+
+#define VR_OFLOW_TABLE_SIZE         (vr_oflow_entries *\
+                sizeof(struct vr_flow_entry))
+
 struct vr_flow_md {
     struct vrouter *flmd_router;
     unsigned int flmd_index;

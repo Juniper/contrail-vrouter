@@ -187,9 +187,9 @@ struct dpdk_global {
     /* global stop flag */
     rte_atomic32_t stop_flag;
     /* NetLink socket handler */
-    int netlink_sock;
-    /* NetLink message buffer */
-    uint8_t netlink_buf[VR_DPDK_NL_BUF_SZ];
+    void *netlink_sock;
+    void *packet_transport;
+    void *flow_table;
     /* KNI thread ID */
     pthread_t kni_thread;
     /* timer thread ID */

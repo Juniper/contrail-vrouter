@@ -40,6 +40,11 @@
 
 #define VR_INTERFACE_NAME_LEN       64
 
+#define VIF_TRANSPORT_VIRTUAL       0
+#define VIF_TRANSPORT_ETH           1
+#define VIF_TRANSPORT_PMD           2
+#define VIF_TRANSPORT_SOCKET        3
+
 #define VR_IF_ADD                   0
 #define VR_IF_DEL                   1
 
@@ -108,7 +113,6 @@ struct vr_interface {
     unsigned short vif_vrf;
     unsigned short vif_rid;
     unsigned short vif_mtu;
-    unsigned short vif_vlan_id;
 
     unsigned int vif_flags;
     unsigned int vif_idx;
@@ -122,6 +126,8 @@ struct vr_interface {
 
     unsigned short vif_nh_id;
     unsigned short vif_vrf_table_users;
+    unsigned short vif_vlan_id;
+    uint8_t vif_transport;
     uint8_t vif_mirror_id; /* best placed here for now - less space wasted */
     /*
      * unsigned short does not cut it, because initial value for

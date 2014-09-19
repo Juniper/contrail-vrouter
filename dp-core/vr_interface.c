@@ -560,10 +560,6 @@ vhost_drv_add(struct vr_interface *vif,
 {
     int ret = 0;
 
-    /* index 0 is ok for PMD devices */
-    if (!(vif->vif_flags & VIF_FLAG_PMD) && !vif->vif_os_idx)
-        return -EINVAL;
-
     if (!vif->vif_mtu)
         vif->vif_mtu = 1514;
 
@@ -836,10 +832,6 @@ eth_drv_add(struct vr_interface *vif,
         vr_interface_req *vifr __attribute__((unused)))
 {
     int ret = 0;
-
-    /* index 0 is ok for PMD devices */
-    if (!(vif->vif_flags & VIF_FLAG_PMD) && !vif->vif_os_idx)
-        return -EINVAL;
 
     if (!vif->vif_mtu) {
         vif->vif_mtu = 9160;
@@ -1329,6 +1321,23 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
     return 0;
 }
 
+static bool
+vif_transport_valid(vr_interface_req *req)
+{
+    switch (req->vifr_transport) {
+    case VIF_TRANSPORT_VIRTUAL:
+    case VIF_TRANSPORT_ETH:
+    case VIF_TRANSPORT_PMD:
+    case VIF_TRANSPORT_SOCKET:
+        return true;
+
+    default:
+        break;
+    }
+
+    return false;
+}
+
 int
 vr_interface_add(vr_interface_req *req, bool need_response)
 {
@@ -1342,6 +1351,9 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     }
 
     if (req->vifr_type >= VIF_TYPE_MAX && (ret = -EINVAL))
+        goto generate_resp;
+
+    if (!vif_transport_valid(req))
         goto generate_resp;
 
     vif = __vrouter_get_interface(router, req->vifr_idx);
@@ -1377,6 +1389,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_vlan_id = VLAN_ID_INVALID;
     vif->vif_mtu = req->vifr_mtu;
     vif->vif_idx = req->vifr_idx;
+    vif->vif_transport = req->vifr_transport;
     vif->vif_os_idx = req->vifr_os_idx;
     vif->vif_rid = req->vifr_rid;
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
@@ -1438,6 +1451,7 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
     req->vifr_vrf = intf->vif_vrf;
     req->vifr_idx = intf->vif_idx;
     req->vifr_rid = intf->vif_rid;
+    req->vifr_transport = intf->vif_transport;
     req->vifr_os_idx = intf->vif_os_idx;
     req->vifr_mtu = intf->vif_mtu;
     if (req->vifr_mac_size && req->vifr_mac)
@@ -1752,6 +1766,7 @@ vr_gro_vif_add(struct vrouter *router, unsigned int os_idx, char *name)
     req->vifr_vrf = 65535;
     req->vifr_idx = router->vr_max_interfaces - 1;
     req->vifr_rid = 0;
+    req->vifr_transport = VIF_TRANSPORT_ETH;
     req->vifr_os_idx = os_idx;
     req->vifr_mtu = 9136;
 

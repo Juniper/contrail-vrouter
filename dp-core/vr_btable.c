@@ -1,4 +1,3 @@
-#ifndef __DPDK__
 /*
  * vr_btable.c -- Big tables. With (kernel)malloc, there is a limitation of
  * how much contiguous memory we will get (4M). So, for allocations more than
@@ -72,7 +71,8 @@ vr_btable_free(struct vr_btable *table)
     if (!table)
         return;
 
-    if (table->vb_mem) {
+    if (!(table->vb_flags & VB_FLAG_MEMORY_ATTACHED) &&
+            (table->vb_mem)) {
         for (i = 0; i < table->vb_partitions; i++) {
             if (table->vb_mem[i]) {
                 vr_page_free(table->vb_mem[i],
@@ -80,12 +80,6 @@ vr_btable_free(struct vr_btable *table)
             }
         }
     }
-
-    if (table->vb_table_info)
-        vr_free(table->vb_table_info);
-
-    if (table->vb_mem)
-        vr_free(table->vb_mem);
 
     vr_free(table);
 
@@ -96,7 +90,7 @@ struct vr_btable *
 vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
 {
     unsigned int i = 0, num_parts, remainder;
-    unsigned int total_parts;
+    unsigned int total_parts, alloc_size;
     uint64_t total_mem;
     struct vr_btable *table;
     unsigned int offset = 0;
@@ -128,15 +122,18 @@ vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
     if (!total_parts)
         return NULL;
 
-    table = vr_zalloc(sizeof(*table));
+    alloc_size = sizeof(*table) + (total_parts * (sizeof(void *))) +
+        (total_parts * sizeof(struct vr_btable_partition));
+
+    table = vr_zalloc(alloc_size);
     if (!table)
         return NULL;
 
-    table->vb_mem = vr_zalloc(total_parts * sizeof(void *));
-    table->vb_table_info = vr_zalloc(total_parts *
-            sizeof(struct vr_btable_partition));
-    if (!table->vb_mem || !table->vb_table_info)
-        goto exit_alloc;
+    table->vb_alloc_limit = VR_SINGLE_ALLOC_LIMIT;
+    table->vb_mem = (void **)(table + 1);
+    table->vb_table_info =
+        (struct vr_btable_partition *)((unsigned char *)table->vb_mem +
+                (total_parts * sizeof(void *)));
 
     if (num_parts) {
         for (i = 0; i < num_parts; i++) {
@@ -168,4 +165,62 @@ exit_alloc:
     vr_btable_free(table);
     return NULL;
 }
-#endif /* __DPDK__ */
+
+struct vr_btable *
+vr_btable_attach(struct iovec *iov, unsigned int iov_len,
+        unsigned short esize)
+{
+    unsigned int i, alloc_size, alloc_limit;
+    unsigned int offset = 0, total_size = 0;
+    struct vr_btable *table;
+    struct vr_btable_partition *part;
+
+    if (!iov || !iov_len)
+        return NULL;
+
+    if (iov[0].iov_len % esize)
+        return NULL;
+
+    alloc_size = sizeof(struct vr_btable *);
+    alloc_size += (sizeof(void *) * iov_len);
+    alloc_size += (sizeof(struct vr_btable_partition) * iov_len);
+
+
+    table = (struct vr_btable *)vr_zalloc(alloc_size);
+    if (!table)
+        return NULL;
+
+    table->vb_esize = esize;
+    table->vb_partitions = iov_len;
+    table->vb_alloc_limit = iov->iov_len;
+    table->vb_mem = (void **)(table + 1);
+    table->vb_table_info =
+        (struct vr_btable_partition *)((unsigned char *)table->vb_mem +
+                (iov_len * sizeof(void *)));
+
+    for (i = 0; i < iov_len; i++) {
+        table->vb_mem[i] = iov[i].iov_base;
+        if ((iov[i].iov_len != table->vb_alloc_limit) &&
+                (i != (iov_len - 1)))
+            goto error;
+
+        table->vb_table_info[i].vb_mem_size = iov[i].iov_len;
+        table->vb_table_info[i].vb_offset = offset;
+
+        offset += iov[i].iov_len;
+        total_size += iov[i].iov_len;
+    }
+
+    if (total_size % esize)
+        goto error;
+
+    table->vb_entries = (total_size / esize);
+    table->vb_flags |= VB_FLAG_MEMORY_ATTACHED;
+
+    return table;
+
+error:
+    vr_btable_free(table);
+    return NULL;
+}
+

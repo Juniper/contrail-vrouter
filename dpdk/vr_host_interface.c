@@ -17,9 +17,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <net/if.h>
 
+#include "vr_queue.h"
 #include "vr_dpdk.h"
+#include "vr_dpdk_usocket.h"
+
 
 static struct rte_pci_device *
 dpdk_pci_dev_get(struct rte_pci_addr *pci)
@@ -189,6 +193,16 @@ dpdk_if_add(struct vr_interface *vif)
 {
     int ret = 0;
 
+    if ((vif->vif_type == VIF_TYPE_AGENT) &&
+            (vif->vif_transport == VIF_TRANSPORT_SOCKET)) {
+        ret = dpdk_packet_socket_init();
+        if (ret)
+            return ret;
+
+        vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
+        return 0;
+    }
+
     /* get interface name */
     if (vif->vif_flags & VIF_FLAG_PMD) {
         if (vif->vif_os_idx >= rte_eth_dev_count()) {
@@ -235,7 +249,10 @@ dpdk_if_add(struct vr_interface *vif)
 static int
 dpdk_if_del(struct vr_interface *vif)
 {
-    /* TODO: not implemented */
+    if ((vif->vif_type == VIF_TYPE_AGENT) &&
+            (vif->vif_transport == VIF_TRANSPORT_SOCKET))
+        dpdk_packet_socket_close();
+
     return 0;
 }
 

@@ -75,6 +75,7 @@ buffer sandesh vr_interface_req {
    25: i32          vifr_parent_vif_idx;
    26: i16          vifr_nh_id;
    27: i32          vifr_cross_connect_idx;
+   28: byte         vifr_transport;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -146,6 +147,7 @@ buffer sandesh vr_flow_req {
    23: i32          fr_src_nh_index;
    24: i16          fr_flow_nh_id;
    25: i16          fr_drop_reason;
+   26: string       fr_file_path;
 }
 
 buffer sandesh vr_vrf_assign_req {

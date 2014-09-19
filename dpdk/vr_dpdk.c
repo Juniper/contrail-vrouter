@@ -105,6 +105,14 @@ dpdk_burst_vroute(unsigned nb_rx, struct rte_mbuf *pkt_burst[VR_DPDK_PKT_BURST_S
     }
 }
 
+void
+dpdk_burst_rx(unsigned nb_rx, struct rte_mbuf *pkt_burst[VR_DPDK_PKT_BURST_SZ],
+        struct vr_interface *vif, const char *name, unsigned port_id)
+{
+    dpdk_burst_vroute(nb_rx, pkt_burst, vif, name, port_id);
+    return;
+}
+
 /* Read a burst from eth and KNI interfaces and transmit it to VRouter */
 unsigned
 vr_dpdk_port_rx(struct vif_port *port)
@@ -564,6 +572,7 @@ dpdk_burst_enqueue(struct vr_interface *vif, struct rte_ring *ring, struct rte_m
 int
 vr_dpdk_eth_tx_queue_drain(struct vif_port *port, struct lcore_ctx *lcore_ctx)
 {
+    struct vr_interface *vif = port->vip_vif;
     unsigned port_id = port->vip_id;
     struct rte_ring *tx_ring = port->vip_tx_ring;
     int tx_index = lcore_ctx->lcore_tx_index[port_id];
@@ -571,6 +580,13 @@ vr_dpdk_eth_tx_queue_drain(struct vif_port *port, struct lcore_ctx *lcore_ctx)
     unsigned nb_tx_burst = lcore_ctx->lcore_port_tx_len[port_id];
 
     RTE_VERIFY(NULL != lcore_ctx);
+
+    if ((vif->vif_type == VIF_TYPE_AGENT) &&
+            (vif->vif_transport == VIF_TRANSPORT_SOCKET)) {
+        vr_dpdk_packet_tx(port);
+        return 0;
+    }
+
 
     if (likely(NULL == tx_ring)) {
         /* if we have no ring -> just transmit the burst */

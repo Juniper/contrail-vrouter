@@ -13,11 +13,16 @@
  * dpdk_vrouter.c -- DPDK vRouter application
  *
  */
-
+#include <getopt.h>
 #include <signal.h>
 
 #include "vr_os.h"
 #include "vr_dpdk.h"
+
+static int no_daemon_set;
+
+extern int dpdk_netlink_core_id, dpdk_packet_core_id;
+extern int vr_dpdk_flow_mem_init(void);
 
 /* Global vRouter/DPDK structure */
 struct dpdk_global vr_dpdk;
@@ -32,6 +37,11 @@ dpdk_init(void)
 {
     int i, ret, nb_sys_ports;
     unsigned lcore_id;
+
+    if ((ret = vr_dpdk_flow_mem_init())) {
+        RTE_LOG(CRIT, VROUTER, "Could not initialise flow table\n");
+        return -1;
+    }
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (0 > ret) {
@@ -106,22 +116,6 @@ dpdk_exit(void)
     }
 }
 
-/* NetLink handling loop */
-static void *
-dpdk_netlink_loop(__attribute__((unused)) void *dummy)
-{
-    while(1) {
-        /* vr_dpdk_netlink_handle would block waiting for a message
-         * so we do not sleep in this loop */
-        vr_dpdk_netlink_handle();
-
-        /* check for the global stop flag */
-        if (unlikely(rte_atomic32_read(&vr_dpdk.stop_flag)))
-            break;
-    };
-    return NULL;
-}
-
 /* Timer handling loop */
 static void *
 dpdk_timer_loop(__attribute__((unused)) void *dummy)
@@ -162,6 +156,7 @@ dpdk_lcore_loop(__attribute__((unused)) void *dummy)
     const unsigned lcore_id = rte_lcore_id();
     /* current lcore context */
     struct lcore_ctx * const lcore_ctx = &vr_dpdk.lcores[lcore_id];
+    unsigned int lcore_count = rte_lcore_count();
 
     /* cycles counters */
     uint64_t cur_cycles = 0;
@@ -186,6 +181,22 @@ dpdk_lcore_loop(__attribute__((unused)) void *dummy)
 #else
         cur_cycles++;
 #endif
+
+    if ((lcore_id == dpdk_netlink_core_id) ||
+            (lcore_id == dpdk_packet_core_id)) {
+cp_loop:
+        if (lcore_id == dpdk_netlink_core_id)
+            dpdk_netlink_io();
+
+        if (lcore_id == dpdk_packet_core_id)
+            dpdk_packet_io();
+
+        if (dpdk_netlink_core_id == dpdk_packet_core_id)
+            goto cp_loop;
+
+        return 0;
+    }
+
 
         /* Read bursts from all the ports assigned and
          * transmit those packets to VRouter
@@ -249,6 +260,14 @@ dpdk_signals_init(void)
         RTE_LOG(CRIT, VROUTER, "Fail to register SIGINT handler\n");
         return -1;
     }
+
+    /* ignore sigpipes emanating from sockets that are closed */
+    act.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &act, NULL) != 0) {
+        RTE_LOG(CRIT, VROUTER, "Failed to ignore SIGPIPE\n");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -299,29 +318,44 @@ dpdk_threads_create(void)
         return ret;
     }
 
-    /* thread to handle NetLink */
-    if (ret = pthread_create(&vr_dpdk.netlink_thread, NULL,
-        &dpdk_netlink_loop, NULL)) {
-        RTE_LOG(CRIT, VROUTER, "Error creating NetLink thread (%d)\n",
-            ret);
-
-        return ret;
-    }
-
     return 0;
 }
 
+enum vr_opt_index {
+    DAEMON_OPT_INDEX,
+    MAX_OPT_INDEX
+};
+
+static struct option long_options[] = {
+    [DAEMON_OPT_INDEX]              =   {"no-daemon",           no_argument,
+                                                    &no_daemon_set,         1},
+    [MAX_OPT_INDEX]                 =   {NULL,                  0,
+                                                    NULL,                   0},
+};
+
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
-    int ret;
+    int ret, opt, option_index;
     bool daemonize = true;
 
-    /* daemonize... */
-    if (argc >= 2 && strcmp(argv[1],"--no-daemon") == 0)
-        daemonize = false;
+    while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
+            >= 0) {
+        switch (opt) {
+        case 0:
+            break;
 
-    if (daemonize) {
+        case '?':
+        default:
+            printf("Invalid option %s\n", argv[optind]);
+            exit(-EINVAL);
+            break;
+        }
+    }
+    /* for other getopts  in dpdk */
+    optind = 0;
+
+    if (!no_daemon_set) {
         if (daemon(0, 0) < 0)
             return -1;
     }
@@ -343,7 +377,7 @@ main(int argc, const char *argv[])
     }
 
     /* init the communication socket with agent */
-    if (ret = vr_dpdk_netlink_sock_init()) {
+    if (ret = dpdk_netlink_init()) {
         vrouter_host_exit();
         dpdk_exit();
         return ret;
@@ -373,7 +407,7 @@ main(int argc, const char *argv[])
     dpdk_threads_join();
 
     /* close the communication socket */
-    vr_dpdk_netlink_sock_close();
+    dpdk_netlink_exit();
 
     /* close DPDK ports first since we examine vif flags */
     dpdk_exit();

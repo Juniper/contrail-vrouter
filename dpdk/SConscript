@@ -30,8 +30,8 @@ env.Append(LIBS = ['rt', 'pcap', 'dl', 'pthread'])
 env.Append(LINKCOM =
     ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
 
-sources = Split('dpdk_vrouter vr_dpdk vr_host_interface vr_netlink'
-    + ' vrouter_mod')
+sources = Split('dpdk_vrouter vr_dpdk vr_host_interface vr_dpdk_netlink'
+    + ' vrouter_mod vr_dpdk_usocket vr_dpdk_packet vr_dpdk_flow_mem')
 
 sources = [env.Object(f + '.o', f + '.c') for f in sources]
 
