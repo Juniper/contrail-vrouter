@@ -33,6 +33,7 @@
 #include "vhost.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+#include "ini_parser.h"
 
 #define VHOST_TYPE_STRING       "vhost"
 #define AGENT_TYPE_STRING       "agent"
@@ -58,6 +59,7 @@ static int xconnect_set, vhost_phys_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
+static bool response_pending = true;
 static bool vr_vrf_assign_dump = false;
 static int dump_marker = -1, var_marker = -1;
 
@@ -245,6 +247,7 @@ vr_interface_req_process(void *s)
         vr_ifindex = req->vifr_idx;
     }
 
+    response_pending = false;
     return;
 }
 
@@ -254,14 +257,20 @@ vr_response_process(void *s)
 {
     vr_response *resp = (vr_response *)s;
 
+    response_pending = false;
     if (resp->resp_code < 0 && !ignore_error)
         printf("%s\n", strerror(-resp->resp_code));
 
     if (vr_op == SANDESH_OP_DUMP) {
-            if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
-                dump_pending = true;
-            else
-                dump_pending = false;
+        if (resp->resp_code > 0)
+            response_pending = true;
+
+        if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
+            response_pending = true;
+            dump_pending = true;
+        } else {
+            dump_pending = false;
+        }
     } else if (vr_op == SANDESH_OP_GET && vr_vrf_assign_dump) {
         if (!(resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)) {
             vr_vrf_assign_dump = false;
@@ -294,7 +303,7 @@ vhost_create(void)
     if (ret <= 0)
         return ret;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
+    if ((ret = nl_recvmsg(cl)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp && resp->nl_op)
             printf("%s\n", strerror(resp->nl_op));
@@ -336,13 +345,17 @@ vr_intf_send_msg(void *request, char *request_string)
     nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
     nl_update_nlh(cl);
 
+    response_pending = true;
     /* Send the request to kernel */
     ret = nl_sendmsg(cl);
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST) {
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+    while (response_pending) {
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST) {
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                               vr_find_sandesh_info, &ret);
+            }
         }
 
         nlh = (struct nlmsghdr *)cl->cl_buf;
@@ -791,9 +804,17 @@ main(int argc, char *argv[])
     if (create_set)
         sock_proto = NETLINK_ROUTE;
 
-    ret = nl_socket(cl, sock_proto);
-    if (ret <= 0)
-       exit(ret);
+    parse_ini_file();
+
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
+    if (ret <= 0) {
+        exit(1);
+    }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
+        exit(1);
+    }
 
     if (sock_proto == NETLINK_GENERIC)
         if (vrouter_get_family_id(cl) <= 0)

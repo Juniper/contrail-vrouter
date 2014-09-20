@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <net/if.h>
+#include <netinet/in.h>
 #include "vr_types.h"
 #include "nl_util.h"
 #include "vr_genetlink.h"
@@ -243,7 +244,6 @@ nl_update_header(struct nl_client *cl, int data_len)
     assert(nla->nla_type == NL_ATTR_VR_MESSAGE_PROTOCOL);
     nla->nla_len +=  data_len;
 
-    /* Update the netlink header len */
     cl->cl_buf_offset += data_len;
     nl_update_nlh(cl);
 }
@@ -418,46 +418,69 @@ nl_free(struct nl_client *cl)
 }
 
 int
-nl_socket(struct nl_client *cl, unsigned int protocol)
+nl_socket(struct nl_client *cl,int domain, int type, int protocol)
 {
     struct sockaddr_nl sa;
 
     if (cl->cl_sock >= 0)
         return -EEXIST;
 
-    cl->cl_sock = socket(AF_NETLINK, SOCK_DGRAM, protocol);
+    cl->cl_sock = socket(domain, type, protocol);
     if (cl->cl_sock < 0)
         return cl->cl_sock;
 
-    memset(&sa, 0, sizeof(sa));
-    sa.nl_family = AF_NETLINK;
-#if 0
-    sa.nl_pid = cl->cl_id;
-#else
-    sa.nl_pid = getpid();
-#endif
-    bind(cl->cl_sock, (struct sockaddr *)&sa, sizeof(sa));
 
     cl->cl_sock_protocol = protocol;
+    cl->cl_socket_domain = domain;
+    cl->cl_socket_type = type;
+
+    if (type == SOCK_STREAM) {
+        cl->cl_recvmsg = nl_client_stream_recvmsg;
+    } else {
+        cl->cl_recvmsg = nl_client_datagram_recvmsg;
+    }
 
     return cl->cl_sock;
 }
 
-#if 0
 int
-nl_recvmsg(struct nl_client *cl)
+nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
+{
+    if (cl->cl_socket_domain == AF_NETLINK) {
+        struct sockaddr_nl *sa = malloc(sizeof(struct sockaddr_nl));
+        memset(sa, 0, sizeof(*sa));
+        sa->nl_family = cl->cl_socket_domain;
+        sa->nl_pid = cl->cl_id;
+        cl->cl_sa = (struct sockaddr *)sa;
+        cl->cl_sa_len = sizeof(*sa);
+        return bind(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+    }
+
+    if (cl->cl_socket_domain == AF_INET) {
+        struct sockaddr_in *sa = malloc(sizeof(struct sockaddr_in));
+        struct in_addr address;
+        address.s_addr = htonl(ip);
+        memset(sa, 0, sizeof(*sa));
+        sa->sin_family = cl->cl_socket_domain;
+        sa->sin_addr = address;
+        sa->sin_port = htons(port);
+        cl->cl_sa = (struct sockaddr *)sa;
+        cl->cl_sa_len = sizeof(*sa);
+        return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+    }
+    return 0;
+}
+
+int
+nl_client_datagram_recvmsg(struct nl_client *cl)
 {
     int ret;
-    struct sockaddr_nl sa;
     struct msghdr msg;
     struct iovec iov;
 
     memset(&msg, 0, sizeof(msg));
-    memset(&sa, 0, sizeof(sa));
-    sa.nl_family = AF_NETLINK;
-
-    msg.msg_name = &sa;
-    msg.msg_namelen = sizeof(sa);
+    msg.msg_name = cl->cl_sa;
+    msg.msg_namelen = cl->cl_sa_len;
 
     iov.iov_base = (void *)(cl->cl_buf);
     iov.iov_len = cl->cl_buf_len;
@@ -479,18 +502,64 @@ nl_recvmsg(struct nl_client *cl)
 }
 
 int
-nl_sendmsg(struct nl_client *cl)
-{
-    struct sockaddr_nl sa;
+nl_client_stream_recvmsg(struct nl_client *cl) {
+    int ret;
     struct msghdr msg;
     struct iovec iov;
 
     memset(&msg, 0, sizeof(msg));
-    memset(&sa, 0, sizeof(sa));
-    sa.nl_family = AF_NETLINK;
 
-    msg.msg_name = &sa;
-    msg.msg_namelen = sizeof(sa);
+    msg.msg_name = cl->cl_sa;
+    msg.msg_namelen = sizeof(cl->cl_sa_len);
+
+    iov.iov_base = (void *)(cl->cl_buf);
+    iov.iov_len = sizeof(struct nlmsghdr);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    cl->cl_buf_offset = 0;
+
+    //Read netlink header and get the lenght of sandesh message
+    ret = recvmsg(cl->cl_sock, &msg, 0);
+    if (ret < 0) {
+        return ret;
+    }
+    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf + cl->cl_buf_offset);
+    uint32_t pending_length = nlh->nlmsg_len - sizeof(struct nlmsghdr);
+
+    //Read sandesh message
+    iov.iov_base = (void *)(cl->cl_buf + sizeof(struct nlmsghdr));
+    iov.iov_len = pending_length;
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    ret = recvmsg(cl->cl_sock, &msg, 0);
+    if (ret < 0) {
+        return ret;
+    }
+
+    cl->cl_recv_len = nlh->nlmsg_len;
+    if (cl->cl_recv_len > cl->cl_buf_len)
+        return -EOPNOTSUPP;
+
+    return ret;
+}
+
+int
+nl_recvmsg(struct nl_client *cl)
+{
+    return cl->cl_recvmsg(cl);
+}
+
+int
+nl_sendmsg(struct nl_client *cl)
+{
+    struct msghdr msg;
+    struct iovec iov;
+
+    memset(&msg, 0, sizeof(msg));
+
+    msg.msg_name = cl->cl_sa;
+    msg.msg_namelen = cl->cl_sa_len;
 
     iov.iov_base = (void *)(cl->cl_buf);
     iov.iov_len = cl->cl_buf_offset;
@@ -502,63 +571,6 @@ nl_sendmsg(struct nl_client *cl)
 
     return sendmsg(cl->cl_sock, &msg, 0);
 }
-#else
-int
-nl_recvmsg(struct nl_client *cl)
-{
-    struct sockaddr_nl sa;
-    socklen_t len;
-    int ret;
-
-    cl->cl_buf_offset = 0;
-    len = sizeof(sa);
-
-    ret = recvfrom(cl->cl_sock, cl->cl_buf, cl->cl_buf_len, 0,
-        (struct sockaddr *)&sa, &len);
-    if (ret < 0)
-        return ret;
-
-
-    cl->cl_recv_len = ret;
-    if (cl->cl_recv_len > cl->cl_buf_len)
-        return -EOPNOTSUPP;
-
-#ifdef VR_DPDK_NETLINK_DEBUG
-{
-    int i;
-    for(i = 0; i < cl->cl_recv_len; i++)
-        printf("%c%02hhx", (i % 8) ? ' ' : '\n', cl->cl_buf[i]);
-}
-#endif
-
-    return ret;
-}
-
-int
-nl_sendmsg(struct nl_client *cl)
-{
-    struct sockaddr_nl sa;
-    ssize_t len;
-
-    memset(&sa, 0, sizeof(sa));
-    sa.nl_family = AF_NETLINK;
-    sa.nl_pid = cl->cl_id;
-
-#ifdef VR_DPDK_NETLINK_DEBUG
-{
-    int i;
-    for(i = 0; i < cl->cl_buf_offset; i++)
-        printf("%c%02hhx", (i % 8) ? ' ' : '\n', cl->cl_buf[i]);
-}
-#endif
-
-    len = cl->cl_buf_offset;
-    cl->cl_buf_offset = 0;
-
-    return sendto(cl->cl_sock, cl->cl_buf, len, 0,
-        (struct sockaddr *)&sa, sizeof(sa));
-}
-#endif
 
 void
 nl_set_buf(struct nl_client *cl, char *buf, unsigned int len)
@@ -720,6 +732,11 @@ vrouter_get_family_id(struct nl_client *cl)
     int ret;
     struct nl_response *resp;
     struct genl_ctrl_message *msg;
+
+    if (cl->cl_socket_domain != AF_NETLINK) {
+        nl_set_genl_family_id(cl, 1);
+        return 1;
+    }
 
     if ((ret = nl_build_get_family_id(cl, VROUTER_GENETLINK_FAMILY_NAME)))
         return ret;

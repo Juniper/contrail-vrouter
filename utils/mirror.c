@@ -31,9 +31,11 @@
 #include "vr_mirror.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+#include "ini_parser.h"
 
 static struct nl_client *cl;
 static bool dump_pending = false;
+static bool response_pending = true;
 static int dump_marker = -1;
 
 static int create_set, delete_set, dump_set;
@@ -62,22 +64,28 @@ vr_mirror_req_process(void *s_req)
    if (mirror_op == SANDESH_OP_DUMP)
        dump_marker = req->mirr_index;
 
+   response_pending = false;
    return;
 }
 
 void
 vr_response_process(void *s)
 {
-   vr_response *resp = (vr_response *)s;
-
+    vr_response *resp = (vr_response *)s;
+    response_pending = false;
     if (resp->resp_code < 0) {
         printf("Error: %s\n", strerror(-resp->resp_code));
     } else {
         if (mirror_op == SANDESH_OP_DUMP) {
-            if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
+            if (resp->resp_code > 0)
+                response_pending = true;
+
+            if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
                 dump_pending = true;
-            else
-                dump_pending = false; 
+                response_pending = true;
+            } else {
+                dump_pending = false;
+            }
         }
     }
 
@@ -137,12 +145,16 @@ op_retry:
     nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
     nl_update_nlh(cl);
 
+    response_pending = true;
     /* Send the request to kernel */
     ret = nl_sendmsg(cl);
-    while ((ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST) {
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+    while (response_pending) {
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST) {
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                               vr_find_sandesh_info, &ret);
+            }
         }
 
         nlh = (struct nlmsghdr *)cl->cl_buf;
@@ -358,10 +370,17 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
+    parse_ini_file();
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
     if (ret <= 0) {
        exit(1);
     }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
+        exit(1);
+    }
+
 
     if (vrouter_get_family_id(cl) <= 0) {
         return -1;

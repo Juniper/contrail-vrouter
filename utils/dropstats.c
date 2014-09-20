@@ -31,6 +31,7 @@
 #include "vr_nexthop.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+#include "ini_parser.h"
 
 static struct nl_client *cl;
 static int resp_code;
@@ -204,14 +205,10 @@ vr_send_one_message(void)
     if (ret <= 0)
         return 0;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
+    if((ret = nl_recvmsg(cl)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp->nl_op == SANDESH_REQUEST)
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
-
-        nlh = (struct nlmsghdr *)cl->cl_buf;
-        if (!nlh->nlmsg_flags)
-            break;
     }
 
     return resp_code;
@@ -282,8 +279,15 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
+    parse_ini_file();
+
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
     if (ret <= 0) {
+       exit(1);
+    }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
        exit(1);
     }
 
