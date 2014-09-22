@@ -38,6 +38,7 @@
 static struct nl_client *cl;
 static int resp_code;
 static vr_route_req rt_req;
+static uint8_t rt_prefix[16], rt_src[16], rt_marker[16];
 static bool cmd_proxy_set = false;
 
 static int cmd_set, dump_set;
@@ -51,7 +52,7 @@ static int cmd_vrf_id = -1, cmd_family_id;
 static int cmd_op = -1;
 
 static int cmd_nh_id = -1;
-static uint8_t *cmd_prefix, *cmd_src;
+static uint8_t cmd_prefix[16], cmd_src[16];
 static uint32_t cmd_plen = 0;
 static int32_t cmd_label;
 static int cmd_rt_type = RT_UCAST;
@@ -98,9 +99,10 @@ vr_route_req_process(void *s_req)
     vr_route_req *rt = (vr_route_req *)s_req;
 
     if (!rt_req.rtr_prefix) {
-        rt_req.rtr_prefix = calloc(1, 16);
-        rt_req.rtr_marker = calloc(1, 16);
-        rt_req.rtr_src    = calloc(1, 16);
+        rt_req.rtr_prefix = rt_prefix;
+        rt_req.rtr_marker = rt_marker;
+        rt_req.rtr_src    = rt_src;
+            
     }
     rt_req.rtr_prefix_size = rt_req.rtr_marker_size = rt_req.rtr_src_size = 0;
 
@@ -223,9 +225,9 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
     rt_req.h_op = op;
 
     if (!rt_req.rtr_prefix) {
-        rt_req.rtr_prefix = calloc(1, 16);
-        rt_req.rtr_marker = calloc(1, 16);
-        rt_req.rtr_src    = calloc(1, 16);
+        rt_req.rtr_prefix = rt_prefix;
+        rt_req.rtr_marker = rt_marker;
+        rt_req.rtr_src    = rt_src;
     }
     rt_req.rtr_prefix_size = rt_req.rtr_marker_size = rt_req.rtr_src_size = 0;
 
@@ -611,12 +613,6 @@ int main(int argc, char *argv[])
                     usage_internal();
                 }
                 cmd_op = SANDESH_OP_DUMP;
-                if (!cmd_src)
-                     cmd_src = calloc(1, 16);
-                *cmd_src = 0;
-                if (!cmd_prefix)
-                     cmd_prefix = calloc(1, 16);
-                *cmd_prefix = 0;
                 break;
 
             case 'v':
@@ -628,8 +624,6 @@ int main(int argc, char *argv[])
                 break;
 
             case 'p':
-                if (!cmd_prefix)
-                     cmd_prefix = calloc(1, 16);
                 /* 
                  * Note: Only one of the following 2 APIs will succeed and 
                  * update cmd_prefix
@@ -652,8 +646,6 @@ int main(int argc, char *argv[])
                 break;
 
             case 's':
-                if (!cmd_src)
-                     cmd_src = calloc(1, 16);
                 /* 
                  * Note: Only one of the following 2 APIs will succeed and 
                  * update cmd_src
@@ -701,7 +693,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf ("Calling validate_options \n");
     validate_options();
 
     cl = nl_register_client();
@@ -720,8 +711,6 @@ int main(int argc, char *argv[])
         printf("Unable to get vrouter family id\n");
         return -1;
     }
-
-    printf ("Calling vr_route_op \n");
 
     vr_route_op();
 

@@ -44,6 +44,7 @@ extern int vr_ip_input(struct vrouter *, unsigned short,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_ip_update_csum(struct vr_packet *, unsigned int,
         unsigned int);
+extern uint16_t vr_icmp6_checksum(void * buffer, int bytes);
 
 static void vr_flush_entry(struct vrouter *, struct vr_flow_entry *,
         struct vr_flow_md *, struct vr_forwarding_md *);
@@ -801,20 +802,6 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
     return res;
 }
 
-#if 0
-struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *, struct vr_packet *);
-
-static void
-print_data(const char* str, uint8_t* data, int len)
-{
-    int i;
-    vr_printf("%s \t", str);
-    for (i=0; i<len; i++)
-       vr_printf("%2x:", data[i]);
-    vr_printf("\n");
-}
-#endif
-
 extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
                 struct vr_route_req *, struct vr_packet *);
 unsigned int
@@ -832,6 +819,7 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
     struct vr_route_req rt;
     struct vr_nexthop *nh;
     struct vr_interface *vif = pkt->vp_if;
+    uint32_t rt_prefix[4];
    
     pkt->vp_type = VP_TYPE_IP6;
     ip6 = (struct vr_ip6 *)pkt_network_header(pkt); 
@@ -849,11 +837,14 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
             break;
         case VR_ICMP6_TYPE_NEIGH_SOL: //Neighbor Solicit, respond with VRRP MAC
 
+            /* For L2-only networks, bridge the packets */
+            if (vif_is_virtual(vif) && !(vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
+                return 0;
+            }
+
             rt.rtr_req.rtr_vrf_id = vrf;
             rt.rtr_req.rtr_family = AF_INET6;
-            rt.rtr_req.rtr_prefix = vr_zalloc(16);
-            if (!rt.rtr_req.rtr_prefix)
-                 return false;
+            rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
             memcpy(rt.rtr_req.rtr_prefix, &icmph->icmp_data, 16);
             rt.rtr_req.rtr_prefix_size = 16;
             rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
@@ -861,11 +852,6 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
             rt.rtr_req.rtr_label_flags = 0;
             rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
         
-            /* For L2-only networks, need to identify the flood NH */
-            if (vif_is_virtual(vif) && !(vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
-                memcpy(rt.rtr_req.rtr_prefix, ip6->ip6_dst, 16);
-            }
-
             nh = vr_inet_route_lookup(vrf, &rt, NULL);
             if (!nh || nh->nh_type == NH_DISCARD) {
                 vr_pfree(pkt, VP_DROP_ARP_NOT_ME);
@@ -900,20 +886,22 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
              * Update IPv6 header  
              * Copy the IP6 src to IP6 dst 
              * Copy the target IP n ICMPv6 header as src IP of packet
-             * Do IP lookup to confirm if we can respond with 
-             * Neighbor advertisement
+             * Do IP lookup to confirm if we can respond with Neighbor advertisement
              */
              memcpy(ip6->ip6_dst, ip6->ip6_src, 16);
              memcpy(ip6->ip6_src, &icmph->icmp_data, 16);
              ip6->ip6_src[15] = 0xFF; // Mimic a different src IP
-
-             //TODO: Update checksum
 
              /* Update ICMP header and options */
              icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD; 
              icmp_opt_ptr = ((char*)&icmph->icmp_data[0]) + 16;
              *icmp_opt_ptr = 0x02; //Target-link-layer-address
              memcpy(icmp_opt_ptr+2, vif->vif_mac, VR_ETHER_ALEN);
+             
+             //Update icmp6 checksum
+             icmph->icmp_csum = 
+                       ~(vr_icmp6_checksum(ip6, sizeof(struct vr_ip6) + 
+                                                sizeof(struct vr_icmp) + 24));
              
              /* Update Ethernet headr */
              eth = (struct vr_eth*) ((char*)ip6 - sizeof(struct vr_eth));
@@ -952,9 +940,6 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
     default:
         break;
     }
-
-    /* Act as though flow lookup has already happenend */
-//    pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
     return vr_flow_forward(vrf, pkt, proto, fmd);
 }

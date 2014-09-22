@@ -233,6 +233,7 @@ __mcast_dump(struct vr_message_dumper *dumper)
     int ret;
     struct vr_mcast_entry *ent;
     unsigned int i;
+    uint32_t rt_prefix, rt_src;
 
     for(i = 0; i < (vr_mcast_entries + vr_mcast_oentries); i++) {
         ent = (struct vr_mcast_entry *) vr_get_hentry_by_index(vn_rtable, i);
@@ -249,13 +250,11 @@ __mcast_dump(struct vr_message_dumper *dumper)
                 }
             } else {
                 memset(&resp, 0, sizeof(struct vr_route_req));
-                resp.rtr_req.rtr_src = vr_zalloc(4);
-                resp.rtr_req.rtr_prefix = vr_zalloc(4);
+                resp.rtr_req.rtr_src = (uint8_t*)&rt_src;
+                resp.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
 
                 mcast_make_req(&resp, ent);
                 ret = vr_message_dump_object(dumper, VR_ROUTE_OBJECT_ID, &resp);
-                vr_free(resp.rtr_req.rtr_src);
-                vr_free(resp.rtr_req.rtr_prefix);
                 if (ret <= 0) 
                     return ret;
             }
@@ -359,6 +358,7 @@ vr_mcast_forward(struct vrouter *router, unsigned short vrf,
     struct vr_route_req rt;
     struct vr_nexthop *nh;
     struct vr_ip *ip;
+    uint32_t rt_prefix, rt_src;
 
     pkt->vp_type = VP_TYPE_IP;
     ip = (struct vr_ip *)pkt_data(pkt);
@@ -366,8 +366,8 @@ vr_mcast_forward(struct vrouter *router, unsigned short vrf,
     rt.rtr_req.rtr_vrf_id = vrf;
     rt.rtr_req.rtr_prefix_len = 32;
 
-    rt.rtr_req.rtr_src = vr_zalloc(4);
-    rt.rtr_req.rtr_prefix = vr_zalloc(4);
+    rt.rtr_req.rtr_src = (uint8_t*)&rt_src;
+    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
     rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_prefix_size = 4;
     rt.rtr_req.rtr_marker_size = 0;
   
@@ -383,8 +383,6 @@ vr_mcast_forward(struct vrouter *router, unsigned short vrf,
     if (!nh) {
         nh = ip4_default_nh;
     }
-    vr_free(rt.rtr_req.rtr_src);
-    vr_free(rt.rtr_req.rtr_prefix);
 
     return nh_output(vrf, pkt, nh, fmd);
 }

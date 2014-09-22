@@ -26,12 +26,39 @@ vr_generate_unique_ip_id()
     return vr_ip_id;
 }
 
+/* 
+ * Calculates ICMP6 checksum
+ * buffer is pointer to ip6 header, all values other than src, dst and plen are ZERO
+ * bytes is total length of ip6 header, icmp header and icmp option 
+ */
+uint16_t
+vr_icmp6_checksum (void * buffer, int bytes) {
+   uint32_t   total;
+   uint16_t * ptr;
+   int        num_words;
+
+   total = 0;
+   ptr   = (uint16_t *) buffer;
+   num_words = (bytes + 1) / 2; 
+
+   while (num_words--) total += *ptr++;
+
+   /*
+    *   Fold in any carries
+    *   - the addition may cause another carry so we loop
+    */
+   while (total & 0xffff0000) total = (total >> 16) + (total & 0xffff);
+
+   return (uint16_t) total;
+}
+
 struct vr_nexthop *
 vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
 {
     struct vr_route_req rt;
     struct vr_nexthop *nh;
     struct vr_ip6 *ip6;
+    uint32_t rt_prefix[4];
 
     if (!ip || !pkt) 
         return NULL;
@@ -39,14 +66,14 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
     rt.rtr_req.rtr_vrf_id = vrf;
     if (!vr_ip_is_ip6(ip)) {
         pkt->vp_type = VP_TYPE_IP;
-        rt.rtr_req.rtr_prefix = vr_zalloc(4);
+        rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         *(uint32_t*)rt.rtr_req.rtr_prefix = (ip->ip_saddr);
         rt.rtr_req.rtr_prefix_size = 4;
         rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
     } else {
         ip6 = (struct vr_ip6 *)pkt_data(pkt);
         pkt->vp_type = VP_TYPE_IP6;
-        rt.rtr_req.rtr_prefix = vr_zalloc(16);
+        rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         rt.rtr_req.rtr_prefix_size = 16;
         memcpy(rt.rtr_req.rtr_prefix, ip6->ip6_src, 16);
         rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
@@ -55,7 +82,6 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
     rt.rtr_req.rtr_nh_id = 0;
 
     nh = vr_inet_route_lookup(vrf, &rt, pkt);
-    vr_free(rt.rtr_req.rtr_prefix);
 
     return nh;
 }
@@ -73,6 +99,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     struct vr_interface *vif;
     int family = AF_INET, status, encap_len = 0;
     short plen;
+    uint32_t rt_prefix[4];
 
     if (pkt->vp_flags & VP_FLAG_MULTICAST) { 
         return vr_mcast_forward(router, vrf, pkt, fmd);
@@ -90,12 +117,12 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     rt.rtr_req.rtr_vrf_id = vrf;
     rt.rtr_req.rtr_family = family;
     if (family == AF_INET) {
-        rt.rtr_req.rtr_prefix = vr_zalloc(4);
+        rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         *(uint32_t*)rt.rtr_req.rtr_prefix = (ip->ip_daddr);
         rt.rtr_req.rtr_prefix_size = 4;
         rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
     } else {
-        rt.rtr_req.rtr_prefix = vr_zalloc(16);
+        rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         rt.rtr_req.rtr_prefix_size = 16;
         memcpy(rt.rtr_req.rtr_prefix, ip6->ip6_dst, 16);
         rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
@@ -134,7 +161,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
                    return 0;
                }
                icmph = (struct vr_icmp*) pkt_push(pkt, sizeof(struct vr_icmp));
-               icmph->icmp_type = 2; //Packet too big
+               icmph->icmp_type = VR_ICMP6_TYPE_PKT_TOO_BIG; 
                icmph->icmp_code = 0;
                icmph->icmp_csum = 0;
                icmph->icmp_eid = 0;
@@ -142,6 +169,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
 
                /* Build the outer header */
                outer_ip6 = (struct vr_ip6*) pkt_push(pkt, sizeof(struct vr_ip6));
+               memset(outer_ip6, 0, sizeof(struct vr_ip6));
                memcpy(outer_ip6, ip6, sizeof(struct vr_ip6));
                memcpy(outer_ip6->ip6_dst, ip6->ip6_src, 16);
                memcpy(outer_ip6->ip6_src, ip6->ip6_dst, 16);
@@ -151,8 +179,13 @@ vr_forward(struct vrouter *router, unsigned short vrf,
                                                     + sizeof(struct vr_icmp))) {
                    outer_ip6->ip6_plen = htons(plen + sizeof(struct vr_ip6) + sizeof(struct vr_icmp));
                } else {
-                   /* Chop the packet at the tail for the added header*/
+                   /* TODO: Chop the packet at the tail for the added header*/
                }
+
+               /* Calculate ICMP6 checksum */
+               icmph->icmp_csum = ~(vr_icmp6_checksum(outer_ip6, 
+                                    sizeof(struct vr_ip6) + sizeof(struct vr_icmp)));
+
                /* Update packet pointers, perform route lookup and forward */
                pkt_set_network_header(pkt, pkt->vp_data);
 
@@ -163,7 +196,6 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     }
     
     status =  nh_output(vrf, pkt, nh, fmd);
-    vr_free(rt.rtr_req.rtr_prefix);
 
     return status;
 }
@@ -530,26 +562,6 @@ vr_ip_partial_csum(struct vr_ip *ip)
     return csum;
 }
 
-unsigned int
-vr_route_flags(unsigned int vrf, unsigned int ip)
-{
-    struct vr_route_req rt;
-
-    rt.rtr_req.rtr_vrf_id = vrf;
-    rt.rtr_req.rtr_prefix = vr_zalloc(4);
-    if (!rt.rtr_req.rtr_prefix)
-         return false;
-
-    *(uint32_t*)rt.rtr_req.rtr_prefix = (ip);
-    rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
-    rt.rtr_req.rtr_nh_id = 0;
-    rt.rtr_req.rtr_label_flags = 0;
-
-    (void)vr_inet_route_lookup(vrf, &rt, NULL);
-
-    return rt.rtr_req.rtr_label_flags;
-}
-
 bool
 vr_has_to_fragment(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned int tun_len)
@@ -589,15 +601,14 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
 {
     struct vr_route_req rt;
     struct vr_nexthop *nh;
+    uint32_t rt_prefix;
 
     if (vif->vif_type != VIF_TYPE_PHYSICAL)
         return 1;
 
 
     rt.rtr_req.rtr_vrf_id = vif->vif_vrf;
-    rt.rtr_req.rtr_prefix = vr_zalloc(4);
-    if (!rt.rtr_req.rtr_prefix)
-         return 0;
+    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
 
     *(uint32_t*)rt.rtr_req.rtr_prefix = (ip);
     rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
@@ -606,7 +617,6 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
     rt.rtr_req.rtr_nh_id = 0;
 
     nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
-    vr_free(rt.rtr_req.rtr_prefix);
 
     if (!nh || nh->nh_type != NH_RCV)
         return 0;

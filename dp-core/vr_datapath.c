@@ -25,6 +25,7 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
 {
     struct vr_route_req rt;
     struct vr_nexthop *nh;
+    uint32_t rt_prefix;
 
     /*
      * Packet from VM :
@@ -75,9 +76,7 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
     }
 
     rt.rtr_req.rtr_vrf_id = vif->vif_vrf;
-    rt.rtr_req.rtr_prefix = vr_zalloc(4);
-    if (!rt.rtr_req.rtr_prefix)
-         return false;
+    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
     *(uint32_t*)rt.rtr_req.rtr_prefix = (arp->arp_dpa);
     rt.rtr_req.rtr_prefix_size = 4;
     rt.rtr_req.rtr_prefix_len = 32;
@@ -86,7 +85,6 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
     rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
-    vr_free(rt.rtr_req.rtr_prefix);
 
     if (!nh || nh->nh_type == NH_DISCARD)
         return PKT_ARP_DROP;
@@ -490,6 +488,7 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
             }
         } else { //IPv6
             ip6 = (struct vr_ip6 *)l3_hdr;
+            // 0xFF02 is the multicast address used for NDP, DHCPv6 etc
             if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
                 return true;
             }

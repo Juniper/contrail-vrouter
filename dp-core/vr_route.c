@@ -40,6 +40,7 @@ vr_route_delete(vr_route_req *req)
     struct rtable_fspec *fs;
     struct vr_route_req vr_req;
     int ret;
+    uint32_t rt_prefix[4];
 
     fs = vr_get_family(req->rtr_family);
     if (!fs)
@@ -59,13 +60,11 @@ vr_route_delete(vr_route_req *req)
         }
 
         if (req ->rtr_family != AF_BRIDGE) {
-            vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+            vr_req.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
             memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
         }
         vr_req.rtr_req.rtr_src_size = vr_req.rtr_req.rtr_marker_size = 0;
         ret = fs->route_del(fs, &vr_req);
-        if (req ->rtr_family != AF_BRIDGE)
-            vr_free(vr_req.rtr_req.rtr_prefix);
     }
 
 error:
@@ -80,6 +79,7 @@ vr_route_add(vr_route_req *req)
     struct rtable_fspec *fs;
     struct vr_route_req vr_req;
     int ret;
+    uint32_t rt_prefix[4];
 
     fs = vr_get_family(req->rtr_family);
     if (!fs) {
@@ -87,7 +87,7 @@ vr_route_add(vr_route_req *req)
     } else {
         vr_req.rtr_req = *req;
         if (req->rtr_prefix_size) {
-            vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+            vr_req.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
             memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
             vr_req.rtr_req.rtr_src_size = vr_req.rtr_req.rtr_marker_size = 0;
             vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
@@ -96,8 +96,6 @@ vr_route_add(vr_route_req *req)
         }
 
         ret = fs->route_add(fs, &vr_req);
-        if (vr_req.rtr_req.rtr_prefix) 
-            vr_free(vr_req.rtr_req.rtr_prefix);
     }
 
     vr_send_response(ret);
@@ -141,20 +139,21 @@ vr_route_get(vr_route_req *req)
     struct vrouter *router;
     struct vr_rtable *rtable;
     int ret = 0;
+    uint32_t rt_prefix[4], rt_src[4];
    
     vr_req.rtr_req = *req;
 
     vr_req.rtr_req.rtr_marker_size = 0;
     vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
     if (req->rtr_prefix_size) {
-        vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        vr_req.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
     } else
         vr_req.rtr_req.rtr_prefix = NULL;
 
     vr_req.rtr_req.rtr_src_size = req->rtr_src_size;
     if (req->rtr_src_size) {
-        vr_req.rtr_req.rtr_src = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        vr_req.rtr_req.rtr_src = (uint8_t*)&rt_src;
         memcpy(vr_req.rtr_req.rtr_src, req->rtr_src, RT_IP_ADDR_SIZE(req->rtr_family));
     } else
         vr_req.rtr_req.rtr_src = NULL;
@@ -176,10 +175,6 @@ vr_route_get(vr_route_req *req)
 
 generate_response:
     vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
-    if (vr_req.rtr_req.rtr_src)
-        vr_free(vr_req.rtr_req.rtr_src);
-    if (vr_req.rtr_req.rtr_prefix)
-        vr_free(vr_req.rtr_req.rtr_prefix);
     return ret;
 }
 
@@ -190,11 +185,12 @@ vr_route_dump(vr_route_req *req)
     struct vrouter *router;
     struct vr_rtable *rtable = NULL;
     int ret;
+    uint32_t rt_prefix[4], rt_src[4], rt_marker[4];
    
     vr_req.rtr_req = *req;
     vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
     if (req->rtr_prefix_size) {
-        vr_req.rtr_req.rtr_prefix = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        vr_req.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         memcpy(vr_req.rtr_req.rtr_prefix, req->rtr_prefix, RT_IP_ADDR_SIZE(req->rtr_family));
     } else {
         vr_req.rtr_req.rtr_prefix = NULL;
@@ -203,7 +199,7 @@ vr_route_dump(vr_route_req *req)
     vr_req.rtr_req.rtr_marker_size = req->rtr_marker_size;
     vr_req.rtr_req.rtr_marker_plen = req->rtr_prefix_len;
     if (req->rtr_marker_size) {
-        vr_req.rtr_req.rtr_marker = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        vr_req.rtr_req.rtr_marker = (uint8_t*)&rt_marker;
         memcpy(vr_req.rtr_req.rtr_marker, req->rtr_marker, RT_IP_ADDR_SIZE(req->rtr_family));
     } else {
         vr_req.rtr_req.rtr_marker = NULL;
@@ -211,7 +207,7 @@ vr_route_dump(vr_route_req *req)
         
     vr_req.rtr_req.rtr_src_size = req->rtr_src_size;
     if (req->rtr_src_size) {
-        vr_req.rtr_req.rtr_src = vr_zalloc(RT_IP_ADDR_SIZE(req->rtr_family));
+        vr_req.rtr_req.rtr_src = (uint8_t*)&rt_src;
         memcpy(vr_req.rtr_req.rtr_src, req->rtr_src, RT_IP_ADDR_SIZE(req->rtr_family));
     } else
         vr_req.rtr_req.rtr_src = NULL;
@@ -235,26 +231,10 @@ vr_route_dump(vr_route_req *req)
 
         ret = rtable->algo_dump(NULL, &vr_req);
     }
-    if (vr_req.rtr_req.rtr_prefix)
-        vr_free(vr_req.rtr_req.rtr_prefix);
-
-    if (vr_req.rtr_req.rtr_src)
-        vr_free(vr_req.rtr_req.rtr_src);
-
-    if (vr_req.rtr_req.rtr_marker)
-        vr_free(vr_req.rtr_req.rtr_marker);
-
     return ret;
 
 generate_error:
     vr_send_response(ret);
-    if (vr_req.rtr_req.rtr_prefix)
-        vr_free(vr_req.rtr_req.rtr_prefix);
-    if (vr_req.rtr_req.rtr_src)
-        vr_free(vr_req.rtr_req.rtr_src);
-    if (vr_req.rtr_req.rtr_marker)
-        vr_free(vr_req.rtr_req.rtr_marker);
-
 
     return ret;
 }
