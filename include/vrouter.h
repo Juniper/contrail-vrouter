@@ -179,6 +179,9 @@ struct vrouter {
 
     uint64_t **vr_pdrop_stats;
 
+    uint16_t vr_link_local_ports_size;
+    unsigned char *vr_link_local_ports;
+
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;
     struct vr_interface *vr_eth_if;

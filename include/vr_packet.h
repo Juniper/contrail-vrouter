@@ -18,6 +18,8 @@
 #define VR_ETHER_PROTO_MAC_OFF  1
 #define VR_ETHER_PROTO_MAC_LEN  2
 
+#define VR_DYNAMIC_PORT_START   32768
+#define VR_DYNAMIC_PORT_END     65535
 
 #define VR_IP_PROTO_ICMP        1
 #define VR_IP_PROTO_IGMP        2

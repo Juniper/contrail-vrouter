@@ -262,20 +262,29 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
              * lets subject it to flow processing.
              */
             if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
-                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) && 
-                    !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
-                    /* Force the flow lookup */
-                    pkt->vp_flags |= VP_FLAG_FLOW_GET;
+                if (ip->ip_proto == VR_IP_PROTO_UDP ||
+                    ip->ip_proto == VR_IP_PROTO_TCP) {
+                    struct vr_tcp *tcp = (struct vr_tcp *)
+                                         ((unsigned char *)ip + hlen);
+                    if (vr_valid_link_local_port(router, AF_INET,
+                                ip->ip_proto, ntohs(tcp->tcp_dport))) {
+                        if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) &&
+                            !(pkt->vp_flags & (VP_FLAG_TO_ME |
+                              VP_FLAG_FROM_DP))) {
+                            /* Force the flow lookup */
+                            pkt->vp_flags |= VP_FLAG_FLOW_GET;
 
-                    /* Get back the IP header */
-                    if (!pkt_push(pkt, hlen)) {
-                        drop_reason = VP_DROP_PUSH;
-                        goto drop_pkt;
-                    }
+                            /* Get back the IP header */
+                            if (!pkt_push(pkt, hlen)) {
+                                drop_reason = VP_DROP_PUSH;
+                                goto drop_pkt;
+                            }
 
-                    /* Subject it to flow for Linklocal */
-                    return vr_flow_inet_input(pkt->vp_nh->nh_router,
+                            /* Subject it to flow for Linklocal */
+                            return vr_flow_inet_input(pkt->vp_nh->nh_router,
                                 pkt->vp_nh->nh_vrf, pkt, VR_ETH_PROTO_IP, fmd);
+                        }
+                    }
                 }
             }
             vif = pkt->vp_nh->nh_dev;
