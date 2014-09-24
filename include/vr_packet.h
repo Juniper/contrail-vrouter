@@ -23,7 +23,7 @@
 #define VR_IP_PROTO_IGMP        2
 #define VR_IP_PROTO_TCP         6
 #define VR_IP_PROTO_UDP         17
-#define	VR_IP_PROTO_GRE         47
+#define VR_IP_PROTO_GRE         47
 #define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
 #define VR_GRE_FLAG_KEY         (ntohs(0x2000)) 
 
@@ -86,9 +86,9 @@
 /*
  * Values to define how to proceed with handling a packet.
  */
-#define PKT_RET_FAST_PATH 			1
-#define PKT_RET_SLOW_PATH 			2
-#define PKT_RET_ERROR     			3
+#define PKT_RET_FAST_PATH           1
+#define PKT_RET_SLOW_PATH           2
+#define PKT_RET_ERROR               3
 
 /*
  * Values to define the MPLS tunnel type
@@ -654,7 +654,7 @@ static inline unsigned char *
 pkt_push(struct vr_packet *pkt, unsigned int len)
 {
     if (len > pkt->vp_data)
-	    return NULL;
+        return NULL;
 
     pkt->vp_data -= len;
     pkt->vp_len += len;

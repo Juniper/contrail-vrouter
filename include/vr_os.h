@@ -81,7 +81,7 @@ typedef unsigned int __u32;
  * BSD has no family AF_BRIDGE so to avoid to many ifdef in ksync and
  * vrouter code it is defined here in the same way as in LINUX
  */
-#define AF_BRIDGE	7
+#define AF_BRIDGE    7
 
 #if defined(_KERNEL)
 #define vr_printf(format, arg...)   printf(format, ##arg)
