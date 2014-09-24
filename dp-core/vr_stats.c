@@ -135,6 +135,8 @@ vr_drop_stats_get(void)
 
 exit_get:
     vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : &response, ret);
+    if (stats != NULL)
+        vr_free(stats);
     return;
 }
 
