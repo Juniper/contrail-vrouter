@@ -86,9 +86,9 @@
 /*
  * Values to define how to proceed with handling a packet.
  */
-#define PKT_RET_FAST_PATH 			1
-#define PKT_RET_SLOW_PATH 			2
-#define PKT_RET_ERROR     			3
+#define PKT_RET_FAST_PATH           1
+#define PKT_RET_SLOW_PATH           2
+#define PKT_RET_ERROR               3
 
 /*
  * Values to define the MPLS tunnel type
@@ -716,7 +716,7 @@ static inline unsigned char *
 pkt_push(struct vr_packet *pkt, unsigned int len)
 {
     if (len > pkt->vp_data)
-	    return NULL;
+        return NULL;
 
     pkt->vp_data -= len;
     pkt->vp_len += len;

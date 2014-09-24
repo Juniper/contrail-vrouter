@@ -120,9 +120,9 @@ enum rx_handler_result {
 
 typedef enum rx_handler_result rx_handler_result_t;
 
-#define VLAN_CFI_MASK	0x1000
+#define VLAN_CFI_MASK    0x1000
 #define VLAN_TAG_PRESENT VLAN_CFI_MASK
-#define ARPHRD_VOID	0xFFFF
+#define ARPHRD_VOID    0xFFFF
 
 #if (RHEL_MAJOR != 6) && (RHEL_MINOR != 4) 
 

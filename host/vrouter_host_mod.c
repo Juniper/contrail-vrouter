@@ -13,7 +13,7 @@
 #include "host/vr_host_packet.h"
 #include "ulinux.h"
 
-#define PAGE_SIZE	4096
+#define PAGE_SIZE    4096
 unsigned int vr_num_cpus = 1;
 
 static bool vr_host_inited = false;
