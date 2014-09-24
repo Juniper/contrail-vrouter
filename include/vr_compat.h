@@ -15,9 +15,14 @@ typedef u64 netdev_features_t;
  * As per lxr, skb_get_rxhash exists in 3.13 versions and disappeared in
  * 3.14. We do not know of in between versions. However, the ubuntu
  * sources for 3.13.0-32 does not have it (for which the LINUX_VERSION
- * CODE is 199947, which corresponds to 3.13.11) and hence the following
+ * CODE is 199947, which corresponds to 3.13.11) and hence the following.
+ *
+ * But then in 3.13.0-36, ubuntu did
+ *
+ * #define skb_get_rxhash skb_get_hash
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,11))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,11)) && \
+                           !(defined(skb_get_rxhash))
 static inline __u32
 skb_get_rxhash(struct sk_buff *skb)
 {
