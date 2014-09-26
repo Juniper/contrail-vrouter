@@ -1341,7 +1341,7 @@ vif_transport_valid(vr_interface_req *req)
 int
 vr_interface_add(vr_interface_req *req, bool need_response)
 {
-    int ret;
+    int ret = 0;
     struct vr_interface *vif = NULL;
     struct vrouter *router = vrouter_get(req->vifr_rid);
 

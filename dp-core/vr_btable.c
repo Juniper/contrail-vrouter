@@ -170,10 +170,9 @@ struct vr_btable *
 vr_btable_attach(struct iovec *iov, unsigned int iov_len,
         unsigned short esize)
 {
-    unsigned int i, alloc_size, alloc_limit;
+    unsigned int i, alloc_size;
     unsigned int offset = 0, total_size = 0;
     struct vr_btable *table;
-    struct vr_btable_partition *part;
 
     if (!iov || !iov_len)
         return NULL;

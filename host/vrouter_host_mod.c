@@ -18,9 +18,6 @@ unsigned int vr_num_cpus = 1;
 static bool vr_host_inited = false;
 static unsigned int vr_message_proto;
 
-extern int vr_flow_entries;
-extern int vr_oflow_entries;
-
 extern void vr_diet_message_proto_exit(void);
 extern int vr_diet_message_proto_init(void);
 

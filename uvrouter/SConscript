@@ -12,7 +12,7 @@ env.Append(CCFLAGS = '-g')
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Replace(LIBS = ['vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
+env.Replace(LIBS = ['vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'rt'])
 
 uvrouter_sources = ['uvrouter.c']
 uvrouter = env.Program(target = 'uvrouter', source = uvrouter_sources)
