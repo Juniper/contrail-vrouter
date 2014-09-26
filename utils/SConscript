@@ -19,7 +19,8 @@ env.Append(CCFLAGS = '-g')
 
 # Build libvrutil
 libvrutil = 'vrutil'
-libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo', 'udp_util.c')]
+libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo', 'udp_util.c'),
+                  env.Object('ini_parser.lo', 'ini_parser.c')]
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])

@@ -62,6 +62,10 @@
 /* The interface corresponds to a DPDK port */
 #define VIF_FLAG_PMD                0x400
 
+#define VIF_TRANSPORT_VIRTUAL       0
+#define VIF_TRANSPORT_ETH           1
+#define VIF_TRANSPORT_PMD           2
+#define VIF_TRANSPORT_SOCKET        3
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)

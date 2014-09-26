@@ -34,6 +34,8 @@
 #include "vr_defs.h"
 #include "vr_route.h"
 #include "vr_bridge.h"
+#include "vr_message.h"
+#include "ini_parser.h"
 
 static struct nl_client *cl;
 static int resp_code;
@@ -56,6 +58,7 @@ static int32_t cmd_label;
 static int cmd_rt_type = RT_UCAST;
 static uint32_t cmd_replace_plen = 100;
 static char cmd_dst_mac[6];
+static bool response_pending = true;
 
 static void Usage(void);
 static void usage_internal(void);
@@ -163,6 +166,7 @@ vr_route_req_process(void *s_req)
         printf("%3d \n",rt->rtr_nh_id); 
     }
 
+    response_pending = false;
     return;
 }
 
@@ -173,10 +177,19 @@ vr_response_process(void *s)
 
     rt_resp = (vr_response *)s;
     resp_code = rt_resp->resp_code;
-
-    if (rt_resp->resp_code < 0)
+    response_pending = false;
+    if (rt_resp->resp_code < 0) {
         printf("Error %s in kernel operation\n", strerror(rt_resp->resp_code));
+    } else {
+        if (cmd_op == SANDESH_OP_DUMP) {
+            if (rt_resp->resp_code > 0)
+                response_pending = true;
 
+            if (rt_resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
+                response_pending = true;
+            }
+        }
+    }
     return;
 }
 
@@ -282,16 +295,15 @@ vr_send_one_message(void)
     if (ret <= 0)
         return 0;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST)
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
-
-        nlh = (struct nlmsghdr *)cl->cl_buf;
-        if (!nlh->nlmsg_flags)
-            break;
+    response_pending = true;
+    while (response_pending) {
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST)
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                               vr_find_sandesh_info, &ret);
+        }
     }
-
     return resp_code;
 }
 
@@ -625,9 +637,15 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
+    parse_ini_file();
+
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
     if (ret <= 0) {
-        printf("nl_socket failed\n");
+        exit(1);
+    }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
         exit(1);
     }
 
