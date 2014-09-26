@@ -20,7 +20,7 @@ env.Replace(CPPPATH = '#vrouter/include')
 env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
 env.Append(CPPPATH = ['#tools'])
 env.Append(CPPPATH = ['#tools/sandesh/library/c'])
-env.Append(CPPPATH = ['#dpdk/build/include'])
+env.Append(CPPPATH = ['#third_party/dpdk/build/include'])
 
 vr_root = './'
 makefile = vr_root + 'Makefile'

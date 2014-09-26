@@ -1,6 +1,7 @@
 #
 # Copyright (c) 2014 Semihalf. All rights reserved.
 #
+import os
 
 Import('VRouterEnv')
 
@@ -14,7 +15,7 @@ env.Append(CCFLAGS = '-D__DPDK__')
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Append(LIBPATH = ['#dpdk/build/lib'])
+env.Append(LIBPATH = ['#third_party/dpdk/build/lib'])
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
 
 
@@ -30,15 +31,31 @@ env.Append(LIBS = ['rt', 'pcap', 'dl', 'pthread'])
 env.Append(LINKCOM =
     ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
 
-sources = Split('dpdk_vrouter vr_dpdk vr_host_interface vr_dpdk_netlink'
-    + ' vrouter_mod vr_dpdk_usocket vr_dpdk_packet vr_dpdk_flow_mem')
+dpdk_dir ='#third_party/dpdk/'
+make_dir = Dir(dpdk_dir).srcnode().abspath
 
-sources = [env.Object(f + '.o', f + '.c') for f in sources]
+make_cmd = 'make config T=x86_64-native-linuxapp-gcc; make'
+dpdk_lib = env.Command('dpdk_lib', None, make_cmd, chdir=make_dir)
+env.AlwaysBuild(dpdk_lib)
 
-dpdk_vrouter = env.Program(target = 'dpdk_vrouter', source = sources)
+dpdk_vrouter_src = [ 'dpdk_vrouter.c',
+                     'vr_dpdk.c',
+                     'vr_dpdk_flow_mem.c',
+                     'vr_dpdk_netlink.c',
+                     'vr_dpdk_packet.c',
+                     'vr_dpdk_usocket.c',
+                     'vr_host_interface.c',
+                     'vrouter_mod.c',
+                   ]
 
+dpdk_vrouter = env.Program('dpdk_vrouter', dpdk_vrouter_src)
+env.Depends(dpdk_vrouter, dpdk_lib)
+
+if GetOption('clean'):
+    os.system('cd ' + make_dir + ';' + make_cmd + ' clean')
 # to make sure that all are built when you do 'scons' @ the top level
 env.Default(dpdk_vrouter)
+
 # Local Variables:
 # mode: python
 # End:
