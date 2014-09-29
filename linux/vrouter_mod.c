@@ -1602,6 +1602,21 @@ slow_path:
     return 1;
 }
 
+static int
+lh_pkt_may_pull(struct vr_packet *pkt, unsigned int len)
+{
+    struct sk_buff *skb = vp_os_packet(pkt);
+    unsigned int pull_len;
+
+    pull_len = pkt->vp_data - skb_headroom(skb);
+    pull_len += len;
+    if (!pskb_may_pull(skb, pull_len))
+        return -1;
+
+    lh_reset_skb_fields(pkt);
+    return 0;
+}
+
 /*
  * lh_pull_inner_headers_fast - faster version of lh_pull_inner_headers that
  * avoids multiple calls to pskb_may_pull(). In the common case, this
@@ -2061,6 +2076,7 @@ struct host_os linux_host = {
     .hos_pull_inner_headers_fast    =       lh_pull_inner_headers_fast,
     .hos_get_udp_src_port           =       lh_get_udp_src_port,
     .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj,
+    .hos_pkt_may_pull               =       lh_pkt_may_pull,
 };
     
 struct host_os *

@@ -225,6 +225,8 @@ vhost_if_add(struct vr_interface *vif)
 
     vp->vp_vifp = vif;
     if (vif->vif_type == VIF_TYPE_HOST) {
+        dev->features |= (NETIF_F_GSO | NETIF_F_TSO | NETIF_F_SG | NETIF_F_IP_CSUM);
+
         if (vif->vif_bridge) {
             vp->vp_phys_dev =
                 (struct net_device *)vif->vif_bridge->vif_os;

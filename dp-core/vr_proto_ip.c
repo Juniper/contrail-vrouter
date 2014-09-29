@@ -262,20 +262,40 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
              * lets subject it to flow processing.
              */
             if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
-                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) && 
-                    !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
-                    /* Force the flow lookup */
-                    pkt->vp_flags |= VP_FLAG_FLOW_GET;
+                unsigned short l4_size = 0;
+                unsigned char ip_proto = ip->ip_proto;
+                if (ip_proto == VR_IP_PROTO_UDP) {
+                    l4_size = sizeof(struct vr_udp);
+                } else if (ip_proto == VR_IP_PROTO_TCP) {
+                    l4_size = sizeof(struct vr_tcp);
+                }
 
-                    /* Get back the IP header */
-                    if (!pkt_push(pkt, hlen)) {
+                if (l4_size) {
+                    unsigned short l4_port = 0;
+                    if (vr_pkt_may_pull(pkt, l4_size)) {
                         drop_reason = VP_DROP_PUSH;
                         goto drop_pkt;
                     }
 
-                    /* Subject it to flow for Linklocal */
-                    return vr_flow_inet_input(pkt->vp_nh->nh_router,
+                    l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
+                    if (vr_valid_link_local_port(router, AF_INET,
+                            ip_proto, ntohs(l4_port))) {
+                        if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) &&
+                            !(pkt->vp_flags & (VP_FLAG_TO_ME |
+                                               VP_FLAG_FROM_DP))) {
+                             /* Force the flow lookup */
+                             pkt->vp_flags |= VP_FLAG_FLOW_GET;
+
+                             /* Get back the IP header */
+                             if (!pkt_push(pkt, hlen)) {
+                                drop_reason = VP_DROP_PUSH;
+                                goto drop_pkt;
+                             }
+                            /* Subject it to flow for Linklocal */
+                            return vr_flow_inet_input(pkt->vp_nh->nh_router,
                                 pkt->vp_nh->nh_vrf, pkt, VR_ETH_PROTO_IP, fmd);
+                        }
+                    }
                 }
             }
             vif = pkt->vp_nh->nh_dev;
