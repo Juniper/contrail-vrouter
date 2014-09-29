@@ -194,6 +194,9 @@ dump_table(struct flow_table *ft)
                     case VR_FLOW_FLAG_DPAT:
                         flag_string[fi++] = 'P';
                         flag_string[fi++] = 'd';
+                        break;
+                    case VR_FLOW_FLAG_LINK_LOCAL:
+                        flag_string[fi++] = 'L';
                     }
 
                 break;
