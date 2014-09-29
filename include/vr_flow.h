@@ -21,6 +21,7 @@
 #define VR_RFLOW_VALID              0x1000
 #define VR_FLOW_FLAG_MIRROR         0x2000
 #define VR_FLOW_FLAG_VRFT           0x4000
+#define VR_FLOW_FLAG_LINK_LOCAL     0x8000
 
 /* rest of the flags are action specific */
 
@@ -201,5 +202,6 @@ void *vr_flow_get_va(struct vrouter *, uint64_t);
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
 struct vr_flow_entry * vr_get_flow_entry(struct vrouter *, int );
+bool vr_valid_link_local_port(struct vrouter *, int , int , int );
 
 #endif /* __VR_FLOW_H__ */
