@@ -16,6 +16,9 @@
 int dpdk_packet_core_id = -1;
 unsigned int packet0_port_id = RTE_MAX_ETHPORTS - 1;
 
+/*
+ * TODO: rebase on RSS commit
+
 int
 vr_dpdk_packet_tx(struct vif_port *port)
 {
@@ -28,7 +31,7 @@ vr_dpdk_packet_tx(struct vif_port *port)
     vr_usocket_write(usockp, &event, sizeof(event));
     return 0;
 }
-
+*/
 int
 dpdk_packet_io(void)
 {
@@ -59,9 +62,10 @@ dpdk_packet_socket_close(void)
 
     vr_dpdk.packet_transport = NULL;
 
+    /* TODO: rebase on RSS commit
     port = &vr_dpdk.ports[port_id];
     port->vip_eth = NULL;
-
+    */
     vr_usocket_close(usockp);
 
     return;
@@ -74,8 +78,10 @@ dpdk_packet_socket_init(void)
     unsigned short lcore_id;
     unsigned short lcore_count = rte_lcore_count();
     unsigned short port_id = packet0_port_id;
+    /* TODO: rebase on RSS commit
     struct vif_port *port;
-    struct lcore_ctx *lcore_ctx;
+    struct vr_dpdk_lcore *lcore;
+    */
     void *event_sock;
 
     vr_dpdk.packet_transport = (void *)vr_usocket(PACKET, RAW);
@@ -85,6 +91,7 @@ dpdk_packet_socket_init(void)
     if (lcore_count == 2)
         vr_usocket_non_blocking(vr_dpdk.packet_transport);
 
+    /* TODO: rebase on RSS commit
     port = &vr_dpdk.ports[port_id];
     port->vip_id = port_id;
     port->vip_nb_tx = 1;
@@ -103,8 +110,8 @@ dpdk_packet_socket_init(void)
     }
 
     RTE_LCORE_FOREACH(lcore_id) {
-        lcore_ctx = &vr_dpdk.lcores[lcore_id];
-        lcore_ctx->lcore_tx_index[port_id] = 1;
+        lcore = &vr_dpdk.lcores[lcore_id];
+        lcore->lcore_tx_index[port_id] = 1;
     }
 
     event_sock = (void *)vr_usocket(EVENT, RAW);
@@ -117,6 +124,7 @@ dpdk_packet_socket_init(void)
         goto error;
 
     port->vip_eth = (struct rte_eth_dev *)event_sock;
+    */
 
     return 0;
 

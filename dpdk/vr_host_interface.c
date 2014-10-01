@@ -10,7 +10,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vr_host_interface.c -- DPDK specific handling of vrouter interfaces
+ * vr_host_interface.c -- vRouter interface callbacks
  *
  */
 
@@ -25,169 +25,96 @@
 #include "vr_dpdk_usocket.h"
 
 
-static struct rte_pci_device *
-dpdk_pci_dev_get(struct rte_pci_addr *pci)
-{
-    struct rte_pci_device *dev;
-
-    TAILQ_FOREACH(dev, &pci_device_list, next)
-        if ((dev->addr.domain == pci->domain) &&
-            (dev->addr.bus == pci->bus) &&
-            (dev->addr.devid == pci->devid) &&
-            (dev->addr.function == pci->function))
-            return dev;
-
-    return NULL;
-}
-
-static struct rte_eth_dev *
-dpdk_eth_dev_get(struct rte_pci_device *dev)
-{
-    unsigned i;
-
-    for (i=0; i< rte_eth_dev_count(); i++)
-        if (rte_eth_devices[i].pci_dev == dev)
-            return &rte_eth_devices[i];
-    rte_panic("No port found for device " PCI_PRI_FMT,
-                    dev->addr.domain, dev->addr.bus,
-                    dev->addr.devid, dev->addr.function);
-}
-
-static uint8_t
-dpdk_port_id_get(struct rte_pci_device *dev)
-{
-    return dpdk_eth_dev_get(dev)->data->port_id;
-}
-
+/* Add fabric interface */
 static int
-dpdk_phys_if_add(struct vr_interface *vif)
+dpdk_fabric_if_add(struct vr_interface *vif)
 {
-    struct rte_pci_addr pci;
-    struct rte_pci_device *dev;
-    uint8_t port_id;
-    struct vif_port *port;
-    struct rte_eth_dev *eth;
+    uint8_t port_id = vif->vif_os_idx;
+    int ret;
+    struct ether_addr mac_addr;
+    struct rte_eth_dev_info dev_info;
+    uint16_t nb_rx_queues, nb_tx_queues;
 
-    if (vif->vif_flags & VIF_FLAG_PMD) {
-        /* use DPDK port */
-        port_id = vif->vif_os_idx;
-        eth = &rte_eth_devices[port_id];
-        port = &vr_dpdk.ports[port_id];
-    } else {
-        RTE_LOG(ERR, VROUTER, "Error adding physical interface %s\n"
-            "This version of vRouter only supports DPDK ports.\n",
-            "Please use port index and --pmd flag.\n",
-            vif->vif_name);
-        return -EFAULT;
-    } /* VIF_FLAG_PMD */
+    /* get interface MAC address */
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    rte_eth_macaddr_get(port_id, &mac_addr);
 
-    strncpy(port->vip_name, vif->vif_name, sizeof(port->vip_name));
-    port->vip_id = port_id;
-    port->vip_addr = pci;
-    port->vip_eth = eth;
-    vif->vif_os = port;
-    port->vip_vif = vif;
+    RTE_LOG(INFO, VROUTER, "Adding vif %u eth dev %" PRIu8 " MAC " MAC_FORMAT "\n",
+                vif->vif_idx, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
-    if (unlikely(vr_dpdk_port_init(port_id)))
-        return -ENOLINK;
+    /* check if eth dev is already added */
+    if (vr_dpdk.eth_devs[vif->vif_os_idx] != NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
+                vif->vif_name);
+        return -EALREADY;
+    }
 
-    return 0;
+    /* get device info to find out the number of hardware TX queues */
+    memset(&dev_info, 0, sizeof(dev_info));
+    rte_eth_dev_info_get(port_id, &dev_info);
+
+    /* use no more queues than lcores */
+    nb_rx_queues = RTE_MIN(RTE_MIN(dev_info.max_rx_queues, vr_dpdk.nb_lcores),
+                    VR_DPDK_MAX_RX_QUEUES);
+    nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues, vr_dpdk.nb_lcores),
+                    VR_DPDK_MAX_TX_QUEUES);
+
+    /* init eth dev */
+    ret = vr_dpdk_ethdev_init(vif, nb_rx_queues, nb_tx_queues);
+    if (ret != 0)
+        return ret;
+
+    /* add interface to the table of eth devs */
+    vr_dpdk.eth_devs[vif->vif_os_idx] = &rte_eth_devices[vif->vif_os_idx];
+
+    /* schedule RX/TX queues */
+    return vr_dpdk_lcore_if_schedule(vif, nb_rx_queues, &vr_dpdk_eth_rx_queue_init,
+            nb_tx_queues, &vr_dpdk_eth_tx_queue_init);
 }
 
+/* Add vhost interface */
 static int
-dpdk_kni_if_add(struct vr_interface *vif)
+dpdk_vhost_if_add(struct vr_interface *vif)
 {
-    int port_id = vif->vif_os_idx;
+    /* eth dev port id */
+    uint8_t port_id = vif->vif_os_idx;
+    /* return value */
+    int ret;
+    /* port MAC address */
+    struct ether_addr mac_addr;
 
-    RTE_LOG(INFO, VROUTER, "Initialising KNI interface for port %u ...\n", port_id);
+    /* get interface MAC address */
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    rte_eth_macaddr_get(port_id, &mac_addr);
 
-    /* add KNI to DPDK ports only */
-    if (!(vif->vif_flags & VIF_FLAG_PMD)) {
-        RTE_LOG(ERR, VROUTER, "Please use --pmd option to specify"
-               " DPDK port index\n");
-        return -ENOENT;
+    RTE_LOG(INFO, VROUTER, "Adding vif %u KNI %s at eth dev %" PRIu8
+                " MAC " MAC_FORMAT "\n",
+                vif->vif_idx, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
+
+    /* check if KNI is already added */
+    if (vr_dpdk.knis[vif->vif_idx] != NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror adding KNI device %s: already exist\n",
+                vif->vif_name);
+        return -EEXIST;
     }
 
-    vif->vif_os = &vr_dpdk.ports[port_id];
-    /* add new KNI interface */
-    return vr_dpdk_kni_init(port_id, vif);
+    /* init KNI */
+    ret = vr_dpdk_knidev_init(vif);
+    if (ret != 0)
+        return ret;
+
+    /* add interface to the table of KNIs */
+    vr_dpdk.knis[vif->vif_idx] = vif->vif_os;
+
+    /* add interface to the table of vHosts */
+    vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
+
+    /* schedule KNI queues */
+    return vr_dpdk_lcore_if_schedule(vif, 1, &vr_dpdk_kni_rx_queue_init,
+            1, &vr_dpdk_kni_tx_queue_init);
 }
 
-static int
-dpdk_pcap_if_add(struct vr_interface *vif)
-{
-    RTE_LOG(ERR, VROUTER, "Tap interfaces are not supported\n");
-    return -EINVAL;
-}
-
-/* Schedule vif to one of the lcores */
-static void
-dpdk_vif_schedule(struct vr_interface *vif)
-{
-    int i;
-    unsigned lcore_id;
-    struct lcore_ctx *lcore_ctx;
-    struct lcore_ctx *min_lcore_ctx;
-    unsigned min_lcore_id = RTE_MAX_LCORE;
-    unsigned min_nb_rx_ports = RTE_MAX_ETHPORTS;
-    struct vif_port *port = vif->vif_os;
-    unsigned port_id = port->vip_id;
-    unsigned tx_index, nb_tx;
-
-    /* find an lcore with the least number of ports assigned */
-    RTE_LCORE_FOREACH(lcore_id) {
-        lcore_ctx = &vr_dpdk.lcores[lcore_id];
-        if (lcore_ctx->lcore_nb_rx_ports < min_nb_rx_ports) {
-            min_nb_rx_ports = lcore_ctx->lcore_nb_rx_ports;
-            min_lcore_id = lcore_id;
-        }
-    }
-    if (unlikely(RTE_MAX_LCORE == min_lcore_id)) {
-        RTE_LOG(ERR, VROUTER, "Error assigning port to lcore\n");
-        return;
-    }
-    min_lcore_ctx = &vr_dpdk.lcores[min_lcore_id];
-
-    RTE_LOG(INFO, VROUTER, "Assigning port %u to lcore %u:\n",
-        port_id, min_lcore_id);
-
-    /* Assign hardware queues to lcores */
-    tx_index = 0;
-    nb_tx = port->vip_nb_tx;
-    lcore_id = min_lcore_id;
-    do {
-        lcore_ctx = &vr_dpdk.lcores[lcore_id];
-        if (tx_index < nb_tx) {
-            lcore_ctx->lcore_tx_index[port_id] = tx_index;
-            RTE_LOG(INFO, VROUTER, "\tlcore %u - TX queue %u\n",
-                lcore_id, tx_index);
-            tx_index++;
-        } else {
-            lcore_ctx->lcore_tx_index[port_id] = -1;
-            RTE_LOG(INFO, VROUTER, "\tlcore %u - TX ring\n", lcore_id);
-        }
-        /* do not skip master lcore but wrap */
-        lcore_id = rte_get_next_lcore(lcore_id, 0, 1);
-    } while (lcore_id != min_lcore_id);
-
-    /* find an empty port slot in the array */
-    for (i = 0; i < min_nb_rx_ports; i++) {
-        if (unlikely(NULL == min_lcore_ctx->lcore_rx_ports[i]))
-            /* empty slot found */
-            break;
-    }
-    /* increase number of ports if nescessary */
-    if (i == min_lcore_ctx->lcore_nb_rx_ports)
-        min_lcore_ctx->lcore_nb_rx_ports++;
-
-
-
-    /* add port to the lcore list */
-    rte_wmb();
-    min_lcore_ctx->lcore_rx_ports[i] = port;
-    port->vip_lcore_ctx = min_lcore_ctx;
-}
-
+/* vRouter callback */
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
@@ -205,45 +132,29 @@ dpdk_if_add(struct vr_interface *vif)
 
     /* get interface name */
     if (vif->vif_flags & VIF_FLAG_PMD) {
+        /* check DPDK port index */
         if (vif->vif_os_idx >= rte_eth_dev_count()) {
-            RTE_LOG(ERR, VROUTER, "DPDK port index is out of range %u\n",
-                            vif->vif_os_idx);
+            RTE_LOG(ERR, VROUTER, "Invalid eth dev index %u (must be less than %u)\n",
+                (unsigned)vif->vif_os_idx, (unsigned)rte_eth_dev_count());
             return -ENOENT;
         }
     } else {
-        if (if_indextoname(vif->vif_os_idx, vif->vif_name) == NULL) {
-            RTE_LOG(ERR, VROUTER, "No interface with index %u\n",
-                            vif->vif_os_idx);
-            return -ENOENT;
-        }
-    }
+        RTE_LOG(ERR, VROUTER, "Error adding interface %s:\n"
+            "\tThis version of vRouter supports DPDK eth devices only.\n"
+            "\tPlease use an eth dev index and --pmd flag instead.\n",
+                vif->vif_name);
+        return -EFAULT;
+    } /* VIF_FLAG_PMD */
 
-    if (vif_is_fabric(vif)) {
-        ret = dpdk_phys_if_add(vif);
-    }
-    else if (vif_is_tap(vif)) {
-        if (vif->vif_flags & VIF_FLAG_PMD)
-            ret = dpdk_phys_if_add(vif);
-        else
-            ret = dpdk_pcap_if_add(vif);
+    if (vif_is_fabric(vif) || vif_is_tap(vif)) {
+        return dpdk_fabric_if_add(vif);
     }
     else if (vif_is_vhost(vif)) {
-        /* do not schedule KNI interface */
-        return dpdk_kni_if_add(vif);
-    }
-    else {
-        RTE_LOG(ERR, VROUTER, "Unknown interface type %hu\n",
-            vif->vif_type);
+        return dpdk_vhost_if_add(vif);
     }
 
-    /* return error if any */
-    if (unlikely(ret))
-        return ret;
-
-    /* schedule new port to one of the cores */
-    dpdk_vif_schedule(vif);
-
-    return 0;
+    RTE_LOG(ERR, VROUTER, "Unknown interface type %hu\n", vif->vif_type);
+    return -EFAULT;
 }
 
 static int
@@ -256,6 +167,7 @@ dpdk_if_del(struct vr_interface *vif)
     return 0;
 }
 
+/* vRouter callback */
 static int
 dpdk_if_del_tap(struct vr_interface *vif)
 {
@@ -264,6 +176,7 @@ dpdk_if_del_tap(struct vr_interface *vif)
 }
 
 
+/* vRouter callback */
 static int
 dpdk_if_add_tap(struct vr_interface *vif)
 {
@@ -372,28 +285,23 @@ dpdk_sw_checksum(struct vr_packet *pkt)
     }
 }
 
+/* TX packet callback */
 static int
 dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     /* currect lcore id */
     const unsigned lcore_id = rte_lcore_id();
     /* current lcore context */
-    struct lcore_ctx * const lcore_ctx = &vr_dpdk.lcores[lcore_id];
-    /* pointer to vif_port structure */
-    struct vif_port * const port = (struct vif_port *)vif->vif_os;
-    /* port index */
-    const unsigned port_id = port->vip_id;
+    struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
     /* pointer to mbuf */
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    /* tx burst */
-    struct rte_mbuf ** const tx_burst = lcore_ctx->lcore_port_tx[port_id];
-    /* tx burst size */
-    unsigned nb_tx_burst = lcore_ctx->lcore_port_tx_len[port_id];
+    /* interface index */
+    unsigned vif_idx = vif->vif_idx;
+    /* TX queue */
+    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
-    RTE_VERIFY(nb_tx_burst < VR_DPDK_PKT_BURST_SZ);
-
-    RTE_LOG(DEBUG, VROUTER,"%s: TX %u packet(s) to port %hhu\n",
-         __func__, nb_tx_burst + 1, port_id);
+    RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
+        vif->vif_name);
 
     /* reset mbuf data pointer and length */
     m->pkt.data = pkt_data(pkt);
@@ -440,17 +348,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 #ifdef VR_DPDK_TX_PKT_DUMP
     rte_pktmbuf_dump(m, 0x60);
 #endif
-    /* Burst tx to eth */
-    tx_burst[nb_tx_burst++] = m;
 
-    /* update burst size */
-    lcore_ctx->lcore_port_tx_len[port_id] = nb_tx_burst;
-
-    if (unlikely(VR_DPDK_PKT_BURST_SZ == nb_tx_burst)) {
-        RTE_LOG(DEBUG, VROUTER, "lcore %u %s drain\n", lcore_id, __func__);
-        /* drain eth TX queue */
-        return vr_dpdk_eth_tx_queue_drain(port, lcore_ctx);
-    }
+    tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
 
     return 0;
 }
@@ -461,22 +360,16 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     /* currect lcore id */
     const unsigned lcore_id = rte_lcore_id();
     /* current lcore context */
-    struct lcore_ctx * const lcore_ctx = &vr_dpdk.lcores[lcore_id];
-    /* pointer to vif_port structure */
-    struct vif_port * const port = (struct vif_port *)vif->vif_os;
-    /* port index */
-    const unsigned port_id = port->vip_id;
-    /* mbuf */
+    struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
+    /* pointer to mbuf */
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    /* tx burst */
-    struct rte_mbuf ** const tx_burst = lcore_ctx->lcore_kni_tx[port_id];
-    /* tx burst size */
-    unsigned nb_tx_burst = lcore_ctx->lcore_kni_tx_len[port_id];
+    /* interface index */
+    unsigned vif_idx = vif->vif_idx;
+    /* TX queue */
+    struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
-    RTE_VERIFY(nb_tx_burst < VR_DPDK_PKT_BURST_SZ);
-
-    RTE_LOG(DEBUG, VROUTER,"%s: TX %u packet(s) to KNI %hhu\n",
-         __func__, nb_tx_burst + 1, port_id);
+    RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
+        vif->vif_name);
 
     /* reset mbuf data pointer and length */
     m->pkt.data = pkt_data(pkt);
@@ -484,16 +377,11 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     /* TODO: use pkt_len instead? */
     m->pkt.pkt_len = pkt_head_len(pkt);
 
-    /* Burst tx to KNI */
-    tx_burst[nb_tx_burst++] = m;
-    /* update burst size */
-    lcore_ctx->lcore_kni_tx_len[port_id] = nb_tx_burst;
+#ifdef VR_DPDK_TX_PKT_DUMP
+    rte_pktmbuf_dump(m, 0x60);
+#endif
 
-    if (unlikely(VR_DPDK_PKT_BURST_SZ == nb_tx_burst)) {
-        RTE_LOG(DEBUG, VROUTER, "lcore %u main loop KNI drain\n", lcore_id);
-        /* drain KNI TX queue */
-        return vr_dpdk_kni_tx_queue_drain(port, lcore_ctx);
-    } 
+    tx_queue->txq_ops.f_tx(tx_queue->txq_queue_h, m);
 
     return 0;
 }
@@ -511,13 +399,16 @@ dpdk_if_get_settings(struct vr_interface *vif,
 static unsigned int
 dpdk_if_get_mtu(struct vr_interface *vif)
 {
-    u_int16_t mtu;
-    struct vif_port *port = (struct vif_port *)vif->vif_os;
+    /* port id */
+    uint8_t port_id;
+    /* MTU 8 */
+    uint16_t mtu;
 
-    if (port) {
-        if (0 == rte_eth_dev_get_mtu(port->vip_id, &mtu))
-            return mtu;
-    }
+    port_id = vif->vif_os_idx;
+
+    if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
+        return mtu;
+
     return vif->vif_mtu;
 }
 
@@ -565,4 +456,3 @@ vr_host_interface_exit(void)
 {
     return;
 }
-

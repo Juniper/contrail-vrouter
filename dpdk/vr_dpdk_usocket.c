@@ -401,8 +401,10 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         pmbuf->data = usockp->usock_rx_buf;
         pmbuf->data_len = usockp->usock_read_len;
         pmbuf->pkt_len = usockp->usock_read_len;
+        /* TODO: rebase on RSS commit
         dpdk_burst_rx(1, &usockp->usock_mbuf, usockp->usock_vif,
                 "pkt0", 0);
+        */
     } else {
         rte_pktmbuf_free(usockp->usock_mbuf);
     }
@@ -420,6 +422,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     int ret;
     void *objp;
     struct vr_interface *vif = usockp->usock_vif;
+    /* TODO: rebase on RSS commit
     struct vif_port *port;
 
     if (!vif || !(port = (struct vif_port *)vif->vif_os))
@@ -428,6 +431,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     ret = rte_ring_dequeue(port->vip_tx_ring, &objp);
     if (ret)
         return NULL;
+    */
 
     return (struct rte_mbuf *)objp;
 }
@@ -666,7 +670,8 @@ usock_alloc(unsigned short proto, unsigned short type)
             usockp->usock_mbuf_pool = rte_mempool_create("pkt0_mbuf_pool",
                     PKT0_MBUF_POOL_SIZE, PKT0_MBUF_PACKET_SIZE,
                     VR_DPDK_MPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private),
-                    rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+                    /* TODO: rebase on RSS commit */
+                    rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
                     rte_socket_id(), 0);
             if (!usockp->usock_mbuf_pool)
                 goto error_exit;
