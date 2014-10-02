@@ -10,7 +10,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vrouter_mod.c -- DPDK vrouter module
+ * vr_dpdk_host.c -- DPDK vrouter module
  *
  */
 

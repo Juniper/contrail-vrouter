@@ -10,7 +10,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vr_lcore.c -- lcore support functions
+ * vr_dpdk_lcore.c -- lcore support functions
  *
  */
 

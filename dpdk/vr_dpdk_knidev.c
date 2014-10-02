@@ -10,7 +10,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vr_knidev.c -- DPDK KNI device
+ * vr_dpdk_knidev.c -- DPDK KNI device
  *
  */
 #include <stdio.h>

@@ -10,7 +10,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vr_host_interface.c -- vRouter interface callbacks
+ * vr_dpdk_interface.c -- vRouter interface callbacks
  *
  */
 

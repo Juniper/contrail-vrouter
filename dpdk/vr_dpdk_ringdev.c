@@ -10,7 +10,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vr_ringdev.c -- DPDK ring device
+ * vr_dpdk_ringdev.c -- DPDK ring device
  *
  */
 #include <stdio.h>
