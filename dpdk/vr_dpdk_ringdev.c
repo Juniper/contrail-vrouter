@@ -60,9 +60,6 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
 
     RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_MAX_INTERFACES);
 
-    RTE_LOG(DEBUG, VROUTER, "%s: lcore_id=%u  rings_to_push=%u\n", __func__,
-        lcore_id, (unsigned)lcore->lcore_nb_rings_to_push);
-
     ring_to_push->rtp_tx_ring = tx_ring;
     ring_to_push->rtp_tx_queue = tx_queue;
 }

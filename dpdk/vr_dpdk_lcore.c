@@ -120,8 +120,6 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
     struct vr_dpdk_rx_queue *rx_queue;
     struct vr_dpdk_tx_queue *tx_queue;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u least_used_id=%u\n",
-        __func__, (unsigned)nb_rx_queues, (unsigned)nb_tx_queues, (unsigned)least_used_id);
     if (least_used_id == RTE_MAX_LCORE) {
         RTE_LOG(ERR, VROUTER, "\terror getting the least used lcore ID\n");
         return -EFAULT;

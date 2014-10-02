@@ -210,9 +210,6 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
-    RTE_LOG(DEBUG, VROUTER, "%s: lcore_id=%u  host_lcore_id=%u\n", __func__,
-        lcore_id, host_lcore_id);
-
     /* init queue */
     memcpy(&rx_queue->rxq_ops, &dpdk_knidev_reader_ops,
         sizeof(struct rte_port_in_ops));
@@ -244,9 +241,6 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     uint8_t port_id = vif->vif_os_idx;
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-
-    RTE_LOG(DEBUG, VROUTER, "%s: lcore_id=%u  host_lcore_id=%u\n", __func__,
-        lcore_id, host_lcore_id);
 
     /* init queue */
     memcpy(&tx_queue->txq_ops, &dpdk_knidev_writer_ops,

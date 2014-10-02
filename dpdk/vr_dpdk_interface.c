@@ -237,7 +237,6 @@ dpdk_hw_checksum(struct vr_packet *pkt)
 {
     /* if a tunnel */
     if (VP_TYPE_IPOIP == pkt->vp_type) {
-        RTE_LOG(DEBUG, VROUTER,"%s: tunnel\n",  __func__);
         /* calculate outer checksum in soft */
         /* TODO: vlan support */
         dpdk_sw_checksum_at_offset(pkt,
@@ -246,7 +245,6 @@ dpdk_hw_checksum(struct vr_packet *pkt)
         dpdk_hw_checksum_at_offset(pkt,
                pkt_get_inner_network_header_off(pkt));
     } else {
-        RTE_LOG(DEBUG, VROUTER,"%s: normal IP\n",  __func__);
         /* normal IP packet */
         /* TODO: vlan support */
         dpdk_hw_checksum_at_offset(pkt,
@@ -260,7 +258,6 @@ dpdk_sw_checksum(struct vr_packet *pkt)
 {
     /* if a tunnel */
     if (VP_TYPE_IPOIP == pkt->vp_type) {
-        RTE_LOG(DEBUG, VROUTER,"%s: tunnel\n",  __func__);
         /* calculate outer checksum */
         /* TODO: vlan support */
         dpdk_sw_checksum_at_offset(pkt,
@@ -269,7 +266,6 @@ dpdk_sw_checksum(struct vr_packet *pkt)
         dpdk_sw_checksum_at_offset(pkt,
                pkt_get_inner_network_header_off(pkt));
     } else {
-        RTE_LOG(DEBUG, VROUTER,"%s: normal IP\n",  __func__);
         /* normal IP packet */
         /* TODO: vlan support */
         dpdk_sw_checksum_at_offset(pkt,
@@ -309,23 +305,18 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      */
     if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
         /* if NIC supports checksum offload */
-        if(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) {
+        if(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)
             dpdk_hw_checksum(pkt);
-        } else {
+        else
             dpdk_sw_checksum(pkt);
-        }
     } else if(VP_TYPE_IPOIP == pkt->vp_type) {
         /* always calculate outer checksum for tunnels */
         /* if NIC supports checksum offload */
         if(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) {
-            RTE_LOG(DEBUG, VROUTER,"%s: tunnel HW outer checksum\n",
-                 __func__);
             /* TODO: vlan support */
             dpdk_hw_checksum_at_offset(pkt,
                 pkt->vp_data + sizeof(struct ether_hdr));
         } else {
-            RTE_LOG(DEBUG, VROUTER,"%s: tunnel SW outer checksum\n",
-                 __func__);
             /* TODO: vlan support */
             dpdk_sw_checksum_at_offset(pkt,
                 pkt->vp_data + sizeof(struct ether_hdr));

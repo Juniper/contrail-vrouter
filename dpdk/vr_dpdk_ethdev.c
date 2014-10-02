@@ -96,8 +96,6 @@ vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
-    RTE_LOG(DEBUG, VROUTER, "%s: rx_queue_id=%u\n", __func__, rx_queue_id);
-
     /* init queue */
     memcpy(&rx_queue->rxq_ops, &rte_port_ethdev_reader_ops,
         sizeof(struct rte_port_in_ops));
@@ -131,8 +129,6 @@ vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
-    RTE_LOG(DEBUG, VROUTER, "%s: tx_queue_id=%u\n", __func__, tx_queue_id);
-
     /* init queue */
     memcpy(&tx_queue->txq_ops, &rte_port_ethdev_writer_ops,
         sizeof(struct rte_port_out_ops));
@@ -165,8 +161,6 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     int ret, i;
 
     /* configure the port */
-    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u\n",
-        __func__, (unsigned)nb_rx_queues, (unsigned)nb_tx_queues);
     ret = rte_eth_dev_configure(port_id, nb_rx_queues, nb_tx_queues, &eth_dev_conf);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror configuring eth device %" PRIu8 ": %s (%d)\n",
