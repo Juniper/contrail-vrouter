@@ -112,7 +112,7 @@ vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     rx_queue->rxq_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
     if (rx_queue->rxq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating eth dev %" PRIu8
+        RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
                 " RX queue %" PRIu16 "\n", port_id, rx_queue_id);
         return NULL;
     }
@@ -147,7 +147,7 @@ vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
     if (tx_queue->txq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating eth dev %" PRIu8
+        RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
                 " TX queue %" PRIu16 "\n", port_id, tx_queue_id);
         return NULL;
     }
@@ -169,7 +169,7 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
         __func__, (unsigned)nb_rx_queues, (unsigned)nb_tx_queues);
     ret = rte_eth_dev_configure(port_id, nb_rx_queues, nb_tx_queues, &eth_dev_conf);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror configuring eth dev %" PRIu8 ": %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "\terror configuring eth device %" PRIu8 ": %s (%d)\n",
             port_id, strerror(-ret), -ret);
         return ret;
     }
@@ -189,7 +189,7 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
         ret = rte_eth_rx_queue_setup(port_id, i, VR_DPDK_NB_RXD,
             rte_eth_dev_socket_id(port_id), &rx_queue_conf, vr_dpdk.pktmbuf_pool);
         if (ret < 0) {
-            RTE_LOG(ERR, VROUTER, "\terror setting up eth dev %" PRIu8 " RX queue %d"
+            RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " RX queue %d"
                     ": %s (%d)\n", port_id, i, strerror(-ret), -ret);
             return ret;
         }
@@ -200,16 +200,16 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
         ret = rte_eth_tx_queue_setup(port_id, i, VR_DPDK_NB_TXD,
             rte_eth_dev_socket_id(port_id), &tx_queue_conf);
         if (ret < 0) {
-            RTE_LOG(ERR, VROUTER, "\terror setting up eth dev %" PRIu8 " TX queue %d"
+            RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " TX queue %d"
                     ": %s (%d)\n", port_id, i, strerror(-ret), -ret);
             return ret;
         }
     }
 
-    /* start eth dev */
+    /* start eth device */
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror starting eth dev %" PRIu8
+        RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
                 ": %s (%d)\n", port_id, strerror(-ret), -ret);
         return ret;
     }

@@ -39,14 +39,14 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u eth dev %" PRIu8 " MAC " MAC_FORMAT "\n",
+    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " MAC " MAC_FORMAT "\n",
                 vif->vif_idx, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
-    /* check if eth dev is already added */
+    /* check if ethdev is already added */
     if (vr_dpdk.eth_devs[vif->vif_os_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
+        RTE_LOG(ERR, VROUTER, "\terror adding eth device %s: already exists\n",
                 vif->vif_name);
-        return -EALREADY;
+        return -EEXIST;
     }
 
     /* get device info to find out the number of hardware TX queues */
@@ -59,12 +59,12 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues, vr_dpdk.nb_lcores),
                     VR_DPDK_MAX_TX_QUEUES);
 
-    /* init eth dev */
+    /* init eth device */
     ret = vr_dpdk_ethdev_init(vif, nb_rx_queues, nb_tx_queues);
     if (ret != 0)
         return ret;
 
-    /* add interface to the table of eth devs */
+    /* add interface to the table of eth devices */
     vr_dpdk.eth_devs[vif->vif_os_idx] = &rte_eth_devices[vif->vif_os_idx];
 
     /* schedule RX/TX queues */
@@ -84,7 +84,7 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u KNI %s at eth dev %" PRIu8
+    RTE_LOG(INFO, VROUTER, "Adding vif %u KNI device %s at eth device %" PRIu8
                 " MAC " MAC_FORMAT "\n",
                 vif->vif_idx, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
@@ -131,14 +131,14 @@ dpdk_if_add(struct vr_interface *vif)
     if (vif->vif_flags & VIF_FLAG_PMD) {
         /* check DPDK port index */
         if (vif->vif_os_idx >= rte_eth_dev_count()) {
-            RTE_LOG(ERR, VROUTER, "Invalid eth dev index %u (must be less than %u)\n",
+            RTE_LOG(ERR, VROUTER, "Invalid eth device index %u (must be less than %u)\n",
                 (unsigned)vif->vif_os_idx, (unsigned)rte_eth_dev_count());
             return -ENOENT;
         }
     } else {
         RTE_LOG(ERR, VROUTER, "Error adding interface %s:\n"
             "\tThis version of vRouter supports DPDK eth devices only.\n"
-            "\tPlease use an eth dev index and --pmd flag instead.\n",
+            "\tPlease use an eth device index and --pmd flag instead.\n",
                 vif->vif_name);
         return -EFAULT;
     } /* VIF_FLAG_PMD */

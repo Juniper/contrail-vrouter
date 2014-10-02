@@ -226,7 +226,7 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     rx_queue->rxq_queue_h = rx_queue->rxq_ops.f_create(&rx_queue_params, socket_id);
     if (rx_queue->rxq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating KNI %s RX queue at eth dev %" PRIu8 "\n",
+        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s RX queue at eth device %" PRIu8 "\n",
             vif->vif_name, port_id);
         return NULL;
     }
@@ -261,7 +261,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
     if (tx_queue->txq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating KNI %s TX queue at eth dev %" PRIu8 "\n",
+        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s TX queue at eth device %" PRIu8 "\n",
             vif->vif_name, port_id);
         return NULL;
     }
@@ -275,11 +275,11 @@ dpdk_knidev_change_mtu(uint8_t portid, unsigned new_mtu)
 {
     /* TODO: not implemented */
     if (portid >= rte_eth_dev_count()) {
-        RTE_LOG(ERR, VROUTER, "Invalid port id %d\n", portid);
+        RTE_LOG(ERR, VROUTER, "Invalid eth device %d\n", portid);
         return -EINVAL;
     }
 
-    RTE_LOG(INFO, VROUTER, "Change MTU of port %d to %u\n", portid, new_mtu);
+    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %d to %u\n", portid, new_mtu);
 
     return 0;
 }
@@ -292,7 +292,7 @@ dpdk_knidev_config_network_if(uint8_t portid, uint8_t if_up)
     RTE_LOG(INFO, VROUTER, "Configuring eth device %d %s\n",
                     (int)portid, if_up ? "UP" : "DOWN");
     if (portid >= rte_eth_dev_count() || portid >= RTE_MAX_ETHPORTS) {
-        RTE_LOG(ERR, VROUTER, "Invalid port id %d\n", portid);
+        RTE_LOG(ERR, VROUTER, "Invalid eth device %d\n", portid);
         return -EINVAL;
     }
 
@@ -310,7 +310,7 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
     struct rte_kni_conf kni_conf;
     struct rte_kni *kni;
 
-    /* get eth dev info */
+    /* get eth device info */
     memset(&dev_info, 0, sizeof(dev_info));
     rte_eth_dev_info_get(port_id, &dev_info);
 
@@ -333,7 +333,7 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
     /* allocate KNI device */
     kni = rte_kni_alloc(vr_dpdk.pktmbuf_pool, &kni_conf, &kni_ops);
     if (kni == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror allocation KNI %s at eth dev %" PRIu8 "\n",
+        RTE_LOG(ERR, VROUTER, "\terror allocation KNI device %s at eth device %" PRIu8 "\n",
                 vif->vif_name, port_id);
         return -ENOMEM;
     }

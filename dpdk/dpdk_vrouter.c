@@ -100,7 +100,7 @@ dpdk_init(void)
 
     /* Get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count();
-    RTE_LOG(INFO, VROUTER, "Found %d eth dev(s)\n", nb_sys_ports);
+    RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
     /* Enable all detected lcores */
     vr_dpdk.nb_lcores = rte_lcore_count();
@@ -125,7 +125,7 @@ dpdk_exit(void)
     int i;
     uint8_t port_id;
 
-    RTE_LOG(INFO, VROUTER, "Releasing KNI device...\n");
+    RTE_LOG(INFO, VROUTER, "Releasing KNI devices...\n");
     for (i = 0; i < VR_MAX_INTERFACES; i++) {
         if (vr_dpdk.knis[i] != NULL) {
             rte_kni_release(vr_dpdk.knis[i]);

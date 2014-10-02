@@ -365,9 +365,8 @@ vr_dpdk_lcore_loop(__attribute__((unused)) void *dummy)
             /* flush all TX queues */
             dpdk_lcore_flush(lcore);
 
-            /* check if any port attached */
             if (unlikely(lcore->lcore_nb_rx_queues == 0)) {
-                /* no RX queues -> just sleep */
+                /* no queues to poll -> sleep a bit */
                 usleep(VR_DPDK_SLEEP_NO_QUEUES_US);
             }
 

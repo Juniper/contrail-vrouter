@@ -82,7 +82,7 @@
 #define VR_DPDK_TX_FLUSH_US         100
 /* Lcore ID to create timers on */
 #define VR_DPDK_TIMER_LCORE_ID      0
-/* Sleep time in US if no ports attached */
+/* Sleep time in US if there are no queues to poll */
 #define VR_DPDK_SLEEP_NO_QUEUES_US  10000
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
 #define VR_DPDK_SLEEP_NO_PACKETS_US 10
@@ -185,7 +185,7 @@ struct vr_dpdk_global {
     struct rte_kni *knis[VR_MAX_INTERFACES];
     /* table of vHosts */
     struct vr_interface *vhosts[VR_MAX_INTERFACES];
-    /* table of eth devs */
+    /* table of eth devices */
     struct rte_eth_dev *eth_devs[RTE_MAX_ETHPORTS];
 };
 

@@ -81,8 +81,6 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_tx_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
     struct rte_ring *tx_ring;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: host_lcore_id=%u\n", __func__, host_lcore_id);
-
     /* init queue */
     memcpy(&tx_queue->txq_ops, &rte_port_ring_writer_ops,
         sizeof(struct rte_port_out_ops));
@@ -97,7 +95,8 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
         tx_ring = dpdk_ring_allocate(host_lcore_id, vif_idx, lcore_id);
     }
     if (tx_ring == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror allocating a ring for dev %" PRIu8 "\n", port_id);
+        RTE_LOG(ERR, VROUTER, "\terror allocating ring for device %" PRIu8 "\n",
+            port_id);
         return NULL;
     }
 
@@ -111,7 +110,8 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     tx_queue->txq_queue_h = tx_queue->txq_ops.f_create(&tx_queue_params, socket_id);
     if (tx_queue->txq_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating ring dev %" PRIu8 "\n", port_id);
+        RTE_LOG(ERR, VROUTER, "\terror creating ring for device %" PRIu8 "\n",
+            port_id);
         return NULL;
     }
 
