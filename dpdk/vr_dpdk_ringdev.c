@@ -25,11 +25,8 @@
 struct rte_ring *
 dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx, unsigned for_lcore_id)
 {
-    /* return value */
     int ret;
-    /* ring name */
     char ring_name[RTE_RING_NAMESIZE];
-    /* pointer to ring */
     struct rte_ring *ring;
 
     RTE_LOG(INFO, VROUTER, "\tcreating lcore %u TX ring for lcore %u vif %u\n",
@@ -57,9 +54,7 @@ void
 dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     struct vr_dpdk_tx_queue *tx_queue)
 {
-    /* host lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* current ring to push object */
     struct vr_dpdk_ring_to_push *ring_to_push =
         &lcore->lcore_rings_to_push[lcore->lcore_nb_rings_to_push++];
 
@@ -77,21 +72,13 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* host lcore context */
     struct vr_dpdk_lcore *host_lcore = vr_dpdk.lcores[host_lcore_id];
-    /* queue lcore socket id */
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* interface id */
     unsigned vif_idx = vif->vif_idx;
-    /* pointer to TX queue */
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-    /* pointer to host TX queue */
     struct vr_dpdk_tx_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
-    /* pointer to TX ring */
     struct rte_ring *tx_ring;
 
     RTE_LOG(DEBUG, VROUTER, "%s: host_lcore_id=%u\n", __func__, host_lcore_id);

@@ -23,13 +23,9 @@
 static unsigned
 dpdk_lcore_least_used_get(void)
 {
-    /* loop iterator */
     unsigned lcore_id;
-    /* loop pointer to lcore context */
     struct vr_dpdk_lcore *lcore;
-    /* least used lcore */
     unsigned least_used_id = RTE_MAX_LCORE;
-    /* number of RX queues for least used lcore */
     uint16_t least_used_nb_queues = VR_MAX_INTERFACES;
 
     RTE_LCORE_FOREACH(lcore_id) {
@@ -47,13 +43,9 @@ dpdk_lcore_least_used_get(void)
 void
 dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* interface id */
     unsigned vif_idx = rx_queue->rxq_vif->vif_idx;
-    /* prev RX queue */
     struct vr_dpdk_rx_queue *prev_rx_queue;
-    /* loop RX queue */
     struct vr_dpdk_rx_queue *cur_rx_queue;
 
     /* write barrier */
@@ -87,13 +79,9 @@ dpdk_lcore_rx_queue_add(unsigned lcore_id, struct vr_dpdk_rx_queue *rx_queue)
 void
 dpdk_lcore_tx_queue_add(unsigned lcore_id, struct vr_dpdk_tx_queue *tx_queue)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* interface id */
     unsigned vif_idx = tx_queue->txq_vif->vif_idx;
-    /* prev TX queue */
     struct vr_dpdk_tx_queue *prev_tx_queue;
-    /* loop TX queue */
     struct vr_dpdk_tx_queue *cur_tx_queue;
 
     /* write barrier */
@@ -126,15 +114,10 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
     uint16_t nb_rx_queues, vr_dpdk_rx_queue_init_op rx_queue_init_op,
     uint16_t nb_tx_queues, vr_dpdk_tx_queue_init_op tx_queue_init_op)
 {
-    /* loop iterator */
     unsigned lcore_id;
-    /* least used lcore id */
     unsigned least_used_id = dpdk_lcore_least_used_get();
-    /* loop queue index */
     uint16_t queue_id;
-    /* loop RX queue */
     struct vr_dpdk_rx_queue *rx_queue;
-    /* loop TX queue */
     struct vr_dpdk_tx_queue *tx_queue;
 
     RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u least_used_id=%u\n",
@@ -209,7 +192,6 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
 static inline void
 dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
 {
-    /* loop pointer to TX queue */
     struct vr_dpdk_tx_queue *tx_queue;
 
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, txq_next) {
@@ -222,11 +204,8 @@ static inline void
 dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ],
     uint32_t nb_pkts)
 {
-    /* packet iterator */
     unsigned i;
-    /* loop mbuf pointer */
     struct rte_mbuf *mbuf;
-    /* loop packet pointer */
     struct vr_packet *pkt;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
@@ -250,17 +229,11 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
 static inline void
 dpdk_lcore_run(struct vr_dpdk_lcore *lcore)
 {
-    /* loop pointer to RX queue */
     struct vr_dpdk_rx_queue *rx_queue;
-    /* number of packets read */
     uint32_t nb_pkts;
-    /* total packets counter */
     uint64_t total_pkts = 0;
-    /* list of packets read */
     struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ];
-    /* loop iterator */
     int i;
-    /* loop ring to push pointer */
     struct vr_dpdk_ring_to_push *rtp;
 
     /* for all RX queues */
@@ -310,9 +283,7 @@ dpdk_lcore_run(struct vr_dpdk_lcore *lcore)
 static int
 dpdk_lcore_init(void)
 {
-    /* current lcore id */
     const unsigned lcore_id = rte_lcore_id();
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore;
 
     /* allocate lcore context */
@@ -336,9 +307,7 @@ dpdk_lcore_init(void)
 static void
 dpdk_lcore_exit()
 {
-    /* current lcore id */
     const unsigned lcore_id = rte_lcore_id();
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
 
     /* free lcore context */
@@ -350,9 +319,7 @@ dpdk_lcore_exit()
 int
 vr_dpdk_lcore_loop(__attribute__((unused)) void *dummy)
 {
-    /* current lcore id */
     const unsigned lcore_id = rte_lcore_id();
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore;
 
     /* cycles counters */

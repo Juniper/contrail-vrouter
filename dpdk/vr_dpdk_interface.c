@@ -76,11 +76,8 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 static int
 dpdk_vhost_if_add(struct vr_interface *vif)
 {
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* return value */
     int ret;
-    /* port MAC address */
     struct ether_addr mac_addr;
 
     /* get interface MAC address */
@@ -187,15 +184,10 @@ dpdk_if_add_tap(struct vr_interface *vif)
 static inline void
 dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
-    /* pointer to mbuf */
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    /* pointer to IP header */
     struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
-    /* size of IP header */
     unsigned iph_len = iph->ip_hl * 4;
-    /* pointer to TCP header */
     struct vr_tcp *tcph;
-    /* pointer to UDP header */
     struct vr_udp *udph;
 
     RTE_VERIFY(0 < offset);
@@ -289,15 +281,10 @@ dpdk_sw_checksum(struct vr_packet *pkt)
 static int
 dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
-    /* currect lcore id */
     const unsigned lcore_id = rte_lcore_id();
-    /* current lcore context */
     struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
-    /* pointer to mbuf */
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    /* interface index */
     unsigned vif_idx = vif->vif_idx;
-    /* TX queue */
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
@@ -357,15 +344,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 static int
 dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 {
-    /* currect lcore id */
     const unsigned lcore_id = rte_lcore_id();
-    /* current lcore context */
     struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
-    /* pointer to mbuf */
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    /* interface index */
     unsigned vif_idx = vif->vif_idx;
-    /* TX queue */
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
@@ -399,9 +381,7 @@ dpdk_if_get_settings(struct vr_interface *vif,
 static unsigned int
 dpdk_if_get_mtu(struct vr_interface *vif)
 {
-    /* port id */
     uint8_t port_id;
-    /* MTU 8 */
     uint16_t mtu;
 
     port_id = vif->vif_os_idx;

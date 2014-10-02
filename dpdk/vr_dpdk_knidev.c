@@ -204,15 +204,10 @@ struct vr_dpdk_rx_queue *
 vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* queue lcore socket id */
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* interface id */
     unsigned vif_idx = vif->vif_idx;
-    /* pointer to RX queue */
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
     RTE_LOG(DEBUG, VROUTER, "%s: lcore_id=%u  host_lcore_id=%u\n", __func__,
@@ -244,15 +239,10 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* queue lcore socket id */
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* interface id */
     unsigned vif_idx = vif->vif_idx;
-    /* pointer to TX queue */
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     RTE_LOG(DEBUG, VROUTER, "%s: lcore_id=%u  host_lcore_id=%u\n", __func__,
@@ -315,13 +305,9 @@ dpdk_knidev_config_network_if(uint8_t portid, uint8_t if_up)
 int
 vr_dpdk_knidev_init(struct vr_interface *vif)
 {
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* port device info */
     struct rte_eth_dev_info dev_info;
-    /* KNI configuration */
     struct rte_kni_conf kni_conf;
-    /* KNI device */
     struct rte_kni *kni;
 
     /* get eth dev info */
@@ -362,11 +348,8 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
 void
 vr_dpdk_knidev_all_handle(void)
 {
-    /* pointer to vRouter */
     struct vrouter *router = vrouter_get(0);
-    /* loop iterator */
     int i;
-    /* loop pointer to vif */
     struct vr_interface *vif;
 
     for (i = 0; i < router->vr_max_interfaces; i++) {

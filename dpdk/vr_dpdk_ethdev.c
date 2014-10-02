@@ -90,15 +90,10 @@ struct vr_dpdk_rx_queue *
 vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned rx_queue_id)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* queue lcore socket id */
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* interface id */
     unsigned vif_idx = vif->vif_idx;
-    /* pointer to RX queue */
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
     RTE_LOG(DEBUG, VROUTER, "%s: rx_queue_id=%u\n", __func__, rx_queue_id);
@@ -130,15 +125,10 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id)
 {
-    /* current lcore context */
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    /* queue lcore socket id */
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* interface id */
     unsigned vif_idx = vif->vif_idx;
-    /* pointer to TX queue */
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     RTE_LOG(DEBUG, VROUTER, "%s: tx_queue_id=%u\n", __func__, tx_queue_id);
@@ -170,14 +160,9 @@ int
 vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     uint16_t nb_tx_queues)
 {
-    /* eth dev port id */
     uint8_t port_id = vif->vif_os_idx;
-    /* port device info */
     struct rte_eth_dev_info dev_info;
-    /* return value */
-    int ret;
-    /* loop iterator */
-    int i;
+    int ret, i;
 
     /* configure the port */
     RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u\n",

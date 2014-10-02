@@ -122,9 +122,7 @@ dpdk_init(void)
 static void
 dpdk_exit(void)
 {
-    /* loop iterator */
     int i;
-    /* loop port id */
     uint8_t port_id;
 
     RTE_LOG(INFO, VROUTER, "Releasing KNI device...\n");
