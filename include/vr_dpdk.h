@@ -251,7 +251,7 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
 }
 
 /*
- * vr_eth_if.c
+ * vr_ethdev.c
  */
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
@@ -262,14 +262,14 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id);
 /* Init ethernet device */
-int vr_dpdk_eth_if_init(struct vr_interface *vif, uint16_t nb_rx_queues,
+int vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     uint16_t nb_tx_queues);
 
 /*
- * vr_kni_if.c
+ * vr_knidev.c
  */
 /* Init KNI */
-int vr_dpdk_kni_if_init(struct vr_interface *vif);
+int vr_dpdk_knidev_init(struct vr_interface *vif);
 /* Init KNI RX queue */
 struct vr_dpdk_rx_queue *
 vr_dpdk_kni_rx_queue_init( unsigned lcore_id, struct vr_interface *vif,
@@ -279,7 +279,7 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_kni_tx_queue_init( unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id);
 /* Handle all KNIs attached */
-void vr_dpdk_kni_if_all_handle(void);
+void vr_dpdk_knidev_all_handle(void);
 
 /*
  * vr_lcore.c
@@ -298,7 +298,7 @@ void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 
 /*
- * vr_ring_if.c
+ * vr_ringdev.c
  */
 /* Init ring RX queue */
 struct vr_dpdk_rx_queue *
