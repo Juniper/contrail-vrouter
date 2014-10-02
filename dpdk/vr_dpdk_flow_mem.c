@@ -24,7 +24,7 @@
 #define MOUNT_TABLE     "/proc/mounts"
 
 struct vr_hugepage_info {
-    unsigned char *mnt;
+    char *mnt;
     unsigned int page_size;
     unsigned int num_pages;
     unsigned int size;
@@ -38,15 +38,15 @@ static int
 vr_hugepage_info_init(void)
 {
     unsigned int i = 0, multiple = 1;
-    unsigned char *str, *token;
+    char *str, *token;
 
     char *dev, *mnt, *fs, *options, *size;
     char *size_attr, *sys_hp_file;
     FILE *fp = NULL, *sys_fp = NULL;
     struct vr_hugepage_info *hp;
 
-    unsigned char line[MAX_LINE_SIZE];
-    unsigned char nr_pages[MAX_LINE_SIZE];
+    char line[MAX_LINE_SIZE];
+    char nr_pages[MAX_LINE_SIZE];
 
 
     fp = fopen(MOUNT_TABLE, "r");
@@ -63,6 +63,10 @@ vr_hugepage_info_init(void)
             mnt = strtok(NULL, " ");
             fs = strtok(NULL, " ");
             options = strtok(NULL, " ");
+
+            RTE_SET_USED(fs);
+            RTE_SET_USED(dev);
+            RTE_SET_USED(token);
 
             hp->mnt = malloc(strlen(mnt) + 1);
             memcpy(hp->mnt, mnt, strlen(mnt) + 1);
@@ -112,7 +116,9 @@ vr_hugepage_info_init(void)
                 if (!sys_fp)
                     goto exit_func;
 
-                fgets(nr_pages, MAX_LINE_SIZE, sys_fp);
+                str = fgets(nr_pages, MAX_LINE_SIZE, sys_fp);
+                if (str == NULL)
+                    goto exit_func;
                 hp->num_pages = strtoul(nr_pages, NULL, 0);
                 hp->size = hp->num_pages * hp->page_size;
             }
@@ -139,6 +145,8 @@ vr_dpdk_flow_mem_init(void)
     struct vr_hugepage_info *hpi;
     char *file_name, *touse_file_name = NULL;
     struct stat f_stat;
+
+    RTE_SET_USED(num_sizes);
 
     ret = vr_hugepage_info_init();
     if (ret < 0)
@@ -168,7 +176,8 @@ vr_dpdk_flow_mem_init(void)
     }
 
     if (touse_file_name) {
-        fd = open(touse_file_name, O_RDWR | O_CREAT);
+        /* TODO: fix file permissions */
+        fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRWXU);
         if (fd < 0)
             return -1;
         vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
@@ -176,7 +185,7 @@ vr_dpdk_flow_mem_init(void)
         if (vr_dpdk.flow_table == MAP_FAILED)
             return -1;
         bzero(vr_dpdk.flow_table, flow_table_size);
-        vr_flow_path = touse_file_name;
+        vr_flow_path = (unsigned char *)touse_file_name;
     }
 
     if (!vr_dpdk.flow_table)

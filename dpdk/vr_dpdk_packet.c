@@ -52,8 +52,10 @@ wait_for_connection:
 void
 dpdk_packet_socket_close(void)
 {
+    /* TODO: rebase on RSS commit
     unsigned short port_id = packet0_port_id;
     struct vif_port *port;
+    */
     void *usockp;
 
     if (!vr_dpdk.packet_transport)
@@ -75,14 +77,14 @@ int
 dpdk_packet_socket_init(void)
 {
     int ret;
-    unsigned short lcore_id;
     unsigned short lcore_count = rte_lcore_count();
-    unsigned short port_id = packet0_port_id;
     /* TODO: rebase on RSS commit
+    unsigned short lcore_id;
+    unsigned short port_id = packet0_port_id;
     struct vif_port *port;
     struct vr_dpdk_lcore *lcore;
-    */
     void *event_sock;
+    */
 
     vr_dpdk.packet_transport = (void *)vr_usocket(PACKET, RAW);
     if (!vr_dpdk.packet_transport)
@@ -128,7 +130,9 @@ dpdk_packet_socket_init(void)
 
     return 0;
 
+    /* TODO: unused
 error:
+    */
     if (vr_dpdk.packet_transport) {
         vr_usocket_close(vr_dpdk.packet_transport);
         vr_dpdk.packet_transport = NULL;

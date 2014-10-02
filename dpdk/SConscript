@@ -10,7 +10,7 @@ env = VRouterEnv.Clone()
 # Include paths
 
 # CFLAGS
-#env.Append(CCFLAGS = '-Werror -Wall')
+env.Append(CCFLAGS = '-Werror -Wall')
 env.Append(CCFLAGS = '-D__DPDK__')
 
 env.Replace(LIBPATH = env['TOP_LIB'])

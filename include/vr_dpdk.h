@@ -296,6 +296,13 @@ int vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
  */
 void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
+int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
+
+/*
+ * vr_dpdk_packet.c
+ */
+int dpdk_packet_socket_init(void);
+void dpdk_packet_socket_close(void);
 
 /*
  * vr_ringdev.c

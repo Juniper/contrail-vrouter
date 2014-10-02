@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/eventfd.h>
 
 #include <netinet/in.h>
 
@@ -246,6 +247,8 @@ usock_close(struct vr_usocket *usockp)
     int i;
     struct vr_usocket *parent;
 
+    RTE_SET_USED(parent);
+
     if (!usockp)
         return;
 
@@ -419,10 +422,10 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 static struct rte_mbuf *
 vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
+    /* TODO: rebase on RSS commit
     int ret;
     void *objp;
     struct vr_interface *vif = usockp->usock_vif;
-    /* TODO: rebase on RSS commit
     struct vif_port *port;
 
     if (!vif || !(port = (struct vif_port *)vif->vif_os))
@@ -431,9 +434,10 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     ret = rte_ring_dequeue(port->vip_tx_ring, &objp);
     if (ret)
         return NULL;
-    */
 
     return (struct rte_mbuf *)objp;
+    */
+    return NULL;
 }
 
 static int
@@ -494,7 +498,7 @@ usock_read_init(struct vr_usocket *usockp)
             return -ENOMEM;
 
         usockp->usock_rx_buf = rte_pktmbuf_mtod(usockp->usock_mbuf,
-                unsigned char *);
+                char *);
         usockp->usock_buf_len = PKT0_MBUF_PACKET_SIZE;
         usockp->usock_read_len = PKT0_MBUF_PACKET_SIZE;
         usockp->usock_state = READING_DATA;
@@ -518,7 +522,7 @@ __usock_read(struct vr_usocket *usockp)
 
     struct nlmsghdr *nlh;
     unsigned int proto = usockp->usock_proto;
-    unsigned char *buf = usockp->usock_rx_buf;
+    char *buf = usockp->usock_rx_buf;
 
     if (toread > usockp->usock_buf_len) {
         toread = usockp->usock_buf_len - offset;
@@ -584,6 +588,8 @@ usock_alloc(unsigned short proto, unsigned short type)
     struct vr_usocket *usockp = NULL, *child;
     bool is_socket = true;
     unsigned short sock_type;
+
+    RTE_SET_USED(child);
 
     switch (type) {
     case TCP:
@@ -803,7 +809,7 @@ vr_usocket_read(struct vr_usocket *usockp)
     int ret;
 
     if (!usockp || usockp->usock_fd < 0)
-        return;
+        return -1;
 
     switch (usockp->usock_state) {
     case LISTENING:
@@ -832,7 +838,7 @@ vr_usocket_read(struct vr_usocket *usockp)
         break;
 
     default:
-        return;
+        return -1;
     }
 
     return ret;
@@ -841,7 +847,6 @@ vr_usocket_read(struct vr_usocket *usockp)
 static int
 vr_usocket_connect(struct vr_usocket *usockp)
 {
-    int ret;
     struct sockaddr_un sun;
 
     if (usockp->usock_proto != PACKET)
@@ -961,6 +966,8 @@ void *
 vr_usocket(int proto, int type)
 {
     struct vr_usocket *usockp = NULL;
+
+    RTE_SET_USED(usockp);
 
     if (!valid_usock(proto, type))
         return NULL;

@@ -29,7 +29,7 @@ static void
 dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 {
     __u32 seq;
-    unsigned int multi_flag;
+    unsigned int multi_flag = 0;
     bool write = true;
 
     struct vr_message *resp;
@@ -82,7 +82,7 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 }
 
 int
-dpdk_netlink_receive(void *usockp, unsigned char *nl_buf,
+dpdk_netlink_receive(void *usockp, char *nl_buf,
         unsigned int nl_len)
 {
     struct vr_message request;
@@ -120,7 +120,7 @@ dpdk_nl_trans_free(char *buf)
 static char *
 dpdk_nl_trans_alloc(unsigned int size)
 {
-    unsigned char *buf;
+    char *buf;
 
     buf = vr_malloc(size + HDR_LEN);
     if (!buf)
