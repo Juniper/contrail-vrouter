@@ -74,7 +74,7 @@ dpdk_init(void)
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (ret < 0) {
-        RTE_LOG(CRIT, VROUTER, "Error initializing EAL\n");
+        printf("Error initializing EAL\n");
         return ret;
     }
 
@@ -364,15 +364,16 @@ main(int argc, char *argv[])
             return -1;
     }
 
-    /* associate signal hanlder with signals */
-    ret = dpdk_signals_init();
+    /* init DPDK first since vRouter uses DPDK mallocs and logs */
+    ret = dpdk_init();
     if (ret != 0) {
         return ret;
     }
 
-    /* init DPDK first since vRouter uses DPDK mallocs */
-    ret = dpdk_init();
+    /* associate signal hanlder with signals */
+    ret = dpdk_signals_init();
     if (ret != 0) {
+        dpdk_exit();
         return ret;
     }
 
