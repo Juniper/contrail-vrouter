@@ -44,6 +44,8 @@
 
 /* Forwarding lcore mask */
 #define VR_DPDK_LCORE_MASK          "0x0f"
+/* Memory to allocate at startup in MB */
+#define VR_DPDK_MAX_MEM             "256"
 /* Maximum number of hardware RX queues (also limited by #lcores and hardware) */
 #define VR_DPDK_MAX_RX_QUEUES       4
 /* Maximum number of hardware TX queues */

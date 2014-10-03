@@ -37,7 +37,10 @@ unsigned int vr_num_cpus = RTE_MAX_LCORE;
 static bool vr_host_inited = false;
 
 /* TODO: default commandline params */
-static char *dpdk_argv[] = {"dpdk", "-c", VR_DPDK_LCORE_MASK, "-n", "1" };
+static char *dpdk_argv[] = {"dpdk",
+    "-m", VR_DPDK_MAX_MEM,
+    "-c", VR_DPDK_LCORE_MASK,
+    "-n", "2" };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
 
 /*
@@ -69,14 +72,16 @@ dpdk_init(void)
 {
     int ret, nb_sys_ports;
 
-    if ((ret = vr_dpdk_flow_mem_init())) {
-        RTE_LOG(CRIT, VROUTER, "Could not initialise flow table\n");
-        return -1;
+    ret = rte_eal_init(dpdk_argc, dpdk_argv);
+    if (ret < 0) {
+        RTE_LOG(CRIT, VROUTER, "Error initializing EAL\n");
+        return ret;
     }
 
-    ret = rte_eal_init(dpdk_argc, dpdk_argv);
-    if (0 > ret) {
-        RTE_LOG(CRIT, VROUTER, "Could not initialise EAL (%d)\n", ret);
+    ret = vr_dpdk_flow_mem_init();
+    if (ret < 0) {
+        RTE_LOG(CRIT, VROUTER, "Error initializing flow table: %s (%d)\n",
+            strerror(-ret), -ret);
         return ret;
     }
 

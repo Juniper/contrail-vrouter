@@ -149,8 +149,11 @@ vr_dpdk_flow_mem_init(void)
     RTE_SET_USED(num_sizes);
 
     ret = vr_hugepage_info_init();
-    if (ret < 0)
+    if (ret < 0) {
+        RTE_LOG(CRIT, VROUTER, "Error initializing hugepage info: %s (%d)\n",
+            strerror(-ret), -ret);
         return ret;
+    }
 
     flow_table_size = VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE;
 
@@ -176,20 +179,25 @@ vr_dpdk_flow_mem_init(void)
     }
 
     if (touse_file_name) {
-        /* TODO: fix file permissions */
-        fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRWXU);
-        if (fd < 0)
-            return -1;
+        fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        if (fd == -1) {
+            RTE_LOG(CRIT, VROUTER, "Error opening file %s: %s (%d)\n",
+                touse_file_name, strerror(errno), errno);
+            return -errno;
+        }
         vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
-        if (vr_dpdk.flow_table == MAP_FAILED)
-            return -1;
+        if (vr_dpdk.flow_table == MAP_FAILED) {
+            RTE_LOG(CRIT, VROUTER, "Error mapping file %s: %s (%d)\n",
+                touse_file_name, strerror(errno), errno);
+            return -errno;
+        }
         bzero(vr_dpdk.flow_table, flow_table_size);
         vr_flow_path = (unsigned char *)touse_file_name;
     }
 
     if (!vr_dpdk.flow_table)
-        return -1;
+        return -ENOMEM;
 
     return 0;
 }
