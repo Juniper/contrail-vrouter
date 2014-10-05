@@ -190,12 +190,20 @@ vr_route_req_process(void *s_req)
             printf("\n");
         }
     } else {
-        printf("%12s %5d", ether_ntoa((struct ether_addr *)(rt->rtr_mac)), rt->rtr_vrf_id);
+        ret = printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
+        for(i = ret; i < 21; i++)
+            printf(" ");
+
+        ret = printf("%5d", rt->rtr_vrf_id);
+        for(i = ret; i < 12; i++)
+            printf(" ");
         if (rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
-            printf("%5d        ", rt->rtr_label);
+            ret = printf("%5d", rt->rtr_label);
         else
-            printf("%5c        ", '-');
-        printf("%3d \n",rt->rtr_nh_id); 
+            ret = printf("%5c", '-');
+        for(i = ret; i < 12; i++)
+            printf(" ");
+        printf("%7d\n",rt->rtr_nh_id);
     }
 
     return;
@@ -264,7 +272,7 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
 
     default:
         rt_req.rtr_nh_id = nh_id;
-        if (prefix) {
+        if (cmd_prefix_set) {
             memcpy(rt_req.rtr_prefix, prefix, RT_IP_ADDR_SIZE(family));
             rt_req.rtr_prefix_size = RT_IP_ADDR_SIZE(family);
 
@@ -408,8 +416,8 @@ vr_route_op(void)
                 printf("(Src,Group)                       Nexthop\n");
             }
         } else {
-                printf("Kernel L2 Bridge table %d\n", req->rtr_rid);
-                printf("DestMac Vrf Label/VNID          Nexthop\n");
+                printf("Kernel L2 Bridge table %d/%d\n", req->rtr_rid, cmd_vrf_id);
+                printf("DestMac                 Vrf    Label/VNID     Nexthop\n");
         }
     }
 
