@@ -62,6 +62,9 @@ if sys.platform != 'darwin':
     make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
     make_cmd += ' SANDESH_SRC_ROOT=' + '../build/kbuild/'
     make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#tools/').abspath
+    if 'vrouter' in COMMAND_LINE_TARGETS:
+        BUILD_TARGETS.append('vrouter/uvrouter')
+        BUILD_TARGETS.append('vrouter/utils')
 
     kern = env.Command('vrouter.ko', makefile, make_cmd, chdir=dp_dir)
     env.Default(kern)
