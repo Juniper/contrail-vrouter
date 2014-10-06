@@ -39,7 +39,6 @@ dpdk_init(void)
     unsigned lcore_id;
 
     if ((ret = vr_dpdk_flow_mem_init())) {
-        RTE_LOG(CRIT, VROUTER, "Could not initialise flow table\n");
         return -1;
     }
 
