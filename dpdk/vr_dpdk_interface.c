@@ -42,9 +42,9 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " MAC " MAC_FORMAT "\n",
                 vif->vif_idx, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
-    /* check if ethdev is already added */
-    if (vr_dpdk.eth_devs[vif->vif_os_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding eth device %s: already exists\n",
+    /* check if eth dev is already added */
+    if (vr_dpdk.ethdevs[vif->vif_os_idx].ethdev_ptr != NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
                 vif->vif_name);
         return -EEXIST;
     }
@@ -52,6 +52,12 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     /* get device info to find out the number of hardware TX queues */
     memset(&dev_info, 0, sizeof(dev_info));
     rte_eth_dev_info_get(port_id, &dev_info);
+    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u max_rx_queues=%"PRIu16
+        " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
+        " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
+        dev_info.driver_name, dev_info.if_index, dev_info.max_rx_queues,
+        dev_info.max_vfs, dev_info.max_vmdq_pools, dev_info.rx_offload_capa,
+        dev_info.tx_offload_capa);
 
     /* use no more queues than lcores */
     nb_rx_queues = RTE_MIN(RTE_MIN(dev_info.max_rx_queues, vr_dpdk.nb_fwd_lcores),
@@ -64,8 +70,8 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     if (ret != 0)
         return ret;
 
-    /* add interface to the table of eth devices */
-    vr_dpdk.eth_devs[vif->vif_os_idx] = &rte_eth_devices[vif->vif_os_idx];
+    /* add interface to the table of eth devs */
+    vr_dpdk.ethdevs[vif->vif_os_idx].ethdev_ptr = &rte_eth_devices[vif->vif_os_idx];
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),

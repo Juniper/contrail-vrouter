@@ -50,10 +50,12 @@
 #define VR_DPDK_MIN_LCORES          2
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "256"
-/* Maximum number of hardware RX queues (also limited by #lcores and hardware) */
-#define VR_DPDK_MAX_RX_QUEUES       4
-/* Maximum number of hardware TX queues */
+/* Maximum number of hardware RX queues to use */
+#define VR_DPDK_MAX_RX_QUEUES       128
+/* Maximum number of hardware TX queues to use (also limited by nb of lcores) */
 #define VR_DPDK_MAX_TX_QUEUES       4
+/* Maximum number of hardware RX queues to use for RSS (also limited by lcores) */
+#define VR_DPDK_MAX_RSS_RX_QUEUES   4
 /* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*RTE_MAX_LCORE) */
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
 /* Max size of a single packet */
@@ -170,6 +172,32 @@ struct vr_dpdk_lcore {
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
 };
 
+/* Hardware RX queue states */
+enum vr_dpdk_queue_state {
+    /* The queue is not available, i.e. device has no such a queue */
+    VR_DPDK_QUEUE_NA,
+    /* The queue is free to use for RSS or filtering */
+    VR_DPDK_QUEUE_FREE,
+    /* The queue is being used for RSS */
+    VR_DPDK_QUEUE_RSS,
+    /* The queue is being used for filtering */
+    VR_DPDK_QUEUE_FILTER
+};
+
+/* Ethdev configuration */
+struct vr_dpdk_ethdev {
+    /* Pointer to ethdev or NULL if the device is not used */
+    struct rte_eth_dev *ethdev_ptr;
+    /* Number of HW RX queues reported by device */
+    uint16_t ethdev_reported_rx_queues;
+    /* Number of HW RX queues used for RSS (limited by the nb of lcores) */
+    uint16_t ethdev_rss_rx_queues;
+    /* Number of HW TX queues (limited by the nb of lcores) */
+    uint16_t ethdev_nb_tx_queues;
+    /* Each HW RX queue state */
+    enum vr_dpdk_queue_state ethdev_rx_configs[VR_DPDK_MAX_RX_QUEUES];
+};
+
 struct vr_dpdk_global {
     /* pointer to memory pool */
     struct rte_mempool *pktmbuf_pool;
@@ -196,8 +224,8 @@ struct vr_dpdk_global {
     struct rte_kni *knis[VR_MAX_INTERFACES];
     /* table of vHosts */
     struct vr_interface *vhosts[VR_MAX_INTERFACES];
-    /* table of eth devices */
-    struct rte_eth_dev *eth_devs[RTE_MAX_ETHPORTS];
+    /* table of ethdevs */
+    struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
 };
 
 extern struct vr_dpdk_global vr_dpdk;

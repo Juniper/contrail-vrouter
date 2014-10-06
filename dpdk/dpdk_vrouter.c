@@ -128,10 +128,9 @@ dpdk_exit(void)
 
     RTE_LOG(INFO, VROUTER, "Closing eth devices...\n");
     for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
-        if (vr_dpdk.eth_devs[i] != NULL) {
-            port_id = vr_dpdk.eth_devs[i]->data->port_id;
-            rte_eth_dev_stop(port_id);
-            rte_eth_dev_close(port_id);
+        if (vr_dpdk.ethdevs[i].ethdev_ptr != NULL) {
+            rte_eth_dev_stop(i);
+            rte_eth_dev_close(i);
         }
     }
 }

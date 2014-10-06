@@ -157,6 +157,7 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     uint8_t port_id = vif->vif_os_idx;
     struct rte_eth_dev_info dev_info;
     int ret, i;
+    struct rte_eth_fdir fdir_info;
 
     /* configure the port */
     ret = rte_eth_dev_configure(port_id, nb_rx_queues, nb_tx_queues, &eth_dev_conf);
@@ -174,6 +175,15 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
         vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
+    }
+
+    /* check if the device supports Flow Director filters */
+    memset(&fdir_info, 0, sizeof(fdir_info));
+    ret = rte_eth_dev_fdir_get_infos(port_id, &fdir_info);
+    if (ret == 0 && fdir_info.free > 0) {
+        vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
+    } else {
+        vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
     }
 
     /* configure RX queues */
