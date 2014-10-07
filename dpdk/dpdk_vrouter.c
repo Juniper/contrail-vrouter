@@ -86,20 +86,20 @@ dpdk_init(void)
     }
 
     /* Create the mbuf pool */
-    vr_dpdk.pktmbuf_pool = rte_mempool_create("mbuf_pool", VR_DPDK_MPOOL_SZ,
+    vr_dpdk.pktmbuf_pool = rte_mempool_create("vrouter_mbuf_pool", VR_DPDK_MPOOL_SZ,
             VR_DPDK_MBUF_SZ, VR_DPDK_MPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             rte_pktmbuf_pool_init, NULL, dpdk_pktmbuf_init, NULL,
             rte_socket_id(), 0);
     if (NULL == vr_dpdk.pktmbuf_pool) {
-        RTE_LOG(CRIT, VROUTER, "Could not initialise mbuf pool\n");
+        RTE_LOG(CRIT, VROUTER, "Error initializing mbuf pool\n");
         return -ENOMEM;
     }
 
     /* Scan PCI bus for recognised devices */
     ret = rte_eal_pci_probe();
-    if (0 > ret) {
-        RTE_LOG(CRIT, VROUTER, "Could not probe PCI (%d)\n", ret);
+    if (ret < 0) {
+        RTE_LOG(CRIT, VROUTER, "Error probing PCI: %s (%d)\n", strerror(-ret), -ret);
         return ret;
     }
 
@@ -356,7 +356,7 @@ main(int argc, char *argv[])
             break;
         }
     }
-    /* for other getopts  in dpdk */
+    /* for other getopts in dpdk */
     optind = 0;
 
     if (!no_daemon_set) {
