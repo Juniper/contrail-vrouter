@@ -42,8 +42,12 @@
 #define VR_DPDK_TX_PKT_DUMP
  */
 
-/* Forwarding lcore mask */
+/* lcore mask */
 #define VR_DPDK_LCORE_MASK          "0x0f"
+/* Number of service lcores */
+#define VR_DPDK_NB_SERVICE_LCORES   2
+/* Minimum number of lcores */
+#define VR_DPDK_MIN_LCORES          2
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "256"
 /* Maximum number of hardware RX queues (also limited by #lcores and hardware) */
@@ -170,7 +174,7 @@ struct vr_dpdk_global {
     /* pointer to memory pool */
     struct rte_mempool *pktmbuf_pool;
     /* number of forwarding lcores */
-    unsigned nb_lcores;
+    unsigned nb_fwd_lcores;
     /* table of pointers to forwarding lcore */
     struct vr_dpdk_lcore *lcores[RTE_MAX_LCORE];
     /* global stop flag */
@@ -181,6 +185,7 @@ struct vr_dpdk_global {
     /* Packet socket */
     struct rte_ring *packet_ring;
     void *packet_transport;
+    unsigned packet_lcore_id;
     /* Event socket */
     void *event_sock;
     /* KNI thread ID */
@@ -313,9 +318,11 @@ void vr_dpdk_knidev_all_handle(void);
 /* Launch lcore main loop */
 int vr_dpdk_lcore_launch(void *dummy);
 /* Schedule an interface */
-int vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
+int vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     uint16_t nb_rx_queues, vr_dpdk_rx_queue_init_op rx_queue_init_op,
     uint16_t nb_tx_queues, vr_dpdk_tx_queue_init_op tx_queue_init_op);
+/* Returns the least used lcore or RTE_MAX_LCORE */
+unsigned vr_dpdk_lcore_least_used_get(void);
 
 /*
  * vr_dpdk_netlink.c

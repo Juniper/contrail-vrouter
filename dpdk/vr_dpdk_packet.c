@@ -71,7 +71,7 @@ dpdk_packet_socket_init(void)
     if (!vr_dpdk.packet_transport)
         return -1;
 
-    if (lcore_count == 2)
+    if (lcore_count == VR_DPDK_MIN_LCORES)
         vr_usocket_non_blocking(vr_dpdk.packet_transport);
 
     if (!vr_dpdk.packet_ring) {

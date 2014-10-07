@@ -92,9 +92,15 @@ dpdk_init(void)
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
     /* Enable all detected lcores */
-    vr_dpdk.nb_lcores = rte_lcore_count();
-    if (vr_dpdk.nb_lcores >= 2) {
-        RTE_LOG(INFO, VROUTER, "Using %i forwarding lcore(s)\n", vr_dpdk.nb_lcores);
+    vr_dpdk.nb_fwd_lcores = rte_lcore_count();
+    if (vr_dpdk.nb_fwd_lcores >= VR_DPDK_MIN_LCORES) {
+        /* do not use service lcores */
+        vr_dpdk.nb_fwd_lcores -= VR_DPDK_NB_SERVICE_LCORES;
+        if (vr_dpdk.nb_fwd_lcores == 0)
+            vr_dpdk.nb_fwd_lcores = 1;
+        RTE_LOG(INFO, VROUTER, "Using %i forwarding lcore(s)\n", vr_dpdk.nb_fwd_lcores);
+        RTE_LOG(INFO, VROUTER, "Using %i service lcore(s)\n",
+            rte_lcore_count() - vr_dpdk.nb_fwd_lcores);
     } else {
         RTE_LOG(CRIT, VROUTER, "Please enable at least 2 lcores\n");
         return -ENODEV;

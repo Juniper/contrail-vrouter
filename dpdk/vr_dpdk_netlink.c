@@ -164,7 +164,7 @@ dpdk_netlink_init(void)
         return -1;
     }
 
-    if (num_cores == 2)
+    if (num_cores == VR_DPDK_MIN_LCORES)
         vr_usocket_non_blocking(vr_dpdk.netlink_sock);
 
     return 0;

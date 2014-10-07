@@ -54,9 +54,9 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     rte_eth_dev_info_get(port_id, &dev_info);
 
     /* use no more queues than lcores */
-    nb_rx_queues = RTE_MIN(RTE_MIN(dev_info.max_rx_queues, vr_dpdk.nb_lcores),
+    nb_rx_queues = RTE_MIN(RTE_MIN(dev_info.max_rx_queues, vr_dpdk.nb_fwd_lcores),
                     VR_DPDK_MAX_RX_QUEUES);
-    nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues, vr_dpdk.nb_lcores),
+    nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues, vr_dpdk.nb_fwd_lcores),
                     VR_DPDK_MAX_TX_QUEUES);
 
     /* init eth device */
@@ -68,7 +68,8 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     vr_dpdk.eth_devs[vif->vif_os_idx] = &rte_eth_devices[vif->vif_os_idx];
 
     /* schedule RX/TX queues */
-    return vr_dpdk_lcore_if_schedule(vif, nb_rx_queues, &vr_dpdk_eth_rx_queue_init,
+    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+            nb_rx_queues, &vr_dpdk_eth_rx_queue_init,
             nb_tx_queues, &vr_dpdk_eth_tx_queue_init);
 }
 
@@ -107,24 +108,45 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
 
     /* schedule KNI queues */
-    return vr_dpdk_lcore_if_schedule(vif, 1, &vr_dpdk_kni_rx_queue_init,
+    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+            1, &vr_dpdk_kni_rx_queue_init,
             1, &vr_dpdk_kni_tx_queue_init);
+}
+
+/* Add agent interface */
+static int
+dpdk_agent_if_add(struct vr_interface *vif)
+{
+    int ret;
+
+    RTE_LOG(INFO, VROUTER, "Adding vif %u packet device %s\n",
+                vif->vif_idx, vif->vif_name);
+
+    /* check if packet device is already added */
+    if (vr_dpdk.packet_ring != NULL) {
+        RTE_LOG(ERR, VROUTER, "\terror adding packet device %s: already exist\n",
+                vif->vif_name);
+        return -EEXIST;
+    }
+
+    /* init packet device */
+    ret = dpdk_packet_socket_init();
+    if (ret)
+        return ret;
+
+    vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
+
+    /* schedule packet device with no hardware queues */
+    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk.packet_lcore_id, 0, NULL, 0, NULL);
 }
 
 /* vRouter callback */
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
-    int ret = 0;
-
     if ((vif->vif_type == VIF_TYPE_AGENT) &&
             (vif->vif_transport == VIF_TRANSPORT_SOCKET)) {
-        ret = dpdk_packet_socket_init();
-        if (ret)
-            return ret;
-
-        vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
-        return 0;
+        return dpdk_agent_if_add(vif);
     }
 
     /* get interface name */
