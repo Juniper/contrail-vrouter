@@ -32,14 +32,9 @@ static char *dpdk_argv[] = {"dpdk",
     "-n", "2" };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
 
-/*
- * pktmbuf constructor with vr_packet support
- */
+/* Pktmbuf constructor with vr_packet support */
 void
-dpdk_pktmbuf_init(struct rte_mempool *mp,
-         __attribute__((unused)) void *opaque_arg,
-         void *_m,
-         __attribute__((unused)) unsigned i)
+vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i)
 {
     struct rte_mbuf *m = _m;
     struct vr_packet *pkt;
@@ -78,7 +73,7 @@ dpdk_init(void)
     vr_dpdk.pktmbuf_pool = rte_mempool_create("vrouter_mbuf_pool", VR_DPDK_MPOOL_SZ,
             VR_DPDK_MBUF_SZ, VR_DPDK_MPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
-            rte_pktmbuf_pool_init, NULL, dpdk_pktmbuf_init, NULL,
+            rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
             rte_socket_id(), 0);
     if (NULL == vr_dpdk.pktmbuf_pool) {
         RTE_LOG(CRIT, VROUTER, "Error initializing mbuf pool\n");

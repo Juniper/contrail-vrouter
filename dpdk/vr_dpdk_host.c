@@ -933,6 +933,13 @@ vr_dpdk_host_init(void)
     if (vr_host_inited)
         return 0;
 
+    if (!vrouter_host) {
+        vrouter_host = vrouter_get_host();
+        if (vr_dpdk_flow_init()) {
+            return -1;
+        }
+    }
+
     ret = vrouter_init();
     if (ret)
         return ret;

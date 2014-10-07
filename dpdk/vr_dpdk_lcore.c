@@ -196,6 +196,7 @@ dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, txq_next) {
         tx_queue->txq_ops.f_flush(tx_queue->txq_queue_h);
     }
+    vr_dpdk_packet_tx();
 }
 
 /* Send a burst of packets to vRouter */
@@ -382,11 +383,21 @@ dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
     while (likely(1)) {
         rte_prefetch0(lcore);
 
-        if (lcore_id == netlink_lcore_id)
+        if (lcore_id == netlink_lcore_id) {
+            RTE_LOG(DEBUG, VROUTER, "%s: NetLink IO on lcore %u\n",
+                __func__, rte_lcore_id());
             dpdk_netlink_io();
-        if (lcore_id == packet_lcore_id)
+        }
+        if (lcore_id == packet_lcore_id) {
+            RTE_LOG(DEBUG, VROUTER, "%s: packet IO on lcore %u\n",
+                __func__, rte_lcore_id());
             dpdk_packet_io();
+        }
 
+        if (netlink_lcore_id != packet_lcore_id)
+            break;
+
+        usleep(VR_DPDK_SLEEP_SERVICE_US);
         /* check for the stop flag */
         if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
             break;
@@ -416,7 +427,6 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
 
     if (rte_lcore_count() == 2) {
         /* use master lcore for packet and NetLink handling */
-        vr_usocket_non_blocking(vr_dpdk.netlink_sock);
         packet_lcore_id = netlink_lcore_id;
     }
 

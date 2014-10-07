@@ -122,6 +122,9 @@ void vr_usocket_close(void *sock);
 int vr_usocket_io(void *transport);
 void vr_usocket_non_blocking(struct vr_usocket *usockp);
 void vr_usocket_attach_vif(void *usockp, struct vr_interface *vif);
+int vr_usocket_bind_usockets(void *usock1, void *usock2);
+int vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
+    unsigned int len);
 
 #define VR_NETLINK_TCP_PORT         20914
 #define VR_NETLINK_UNIX_FILE        "/tmp/dpdk_netlink"

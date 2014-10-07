@@ -398,16 +398,17 @@ static void
 vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 {
     struct rte_pktmbuf *pmbuf;
+    struct vr_packet *pkt;
 
     if (usockp->usock_vif) {
         pmbuf = &usockp->usock_mbuf->pkt;
         pmbuf->data = usockp->usock_rx_buf;
         pmbuf->data_len = usockp->usock_read_len;
         pmbuf->pkt_len = usockp->usock_read_len;
-        /* TODO: rebase on RSS commit
-        dpdk_burst_rx(1, &usockp->usock_mbuf, usockp->usock_vif,
-                "pkt0", 0);
-        */
+        /* convert mbuf to vr_packet */
+        pkt = vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
+        /* send the packet to vRouter */
+        usockp->usock_vif->vif_rx(usockp->usock_vif, pkt, VLAN_ID_INVALID);
     } else {
         rte_pktmbuf_free(usockp->usock_mbuf);
     }
@@ -422,22 +423,18 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 static struct rte_mbuf *
 vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
-    /* TODO: rebase on RSS commit
     int ret;
     void *objp;
     struct vr_interface *vif = usockp->usock_vif;
-    struct vif_port *port;
 
-    if (!vif || !(port = (struct vif_port *)vif->vif_os))
+    if (!vif)
         return NULL;
 
-    ret = rte_ring_dequeue(port->vip_tx_ring, &objp);
+    ret = rte_ring_dequeue(vr_dpdk.packet_ring, &objp);
     if (ret)
         return NULL;
 
     return (struct rte_mbuf *)objp;
-    */
-    return NULL;
 }
 
 static int
@@ -676,8 +673,7 @@ usock_alloc(unsigned short proto, unsigned short type)
             usockp->usock_mbuf_pool = rte_mempool_create("pkt0_mbuf_pool",
                     PKT0_MBUF_POOL_SIZE, PKT0_MBUF_PACKET_SIZE,
                     VR_DPDK_MPOOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private),
-                    /* TODO: rebase on RSS commit */
-                    rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
+                    rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                     rte_socket_id(), 0);
             if (!usockp->usock_mbuf_pool)
                 goto error_exit;

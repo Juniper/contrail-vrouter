@@ -93,6 +93,8 @@
 #define VR_DPDK_SLEEP_TIMER_US      100
 /* KNI handling periodicity in US */
 #define VR_DPDK_SLEEP_KNI_US        100
+/* Sleep time in US for service lcore */
+#define VR_DPDK_SLEEP_SERVICE_US    100
 
 /*
  * VRouter/DPDK Data Structures
@@ -175,8 +177,12 @@ struct vr_dpdk_global {
     rte_atomic16_t stop_flag;
     /* NetLink socket handler */
     void *netlink_sock;
-    void *packet_transport;
     void *flow_table;
+    /* Packet socket */
+    struct rte_ring *packet_ring;
+    void *packet_transport;
+    /* Event socket */
+    void *event_sock;
     /* KNI thread ID */
     pthread_t kni_thread;
     /* timer thread ID */
@@ -251,7 +257,13 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
 }
 
 /*
- * vr_ethdev.c
+ * dpdk_vrouter.c
+ */
+/* pktmbuf constructor with vr_packet support */
+void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i);
+
+/*
+ * vr_dpdk_ethdev.c
  */
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
@@ -266,13 +278,21 @@ int vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     uint16_t nb_tx_queues);
 
 /*
+ * vr_dpdk_flow_mem.c
+ */
+int vr_dpdk_flow_mem_init(void);
+int vr_dpdk_flow_init(void);
+
+/*
  * vr_dpdk_host.c
  */
 int vr_dpdk_host_init(void);
 void vr_dpdk_host_exit(void);
+/* Convert internal packet fields */
+struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif);
 
 /*
- * vr_knidev.c
+ * vr_dpdk_knidev.c
  */
 /* Init KNI */
 int vr_dpdk_knidev_init(struct vr_interface *vif);
@@ -288,7 +308,7 @@ vr_dpdk_kni_tx_queue_init( unsigned lcore_id, struct vr_interface *vif,
 void vr_dpdk_knidev_all_handle(void);
 
 /*
- * vr_lcore.c
+ * vr_dpdk_lcore.c
  */
 /* Launch lcore main loop */
 int vr_dpdk_lcore_launch(void *dummy);
@@ -308,12 +328,13 @@ int dpdk_netlink_io(void);
 /*
  * vr_dpdk_packet.c
  */
+int vr_dpdk_packet_tx(void);
 int dpdk_packet_socket_init(void);
 void dpdk_packet_socket_close(void);
 int dpdk_packet_io(void);
 
 /*
- * vr_ringdev.c
+ * vr_dpdk_ringdev.c
  */
 /* Init ring RX queue */
 struct vr_dpdk_rx_queue *
@@ -323,11 +344,5 @@ vr_dpdk_ring_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 struct vr_dpdk_tx_queue *
 vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id);
-
-/*
- * vrouter_mod.c
- */
-/* Convert internal packet fields */
-struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif);
 
 #endif /*_VR_DPDK_H_ */
