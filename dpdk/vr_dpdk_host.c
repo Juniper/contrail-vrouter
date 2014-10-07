@@ -27,9 +27,17 @@
 #include <rte_cycles.h>
 
 #include "vr_dpdk.h"
+#include "vr_sandesh.h"
+#include "vr_proto.h"
 
 uint32_t vr_hashrnd = 0;
 int hashrnd_inited = 0;
+extern int dpdk_netlink_core_id, dpdk_packet_core_id;
+/* Max number of CPU */
+unsigned int vr_num_cpus = RTE_MAX_LCORE;
+/* Global init flag */
+static bool vr_host_inited = false;
+
 
 static void *
 dpdk_page_alloc(unsigned int size)
@@ -874,9 +882,7 @@ vrouter_get_host(void)
 void
 vhost_remove_xconnect(void)
 {
-    /* loop iterator */
     int i;
-    /* loop interface */
     struct vr_interface *vif;
 
     for (i = 0; i < VR_MAX_INTERFACES; i++) {
@@ -906,5 +912,51 @@ vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif)
     pkt->vp_type = VP_TYPE_NULL;
     pkt->vp_ttl = 0;
 
-    return (pkt);
+    return pkt;
 }
+
+/* Exit vRouter */
+void
+vr_dpdk_host_exit(void)
+{
+    vr_sandesh_exit();
+    vrouter_exit(false);
+
+    return;
+}
+
+/* Init vRouter */
+int
+vr_dpdk_host_init(void)
+{
+    int ret;
+    int lcore_count = rte_lcore_count();
+
+    if (vr_host_inited)
+        return 0;
+
+    ret = vrouter_init();
+    if (ret)
+        return ret;
+
+    ret = vr_sandesh_init();
+    if (ret)
+        goto init_fail;
+
+    dpdk_netlink_core_id = rte_get_master_lcore();
+    if (lcore_count == 2) {
+        dpdk_packet_core_id = dpdk_netlink_core_id;
+    } else {
+        dpdk_packet_core_id = rte_get_next_lcore(dpdk_netlink_core_id,
+                1, 1);
+    }
+
+    vr_host_inited = true;
+
+    return 0;
+
+init_fail:
+    vr_dpdk_host_exit();
+    return ret;
+}
+

@@ -18,9 +18,6 @@
 
 #include <rte_timer.h>
 
-#include "vr_os.h"
-#include "vr_proto.h"
-#include "vr_sandesh.h"
 #include "vr_dpdk.h"
 
 static int no_daemon_set;
@@ -30,11 +27,6 @@ extern int vr_dpdk_flow_mem_init(void);
 
 /* Global vRouter/DPDK structure */
 struct vr_dpdk_global vr_dpdk;
-
-/* Max number of CPU */
-unsigned int vr_num_cpus = RTE_MAX_LCORE;
-/* Global init flag */
-static bool vr_host_inited = false;
 
 /* TODO: default commandline params */
 static char *dpdk_argv[] = {"dpdk",
@@ -72,16 +64,16 @@ dpdk_init(void)
 {
     int ret, nb_sys_ports;
 
-    ret = rte_eal_init(dpdk_argc, dpdk_argv);
+    ret = vr_dpdk_flow_mem_init();
     if (ret < 0) {
-        printf("Error initializing EAL\n");
+        printf("Error initializing flow table: %s (%d)\n",
+            strerror(-ret), -ret);
         return ret;
     }
 
-    ret = vr_dpdk_flow_mem_init();
+    ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (ret < 0) {
-        RTE_LOG(CRIT, VROUTER, "Error initializing flow table: %s (%d)\n",
-            strerror(-ret), -ret);
+        printf("Error initializing EAL\n");
         return ret;
     }
 
@@ -290,42 +282,6 @@ dpdk_threads_create(void)
     return 0;
 }
 
-/* Exit vRouter */
-void
-dpdk_vrouter_exit(void)
-{
-    vr_sandesh_exit();
-    vrouter_exit(false);
-
-    return;
-}
-
-/* Init vRouter */
-int
-dpdk_vrouter_init(void)
-{
-    int ret;
-
-    if (vr_host_inited)
-        return 0;
-
-    ret = vrouter_init();
-    if (ret)
-        return ret;
-
-    ret = vr_sandesh_init();
-    if (ret)
-        goto init_fail;
-
-    vr_host_inited = true;
-
-    return 0;
-
-init_fail:
-    dpdk_vrouter_exit();
-    return ret;
-}
-
 enum vr_opt_index {
     DAEMON_OPT_INDEX,
     MAX_OPT_INDEX
@@ -377,8 +333,8 @@ main(int argc, char *argv[])
         return ret;
     }
 
-    /* init the vrouter */
-    ret = dpdk_vrouter_init();
+    /* init the vRouter */
+    ret = vr_dpdk_host_init();
     if (ret != 0) {
         dpdk_exit();
         return ret;
@@ -387,7 +343,7 @@ main(int argc, char *argv[])
     /* init the communication socket with agent */
     ret = dpdk_netlink_init();
     if (ret != 0) {
-        dpdk_vrouter_exit();
+        vr_dpdk_host_exit();
         dpdk_exit();
         return ret;
     }
@@ -397,7 +353,7 @@ main(int argc, char *argv[])
     if (ret != 0) {
         dpdk_threads_cancel();
         dpdk_threads_join();
-        dpdk_vrouter_exit();
+        vr_dpdk_host_exit();
         dpdk_exit();
         return ret;
     }
@@ -409,8 +365,8 @@ main(int argc, char *argv[])
     dpdk_threads_cancel();
     dpdk_threads_join();
     dpdk_netlink_exit();
+    vr_dpdk_host_exit();
     dpdk_exit();
-    dpdk_vrouter_exit();
 
     return ret;
 }

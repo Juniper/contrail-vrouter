@@ -48,10 +48,10 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
             continue;
         }
 
-        if (!multi_flag && !vr_response_queue_empty()) {
+        if (!vr_response_queue_empty()) {
             multi_flag = NLM_F_MULTI;
         } else {
-            multi_flag = 0;
+            multi_flag = NLMSG_DONE;
         }
 
         resp->vr_message_len = RTE_ALIGN(resp->vr_message_len, 4);

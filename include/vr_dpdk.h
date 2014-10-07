@@ -268,6 +268,12 @@ int vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     uint16_t nb_tx_queues);
 
 /*
+ * vr_dpdk_host.c
+ */
+int vr_dpdk_host_init(void);
+void vr_dpdk_host_exit(void);
+
+/*
  * vr_knidev.c
  */
 /* Init KNI */
