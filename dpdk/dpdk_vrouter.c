@@ -22,9 +22,6 @@
 
 static int no_daemon_set;
 
-extern int dpdk_netlink_core_id, dpdk_packet_core_id;
-extern int vr_dpdk_flow_mem_init(void);
-
 /* Global vRouter/DPDK structure */
 struct vr_dpdk_global vr_dpdk;
 
@@ -101,11 +98,10 @@ dpdk_init(void)
 
     /* Enable all detected lcores */
     vr_dpdk.nb_lcores = rte_lcore_count();
-    if (vr_dpdk.nb_lcores) {
+    if (vr_dpdk.nb_lcores >= 2) {
         RTE_LOG(INFO, VROUTER, "Using %i forwarding lcore(s)\n", vr_dpdk.nb_lcores);
     } else {
-        RTE_LOG(CRIT, VROUTER, "No forwarding lcores found. Please use -c option to"
-            " enable more lcores.");
+        RTE_LOG(CRIT, VROUTER, "Please enable at least 2 lcores\n");
         return -ENODEV;
     }
 
@@ -352,7 +348,7 @@ main(int argc, char *argv[])
     }
 
     /* run loops on all forwarding lcores */
-    ret = rte_eal_mp_remote_launch(vr_dpdk_lcore_loop, NULL, CALL_MASTER);
+    ret = rte_eal_mp_remote_launch(vr_dpdk_lcore_launch, NULL, CALL_MASTER);
 
     rte_eal_mp_wait_lcore();
     dpdk_threads_cancel();

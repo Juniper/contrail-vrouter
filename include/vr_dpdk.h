@@ -31,7 +31,7 @@
 
 #define RTE_LOGTYPE_VROUTER         RTE_LOGTYPE_USER1
 #undef RTE_LOG_LEVEL
-#define RTE_LOG_LEVEL               RTE_LOG_INFO
+#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
 /*
  * Debug options:
  *
@@ -290,8 +290,8 @@ void vr_dpdk_knidev_all_handle(void);
 /*
  * vr_lcore.c
  */
-/* Forwarding lcore main loop */
-int vr_dpdk_lcore_loop(void *dummy);
+/* Launch lcore main loop */
+int vr_dpdk_lcore_launch(void *dummy);
 /* Schedule an interface */
 int vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
     uint16_t nb_rx_queues, vr_dpdk_rx_queue_init_op rx_queue_init_op,
@@ -303,12 +303,14 @@ int vr_dpdk_lcore_if_schedule(struct vr_interface *vif,
 void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
+int dpdk_netlink_io(void);
 
 /*
  * vr_dpdk_packet.c
  */
 int dpdk_packet_socket_init(void);
 void dpdk_packet_socket_close(void);
+int dpdk_packet_io(void);
 
 /*
  * vr_ringdev.c

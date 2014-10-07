@@ -18,6 +18,7 @@
 #include <rte_malloc.h>
 
 #include "vr_dpdk.h"
+#include "vr_dpdk_usocket.h"
 
 /* Returns the least used lcore or RTE_MAX_LCORE */
 static unsigned
@@ -223,9 +224,9 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     }
 }
 
-/* Forwarding lcore run */
+/* Forwarding lcore IO */
 static inline void
-dpdk_lcore_run(struct vr_dpdk_lcore *lcore)
+dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 {
     struct vr_dpdk_rx_queue *rx_queue;
     uint32_t nb_pkts;
@@ -315,11 +316,8 @@ dpdk_lcore_exit()
 
 /* Forwarding lcore main loop */
 int
-vr_dpdk_lcore_loop(__attribute__((unused)) void *dummy)
+dpdk_lcore_fwd_loop(struct vr_dpdk_lcore *lcore)
 {
-    const unsigned lcore_id = rte_lcore_id();
-    struct vr_dpdk_lcore *lcore;
-
     /* cycles counters */
     uint64_t cur_cycles = 0;
     uint64_t diff_cycles;
@@ -332,14 +330,7 @@ vr_dpdk_lcore_loop(__attribute__((unused)) void *dummy)
     const uint64_t tx_flush_cycles = VR_DPDK_TX_FLUSH_LOOPS;
 #endif
 
-    RTE_LOG(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", lcore_id);
-
-    /* init forwarding lcore */
-    if (dpdk_lcore_init() != 0)
-        return -ENOMEM;
-
-    /* set current lcore context */
-    lcore = vr_dpdk.lcores[lcore_id];
+    RTE_LOG(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", rte_lcore_id());
 
     while (likely(1)) {
         rte_prefetch0(lcore);
@@ -351,8 +342,8 @@ vr_dpdk_lcore_loop(__attribute__((unused)) void *dummy)
         cur_cycles++;
 #endif
 
-        /* run lcore loop */
-        dpdk_lcore_run(lcore);
+        /* run forwarding lcore IO */
+        dpdk_lcore_fwd_io(lcore);
 
         /* check if we need to flush TX queues */
         diff_cycles = cur_cycles - last_tx_cycles;
@@ -374,7 +365,65 @@ vr_dpdk_lcore_loop(__attribute__((unused)) void *dummy)
         } /* flush TX queues */
     } /* lcore loop */
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from forwarding lcore %u\n", lcore_id);
+    RTE_LOG(DEBUG, VROUTER, "Bye-bye from forwarding lcore %u\n", rte_lcore_id());
+
+    return 0;
+}
+
+/* Service lcore main loop */
+int
+dpdk_lcore_service_loop(struct vr_dpdk_lcore *lcore, unsigned netlink_lcore_id,
+    unsigned packet_lcore_id)
+{
+    unsigned lcore_id = rte_lcore_id();
+
+    RTE_LOG(DEBUG, VROUTER, "Hello from service lcore %u\n", rte_lcore_id());
+
+    while (likely(1)) {
+        rte_prefetch0(lcore);
+
+        if (lcore_id == netlink_lcore_id)
+            dpdk_netlink_io();
+        if (lcore_id == packet_lcore_id)
+            dpdk_packet_io();
+
+        /* check for the stop flag */
+        if (unlikely(rte_atomic16_read(&lcore->lcore_stop_flag) != 0))
+            break;
+    } /* lcore loop */
+
+    RTE_LOG(DEBUG, VROUTER, "Bye-bye from service lcore %u\n", rte_lcore_id());
+
+    return 0;
+}
+
+/* Launch lcore main loop */
+int
+vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
+{
+    const unsigned lcore_id = rte_lcore_id();
+    struct vr_dpdk_lcore *lcore;
+    const unsigned netlink_lcore_id = rte_get_master_lcore();
+    /* skip master lcore and wrap */
+    unsigned packet_lcore_id = rte_get_next_lcore(netlink_lcore_id, 1, 1);
+
+    /* init forwarding lcore */
+    if (dpdk_lcore_init() != 0)
+        return -ENOMEM;
+
+    /* set current lcore context */
+    lcore = vr_dpdk.lcores[lcore_id];
+
+    if (rte_lcore_count() == 2) {
+        /* use master lcore for packet and NetLink handling */
+        vr_usocket_non_blocking(vr_dpdk.netlink_sock);
+        packet_lcore_id = netlink_lcore_id;
+    }
+
+    if (lcore_id == netlink_lcore_id || lcore_id == packet_lcore_id)
+        dpdk_lcore_service_loop(lcore, netlink_lcore_id, packet_lcore_id);
+    else
+        dpdk_lcore_fwd_loop(lcore);
 
     /* exit forwarding lcore */
     dpdk_lcore_exit();

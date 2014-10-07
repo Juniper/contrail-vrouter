@@ -7,6 +7,8 @@
 #ifndef __VR_DPDK_USOCKET_H__
 #define __VR_DPDK_USOCKET_H__
 
+#include "vr_queue.h"
+
 /*
  * usocket is an object where io happens. while it can represent non
  * socket objects too (like an eventfd), most consumers are socket

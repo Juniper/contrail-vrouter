@@ -32,7 +32,6 @@
 
 uint32_t vr_hashrnd = 0;
 int hashrnd_inited = 0;
-extern int dpdk_netlink_core_id, dpdk_packet_core_id;
 /* Max number of CPU */
 unsigned int vr_num_cpus = RTE_MAX_LCORE;
 /* Global init flag */
@@ -930,7 +929,6 @@ int
 vr_dpdk_host_init(void)
 {
     int ret;
-    int lcore_count = rte_lcore_count();
 
     if (vr_host_inited)
         return 0;
@@ -942,14 +940,6 @@ vr_dpdk_host_init(void)
     ret = vr_sandesh_init();
     if (ret)
         goto init_fail;
-
-    dpdk_netlink_core_id = rte_get_master_lcore();
-    if (lcore_count == 2) {
-        dpdk_packet_core_id = dpdk_netlink_core_id;
-    } else {
-        dpdk_packet_core_id = rte_get_next_lcore(dpdk_netlink_core_id,
-                1, 1);
-    }
 
     vr_host_inited = true;
 
