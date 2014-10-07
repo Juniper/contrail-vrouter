@@ -142,14 +142,14 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
         /* init hardware or ring queue */
         if (queue_id < nb_tx_queues) {
             /* there is a hardware queue available */
-            RTE_LOG(INFO, VROUTER, "\tlcore %u - HW TX queue %" PRIu16 "\n",
+            RTE_LOG(INFO, VROUTER, "\tlcore %u TX to HW queue %" PRIu16 "\n",
                 lcore_id, queue_id);
             tx_queue = (*tx_queue_init_op)(lcore_id, vif, queue_id);
             if (tx_queue == NULL)
                 return -EFAULT;
         } else {
             /* no more hardware queues left, so we use rings instead */
-            RTE_LOG(INFO, VROUTER, "\tlcore %u - SW TX ring\n", lcore_id);
+            RTE_LOG(INFO, VROUTER, "\tlcore %u TX to SW ring\n", lcore_id);
             tx_queue = vr_dpdk_ring_tx_queue_init(lcore_id, vif, least_used_id);
             if (tx_queue == NULL)
                 return -EFAULT;
@@ -181,7 +181,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
         /* init hardware or ring queue */
         if (queue_id < nb_rx_queues) {
             /* there is a hardware queue available */
-            RTE_LOG(INFO, VROUTER, "\tlcore %u - HW RX queue %" PRIu16 "\n",
+            RTE_LOG(INFO, VROUTER, "\tlcore %u RX from HW queue %" PRIu16 "\n",
                 lcore_id, queue_id);
             rx_queue = (*rx_queue_init_op)(lcore_id, vif, queue_id);
             if (rx_queue == NULL)
