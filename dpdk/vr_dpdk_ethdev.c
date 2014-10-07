@@ -97,8 +97,7 @@ vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
 
     /* init queue */
-    memcpy(&rx_queue->rxq_ops, &rte_port_ethdev_reader_ops,
-        sizeof(struct rte_port_in_ops));
+    rx_queue->rxq_ops = rte_port_ethdev_reader_ops;
     rx_queue->rxq_queue_h = NULL;
     rx_queue->rxq_burst_size = VR_DPDK_ETH_RX_BURST_SZ;
     rx_queue->rxq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
@@ -130,8 +129,7 @@ vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
 
     /* init queue */
-    memcpy(&tx_queue->txq_ops, &rte_port_ethdev_writer_ops,
-        sizeof(struct rte_port_out_ops));
+    tx_queue->txq_ops = rte_port_ethdev_writer_ops;
     tx_queue->txq_queue_h = NULL;
     tx_queue->txq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 

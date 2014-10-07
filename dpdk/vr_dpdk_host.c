@@ -242,9 +242,9 @@ dpdk_pclone(struct vr_packet *pkt)
 
     /* clone vr_packet data */
     pkt_clone = vr_dpdk_mbuf_to_pkt(m_clone);
-    rte_memcpy(pkt_clone, pkt, sizeof(struct vr_packet));
+    *pkt_clone = *pkt;
 
-    return (pkt_clone);
+    return pkt_clone;
 #else
     /* if no scatter/gather enabled -> just copy the mbuf */
     struct rte_mbuf *m, *m_copy;
@@ -258,7 +258,7 @@ dpdk_pclone(struct vr_packet *pkt)
 
     /* copy vr_packet data */
     pkt_copy = vr_dpdk_mbuf_to_pkt(m_copy);
-    rte_memcpy(pkt_copy, pkt, sizeof(struct vr_packet));
+    *pkt_copy = *pkt;
     /* set head pointer to a copy */
     pkt_copy->vp_head = m_copy->buf_addr;
 

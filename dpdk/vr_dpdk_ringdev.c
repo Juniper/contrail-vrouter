@@ -79,8 +79,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct rte_ring *tx_ring;
 
     /* init queue */
-    memcpy(&tx_queue->txq_ops, &rte_port_ring_writer_ops,
-        sizeof(struct rte_port_out_ops));
+    tx_queue->txq_ops = rte_port_ring_writer_ops;
     tx_queue->txq_queue_h = NULL;
     tx_queue->txq_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 

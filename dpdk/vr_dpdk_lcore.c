@@ -196,6 +196,7 @@ dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, txq_next) {
         tx_queue->txq_ops.f_flush(tx_queue->txq_queue_h);
     }
+    /* TODO: find a better place to call the function */
     vr_dpdk_packet_tx();
 }
 
