@@ -48,8 +48,8 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         return -EEXIST;
     }
 
-    /* init eth dev */
-    ret = vr_dpdk_eth_if_init(vif);
+    /* init eth device */
+    ret = vr_dpdk_ethdev_init(vif);
     if (ret != 0)
         return ret;
 
@@ -58,8 +58,8 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-            nb_rx_queues, &vr_dpdk_eth_rx_queue_init,
-            nb_tx_queues, &vr_dpdk_eth_tx_queue_init);
+        ethdev->ethdev_nb_rss_queues, &vr_dpdk_eth_rx_queue_init,
+        ethdev->ethdev_nb_tx_queues, &vr_dpdk_eth_tx_queue_init);
 }
 
 /* Add vhost interface */

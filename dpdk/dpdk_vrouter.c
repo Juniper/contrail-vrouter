@@ -117,7 +117,6 @@ static void
 dpdk_exit(void)
 {
     int i;
-    uint8_t port_id;
 
     RTE_LOG(INFO, VROUTER, "Releasing KNI devices...\n");
     for (i = 0; i < VR_MAX_INTERFACES; i++) {
