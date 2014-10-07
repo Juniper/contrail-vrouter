@@ -32,8 +32,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     uint8_t port_id = vif->vif_os_idx;
     int ret;
     struct ether_addr mac_addr;
-    struct rte_eth_dev_info dev_info;
-    uint16_t nb_rx_queues, nb_tx_queues;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[vif->vif_os_idx];
 
     /* get interface MAC address */
     memset(&mac_addr, 0, sizeof(mac_addr));
@@ -43,35 +42,19 @@ dpdk_fabric_if_add(struct vr_interface *vif)
                 vif->vif_idx, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
     /* check if eth dev is already added */
-    if (vr_dpdk.ethdevs[vif->vif_os_idx].ethdev_ptr != NULL) {
+    if (ethdev->ethdev_ptr != NULL) {
         RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
                 vif->vif_name);
         return -EEXIST;
     }
 
-    /* get device info to find out the number of hardware TX queues */
-    memset(&dev_info, 0, sizeof(dev_info));
-    rte_eth_dev_info_get(port_id, &dev_info);
-    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u max_rx_queues=%"PRIu16
-        " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
-        " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
-        dev_info.driver_name, dev_info.if_index, dev_info.max_rx_queues,
-        dev_info.max_vfs, dev_info.max_vmdq_pools, dev_info.rx_offload_capa,
-        dev_info.tx_offload_capa);
-
-    /* use no more queues than lcores */
-    nb_rx_queues = RTE_MIN(RTE_MIN(dev_info.max_rx_queues, vr_dpdk.nb_fwd_lcores),
-                    VR_DPDK_MAX_RX_QUEUES);
-    nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues, vr_dpdk.nb_fwd_lcores),
-                    VR_DPDK_MAX_TX_QUEUES);
-
-    /* init eth device */
-    ret = vr_dpdk_ethdev_init(vif, nb_rx_queues, nb_tx_queues);
+    /* init eth dev */
+    ret = vr_dpdk_eth_if_init(vif);
     if (ret != 0)
         return ret;
 
     /* add interface to the table of eth devs */
-    vr_dpdk.ethdevs[vif->vif_os_idx].ethdev_ptr = &rte_eth_devices[vif->vif_os_idx];
+    ethdev->ethdev_ptr = &rte_eth_devices[vif->vif_os_idx];
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),

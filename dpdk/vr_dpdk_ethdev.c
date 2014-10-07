@@ -20,7 +20,7 @@
 
 #include <rte_port_ethdev.h>
 
-static struct rte_eth_conf eth_dev_conf = {
+static struct rte_eth_conf ethdev_conf = {
     .link_speed = 0, /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
     .link_duplex = 0, /* ETH_LINK_[HALF_DUPLEX|FULL_DUPLEX], or 0 for autonegotation */
     .rxmode = { /* Port RX configuration. */
@@ -51,6 +51,25 @@ static struct rte_eth_conf eth_dev_conf = {
         .hw_vlan_reject_untagged    = 0, /* If set, reject sending out untagged pkts */
         .hw_vlan_insert_pvid        = 0, /* If set, enable port based VLAN insertion */
     },
+};
+struct rte_fdir_conf fdir_conf_perfect = {
+    .mode = RTE_FDIR_MODE_PERFECT,         /* Flow Director mode. */
+    .pballoc = RTE_FDIR_PBALLOC_64K,    /* Space for FDIR filters. */
+    .status = RTE_FDIR_REPORT_STATUS,   /* How to report FDIR hash. */
+    /* Offset of flexbytes field in RX packets (in 16-bit word units). */
+    .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
+    /* RX queue of packets matching a "drop" filter in perfect mode. */
+    .drop_queue = 0,
+};
+
+struct rte_fdir_conf fdir_conf_none = {
+    .mode = RTE_FDIR_MODE_NONE,         /* Flow Director mode. */
+    .pballoc = 0,    /* Space for FDIR filters. */
+    .status = 0,   /* How to report FDIR hash. */
+    /* Offset of flexbytes field in RX packets (in 16-bit word units). */
+    .flexbytes_offset = 0,
+    /* RX queue of packets matching a "drop" filter in perfect mode. */
+    .drop_queue = 0,
 };
 
 /* RX and TX Prefetch, Host, and Write-back threshold values should be
@@ -149,29 +168,60 @@ vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 }
 
-/* Init ethernet device */
+/* Check if the device supports Flow Director filters */
 int
-vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
-    uint16_t nb_tx_queues)
+dpdk_ethdev_fdir_probe(struct vr_interface *vif)
 {
+    int ret;
     uint8_t port_id = vif->vif_os_idx;
-    struct rte_eth_dev_info dev_info;
-    int ret, i;
-    struct rte_eth_fdir fdir_info;
 
-    /* configure the port */
-    ret = rte_eth_dev_configure(port_id, nb_rx_queues, nb_tx_queues, &eth_dev_conf);
+    /* try to enable Flow Director filters */
+    ethdev_conf.fdir_conf = fdir_conf_perfect;
+    ret = rte_eth_dev_configure(port_id, 1, 1, &ethdev_conf);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror configuring eth device %" PRIu8 ": %s (%d)\n",
-            port_id, strerror(-ret), -ret);
-        return ret;
+        /* try with no filters */
+        ethdev_conf.fdir_conf = fdir_conf_none;
+        ret = rte_eth_dev_configure(port_id, 1, 1, &ethdev_conf);
+        if (ret < 0) {
+            RTE_LOG(ERR, VROUTER, "\terror probing hardware filters for ethdev %" PRIu8
+                ": %s (%d)\n", port_id, strerror(-ret), -ret);
+        }
     }
 
-    /* check if the device supports checksum offloading */
+    return ret;
+}
+
+/* Update device info */
+void
+dpdk_ethdev_info_update(struct vr_interface *vif)
+{
+    int ret;
+    uint8_t port_id = vif->vif_os_idx;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+    struct rte_eth_dev_info dev_info;
+    struct rte_eth_fdir fdir_info;
+
+    /* get device info */
     memset(&dev_info, 0, sizeof(dev_info));
     rte_eth_dev_info_get(port_id, &dev_info);
+    ethdev->ethdev_nb_rx_queues = RTE_MIN(dev_info.max_rx_queues,
+        VR_DPDK_MAX_NB_RX_QUEUES);
+    ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
+        vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_TX_QUEUES);
+    ethdev->ethdev_nb_rss_queues = RTE_MIN(RTE_MIN(ethdev->ethdev_nb_rx_queues,
+        vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_RSS_QUEUES);
 
+    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u max_rx_queues=%"PRIu16
+        " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
+        " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
+        dev_info.driver_name, dev_info.if_index, dev_info.max_rx_queues,
+        dev_info.max_vfs, dev_info.max_vmdq_pools, dev_info.rx_offload_capa,
+        dev_info.tx_offload_capa);
+
+    /* check if the device supports checksum offloading */
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) {
+        RTE_LOG(INFO, VROUTER, "\tenabling hardware TX checksum offloading for ethdev %"
+            PRIu8 "\n", port_id);
         vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
@@ -180,14 +230,35 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
     /* check if the device supports Flow Director filters */
     memset(&fdir_info, 0, sizeof(fdir_info));
     ret = rte_eth_dev_fdir_get_infos(port_id, &fdir_info);
-    if (ret == 0 && fdir_info.free > 0) {
+    if (ret == 0) {
+        RTE_LOG(INFO, VROUTER, "\tenabling hardware filtering for ethdev %"
+            PRIu8 "\n", port_id);
         vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
+        /* use RSS queues only */
+        ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
+    }
+}
+
+/* Setup ethdev hardware queues */
+int
+dpdk_ethdev_queues_setup(struct vr_interface *vif)
+{
+    int ret, i;
+    uint8_t port_id = vif->vif_os_idx;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+
+    /* reset RX queue states */
+    for (i = 0; i < ethdev->ethdev_nb_rx_queues; i++) {
+        if (i < ethdev->ethdev_nb_rss_queues)
+            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_RSS_STATE;
+        else
+            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_FREE_STATE;
     }
 
     /* configure RX queues */
-    for (i = 0; i < nb_rx_queues; i++) {
+    for (i = 0; i < ethdev->ethdev_nb_rx_queues; i++) {
         ret = rte_eth_rx_queue_setup(port_id, i, VR_DPDK_NB_RXD,
             rte_eth_dev_socket_id(port_id), &rx_queue_conf, vr_dpdk.pktmbuf_pool);
         if (ret < 0) {
@@ -197,8 +268,11 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
         }
     }
 
+    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u\n",
+        __func__, (unsigned)ethdev->ethdev_nb_rx_queues,
+            (unsigned)ethdev->ethdev_nb_tx_queues);
     /* configure TX queues */
-    for (i = 0; i < nb_tx_queues; i++) {
+    for (i = 0; i < ethdev->ethdev_nb_tx_queues; i++) {
         ret = rte_eth_tx_queue_setup(port_id, i, VR_DPDK_NB_TXD,
             rte_eth_dev_socket_id(port_id), &tx_queue_conf);
         if (ret < 0) {
@@ -207,6 +281,78 @@ vr_dpdk_ethdev_init(struct vr_interface *vif, uint16_t nb_rx_queues,
             return ret;
         }
     }
+    return 0;
+}
+
+/* Init RSS */
+int
+dpdk_ethdev_rss_init(struct vr_interface *vif)
+{
+    int ret, i, j;
+    uint8_t port_id = vif->vif_os_idx;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+    struct rte_eth_rss_reta reta_conf;
+
+    /* create new RSS redirection table */
+    memset(&reta_conf, 0, sizeof(reta_conf));
+    for (i = j = 0; i < ETH_RSS_RETA_NUM_ENTRIES; i++) {
+        reta_conf.reta[i] = j++;
+        if (ethdev->ethdev_queue_states[j] != VR_DPDK_QUEUE_RSS_STATE)
+            j = 0;
+    }
+
+    /* update RSS redirection table */
+    reta_conf.mask_lo = reta_conf.mask_hi = 0xffffffffffffffffULL;
+    ret = rte_eth_dev_rss_reta_update(port_id, &reta_conf);
+
+    /* no error if the device does not support RETA configuration */
+    if (ret == -ENOTSUP)
+        return 0;
+
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "\terror initializing ethdev %" PRIu8 " RSS: %s (%d)\n",
+            port_id, strerror(-ret), -ret);
+    }
+
+    return ret;
+}
+
+/* Init ethernet device */
+int
+vr_dpdk_ethdev_init(struct vr_interface *vif)
+{
+    /* eth dev port id */
+    uint8_t port_id = vif->vif_os_idx;
+    /* return value */
+    int ret;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+
+    /* probe hardware filters */
+    ret = dpdk_ethdev_fdir_probe(vif);
+    if (ret < 0)
+        return ret;
+
+    /* update ethdev info */
+    dpdk_ethdev_info_update(vif);
+
+    /* configure the device */
+    ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
+        ethdev->ethdev_nb_tx_queues, &ethdev_conf);
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "\terror configuring eth dev %" PRIu8 ": %s (%d)\n",
+            port_id, strerror(-ret), -ret);
+        return ret;
+    }
+
+    /* setup hardware queues */
+    ret = dpdk_ethdev_queues_setup(vif);
+    if (ret < 0)
+        return ret;
+
+    /* init RSS */
+    ret = dpdk_ethdev_rss_init(vif);
+    if (ret < 0)
+        return ret;
 
     /* start eth device */
     ret = rte_eth_dev_start(port_id);
