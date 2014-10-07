@@ -181,8 +181,6 @@ struct vr_dpdk_global {
     pthread_t kni_thread;
     /* timer thread ID */
     pthread_t timer_thread;
-    /* NetLink thread ID */
-    pthread_t netlink_thread;
     /* table of KNIs */
     struct rte_kni *knis[VR_MAX_INTERFACES];
     /* table of vHosts */

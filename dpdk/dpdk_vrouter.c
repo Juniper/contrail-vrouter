@@ -66,14 +66,14 @@ dpdk_init(void)
 
     ret = vr_dpdk_flow_mem_init();
     if (ret < 0) {
-        printf("Error initializing flow table: %s (%d)\n",
+        fprintf(stderr, "Error initializing flow table: %s (%d)\n",
             strerror(-ret), -ret);
         return ret;
     }
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (ret < 0) {
-        printf("Error initializing EAL\n");
+        fprintf(stderr, "Error initializing EAL\n");
         return ret;
     }
 
@@ -143,7 +143,7 @@ dpdk_exit(void)
 static void *
 dpdk_timer_loop(__attribute__((unused)) void *dummy)
 {
-    while(1) {
+    while (1) {
         rte_timer_manage();
 
         /* check for the global stop flag */
@@ -159,7 +159,7 @@ dpdk_timer_loop(__attribute__((unused)) void *dummy)
 static void *
 dpdk_kni_loop(__attribute__((unused)) void *dummy)
 {
-    while(1) {
+    while (1) {
         vr_dpdk_knidev_all_handle();
 
         /* check for the global stop flag */
@@ -196,10 +196,7 @@ dpdk_signal_handler(int signum)
     RTE_LOG(DEBUG, VROUTER, "Got signal %i on lcore %u\n",
             signum, rte_lcore_id());
 
-    /* stop processing on RTMIN or SIGINT signal */
-    if (signum == SIGTERM || signum == SIGINT) {
-        dpdk_stop_flag_set();
-    }
+    dpdk_stop_flag_set();
 }
 
 /* Setup signal handlers */
@@ -238,8 +235,6 @@ dpdk_threads_cancel(void)
         pthread_cancel(vr_dpdk.kni_thread);
     if (vr_dpdk.timer_thread)
         pthread_cancel(vr_dpdk.timer_thread);
-    if (vr_dpdk.netlink_thread)
-        pthread_cancel(vr_dpdk.netlink_thread);
 }
 
 /* Wait for other threads to join */
@@ -250,8 +245,6 @@ dpdk_threads_join(void)
         pthread_join(vr_dpdk.kni_thread, NULL);
     if (vr_dpdk.timer_thread)
         pthread_join(vr_dpdk.timer_thread, NULL);
-    if (vr_dpdk.netlink_thread)
-        pthread_join(vr_dpdk.netlink_thread, NULL);
 }
 
 
@@ -307,7 +300,7 @@ main(int argc, char *argv[])
 
         case '?':
         default:
-            printf("Invalid option %s\n", argv[optind]);
+            fprintf(stderr, "Invalid option %s\n", argv[optind]);
             exit(-EINVAL);
             break;
         }

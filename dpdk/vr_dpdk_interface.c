@@ -305,14 +305,14 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      */
     if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
         /* if NIC supports checksum offload */
-        if(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)
+        if (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)
             dpdk_hw_checksum(pkt);
         else
             dpdk_sw_checksum(pkt);
-    } else if(VP_TYPE_IPOIP == pkt->vp_type) {
+    } else if (VP_TYPE_IPOIP == pkt->vp_type) {
         /* always calculate outer checksum for tunnels */
         /* if NIC supports checksum offload */
-        if(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) {
+        if (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) {
             /* TODO: vlan support */
             dpdk_hw_checksum_at_offset(pkt,
                 pkt->vp_data + sizeof(struct ether_hdr));
