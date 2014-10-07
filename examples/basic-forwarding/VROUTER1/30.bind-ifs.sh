@@ -14,8 +14,8 @@ sudo ifconfig ${VROUTER1_2_IF} down
 #################################################################
 ## Load Kernel Modules
 sudo modprobe uio
-sudo insmod ${CONTRAIL_DIR}/dpdk/build/kmod/rte_kni.ko
-sudo insmod ${CONTRAIL_DIR}/dpdk/build/kmod/igb_uio.ko
+sudo insmod ${DPDK_DIR}/build/kmod/rte_kni.ko
+sudo insmod ${DPDK_DIR}/build/kmod/igb_uio.ko
 
 #################################################################
 ## Re-bind NICs to DPDK Drivers

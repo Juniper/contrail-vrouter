@@ -18,6 +18,8 @@ OPTIMIZATION="production"
 CONTRAIL_DIR="${HOME}/contrail"
 # HugeTLBfs mount point
 TLBFS_DIR="/mnt/huge"
+# DPDK base directory
+DPDK_DIR="${CONTRAIL_DIR}/third_party/dpdk"
 
 #################################################################
 ## INTERFACES
@@ -59,4 +61,4 @@ VIF="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/utils/vif"
 VROUTER="${CONTRAIL_DIR}/build/${OPTIMIZATION}/vrouter/dpdk/dpdk_vrouter"
 
 # Bind Tool
-BIND="${CONTRAIL_DIR}/dpdk/tools/dpdk_nic_bind.py"
+BIND="${DPDK_DIR}/tools/dpdk_nic_bind.py"

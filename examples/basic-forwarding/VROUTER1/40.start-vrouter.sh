@@ -6,5 +6,5 @@
 
 . 00.config.sh
 
-export RTE_SDK="${CONTRAIL_DIR}/dpdk"
+export RTE_SDK="${DPDK_DIR}"
 sudo -E ${VROUTER} --no-daemon

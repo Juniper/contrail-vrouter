@@ -6,5 +6,4 @@
 
 . 00.config.sh
 
-(cd ${CONTRAIL_DIR} && scons dpdk vrouter/dpdk vrouter/utils \
-    --optimization=${OPTIMIZATION})
+(cd ${CONTRAIL_DIR} && scons vrouter --optimization=${OPTIMIZATION})
