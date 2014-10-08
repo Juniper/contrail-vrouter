@@ -61,6 +61,8 @@
 #define VIF_FLAG_VHOST_PHYS         0x200
 /* The interface corresponds to a DPDK port */
 #define VIF_FLAG_PMD                0x400
+/* The physical interface supports hardware filters */
+#define VIF_FLAG_FILTER_OFFLOAD     0x800
 
 #define VIF_TRANSPORT_VIRTUAL       0
 #define VIF_TRANSPORT_ETH           1

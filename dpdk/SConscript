@@ -10,7 +10,7 @@ env = VRouterEnv.Clone()
 # Include paths
 
 # CFLAGS
-env.Append(CCFLAGS = '-g -Werror')
+env.Append(CCFLAGS = '-Werror -Wall')
 env.Append(CCFLAGS = '-D__DPDK__')
 
 env.Replace(LIBPATH = env['TOP_LIB'])
@@ -23,10 +23,10 @@ env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
 # Add all dpdk libraries
 env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
     'rte_hash', 'rte_mempool', 'rte_ring', 'rte_mbuf', 'rte_eal', 'rte_malloc',
-    'rte_timer', 'ethdev'])
+    'rte_port', 'rte_timer', 'ethdev'])
 
 # Add libraries required by dpdk
-env.Append(LIBS = ['rt', 'pcap', 'dl', 'pthread'])
+env.Append(LIBS = ['rt', 'dl', 'pthread'])
 
 env.Append(LINKCOM =
     ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
@@ -39,13 +39,16 @@ dpdk_lib = env.Command('dpdk_lib', None, make_cmd, chdir=make_dir)
 env.AlwaysBuild(dpdk_lib)
 
 dpdk_vrouter_src = [ 'dpdk_vrouter.c',
-                     'vr_dpdk.c',
+                     'vr_dpdk_ethdev.c',
                      'vr_dpdk_flow_mem.c',
+                     'vr_dpdk_host.c',
+                     'vr_dpdk_interface.c',
+                     'vr_dpdk_knidev.c',
+                     'vr_dpdk_lcore.c',
                      'vr_dpdk_netlink.c',
                      'vr_dpdk_packet.c',
+                     'vr_dpdk_ringdev.c',
                      'vr_dpdk_usocket.c',
-                     'vr_host_interface.c',
-                     'vrouter_mod.c',
                    ]
 
 dpdk_vrouter = env.Program('dpdk_vrouter', dpdk_vrouter_src)
