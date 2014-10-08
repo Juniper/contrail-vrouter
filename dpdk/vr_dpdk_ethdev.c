@@ -21,8 +21,8 @@
 #include <rte_port_ethdev.h>
 
 static struct rte_eth_conf ethdev_conf = {
-    .link_speed = 0, /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
-    .link_duplex = 0, /* ETH_LINK_[HALF_DUPLEX|FULL_DUPLEX], or 0 for autonegotation */
+    .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
+    .link_duplex = 0,   /* ETH_LINK_[HALF_DUPLEX|FULL_DUPLEX], or 0 for autonegotation */
     .rxmode = { /* Port RX configuration. */
         /* The multi-queue packet distribution mode to be used, e.g. RSS. */
         .mq_mode            = ETH_MQ_RX_RSS,
@@ -51,25 +51,19 @@ static struct rte_eth_conf ethdev_conf = {
         .hw_vlan_reject_untagged    = 0, /* If set, reject sending out untagged pkts */
         .hw_vlan_insert_pvid        = 0, /* If set, enable port based VLAN insertion */
     },
-};
-struct rte_fdir_conf fdir_conf_perfect = {
-    .mode = RTE_FDIR_MODE_PERFECT,         /* Flow Director mode. */
-    .pballoc = RTE_FDIR_PBALLOC_64K,    /* Space for FDIR filters. */
-    .status = RTE_FDIR_REPORT_STATUS,   /* How to report FDIR hash. */
-    /* Offset of flexbytes field in RX packets (in 16-bit word units). */
-    .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
-    /* RX queue of packets matching a "drop" filter in perfect mode. */
-    .drop_queue = 0,
-};
-
-struct rte_fdir_conf fdir_conf_none = {
-    .mode = RTE_FDIR_MODE_NONE,         /* Flow Director mode. */
-    .pballoc = 0,    /* Space for FDIR filters. */
-    .status = 0,   /* How to report FDIR hash. */
-    /* Offset of flexbytes field in RX packets (in 16-bit word units). */
-    .flexbytes_offset = 0,
-    /* RX queue of packets matching a "drop" filter in perfect mode. */
-    .drop_queue = 0,
+    .fdir_conf = {
+#if VR_DPDK_USE_HW_FILTERS == true
+        .mode = RTE_FDIR_MODE_PERFECT,          /* Flow Director mode. */
+#else
+        .mode = RTE_FDIR_MODE_NONE,
+#endif
+        .pballoc = RTE_FDIR_PBALLOC_64K,        /* Space for FDIR filters. */
+        .status = RTE_FDIR_NO_REPORT_STATUS,    /* How to report FDIR hash. */
+        /* Offset of flexbytes field in RX packets (in 16-bit word units). */
+        .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
+        /* RX queue of packets matching a "drop" filter in perfect mode. */
+        .drop_queue = 1,
+    },
 };
 
 /* RX and TX Prefetch, Host, and Write-back threshold values should be
@@ -101,8 +95,13 @@ static const struct rte_eth_txconf tx_queue_conf = {
     },
     .tx_free_thresh = 0,    /* Use PMD default values */
     .tx_rs_thresh = 0,      /* Use PMD default values */
+    .txq_flags =            /* Set flags for the Tx queue */
+        ETH_TXQ_FLAGS_NOMULTSEGS
+        | ETH_TXQ_FLAGS_NOREFCOUNT
+        | ETH_TXQ_FLAGS_NOVLANOFFL
+        | ETH_TXQ_FLAGS_NOXSUMSCTP
+        | ETH_TXQ_FLAGS_NOXSUMTCP
 };
-
 
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
@@ -168,38 +167,13 @@ vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 }
 
-/* Check if the device supports Flow Director filters */
-int
-dpdk_ethdev_fdir_probe(struct vr_interface *vif)
-{
-    int ret;
-    uint8_t port_id = vif->vif_os_idx;
-
-    /* try to enable Flow Director filters */
-    ethdev_conf.fdir_conf = fdir_conf_perfect;
-    ret = rte_eth_dev_configure(port_id, 1, 1, &ethdev_conf);
-    if (ret < 0) {
-        /* try with no filters */
-        ethdev_conf.fdir_conf = fdir_conf_none;
-        ret = rte_eth_dev_configure(port_id, 1, 1, &ethdev_conf);
-        if (ret < 0) {
-            RTE_LOG(ERR, VROUTER, "\terror probing hardware filters for ethdev %" PRIu8
-                ": %s (%d)\n", port_id, strerror(-ret), -ret);
-        }
-    }
-
-    return ret;
-}
-
 /* Update device info */
 void
 dpdk_ethdev_info_update(struct vr_interface *vif)
 {
-    int ret;
     uint8_t port_id = vif->vif_os_idx;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
     struct rte_eth_dev_info dev_info;
-    struct rte_eth_fdir fdir_info;
 
     /* get device info */
     memset(&dev_info, 0, sizeof(dev_info));
@@ -227,18 +201,16 @@ dpdk_ethdev_info_update(struct vr_interface *vif)
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
     }
 
-    /* check if the device supports Flow Director filters */
-    memset(&fdir_info, 0, sizeof(fdir_info));
-    ret = rte_eth_dev_fdir_get_infos(port_id, &fdir_info);
-    if (ret == 0) {
-        RTE_LOG(INFO, VROUTER, "\tenabling hardware filtering for ethdev %"
-            PRIu8 "\n", port_id);
-        vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
-    } else {
-        vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
-        /* use RSS queues only */
-        ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
-    }
+#if VR_DPDK_USE_HW_FILTERS == true
+    /* enable hardware filters */
+    RTE_LOG(INFO, VROUTER, "\tenabling hardware filtering for ethdev %"
+        PRIu8 "\n", port_id);
+    vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
+#else
+    vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
+    /* use RSS queues only */
+    ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
+#endif
 }
 
 /* Setup ethdev hardware queues */
@@ -327,11 +299,6 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
     int ret;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
 
-    /* probe hardware filters */
-    ret = dpdk_ethdev_fdir_probe(vif);
-    if (ret < 0)
-        return ret;
-
     /* update ethdev info */
     dpdk_ethdev_info_update(vif);
 
@@ -362,11 +329,13 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
         return ret;
     }
 
-    /* TODO: Promisc mode
+    /* Promisc mode
      * KNI generates random MACs for e1000e NICs, so we need this
      * option enabled for the development on servers with those NICs
      */
-    /* rte_eth_promiscuous_enable(port_id); */
+#if VR_DPDK_ENABLE_PROMISC == true
+    rte_eth_promiscuous_enable(port_id);
+#endif
 
     /* reset OS dev pointer */
     vif->vif_os = NULL;

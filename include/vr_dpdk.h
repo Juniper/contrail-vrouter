@@ -31,7 +31,7 @@
 
 #define RTE_LOGTYPE_VROUTER         RTE_LOGTYPE_USER1
 #undef RTE_LOG_LEVEL
-#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
+#define RTE_LOG_LEVEL               RTE_LOG_INFO
 /*
  * Debug options:
  *
@@ -43,19 +43,26 @@
  */
 
 /* lcore mask */
-#define VR_DPDK_LCORE_MASK          "0x0f"
+#define VR_DPDK_LCORE_MASK          "0x3f"
 /* Number of service lcores */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
 #define VR_DPDK_MIN_LCORES          2
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "256"
+/* Use hardware filters (Flow Director) */
+#define VR_DPDK_USE_HW_FILTERS      false
+/* Promisc mode
+ * KNI generates random MACs for e1000e NICs, so we need this
+ * option enabled for the development on servers with those NICs
+ */
+#define VR_DPDK_ENABLE_PROMISC      false
 /* Maximum number of hardware RX queues to use for RSS and filtering (limited by NIC) */
 #define VR_DPDK_MAX_NB_RX_QUEUES    128
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_TX_QUEUES    4
+#define VR_DPDK_MAX_NB_TX_QUEUES    8
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_RSS_QUEUES   4
+#define VR_DPDK_MAX_NB_RSS_QUEUES   8
 /* Offset to MPLS label for hardware filters */
 #define VR_DPDK_MPLS_OFFSET         (VR_ETHER_HLEN          \
                                     + sizeof(struct vr_ip)  \
@@ -102,7 +109,7 @@
 /* Timers handling periodicity in US */
 #define VR_DPDK_SLEEP_TIMER_US      100
 /* KNI handling periodicity in US */
-#define VR_DPDK_SLEEP_KNI_US        100
+#define VR_DPDK_SLEEP_KNI_US        500
 /* Sleep time in US for service lcore */
 #define VR_DPDK_SLEEP_SERVICE_US    100
 

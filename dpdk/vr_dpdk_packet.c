@@ -34,11 +34,13 @@ dpdk_packet_io(void)
     int ret;
 
 wait_for_connection:
-    while (!vr_dpdk.packet_transport);
+    while (!vr_dpdk.packet_transport)
+        usleep(VR_DPDK_SLEEP_SERVICE_US);
 
     ret = vr_usocket_io(vr_dpdk.packet_transport);
     if (ret < 0) {
         vr_dpdk.packet_transport = NULL;
+        usleep(VR_DPDK_SLEEP_SERVICE_US);
         goto wait_for_connection;
     }
 
