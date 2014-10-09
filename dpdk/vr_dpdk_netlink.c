@@ -23,13 +23,12 @@ struct nlmsghdr *dpdk_nl_message_hdr(struct vr_message *);
 unsigned int dpdk_nl_message_len(struct vr_message *);
 
 int vr_usocket_message_write(struct vr_usocket *, struct vr_message *);
-int dpdk_netlink_core_id = -1;
 
 static void
 dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 {
     __u32 seq;
-    unsigned int multi_flag;
+    unsigned int multi_flag = 0;
     bool write = true;
 
     struct vr_message *resp;
@@ -82,7 +81,7 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 }
 
 int
-dpdk_netlink_receive(void *usockp, unsigned char *nl_buf,
+dpdk_netlink_receive(void *usockp, char *nl_buf,
         unsigned int nl_len)
 {
     struct vr_message request;
@@ -120,7 +119,7 @@ dpdk_nl_trans_free(char *buf)
 static char *
 dpdk_nl_trans_alloc(unsigned int size)
 {
-    unsigned char *buf;
+    char *buf;
 
     buf = vr_malloc(size + HDR_LEN);
     if (!buf)
@@ -165,7 +164,7 @@ dpdk_netlink_init(void)
         return -1;
     }
 
-    if (num_cores == 2)
+    if (num_cores == VR_DPDK_MIN_LCORES)
         vr_usocket_non_blocking(vr_dpdk.netlink_sock);
 
     return 0;

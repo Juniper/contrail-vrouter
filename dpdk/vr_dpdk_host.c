@@ -10,11 +10,10 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * vrouter_mod.c -- DPDK vrouter module
+ * vr_dpdk_host.c -- DPDK vrouter module
  *
  */
 
-#include <sys/time.h>
 #include <sys/user.h>
 #include <linux/if_ether.h>
 
@@ -23,32 +22,22 @@
 
 #include <urcu-qsbr.h>
 
-#include "vr_os.h"
-#include "vr_proto.h"
-#include "vrouter.h"
-#include "vr_message.h"
-#include "vr_sandesh.h"
-
 #include <rte_config.h>
-#include <rte_common.h>
 #include <rte_malloc.h>
-#include <rte_lcore.h>
-#include <rte_mempool.h>
-#include <rte_mbuf.h>
-#include <rte_ethdev.h>
 #include <rte_jhash.h>
 #include <rte_timer.h>
 #include <rte_cycles.h>
 
 #include "vr_dpdk.h"
-
-unsigned int vr_num_cpus = RTE_MAX_LCORE;
-static bool vr_host_inited = false;
-
-extern int dpdk_netlink_core_id, dpdk_packet_core_id;
+#include "vr_sandesh.h"
+#include "vr_proto.h"
 
 uint32_t vr_hashrnd = 0;
 int hashrnd_inited = 0;
+/* Max number of CPU */
+unsigned int vr_num_cpus = RTE_MAX_LCORE;
+/* Global init flag */
+static bool vr_host_inited = false;
 
 struct rcu_cb_data {
     struct rcu_head rcd_rcu;
@@ -56,28 +45,6 @@ struct rcu_cb_data {
     struct vrouter *rcd_router;
     unsigned char rcd_user_data[0];
 };
-
-
-/* Conversion mbuf <=> packet */
-struct vr_packet *
-vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif)
-{
-    struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(m);
-
-    pkt->vp_cpu = vr_get_cpu();
-    pkt->vp_data = rte_pktmbuf_headroom(m);
-    pkt->vp_tail = rte_pktmbuf_headroom(m) + rte_pktmbuf_data_len(m);
-    pkt->vp_len = rte_pktmbuf_data_len(m);
-    pkt->vp_if = vif;
-    pkt->vp_network_h = pkt->vp_inner_network_h = 0;
-    pkt->vp_flags = 0;
-    pkt->vp_nh = 0;
-    pkt->vp_type = VP_TYPE_NULL;
-    pkt->vp_ttl = 0;
-
-    return (pkt);
-}
-
 
 static void *
 dpdk_page_alloc(unsigned int size)
@@ -150,7 +117,6 @@ dpdk_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 static void
 dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
-    struct vrouter *router;
     struct rte_mbuf *m;
 
     if (!pkt)
@@ -284,9 +250,9 @@ dpdk_pclone(struct vr_packet *pkt)
 
     /* clone vr_packet data */
     pkt_clone = vr_dpdk_mbuf_to_pkt(m_clone);
-    rte_memcpy(pkt_clone, pkt, sizeof(struct vr_packet));
+    *pkt_clone = *pkt;
 
-    return (pkt_clone);
+    return pkt_clone;
 #else
     /* if no scatter/gather enabled -> just copy the mbuf */
     struct rte_mbuf *m, *m_copy;
@@ -300,7 +266,7 @@ dpdk_pclone(struct vr_packet *pkt)
 
     /* copy vr_packet data */
     pkt_copy = vr_dpdk_mbuf_to_pkt(m_copy);
-    rte_memcpy(pkt_copy, pkt, sizeof(struct vr_packet));
+    *pkt_copy = *pkt;
     /* set head pointer to a copy */
     pkt_copy->vp_head = m_copy->buf_addr;
 
@@ -497,6 +463,7 @@ static void
 dpdk_delay_op(void)
 {
     synchronize_rcu();
+
     return;
 }
 
@@ -558,10 +525,6 @@ dpdk_put_defer_data(void *data)
 static void *
 dpdk_network_header(struct vr_packet *pkt)
 {
-    struct rte_mbuf *m;
-
-    m = vr_dpdk_pkt_to_mbuf(pkt);
-
     if (pkt->vp_network_h < pkt->vp_end)
         return pkt->vp_head + pkt->vp_network_h;
 
@@ -583,10 +546,6 @@ dpdk_inner_network_header(struct vr_packet *pkt)
 static void *
 dpdk_data_at_offset(struct vr_packet *pkt, unsigned short off)
 {
-    struct rte_mbuf *m;
-
-    m = vr_dpdk_pkt_to_mbuf(pkt);
-
     if (off < pkt->vp_end)
         return pkt->vp_head + off;
 
@@ -679,7 +638,6 @@ dpdk_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     struct iphdr *iph;
     uint32_t *data;
     uint16_t port;
-    int32_t flow_index = 0;
 
 
     if (hashrnd_inited == 0) {
@@ -777,7 +735,7 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m, unsigned short over
     u_int8_t *opt_ptr = (u_int8_t *) tcph;
     u_int16_t pkt_mss, max_mss, mtu;
     unsigned int csum;
-    struct vif_port *vip;
+    uint8_t port_id;
     struct vrouter *router = vrouter_get(0);
 
     if ((tcph == NULL) || !(tcph->syn) || (router == NULL))
@@ -803,11 +761,12 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m, unsigned short over
                 return;
 
             pkt_mss = (opt_ptr[opt_off+2] << 8) | opt_ptr[opt_off+3];
-            vip = (struct vif_port *)router->vr_eth_if->vif_os;
-            if (vip == NULL)
+            if (router->vr_eth_if == NULL)
                 return;
 
-            rte_eth_dev_get_mtu(vip->vip_id, &mtu);
+            port_id = router->vr_eth_if->vif_os_idx;
+            rte_eth_dev_get_mtu(port_id, &mtu);
+
             max_mss = mtu - (overlay_len + sizeof(struct vr_ip) +
                 sizeof(struct tcphdr));
 
@@ -955,8 +914,46 @@ vrouter_get_host(void)
     return &dpdk_host;
 }
 
+/* Remove xconnect callback */
 void
-vrouter_host_exit(void)
+vhost_remove_xconnect(void)
+{
+    int i;
+    struct vr_interface *vif;
+
+    for (i = 0; i < VR_MAX_INTERFACES; i++) {
+        vif = vr_dpdk.vhosts[i];
+        if (vif != NULL) {
+            vif_remove_xconnect(vif);
+            if (vif->vif_bridge != NULL)
+                vif_remove_xconnect(vif->vif_bridge);
+        }
+    }
+}
+
+/* Convert internal packet fields */
+struct vr_packet *
+vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif)
+{
+    struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(m);
+
+    pkt->vp_cpu = vr_get_cpu();
+    pkt->vp_data = rte_pktmbuf_headroom(m);
+    pkt->vp_tail = rte_pktmbuf_headroom(m) + rte_pktmbuf_data_len(m);
+    pkt->vp_len = rte_pktmbuf_data_len(m);
+    pkt->vp_if = vif;
+    pkt->vp_network_h = pkt->vp_inner_network_h = 0;
+    pkt->vp_flags = 0;
+    pkt->vp_nh = 0;
+    pkt->vp_type = VP_TYPE_NULL;
+    pkt->vp_ttl = 0;
+
+    return pkt;
+}
+
+/* Exit vRouter */
+void
+vr_dpdk_host_exit(void)
 {
     vr_sandesh_exit();
     vrouter_exit(false);
@@ -964,11 +961,11 @@ vrouter_host_exit(void)
     return;
 }
 
+/* Init vRouter */
 int
-vrouter_host_init(void)
+vr_dpdk_host_init(void)
 {
     int ret;
-    int lcore_count = rte_lcore_count();
 
     if (vr_host_inited)
         return 0;
@@ -988,51 +985,12 @@ vrouter_host_init(void)
     if (ret)
         goto init_fail;
 
-    dpdk_netlink_core_id = rte_get_master_lcore();
-    if (lcore_count == 2) {
-        dpdk_packet_core_id = dpdk_netlink_core_id;
-    } else {
-        dpdk_packet_core_id = rte_get_next_lcore(dpdk_netlink_core_id,
-                1, 1);
-    }
-
     vr_host_inited = true;
 
     return 0;
 
 init_fail:
-    vrouter_host_exit();
+    vr_dpdk_host_exit();
     return ret;
 }
 
-void
-vhost_remove_xconnect(void)
-{
-    /* number of DPDK (physical) ports */
-    const unsigned nb_ports = rte_eth_dev_count();
-    /* loop iterator */
-    int i;
-    /* loop port pointer */
-    struct vif_port *port;
-    /* loop bridge pointer */
-    struct vr_interface *bridge;
-
-    /* In DPDK we do not keep a list of vhosts, so we iterate over
-     * all the physical ports instead.
-     */
-    for (i = 0; i < nb_ports; i++) {
-        port = &vr_dpdk.ports[i];
-        /* unused ports marked with NULL lcore context */
-        if (likely(NULL != port->vip_lcore_ctx)) {
-            /* remove xconnect from the physical port */
-            if (likely(NULL != port->vip_vif)) {
-                vif_remove_xconnect(port->vip_vif);
-                if (NULL != (bridge = port->vip_vif->vif_bridge))
-                    /* remove xconnect from the vhost vif */
-                    vif_remove_xconnect(bridge);
-            }
-        }
-    }
-
-    return;
-}

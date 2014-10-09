@@ -7,6 +7,8 @@
 #ifndef __VR_DPDK_USOCKET_H__
 #define __VR_DPDK_USOCKET_H__
 
+#include "vr_queue.h"
+
 /*
  * usocket is an object where io happens. while it can represent non
  * socket objects too (like an eventfd), most consumers are socket
@@ -96,7 +98,7 @@ struct vr_usocket {
     unsigned int usock_buf_len;
     unsigned int usock_pkt_truncated;
 
-    unsigned char *usock_rx_buf;
+    char *usock_rx_buf;
 
     struct rte_mbuf *usock_mbuf;
     struct rte_mempool *usock_mbuf_pool;
@@ -113,6 +115,16 @@ struct vr_usocket {
 };
 
 void *vr_usocket(int, int);
+void vr_usocket_close(void *sock);
+/*
+ * start io on socket
+ */
+int vr_usocket_io(void *transport);
+void vr_usocket_non_blocking(struct vr_usocket *usockp);
+void vr_usocket_attach_vif(void *usockp, struct vr_interface *vif);
+int vr_usocket_bind_usockets(void *usock1, void *usock2);
+int vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
+    unsigned int len);
 
 #define VR_NETLINK_TCP_PORT         20914
 #define VR_NETLINK_UNIX_FILE        "/tmp/dpdk_netlink"

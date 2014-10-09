@@ -10,73 +10,99 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * dpdk_vrouter.c -- DPDK vRouter application
+ * dpdk_vrouter.c -- vRouter/DPDK application
  *
  */
 #include <getopt.h>
 #include <signal.h>
-#include <urcu-qsbr.h>
 
-#include "vr_os.h"
+#include <rte_timer.h>
+
 #include "vr_dpdk.h"
 
 static int no_daemon_set;
 
-extern int dpdk_netlink_core_id, dpdk_packet_core_id;
-extern int vr_dpdk_flow_mem_init(void);
-
 /* Global vRouter/DPDK structure */
-struct dpdk_global vr_dpdk;
+struct vr_dpdk_global vr_dpdk;
 
 /* TODO: default commandline params */
-static char *dpdk_argv[] = {"dpdk", "-c", "0xf", "-n", "1" };
+static char *dpdk_argv[] = {"dpdk",
+    "-m", VR_DPDK_MAX_MEM,
+    "-c", VR_DPDK_LCORE_MASK,
+    "-n", "2" };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
+
+/* Pktmbuf constructor with vr_packet support */
+void
+vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i)
+{
+    struct rte_mbuf *m = _m;
+    struct vr_packet *pkt;
+    rte_pktmbuf_init(mp, opaque_arg, _m, i);
+
+    /* decrease rte packet size to fit vr_packet struct */
+    m->buf_len -= sizeof(struct vr_packet);
+    RTE_VERIFY(0 < m->buf_len);
+
+    /* basic vr_packet initialization */
+    pkt = vr_dpdk_mbuf_to_pkt(m);
+    pkt->vp_head = (unsigned char *)m->buf_addr;
+    pkt->vp_end = m->buf_len;
+}
 
 /* Init DPDK EAL */
 static int
 dpdk_init(void)
 {
-    int i, ret, nb_sys_ports;
-    unsigned lcore_id;
+    int ret, nb_sys_ports;
 
-    if ((ret = vr_dpdk_flow_mem_init())) {
-        return -1;
+    ret = vr_dpdk_flow_mem_init();
+    if (ret < 0) {
+        fprintf(stderr, "Error initializing flow table: %s (%d)\n",
+            strerror(-ret), -ret);
+        return ret;
     }
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
-    if (0 > ret) {
-        RTE_LOG(CRIT, VROUTER, "Could not initialise EAL (%d)\n", ret);
+    if (ret < 0) {
+        fprintf(stderr, "Error initializing EAL\n");
         return ret;
     }
 
     /* Create the mbuf pool */
-    vr_dpdk.pktmbuf_pool = rte_mempool_create("mbuf_pool", VR_DPDK_MPOOL_SZ,
+    vr_dpdk.pktmbuf_pool = rte_mempool_create("vrouter_mbuf_pool", VR_DPDK_MPOOL_SZ,
             VR_DPDK_MBUF_SZ, VR_DPDK_MPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
             rte_socket_id(), 0);
     if (NULL == vr_dpdk.pktmbuf_pool) {
-        RTE_LOG(CRIT, VROUTER, "Could not initialise mbuf pool\n");
+        RTE_LOG(CRIT, VROUTER, "Error initializing mbuf pool\n");
         return -ENOMEM;
     }
 
     /* Scan PCI bus for recognised devices */
     ret = rte_eal_pci_probe();
-    if (0 > ret) {
-        RTE_LOG(CRIT, VROUTER, "Could not probe PCI (%d)\n", ret);
+    if (ret < 0) {
+        RTE_LOG(CRIT, VROUTER, "Error probing PCI: %s (%d)\n", strerror(-ret), -ret);
         return ret;
     }
 
     /* Get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count();
-    RTE_LOG(INFO, VROUTER, "Found %d port(s)\n", nb_sys_ports);
+    RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
     /* Enable all detected lcores */
-    vr_dpdk.nb_lcores = rte_lcore_count();
-    if (vr_dpdk.nb_lcores) {
-        RTE_LOG(INFO, VROUTER, "Found %i lcore(s)\n", vr_dpdk.nb_lcores);
+    vr_dpdk.nb_fwd_lcores = rte_lcore_count();
+    if (vr_dpdk.nb_fwd_lcores >= VR_DPDK_MIN_LCORES) {
+        /* do not use service lcores */
+        vr_dpdk.nb_fwd_lcores -= VR_DPDK_NB_SERVICE_LCORES;
+        if (vr_dpdk.nb_fwd_lcores == 0)
+            vr_dpdk.nb_fwd_lcores = 1;
+        RTE_LOG(INFO, VROUTER, "Using %i forwarding lcore(s)\n", vr_dpdk.nb_fwd_lcores);
+        RTE_LOG(INFO, VROUTER, "Using %i service lcore(s)\n",
+            rte_lcore_count() - vr_dpdk.nb_fwd_lcores);
     } else {
-        RTE_LOG(CRIT, VROUTER, "No lcores found. Please use -c option to enable more lcores.");
+        RTE_LOG(CRIT, VROUTER, "Please enable at least 2 lcores\n");
         return -ENODEV;
     }
 
@@ -90,29 +116,21 @@ dpdk_init(void)
 static void
 dpdk_exit(void)
 {
-    unsigned port_id;
-    /* loop eth dev pointer */
-    struct rte_eth_dev *eth;
-    /* loop vr_dpdk_port pointer */
-    struct vif_port *port;
+    int i;
 
-    RTE_LOG(INFO, VROUTER, "Closing %d ports...\n", (int)rte_eth_dev_count());
-    for (port_id = 0; port_id < rte_eth_dev_count(); port_id++) {
-        eth = &rte_eth_devices[port_id];
-        /* unused ports marked with NULL data pointer */
-        if (!eth->data)
-            continue;
+    RTE_LOG(INFO, VROUTER, "Releasing KNI devices...\n");
+    for (i = 0; i < VR_MAX_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] != NULL) {
+            rte_kni_release(vr_dpdk.knis[i]);
+        }
+    }
 
-        port = &vr_dpdk.ports[port_id];
-
-        /* check if port was added and assigned to a lcore */
-        if (unlikely(NULL == port->vip_lcore_ctx))
-            continue;
-
-        RTE_LOG(DEBUG, VROUTER, "Closing port %s...\n", port->vip_name);
-
-        rte_eth_dev_stop(port_id);
-        rte_eth_dev_close(port_id);
+    RTE_LOG(INFO, VROUTER, "Closing eth devices...\n");
+    for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
+        if (vr_dpdk.ethdevs[i].ethdev_ptr != NULL) {
+            rte_eth_dev_stop(i);
+            rte_eth_dev_close(i);
+        }
     }
 }
 
@@ -120,14 +138,14 @@ dpdk_exit(void)
 static void *
 dpdk_timer_loop(__attribute__((unused)) void *dummy)
 {
-    while(1) {
+    while (1) {
         rte_timer_manage();
 
         /* check for the global stop flag */
-        if (unlikely(rte_atomic32_read(&vr_dpdk.stop_flag)))
+        if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
             break;
 
-        usleep(VR_DPDK_TIMER_US);
+        usleep(VR_DPDK_SLEEP_TIMER_US);
     };
     return NULL;
 }
@@ -136,121 +154,44 @@ dpdk_timer_loop(__attribute__((unused)) void *dummy)
 static void *
 dpdk_kni_loop(__attribute__((unused)) void *dummy)
 {
-    while(1) {
-        vr_dpdk_all_knis_handle();
+    while (1) {
+        vr_dpdk_knidev_all_handle();
 
         /* check for the global stop flag */
-        if (unlikely(rte_atomic32_read(&vr_dpdk.stop_flag)))
+        if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
             break;
 
-        usleep(VR_DPDK_KNI_US);
+        usleep(VR_DPDK_SLEEP_KNI_US);
     };
     return NULL;
 }
 
-/* Lcore main loop */
-static int
-dpdk_lcore_loop(__attribute__((unused)) void *dummy)
-{
-    int ret;
-    /* current lcore id */
-    const unsigned lcore_id = rte_lcore_id();
-    /* current lcore context */
-    struct lcore_ctx * const lcore_ctx = &vr_dpdk.lcores[lcore_id];
-    unsigned int lcore_count = rte_lcore_count();
+/* Set stop flag for all lcores */
+static void
+dpdk_stop_flag_set(void) {
+    unsigned lcore_id;
+    struct vr_dpdk_lcore *lcore;
 
-    /* cycles counters */
-    uint64_t cur_cycles = 0;
-    uint64_t diff_cycles;
-    uint64_t last_tx_cycles = 0;
-#ifdef VR_DPDK_USE_TIMER
-    /* calculate timeouts in CPU cycles */
-    const uint64_t tx_drain_cycles = (rte_get_timer_hz() + US_PER_S - 1)
-        * VR_DPDK_TX_DRAIN_US / US_PER_S;
-#else
-    const uint64_t tx_drain_cycles = VR_DPDK_TX_DRAIN_LOOPS;
-#endif
+    /* check if the flag is already set */
+    if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        return;
 
-    RTE_LOG(DEBUG, VROUTER, "Hello from lcore %u\n", lcore_id);
+    RTE_LCORE_FOREACH(lcore_id) {
+        lcore = vr_dpdk.lcores[lcore_id];
+        rte_atomic16_inc(&lcore->lcore_stop_flag);
+    }
 
-    rcu_register_thread();
-    rcu_thread_offline();
-
-    while (1) {
-        rte_prefetch0(lcore_ctx);
-
-        /* update cycles counter */
-#ifdef VR_DPDK_USE_TIMER
-        cur_cycles = rte_get_timer_cycles();
-#else
-        cur_cycles++;
-#endif
-
-        if ((lcore_id == dpdk_netlink_core_id) ||
-                (lcore_id == dpdk_packet_core_id)) {
-
-            while (1) {
-                if (lcore_id == dpdk_netlink_core_id) {
-                    ret = dpdk_netlink_io();
-                    if (ret)
-                        goto exit_loop;
-                }
-
-                if (lcore_id == dpdk_packet_core_id) {
-                    ret = dpdk_packet_io();
-                    if (ret)
-                        goto exit_loop;
-                }
-            }
-        }
-
-
-        /* Read bursts from all the ports assigned and
-         * transmit those packets to VRouter
-         */
-        vr_dpdk_all_ports_poll(lcore_ctx);
-
-        /* check if we need to drain TX queues */
-        diff_cycles = cur_cycles - last_tx_cycles;
-        if (unlikely(tx_drain_cycles < diff_cycles)) {
-            /* update TX drain timer */
-            last_tx_cycles = cur_cycles;
-
-            vr_dpdk_all_ports_drain(lcore_ctx);
-
-            /* check if any port attached */
-            if (unlikely(0 == lcore_ctx->lcore_nb_rx_ports)) {
-                /* no RX ports -> just sleep */
-                usleep(VR_DPDK_NO_PORTS_US);
-            }
-
-            /* check for the global stop flag */
-            if (unlikely(rte_atomic32_read(&vr_dpdk.stop_flag)))
-                break;
-        } /* drain TX queues */
-    } /* lcore loop */
-
-exit_loop:
-    rcu_unregister_thread();
-
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from lcore %u\n", lcore_id);
-
-    return 0;
+    rte_atomic16_inc(&vr_dpdk.stop_flag);
 }
 
 /* Custom handling of signals */
 static void
 dpdk_signal_handler(int signum)
 {
-    int lcore_id = rte_lcore_id();
+    RTE_LOG(DEBUG, VROUTER, "Got signal %i on lcore %u\n",
+            signum, rte_lcore_id());
 
-    RTE_LOG(DEBUG, VROUTER, "Got signal %i on lcore %i\n",
-            signum, lcore_id);
-
-    /* stop processing on RTMIN or SIGINT signal */
-    if (SIGTERM == signum || SIGINT == signum) {
-        rte_atomic32_inc(&vr_dpdk.stop_flag);
-    }
+    dpdk_stop_flag_set();
 }
 
 /* Setup signal handlers */
@@ -289,8 +230,6 @@ dpdk_threads_cancel(void)
         pthread_cancel(vr_dpdk.kni_thread);
     if (vr_dpdk.timer_thread)
         pthread_cancel(vr_dpdk.timer_thread);
-    if (vr_dpdk.netlink_thread)
-        pthread_cancel(vr_dpdk.netlink_thread);
 }
 
 /* Wait for other threads to join */
@@ -301,8 +240,6 @@ dpdk_threads_join(void)
         pthread_join(vr_dpdk.kni_thread, NULL);
     if (vr_dpdk.timer_thread)
         pthread_join(vr_dpdk.timer_thread, NULL);
-    if (vr_dpdk.netlink_thread)
-        pthread_join(vr_dpdk.netlink_thread, NULL);
 }
 
 
@@ -313,17 +250,19 @@ dpdk_threads_create(void)
     int ret;
 
     /* thread to handle KNI requests */
-    if (ret = pthread_create(&vr_dpdk.kni_thread, NULL,
-        &dpdk_kni_loop, NULL)) {
-        RTE_LOG(CRIT, VROUTER, "Error creating KNI thread (%d)\n",
-            ret);
+    ret = pthread_create(&vr_dpdk.kni_thread, NULL,
+            &dpdk_kni_loop, NULL);
+    if (ret != 0) {
+        RTE_LOG(CRIT, VROUTER, "Error creating KNI thread: %s (%d)\n",
+            strerror(ret), ret);
         return ret;
     }
     /* thread to handle timers */
-    if (ret = pthread_create(&vr_dpdk.timer_thread, NULL,
-        &dpdk_timer_loop, NULL)) {
-        RTE_LOG(CRIT, VROUTER, "Error creating timer thread (%d)\n",
-            ret);
+    ret = pthread_create(&vr_dpdk.timer_thread, NULL,
+            &dpdk_timer_loop, NULL);
+    if (ret != 0) {
+        RTE_LOG(CRIT, VROUTER, "Error creating timer thread: %s (%d)\n",
+            strerror(ret), ret);
 
         return ret;
     }
@@ -347,7 +286,6 @@ int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
-    bool daemonize = true;
 
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {
@@ -357,12 +295,12 @@ main(int argc, char *argv[])
 
         case '?':
         default:
-            printf("Invalid option %s\n", argv[optind]);
+            fprintf(stderr, "Invalid option %s\n", argv[optind]);
             exit(-EINVAL);
             break;
         }
     }
-    /* for other getopts  in dpdk */
+    /* for other getopts in dpdk */
     optind = 0;
 
     if (!no_daemon_set) {
@@ -370,59 +308,53 @@ main(int argc, char *argv[])
             return -1;
     }
 
+    /* init DPDK first since vRouter uses DPDK mallocs and logs */
+    ret = dpdk_init();
+    if (ret != 0) {
+        return ret;
+    }
+
     /* associate signal hanlder with signals */
-    if (ret = dpdk_signals_init()) {
+    ret = dpdk_signals_init();
+    if (ret != 0) {
+        dpdk_exit();
         return ret;
     }
 
-    /* init DPDK first since vRouter uses DPDK mallocs */
-    if (ret = dpdk_init()) {
-        return ret;
-    }
-
-    /* init the vrouter */
-    if (ret = vrouter_host_init()) {
+    /* init the vRouter */
+    ret = vr_dpdk_host_init();
+    if (ret != 0) {
         dpdk_exit();
         return ret;
     }
 
     /* init the communication socket with agent */
-    if (ret = dpdk_netlink_init()) {
-        vrouter_host_exit();
+    ret = dpdk_netlink_init();
+    if (ret != 0) {
+        vr_dpdk_host_exit();
         dpdk_exit();
         return ret;
     }
 
     /* create threads to handle KNI, timers, NetLink etc */
-    if (ret = dpdk_threads_create()) {
+    ret = dpdk_threads_create();
+    if (ret != 0) {
         dpdk_threads_cancel();
         dpdk_threads_join();
-        vrouter_host_exit();
+        vr_dpdk_host_exit();
         dpdk_exit();
         return ret;
     }
 
-    /* run lcore loops on all lcores */
-    ret = rte_eal_mp_remote_launch(dpdk_lcore_loop,
-        NULL, CALL_MASTER);
+    /* run loops on all forwarding lcores */
+    ret = rte_eal_mp_remote_launch(vr_dpdk_lcore_launch, NULL, CALL_MASTER);
 
-    /* set the stop flag */
-    rte_atomic32_inc(&vr_dpdk.stop_flag);
-    /* wait for other lcores to stop */
     rte_eal_mp_wait_lcore();
-
-    /* cancel all threads*/
     dpdk_threads_cancel();
-    /* wait for other threads to join */
     dpdk_threads_join();
-
-    /* close the communication socket */
     dpdk_netlink_exit();
-
-    /* close DPDK ports first since we examine vif flags */
+    vr_dpdk_host_exit();
     dpdk_exit();
-        /* close sandesh link and shutdown vrouter */
-    vrouter_host_exit();
 
     return ret;
 }

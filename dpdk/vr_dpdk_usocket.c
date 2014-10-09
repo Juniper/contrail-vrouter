@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/eventfd.h>
 
 #include <urcu-qsbr.h>
 
@@ -248,6 +249,8 @@ usock_close(struct vr_usocket *usockp)
     int i;
     struct vr_usocket *parent;
 
+    RTE_SET_USED(parent);
+
     if (!usockp)
         return;
 
@@ -397,14 +400,17 @@ static void
 vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 {
     struct rte_pktmbuf *pmbuf;
+    struct vr_packet *pkt;
 
     if (usockp->usock_vif) {
         pmbuf = &usockp->usock_mbuf->pkt;
         pmbuf->data = usockp->usock_rx_buf;
         pmbuf->data_len = usockp->usock_read_len;
         pmbuf->pkt_len = usockp->usock_read_len;
-        dpdk_burst_rx(1, &usockp->usock_mbuf, usockp->usock_vif,
-                "pkt0", 0);
+        /* convert mbuf to vr_packet */
+        pkt = vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
+        /* send the packet to vRouter */
+        usockp->usock_vif->vif_rx(usockp->usock_vif, pkt, VLAN_ID_INVALID);
         rcu_quiescent_state();
     } else {
         rte_pktmbuf_free(usockp->usock_mbuf);
@@ -423,12 +429,11 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     int ret;
     void *objp;
     struct vr_interface *vif = usockp->usock_vif;
-    struct vif_port *port;
 
-    if (!vif || !(port = (struct vif_port *)vif->vif_os))
+    if (!vif)
         return NULL;
 
-    ret = rte_ring_dequeue(port->vip_tx_ring, &objp);
+    ret = rte_ring_dequeue(vr_dpdk.packet_ring, &objp);
     if (ret)
         return NULL;
 
@@ -493,7 +498,7 @@ usock_read_init(struct vr_usocket *usockp)
             return -ENOMEM;
 
         usockp->usock_rx_buf = rte_pktmbuf_mtod(usockp->usock_mbuf,
-                unsigned char *);
+                char *);
         usockp->usock_buf_len = PKT0_MBUF_PACKET_SIZE;
         usockp->usock_read_len = PKT0_MBUF_PACKET_SIZE;
         usockp->usock_state = READING_DATA;
@@ -517,7 +522,7 @@ __usock_read(struct vr_usocket *usockp)
 
     struct nlmsghdr *nlh;
     unsigned int proto = usockp->usock_proto;
-    unsigned char *buf = usockp->usock_rx_buf;
+    char *buf = usockp->usock_rx_buf;
 
     if (toread > usockp->usock_buf_len) {
         toread = usockp->usock_buf_len - offset;
@@ -583,6 +588,8 @@ usock_alloc(unsigned short proto, unsigned short type)
     struct vr_usocket *usockp = NULL, *child;
     bool is_socket = true;
     unsigned short sock_type;
+
+    RTE_SET_USED(child);
 
     switch (type) {
     case TCP:
@@ -801,7 +808,7 @@ vr_usocket_read(struct vr_usocket *usockp)
     int ret;
 
     if (!usockp || usockp->usock_fd < 0)
-        return;
+        return -1;
 
     switch (usockp->usock_state) {
     case LISTENING:
@@ -830,7 +837,7 @@ vr_usocket_read(struct vr_usocket *usockp)
         break;
 
     default:
-        return;
+        return -1;
     }
 
     return ret;
@@ -839,7 +846,6 @@ vr_usocket_read(struct vr_usocket *usockp)
 static int
 vr_usocket_connect(struct vr_usocket *usockp)
 {
-    int ret;
     struct sockaddr_un sun;
 
     if (usockp->usock_proto != PACKET)
@@ -959,6 +965,8 @@ void *
 vr_usocket(int proto, int type)
 {
     struct vr_usocket *usockp = NULL;
+
+    RTE_SET_USED(usockp);
 
     if (!valid_usock(proto, type))
         return NULL;
