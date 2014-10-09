@@ -150,7 +150,7 @@ vr_dpdk_flow_mem_init(void)
 
     ret = vr_hugepage_info_init();
     if (ret < 0) {
-        RTE_LOG(CRIT, VROUTER, "Error initializing hugepage info: %s (%d)\n",
+        fprintf(stderr, "Error initializing hugepage info: %s (%d)\n",
             strerror(-ret), -ret);
         return ret;
     }
@@ -181,14 +181,14 @@ vr_dpdk_flow_mem_init(void)
     if (touse_file_name) {
         fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         if (fd == -1) {
-            RTE_LOG(CRIT, VROUTER, "Error opening file %s: %s (%d)\n",
+            fprintf(stderr, "Error opening file %s: %s (%d)\n",
                 touse_file_name, strerror(errno), errno);
             return -errno;
         }
         vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
         if (vr_dpdk.flow_table == MAP_FAILED) {
-            RTE_LOG(CRIT, VROUTER, "Error mapping file %s: %s (%d)\n",
+            fprintf(stderr, "Error mmapping file %s: %s (%d)\n",
                 touse_file_name, strerror(errno), errno);
             return -errno;
         }
