@@ -62,7 +62,7 @@ static struct rte_eth_conf ethdev_conf = {
         /* Offset of flexbytes field in RX packets (in 16-bit word units). */
         .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
         /* RX queue of packets matching a "drop" filter in perfect mode. */
-        .drop_queue = 1,
+        .drop_queue = 0,
     },
 };
 
@@ -194,20 +194,14 @@ dpdk_ethdev_info_update(struct vr_interface *vif)
 
     /* check if the device supports checksum offloading */
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) {
-        RTE_LOG(INFO, VROUTER, "\tenabling hardware TX checksum offloading for ethdev %"
+        RTE_LOG(INFO, VROUTER, "\tenable hardware TX checksum offload for ethdev %"
             PRIu8 "\n", port_id);
         vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
     }
 
-#if VR_DPDK_USE_HW_FILTERS == true
-    /* enable hardware filters */
-    RTE_LOG(INFO, VROUTER, "\tenabling hardware filtering for ethdev %"
-        PRIu8 "\n", port_id);
-    vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
-#else
-    vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
+#if VR_DPDK_USE_HW_FILTERS == false
     /* use RSS queues only */
     ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #endif
@@ -289,6 +283,41 @@ dpdk_ethdev_rss_init(struct vr_interface *vif)
     return ret;
 }
 
+/* Init hardware filters */
+int
+dpdk_ethdev_filters_init(struct vr_interface *vif)
+{
+    int ret;
+    uint8_t port_id = vif->vif_os_idx;
+    struct rte_fdir_masks masks;
+    struct rte_eth_fdir fdir_info;
+
+    /* probe Flow Director */
+    memset(&fdir_info, 0, sizeof(fdir_info));
+    ret = rte_eth_dev_fdir_get_infos(port_id, &fdir_info);
+    if (ret == 0) {
+        /* enable hardware filters */
+        RTE_LOG(INFO, VROUTER, "\tenable hardware filters for ethdev %"
+            PRIu8 "\n", port_id);
+        vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
+    } else {
+        vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
+    }
+
+    memset(&masks, 0, sizeof(masks));
+    masks.dst_ipv4_mask = 0xffffffff;
+    masks.dst_port_mask = 0xffff;
+    masks.flexbytes = 1;
+
+    ret = rte_eth_dev_fdir_set_masks(port_id, &masks);
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "\terror setting ethdev %" PRIu8
+            " Flow Director masks: %s (%d)\n", port_id, strerror(-ret), -ret);
+    }
+
+    return ret;
+}
+
 /* Init ethernet device */
 int
 vr_dpdk_ethdev_init(struct vr_interface *vif)
@@ -316,11 +345,6 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
     if (ret < 0)
         return ret;
 
-    /* init RSS */
-    ret = dpdk_ethdev_rss_init(vif);
-    if (ret < 0)
-        return ret;
-
     /* start eth device */
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
@@ -328,6 +352,18 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
                 ": %s (%d)\n", port_id, strerror(-ret), -ret);
         return ret;
     }
+
+    /* init RSS */
+    ret = dpdk_ethdev_rss_init(vif);
+    if (ret < 0)
+        return ret;
+
+#if VR_DPDK_USE_HW_FILTERS == true
+    /* init hardware filters */
+    ret = dpdk_ethdev_filters_init(vif);
+    if (ret < 0)
+        return ret;
+#endif
 
     /* Promisc mode
      * KNI generates random MACs for e1000e NICs, so we need this

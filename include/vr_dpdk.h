@@ -51,18 +51,23 @@
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "256"
 /* Use hardware filters (Flow Director) */
-#define VR_DPDK_USE_HW_FILTERS      false
+#define VR_DPDK_USE_HW_FILTERS      true
 /* Promisc mode
  * KNI generates random MACs for e1000e NICs, so we need this
  * option enabled for the development on servers with those NICs
  */
 #define VR_DPDK_ENABLE_PROMISC      false
-/* Maximum number of hardware RX queues to use for RSS and filtering (limited by NIC) */
-#define VR_DPDK_MAX_NB_RX_QUEUES    128
+/* Maximum number of hardware RX queues to use for RSS and filtering
+ * (limited by NIC and number of per queue TX/RX descriptors) */
+#define VR_DPDK_MAX_NB_RX_QUEUES    11
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_TX_QUEUES    8
+#define VR_DPDK_MAX_NB_TX_QUEUES    4
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_RSS_QUEUES   8
+#define VR_DPDK_MAX_NB_RSS_QUEUES   4
+/* Number of hardware RX ring descriptors */
+#define VR_DPDK_NB_RXD              256
+/* Number of hardware TX ring descriptors */
+#define VR_DPDK_NB_TXD              512
 /* Offset to MPLS label for hardware filters */
 #define VR_DPDK_MPLS_OFFSET         (VR_ETHER_HLEN          \
                                     + sizeof(struct vr_ip)  \
@@ -84,10 +89,6 @@
 #define VR_DPDK_KNI_TX_BURST_SZ     32
 #define VR_DPDK_RING_RX_BURST_SZ    32
 #define VR_DPDK_RING_TX_BURST_SZ    32
-/* Number of hardware RX ring descriptors */
-#define VR_DPDK_NB_RXD              256
-/* Number of hardware TX ring descriptors */
-#define VR_DPDK_NB_TXD              512
 /* Number of mbufs in TX ring */
 #define VR_DPDK_TX_RING_SZ          (VR_DPDK_MAX_BURST_SZ*2)
 /* Number of mbufs in mempool */
