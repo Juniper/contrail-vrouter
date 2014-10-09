@@ -14,17 +14,20 @@
  *
  */
 
-#include "vr_os.h"
-#include "vr_proto.h"
-#include "vrouter.h"
 #include <sys/time.h>
 #include <sys/user.h>
 #include <linux/if_ether.h>
-#include "vr_message.h"
-#include "vr_sandesh.h"
 
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+
+#include <urcu-qsbr.h>
+
+#include "vr_os.h"
+#include "vr_proto.h"
+#include "vrouter.h"
+#include "vr_message.h"
+#include "vr_sandesh.h"
 
 #include <rte_config.h>
 #include <rte_common.h>
@@ -46,6 +49,14 @@ extern int dpdk_netlink_core_id, dpdk_packet_core_id;
 
 uint32_t vr_hashrnd = 0;
 int hashrnd_inited = 0;
+
+struct rcu_cb_data {
+    struct rcu_head rcd_rcu;
+    vr_defer_cb rcd_user_cb;
+    struct vrouter *rcd_router;
+    unsigned char rcd_user_data[0];
+};
+
 
 /* Conversion mbuf <=> packet */
 struct vr_packet *
@@ -485,15 +496,31 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 static void
 dpdk_delay_op(void)
 {
-    /* there is no synchronization function, so we just do nothing */
+    synchronize_rcu();
+    return;
+}
+
+static void
+rcu_cb(struct rcu_head *rh)
+{
+    struct rcu_cb_data *cb_data = (struct rcu_cb_data *)rh;
+
+    /* Call the user call back */
+    cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
+    dpdk_free(cb_data);
+
     return;
 }
 
 static void
 dpdk_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
 {
-    /* TODO: for mirroring? */
-    rte_panic("%s: not implemented\n", __func__);
+    struct rcu_cb_data *cb_data;
+
+    cb_data = CONTAINER_OF(rcd_user_data, struct rcu_cb_data, data);
+    cb_data->rcd_user_cb = user_cb;
+    cb_data->rcd_router = router;
+    call_rcu(&cb_data->rcd_rcu, rcu_cb);
 
     return;
 }
@@ -501,17 +528,29 @@ dpdk_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
 static void *
 dpdk_get_defer_data(unsigned int len)
 {
-    /* TODO: for mirroring? */
-    rte_panic("%s: not implemented\n", __func__);
+    struct rcu_cb_data *cb_data;
 
-    return NULL;
+    if (!len)
+        return NULL;
+
+    cb_data = dpdk_malloc(sizeof(*cb_data) + len);
+    if (!cb_data) {
+        return NULL;
+    }
+
+    return cb_data->rcd_user_data;
 }
 
 static void
 dpdk_put_defer_data(void *data)
 {
-    /* TODO: for mirroring? */
-    rte_panic("%s: not implemented\n", __func__);
+    struct rcu_cb_data *cb_data;
+
+    if (!data)
+        return;
+
+    cb_data = CONTAINER_OF(rcd_user_data, struct rcu_cb_data, data);
+    dpdk_free(cb_data);
 
     return;
 }

@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include <urcu-qsbr.h>
+
 #include "vr_dpdk.h"
 
 static struct rte_eth_conf port_conf = {
@@ -103,6 +105,8 @@ dpdk_burst_vroute(unsigned nb_rx, struct rte_mbuf *pkt_burst[VR_DPDK_PKT_BURST_S
             vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
         }
     }
+
+    return;
 }
 
 void
@@ -146,6 +150,9 @@ vr_dpdk_port_rx(struct vif_port *port)
             dpdk_burst_vroute(nb_kni_rx, pkt_burst, kni_vif, "KNI", port_id);
         }
     }
+
+    rcu_quiescent_state();
+
     return nb_rx + nb_kni_rx;
 }
 

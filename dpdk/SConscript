@@ -16,9 +16,8 @@ env.Append(CCFLAGS = '-D__DPDK__')
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
 env.Append(LIBPATH = ['#third_party/dpdk/build/lib'])
+
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
-
-
 
 # Add all dpdk libraries
 env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
@@ -27,6 +26,7 @@ env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
 
 # Add libraries required by dpdk
 env.Append(LIBS = ['rt', 'pcap', 'dl', 'pthread'])
+env.Append(LIBS = ['urcu-qsbr'])
 
 env.Append(LINKCOM =
     ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')

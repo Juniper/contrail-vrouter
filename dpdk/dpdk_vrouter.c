@@ -15,6 +15,7 @@
  */
 #include <getopt.h>
 #include <signal.h>
+#include <urcu-qsbr.h>
 
 #include "vr_os.h"
 #include "vr_dpdk.h"
@@ -151,6 +152,7 @@ dpdk_kni_loop(__attribute__((unused)) void *dummy)
 static int
 dpdk_lcore_loop(__attribute__((unused)) void *dummy)
 {
+    int ret;
     /* current lcore id */
     const unsigned lcore_id = rte_lcore_id();
     /* current lcore context */
@@ -171,6 +173,9 @@ dpdk_lcore_loop(__attribute__((unused)) void *dummy)
 
     RTE_LOG(DEBUG, VROUTER, "Hello from lcore %u\n", lcore_id);
 
+    rcu_register_thread();
+    rcu_thread_offline();
+
     while (1) {
         rte_prefetch0(lcore_ctx);
 
@@ -181,20 +186,23 @@ dpdk_lcore_loop(__attribute__((unused)) void *dummy)
         cur_cycles++;
 #endif
 
-    if ((lcore_id == dpdk_netlink_core_id) ||
-            (lcore_id == dpdk_packet_core_id)) {
-cp_loop:
-        if (lcore_id == dpdk_netlink_core_id)
-            dpdk_netlink_io();
+        if ((lcore_id == dpdk_netlink_core_id) ||
+                (lcore_id == dpdk_packet_core_id)) {
 
-        if (lcore_id == dpdk_packet_core_id)
-            dpdk_packet_io();
+            while (1) {
+                if (lcore_id == dpdk_netlink_core_id) {
+                    ret = dpdk_netlink_io();
+                    if (ret)
+                        goto exit_loop;
+                }
 
-        if (dpdk_netlink_core_id == dpdk_packet_core_id)
-            goto cp_loop;
-
-        return 0;
-    }
+                if (lcore_id == dpdk_packet_core_id) {
+                    ret = dpdk_packet_io();
+                    if (ret)
+                        goto exit_loop;
+                }
+            }
+        }
 
 
         /* Read bursts from all the ports assigned and
@@ -221,6 +229,9 @@ cp_loop:
                 break;
         } /* drain TX queues */
     } /* lcore loop */
+
+exit_loop:
+    rcu_unregister_thread();
 
     RTE_LOG(DEBUG, VROUTER, "Bye-bye from lcore %u\n", lcore_id);
 

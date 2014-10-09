@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include <urcu-qsbr.h>
+
 #include <netinet/in.h>
 
 #include <linux/netlink.h>
@@ -403,6 +405,7 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         pmbuf->pkt_len = usockp->usock_read_len;
         dpdk_burst_rx(1, &usockp->usock_mbuf, usockp->usock_vif,
                 "pkt0", 0);
+        rcu_quiescent_state();
     } else {
         rte_pktmbuf_free(usockp->usock_mbuf);
     }
@@ -1018,6 +1021,7 @@ vr_usocket_io(void *transport)
             return -1;
         }
 
+        rcu_thread_offline();
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
                 timeout);
         if (ret < 0) {
