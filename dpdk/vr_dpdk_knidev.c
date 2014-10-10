@@ -323,7 +323,7 @@ vr_dpdk_knidev_init(struct vr_interface *vif)
     };
 
     /* allocate KNI device */
-    kni = rte_kni_alloc(vr_dpdk.pktmbuf_pool, &kni_conf, &kni_ops);
+    kni = rte_kni_alloc(vr_dpdk.rss_mempool, &kni_conf, &kni_ops);
     if (kni == NULL) {
         RTE_LOG(ERR, VROUTER, "\terror allocation KNI device %s at eth device %" PRIu8 "\n",
                 vif->vif_name, port_id);

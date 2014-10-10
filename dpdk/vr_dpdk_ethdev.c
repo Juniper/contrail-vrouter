@@ -104,6 +104,22 @@ static const struct rte_eth_txconf tx_queue_conf = {
         | ETH_TXQ_FLAGS_NOXSUMTCP
 };
 
+/* Get a ready queue ID */
+int
+vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
+{
+    int i;
+    uint8_t port_id = vif->vif_os_idx;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+
+    for (i = ethdev->ethdev_nb_rss_queues; i < ethdev->ethdev_nb_rx_queues; i++) {
+        if (ethdev->ethdev_queue_states[i] == VR_DPDK_QUEUE_READY_STATE) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
 vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
@@ -215,29 +231,48 @@ dpdk_ethdev_queues_setup(struct vr_interface *vif)
     int ret, i;
     uint8_t port_id = vif->vif_os_idx;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
-
-    /* reset RX queue states */
-    for (i = 0; i < ethdev->ethdev_nb_rx_queues; i++) {
-        if (i < ethdev->ethdev_nb_rss_queues)
-            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_RSS_STATE;
-        else
-            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_FREE_STATE;
-    }
+    struct rte_mempool *mempool;
 
     /* configure RX queues */
-    for (i = 0; i < ethdev->ethdev_nb_rx_queues; i++) {
+    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u\n",
+        __func__, (unsigned)ethdev->ethdev_nb_rx_queues,
+            (unsigned)ethdev->ethdev_nb_tx_queues);
+
+    for (i = 0; i < VR_DPDK_MAX_NB_RX_QUEUES; i++) {
+        if (i < ethdev->ethdev_nb_rss_queues) {
+            mempool = vr_dpdk.rss_mempool;
+            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_RSS_STATE;
+        } else if (i < ethdev->ethdev_nb_rx_queues) {
+            if (vr_dpdk.nb_free_mempools == 0) {
+                RTE_LOG(ERR, VROUTER, "\terror assigning mempool to eth device %"
+                    PRIu8 " RX queue %d\n", port_id, i);
+                return -ENOMEM;
+            }
+            vr_dpdk.nb_free_mempools--;
+            mempool = vr_dpdk.free_mempools[vr_dpdk.nb_free_mempools];
+            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_READY_STATE;
+        } else {
+            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_NONE;
+            continue;
+        }
+
         ret = rte_eth_rx_queue_setup(port_id, i, VR_DPDK_NB_RXD,
-            rte_eth_dev_socket_id(port_id), &rx_queue_conf, vr_dpdk.pktmbuf_pool);
+            rte_eth_dev_socket_id(port_id), &rx_queue_conf, mempool);
         if (ret < 0) {
+            /* return mempool to the list */
+            if (mempool != vr_dpdk.rss_mempool)
+                vr_dpdk.nb_free_mempools++;
             RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " RX queue %d"
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
+        /* save queue mempool pointer */
+        ethdev->ethdev_mempools[i] = mempool;
     }
+    i = ethdev->ethdev_nb_rx_queues - ethdev->ethdev_nb_rss_queues;
+    RTE_LOG(INFO, VROUTER, "\tsetup %d RSS queue(s) and %d filtering queue(s)\n",
+        (int)ethdev->ethdev_nb_rss_queues, i);
 
-    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u  nb_tx_queues=%u\n",
-        __func__, (unsigned)ethdev->ethdev_nb_rx_queues,
-            (unsigned)ethdev->ethdev_nb_tx_queues);
     /* configure TX queues */
     for (i = 0; i < ethdev->ethdev_nb_tx_queues; i++) {
         ret = rte_eth_tx_queue_setup(port_id, i, VR_DPDK_NB_TXD,
@@ -286,6 +321,25 @@ dpdk_ethdev_rss_init(struct vr_interface *vif)
 
 #if VR_DPDK_USE_HW_FILTERING
 /* Init hardware filtering */
+static void
+dpdk_ethdev_mempools_free(struct vr_interface *vif)
+{
+    int i;
+    uint8_t port_id = vif->vif_os_idx;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+
+    for (i = ethdev->ethdev_nb_rss_queues; i < ethdev->ethdev_nb_rx_queues; i++) {
+        if (ethdev->ethdev_mempools[i] != NULL
+            && ethdev->ethdev_mempools[i] != vr_dpdk.rss_mempool) {
+            vr_dpdk.free_mempools[vr_dpdk.nb_free_mempools++] =
+                ethdev->ethdev_mempools[i];
+            ethdev->ethdev_mempools[i] = NULL;
+            ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_READY_STATE;
+        }
+    }
+}
+
+/* Init hardware filtering */
 static int
 dpdk_ethdev_filtering_init(struct vr_interface *vif)
 {
@@ -304,6 +358,10 @@ dpdk_ethdev_filtering_init(struct vr_interface *vif)
         vif->vif_flags |= VIF_FLAG_FILTERING_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_FILTERING_OFFLOAD;
+        /* free filtering mempools */
+        dpdk_ethdev_mempools_free(vif);
+        /* the ethdev does not support hardware filtering - it's not an error */
+        return 0;
     }
 
     memset(&masks, 0, sizeof(masks));

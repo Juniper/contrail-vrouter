@@ -92,7 +92,7 @@ dpdk_palloc(unsigned int size)
 
     /* in DPDK we have fixed-sized mbufs only */
     RTE_VERIFY(size < VR_DPDK_MAX_PACKET_SZ);
-    m = rte_pktmbuf_alloc(vr_dpdk.pktmbuf_pool);
+    m = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
     if (!m)
         return (NULL);
 
@@ -244,7 +244,7 @@ dpdk_pclone(struct vr_packet *pkt)
 
     m = vr_dpdk_pkt_to_mbuf(pkt);
 
-    m_clone = rte_pktmbuf_clone(m, vr_dpdk.pktmbuf_pool);
+    m_clone = rte_pktmbuf_clone(m, vr_dpdk.rss_mempool);
     if (!m_clone)
         return NULL;
 
@@ -260,7 +260,7 @@ dpdk_pclone(struct vr_packet *pkt)
 
     m = vr_dpdk_pkt_to_mbuf(pkt);
 
-    m_copy = dpdk_pktmbuf_copy(m, vr_dpdk.pktmbuf_pool);
+    m_copy = dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);
     if (!m_copy)
         return NULL;
 

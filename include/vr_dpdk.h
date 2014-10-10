@@ -89,10 +89,16 @@
 #define VR_DPDK_RING_TX_BURST_SZ    32
 /* Number of mbufs in TX ring */
 #define VR_DPDK_TX_RING_SZ          (VR_DPDK_MAX_BURST_SZ*2)
-/* Number of mbufs in mempool */
-#define VR_DPDK_MPOOL_SZ            8192
-/* How many objects (mbufs) to keep in per-lcore mempool cache */
-#define VR_DPDK_MPOOL_CACHE_SZ      (VR_DPDK_MAX_BURST_SZ*8)
+/* Number of mbufs in RSS mempool */
+#define VR_DPDK_RSS_MEMPOOL_SZ      8192
+/* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
+#define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_MAX_BURST_SZ*8)
+/* Number of VM mempools */
+#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES - VR_DPDK_MIN_LCORES)*2
+/* Number of mbufs in VM mempool */
+#define VR_DPDK_VM_MEMPOOL_SZ       1024
+/* How many objects (mbufs) to keep in per-lcore VM mempool cache */
+#define VR_DPDK_VM_MEMPOOL_CACHE_SZ (VR_DPDK_MAX_BURST_SZ*8)
 /* Use timer to measure flushes (slower, but should improve latency) */
 #define VR_DPDK_USE_TIMER           false
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
@@ -182,8 +188,10 @@ struct vr_dpdk_lcore {
 
 /* Hardware RX queue state */
 enum vr_dpdk_queue_state {
-    /* The queue is free to use for RSS or filtering */
-    VR_DPDK_QUEUE_FREE_STATE,
+    /* No queue available */
+    VR_DPDK_QUEUE_NONE,
+    /* The queue is ready to use for RSS or filtering */
+    VR_DPDK_QUEUE_READY_STATE,
     /* The queue is being used for RSS */
     VR_DPDK_QUEUE_RSS_STATE,
     /* The queue is being used for filtering */
@@ -202,16 +210,18 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_rss_queues;
     /* Hardware RX queue states */
     enum vr_dpdk_queue_state ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
-#if VR_DPDK_USE_HW_FILTERING
     /* Pointers to memory pools */
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
-#endif
 };
 
 struct vr_dpdk_global {
-    /* pointer to memory pool */
-    struct rte_mempool *pktmbuf_pool;
-    /* number of forwarding lcores */
+    /* Pointer to RSS memory pool */
+    struct rte_mempool *rss_mempool;
+    /* Number of free memory pools */
+    uint16_t nb_free_mempools;
+    /* List of free memory pools */
+    struct rte_mempool *free_mempools[VR_DPDK_MAX_VM_MEMPOOLS];
+    /* Number of forwarding lcores */
     unsigned nb_fwd_lcores;
     /* Table of pointers to forwarding lcore */
     struct vr_dpdk_lcore *lcores[RTE_MAX_LCORE];
@@ -318,6 +328,8 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id);
 /* Init ethernet device */
 int vr_dpdk_ethdev_init(struct vr_interface *vif);
+/* Get free queue ID */
+int vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
 
 /*
  * vr_dpdk_flow_mem.c

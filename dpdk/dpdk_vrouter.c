@@ -51,6 +51,51 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
     pkt->vp_end = m->buf_len;
 }
 
+/* Create memory pools */
+static int
+dpdk_mempools_create(void)
+{
+    /* Create the mbuf pool used for RSS */
+    vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool", VR_DPDK_RSS_MEMPOOL_SZ,
+            VR_DPDK_MBUF_SZ, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
+            sizeof(struct rte_pktmbuf_pool_private),
+            rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+            rte_socket_id(), 0);
+    if (vr_dpdk.rss_mempool == NULL) {
+        RTE_LOG(CRIT, VROUTER, "Error creating RSS mempool: %s (%d)\n",
+            rte_strerror(rte_errno), rte_errno);
+        return -rte_errno;
+    }
+
+    int ret, i;
+    char mempool_name[RTE_MEMPOOL_NAMESIZE];
+
+    /* Create a list of free mempools */
+    vr_dpdk.nb_free_mempools = 0;
+    for (i = 0; i < VR_DPDK_MAX_VM_MEMPOOLS; i++) {
+        ret = snprintf(mempool_name, sizeof(mempool_name), "vr_mempool_%d", i);
+        if (ret >= sizeof(mempool_name)) {
+            RTE_LOG(INFO, VROUTER, "Error creating mempool %d name\n", i);
+            return -ENOMEM;
+        }
+        vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
+                VR_DPDK_VM_MEMPOOL_SZ, VR_DPDK_MBUF_SZ, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
+                sizeof(struct rte_pktmbuf_pool_private),
+                rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+                rte_socket_id(), 0);
+        if (vr_dpdk.free_mempools[i] == NULL) {
+            RTE_LOG(CRIT, VROUTER, "Error creating mempool %d: %s (%d)\n",
+                i, rte_strerror(rte_errno), rte_errno);
+            return -rte_errno;
+        }
+        vr_dpdk.nb_free_mempools++;
+    }
+    RTE_LOG(INFO, VROUTER, "Allocated %" PRIu16 " mempool(s)\n",
+        vr_dpdk.nb_free_mempools);
+
+    return 0;
+}
+
 /* Init DPDK EAL */
 static int
 dpdk_init(void)
@@ -70,16 +115,9 @@ dpdk_init(void)
         return ret;
     }
 
-    /* Create the mbuf pool */
-    vr_dpdk.pktmbuf_pool = rte_mempool_create("vrouter_mbuf_pool", VR_DPDK_MPOOL_SZ,
-            VR_DPDK_MBUF_SZ, VR_DPDK_MPOOL_CACHE_SZ,
-            sizeof(struct rte_pktmbuf_pool_private),
-            rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
-            rte_socket_id(), 0);
-    if (NULL == vr_dpdk.pktmbuf_pool) {
-        RTE_LOG(CRIT, VROUTER, "Error initializing mbuf pool\n");
-        return -ENOMEM;
-    }
+    ret = dpdk_mempools_create();
+    if (ret < 0)
+        return ret;
 
     /* Scan PCI bus for recognised devices */
     ret = rte_eal_pci_probe();
