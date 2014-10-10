@@ -34,8 +34,8 @@ dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx, unsigned for_lcore_
     ret = snprintf(ring_name, sizeof(ring_name), "vr_dpdk_ring_%u_%u_%u",
             host_lcore_id, vif_idx, for_lcore_id);
     if (ret >= sizeof(ring_name)) {
-        RTE_LOG(INFO, VROUTER, "\terror creating lcore %u TX ring name %u\n",
-            host_lcore_id, (unsigned)IFNAMSIZ);
+        RTE_LOG(INFO, VROUTER, "\terror creating lcore %u TX ring name\n",
+            host_lcore_id);
         return NULL;
     }
     /* create single-producer single-consumer ring */
@@ -43,7 +43,7 @@ dpdk_ring_allocate(unsigned host_lcore_id, unsigned vif_idx, unsigned for_lcore_
         rte_lcore_to_socket_id(host_lcore_id), RING_F_SP_ENQ | RING_F_SC_DEQ);
     if (ring == NULL) {
         RTE_LOG(INFO, VROUTER, "\terror creating lcore %u TX ring: %s (%d)\n",
-            host_lcore_id, strerror(rte_errno), rte_errno);
+            host_lcore_id, rte_strerror(rte_errno), rte_errno);
         return NULL;
     }
     return ring;

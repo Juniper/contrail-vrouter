@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
+#include <rte_errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -151,7 +151,7 @@ vr_dpdk_flow_mem_init(void)
     ret = vr_hugepage_info_init();
     if (ret < 0) {
         fprintf(stderr, "Error initializing hugepage info: %s (%d)\n",
-            strerror(-ret), -ret);
+            rte_strerror(-ret), -ret);
         return ret;
     }
 
@@ -182,14 +182,14 @@ vr_dpdk_flow_mem_init(void)
         fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         if (fd == -1) {
             fprintf(stderr, "Error opening file %s: %s (%d)\n",
-                touse_file_name, strerror(errno), errno);
+                touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }
         vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
         if (vr_dpdk.flow_table == MAP_FAILED) {
             fprintf(stderr, "Error mmapping file %s: %s (%d)\n",
-                touse_file_name, strerror(errno), errno);
+                touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }
         bzero(vr_dpdk.flow_table, flow_table_size);

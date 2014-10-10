@@ -19,6 +19,7 @@
 #include "vr_dpdk.h"
 
 #include <rte_port_ethdev.h>
+#include <rte_errno.h>
 
 static struct rte_eth_conf ethdev_conf = {
     .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
@@ -52,7 +53,7 @@ static struct rte_eth_conf ethdev_conf = {
         .hw_vlan_insert_pvid        = 0, /* If set, enable port based VLAN insertion */
     },
     .fdir_conf = {
-#if VR_DPDK_USE_HW_FILTERS == true
+#if VR_DPDK_USE_HW_FILTERING
         .mode = RTE_FDIR_MODE_PERFECT,          /* Flow Director mode. */
 #else
         .mode = RTE_FDIR_MODE_NONE,
@@ -105,7 +106,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
 
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
-vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
+vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned rx_queue_id)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
@@ -137,7 +138,7 @@ vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
 /* Init eth TX queue */
 struct vr_dpdk_tx_queue *
-vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
+vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
@@ -168,7 +169,7 @@ vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 }
 
 /* Update device info */
-void
+static void
 dpdk_ethdev_info_update(struct vr_interface *vif)
 {
     uint8_t port_id = vif->vif_os_idx;
@@ -201,14 +202,14 @@ dpdk_ethdev_info_update(struct vr_interface *vif)
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
     }
 
-#if VR_DPDK_USE_HW_FILTERS == false
+#if !VR_DPDK_USE_HW_FILTERING
     /* use RSS queues only */
     ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #endif
 }
 
 /* Setup ethdev hardware queues */
-int
+static int
 dpdk_ethdev_queues_setup(struct vr_interface *vif)
 {
     int ret, i;
@@ -229,7 +230,7 @@ dpdk_ethdev_queues_setup(struct vr_interface *vif)
             rte_eth_dev_socket_id(port_id), &rx_queue_conf, vr_dpdk.pktmbuf_pool);
         if (ret < 0) {
             RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " RX queue %d"
-                    ": %s (%d)\n", port_id, i, strerror(-ret), -ret);
+                    ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
     }
@@ -243,7 +244,7 @@ dpdk_ethdev_queues_setup(struct vr_interface *vif)
             rte_eth_dev_socket_id(port_id), &tx_queue_conf);
         if (ret < 0) {
             RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " TX queue %d"
-                    ": %s (%d)\n", port_id, i, strerror(-ret), -ret);
+                    ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
     }
@@ -251,7 +252,7 @@ dpdk_ethdev_queues_setup(struct vr_interface *vif)
 }
 
 /* Init RSS */
-int
+static int
 dpdk_ethdev_rss_init(struct vr_interface *vif)
 {
     int ret, i, j;
@@ -277,15 +278,16 @@ dpdk_ethdev_rss_init(struct vr_interface *vif)
 
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror initializing ethdev %" PRIu8 " RSS: %s (%d)\n",
-            port_id, strerror(-ret), -ret);
+            port_id, rte_strerror(-ret), -ret);
     }
 
     return ret;
 }
 
-/* Init hardware filters */
-int
-dpdk_ethdev_filters_init(struct vr_interface *vif)
+#if VR_DPDK_USE_HW_FILTERING
+/* Init hardware filtering */
+static int
+dpdk_ethdev_filtering_init(struct vr_interface *vif)
 {
     int ret;
     uint8_t port_id = vif->vif_os_idx;
@@ -296,12 +298,12 @@ dpdk_ethdev_filters_init(struct vr_interface *vif)
     memset(&fdir_info, 0, sizeof(fdir_info));
     ret = rte_eth_dev_fdir_get_infos(port_id, &fdir_info);
     if (ret == 0) {
-        /* enable hardware filters */
-        RTE_LOG(INFO, VROUTER, "\tenable hardware filters for ethdev %"
+        /* enable hardware filtering */
+        RTE_LOG(INFO, VROUTER, "\tenable hardware filtering for ethdev %"
             PRIu8 "\n", port_id);
-        vif->vif_flags |= VIF_FLAG_FILTER_OFFLOAD;
+        vif->vif_flags |= VIF_FLAG_FILTERING_OFFLOAD;
     } else {
-        vif->vif_flags &= ~VIF_FLAG_FILTER_OFFLOAD;
+        vif->vif_flags &= ~VIF_FLAG_FILTERING_OFFLOAD;
     }
 
     memset(&masks, 0, sizeof(masks));
@@ -312,11 +314,12 @@ dpdk_ethdev_filters_init(struct vr_interface *vif)
     ret = rte_eth_dev_fdir_set_masks(port_id, &masks);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror setting ethdev %" PRIu8
-            " Flow Director masks: %s (%d)\n", port_id, strerror(-ret), -ret);
+            " Flow Director masks: %s (%d)\n", port_id, rte_strerror(-ret), -ret);
     }
 
     return ret;
 }
+#endif
 
 /* Init ethernet device */
 int
@@ -336,7 +339,7 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
         ethdev->ethdev_nb_tx_queues, &ethdev_conf);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror configuring eth dev %" PRIu8 ": %s (%d)\n",
-            port_id, strerror(-ret), -ret);
+            port_id, rte_strerror(-ret), -ret);
         return ret;
     }
 
@@ -349,7 +352,7 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
-                ": %s (%d)\n", port_id, strerror(-ret), -ret);
+                ": %s (%d)\n", port_id, rte_strerror(-ret), -ret);
         return ret;
     }
 
@@ -358,9 +361,9 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
     if (ret < 0)
         return ret;
 
-#if VR_DPDK_USE_HW_FILTERS == true
-    /* init hardware filters */
-    ret = dpdk_ethdev_filters_init(vif);
+#if VR_DPDK_USE_HW_FILTERING
+    /* init hardware filtering */
+    ret = dpdk_ethdev_filtering_init(vif);
     if (ret < 0)
         return ret;
 #endif

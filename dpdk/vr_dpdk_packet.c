@@ -6,7 +6,6 @@
  */
 #include <stdio.h>
 #include <unistd.h>
-#include <errno.h>
 #include <stdbool.h>
 
 #include "vr_queue.h"

@@ -50,12 +50,10 @@
 #define VR_DPDK_MIN_LCORES          2
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "256"
-/* Use hardware filters (Flow Director) */
-#define VR_DPDK_USE_HW_FILTERS      true
-/* Promisc mode
- * KNI generates random MACs for e1000e NICs, so we need this
- * option enabled for the development on servers with those NICs
- */
+/* Use hardware filtering (Flow Director) */
+#define VR_DPDK_USE_HW_FILTERING    false
+/* KNI generates random MACs for e1000e NICs, so we need this
+ * option enabled for the development on servers with those NICs */
 #define VR_DPDK_ENABLE_PROMISC      false
 /* Maximum number of hardware RX queues to use for RSS and filtering
  * (limited by NIC and number of per queue TX/RX descriptors) */
@@ -68,7 +66,7 @@
 #define VR_DPDK_NB_RXD              256
 /* Number of hardware TX ring descriptors */
 #define VR_DPDK_NB_TXD              512
-/* Offset to MPLS label for hardware filters */
+/* Offset to MPLS label for hardware filtering */
 #define VR_DPDK_MPLS_OFFSET         (VR_ETHER_HLEN          \
                                     + sizeof(struct vr_ip)  \
                                     + sizeof(struct vr_udp))
@@ -126,31 +124,29 @@
  */
 
 struct vr_dpdk_rx_queue {
-    /* single-linked list */
     SLIST_ENTRY(vr_dpdk_rx_queue) rxq_next;
     /* RX queue operators */
     struct rte_port_in_ops rxq_ops;
-    /* queue handler */
+    /* Queue handler */
     void *rxq_queue_h;
     /* RX burst size */
     uint16_t rxq_burst_size;
-    /* pointer to vRouter interface */
+    /* Pointer to vRouter interface */
     struct vr_interface *rxq_vif;
 };
 
 struct vr_dpdk_tx_queue {
-    /* single-linked list */
     SLIST_ENTRY(vr_dpdk_tx_queue) txq_next;
     /* TX queue operators */
     struct rte_port_out_ops txq_ops;
-    /* queue handler */
+    /* Queue handler */
     void *txq_queue_h;
-    /* pointer to vRouter interface */
+    /* Pointer to vRouter interface */
     struct vr_interface *txq_vif;
 };
 
 struct vr_dpdk_ring_to_push {
-    /* ring pointer */
+    /* Ring pointer */
     struct rte_ring *rtp_tx_ring;
     /* TX queue pointer */
     struct vr_dpdk_tx_queue *rtp_tx_queue;
@@ -160,27 +156,27 @@ SLIST_HEAD(vr_dpdk_rx_slist, vr_dpdk_rx_queue);
 SLIST_HEAD(vr_dpdk_tx_slist, vr_dpdk_tx_queue);
 
 struct vr_dpdk_lcore {
-    /* global stop flag */
+    /* Global stop flag */
     rte_atomic16_t lcore_stop_flag;
-    /* pointer to memory pool */
+    /* Pointer to memory pool */
     struct rte_mempool *pktmbuf_pool;
-    /* number of RX queues assigned to the lcore (for the scheduler) */
+    /* Number of RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
     /* RX queues head */
     struct vr_dpdk_rx_slist lcore_rx_head;
-    /* list of RX queues */
+    /* List of RX queues */
     struct vr_dpdk_rx_queue lcore_rx_queues[VR_MAX_INTERFACES];
     /* TX queues head */
     struct vr_dpdk_tx_slist lcore_tx_head;
-    /* table of TX queues */
+    /* Table of TX queues */
     struct vr_dpdk_tx_queue lcore_tx_queues[VR_MAX_INTERFACES];
-    /* number of rings to push for the lcore */
+    /* Number of rings to push for the lcore */
     uint16_t lcore_nb_rings_to_push;
-    /* list of rings to push */
+    /* List of rings to push */
     struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
-    /* number of free rings available for the lcore */
+    /* Number of free rings available for the lcore */
     uint16_t lcore_nb_free_rings;
-    /* list of free rings */
+    /* List of free rings */
     struct rte_ring *lcore_free_rings[VR_DPDK_MAX_RINGS];
 };
 
@@ -191,7 +187,7 @@ enum vr_dpdk_queue_state {
     /* The queue is being used for RSS */
     VR_DPDK_QUEUE_RSS_STATE,
     /* The queue is being used for filtering */
-    VR_DPDK_QUEUE_FILTER_STATE
+    VR_DPDK_QUEUE_FILTERING_STATE
 };
 
 /* Ethdev configuration */
@@ -206,6 +202,10 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_rss_queues;
     /* Hardware RX queue states */
     enum vr_dpdk_queue_state ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
+#if VR_DPDK_USE_HW_FILTERING
+    /* Pointers to memory pools */
+    struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
+#endif
 };
 
 struct vr_dpdk_global {
@@ -213,9 +213,9 @@ struct vr_dpdk_global {
     struct rte_mempool *pktmbuf_pool;
     /* number of forwarding lcores */
     unsigned nb_fwd_lcores;
-    /* table of pointers to forwarding lcore */
+    /* Table of pointers to forwarding lcore */
     struct vr_dpdk_lcore *lcores[RTE_MAX_LCORE];
-    /* global stop flag */
+    /* Global stop flag */
     rte_atomic16_t stop_flag;
     /* NetLink socket handler */
     void *netlink_sock;
@@ -228,13 +228,13 @@ struct vr_dpdk_global {
     void *event_sock;
     /* KNI thread ID */
     pthread_t kni_thread;
-    /* timer thread ID */
+    /* Timer thread ID */
     pthread_t timer_thread;
-    /* table of KNIs */
+    /* Table of KNIs */
     struct rte_kni *knis[VR_MAX_INTERFACES];
-    /* table of vHosts */
+    /* Table of vHosts */
     struct vr_interface *vhosts[VR_MAX_INTERFACES];
-    /* table of ethdevs */
+    /* Table of ethdevs */
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS];
 };
 
@@ -310,11 +310,11 @@ void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, un
  */
 /* Init eth RX queue */
 struct vr_dpdk_rx_queue *
-vr_dpdk_eth_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
+vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned rx_queue_id);
 /* Init eth TX queue */
 struct vr_dpdk_tx_queue *
-vr_dpdk_eth_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
+vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id);
 /* Init ethernet device */
 int vr_dpdk_ethdev_init(struct vr_interface *vif);

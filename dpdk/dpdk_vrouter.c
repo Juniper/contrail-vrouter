@@ -17,6 +17,7 @@
 #include <signal.h>
 
 #include <rte_timer.h>
+#include <rte_errno.h>
 
 #include "vr_dpdk.h"
 
@@ -59,7 +60,7 @@ dpdk_init(void)
     ret = vr_dpdk_flow_mem_init();
     if (ret < 0) {
         fprintf(stderr, "Error initializing flow table: %s (%d)\n",
-            strerror(-ret), -ret);
+            rte_strerror(-ret), -ret);
         return ret;
     }
 
@@ -83,7 +84,7 @@ dpdk_init(void)
     /* Scan PCI bus for recognised devices */
     ret = rte_eal_pci_probe();
     if (ret < 0) {
-        RTE_LOG(CRIT, VROUTER, "Error probing PCI: %s (%d)\n", strerror(-ret), -ret);
+        RTE_LOG(CRIT, VROUTER, "Error probing PCI: %s (%d)\n", rte_strerror(-ret), -ret);
         return ret;
     }
 
@@ -254,7 +255,7 @@ dpdk_threads_create(void)
             &dpdk_kni_loop, NULL);
     if (ret != 0) {
         RTE_LOG(CRIT, VROUTER, "Error creating KNI thread: %s (%d)\n",
-            strerror(ret), ret);
+            rte_strerror(ret), ret);
         return ret;
     }
     /* thread to handle timers */
@@ -262,7 +263,7 @@ dpdk_threads_create(void)
             &dpdk_timer_loop, NULL);
     if (ret != 0) {
         RTE_LOG(CRIT, VROUTER, "Error creating timer thread: %s (%d)\n",
-            strerror(ret), ret);
+            rte_strerror(ret), ret);
 
         return ret;
     }

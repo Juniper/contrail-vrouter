@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 #include <unistd.h>
-#include <errno.h>
 #include <stdbool.h>
 #include <net/if.h>
 
@@ -58,8 +57,8 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-        ethdev->ethdev_nb_rss_queues, &vr_dpdk_eth_rx_queue_init,
-        ethdev->ethdev_nb_tx_queues, &vr_dpdk_eth_tx_queue_init);
+        ethdev->ethdev_nb_rss_queues, &vr_dpdk_ethdev_rx_queue_init,
+        ethdev->ethdev_nb_tx_queues, &vr_dpdk_ethdev_tx_queue_init);
 }
 
 /* Add vhost interface */
