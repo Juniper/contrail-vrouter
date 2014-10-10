@@ -932,7 +932,6 @@ linux_to_vr(struct vr_interface *vif, struct sk_buff *skb)
     if (!pkt)
         return 0;
 
-    pkt->vp_flags |= VP_FLAG_GSO;
     vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
 
     return 0;
