@@ -37,6 +37,7 @@ make_dir = Dir(dpdk_dir).srcnode().abspath
 make_cmd = 'make config T=x86_64-native-linuxapp-gcc; make'
 dpdk_lib = env.Command('dpdk_lib', None, make_cmd, chdir=make_dir)
 env.AlwaysBuild(dpdk_lib)
+env.Default(dpdk_lib)
 
 dpdk_vrouter_src = [ 'dpdk_vrouter.c',
                      'vr_dpdk_ethdev.c',
