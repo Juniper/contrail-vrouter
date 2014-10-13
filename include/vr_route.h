@@ -19,6 +19,9 @@ extern "C" {
 #define IS_LINK_LOCAL_IP(ip) \
     ((ntohl(ip) & METADATA_IP_MASK) == METADATA_IP_SUBNET)
 
+#define RT_IP_ADDR_SIZE(family) \
+    ((family == AF_INET6)?16:4)
+
 struct vrouter;
 struct rtable_fspec;
 
