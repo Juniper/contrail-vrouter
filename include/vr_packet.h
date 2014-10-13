@@ -18,12 +18,12 @@
 #define VR_ETHER_PROTO_MAC_OFF  1
 #define VR_ETHER_PROTO_MAC_LEN  2
 
-
 #define VR_IP_PROTO_ICMP        1
 #define VR_IP_PROTO_IGMP        2
 #define VR_IP_PROTO_TCP         6
 #define VR_IP_PROTO_UDP         17
 #define	VR_IP_PROTO_GRE         47
+#define VR_IP_PROTO_ICMP6       58
 #define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
 #define VR_GRE_FLAG_KEY         (ntohs(0x2000)) 
 
@@ -260,6 +260,7 @@ struct vr_vlan_hdr {
 
 #define VR_ETH_PROTO_ARP        0x806
 #define VR_ETH_PROTO_IP         0x800
+#define VR_ETH_PROTO_IP6        0x86DD
 #define VR_ETH_PROTO_VLAN       0x8100
 
 #define VR_DIAG_IP_CSUM         0xffff
@@ -317,6 +318,47 @@ struct vr_ip {
     unsigned int ip_daddr;
 } __attribute__((packed));
 
+struct vr_ip6 {
+#ifdef __KERNEL__
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+    unsigned int  
+               ip6_flow:20,
+               ip6_priority:8,
+               ip6_version:4;
+#elif defined(__BIG_ENDIAN_BITFIELD)
+    unsigned int  
+               ip6_version:4,
+               ip6_priority:8,
+               ip6_flow:20;
+#endif
+#else
+#if (__BYTE_ORDER == __LITTLE_ENDIAN)
+    unsigned int  
+               ip6_flow:20,
+               ip6_priority:8,
+               ip6_version:4;
+#elif (__BYTE_ORDER == __BIG_ENDIAN)
+    unsigned int  
+               ip6_version:4,
+               ip6_priority:8,
+               ip6_flow:20;
+#endif
+#endif
+    unsigned short  ip6_plen;        /* payload length */
+    unsigned char   ip6_nxt;         /* next header */
+    unsigned char   ip6_hlim;        /* hop limit */
+    unsigned char ip6_src[16];       /* source address */
+    unsigned char ip6_dst[16];       /* destination address */
+} __attribute__((packed));
+
+static inline bool
+vr_ip_is_ip6(struct vr_ip *iph)
+{
+    if ((iph->ip_version & 0xf) == 0x4)
+        return false;
+    else
+        return true;
+}
 static inline unsigned char *pkt_network_header(struct vr_packet *);
 
 static inline bool
@@ -336,6 +378,9 @@ vr_ip_fragment_tail(struct vr_ip *iph)
     unsigned short frag = ntohs(iph->ip_frag_off);
     bool more = (frag & VR_IP_MF) ? true : false;
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
+
+    if (vr_ip_is_ip6(iph))
+        return false;
 
     if (!more && offset)
         return true;
@@ -361,6 +406,9 @@ vr_ip_fragment_head(struct vr_ip *iph)
     bool more = (frag & VR_IP_MF) ? true : false;
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
+    if (vr_ip_is_ip6(iph))
+        return false;
+
     if (more && !offset)
         return true;
 
@@ -374,6 +422,9 @@ vr_ip_fragment(struct vr_ip *iph)
     bool more = (frag & VR_IP_MF) ? true : false;
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
+    if (vr_ip_is_ip6(iph))
+        return false;
+
     if (offset || more)
         return true;
 
@@ -385,6 +436,9 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
 {
     unsigned short frag = ntohs(iph->ip_frag_off);
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
+
+    if (vr_ip_is_ip6(iph))
+        return true;
 
     if (offset)
         return false;
@@ -434,6 +488,13 @@ struct vr_udp {
 #define VR_ICMP_TYPE_ECHO           8
 #define VR_ICMP_TYPE_TIME_EXCEEDED 11
 
+#define VR_ICMP6_TYPE_PKT_TOO_BIG  2
+#define VR_ICMP6_TYPE_ECHO_REQ     128
+#define VR_ICMP6_TYPE_ECHO_REPLY   129
+#define VR_ICMP6_TYPE_ROUTER_SOL   133
+#define VR_ICMP6_TYPE_NEIGH_SOL    135
+#define VR_ICMP6_TYPE_NEIGH_AD     136
+
 struct vr_icmp {
     uint8_t icmp_type;
     uint8_t icmp_code;
@@ -441,6 +502,7 @@ struct vr_icmp {
     /* now only for icmp echo */
     uint16_t icmp_eid;
     uint16_t icmp_eseq;
+    uint8_t  icmp_data[0]; // Compatibility with ICMPv6
 } __attribute__((packed));
 
 static inline bool
