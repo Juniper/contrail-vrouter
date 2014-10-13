@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <malloc.h>
 #include <assert.h>
@@ -629,9 +630,6 @@ struct nl_client *
 nl_register_client(void)
 {
     struct nl_client *cl;
-#if 1
-    FILE *pid_file;
-#endif
 
     cl = calloc(sizeof(*cl), 1);
     if (!cl)
@@ -646,13 +644,7 @@ nl_register_client(void)
         goto exit_register;
     cl->cl_resp_buf_len = NL_RESP_DEFAULT_SIZE;
 
-#if 0
-    /* this really is OK... */
-    cl->cl_id = __sync_fetch_and_add(&nl_client_ids, 1);
-#else
-    cl->cl_id = get_vrouter_pid();
-#endif
-
+    cl->cl_id = 0;
     cl->cl_sock = -1;
 
     return cl;
@@ -728,14 +720,13 @@ nl_parse_reply(struct nl_client *cl)
 int
 vrouter_get_family_id(struct nl_client *cl)
 {
-#if 0
     int ret;
     struct nl_response *resp;
     struct genl_ctrl_message *msg;
 
     if (cl->cl_socket_domain != AF_NETLINK) {
-        nl_set_genl_family_id(cl, 1);
-        return 1;
+        nl_set_genl_family_id(cl, GENL_ID_VROUTER);
+        return GENL_ID_VROUTER;
     }
 
     if ((ret = nl_build_get_family_id(cl, VROUTER_GENETLINK_FAMILY_NAME)))
@@ -744,8 +735,15 @@ vrouter_get_family_id(struct nl_client *cl)
     if (nl_sendmsg(cl) <= 0)
         return -errno;
 
-    if (nl_recvmsg(cl) <= 0)
+    while (1) {
+        ret = nl_recvmsg(cl);
+        if (ret == EAGAIN)
+            continue;
+        else if (ret > 0)
+            break;
+
         return -errno;
+    }
 
     resp = nl_parse_reply(cl);
     if (!resp || resp->nl_type != NL_MSG_TYPE_GEN_CTRL ||
@@ -756,10 +754,6 @@ vrouter_get_family_id(struct nl_client *cl)
     nl_set_genl_family_id(cl, msg->family_id);
 
     return msg->family_id;
-#else
-    nl_set_genl_family_id(cl, GENL_ID_VROUTER);
-    return GENL_ID_VROUTER;
-#endif
 }
 
 int
