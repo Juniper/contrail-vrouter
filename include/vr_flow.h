@@ -21,6 +21,7 @@
 #define VR_RFLOW_VALID              0x1000
 #define VR_FLOW_FLAG_MIRROR         0x2000
 #define VR_FLOW_FLAG_VRFT           0x4000
+#define VR_FLOW_FLAG_LINK_LOCAL     0x8000
 
 /* rest of the flags are action specific */
 
@@ -166,6 +167,9 @@ struct vr_flow_entry {
 #define VR_UDP_DNS_SPORT    (17 << 16 | htons(53))
 #define VR_TCP_DNS_SPORT    (6 << 16 | htons(53))
 
+#define VR_DHCP6_SPORT htons(546)
+#define VR_DHCP6_DPORT htons(547)
+
 #define VR_DNS_SERVER_PORT  htons(53)
 
 struct vr_flow_md {
@@ -187,11 +191,17 @@ extern int vr_flow_init(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);
 extern unsigned int vr_flow_inet_input(struct vrouter *, unsigned short, 
         struct vr_packet *, unsigned short, struct vr_forwarding_md *);
+extern unsigned int vr_flow_inet6_input(struct vrouter *, unsigned short, 
+        struct vr_packet *, unsigned short, struct vr_forwarding_md *);
+
+extern int vr_flow_forward(unsigned short vrf, struct vr_packet *pkt,
+        unsigned short proto, struct vr_forwarding_md *fmd);
 extern inline unsigned int
 vr_flow_bypass(struct vrouter *, struct vr_flow_key *, struct vr_packet *, unsigned int *);
 void *vr_flow_get_va(struct vrouter *, uint64_t);
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
 struct vr_flow_entry * vr_get_flow_entry(struct vrouter *, int );
+bool vr_valid_link_local_port(struct vrouter *, int , int , int );
 
 #endif /* __VR_FLOW_H__ */

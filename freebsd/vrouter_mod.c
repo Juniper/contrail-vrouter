@@ -94,6 +94,7 @@ struct host_os *vrouter_get_host(void);
 unsigned int vr_num_cpus = 1;
 
 int vr_log_level = 0;
+int vrouter_dbg = 0;
 
 /* Create malloc type for vrouter */
 MALLOC_DECLARE(M_VROUTER);

@@ -14,6 +14,7 @@
 #include "vr_fragment.h"
 #include "vr_datapath.h"
 #include "vr_hash.h"
+#include "vr_ip_mtrie.h"
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
@@ -47,6 +48,7 @@ extern int vr_ip_input(struct vrouter *, unsigned short,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_ip_update_csum(struct vr_packet *, unsigned int,
         unsigned int);
+extern uint16_t vr_icmp6_checksum(void * buffer, int bytes);
 
 static void vr_flush_entry(struct vrouter *, struct vr_flow_entry *,
         struct vr_flow_md *, struct vr_forwarding_md *);
@@ -76,6 +78,87 @@ jhash(void *key, uint32_t length, uint32_t interval)
   return ret;
 }
 #endif
+
+
+bool
+vr_valid_link_local_port(struct vrouter *router, int family,
+                         int proto, int port)
+{
+    unsigned char data;
+    unsigned int tmp;
+
+    if (!router->vr_link_local_ports)
+        return false;
+
+    if ((family != AF_INET) ||
+        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
+        return false;
+
+    if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
+        return false;
+
+    tmp = port - VR_DYNAMIC_PORT_START;
+    if (proto == VR_IP_PROTO_UDP)
+        tmp += (router->vr_link_local_ports_size * 8 / 2);
+
+    data = router->vr_link_local_ports[(tmp /8)];
+    if (data & (1 << (tmp % 8)))
+        return true;
+
+    return false;
+}
+
+static void
+vr_clear_link_local_port(struct vrouter *router, int family,
+                       int proto, int port)
+{
+
+    unsigned char *data;
+    unsigned int tmp;
+
+    if (!router->vr_link_local_ports)
+        return;
+
+    if ((family != AF_INET) ||
+        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
+        return;
+
+    if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
+        return;
+
+    tmp = port - VR_DYNAMIC_PORT_START;
+    if (proto == VR_IP_PROTO_UDP)
+        tmp += (router->vr_link_local_ports_size * 8 / 2);
+
+    data = &router->vr_link_local_ports[(tmp /8)];
+    *data &= (~(1 << (tmp % 8)));
+}
+
+static void
+vr_set_link_local_port(struct vrouter *router, int family,
+                       int proto, int port)
+{
+
+    unsigned char *data;
+    unsigned int tmp;
+
+    if (!router->vr_link_local_ports)
+        return;
+
+    if ((family != AF_INET) ||
+        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
+        return;
+
+    if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
+        return;
+
+    tmp = port - VR_DYNAMIC_PORT_START;
+    if (proto == VR_IP_PROTO_UDP)
+        tmp += (router->vr_link_local_ports_size * 8 / 2);
+
+    data = &router->vr_link_local_ports[tmp /8];
+    *data |= (1 << (tmp % 8));
+}
 
 static void
 vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe, 
@@ -224,6 +307,7 @@ vr_get_flow_key(struct vr_flow_key *key, uint16_t vlan, struct vr_packet *pkt,
     case VR_IP_PROTO_TCP:
     case VR_IP_PROTO_UDP:
     case VR_IP_PROTO_ICMP:
+    case VR_IP_PROTO_ICMP6:
         key->key_src_port = sport;
         key->key_dst_port = dport;
         break;
@@ -400,14 +484,14 @@ drop:
     return 0;
 }
 
-static int
+int
 vr_flow_forward(unsigned short vrf, struct vr_packet *pkt,
         unsigned short proto, struct vr_forwarding_md *fmd)
 {
     struct vr_interface *vif = pkt->vp_if;
     struct vrouter *router = vif->vif_router;
 
-    if (proto != VR_ETH_PROTO_IP) {
+    if ((proto != VR_ETH_PROTO_IP) && (proto != VR_ETH_PROTO_IP6)) {
         vr_pfree(pkt, VP_DROP_FLOW_INVALID_PROTOCOL);
         return 0;
     }
@@ -434,11 +518,17 @@ vr_flow_nat(unsigned short vrf, struct vr_flow_entry *fe, struct vr_packet *pkt,
     if (fe->fe_rflow < 0)
         goto drop;
 
+    ip = (struct vr_ip *)pkt_data(pkt);
+
+    if (vr_ip_is_ip6(ip)) {
+        /* No NAT support for IPv6 yet */
+        vr_pfree(pkt, VP_DROP_FLOW_ACTION_INVALID);
+        return 0;
+    }
+
     rfe = vr_get_flow_entry(router, fe->fe_rflow);
     if (!rfe)
         goto drop;
-
-    ip = (struct vr_ip *)pkt_data(pkt);
 
     if (ip->ip_proto == VR_IP_PROTO_ICMP) {
         icmph = (struct vr_icmp *)((unsigned char *)ip + (ip->ip_hl * 4));
@@ -823,6 +913,151 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
     return res;
 }
 
+extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
+                struct vr_route_req *, struct vr_packet *);
+unsigned int
+vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
+        struct vr_packet *pkt, unsigned short proto,
+        struct vr_forwarding_md *fmd)
+{
+    struct vr_ip6 *ip6;
+    struct vr_eth *eth;
+    unsigned int trap_res  = 0;
+    unsigned short *t_hdr, sport, dport, eth_off;
+    struct vr_icmp *icmph;
+    unsigned char *icmp_opt_ptr;
+    int proxy = 0;
+    struct vr_route_req rt;
+    struct vr_nexthop *nh;
+    struct vr_interface *vif = pkt->vp_if;
+    uint32_t rt_prefix[4];
+   
+    pkt->vp_type = VP_TYPE_IP6;
+    ip6 = (struct vr_ip6 *)pkt_network_header(pkt); 
+    /* TODO: Handle options headers */
+    t_hdr = (unsigned short *)((char *)ip6 + sizeof(struct vr_ip6));
+    switch (ip6->ip6_nxt) {
+    case VR_IP_PROTO_ICMP6: 
+        /* First word on ICMP and ICMPv6 are same */
+        icmph = (struct vr_icmp *)t_hdr;
+        switch (icmph->icmp_type) {
+        case VR_ICMP6_TYPE_ECHO_REQ: 
+        case VR_ICMP6_TYPE_ECHO_REPLY: 
+            /* ICMPv6 Echo format is same as ICMP */
+            sport = icmph->icmp_eid;
+            dport = VR_ICMP6_TYPE_ECHO_REPLY;
+            break;
+        case VR_ICMP6_TYPE_NEIGH_SOL: //Neighbor Solicit, respond with VRRP MAC
+
+            /* For L2-only networks, bridge the packets */
+            if (vif_is_virtual(vif) && !(vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
+                return 0;
+            }
+
+            rt.rtr_req.rtr_vrf_id = vrf;
+            rt.rtr_req.rtr_family = AF_INET6;
+            rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
+            memcpy(rt.rtr_req.rtr_prefix, &icmph->icmp_data, 16);
+            rt.rtr_req.rtr_prefix_size = 16;
+            rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
+            rt.rtr_req.rtr_nh_id = 0;
+            rt.rtr_req.rtr_label_flags = 0;
+            rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
+        
+            nh = vr_inet_route_lookup(vrf, &rt, NULL);
+            if (!nh || nh->nh_type == NH_DISCARD) {
+                vr_pfree(pkt, VP_DROP_ARP_NOT_ME);
+                return 1;
+            }
+        
+            if (rt.rtr_req.rtr_label_flags & VR_RT_HOSTED_FLAG) {
+                proxy = 1;
+            }
+
+            /*
+             * If an L3VPN route is learnt, we need to proxy
+             */
+            if (nh->nh_type == NH_TUNNEL) {
+                proxy = 1;
+            }
+
+            /*
+             * If not l3 vpn route, we default to flooding
+             */
+            if ((nh->nh_type == NH_COMPOSITE) &&
+                ((nh->nh_flags & NH_FLAG_COMPOSITE_EVPN) || 
+                  (nh->nh_flags & NH_FLAG_COMPOSITE_L2))) {
+                nh_output(vrf, pkt, nh, fmd);
+                return 1;
+            } else if (!proxy) {
+                vr_pfree(pkt, VP_DROP_ARP_NOT_ME);
+                return 1;
+            }
+
+            /* 
+             * Update IPv6 header  
+             * Copy the IP6 src to IP6 dst 
+             * Copy the target IP n ICMPv6 header as src IP of packet
+             * Do IP lookup to confirm if we can respond with Neighbor advertisement
+             */
+             memcpy(ip6->ip6_dst, ip6->ip6_src, 16);
+             memcpy(ip6->ip6_src, &icmph->icmp_data, 16);
+             ip6->ip6_src[15] = 0xFF; // Mimic a different src IP
+
+             /* Update ICMP header and options */
+             icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD; 
+             icmp_opt_ptr = ((char*)&icmph->icmp_data[0]) + 16;
+             *icmp_opt_ptr = 0x02; //Target-link-layer-address
+             memcpy(icmp_opt_ptr+2, vif->vif_mac, VR_ETHER_ALEN);
+             
+             /*
+              * Update icmp6 checksum
+              * ICMPv6 option size is 24 bytes (IPv6 + MAC + 2 bytes)
+              */
+             icmph->icmp_csum = 
+                       ~(vr_icmp6_checksum(ip6, sizeof(struct vr_ip6) + 
+                                                sizeof(struct vr_icmp) + 24));
+             
+             /* Update Ethernet headr */
+             eth = (struct vr_eth*) ((char*)ip6 - sizeof(struct vr_eth));
+             memcpy(eth->eth_dmac, eth->eth_smac, VR_ETHER_ALEN);
+             memcpy(eth->eth_smac, vif->vif_mac, VR_ETHER_ALEN);
+
+             eth_off = pkt_get_network_header_off(pkt) - sizeof(struct vr_eth);
+
+             pkt_set_data(pkt,eth_off);
+
+             /* Respond back directly*/
+             vif->vif_tx(vif, pkt);
+             
+             return 1;
+        case VR_ICMP6_TYPE_ROUTER_SOL: //Router solicit, trap to agent
+             return vr_trap(pkt, vrf, AGENT_TRAP_L3_PROTOCOLS, NULL);
+        default:
+            sport = 0;
+            dport = icmph->icmp_type;
+        }
+        break;
+    case VR_IP_PROTO_UDP:
+        sport = *t_hdr;
+        dport = *(t_hdr + 1);
+        
+        if (vif_is_virtual(pkt->vp_if)) {
+            if ((sport == VR_DHCP6_SPORT) && (dport == VR_DHCP6_DPORT)) {
+                trap_res = AGENT_TRAP_L3_PROTOCOLS;
+                return vr_trap(pkt, vrf, trap_res, NULL);
+            }
+        }
+        break;
+    case VR_IP_PROTO_TCP:
+        sport = *t_hdr;
+        dport = *(t_hdr + 1);
+    default:
+        break;
+    }
+
+    return vr_flow_forward(vrf, pkt, proto, fmd);
+}
 
 unsigned int
 vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
@@ -1183,6 +1418,10 @@ static int
 vr_flow_delete(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
 {
+    if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL)
+        vr_clear_link_local_port(router, AF_INET, fe->fe_key.key_proto,
+                                   ntohs(fe->fe_key.key_dst_port));
+
     fe->fe_action = VR_FLOW_ACTION_DROP;
     vr_flow_reset_mirror(router, fe, req->fr_index);
 
@@ -1278,6 +1517,16 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     fe->fe_vrf = req->fr_flow_vrf;
     if (req->fr_flags & VR_FLOW_FLAG_VRFT) 
         fe->fe_dvrf = req->fr_flow_dvrf;
+
+    if (req->fr_flags & VR_FLOW_FLAG_LINK_LOCAL) {
+        if (!(fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL))
+            vr_set_link_local_port(router, AF_INET, fe->fe_key.key_proto,
+                                   ntohs(fe->fe_key.key_dst_port));
+    } else {
+        if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL)
+            vr_clear_link_local_port(router, AF_INET, fe->fe_key.key_proto,
+                                   ntohs(fe->fe_key.key_dst_port));
+    }
 
     fe->fe_ecmp_nh_index = req->fr_ecmp_nh_index;
     fe->fe_src_nh_index = req->fr_src_nh_index;
@@ -1449,16 +1698,60 @@ vr_flow_table_init(struct vrouter *router)
 
     return vr_flow_table_info_init(router);
 }
+void
+vr_link_local_ports_reset(struct vrouter *router)
+{
+    if (router->vr_link_local_ports) {
+        memset(router->vr_link_local_ports,
+               0, router->vr_link_local_ports_size);
+    }
+}
 
+
+
+void
+vr_link_local_ports_exit(struct vrouter *router)
+{
+    if (router->vr_link_local_ports) {
+        vr_free(router->vr_link_local_ports);
+        router->vr_link_local_ports = NULL;
+        router->vr_link_local_ports_size = 0;
+    }
+}
+
+int
+vr_link_local_ports_init(struct vrouter *router)
+{
+    unsigned int port_range, bytes;
+
+    if (router->vr_link_local_ports)
+        return 0;
+
+    /*  Udp and TCP inclusive of low and high limits*/
+    port_range = 2 * ((VR_DYNAMIC_PORT_END - VR_DYNAMIC_PORT_START) + 1);
+    /* Make it 16 bit boundary */
+    bytes = (port_range + 15) & ~15;
+    /* Bits to Bytes */
+    bytes /= 8;
+
+    router->vr_link_local_ports = vr_zalloc(bytes);
+    if (!router->vr_link_local_ports)
+        return -1;
+    router->vr_link_local_ports_size = bytes;
+
+    return 0;
+}
 
 /* flow module exit and init */
 void
 vr_flow_exit(struct vrouter *router, bool soft_reset)
 {
     vr_flow_table_reset(router);
+    vr_link_local_ports_reset(router);
     if (!soft_reset) {
         vr_flow_table_destroy(router);
         vr_fragment_table_exit(router);
+        vr_link_local_ports_exit(router);
     }
 
     return;
@@ -1473,6 +1766,9 @@ vr_flow_init(struct vrouter *router)
         return ret;
 
     if ((ret = vr_flow_table_init(router)))
+        return ret;
+
+    if ((ret = vr_link_local_ports_init(router)))
         return ret;
 
     return 0;

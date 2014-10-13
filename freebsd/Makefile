@@ -35,6 +35,7 @@ SRCS += vr_message.c \
        vr_sandesh.c \
        vr_queue.c \
        vr_index_table.c \
+       vr_ip_mtrie.c \
        vrouter.c \
        vr_route.c \
        vr_nexthop.c \
@@ -43,7 +44,6 @@ SRCS += vr_message.c \
        vr_packet.c \
        vr_proto_ip.c \
        vr_mpls.c \
-       vr_ip4_mtrie.c \
        vr_response.c \
        vr_flow.c \
        vr_mirror.c \

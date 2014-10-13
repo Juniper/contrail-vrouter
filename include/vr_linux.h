@@ -12,6 +12,6 @@ vp_os_packet(struct vr_packet *pkt)
     return CONTAINER_OF(cb, struct sk_buff, pkt);
 }
 
-#define	VROUTER_VERSIONID "1.0"
+#define VROUTER_VERSIONID "1.0"
 
 #endif /* __VR_LINUX_H__ */

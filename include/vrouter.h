@@ -105,6 +105,7 @@ struct host_os {
                                         (*is_label_l2)(unsigned int,
                                             unsigned int, unsigned short *), 
                                         int *, int *);
+    int (*hos_pkt_may_pull)(struct vr_packet *, unsigned int);
 };
 
 #define vr_malloc                       vrouter_host->hos_malloc
@@ -143,6 +144,7 @@ struct host_os {
 #define vr_pull_inner_headers_fast      vrouter_host->hos_pull_inner_headers_fast
 #define vr_get_udp_src_port             vrouter_host->hos_get_udp_src_port
 #define vr_pkt_from_vm_tcp_mss_adj      vrouter_host->hos_pkt_from_vm_tcp_mss_adj
+#define vr_pkt_may_pull                 vrouter_host->hos_pkt_may_pull
 
 struct vrouter {
     unsigned int vr_num_if;
@@ -178,6 +180,9 @@ struct vrouter {
     struct vr_timer *vr_fragment_otable_scanner;
 
     uint64_t **vr_pdrop_stats;
+
+    uint16_t vr_link_local_ports_size;
+    unsigned char *vr_link_local_ports;
 
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;

@@ -12,12 +12,12 @@
  * Generic Netlink Message Header
  */
 struct genlmsghdr {
-	uint8_t	cmd;
-	uint8_t	version;
-	uint16_t	reserved;
+    uint8_t    cmd;
+    uint8_t    version;
+    uint16_t    reserved;
 };
 
-#define GENL_HDRLEN	NLMSG_ALIGN(sizeof(struct genlmsghdr))
+#define GENL_HDRLEN    NLMSG_ALIGN(sizeof(struct genlmsghdr))
 
 /*
  * Below identifiers have similar meaning as in Linux and the same
@@ -25,12 +25,12 @@ struct genlmsghdr {
  * code has been defined.
  */
 enum {
-	GENL_ID_GENERATE = 0,
-	GENL_ID_CTRL = NLMSG_MIN_TYPE,
-	CTRL_CMD_NEWFAMILY = 1,
-	CTRL_CMD_GETFAMILY = 3,
-	CTRL_ATTR_FAMILY_ID = 1,
-	CTRL_ATTR_FAMILY_NAME,
+    GENL_ID_GENERATE = 0,
+    GENL_ID_CTRL = NLMSG_MIN_TYPE,
+    CTRL_CMD_NEWFAMILY = 1,
+    CTRL_CMD_GETFAMILY = 3,
+    CTRL_ATTR_FAMILY_ID = 1,
+    CTRL_ATTR_FAMILY_NAME,
 };
 
 #endif /* FAKE_GENERIC_NETLINK_H */

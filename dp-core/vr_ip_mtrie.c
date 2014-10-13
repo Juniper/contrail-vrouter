@@ -1,14 +1,14 @@
 /*
- * vr_ip4_mtrie.c -- 	VRF mtrie management
+ * vr_ip_mtrie.c -- 	VRF mtrie management
  *
- * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.	
+ * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.	
  */
 #include <vr_os.h>
-#include <vr_types.h>
-#include <vr_packet.h>
 #include "vr_sandesh.h"
 #include "vr_message.h"
-#include "vr_ip4_mtrie.h"
+#include "vr_packet.h"
+#include "vr_route.h"
+#include "vr_ip_mtrie.h"
 
 extern struct vr_nexthop *ip4_default_nh; 
 
@@ -19,79 +19,96 @@ struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int, struct vr_route_req *,
         struct vr_packet *);
 struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 
-static struct ip4_mtrie *mtrie_alloc_vrf(unsigned int);
+static struct ip_mtrie *mtrie_alloc_vrf(unsigned int, unsigned int);
 
-int mtrie4_algo_init(struct vr_rtable *, struct rtable_fspec *);
-void mtrie4_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
+/* mtrie specific, bucket_info for v4 and v6 */
+#define IP4_BKT_LEVELS  (IP4_PREFIX_LEN / IPBUCKET_LEVEL_BITS) 
+#define IP6_BKT_LEVELS  (IP6_PREFIX_LEN / IPBUCKET_LEVEL_BITS) 
 
-/* mtrie specific */
-#define IP4_BKT_LEVELS  4 /* 8/8/8/8 */
-struct mtrie_bkt_info ip4_bkt_info[IP4_BKT_LEVELS] = {
-    {
-        .bi_size    =   IP4BUCKET_LEVEL0_SIZE,
-        .bi_shift   =   IP4BUCKET_LEVEL0_SHIFT,
-        .bi_pfx_len =   IP4BUCKET_LEVEL0_PFX_LEN,
-        .bi_mask    =   IP4BUCKET_LEVEL0_MASK,
-        .bi_bits    =   IP4BUCKET_LEVEL0_BITS,
-    },
-    {
-        .bi_size    =   IP4BUCKET_LEVEL1_SIZE,
-        .bi_shift   =   IP4BUCKET_LEVEL1_SHIFT,
-        .bi_pfx_len =   IP4BUCKET_LEVEL1_PFX_LEN,
-        .bi_mask    =   IP4BUCKET_LEVEL1_MASK,
-        .bi_bits    =   IP4BUCKET_LEVEL1_BITS,
-    },
-    {
-        .bi_size    =   IP4BUCKET_LEVEL2_SIZE,
-        .bi_shift   =   IP4BUCKET_LEVEL2_SHIFT,
-        .bi_pfx_len =   IP4BUCKET_LEVEL2_PFX_LEN,
-        .bi_mask    =   IP4BUCKET_LEVEL2_MASK,
-        .bi_bits    =   IP4BUCKET_LEVEL2_BITS,
-    },
-    {
-        .bi_size    =   IP4BUCKET_LEVEL3_SIZE,
-        .bi_shift   =   IP4BUCKET_LEVEL3_SHIFT,
-        .bi_pfx_len =   IP4BUCKET_LEVEL3_PFX_LEN,
-        .bi_mask    =   IP4BUCKET_LEVEL3_MASK,
-        .bi_bits    =   IP4BUCKET_LEVEL3_BITS,
-    },
-};
+struct mtrie_bkt_info ip4_bkt_info[IP4_BKT_LEVELS];
+struct mtrie_bkt_info ip6_bkt_info[IP6_BKT_LEVELS];
 
-struct ip4_mtrie **vn_rtable;
+struct ip_mtrie **vn_rtable[2];
+static int algo_init_done = 0;
+static vr_route_req dump_resp;
+
+static void
+mtrie_ip_bkt_info_init(struct mtrie_bkt_info *ip_bkt_info, int pfx_len)
+{
+    int level;
+
+    ip_bkt_info[0].bi_bits = IPBUCKET_LEVEL_BITS;
+    ip_bkt_info[0].bi_pfx_len = IPBUCKET_LEVEL_BITS;
+    ip_bkt_info[0].bi_shift = pfx_len - IPBUCKET_LEVEL_BITS;
+    ip_bkt_info[0].bi_size = IPBUCKET_LEVEL_SIZE;
+    ip_bkt_info[0].bi_mask = IPBUCKET_LEVEL_MASK;
+
+    for (level = 1; level < (pfx_len/IPBUCKET_LEVEL_BITS); level++) {
+        ip_bkt_info[level].bi_bits = IPBUCKET_LEVEL_BITS;
+        ip_bkt_info[level].bi_pfx_len = ip_bkt_info[level-1].bi_pfx_len 
+                                              + IPBUCKET_LEVEL_BITS;
+        ip_bkt_info[level].bi_shift =  ip_bkt_info[level-1].bi_shift - IPBUCKET_LEVEL_BITS;
+        ip_bkt_info[level].bi_size = IPBUCKET_LEVEL_SIZE;
+        ip_bkt_info[level].bi_mask = IPBUCKET_LEVEL_MASK;
+    }
+}
 
 /*
  * given a vrf id, get the routing table corresponding to the id
  */
-static inline struct ip4_mtrie * 
-vrfid_to_mtrie(unsigned int vrf_id)
+static inline struct ip_mtrie * 
+vrfid_to_mtrie(unsigned int vrf_id, unsigned int family)
 {
+    int index = 0;
+    struct ip_mtrie **mtrie_table;
     if (vrf_id >= VR_MAX_VRFS)
         return NULL;
 
-    return vn_rtable[vrf_id];
+    if (family == AF_INET6)
+        index = 1;
+
+    mtrie_table = vn_rtable[index];
+    return mtrie_table[vrf_id];
 }
 
-#define PREFIX_TO_INDEX(prefix, level) \
-    ((prefix >> ip4_bkt_info[level].bi_shift) & \
-     ip4_bkt_info[level].bi_mask)
+#define PREFIX_TO_INDEX(prefix, level) (prefix[level]) 
+
+static inline unsigned int
+ip_bkt_get_max_level(int family)
+{
+    if (family == AF_INET6)
+        return(IP6_BKT_LEVELS);
+    else
+        return(IP4_BKT_LEVELS);
+}
+
+static struct mtrie_bkt_info * 
+ip_bkt_info_get(unsigned int family)
+{
+    if (family == AF_INET6)
+        return ip6_bkt_info;
+    else
+        return ip4_bkt_info;
+}
+    
 /*
  * we have to be careful about 'level' here. assumption is that level
  * will be passed sane from whomever is calling
  */
-static inline int
+static inline unsigned char
 rt_to_index(struct vr_route_req *rt, unsigned int level)
 {
     return PREFIX_TO_INDEX(rt->rtr_req.rtr_prefix, level);
 }
 
-static inline struct ip4_bucket_entry *
-index_to_entry(struct ip4_bucket *bkt, int index)
+static inline struct ip_bucket_entry *
+index_to_entry(struct ip_bucket *bkt, int index)
 {
     return &bkt->bkt_data[index];
 }
 
 static void
-set_entry_to_bucket(struct ip4_bucket_entry *ent, struct ip4_bucket *bkt)
+set_entry_to_bucket(struct ip_bucket_entry *ent, struct ip_bucket *bkt)
 {
     struct vr_nexthop *tmp_nh;
 
@@ -111,7 +128,7 @@ set_entry_to_bucket(struct ip4_bucket_entry *ent, struct ip4_bucket *bkt)
  * with an nh * that you are willing to forget about in your function
  */
 static void
-set_entry_to_nh(struct ip4_bucket_entry *entry, struct vr_nexthop *nh)
+set_entry_to_nh(struct ip_bucket_entry *entry, struct vr_nexthop *nh)
 {
     struct vr_nexthop *tmp_nh;
 
@@ -144,13 +161,13 @@ set_entry_to_nh(struct ip4_bucket_entry *entry, struct vr_nexthop *nh)
     return;
 }
 
-static inline struct ip4_bucket *
-entry_to_bucket(struct ip4_bucket_entry *ent)
+static inline struct ip_bucket *
+entry_to_bucket(struct ip_bucket_entry *ent)
 {
     unsigned long long_i = ent->entry_long_i;
 
     if (PTR_IS_BUCKET(long_i))
-        return (struct ip4_bucket *)(long_i & ~0x1UL);
+        return (struct ip_bucket *)(long_i & ~0x1UL);
 
     return NULL;
 }
@@ -158,17 +175,17 @@ entry_to_bucket(struct ip4_bucket_entry *ent)
 /*
  * alloc a mtrie bucket
  */
-static struct ip4_bucket *
-mtrie_alloc_bucket(unsigned char level, struct ip4_bucket_entry *parent)
+static struct ip_bucket *
+mtrie_alloc_bucket(struct mtrie_bkt_info *ip_bkt_info, unsigned char level, struct ip_bucket_entry *parent)
 {
     unsigned int                bkt_size;
     unsigned int                i;
-    struct ip4_bucket          *bkt;
-    struct ip4_bucket_entry    *ent;
+    struct ip_bucket           *bkt;
+    struct ip_bucket_entry     *ent;
 
-    bkt_size = ip4_bkt_info[level].bi_size;
-    bkt = vr_zalloc(sizeof(struct ip4_bucket) 
-                    + sizeof(struct ip4_bucket_entry) * bkt_size);
+    bkt_size = ip_bkt_info[level].bi_size;
+    bkt = vr_zalloc(sizeof(struct ip_bucket) 
+                    + sizeof(struct ip_bucket_entry) * bkt_size);
     if (!bkt)
         return NULL;
 
@@ -184,20 +201,23 @@ mtrie_alloc_bucket(unsigned char level, struct ip4_bucket_entry *parent)
 }
 
 static void
-add_to_tree(struct ip4_bucket_entry *ent, int level, struct vr_route_req *rt)
+add_to_tree(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
 {
     unsigned int i;
-    struct ip4_bucket              *bkt;
+    struct ip_bucket      *bkt;
+    struct mtrie_bkt_info *ip_bkt_info;
 
-    if (level >= IP4_BKT_LEVELS - 1)
+    if (level >= (ip_bkt_get_max_level(rt->rtr_req.rtr_family) - 1))
         /* assert here ? */
         return;
+
+    ip_bkt_info = ip_bkt_info_get(rt->rtr_req.rtr_family);
 
     /* assured that the first one is a bucket */
     bkt = entry_to_bucket(ent);
     level++;
 
-    for (i = 0; i < ip4_bkt_info[level].bi_size; i++) {
+    for (i = 0; i < ip_bkt_info[level].bi_size; i++) {
         ent = index_to_entry(bkt, i);
         if (!ENTRY_IS_NEXTHOP(ent))
             add_to_tree(ent, level, rt);
@@ -214,10 +234,10 @@ add_to_tree(struct ip4_bucket_entry *ent, int level, struct vr_route_req *rt)
 }
 
 static void
-mtrie_free_entry(struct ip4_bucket_entry *entry, unsigned int level)
+mtrie_free_entry(struct ip_bucket_entry *entry, unsigned int level)
 {
     unsigned int i;
-    struct ip4_bucket *bkt;
+    struct ip_bucket *bkt;
 
     if (ENTRY_IS_NEXTHOP(entry)) {
         vrouter_put_nexthop(entry->entry_nh_p);
@@ -228,7 +248,7 @@ mtrie_free_entry(struct ip4_bucket_entry *entry, unsigned int level)
     if (!bkt)
         return;
 
-    for (i = 0; i < ip4_bkt_info[level].bi_size; i++)
+    for (i = 0; i < IPBUCKET_LEVEL_SIZE; i++)
         if (ENTRY_IS_BUCKET(&bkt->bkt_data[i])) {
             mtrie_free_entry(&bkt->bkt_data[i], level + 1);
         } else {
@@ -244,10 +264,10 @@ mtrie_free_entry(struct ip4_bucket_entry *entry, unsigned int level)
 }
         
 static void
-mtrie_reset_entry(struct ip4_bucket_entry *ent, int level,
+mtrie_reset_entry(struct ip_bucket_entry *ent, int level,
                 struct vr_nexthop *nh)
 {
-    struct ip4_bucket_entry cp_ent;
+    struct ip_bucket_entry cp_ent;
 
     memcpy(&cp_ent, ent, sizeof(cp_ent));
 
@@ -277,19 +297,21 @@ mtrie_reset_entry(struct ip4_bucket_entry *ent, int level,
  * covers them.
  */
 static int
-__mtrie_add(struct ip4_mtrie *mtrie, struct vr_route_req *rt)
+__mtrie_add(struct ip_mtrie *mtrie, struct vr_route_req *rt)
 {
-    int                         ret, index, level, err_level = 0;
-    unsigned int                i, fin;
-    struct ip4_bucket          *bkt;
-    struct ip4_bucket_entry    *ent, *err_ent = NULL;
+    int                         ret, index = 0, level, err_level = 0;
+    unsigned char                i, fin = 0;
+    struct ip_bucket          *bkt;
+    struct ip_bucket_entry    *ent, *err_ent = NULL;
     struct vr_nexthop          *nh, *err_nh = NULL;
+    struct mtrie_bkt_info *ip_bkt_info = ip_bkt_info_get(rt->rtr_req.rtr_family);
 
     ent = &mtrie->root;
+
     nh = ent->entry_nh_p;
-    for (level = 0; level < IP4_BKT_LEVELS; level++) {
+    for (level = 0; level < ip_bkt_get_max_level(rt->rtr_req.rtr_family); level++) {
         if (!ENTRY_IS_BUCKET(ent)) {
-            bkt = mtrie_alloc_bucket(level, ent);
+            bkt = mtrie_alloc_bucket(ip_bkt_info, level, ent);
             set_entry_to_bucket(ent, bkt);
             if (!err_ent) {
                 err_ent = ent;
@@ -307,7 +329,7 @@ __mtrie_add(struct ip4_mtrie *mtrie, struct vr_route_req *rt)
         index = rt_to_index(rt, level);
         ent = index_to_entry(bkt, index);
 
-        if (rt->rtr_req.rtr_prefix_len > ip4_bkt_info[level].bi_pfx_len) {
+        if (rt->rtr_req.rtr_prefix_len > ip_bkt_info[level].bi_pfx_len) {
             if (ENTRY_IS_NEXTHOP(ent)) {
                 nh = ent->entry_nh_p;
             }
@@ -320,18 +342,18 @@ __mtrie_add(struct ip4_mtrie *mtrie, struct vr_route_req *rt)
              * prefix match
              */
             if ((rt->rtr_req.rtr_prefix_len >
-                        (ip4_bkt_info[level].bi_pfx_len - ip4_bkt_info[level].bi_bits)) &&
-                    (rt->rtr_req.rtr_prefix_len <= ip4_bkt_info[level].bi_pfx_len)) {
-                fin = 1 << (ip4_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
-            } else {
-                fin = ip4_bkt_info[level].bi_size;
+                        (ip_bkt_info[level].bi_pfx_len - ip_bkt_info[level].bi_bits)) &&
+                    (rt->rtr_req.rtr_prefix_len <= ip_bkt_info[level].bi_pfx_len)) {
+                fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
             }
 
-             fin += index;
-             if (fin > ip4_bkt_info[level].bi_size)
-                 fin = ip4_bkt_info[level].bi_size;
 
-             for (i = index; i < fin; i++) {
+             /* 
+              * Run through the loop 'fin' times only
+              * If fin is 0, it actually means 256 ('char' overflow), so run the
+              * loop 256 times
+              */
+             for (i = index; i <= (ip_bkt_info[level].bi_size-1); i++) {
                 ent = index_to_entry(bkt, i);
                 if (ENTRY_IS_BUCKET(ent))
                     add_to_tree(ent, level, rt);
@@ -342,6 +364,18 @@ __mtrie_add(struct ip4_mtrie *mtrie, struct vr_route_req *rt)
                     ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
                     ent->entry_label = rt->rtr_req.rtr_label;
                 }
+                if (fin) {
+                    /* Repeat the loop 'fin' times only */
+                    fin--;
+                    if (fin == 0)
+                        break;
+                } 
+                /* 
+                 * Bailout at the last index, 
+                 * the below check takes care of overflow 
+                 */
+                if (i == (ip_bkt_info[level].bi_size-1))
+                    break;
              }
 
              break;
@@ -359,15 +393,15 @@ exit_ret:
 
 
 static void
-ip4_bucket_sched_for_free(struct ip4_bucket *bkt, int level)
+ip_bucket_sched_for_free(struct ip_bucket *bkt, int level)
 {
     unsigned int i;
-    struct ip4_bucket_entry *tmp_ent;
+    struct ip_bucket_entry *tmp_ent;
 
     if (!vr_not_ready)
         vr_delay_op();
 
-    for (i = 0; i < ip4_bkt_info[level].bi_size; i++) {
+    for (i = 0; i < IPBUCKET_LEVEL_SIZE; i++) {
         tmp_ent = &bkt->bkt_data[i];
         if (tmp_ent->entry_nh_p) {
             vrouter_put_nexthop(tmp_ent->entry_nh_p);
@@ -377,9 +411,9 @@ ip4_bucket_sched_for_free(struct ip4_bucket *bkt, int level)
 }
 
 static void
-free_bucket(struct ip4_bucket_entry *ent, int level, struct vr_route_req *rt)
+free_bucket(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
 {
-    struct ip4_bucket *bkt;
+    struct ip_bucket *bkt;
 
     if (ENTRY_IS_NEXTHOP(ent)) {
         return;
@@ -390,16 +424,17 @@ free_bucket(struct ip4_bucket_entry *ent, int level, struct vr_route_req *rt)
     ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
     ent->entry_label = rt->rtr_req.rtr_label;
     
-    ip4_bucket_sched_for_free(bkt, level);
+    ip_bucket_sched_for_free(bkt, level);
 }
 
 static int
-__mtrie_delete(struct vr_route_req *rt, struct ip4_bucket_entry *ent,
+__mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
                 unsigned char level)
 {
     unsigned int        index, i, fin;
-    struct ip4_bucket    *bkt;
-    struct ip4_bucket_entry *tmp_ent;
+    struct ip_bucket    *bkt;
+    struct ip_bucket_entry *tmp_ent;
+    struct mtrie_bkt_info *ip_bkt_info = ip_bkt_info_get(rt->rtr_req.rtr_family);
 
     if (ENTRY_IS_NEXTHOP(ent))
         return -ENOENT;
@@ -407,21 +442,21 @@ __mtrie_delete(struct vr_route_req *rt, struct ip4_bucket_entry *ent,
     bkt = entry_to_bucket(ent);
     index = rt_to_index(rt, level);
 
-    if (rt->rtr_req.rtr_prefix_len > ip4_bkt_info[level].bi_pfx_len) {
+    if (rt->rtr_req.rtr_prefix_len > ip_bkt_info[level].bi_pfx_len) {
         tmp_ent = index_to_entry(bkt, index);
         __mtrie_delete(rt, tmp_ent, level + 1);
     } else {
         if ((rt->rtr_req.rtr_prefix_len >
-                (ip4_bkt_info[level].bi_pfx_len - ip4_bkt_info[level].bi_bits)) &&
-                (rt->rtr_req.rtr_prefix_len <= ip4_bkt_info[level].bi_pfx_len)) {
-            fin = 1 << (ip4_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+                (ip_bkt_info[level].bi_pfx_len - ip_bkt_info[level].bi_bits)) &&
+                (rt->rtr_req.rtr_prefix_len <= ip_bkt_info[level].bi_pfx_len)) {
+            fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
         } else {
-            fin = ip4_bkt_info[level].bi_size;
+            fin = ip_bkt_info[level].bi_size;
         }
 
          fin += index;
-         if (fin > ip4_bkt_info[level].bi_size)
-             fin = ip4_bkt_info[level].bi_size;
+         if (fin > ip_bkt_info[level].bi_size)
+             fin = ip_bkt_info[level].bi_size;
 
          for (i = index; i < fin; i++) {
             tmp_ent = index_to_entry(bkt, i);
@@ -437,7 +472,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip4_bucket_entry *ent,
     }
 
     /* check if current bucket neds to be deleted */
-    for (i = 1; i < ip4_bkt_info[level].bi_size; i++) {
+    for (i = 1; i < ip_bkt_info[level].bi_size; i++) {
         if ((bkt->bkt_data[i].entry_long_i == bkt->bkt_data[0].entry_long_i) &&
                 (bkt->bkt_data[i].entry_label_flags ==
                 	bkt->bkt_data[0].entry_label_flags) &&
@@ -468,13 +503,16 @@ mtrie_dumper_route_encode(struct vr_message_dumper *dumper, vr_route_req *resp)
 
 static void
 mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
-        struct ip4_bucket_entry *ent, unsigned int prefix, unsigned int prefix_len)
+        struct ip_bucket_entry *ent, int8_t *prefix, unsigned int prefix_len)
 {
     vr_route_req *req = (vr_route_req *)dumper->dump_req;
 
     resp->rtr_vrf_id = req->rtr_vrf_id;
     resp->rtr_family = req->rtr_family;
-    resp->rtr_prefix = prefix;
+    memcpy(resp->rtr_prefix, prefix, RT_IP_ADDR_SIZE(req->rtr_family));
+    resp->rtr_prefix_size = req->rtr_prefix_size;
+    resp->rtr_marker_size = resp->rtr_src_size = 0;
+    resp->rtr_marker = resp->rtr_src = NULL;
     resp->rtr_prefix_len = prefix_len;
     resp->rtr_rid = req->rtr_rid;
     resp->rtr_label_flags = ent->entry_label_flags;
@@ -489,28 +527,37 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
 }
 
 static int
-mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip4_bucket_entry *ent,
-        unsigned int byte, int level)
+mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip_bucket_entry *ent,
+        int8_t *prefix, int level)
 {
-#ifdef VR_ROUTE_DEBUG
-    unsigned char *addr;
-#endif
-    unsigned int i = 0, prefix;
+    unsigned char i = 0;
+    unsigned int j;
     int ret;
-    struct ip4_bucket *bkt;
-    struct ip4_bucket_entry *ent_p = ent;
-    vr_route_req *req, resp;
+    struct ip_bucket *bkt;
+    struct ip_bucket_entry *ent_p = ent;
+    struct mtrie_bkt_info *ip_bkt_info;
+    vr_route_req *req;
+    int done = 0;
+    uint32_t rt_prefix[4];
 
     req = dumper->dump_req;
+
+    ip_bkt_info = ip_bkt_info_get(req->rtr_family);
     if (!dumper->dump_been_to_marker) {
         i = PREFIX_TO_INDEX(req->rtr_marker, level);
         bkt = entry_to_bucket(ent);
         ent = index_to_entry(bkt, i);
 
-        prefix = byte | (i << ip4_bkt_info[level].bi_shift);
-        if ((prefix == (unsigned int)req->rtr_marker &&
-                    ip4_bkt_info[level].bi_pfx_len == req->rtr_marker_plen))
+        prefix[level] = i;
+        
+        if ((!memcmp(prefix, req->rtr_marker, ip_bkt_info[level].bi_pfx_len/8)) &&
+              (ip_bkt_info[level].bi_pfx_len == req->rtr_marker_plen)) {
             dumper->dump_been_to_marker = 1;
+        }
+
+        /* take care of overflow */
+        if (i == (ip_bkt_info[level].bi_size - 1))
+            done = 1;
 
         if (ENTRY_IS_BUCKET(ent) && !dumper->dump_been_to_marker) {
             if (mtrie_dump_entry(dumper, ent, prefix, level + 1))
@@ -524,55 +571,52 @@ mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip4_bucket_entry *ent,
     }
 
     if (ENTRY_IS_BUCKET(ent_p)) {
+        if (done)
+            return 0;
+        j = ip_bkt_info[level].bi_size - i;
         bkt = entry_to_bucket(ent_p);
-        for (; i < ip4_bkt_info[level].bi_size; i++) {
+        for (; j > 0; j--, i++) {
             ent = &bkt->bkt_data[i];
-            prefix = byte | (i << ip4_bkt_info[level].bi_shift);
+            prefix[level] = i;
             if (mtrie_dump_entry(dumper, ent, prefix, level + 1) < 0)
                 return -1;
         }
     } else if (ent_p->entry_nh_p) {
-        mtrie_dumper_make_response(dumper, &resp, ent_p, byte,
-                ip4_bkt_info[level - 1].bi_pfx_len);
+        dump_resp.rtr_prefix = (uint8_t*)&rt_prefix;
+        mtrie_dumper_make_response(dumper, &dump_resp, ent_p, prefix,
+                ip_bkt_info[level - 1].bi_pfx_len);
 
-#ifdef VR_ROUTE_DEBUG
-        addr = (unsigned char *)&byte;
-        vr_printf("%u.%u.%u.%u/%u\t\t", addr[3], addr[2], addr[1], addr[0],
-                        ip4_bkt_info[level - 1].bi_pfx_len);
-        if (ent_p->entry_label_flags) {
-            vr_printf("%d\t", ent_p->entry_label);
-        } else {
-            vr_printf("N/A\t");
-        }
-        vr_printf("%d\n", ent_p->entry_nh_p->nh_id);
-#endif
+        ret = mtrie_dumper_route_encode(dumper, &dump_resp);
 
-        ret = mtrie_dumper_route_encode(dumper, &resp);
+        dump_resp.rtr_prefix = NULL;
         if (ret <= 0)
-            return -1;
+           return -1;
     }
 
     return 0;
 }
 
 static int
-mtrie_walk(struct vr_message_dumper *dumper)
+mtrie_walk(struct vr_message_dumper *dumper, unsigned int family)
 {
     vr_route_req *req;
-    struct ip4_mtrie *mtrie;
-    struct ip4_bucket_entry *ent;
+    struct ip_mtrie *mtrie;
+    struct ip_bucket_entry *ent;
+    int ret = 0;
+    uint32_t rt_prefix[4];
 
     req = (vr_route_req *)dumper->dump_req;
-    mtrie = vrfid_to_mtrie(req->rtr_vrf_id);
+    mtrie = vrfid_to_mtrie(req->rtr_vrf_id, family);
     if (!mtrie)
         return -EINVAL; 
 
     ent = &mtrie->root;
+
     if (ENTRY_IS_BUCKET(ent)) {
-        return mtrie_dump_entry(dumper, ent, 0, 0);
+        ret =  mtrie_dump_entry(dumper, ent, (uint8_t*)&rt_prefix, 0);
     }
 
-    return 0;
+    return ret;
 }
 
 static int
@@ -587,10 +631,10 @@ mtrie_dump(struct vr_rtable * __unsued, struct vr_route_req *rt)
         goto generate_response;
     }
 
-    if (!((vr_route_req *)(dumper->dump_req))->rtr_marker)
+    if (((vr_route_req *)(dumper->dump_req))->rtr_marker_size == 0)
         dumper->dump_been_to_marker = 1;
 
-    ret = mtrie_walk(dumper);
+    ret = mtrie_walk(dumper, rt->rtr_req.rtr_family);
 
 generate_response:
     vr_message_dump_exit(dumper, ret);
@@ -614,9 +658,9 @@ static int
 mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
     int vrf_id = rt->rtr_req.rtr_vrf_id;
-    struct ip4_mtrie *rtable;
+    struct ip_mtrie *rtable;
 
-    rtable = vrfid_to_mtrie(vrf_id);
+    rtable = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     if (!rtable)
         return -ENOENT;
 
@@ -636,7 +680,10 @@ mtrie_stats(unsigned short vrf, unsigned int cpu)
     if (vrf >= VR_MAX_VRFS)
         return &invalid_vrf_stats[cpu];
 
-    return &((mtrie_vrf_stats[vrf])[cpu]);
+    if (mtrie_vrf_stats) 
+       return &((mtrie_vrf_stats[vrf])[cpu]);
+
+    return NULL;
 }
 
 static int
@@ -745,35 +792,46 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
 {
     unsigned int        level, index;
     unsigned long       ptr;
-    struct ip4_mtrie   *table;
-    struct ip4_bucket  *bkt;
-    struct ip4_bucket_entry *ent;
+    struct ip_mtrie   *table;
+    struct ip_bucket  *bkt;
+    struct ip_bucket_entry *ent;
+    struct vr_nexthop *default_nh, *ret_nh;
+
+      default_nh = ip4_default_nh;
 
     /* we do not support any thing other than /32 route lookup */
-    if (rt->rtr_req.rtr_prefix_len != IP4_PREFIX_LEN)
-        return ip4_default_nh;
+    if ((rt->rtr_req.rtr_family == AF_INET) && 
+        (rt->rtr_req.rtr_prefix_len != IP4_PREFIX_LEN))
+        return default_nh;
 
-    table = vrfid_to_mtrie(vrf_id);
+    if ((rt->rtr_req.rtr_family == AF_INET6) && 
+        (rt->rtr_req.rtr_prefix_len != IP6_PREFIX_LEN))
+        return default_nh;
+
+    table = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     if (!table)
-        return ip4_default_nh;
+        return default_nh;
 
     ent = &table->root;
+
     ptr = ent->entry_long_i;
     if (!ptr)
-        return ip4_default_nh;
+        return default_nh;
 
     if (PTR_IS_NEXTHOP(ptr)) {
         rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
         rt->rtr_req.rtr_label = ent->entry_label;
         rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
-        return PTR_TO_NEXTHOP(ptr);
+        ret_nh = PTR_TO_NEXTHOP(ptr);
+
+        return ret_nh;
     }
 
     bkt = PTR_TO_BUCKET(ptr);
     if (!bkt)
-        return ip4_default_nh;
+        return default_nh;
 
-    for (level = 0; level < IP4_BKT_LEVELS; level++) {
+    for (level = 0; level < ip_bkt_get_max_level(rt->rtr_req.rtr_family); level++) {
         index = rt_to_index(rt, level);
         ent = index_to_entry(bkt, index);
         ptr = ent->entry_long_i;
@@ -781,7 +839,8 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
             rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
             rt->rtr_req.rtr_label = ent->entry_label;
             rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
-            return PTR_TO_NEXTHOP(ptr);
+            ret_nh = PTR_TO_NEXTHOP(ptr);
+            return ret_nh;
         }
 
         bkt = PTR_TO_BUCKET(ptr);
@@ -801,10 +860,10 @@ static int
 mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
     unsigned int            vrf_id = rt->rtr_req.rtr_vrf_id;
-    struct ip4_mtrie       *mtrie = vrfid_to_mtrie(vrf_id);
+    struct ip_mtrie       *mtrie = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     int ret;
 
-    mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id));
+    mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id, rt->rtr_req.rtr_family));
     if (!mtrie)
         return -ENOMEM;
 
@@ -812,12 +871,12 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!rt->rtr_nh)
         return -ENOENT;
 
-
     if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
                  (rt->rtr_nh->nh_type == NH_TUNNEL)) {
         vrouter_put_nexthop(rt->rtr_nh);
         return -EINVAL;
     }
+
     ret = __mtrie_add(mtrie, rt);
     vrouter_put_nexthop(rt->rtr_nh);
     return ret;
@@ -840,15 +899,21 @@ mtrie_get(unsigned int vrf_id, struct vr_route_req *rt)
     return 0;
 }
 
-static struct ip4_mtrie *
-mtrie_alloc_vrf(unsigned int vrf_id)
+static struct ip_mtrie *
+mtrie_alloc_vrf(unsigned int vrf_id, unsigned int family)
 {
-    struct ip4_mtrie *mtrie;
+    struct ip_mtrie *mtrie;
+    struct ip_mtrie **mtrie_table;
+    int index = 0;
 
-    mtrie = vr_zalloc(sizeof(struct ip4_mtrie));
+    if (family == AF_INET6)
+        index = 1;
+
+    mtrie = vr_zalloc(sizeof(struct ip_mtrie));
     if (mtrie) {
         mtrie->root.entry_nh_p = vrouter_get_nexthop(0, NH_DISCARD_ID);
-        vn_rtable[vrf_id] = mtrie;
+        mtrie_table = vn_rtable[index];
+        mtrie_table[vrf_id] = mtrie;
     }
 
     return mtrie;
@@ -857,17 +922,21 @@ mtrie_alloc_vrf(unsigned int vrf_id)
 static void
 mtrie_free_vrf(struct vr_rtable *rtable, unsigned int vrf_id)
 {
-    struct ip4_mtrie *mtrie;
-    struct ip4_mtrie **vrf_tables;
+    struct ip_mtrie *mtrie;
+    struct ip_mtrie **vrf_tables;
+    int i;
 
-    vrf_tables = (struct ip4_mtrie **)rtable->algo_data;
-    mtrie = vrf_tables[vrf_id];
-    if (!mtrie)
-        return;
-
-    mtrie_free_entry(&mtrie->root, 0);
-    vrf_tables[vrf_id] = NULL;
-    vr_free(mtrie);
+    /* Free V4 and V6 tables */
+    for (i=0; i<2; i++) {
+        vrf_tables = vn_rtable[i];
+        mtrie = vrf_tables[vrf_id];
+        if (!mtrie)
+            continue;
+    
+        mtrie_free_entry(&mtrie->root, 0);
+        vrf_tables[vrf_id] = NULL;
+        vr_free(mtrie);
+    }
 
     return;
 }
@@ -896,21 +965,24 @@ mtrie_stats_cleanup(struct vr_rtable *rtable)
 }
 
 void
-mtrie4_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs, bool soft_reset)
+mtrie_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs, bool soft_reset)
 {
     unsigned int i;
 
-    if (!vn_rtable) 
+    if (!vn_rtable[0]) 
         return;
 
     mtrie_stats_cleanup(rtable);
 
-    vn_rtable = NULL;
     for (i = 0; i < fs->rtb_max_vrfs; i++)
         mtrie_free_vrf(rtable, i);
 
+    *vn_rtable[0] = *vn_rtable[1] = NULL;
+
     vr_free(rtable->algo_data);
     rtable->algo_data = NULL;
+
+    algo_init_done = 0;
 
     return;
 }
@@ -967,12 +1039,15 @@ cleanup:
 }
 
 int
-mtrie4_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
+mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
     int ret = 0;
     unsigned int table_memory;
 
-    table_memory = sizeof(void *) * fs->rtb_max_vrfs;
+    if (algo_init_done)
+        return 0;
+
+    table_memory = 2 * sizeof(void *) * fs->rtb_max_vrfs;
     rtable->algo_data = vr_zalloc(table_memory);
     if (!rtable->algo_data)
         return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, table_memory);
@@ -994,8 +1069,14 @@ mtrie4_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     vr_inet_route_lookup = mtrie_lookup;
     vr_inet_vrf_stats = mtrie_stats;
     /* local cache */
-    vn_rtable = (struct ip4_mtrie **)rtable->algo_data;
+    vn_rtable[0] = (struct ip_mtrie **)rtable->algo_data; // V4 table
+    vn_rtable[1] = (struct ip_mtrie **)((char*)rtable->algo_data 
+                                                 + fs->rtb_max_vrfs); // V6 table
 
+    mtrie_ip_bkt_info_init(ip4_bkt_info, IP4_PREFIX_LEN);
+    mtrie_ip_bkt_info_init(ip6_bkt_info, IP6_PREFIX_LEN);
+
+    algo_init_done = 1;
     return 0;
 
 init_fail:

@@ -691,7 +691,7 @@ error:
  * otherwise.
  */
 static void 
-lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb, unsigned short overlay_len)
+lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb, unsigned short overlay_len, unsigned short hlen)
 {
     int opt_off = sizeof(struct tcphdr);
     u8 *opt_ptr = (u8 *) tcph;
@@ -732,8 +732,7 @@ lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb, unsigned short overl
                 }
 
                 max_mss = dev->mtu -
-                             (overlay_len + sizeof(struct vr_ip) +
-                              sizeof(struct tcphdr));
+                             (overlay_len + hlen + sizeof(struct tcphdr));
 
                 if (pkt_mss > max_mss) {
                     opt_ptr[opt_off+2] = (max_mss & 0xff00) >> 8;
@@ -773,43 +772,52 @@ static int
 lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 {
     struct sk_buff *skb = vp_os_packet(pkt);
-    int hlen, pull_len;
+    int hlen, pull_len, proto;
     struct vr_ip *iph;
+    struct vr_ip6 *ip6h;
     struct tcphdr *tcph;
 
     /*
      * Pull enough of the header into the linear part of the skb to be
      * able to inspect/modify the TCP header MSS value.
      */
+    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
+
     pull_len = pkt->vp_data - (skb_headroom(skb));
-    pull_len += sizeof(struct vr_ip);
+
+    if (vr_ip_is_ip6(iph)) {
+
+        ip6h = (struct vr_ip6 *)iph;
+        pull_len += sizeof(struct vr_ip6);
+        proto = ip6h->ip6_nxt;
+        hlen = sizeof(struct vr_ip6);
+    } else {
+        /*
+         * If this is a fragment and not the first one, it can be ignored
+         */
+        if (iph->ip_frag_off & htons(IP_OFFSET)) {
+            goto out;
+        }
+
+        pull_len += sizeof(struct vr_ip);
+        proto = iph->ip_proto;
+        hlen = iph->ip_hl * 4;
+    }
 
     if (!pskb_may_pull(skb, pull_len)) {
         return VP_DROP_PULL; 
     }
 
-    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
-
-    if (iph->ip_proto != VR_IP_PROTO_TCP) {
+    if (proto != VR_IP_PROTO_TCP) {
         goto out;
     }
 
-    /*
-     * If this is a fragment and not the first one, it can be ignored
-     */
-    if (iph->ip_frag_off & htons(IP_OFFSET)) {
-        goto out;
-    }
-
-    hlen = iph->ip_hl * 4;
-    pull_len += (hlen - sizeof(struct vr_ip));
     pull_len += sizeof(struct tcphdr);
 
     if (!pskb_may_pull(skb, pull_len)) {
         return VP_DROP_PULL;
     }
 
-    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
     tcph = (struct tcphdr *) ((char *) iph +  hlen);
 
     if ((tcph->doff << 2) <= (sizeof(struct tcphdr))) {
@@ -825,10 +833,7 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         return VP_DROP_PULL;
     }
 
-    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
-    tcph = (struct tcphdr *) ((char *) iph +  hlen);
-
-    lh_adjust_tcp_mss(tcph, skb, overlay_len);
+    lh_adjust_tcp_mss(tcph, skb, overlay_len, hlen);
 
 out:
     lh_reset_skb_fields(pkt);
@@ -1618,6 +1623,21 @@ slow_path:
     return 1;
 }
 
+static int
+lh_pkt_may_pull(struct vr_packet *pkt, unsigned int len)
+{
+    struct sk_buff *skb = vp_os_packet(pkt);
+    unsigned int pull_len;
+
+    pull_len = pkt->vp_data - skb_headroom(skb);
+    pull_len += len;
+    if (!pskb_may_pull(skb, pull_len))
+        return -1;
+
+    lh_reset_skb_fields(pkt);
+    return 0;
+}
+
 /*
  * lh_pull_inner_headers_fast - faster version of lh_pull_inner_headers that
  * avoids multiple calls to pskb_may_pull(). In the common case, this
@@ -1906,7 +1926,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                   */
                  skb_push(skb, skb_pull_len);
                  if (tcph && vr_to_vm_mss_adj) {
-                     lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len);
+                     lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
                  }
              } else {
                  if ((iph->ip_proto == VR_IP_PROTO_TCP) && 
@@ -1920,7 +1940,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                      }
                      skb_push(skb, tcpoff);
                      if (vr_to_vm_mss_adj) {
-                         lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len);
+                         lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
                      }
                  }
              }
@@ -2082,6 +2102,7 @@ struct host_os linux_host = {
     .hos_pull_inner_headers_fast    =       lh_pull_inner_headers_fast,
     .hos_get_udp_src_port           =       lh_get_udp_src_port,
     .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj,
+    .hos_pkt_may_pull               =       lh_pkt_may_pull,
 };
     
 struct host_os *
