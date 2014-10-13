@@ -92,14 +92,14 @@ buffer sandesh vr_route_req {
     2:  i32         rtr_vrf_id;
     3:  i32         rtr_family;
     4:  i32         rtr_rt_type;
-    5:  i32         rtr_prefix;
-    6:  i32         rtr_src;
+    5:  list<byte>  rtr_prefix;
+    6:  list<byte>  rtr_src;
     7:  i32         rtr_prefix_len;
     8:  i16         rtr_rid;
     9:  i16         rtr_label_flags;
    10:  i32         rtr_label;
    11:  i32         rtr_nh_id;
-   12:  i32         rtr_marker;
+   12:  list<byte>  rtr_marker;
    13:  i32         rtr_marker_plen;
    14:  list<byte>  rtr_mac;
    15:  i32         rtr_replace_plen;
