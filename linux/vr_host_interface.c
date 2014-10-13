@@ -752,6 +752,8 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct sk_buff *skb = vp_os_packet(pkt);
     struct skb_shared_info *sinfo;
     struct vr_ip *ip;
+    struct vr_ip6 *ip6;
+    int proto;
     unsigned short network_off, transport_off, cksum_off;
 #if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
     unsigned char *data;
@@ -823,7 +825,14 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
         if (network_off) {
             ip = (struct vr_ip *)(pkt_data_at_offset(pkt, network_off));
-            transport_off = network_off + (ip->ip_hl * 4);
+            if (!vr_ip_is_ip6(ip)) {
+                transport_off = network_off + (ip->ip_hl * 4);
+                proto = ip->ip_proto;
+            } else {
+                ip6 = (struct vr_ip6 *)ip;
+                transport_off = network_off + sizeof(struct vr_ip6);
+                proto = ip6->ip6_nxt;
+            }
 
             skb_set_network_header(skb, (network_off - skb_headroom(skb)));
             skb_reset_mac_len(skb);
@@ -837,9 +846,9 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
              */
             if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
                 cksum_off = skb->csum_offset;
-                if (ip->ip_proto == VR_IP_PROTO_TCP)
+                if (proto == VR_IP_PROTO_TCP)
                     cksum_off = offsetof(struct vr_tcp, tcp_csum);
-                else if (ip->ip_proto == VR_IP_PROTO_UDP)
+                else if (proto == VR_IP_PROTO_UDP)
                     cksum_off = offsetof(struct vr_udp, udp_csum);
 
                 skb_partial_csum_set(skb, (transport_off - skb_headroom(skb)), cksum_off);
@@ -856,7 +865,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                  * packet, the value will be wrong, and that's where the following
                  * check comes into picture
                  */
-                if (ip->ip_proto == VR_IP_PROTO_UDP) {
+                if (proto == VR_IP_PROTO_UDP) {
                     sinfo = skb_shinfo(skb);
                     if (!(sinfo->gso_type & SKB_GSO_UDP)) {
                         sinfo->gso_type &= ~(SKB_GSO_TCPV4 | SKB_GSO_TCP_ECN |

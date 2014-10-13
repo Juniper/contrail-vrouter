@@ -25,6 +25,7 @@ struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *,
         struct vr_packet *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 struct vr_nexthop *ip4_default_nh;
+struct vr_nexthop *ip6_default_nh;
 
 struct vr_nexthop *
 __vrouter_get_nexthop(struct vrouter *router, unsigned int index)
@@ -1357,11 +1358,16 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
          * Typical example for this situation is when the packet reaches the
          * target VM's server from an ECMP-ed service chain.
          */
+        ip = (struct vr_ip *)pkt_network_header(pkt);
+        if (vr_ip_is_ip6(ip)) {
+            pkt->vp_type = VP_TYPE_IP6;
+            vr_flow_inet6_input(nh->nh_router, vrf, pkt, VR_ETH_PROTO_IP6, fmd);
+            return 1;
+        }
         if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
             if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
                 need_flow_lookup = true;
             } else {
-                ip = (struct vr_ip *)pkt_network_header(pkt);
                 src_nh = vr_inet_src_lookup(vrf, ip, pkt);
                 if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
                         src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
@@ -1371,8 +1377,9 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
 
             if (need_flow_lookup) {
                 pkt->vp_flags |= VP_FLAG_FLOW_GET;
-                return vr_flow_inet_input(nh->nh_router, vrf,
+                vr_flow_inet_input(nh->nh_router, vrf,
                         pkt, VR_ETH_PROTO_IP, fmd);
+                return 1;
             }
         }
     }
@@ -1463,17 +1470,25 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
 {
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
-#ifdef VROUTER_CONFIG_DIAG
     struct vr_ip *ip;
-#endif
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
 
     vif = nh->nh_dev;
-    pkt->vp_type = VP_TYPE_IP;
-#ifdef VROUTER_CONFIG_DIAG
     ip = (struct vr_ip *)pkt_network_header(pkt);
-
+    if (vr_ip_is_ip6(ip)) {
+        pkt->vp_type = VP_TYPE_IP6;
+        if (stats) {
+            if ((pkt->vp_flags & VP_FLAG_GRO) &&
+                    (vif->vif_type == VIF_TYPE_VIRTUAL)) {
+                stats->vrf_gros++;
+            } else {
+                stats->vrf_encaps++;
+            }
+        }
+    } else {
+        pkt->vp_type = VP_TYPE_IP;
+#ifdef VROUTER_CONFIG_DIAG
     if (ip->ip_csum == VR_DIAG_IP_CSUM) {
         pkt->vp_flags &= ~VP_FLAG_GRO;
         if (stats)
@@ -1492,6 +1507,7 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
 #ifdef VROUTER_CONFIG_DIAG
     }
 #endif
+    }
 
     /*
      * For packets being sent up a tap interface, retain the MPLS label
@@ -1517,6 +1533,18 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
             pkt_pull(pkt, VR_MPLS_HDR_LEN);
         }
     } else {
+
+        /* 
+         * Same NH for both V4 and V6, update the rewrite data with correct ethtype
+         */
+        if (pkt->vp_type == VP_TYPE_IP6) {
+            nh->nh_data[nh->nh_encap_len-2] = 0x86;
+            nh->nh_data[nh->nh_encap_len-1] = 0xDD;
+        } else {
+            nh->nh_data[nh->nh_encap_len-2] = 0x08;
+            nh->nh_data[nh->nh_encap_len-1] = 0x00;
+        }
+            
         if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data,
                 nh->nh_encap_len)) {
             vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
