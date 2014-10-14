@@ -439,11 +439,16 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
     int reason;
     struct vr_interface *vif = pkt->vp_if;
 
-    if (IS_MAC_BMCAST(pkt_data(pkt)) &&
-        (vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
-        if (pkt->vp_type == VP_TYPE_ARP || vr_l3_well_known_packet(vrf, pkt))
-            if (vr_l3_input(vrf, pkt, fmd))
-                return 1;
+    /* Only non-vlan tagged are L3 packets */
+    if (fmd->fmd_vlan == VLAN_ID_INVALID) {
+        if (IS_MAC_BMCAST(pkt_data(pkt)) &&
+                (vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
+            if (pkt->vp_type == VP_TYPE_ARP || 
+                    vr_l3_well_known_packet(vrf, pkt)) {
+                if (vr_l3_input(vrf, pkt, fmd))
+                    return 1;
+            }
+        }
     }
 
     if (!(vif->vif_flags & VIF_FLAG_L2_ENABLED))
