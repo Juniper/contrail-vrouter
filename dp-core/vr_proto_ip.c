@@ -325,6 +325,40 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
             vr_preset(pkt);
         }
 
+        /*
+         * IF the packet packet is from Vmware, it will be  a tagged
+         * packet. This tagged packets if destined to Vhost, packet
+         * needs to be stripped of all tags
+         */
+        if (vif->vif_type == VIF_TYPE_HOST && pkt->vp_if->vif_type ==
+                VIF_TYPE_VIRTUAL_VLAN) {
+
+            unsigned short eth_proto, pull_len = 0;
+            unsigned char *new_eth, *eth = pkt_data(pkt);
+            struct vr_vlan_hdr *vlan;
+            unsigned char tmp[2*VR_ETHER_ALEN];
+
+            eth_proto = ntohs(*(unsigned short *)(eth +
+                        VR_ETHER_PROTO_OFF));
+            while (eth_proto == VR_ETH_PROTO_VLAN) {
+                vlan = (struct vr_vlan_hdr *)(pkt_data(pkt) + pull_len +
+                                              VR_ETHER_HLEN);
+                eth_proto = ntohs(vlan->vlan_proto);
+                pull_len += sizeof(*vlan);
+            }
+
+            /* If there are any vlan tags */
+            if (pull_len) {
+                new_eth = pkt_pull(pkt, pull_len);
+                if (!new_eth)
+                    goto drop_pkt;
+                /* The proto field need not be copied and macs are
+                 * overlapping, which requires a tmp copy
+                 */
+                memcpy(tmp, eth, (2* VR_ETHER_ALEN));
+                memcpy(new_eth, tmp,(2 * VR_ETHER_ALEN));
+            }
+        }
         ret = vif->vif_tx(vif, pkt);
     }
 
