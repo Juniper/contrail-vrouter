@@ -318,10 +318,14 @@ vr_trap(struct vr_packet *pkt, unsigned short trap_vrf,
 }
 
 static inline bool
-vr_my_mac(unsigned char *pkt_mac, struct vr_interface *vif)
+vr_my_pkt(unsigned char *pkt_mac, struct vr_interface *vif)
 {
-
-    if (VR_MAC_CMP(pkt_mac, vif->vif_mac))
+    /*
+     * Packet is destined to us if:
+     * 1) IF destination MAC is our Mac
+     * 2) If VIF is service interface
+     */
+    if (VR_MAC_CMP(pkt_mac, vif->vif_mac) || vif_is_service(vif))
         return true;
 
     return false;
@@ -355,7 +359,7 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     }
 
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-    if (vr_my_mac(data, vif)) {
+    if (vr_my_pkt(data, vif)) {
         pkt_pull(pkt, pull_len);
         handled = vr_l3_input(vrf, pkt, &fmd);
         if (handled)
