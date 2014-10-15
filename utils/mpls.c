@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
     }
 
     ret = nl_connect(cl, get_ip(), get_port());
-    if (ret <= 0) {
+    if (ret < 0) {
         exit(1);
     }
 
