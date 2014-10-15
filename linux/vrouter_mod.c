@@ -785,8 +785,8 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 
     pull_len = pkt->vp_data - (skb_headroom(skb));
 
-    /* Pull in ipv6 header-length atleast, be safe than sorry */
-    pull_len += sizeof(struct vr_ip6);
+    /* Pull in ipv4 header-length */
+    pull_len += sizeof(struct vr_ip);
 
     if (!pskb_may_pull(skb, pull_len)) {
         return VP_DROP_PULL; 
@@ -796,7 +796,12 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 
     if (vr_ip_is_ip6(iph)) {
 
-        ip6h = (struct vr_ip6 *)iph;
+        pull_len += (sizeof(struct vr_ip6) - sizeof(struct vr_ip));
+        if (!pskb_may_pull(skb, pull_len)) {
+            return VP_DROP_PULL;
+        }
+
+        ip6h = (struct vr_ip6 *) (skb->head + pkt->vp_data);
         proto = ip6h->ip6_nxt;
         hlen = sizeof(struct vr_ip6);
     } else {
@@ -810,8 +815,6 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         proto = iph->ip_proto;
         hlen = iph->ip_hl * 4;
         opt_len = hlen - sizeof(struct vr_ip);
-        /* Adjust for the extra bytes pulled in earlier */
-        pull_len -= (sizeof(struct vr_ip6) - sizeof(struct vr_ip));
     }
 
     if (proto != VR_IP_PROTO_TCP) {
