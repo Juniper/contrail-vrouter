@@ -240,6 +240,8 @@ struct vr_dpdk_global {
     pthread_t kni_thread;
     /* Timer thread ID */
     pthread_t timer_thread;
+    /* User space vhost thread */
+    pthread_t uvh_thread;
     /* Table of KNIs */
     struct rte_kni *knis[VR_MAX_INTERFACES];
     /* Table of vHosts */

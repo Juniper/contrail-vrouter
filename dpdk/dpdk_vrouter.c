@@ -20,6 +20,7 @@
 #include <rte_errno.h>
 
 #include "vr_dpdk.h"
+#include "vr_uvhost.h"
 
 static int no_daemon_set;
 
@@ -321,6 +322,20 @@ static struct option long_options[] = {
                                                     NULL,                   0},
 };
 
+/*
+ * vr_dpdk_exit_trigger - function that is called by user space vhost server
+ * to cause all DPDK threads to exit.
+ *
+ * Returns nothing.
+ */
+static void
+vr_dpdk_exit_trigger(void)
+{
+    rte_atomic16_inc(&vr_dpdk.stop_flag);
+
+    return;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -345,6 +360,11 @@ main(int argc, char *argv[])
     if (!no_daemon_set) {
         if (daemon(0, 0) < 0)
             return -1;
+    }
+
+    /* Create user space vhost thread */
+    if ((ret = vr_uvhost_init(&vr_dpdk.uvh_thread, vr_dpdk_exit_trigger))) {
+        return ret;
     }
 
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
