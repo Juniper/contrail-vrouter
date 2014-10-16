@@ -568,6 +568,21 @@ vhost_drv_add(struct vr_interface *vif,
 
 /* vlan driver */
 static int
+vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
+        unsigned short vlan_id __attribute__((unused)))
+{
+    struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
+
+    pkt->vp_if = vif;
+
+    stats->vis_ibytes += pkt_len(pkt);
+    stats->vis_ipackets++;
+
+    return vr_virtual_input(vif->vif_vrf, vif, pkt, VLAN_ID_INVALID);
+}
+
+
+static int
 vlan_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     int ret = 0;
@@ -642,7 +657,7 @@ vlan_drv_add(struct vr_interface *vif, vr_interface_req *vifr)
 
     vif->vif_set_rewrite = vif_cmn_rewrite;
     vif->vif_tx = vlan_tx;
-    vif->vif_rx = vm_rx;
+    vif->vif_rx = vlan_rx;
     vif->vif_vlan_id = vifr->vifr_vlan_id;
     vif->vif_ovlan_id = vifr->vifr_ovlan_id;
 
@@ -709,8 +724,9 @@ static int
 eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id)
 {
-    struct vr_interface *sub_vif;
+    struct vr_interface *sub_vif = NULL;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
+    struct vr_eth *eth = (struct vr_eth *)pkt_data(pkt);
 
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
@@ -727,11 +743,15 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
         pkt->vp_flags |= VP_FLAG_TO_ME;
 
     if (vlan_id != VLAN_ID_INVALID && vlan_id < VLAN_ID_MAX) {
-        if (vif->vif_sub_interfaces) {
-            sub_vif = vif->vif_sub_interfaces[vlan_id];
-            if (sub_vif)
-                return sub_vif->vif_rx(sub_vif, pkt, VLAN_ID_INVALID);
+        if (vif->vif_btable) {
+            sub_vif = vif_bridge_get_sub_interface(vif->vif_btable, vlan_id,
+                                                    eth->eth_smac);
+        } else {
+            if (vif->vif_sub_interfaces)
+                sub_vif = vif->vif_sub_interfaces[vlan_id];
         }
+        if (sub_vif)
+            return sub_vif->vif_rx(sub_vif, pkt, VLAN_ID_INVALID);
     }
 
     return vr_fabric_input(vif, pkt, vlan_id);
@@ -749,7 +769,7 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * once without the flag set. Don't count them twice.
      */
     if (((pkt->vp_flags & VP_FLAG_GRO) == 0) ||
-             (vif->vif_type != VIF_TYPE_VIRTUAL)) {
+             (!vif_is_virtual(vif))) {
         stats->vis_obytes += pkt_len(pkt);
         stats->vis_opackets++;
     }

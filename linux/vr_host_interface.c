@@ -130,6 +130,32 @@ vr_skb_get_rxhash(struct sk_buff *skb)
 #endif
 }
 
+static inline struct sk_buff*
+linux_skb_vlan_insert(struct sk_buff *skb, unsigned short vlan_id)
+{
+    struct vlan_ethhdr *veth;
+
+    if (skb_cow_head(skb, VLAN_HLEN) < 0) {
+        lh_pfree_skb(skb, VP_DROP_MISC);
+        return NULL;
+    }
+
+    veth = (struct vlan_ethhdr *)skb_push(skb, VLAN_HLEN);
+
+    /* Move the mac addresses to the beginning of the new header. */
+    memmove(skb->data, skb->data + VLAN_HLEN, 2 * ETH_ALEN);
+    skb->mac_header -= VLAN_HLEN;
+
+    /* first, the ethernet type */
+    veth->h_vlan_proto = htons(ETH_P_8021Q);
+
+    /* now, the TCI */
+    veth->h_vlan_TCI = htons(vlan_id);
+    skb->protocol = htons(ETH_P_8021Q);
+
+    return skb;
+}
+
 static int
 linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 {
@@ -278,8 +304,6 @@ static int
 linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
         unsigned short type)
 {
-    unsigned short proto = ntohs(skb->protocol);
-
     if (vif->vif_type == VIF_TYPE_VIRTUAL &&
             skb->ip_summed == CHECKSUM_NONE)
         skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -292,7 +316,7 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
         return dev_queue_xmit(skb);
     }
 
-    if (proto == ETH_P_IP)
+    if (type == VP_TYPE_IPOIP)
         return linux_inet_fragment(vif, skb, type);
 
     lh_pfree_skb(skb, VP_DROP_NOWHERE_TO_GO);
@@ -311,7 +335,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
-            || (type != VP_TYPE_IPOIP && type != VP_TYPE_L2OIP && type != VP_TYPE_VXLAN)) {
+            || !vr_pkt_type_is_overlay(type)) {
         return linux_xmit(vif, seg, type);
     }
 
@@ -1040,14 +1064,10 @@ linux_rx_handler(struct sk_buff **pskb)
 {
     int ret;
     unsigned short vlan_id = VLAN_ID_INVALID;
-    unsigned short proto;
     struct sk_buff *skb = *pskb;
     struct vr_packet *pkt;
     struct net_device *dev = skb->dev;
     struct vr_interface *vif;
-    unsigned char *new_hdr, *old_hdr;
-    struct vr_vlan_hdr *vlanh;
-    struct vr_eth *eth;
     unsigned int curr_cpu;
     u16 rxq;
     int rpsdev = 0;
@@ -1110,11 +1130,20 @@ linux_rx_handler(struct sk_buff **pskb)
     }
 #endif
 
+    skb_push(skb, ETH_HLEN);
+    if (skb->vlan_tci & VLAN_TAG_PRESENT) {
+        if (!(skb = linux_skb_vlan_insert(skb,
+                        skb->vlan_tci & 0xEFFF)))
+            return RX_HANDLER_CONSUMED;
+
+        vlan_id = skb->vlan_tci & 0xFFF;
+        skb->vlan_tci = 0;
+    }
+
     ret = linux_pull_outer_headers(skb);
     if (ret < 0)
         goto error;
 
-    skb_push(skb, ETH_HLEN);
 
     pkt = linux_get_packet(skb, vif);
     if (!pkt)
@@ -1125,26 +1154,6 @@ linux_rx_handler(struct sk_buff **pskb)
             vif_drop_pkt(vif, pkt, true);
             return RX_HANDLER_CONSUMED;
         }
-    }
-
-    if (skb->vlan_tci & VLAN_TAG_PRESENT) {
-        vlan_id = skb->vlan_tci & 0xFFF;
-        skb->vlan_tci = 0; 
-
-        old_hdr = pkt_data(pkt);
-        new_hdr = pkt_push(pkt, VR_VLAN_HLEN);
-        if (!new_hdr) {
-             vr_pfree(pkt, VP_DROP_PUSH);
-             return RX_HANDLER_CONSUMED;
-        }
-
-        VR_ETH_COPY(new_hdr, old_hdr);
-        eth = (struct vr_eth *)(new_hdr);
-        proto = eth->eth_proto;
-        eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
-        vlanh = (struct vr_vlan_hdr *)(new_hdr + sizeof(struct vr_eth));
-        vlanh->vlan_tag = htons(vlan_id);
-        vlanh->vlan_proto = proto;
     }
 
     ret = vif->vif_rx(vif, pkt, vlan_id);

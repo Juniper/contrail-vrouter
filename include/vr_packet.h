@@ -83,7 +83,8 @@
 #define VP_TYPE_VXLAN           6
 #define VP_TYPE_AGENT           7
 #define VP_TYPE_ARP             8
-#define VP_TYPE_MAX             9
+#define VP_TYPE_IP6OIP          9
+#define VP_TYPE_MAX             10
 
 /*
  * Values to define how to proceed with handling a packet.
@@ -394,8 +395,18 @@ static inline bool
 vr_pkt_is_ip(struct vr_packet *pkt)
 {
     if (pkt->vp_type == VP_TYPE_IPOIP || pkt->vp_type == VP_TYPE_IP ||
-                pkt->vp_type == VP_TYPE_L2 || pkt->vp_type == VP_TYPE_L2OIP ||
-                pkt->vp_type == VP_TYPE_VXLAN)
+              pkt->vp_type == VP_TYPE_L2 || pkt->vp_type == VP_TYPE_L2OIP ||
+              pkt->vp_type == VP_TYPE_VXLAN || pkt->vp_type == VP_TYPE_IP6OIP)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_pkt_type_is_overlay(unsigned short type)
+{
+    if (type == VP_TYPE_IPOIP || type == VP_TYPE_L2OIP ||
+              type == VP_TYPE_VXLAN || type == VP_TYPE_IP6OIP)
         return true;
 
     return false;

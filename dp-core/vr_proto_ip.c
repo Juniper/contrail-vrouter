@@ -470,7 +470,6 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         } else {
             vr_preset(pkt);
         }
-
         ret = vif->vif_tx(vif, pkt);
     }
 
