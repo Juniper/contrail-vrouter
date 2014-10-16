@@ -565,7 +565,7 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
         } else if (dir_nh->nh_flags & NH_FLAG_COMPOSITE_EVPN) {
 
             /* We replicate only if received from VM */
-            if (pkt->vp_if->vif_type != VIF_TYPE_VIRTUAL)
+            if (!vif_is_virtual(pkt->vp_if))
                 continue;
 
             /* Create head space for Vxlan header */
@@ -1164,7 +1164,9 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
      */
     if (pkt->vp_type == VP_TYPE_L2)
         pkt->vp_type = VP_TYPE_L2OIP;
-    else 
+    else if (pkt->vp_type == VP_TYPE_IP6)
+        pkt->vp_type = VP_TYPE_IP6OIP;
+    else
         pkt->vp_type = VP_TYPE_IPOIP;
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
@@ -1295,6 +1297,8 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     pkt_set_network_header(pkt, pkt->vp_data);
     if (pkt->vp_type == VP_TYPE_L2)
         pkt->vp_type = VP_TYPE_L2OIP;
+    else if (pkt->vp_type == VP_TYPE_IP6)
+        pkt->vp_type = VP_TYPE_IP6OIP;
     else 
         pkt->vp_type = VP_TYPE_IPOIP;
 
@@ -1480,7 +1484,7 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
         pkt->vp_type = VP_TYPE_IP6;
         if (stats) {
             if ((pkt->vp_flags & VP_FLAG_GRO) &&
-                    (vif->vif_type == VIF_TYPE_VIRTUAL)) {
+                    vif_is_virtual(vif)) {
                 stats->vrf_gros++;
             } else {
                 stats->vrf_encaps++;
@@ -1497,7 +1501,7 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
 #else
         if (stats) {
             if ((pkt->vp_flags & VP_FLAG_GRO) &&
-                    (vif->vif_type == VIF_TYPE_VIRTUAL)) {
+                    vif_is_virtual(vif)) {
                 stats->vrf_gros++;
             } else {
                 stats->vrf_encaps++;
