@@ -27,6 +27,7 @@ unsigned int dpdk_nl_message_len(struct vr_message *);
 
 int vr_usocket_message_write(struct vr_usocket *, struct vr_message *);
 int vr_nl_uvh_sock;
+/* TODO - remove this */
 int dpdk_nl_tmp_vif_not_added = 0;
 
 static void
@@ -171,10 +172,12 @@ vr_netlink_uvhost_vif_add(char *vif_name)
 int
 dpdk_netlink_io(void)
 {
-    /* TODO - placeholder until netlink thread does this based on vif_add */
-    if (dpdk_nl_tmp_vif_not_added) {
-        vr_netlink_uvhost_vif_add("temp_vif_name");
-        dpdk_nl_tmp_vif_not_added = 1;
+    if (0) {
+        /* TODO - placeholder until netlink thread does this based on vif_add */
+        if (dpdk_nl_tmp_vif_not_added) {
+            vr_netlink_uvhost_vif_add("temp_vif_name");
+            dpdk_nl_tmp_vif_not_added = 1;
+        }
     }
 
     return vr_usocket_io(vr_dpdk.netlink_sock);
