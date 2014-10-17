@@ -44,6 +44,7 @@ typedef struct vr_uvh_client {
     vr_uvh_client_vring_t vruc_vvr[VHOST_CLIENT_MAX_VRINGS]; 
 } vr_uvh_client_t;
 
+void vr_uvhost_client_init(void);
 vr_uvh_client_t *vr_uvhost_new_client(int fd, char *path);
 void vr_uvhost_del_client(vr_uvh_client_t *vru_cl);
 

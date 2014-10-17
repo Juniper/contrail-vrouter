@@ -9,10 +9,14 @@
 #include <sys/un.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <linux/vhost.h>
 
 #include "vr_uvhost.h"
 #include "vr_uvhost_util.h"
 #include "vr_uvhost_msg.h"
+#include "qemu_uvhost.h"
+#include "vr_uvhost_client.h"
 
 /*
  * Prototypes
@@ -69,7 +73,9 @@ vr_uvhost_start(void *arg)
     int s = 0, ret;
     struct sockaddr_un sun;
 
-    s = socket(AF_UNIX, SOCK_DGRAM, 0);
+    vr_uvhost_client_init();
+
+    s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s < 0) {
         goto error;
     }       

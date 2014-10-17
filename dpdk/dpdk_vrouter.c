@@ -331,7 +331,7 @@ static struct option long_options[] = {
 static void
 vr_dpdk_exit_trigger(void)
 {
-    rte_atomic16_inc(&vr_dpdk.stop_flag);
+    dpdk_stop_flag_set();
 
     return;
 }

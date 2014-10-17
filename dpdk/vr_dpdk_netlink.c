@@ -201,7 +201,7 @@ vr_nl_uvhost_connect(void)
     int s = 0, ret = -1;
     struct sockaddr_un nl_sun, uvh_sun;
 
-    s = socket(AF_UNIX, SOCK_DGRAM, 0);
+    s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s < 0) {
         goto error;
     }

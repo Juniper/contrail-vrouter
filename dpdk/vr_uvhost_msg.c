@@ -12,6 +12,7 @@
 #include <linux/vhost.h>
 #include <stdint.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 
 #include "vr_uvhost_util.h"
 #include "vr_uvhost_msg.h"
@@ -266,7 +267,10 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     }
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
+        vr_uvhost_log("Calling handler for message %d\n", msg->request);
         return vr_uvhost_cl_msg_handlers[msg->request](vru_cl);
+    } else {
+        vr_uvhost_log("No handler defined for message %d\n", msg->request);
     }
 
     return 0;
@@ -322,6 +326,9 @@ vr_uvh_cl_send_reply(vr_uvh_client_t *vru_cl)
  * clients. Calls the appropriate handler based on the message type.
  *
  * Returns 0 on success, -1 on error.
+ *
+ * TODO: upon error, this function currently makes the process exit.
+ * Instead, it should close the socket and continue serving other clients.
  */
 static int
 vr_uvh_cl_msg_handler(int fd, void *arg)
@@ -350,9 +357,13 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                 return 0;
             }
 
+            vr_uvhost_log("Receive returned %d in vhost server for client %s\n", 
+                          ret, vru_cl->vruc_path);
             return -1;
         } else if (ret > 0) {
             if (mhdr.msg_flags & MSG_CTRUNC) {
+                vr_uvhost_log("Truncated control message from vhost client %s\n",
+                             vru_cl->vruc_path);
                 return -1;
             }
 
@@ -370,8 +381,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                           vru_cl->vruc_num_fds_sent*sizeof(int));
             }
 
+            vru_cl->vruc_msg_bytes_read = ret;
             if (ret < VHOST_USER_HSIZE) {
-                vru_cl->vruc_msg_bytes_read = ret;
                 return 0;
             }
 
@@ -380,6 +391,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             /*
              * recvmsg returned 0, so return error.
              */
+            vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
+                          ret, vru_cl->vruc_path);
             return -1;
         }    
     } else if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
@@ -388,27 +401,35 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
         read_len = vru_cl->vruc_msg.size - 
                        (vru_cl->vruc_msg_bytes_read - VHOST_USER_HSIZE);
     }        
-    
-    ret = read(fd, (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read),
-               read_len);
-    if (ret < 0) {
-        if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+   
+    if (read_len) { 
+        ret = read(fd, (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read),
+                   read_len);
+        if (ret < 0) {
+            if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+                return 0;
+            }
+
+            vr_uvhost_log(
+                "Read returned %d, %d %d %d in vhost server for client %s\n",
+                ret, errno, read_len,
+                vru_cl->vruc_msg_bytes_read, vru_cl->vruc_path);
+            return -1;
+        } else if (ret == 0) {
+             vr_uvhost_log("Read returned %d in vhost server for client %s\n",
+                           ret, vru_cl->vruc_path); 
+            return -1;
+        }  
+      
+        vru_cl->vruc_msg_bytes_read += ret; 
+        if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
             return 0;
         }
 
-        return -1;
-    } else if (ret == 0) {
-        return -1;
-    }  
-      
-    vru_cl->vruc_msg_bytes_read += ret; 
-    if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
-        return 0;
-    }
-
-    if (vru_cl->vruc_msg_bytes_read < 
-            (vru_cl->vruc_msg.size + VHOST_USER_HSIZE)) {
-        return 0;
+        if (vru_cl->vruc_msg_bytes_read < 
+                (vru_cl->vruc_msg.size + VHOST_USER_HSIZE)) {
+            return 0;
+        }
     }
 
     ret = vr_uvh_cl_call_handler(vru_cl);
@@ -455,10 +476,23 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
 
     s = accept(fd, (struct sockaddr *) &sun, &len);
     if (s < 0) {
+        if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+            return 0;
+        }
+
         vr_uvhost_log("Error in client connection accept in vhost server\n");
         return -1;
     }
 
+    /*
+     * Get the name of the peer
+     */
+    len = sizeof(sun);
+    if (getsockname(fd, (struct sockaddr *) &sun, &len) < 0) {
+        vr_uvhost_log("Error getting peer name in vhost server\n");
+        goto error;
+    }
+ 
     vru_cl = vr_uvhost_new_client(s, sun.sun_path);
     if (vru_cl == NULL) {
         vr_uvhost_log("Error creating new vhost client for %s\n",
@@ -499,6 +533,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 {
     int s = 0, ret = -1;
     struct sockaddr_un sun;
+    int flags;
 
     if (msg == NULL) {
         return -1;
@@ -523,6 +558,12 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
                       errno, sun.sun_path);
         goto error;
     }
+
+    /* 
+     * Set the socket to non-blocking
+     */
+    flags = fcntl(s, F_GETFL, 0);
+    fcntl(s, flags | O_NONBLOCK);
 
     ret = listen(s, 1);
     if (ret < 0) {

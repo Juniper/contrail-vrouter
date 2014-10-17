@@ -56,14 +56,11 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
 {
     int i;
     uvh_fd_t *fds;
-    fd_set *fdset;
 
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
-        fdset = &uvh_rfdset;
     } else if (fd_type == UVH_FD_WRITE) {
         fds = uvh_wfds;
-        fdset = &uvh_wfdset;
     } else {
         return -1;
     }
@@ -74,10 +71,11 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
             fds[i].uvh_fd_arg = fd_handler_arg;
             fds[i].uvh_fd_fn = fd_handler;
 
-            FD_SET(fd, fdset);
-
-            if (i > uvh_max_fd) {
-                uvh_max_fd = i;
+            if (fd > uvh_max_fd) {
+                /*
+                 * TODO - need to update this when fds are deleted.
+                 */
+                uvh_max_fd = fd;
             }
 
             return 0;
@@ -112,11 +110,24 @@ vr_uvh_max_fd(void)
 }
     
 /*
- * vr_uvh_rfdset_p - returns a pointer to the read fdset.
+ * vr_uvh_rfdset_p - returns a pointer to the fdset corresponding to the
+ * read fds. 
  */
 fd_set *
 vr_uvh_rfdset_p(void)
 {
+    int i;
+ 
+    FD_ZERO(&uvh_rfdset);
+ 
+    for (i = 0; i < MAX_UVHOST_FDS; i++) {
+        if (uvh_rfds[i].uvh_fd == 0) {
+            continue;
+        }        
+
+        FD_SET(uvh_rfds[i].uvh_fd, &uvh_rfdset);
+    }
+
     return &uvh_rfdset;
 }
 
@@ -126,6 +137,18 @@ vr_uvh_rfdset_p(void)
 fd_set *
 vr_uvh_wfdset_p(void)
 {
+    int i;
+
+    FD_ZERO(&uvh_wfdset);
+
+    for (i = 0; i < MAX_UVHOST_FDS; i++) {
+        if (uvh_wfds[i].uvh_fd == 0) {
+            continue;
+        }
+
+        FD_SET(uvh_wfds[i].uvh_fd, &uvh_wfdset);
+    }
+
     return &uvh_wfdset;
 }
 

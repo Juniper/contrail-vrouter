@@ -18,6 +18,21 @@
 static vr_uvh_client_t vr_uvh_clients[VR_UVH_MAX_CLIENTS];
 
 /*
+ * vr_uvhost_client_init - initialize the client array.
+ */
+void
+vr_uvhost_client_init(void)
+{
+    int i;
+
+    for (i = 0; i < VR_UVH_MAX_CLIENTS; i++) {
+        vr_uvh_clients[i].vruc_fd = -1;
+    }
+
+    return;
+}
+
+/*
  * vr_uvhost_new_client - initializes state for a new user space vhost client 
  * fd is a file descriptor for the client socket. path is the UNIX domain
  * socket path.
