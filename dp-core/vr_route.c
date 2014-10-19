@@ -399,6 +399,16 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
     if (!router)
         return -EINVAL;
 
+    /* V4 and V6 only */
+    if (req->rtr_req.rtr_family != AF_INET &&
+        req->rtr_req.rtr_family != AF_INET6)
+        return -EINVAL;
+
+    /* There has to be some prefix to add */
+    if (!req->rtr_req.rtr_prefix_size)
+        return -EINVAL;
+
+
     rtable = vr_get_inet_table(router, req->rtr_req.rtr_rt_type);
     if (!rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
