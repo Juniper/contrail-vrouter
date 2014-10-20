@@ -6,6 +6,7 @@
  */
 #include <stdarg.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/select.h>
 #include <pthread.h>
 
@@ -40,6 +41,45 @@ vr_uvhost_log(const char *format, ...)
     fflush(f);
 
     return;
+}
+
+/*
+ * vr_uvhost_del_fd - deletes a fd from the read/write list that the
+ * user space vhost server is listening on. fd_type indicates if it
+ * is a read/write socket. The fd passed in is closed.
+ *
+ * Returns 0 on success, -1 otherwise. 
+ */
+int
+vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
+{
+    int i;
+    uvh_fd_t *fds;
+
+    if (fd_type == UVH_FD_READ) {
+        fds = uvh_rfds;
+    } else if (fd_type == UVH_FD_WRITE) {
+        fds = uvh_wfds;
+    } else {
+        return -1;
+    }
+
+    for (i = 0; i < MAX_UVHOST_FDS; i++) {
+        if (fds[i].uvh_fd == fd) {
+            break;
+        }
+    }
+
+    if (i == MAX_UVHOST_FDS) {
+        vr_uvhost_log(
+            "Cannot find fd %d for deletion inuser space vhost fds\n", fd);
+        return -1;
+    }
+    
+    fds[i].uvh_fd = 0;  /* TODO - -1 instead of 0 */
+    close(fd);
+
+    return 0;
 }
  
 /*
@@ -108,7 +148,18 @@ vr_uvh_max_fd(void)
 {
     return uvh_max_fd;
 }
-    
+ 
+/*
+ * vr_uvh_reset_max_fd - sets the max fd to -1.
+ */
+void
+vr_uvh_reset_max_fd(void)
+{
+    uvh_max_fd = -1;
+
+    return;
+}
+   
 /*
  * vr_uvh_rfdset_p - returns a pointer to the fdset corresponding to the
  * read fds. 
@@ -124,6 +175,10 @@ vr_uvh_rfdset_p(void)
         if (uvh_rfds[i].uvh_fd == 0) {
             continue;
         }        
+
+        if (uvh_rfds[i].uvh_fd > uvh_max_fd) {
+            uvh_max_fd = uvh_rfds[i].uvh_fd;
+        }
 
         FD_SET(uvh_rfds[i].uvh_fd, &uvh_rfdset);
     }
@@ -144,6 +199,10 @@ vr_uvh_wfdset_p(void)
     for (i = 0; i < MAX_UVHOST_FDS; i++) {
         if (uvh_wfds[i].uvh_fd == 0) {
             continue;
+        }
+
+        if (uvh_wfds[i].uvh_fd > uvh_max_fd) {
+            uvh_max_fd = uvh_wfds[i].uvh_fd;
         }
 
         FD_SET(uvh_wfds[i].uvh_fd, &uvh_wfdset);

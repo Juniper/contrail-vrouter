@@ -22,7 +22,62 @@
 #include "vr_queue.h"
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
+#include "vr_dpdk_virtio.h"
+#include "vr_dpdk_netlink.h"
 
+/*
+ * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
+ * Returns 0 on success, < 0  otherwise.
+ */
+static int
+dpdk_virtual_if_add(struct vr_interface *vif)
+{
+    int ret;
+    unsigned int nrxqs, ntxqs;
+
+    nrxqs = vr_dpdk_virtio_nrxqs(vif);
+    ntxqs = vr_dpdk_virtio_ntxqs(vif);
+
+#if 0
+    ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+               nrxqs, &vr_dpdk_virtio_rx_queue_init,
+               ntxqs, &vr_dpdk_virtio_tx_queue_init); 
+    if (ret) {
+        return ret;
+    }
+#endif
+
+    ret = vr_netlink_uvhost_vif_add(vif->vif_name, vif->vif_idx, 
+                                    nrxqs, ntxqs);
+    if (ret) {
+        /*
+         * TODO - remove queues from lcores.
+         */
+        return ret;
+    }
+
+    return 0;
+}
+
+/*
+ * dpdk_virtual_if_del - deletes a virtual (virtio) interface from vrouter.
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+dpdk_virtual_if_del(struct vr_interface *vif)
+{
+    int ret;
+
+    ret = vr_netlink_uvhost_vif_del(vif->vif_idx);
+       
+    /*
+     * TODO - forwarding lcores need to be informed and they need to ack the
+     * vif removal. Also, user space vhost thread need to ack the deletion
+     * of the vif.
+     */
+
+    return ret;
+}
 
 /* Add fabric interface */
 static int
@@ -137,6 +192,10 @@ dpdk_if_add(struct vr_interface *vif)
         return dpdk_agent_if_add(vif);
     }
 
+    if (vif_is_virtual(vif)) {
+        return dpdk_virtual_if_add(vif);
+    }
+
     /* get interface name */
     if (vif->vif_flags & VIF_FLAG_PMD) {
         /* check DPDK port index */
@@ -167,6 +226,10 @@ dpdk_if_add(struct vr_interface *vif)
 static int
 dpdk_if_del(struct vr_interface *vif)
 {
+    if (vif_is_virtual(vif)) {
+        return dpdk_virtual_if_del(vif);
+    }
+
     if ((vif->vif_type == VIF_TYPE_AGENT) &&
             (vif->vif_transport == VIF_TRANSPORT_SOCKET))
         dpdk_packet_socket_close();

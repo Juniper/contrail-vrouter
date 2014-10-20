@@ -72,6 +72,7 @@ vr_uvhost_start(void *arg)
 {
     int s = 0, ret;
     struct sockaddr_un sun;
+    fd_set *rfdset, *wfdset;
 
     vr_uvhost_client_init();
 
@@ -103,8 +104,11 @@ vr_uvhost_start(void *arg)
     }
 
     while (1) {
-        if (select(vr_uvh_max_fd()+1, vr_uvh_rfdset_p(), vr_uvh_wfdset_p(),
-                   NULL, NULL) < 0) {
+        vr_uvh_reset_max_fd();
+        rfdset = vr_uvh_rfdset_p();
+        wfdset = vr_uvh_wfdset_p();
+
+        if (select(vr_uvh_max_fd()+1, rfdset, wfdset,  NULL, NULL) < 0) {
             vr_uvhost_log("Error in vhoset server select\n");
             goto error;
         }

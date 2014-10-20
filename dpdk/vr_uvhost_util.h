@@ -18,6 +18,8 @@ typedef enum uvh_fd_type {
 void vr_uvhost_fdset_init(void);
 int vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
                      uvh_fd_handler_t fd_handler);
+int vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type);
+void vr_uvh_reset_max_fd(void);
 void vr_uvhost_log(const char *format, ...);
 int vr_uvh_max_fd(void);
 fd_set *vr_uvh_rfdset_p(void);

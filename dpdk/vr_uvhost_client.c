@@ -35,29 +35,25 @@ vr_uvhost_client_init(void)
 /*
  * vr_uvhost_new_client - initializes state for a new user space vhost client 
  * fd is a file descriptor for the client socket. path is the UNIX domain
- * socket path.
+ * socket path. cidx is the index of the client.
  *
  * Returns a pointer to the client state on success, NULL otherwise.
  */
 vr_uvh_client_t *
-vr_uvhost_new_client(int fd, char *path)
+vr_uvhost_new_client(int fd, char *path, int cidx)
 {
-    int i;
-
-    for (i = 0; i < VR_UVH_MAX_CLIENTS; i++) {
-        if (vr_uvh_clients[i].vruc_fd == -1) {
-            break;
-        }
-    }
-
-    if (i == VR_UVH_MAX_CLIENTS) {
+    if (cidx >= VR_UVH_MAX_CLIENTS) {
         return NULL;
     }
 
-    vr_uvh_clients[i].vruc_fd = fd;
-    strncpy(vr_uvh_clients[i].vruc_path, path, VR_UNIX_PATH_MAX);
+    if (vr_uvh_clients[cidx].vruc_fd != -1) {
+        return NULL;
+    }
 
-    return &vr_uvh_clients[i];
+    vr_uvh_clients[cidx].vruc_fd = fd;
+    strncpy(vr_uvh_clients[cidx].vruc_path, path, VR_UNIX_PATH_MAX);
+
+    return &vr_uvh_clients[cidx];
 }
 
 /*
@@ -72,3 +68,28 @@ vr_uvhost_del_client(vr_uvh_client_t *vru_cl)
 
     return;
 }
+
+/*
+ * vr_uvhost_cl_set_fd - set the fd for a user space vhost client
+ */
+void
+vr_uvhost_cl_set_fd(vr_uvh_client_t *vru_cl, int fd)
+{
+    vru_cl->vruc_fd = fd;
+
+    return;
+}
+
+/*
+ * vr_uvhost_get_client - Returns the client at the specified index, NULL if
+ * it cannot be found.
+ */
+vr_uvh_client_t *
+vr_uvhost_get_client(unsigned int cidx)
+{
+    if (cidx >= VR_UVH_MAX_CLIENTS) {
+        return NULL;
+    }
+
+    return &vr_uvh_clients[cidx];
+} 

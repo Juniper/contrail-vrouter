@@ -9,7 +9,10 @@
 #ifndef __VR_UVHOST_CLIENT_H__
 #define __VR_UVHOST_CLIENT_H__
 
-#define VR_UVH_MAX_CLIENTS 256
+/*
+ * VR_UVH_MAX_CLIENTS needs to be the same as VR_MAX_INTERFACES.
+ */
+#define VR_UVH_MAX_CLIENTS (256 + 4096) 
 #define VR_UNIX_PATH_MAX 108
 
 typedef struct vr_uvh_client_mem_region {
@@ -38,6 +41,10 @@ typedef struct vr_uvh_client {
     struct vhost_vring_state vruc_vvs[VHOST_CLIENT_MAX_VRINGS];
     VhostUserMsg vruc_msg;
 
+    unsigned int vruc_idx;
+    unsigned int vruc_nrxqs;
+    unsigned int vruc_ntxqs;
+
     /*
      * TODO - the following fields need to tied to the vif.
      */
@@ -45,8 +52,9 @@ typedef struct vr_uvh_client {
 } vr_uvh_client_t;
 
 void vr_uvhost_client_init(void);
-vr_uvh_client_t *vr_uvhost_new_client(int fd, char *path);
+vr_uvh_client_t *vr_uvhost_new_client(int fd, char *path, int cidx);
 void vr_uvhost_del_client(vr_uvh_client_t *vru_cl);
-
+void vr_uvhost_cl_set_fd(vr_uvh_client_t *vru_cl, int fd);
+vr_uvh_client_t *vr_uvhost_get_client(unsigned int cidx);
 #endif /* __VR_UVHOST_CLIENT_H__ */
 

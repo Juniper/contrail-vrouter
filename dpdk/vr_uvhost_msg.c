@@ -472,7 +472,7 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
     int s = 0;
     struct sockaddr_un sun;
     socklen_t len = sizeof(sun);
-    vr_uvh_client_t *vru_cl = NULL;
+    vr_uvh_client_t *vru_cl = (vr_uvh_client_t *) arg;
 
     s = accept(fd, (struct sockaddr *) &sun, &len);
     if (s < 0) {
@@ -485,20 +485,10 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
     }
 
     /*
-     * Get the name of the peer
+     * Don't need to listen on the socket any more.
      */
-    len = sizeof(sun);
-    if (getsockname(fd, (struct sockaddr *) &sun, &len) < 0) {
-        vr_uvhost_log("Error getting peer name in vhost server\n");
-        goto error;
-    }
- 
-    vru_cl = vr_uvhost_new_client(s, sun.sun_path);
-    if (vru_cl == NULL) {
-        vr_uvhost_log("Error creating new vhost client for %s\n",
-                      sun.sun_path);
-        goto error;
-    }
+    vr_uvhost_del_fd(fd, UVH_FD_READ);
+    vr_uvhost_cl_set_fd(vru_cl, s);
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_msg_handler)) {
         vr_uvhost_log("Error adding message fd for vhost client %s\n",
@@ -521,12 +511,47 @@ error:
     return -1;
 }
 
+/*
+ * vr_uvh_nl_vif_del_handler - handle a message from the netlink thread
+ * to delete a vif. 
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
+{
+    unsigned int cidx = msg->vrnu_vif_idx;
+    vr_uvh_client_t *vru_cl;
+
+    if (cidx >= VR_UVH_MAX_CLIENTS) {
+        vr_uvhost_log("Couldn't delete vhost client due to bad index %d\n",
+                      cidx);
+        return -1;
+    }
+
+    vru_cl = vr_uvhost_get_client(cidx);
+    if (vru_cl == NULL) {
+        vr_uvhost_log("Couldn't find vhost client %d for deletion\n",
+                      cidx);
+        return -1;
+    }
+
+    if (vru_cl->vruc_fd != -1) {
+        vr_uvhost_del_fd(vru_cl->vruc_fd, UVH_FD_READ);
+    }
+
+    vru_cl->vruc_fd = -1;
+
+    return 0;
+}
+
+
 /* 
  * vr_uvh_nl_vif_add_handler - handle a vif add message from the netlink
  * thread. In response, the vhost server thread starts listening on the
  * UNIX domain socket corresponding to this vif.
  *
- * returns 0 on success, -1 otherwise.
+ * Returns 0 on success, -1 otherwise.
  */
 static int
 vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
@@ -534,6 +559,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     int s = 0, ret = -1;
     struct sockaddr_un sun;
     int flags;
+    vr_uvh_client_t *vru_cl = NULL;
 
     if (msg == NULL) {
         return -1;
@@ -546,7 +572,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         goto error;
     }
 
-    strncpy(sun.sun_path, VR_UVH_VIF_PREFIX, VR_UVH_VIF_PREFIX_SIZE);
+    strncpy(sun.sun_path, VR_UVH_VIF_PREFIX, VR_UVH_VIF_PREFIX_SIZE+1);
     strncat(sun.sun_path, msg->vrnu_vif_name, VR_UVH_VIF_NAME_SIZE);
     sun.sun_family = AF_UNIX;
 
@@ -572,7 +598,18 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         goto error;
     }
 
-    ret = vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_cl_listen_handler);
+    vru_cl = vr_uvhost_new_client(s, sun.sun_path, msg->vrnu_vif_idx);
+    if (vru_cl == NULL) {
+        vr_uvhost_log("Error creating new vhost client for %s\n",
+                      sun.sun_path);
+        goto error;
+    }
+
+    vru_cl->vruc_idx =  msg->vrnu_vif_idx;
+    vru_cl->vruc_nrxqs = msg->vrnu_vif_nrxqs;
+    vru_cl->vruc_ntxqs = msg->vrnu_vif_ntxqs;
+
+    ret = vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_listen_handler);
     if (ret) {
         vr_uvhost_log("Error adding listen fd for vhost client %s\n",
                       sun.sun_path);
@@ -587,6 +624,10 @@ error:
         close(s);
     }
 
+    if (vru_cl) {
+        vr_uvhost_del_client(vru_cl);
+    }
+ 
     return ret;
 }
 
@@ -626,6 +667,11 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
         case VRNU_MSG_VIF_ADD:
             ret = vr_uvh_nl_vif_add_handler(&msg.vrnum_vif_add);
             break;
+
+        case VRNU_MSG_VIF_DEL:
+            ret = vr_uvh_nl_vif_del_handler(&msg.vrnum_vif_del);
+            break;
+
         default:
             vr_uvhost_log("Unknown netlink msg %d received in vhost server\n",
                           msg.vrnum_type);

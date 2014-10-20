@@ -27,8 +27,6 @@ unsigned int dpdk_nl_message_len(struct vr_message *);
 
 int vr_usocket_message_write(struct vr_usocket *, struct vr_message *);
 int vr_nl_uvh_sock;
-/* TODO - remove this */
-int dpdk_nl_tmp_vif_not_added = 0;
 
 static void
 dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
@@ -140,14 +138,40 @@ static struct vr_mtransport dpdk_nl_transport = {
 };
 
 /*
+ * vr_netlink_uvhost_vif_del - sends a message to the user space vhost 
+ * thread when a vif is deleted. vif_idx is the index of the vif.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_netlink_uvhost_vif_del(int vif_idx)
+{
+    vrnu_msg_t msg;
+
+    msg.vrnum_type = VRNU_MSG_VIF_DEL;
+    msg.vrnum_vif_del.vrnu_vif_idx = vif_idx;
+
+    /*
+     * This is a blocking send.
+     */
+    if (send(vr_nl_uvh_sock, (void *) &msg, sizeof(msg), 0) !=
+             sizeof(msg)) {
+        return -1;
+    }
+
+    return 0;
+}
+ 
+/*
  * vr_netlink_uvhost_vif_add - sends a message to the user space vhost 
  * thread when a new vif is created. The name os the vif is specified in
  * the vif_name argument.
  *
  * Returns 0 on success, -1 otherwise.
  */
-static int
-vr_netlink_uvhost_vif_add(char *vif_name)
+int
+vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
+                          unsigned int vif_nrxqs, unsigned int vif_ntxqs)
 {
     vrnu_msg_t msg;
 
@@ -157,6 +181,9 @@ vr_netlink_uvhost_vif_add(char *vif_name)
 
     msg.vrnum_type = VRNU_MSG_VIF_ADD;
     strncpy(msg.vrnum_vif_add.vrnu_vif_name, vif_name, VR_UVH_VIF_NAME_SIZE);
+    msg.vrnum_vif_add.vrnu_vif_idx = vif_idx;
+    msg.vrnum_vif_add.vrnu_vif_nrxqs = vif_nrxqs;
+    msg.vrnum_vif_add.vrnu_vif_ntxqs = vif_ntxqs;
 
     /*
      * This is a blocking send.
@@ -172,14 +199,6 @@ vr_netlink_uvhost_vif_add(char *vif_name)
 int
 dpdk_netlink_io(void)
 {
-    if (0) {
-        /* TODO - placeholder until netlink thread does this based on vif_add */
-        if (dpdk_nl_tmp_vif_not_added) {
-            vr_netlink_uvhost_vif_add("temp_vif_name");
-            dpdk_nl_tmp_vif_not_added = 1;
-        }
-    }
-
     return vr_usocket_io(vr_dpdk.netlink_sock);
 }
 
