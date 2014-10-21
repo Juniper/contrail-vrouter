@@ -208,6 +208,7 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_tx_queues;
     /* Number of HW RX queues used for RSS (limited by the nb of lcores) */
     uint16_t ethdev_nb_rss_queues;
+    uint16_t ethdev_port_id;
     /* Hardware RX queue states */
     enum vr_dpdk_queue_state ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
     /* Pointers to memory pools */
@@ -329,7 +330,7 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id);
 /* Init ethernet device */
-int vr_dpdk_ethdev_init(struct vr_interface *vif);
+int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
 int vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
 

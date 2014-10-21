@@ -125,11 +125,16 @@ struct vr_dpdk_rx_queue *
 vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned rx_queue_id)
 {
+    uint8_t port_id;
+    unsigned int vif_idx = vif->vif_idx;
+    const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
+
+    struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    uint8_t port_id = vif->vif_os_idx;
-    unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+
+    ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
+    port_id = ethdev->ethdev_port_id;
 
     /* init queue */
     rx_queue->rxq_ops = rte_port_ethdev_reader_ops;
@@ -157,11 +162,16 @@ struct vr_dpdk_tx_queue *
 vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id)
 {
+    uint8_t port_id;
+    unsigned int vif_idx = vif->vif_idx;
+    const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
+
+    struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    uint8_t port_id = vif->vif_os_idx;
-    unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+
+    ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
+    port_id = ethdev->ethdev_port_id;
 
     /* init queue */
     tx_queue->txq_ops = rte_port_ethdev_writer_ops;
@@ -186,15 +196,12 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
 /* Update device info */
 static void
-dpdk_ethdev_info_update(struct vr_interface *vif)
+dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
 {
-    uint8_t port_id = vif->vif_os_idx;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
     struct rte_eth_dev_info dev_info;
 
-    /* get device info */
-    memset(&dev_info, 0, sizeof(dev_info));
-    rte_eth_dev_info_get(port_id, &dev_info);
+    rte_eth_dev_info_get(ethdev->ethdev_port_id, &dev_info);
+
     ethdev->ethdev_nb_rx_queues = RTE_MIN(dev_info.max_rx_queues,
         VR_DPDK_MAX_NB_RX_QUEUES);
     ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
@@ -209,28 +216,20 @@ dpdk_ethdev_info_update(struct vr_interface *vif)
         dev_info.max_vfs, dev_info.max_vmdq_pools, dev_info.rx_offload_capa,
         dev_info.tx_offload_capa);
 
-    /* check if the device supports checksum offloading */
-    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) {
-        RTE_LOG(INFO, VROUTER, "\tenable hardware TX checksum offload for ethdev %"
-            PRIu8 "\n", port_id);
-        vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
-    } else {
-        vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
-    }
-
 #if !VR_DPDK_USE_HW_FILTERING
     /* use RSS queues only */
     ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #endif
+
+    return;
 }
 
 /* Setup ethdev hardware queues */
 static int
-dpdk_ethdev_queues_setup(struct vr_interface *vif)
+dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
 {
     int ret, i;
-    uint8_t port_id = vif->vif_os_idx;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+    uint8_t port_id = ethdev->ethdev_port_id;
     struct rte_mempool *mempool;
 
     /* configure RX queues */
@@ -288,11 +287,10 @@ dpdk_ethdev_queues_setup(struct vr_interface *vif)
 
 /* Init RSS */
 static int
-dpdk_ethdev_rss_init(struct vr_interface *vif)
+dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
 {
     int ret, i, j;
-    uint8_t port_id = vif->vif_os_idx;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+    uint8_t port_id = ethdev->ethdev_port_id;
     struct rte_eth_rss_reta reta_conf;
 
     /* create new RSS redirection table */
@@ -322,11 +320,9 @@ dpdk_ethdev_rss_init(struct vr_interface *vif)
 #if VR_DPDK_USE_HW_FILTERING
 /* Init hardware filtering */
 static void
-dpdk_ethdev_mempools_free(struct vr_interface *vif)
+dpdk_ethdev_mempools_free(struct vr_dpdk_ethdev *ethdev)
 {
     int i;
-    uint8_t port_id = vif->vif_os_idx;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
 
     for (i = ethdev->ethdev_nb_rss_queues; i < ethdev->ethdev_nb_rx_queues; i++) {
         if (ethdev->ethdev_mempools[i] != NULL
@@ -341,10 +337,11 @@ dpdk_ethdev_mempools_free(struct vr_interface *vif)
 
 /* Init hardware filtering */
 static int
-dpdk_ethdev_filtering_init(struct vr_interface *vif)
+dpdk_ethdev_filtering_init(struct vr_interface *vif,
+        struct vr_dpdk_ethdev *ethdev)
 {
     int ret;
-    uint8_t port_id = vif->vif_os_idx;
+    uint8_t port_id = ethdev->ethdev_port_id;
     struct rte_fdir_masks masks;
     struct rte_eth_fdir fdir_info;
 
@@ -359,7 +356,7 @@ dpdk_ethdev_filtering_init(struct vr_interface *vif)
     } else {
         vif->vif_flags &= ~VIF_FLAG_FILTERING_OFFLOAD;
         /* free filtering mempools */
-        dpdk_ethdev_mempools_free(vif);
+        dpdk_ethdev_mempools_free(ethdev);
         /* the ethdev does not support hardware filtering - it's not an error */
         return 0;
     }
@@ -381,18 +378,16 @@ dpdk_ethdev_filtering_init(struct vr_interface *vif)
 
 /* Init ethernet device */
 int
-vr_dpdk_ethdev_init(struct vr_interface *vif)
+vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
 {
-    /* eth dev port id */
-    uint8_t port_id = vif->vif_os_idx;
-    /* return value */
+    uint8_t port_id;
     int ret;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
 
-    /* update ethdev info */
-    dpdk_ethdev_info_update(vif);
+    port_id = ethdev->ethdev_port_id;
+    ethdev->ethdev_ptr = &rte_eth_devices[port_id];
 
-    /* configure the device */
+    dpdk_ethdev_info_update(ethdev);
+
     ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
         ethdev->ethdev_nb_tx_queues, &ethdev_conf);
     if (ret < 0) {
@@ -401,30 +396,13 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
         return ret;
     }
 
-    /* setup hardware queues */
-    ret = dpdk_ethdev_queues_setup(vif);
+    ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
         return ret;
 
-    /* start eth device */
-    ret = rte_eth_dev_start(port_id);
-    if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
-                ": %s (%d)\n", port_id, rte_strerror(-ret), -ret);
-        return ret;
-    }
-
-    /* init RSS */
-    ret = dpdk_ethdev_rss_init(vif);
+    ret = dpdk_ethdev_rss_init(ethdev);
     if (ret < 0)
         return ret;
-
-#if VR_DPDK_USE_HW_FILTERING
-    /* init hardware filtering */
-    ret = dpdk_ethdev_filtering_init(vif);
-    if (ret < 0)
-        return ret;
-#endif
 
     /* Promisc mode
      * KNI generates random MACs for e1000e NICs, so we need this
@@ -433,9 +411,6 @@ vr_dpdk_ethdev_init(struct vr_interface *vif)
 #if VR_DPDK_ENABLE_PROMISC == true
     rte_eth_promiscuous_enable(port_id);
 #endif
-
-    /* reset OS dev pointer */
-    vif->vif_os = NULL;
 
     return 0;
 }

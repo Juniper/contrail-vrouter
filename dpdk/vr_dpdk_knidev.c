@@ -206,9 +206,14 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    uint8_t port_id = vif->vif_os_idx;
+    uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_rx_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
+
+    if (vif->vif_type == VIF_TYPE_HOST) {
+        port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
+                ethdev_port_id);
+    }
 
     /* init queue */
     rx_queue->rxq_ops = dpdk_knidev_reader_ops;
@@ -237,9 +242,14 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    uint8_t port_id = vif->vif_os_idx;
+    uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_tx_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+
+    if (vif->vif_type == VIF_TYPE_HOST) {
+        port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
+                ethdev_port_id);
+    }
 
     /* init queue */
     tx_queue->txq_ops = dpdk_knidev_writer_ops;
@@ -297,10 +307,20 @@ dpdk_knidev_config_network_if(uint8_t portid, uint8_t if_up)
 int
 vr_dpdk_knidev_init(struct vr_interface *vif)
 {
-    uint8_t port_id = vif->vif_os_idx;
+    uint8_t port_id;
+    struct vr_dpdk_ethdev *ethdev;
     struct rte_eth_dev_info dev_info;
     struct rte_kni_conf kni_conf;
     struct rte_kni *kni;
+
+    if (vif->vif_type == VIF_TYPE_HOST) {
+        ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
+        port_id = ethdev->ethdev_port_id;
+    } else {
+        RTE_LOG(ERR, VROUTER, "\tunknown KNI interface addition"
+                "type %d os index %d\n", vif->vif_type, vif->vif_os_idx);
+        return -EINVAL;
+    }
 
     /* get eth device info */
     memset(&dev_info, 0, sizeof(dev_info));
@@ -346,7 +366,7 @@ vr_dpdk_knidev_all_handle(void)
 
     for (i = 0; i < router->vr_max_interfaces; i++) {
         vif = __vrouter_get_interface(router, i);
-        if (vif && vif->vif_os)
+        if (vif && (vif->vif_type == VIF_TYPE_HOST))
             rte_kni_handle_request((struct rte_kni *)vif->vif_os);
     }
 }

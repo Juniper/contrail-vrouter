@@ -25,6 +25,8 @@
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk_netlink.h"
 
+#include <rte_errno.h>
+
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
  * Returns 0 on success, < 0  otherwise.
@@ -79,36 +81,129 @@ dpdk_virtual_if_del(struct vr_interface *vif)
     return ret;
 }
 
+static inline void
+dpdk_dbdf_to_pci(unsigned int dbdf,
+        struct rte_pci_addr *address)
+{
+    address->domain = (dbdf >> 16);
+    address->bus = (dbdf >> 8) & 0xff;
+    address->devid = (dbdf & 0xf8);
+    address->function = (dbdf & 0x7);
+
+    return;
+}
+
+/* mirrors the function used in bonding */
+static inline int
+dpdk_find_port_by_pci_addr(struct rte_pci_addr *addr)
+{
+    unsigned int i;
+    struct rte_pci_addr *eth_pci_addr;
+
+    for (i = 0; i < rte_eth_dev_count(); i++) {
+        if (rte_eth_devices[i].pci_dev == NULL)
+            continue;
+
+        eth_pci_addr = &(rte_eth_devices[i].pci_dev->addr);
+        if (addr->bus == eth_pci_addr->bus &&
+            addr->devid == eth_pci_addr->devid &&
+            addr->domain == eth_pci_addr->domain &&
+            addr->function == eth_pci_addr->function) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int
+dpdk_vif_attach_ethdev(struct vr_interface *vif,
+        struct vr_dpdk_ethdev *ethdev)
+{
+    int ret = 0;
+    struct rte_eth_dev_info dev_info;
+
+    vif->vif_os = (void *)ethdev;
+
+    rte_eth_dev_info_get(ethdev->ethdev_port_id, &dev_info);
+    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) {
+        vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
+    } else {
+        vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
+    }
+
+#if VR_DPDK_USE_HW_FILTERING
+    /* init hardware filtering */
+    ret = dpdk_ethdev_filtering_init(vif, ethdev);
+    if (ret < 0)
+        return ret;
+#endif
+
+    return ret;
+}
+
+
 /* Add fabric interface */
 static int
 dpdk_fabric_if_add(struct vr_interface *vif)
 {
-    uint8_t port_id = vif->vif_os_idx;
     int ret;
+    uint8_t port_id;
     struct ether_addr mac_addr;
-    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[vif->vif_os_idx];
+    struct rte_pci_addr pci_address;
+    struct vr_dpdk_ethdev *ethdev;
 
-    /* get interface MAC address */
+    if (vif->vif_flags & VIF_FLAG_PMD) {
+        if (vif->vif_os_idx >= rte_eth_dev_count()) {
+            RTE_LOG(ERR, VROUTER, "Invalid PMD device index %u"
+                    " (must be less than %u)\n",
+                    vif->vif_os_idx, (unsigned)rte_eth_dev_count());
+            return -ENOENT;
+        }
+
+        port_id = vif->vif_os_idx;
+    } else {
+        dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
+        ret = dpdk_find_port_by_pci_addr(&pci_address);
+        if (ret < 0) {
+            RTE_LOG(ERR, VROUTER, "Invalid PCI address %d:%d:%d:%d\n",
+                    pci_address.domain, pci_address.bus,
+                    pci_address.devid, pci_address.function);
+            return -ENOENT;
+        }
+
+        port_id = ret;
+    }
+
+
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
-
     RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " MAC " MAC_FORMAT "\n",
                 vif->vif_idx, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
-    /* check if eth dev is already added */
+    ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
         RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
                 vif->vif_name);
         return -EEXIST;
     }
+    ethdev->ethdev_port_id = port_id;
 
     /* init eth device */
-    ret = vr_dpdk_ethdev_init(vif);
+    ret = vr_dpdk_ethdev_init(ethdev);
     if (ret != 0)
         return ret;
 
-    /* add interface to the table of eth devs */
-    ethdev->ethdev_ptr = &rte_eth_devices[vif->vif_os_idx];
+    ret = dpdk_vif_attach_ethdev(vif, ethdev);
+    if (ret)
+        return ret;
+
+    ret = rte_eth_dev_start(port_id);
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
+                ": %s (%d)\n", port_id, rte_strerror(-ret), -ret);
+        return ret;
+    }
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
@@ -187,39 +282,20 @@ dpdk_agent_if_add(struct vr_interface *vif)
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
-    if ((vif->vif_type == VIF_TYPE_AGENT) &&
-            (vif->vif_transport == VIF_TRANSPORT_SOCKET)) {
-        return dpdk_agent_if_add(vif);
-    }
-
-    if (vif_is_virtual(vif)) {
-        return dpdk_virtual_if_add(vif);
-    }
-
-    /* get interface name */
-    if (vif->vif_flags & VIF_FLAG_PMD) {
-        /* check DPDK port index */
-        if (vif->vif_os_idx >= rte_eth_dev_count()) {
-            RTE_LOG(ERR, VROUTER, "Invalid eth device index %u (must be less than %u)\n",
-                (unsigned)vif->vif_os_idx, (unsigned)rte_eth_dev_count());
-            return -ENOENT;
-        }
-    } else {
-        RTE_LOG(ERR, VROUTER, "Error adding interface %s:\n"
-            "\tThis version of vRouter supports DPDK eth devices only.\n"
-            "\tPlease use an eth device index and --pmd flag instead.\n",
-                vif->vif_name);
-        return -EFAULT;
-    } /* VIF_FLAG_PMD */
-
     if (vif_is_fabric(vif) || vif_is_tap(vif)) {
         return dpdk_fabric_if_add(vif);
-    }
-    else if (vif_is_vhost(vif)) {
+    } else if (vif_is_virtual(vif)) {
+        return dpdk_virtual_if_add(vif);
+    } else if (vif_is_vhost(vif)) {
         return dpdk_vhost_if_add(vif);
+    } else if (vif->vif_type == VIF_TYPE_AGENT) {
+        if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
+            return dpdk_agent_if_add(vif);
     }
 
-    RTE_LOG(ERR, VROUTER, "Unknown interface type %hu\n", vif->vif_type);
+    RTE_LOG(ERR, VROUTER, "Unsupported interface(type %d, index %d)",
+            vif->vif_type, vif->vif_idx);
+
     return -EFAULT;
 }
 
@@ -448,10 +524,11 @@ dpdk_if_get_mtu(struct vr_interface *vif)
     uint8_t port_id;
     uint16_t mtu;
 
-    port_id = vif->vif_os_idx;
-
-    if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
-        return mtu;
+    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+        port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
+        if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
+            return mtu;
+    }
 
     return vif->vif_mtu;
 }

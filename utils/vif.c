@@ -46,7 +46,8 @@
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
-static int if_kindex = -1, vrf_id, vr_ifindex = -1, if_pmdindex = -1, vr_addindex = -1;
+static int if_kindex = -1, vrf_id, vr_ifindex = -1;
+static int if_pmdindex = -1, vif_index = -1;
 static bool need_xconnect_if = false;
 static int if_xconnect_kindex = -1;
 static short vlan_id = -1;
@@ -54,8 +55,9 @@ static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
-static int vrf_set, mac_set, delete_set, policy_set, pmd_set, addindex_set;
+static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set;
 static int xconnect_set, vhost_phys_set;
+static int transport_type;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -184,6 +186,7 @@ vr_interface_req_process(void *s)
     char name[50];
     vr_interface_req *req = (vr_interface_req *)s;
     unsigned int printed = 0;
+    int platform = get_platform();
 
     if (add_set)
         vr_ifindex = req->vifr_idx;
@@ -194,15 +197,24 @@ vr_interface_req_process(void *s)
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
     for (; printed < 12; printed++)
         printf(" ");
+
     if (req->vifr_flags & VIF_FLAG_PMD) {
         if (req->vifr_type == VIF_TYPE_HOST)
             printf("PMD: %s", req->vifr_os_idx ?
                 if_indextoname(req->vifr_os_idx, name): "NULL");
 		else
             printf("PMD: %d", req->vifr_os_idx);
-	} else
-        printf("OS: %s", req->vifr_os_idx ?
-            if_indextoname(req->vifr_os_idx, name): "NULL");
+	} else {
+        if ((platform == DPDK_PLATFORM) &&
+                (req->vifr_type == VIF_TYPE_PHYSICAL)) {
+            printf("PCI: %d:%d:%d.%d",
+                    (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
+                    (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+        } else {
+            printf("OS: %s", req->vifr_os_idx ?
+                    if_indextoname(req->vifr_os_idx, name): "NULL");
+        }
+    }
 
     if (req->vifr_type == VIF_TYPE_PHYSICAL) {
         if (req->vifr_speed >= 0) {
@@ -428,8 +440,8 @@ op_retry:
         intf_req.vifr_os_idx = if_kindex;
         if (vr_ifindex < 0)
             vr_ifindex = if_kindex;
-        if (addindex_set)
-	    intf_req.vifr_idx = vr_addindex;
+        if (vindex_set)
+            intf_req.vifr_idx = vif_index;
         else
             intf_req.vifr_idx = vr_ifindex;
         intf_req.vifr_rid = 0;
@@ -515,13 +527,12 @@ enum if_opt_index {
     DHCP_OPT_INDEX,
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
-    ADDINDEX_OPT_INDEX,
+    VINDEX_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
     [ADD_OPT_INDEX]         =   {"add",         required_argument,  &add_set,           1},
-    [ADDINDEX_OPT_INDEX]    =   {"id",          required_argument,  &addindex_set,      1},
     [CREATE_OPT_INDEX]      =   {"create",      required_argument,  &create_set,        1},
     [GET_OPT_INDEX]         =   {"get",         required_argument,  &get_set,           1},
     [LIST_OPT_INDEX]        =   {"list",        no_argument,        &list_set,          1},
@@ -538,6 +549,7 @@ static struct option long_options[] = {
     [XCONNECT_OPT_INDEX]    =   {"xconnect",    required_argument,  &xconnect_set,      1},
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
+    [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,      1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -554,7 +566,7 @@ parse_long_opts(int option_index, char *opt_arg)
         strncpy(if_name, opt_arg, sizeof(if_name));
         if_kindex = if_nametoindex(opt_arg);
         if (isdigit(opt_arg[0]))
-            if_pmdindex = strtol(opt_arg, NULL, 10);
+            if_pmdindex = strtol(opt_arg, NULL, 0);
         vr_op = SANDESH_OP_ADD;
         break;
 
@@ -588,8 +600,8 @@ parse_long_opts(int option_index, char *opt_arg)
             Usage();
         break;
 
-    case ADDINDEX_OPT_INDEX:
-        vr_addindex = strtoul(opt_arg, NULL, 0);
+    case VINDEX_OPT_INDEX:
+        vif_index = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
         break;
@@ -608,8 +620,25 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case TYPE_OPT_INDEX:
         vr_if_type = vr_get_if_type(optarg);
-        if (vr_if_type == VIF_TYPE_HOST)
+        switch (vr_if_type) {
+        case VIF_TYPE_HOST:
+            transport_type = VIF_TRANSPORT_ETH;
             need_xconnect_if = true;
+            break;
+
+        case VIF_TYPE_PHYSICAL:
+            transport_type = VIF_TRANSPORT_ETH;
+            break;
+
+        case VIF_TYPE_VIRTUAL:
+            transport_type = VIF_TRANSPORT_VIRTUAL;
+            break;
+
+        default:
+            transport_type = VIF_TRANSPORT_VIRTUAL;
+            break;
+        }
+
         break;
 
     case SET_OPT_INDEX:
@@ -781,8 +810,8 @@ main(int argc, char *argv[])
                 break;
 
             case 'i':  
-                addindex_set = 1;
-                parse_long_opts(ADDINDEX_OPT_INDEX, NULL);
+                vindex_set = 1;
+                parse_long_opts(VINDEX_OPT_INDEX, NULL);
                 break;
 
             case 0:

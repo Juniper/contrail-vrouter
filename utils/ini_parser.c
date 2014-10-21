@@ -217,3 +217,21 @@ get_protocol()
     }
     return NETLINK_GENERIC;
 }
+
+int
+get_platform(void)
+{
+    const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
+
+    if (platform) {
+        if (!strcmp(platform, PLATFORM_DPDK))
+            return DPDK_PLATFORM;
+        else if (!strcmp(platform, PLATFORM_NIC))
+            return NIC_PLATFORM;
+        else
+            return LINUX_PLATFORM;
+    }
+
+    return LINUX_PLATFORM;
+}
+

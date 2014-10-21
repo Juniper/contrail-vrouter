@@ -764,7 +764,8 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m, unsigned short over
             if (router->vr_eth_if == NULL)
                 return;
 
-            port_id = router->vr_eth_if->vif_os_idx;
+            port_id = (((struct vr_dpdk_ethdev *)(router->vr_eth_if->vif_os))->
+                    ethdev_port_id);
             rte_eth_dev_get_mtu(port_id, &mtu);
 
             max_mss = mtu - (overlay_len + sizeof(struct vr_ip) +
