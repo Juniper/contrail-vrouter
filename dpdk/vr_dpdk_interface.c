@@ -282,7 +282,7 @@ dpdk_agent_if_add(struct vr_interface *vif)
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
-    if (vif_is_fabric(vif) || vif_is_tap(vif)) {
+    if (vif_is_fabric(vif)) {
         return dpdk_fabric_if_add(vif);
     } else if (vif_is_virtual(vif)) {
         return dpdk_virtual_if_add(vif);
