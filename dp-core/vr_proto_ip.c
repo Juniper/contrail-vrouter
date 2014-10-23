@@ -113,6 +113,8 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     int family = AF_INET, status, encap_len = 0;
     short plen;
     uint32_t rt_prefix[4];
+    struct vr_eth *eth_ptr;
+    uint8_t eth_smac[6], eth_hdr_size = 18;
 
     if (pkt->vp_flags & VP_FLAG_MULTICAST) { 
         return vr_mcast_forward(router, vrf, pkt, fmd);
@@ -156,7 +158,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
 
     if (vif) {
         if (vif->vif_type == VIF_TYPE_PHYSICAL) {
-            encap_len = sizeof(struct vr_eth) + sizeof(struct vr_ip)
+            encap_len = eth_hdr_size + sizeof(struct vr_ip)
                                      + sizeof(struct vr_udp) +sizeof(unsigned int);
         }
             
@@ -169,11 +171,17 @@ vr_forward(struct vrouter *router, unsigned short vrf,
            /* Handle PMTU for inet6 */
            if (vif->vif_mtu < (sizeof(struct vr_ip6)+plen+encap_len)) {
                /*Send ICMP too big message */
-               if (pkt->vp_data < (sizeof(struct vr_ip6) + sizeof(struct vr_icmp))) {
-                   /* Not enough head room to add ip6/icmpv6 headers*/
+               if (pkt->vp_data < (sizeof(struct vr_eth) + sizeof(struct vr_ip6) + 
+                                                           sizeof(struct vr_icmp))) {
+                   /* Not enough head room to add eth/ip6/icmpv6 headers*/
                    vr_pfree(pkt, VP_DROP_PUSH);
                    return 0;
                }
+
+               /* Cache the Ethernet source MAC */
+               eth_ptr = (struct vr_eth*)((char*)ip6 - sizeof(struct vr_eth));
+               memcpy(&eth_smac, eth_ptr->eth_smac, VR_ETHER_ALEN);
+
                icmph = (struct vr_icmp*) pkt_push(pkt, sizeof(struct vr_icmp));
                icmph->icmp_type = VR_ICMP6_TYPE_PKT_TOO_BIG; 
                icmph->icmp_code = 0;
@@ -192,7 +200,8 @@ vr_forward(struct vrouter *router, unsigned short vrf,
                
                if (pkt->vp_if->vif_mtu >= (plen + 2*sizeof(struct vr_ip6) 
                                                     + sizeof(struct vr_icmp))) {
-                   outer_ip6->ip6_plen = htons(plen + sizeof(struct vr_ip6) + sizeof(struct vr_icmp));
+                   outer_ip6->ip6_plen = htons(plen + sizeof(struct vr_ip6) + 
+                                                      sizeof(struct vr_icmp));
                } else {
                    /* TODO: Chop the packet at the tail for the added header*/
                }
@@ -201,11 +210,17 @@ vr_forward(struct vrouter *router, unsigned short vrf,
                icmph->icmp_csum = ~(vr_icmp6_checksum(outer_ip6, 
                                     sizeof(struct vr_ip6) + sizeof(struct vr_icmp)));
 
-               /* Update packet pointers, perform route lookup and forward */
-               pkt_set_network_header(pkt, pkt->vp_data);
 
-               memcpy(rt.rtr_req.rtr_prefix, outer_ip6->ip6_dst, 16);
-               nh = vr_inet_route_lookup(vrf, &rt, pkt);
+               /* Update Ethernet headr */
+               eth_ptr = (struct vr_eth*) pkt_push(pkt, sizeof(struct vr_eth));
+               memcpy(eth_ptr->eth_dmac, &eth_smac, VR_ETHER_ALEN);
+               memcpy(eth_ptr->eth_smac, pkt->vp_if->vif_mac, VR_ETHER_ALEN);
+               eth_ptr->eth_proto = htons(0x86DD);
+  
+               /* Respond back directly*/
+               pkt->vp_if->vif_tx(pkt->vp_if, pkt);
+             
+               return 0;
            }
        }
     }
