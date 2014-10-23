@@ -57,13 +57,15 @@ dpdk_vrouter_src = [ 'dpdk_vrouter.c',
                      'vr_uvhost_client.c'
                    ]
 
-dpdk_vrouter = env.Program('dpdk_vrouter', dpdk_vrouter_src)
+dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_vrouter_src)
 env.Depends(dpdk_vrouter, dpdk_lib)
 
 if GetOption('clean'):
     os.system('cd ' + make_dir + ';' + make_cmd + ' clean')
 # to make sure that all are built when you do 'scons' @ the top level
 env.Default(dpdk_vrouter)
+
+env.Alias('install', env.Install(env['INSTALL_BIN'], dpdk_vrouter))
 
 # Local Variables:
 # mode: python
