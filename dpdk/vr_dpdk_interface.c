@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <net/if.h>
+#include <linux/vhost.h>
 
 #include "vr_queue.h"
 #include "vr_dpdk.h"
@@ -40,14 +41,12 @@ dpdk_virtual_if_add(struct vr_interface *vif)
     nrxqs = vr_dpdk_virtio_nrxqs(vif);
     ntxqs = vr_dpdk_virtio_ntxqs(vif);
 
-#if 0
     ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
                nrxqs, &vr_dpdk_virtio_rx_queue_init,
                ntxqs, &vr_dpdk_virtio_tx_queue_init); 
     if (ret) {
         return ret;
     }
-#endif
 
     ret = vr_netlink_uvhost_vif_add(vif->vif_name, vif->vif_idx, 
                                     nrxqs, ntxqs);

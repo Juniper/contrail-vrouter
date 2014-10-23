@@ -89,6 +89,10 @@
 #define VR_DPDK_RING_TX_BURST_SZ    32
 /* Number of mbufs in TX ring */
 #define VR_DPDK_TX_RING_SZ          (VR_DPDK_MAX_BURST_SZ*2)
+/* Number of mbufs in virtio mempool */
+#define VR_DPDK_VIRTIO_MEMPOOL_SZ   8192
+/* How many objects (mbufs) to keep in per-lcore virtio mempool cache */
+#define VR_DPDK_VIRTIO_MEMPOOL_CACHE_SZ (VR_DPDK_VIRTIO_RX_BURST_SZ*8)
 /* Number of mbufs in RSS mempool */
 #define VR_DPDK_RSS_MEMPOOL_SZ      8192
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
@@ -216,6 +220,8 @@ struct vr_dpdk_ethdev {
 };
 
 struct vr_dpdk_global {
+    /* Pointer to virtio memory pool */
+    struct rte_mempool *virtio_mempool;
     /* Pointer to RSS memory pool */
     struct rte_mempool *rss_mempool;
     /* Number of free memory pools */

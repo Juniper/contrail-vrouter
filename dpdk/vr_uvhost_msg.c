@@ -18,6 +18,8 @@
 #include "vr_uvhost_msg.h"
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
+#include "vr_dpdk.h"
+#include "vr_dpdk_virtio.h"
 
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
 
@@ -134,9 +136,15 @@ vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    vru_cl->vruc_vvs[vring_idx].index = vum_msg->state.index;
-    vru_cl->vruc_vvs[vring_idx].num = vum_msg->state.num;
-    
+    if (vr_dpdk_set_ring_num_desc(vru_cl->vruc_idx, vring_idx,
+                                  vum_msg->state.num)) {
+        vr_uvhost_log("Could set number of vring descriptors in vhost server"
+                      " %d %d %d\n",
+                      vru_cl->vruc_idx, vring_idx, 
+                      vum_msg->state.num);
+        return -1;
+    }
+
     return 0;
 }
 
@@ -177,6 +185,9 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
 {
     struct vhost_vring_addr *vaddr;
     unsigned int vring_idx;
+    struct vring_desc *vrucv_desc;
+    struct vring_avail *vrucv_avail;
+    struct vring_used *vrucv_used;
 
     vaddr = &vru_cl->vruc_msg.addr;
 
@@ -187,12 +198,32 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    vru_cl->vruc_vvr[vring_idx].vrucv_desc = (struct vring_desc *)
+    vrucv_desc = (struct vring_desc *)
         vr_uvhm_map_addr(vru_cl, vaddr->desc_user_addr);
-    vru_cl->vruc_vvr[vring_idx].vrucv_avail = (struct vring_avail *)
+    vrucv_avail = (struct vring_avail *)
         vr_uvhm_map_addr(vru_cl, vaddr->avail_user_addr);
-    vru_cl->vruc_vvr[vring_idx].vrucv_used = (struct vring_used *)
+    vrucv_used = (struct vring_used *)
         vr_uvhm_map_addr(vru_cl, vaddr->used_user_addr);
+
+    if (vr_dpdk_set_vring_addr(vru_cl->vruc_idx, vring_idx, vrucv_desc,
+                               vrucv_avail, vrucv_used)) {
+        vr_uvhost_log("Couldn't set vring addresses in vhost server, %d %d\n",
+                      vru_cl->vruc_idx, vring_idx);
+        return -1;
+    }
+
+    /*
+     * Now that the addresses have been set, the virtio queue is ready for
+     * forwarding.
+     *
+     * TODO - need a memory barrier here.
+     */
+    if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
+        vr_uvhost_log("Couldn't set virtio queue ready in vhost server, "
+                      "%d %d\n",
+                      vru_cl->vruc_idx, vring_idx);
+        return -1;
+    }
 
     return 0;
 }
@@ -218,14 +249,19 @@ vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    vru_cl->vruc_vvr[vring_idx].vrucv_base_idx = vum_msg->state.num;
+    if (vr_dpdk_virtio_set_vring_base(vru_cl->vruc_idx, vring_idx,
+                                      vum_msg->state.num)) {
+        vr_uvhost_log("Couldn't set vring base in vhost server %d %d %d\n",
+                      vru_cl->vruc_idx, vring_idx, vum_msg->state.num);
+        return -1;
+    } 
 
     return 0;
 }
 
 /*
  * vr_uvhm_get_vring_base - handles a VHOST_USER_GET_VRING_BASE messsage
- * from the vhost user client to get the based index of a vring.
+ * from the vhost user client to get the base index of a vring.
  *
  * Returns 0 on success, -1 otherwise.
  */
@@ -244,7 +280,13 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    vum_msg->state.num = vru_cl->vruc_vvr[vring_idx].vrucv_base_idx; 
+    if (vr_dpdk_virtio_get_vring_base(vru_cl->vruc_idx, vring_idx, 
+                                     &vum_msg->state.num)) {
+        vr_uvhost_log("Couldn't get vring base in vhost server %d %d\n",
+                      vru_cl->vruc_idx, vring_idx);
+        return -1;
+    }
+
     vum_msg->size = sizeof(struct vhost_vring_state);
 
     return 0;
@@ -529,6 +571,8 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
         return -1;
     }
 
+    vr_dpdk_virtio_set_vif_client(cidx, NULL);
+
     vru_cl = vr_uvhost_get_client(cidx);
     if (vru_cl == NULL) {
         vr_uvhost_log("Couldn't find vhost client %d for deletion\n",
@@ -615,6 +659,8 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
                       sun.sun_path);
         goto error;
     }
+
+    vr_dpdk_virtio_set_vif_client(msg->vrnu_vif_idx, vru_cl);
 
     return 0;
 

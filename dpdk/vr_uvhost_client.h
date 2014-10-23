@@ -22,13 +22,6 @@ typedef struct vr_uvh_client_mem_region {
     uint64_t vrucmr_mmap_addr;
 } vr_uvh_client_mem_region_t; 
 
-typedef struct vr_uvh_client_vring {
-    struct vring_desc *vrucv_desc;
-    struct vring_avail *vrucv_avail;
-    struct vring_used *vrucv_used;
-    unsigned int vrucv_base_idx;
-} vr_uvh_client_vring_t;
-
 typedef struct vr_uvh_client {
     int vruc_fd;
     char vruc_path[VR_UNIX_PATH_MAX];
@@ -38,17 +31,11 @@ typedef struct vr_uvh_client {
     int vruc_num_fds_sent;
     int vruc_num_mem_regions;
     vr_uvh_client_mem_region_t vruc_mem_regions[VHOST_MEMORY_MAX_NREGIONS];
-    struct vhost_vring_state vruc_vvs[VHOST_CLIENT_MAX_VRINGS];
     VhostUserMsg vruc_msg;
 
     unsigned int vruc_idx;
     unsigned int vruc_nrxqs;
     unsigned int vruc_ntxqs;
-
-    /*
-     * TODO - the following fields need to tied to the vif.
-     */
-    vr_uvh_client_vring_t vruc_vvr[VHOST_CLIENT_MAX_VRINGS]; 
 } vr_uvh_client_t;
 
 void vr_uvhost_client_init(void);
