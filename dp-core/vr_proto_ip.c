@@ -209,7 +209,9 @@ vr_forward(struct vrouter *router, unsigned short vrf,
                /* Calculate ICMP6 checksum */
                icmph->icmp_csum = ~(vr_icmp6_checksum(outer_ip6, 
                                     sizeof(struct vr_ip6) + sizeof(struct vr_icmp)));
-
+ 
+               /* Update network header pointer */
+               pkt_set_network_header(pkt, pkt->vp_data);
 
                /* Update Ethernet headr */
                eth_ptr = (struct vr_eth*) pkt_push(pkt, sizeof(struct vr_eth));
