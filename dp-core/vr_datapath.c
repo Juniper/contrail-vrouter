@@ -459,6 +459,14 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
     if (!(vif->vif_flags & VIF_FLAG_L2_ENABLED))
         return 0;
 
+
+    if (vif_is_vlan(vif)) {
+        if (vr_untag_pkt(pkt)) {
+            vr_pfree(pkt, VP_DROP_PULL);
+            return 1;
+        }
+    }
+
     /* Even in L2 mode we will have to adjust the MSS for TCP*/
     if (pkt->vp_type == VP_TYPE_IP) {
         if (!pkt_get_network_header_off(pkt)) {
@@ -481,13 +489,13 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
                 return 1;
             }
         }
+        /* Restore back the L2 headers */
+        if (!pkt_push(pkt, pull_len)) {
+            vr_pfree(pkt, VP_DROP_PULL);
+            return 1;
+        }
     }
         
-    /* Restore back the L2 headers */
-    if (!pkt_push(pkt, pull_len)) {
-        vr_pfree(pkt, VP_DROP_PULL);
-        return 1;
-    }
 
     /* Mark the packet as L2 */
     pkt->vp_type = VP_TYPE_L2;
@@ -537,5 +545,46 @@ vr_trap_l2_well_known_packets(unsigned short vrf, struct vr_packet *pkt,
         return 1;   
     }
 
+    return 0;
+}
+
+
+int
+vr_untag_pkt(struct vr_packet *pkt)
+{
+    struct vr_eth *eth;
+    unsigned char *new_eth;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (eth->eth_proto != htons(VR_ETH_PROTO_VLAN))
+        return 0;
+
+    new_eth = pkt_pull(pkt, VR_VLAN_HLEN);
+    if (!new_eth)
+        return -1;
+
+    memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
+    return 0;
+}
+
+
+int
+vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
+{
+    struct vr_eth *new_eth, *eth;
+    unsigned short *vlan_tag;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN))
+        return 0;
+
+    new_eth = (struct vr_eth *)pkt_push(pkt, VR_VLAN_HLEN);
+    if (!new_eth)
+        return -1;
+
+    memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
+    new_eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
+    vlan_tag = (unsigned short *)(new_eth + 1);
+    *vlan_tag = htons(vlan_id);
     return 0;
 }
