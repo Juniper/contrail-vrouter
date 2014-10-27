@@ -560,6 +560,7 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
             }
+
             pkt_vrf = dir_nh->nh_vrf;
 
         } else if (dir_nh->nh_flags & NH_FLAG_COMPOSITE_EVPN) {
@@ -574,6 +575,7 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
             }
+
             pkt_vrf = dir_nh->nh_vrf;
 
         } else {
@@ -1441,6 +1443,7 @@ nh_encap_l2(unsigned short vrf, struct vr_packet *pkt,
 {
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
+    int drop_reason = VP_DROP_PULL;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
     if (stats)
@@ -1453,9 +1456,21 @@ nh_encap_l2(unsigned short vrf, struct vr_packet *pkt,
     pkt->vp_type = VP_TYPE_L2;
 
     vif = nh->nh_dev;
-    vif->vif_tx(vif, pkt);
 
+    if (vif_is_vlan(vif)) {
+        if (vr_tag_pkt(pkt, vif->vif_ovlan_id)) {
+            drop_reason = VP_DROP_PUSH;
+            goto drop;
+        }
+    }
+
+    vif->vif_tx(vif, pkt);
     return 0;
+
+drop:
+    vr_pfree(pkt, drop_reason);
+    return 0;
+
 }
 
 static int

@@ -153,6 +153,8 @@ vr_if_flags(int flags)
         strcat(flag_string, "L2");
     if (flags & VIF_FLAG_DHCP_ENABLED)
         strcat(flag_string, "D");
+    if (flags & VIF_FLAG_PROMISCOUS)
+        strcat(flag_string, "Pr");
 
 
     return flag_string;

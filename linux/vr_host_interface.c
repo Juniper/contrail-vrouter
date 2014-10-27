@@ -1150,7 +1150,8 @@ linux_rx_handler(struct sk_buff **pskb)
         return RX_HANDLER_CONSUMED;
 
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
-        if (skb->pkt_type == PACKET_OTHERHOST) {
+        if ((!(vif->vif_flags & VIF_FLAG_PROMISCOUS)) &&
+                (skb->pkt_type == PACKET_OTHERHOST)) {
             vif_drop_pkt(vif, pkt, true);
             return RX_HANDLER_CONSUMED;
         }
