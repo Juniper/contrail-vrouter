@@ -539,3 +539,64 @@ vr_trap_l2_well_known_packets(unsigned short vrf, struct vr_packet *pkt,
 
     return 0;
 }
+
+
+int
+vr_untag_pkt(struct vr_packet *pkt)
+{
+    struct vr_eth *eth;
+    unsigned char *new_eth;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (eth->eth_proto != htons(VR_ETH_PROTO_VLAN))
+        return 0;
+
+    new_eth = pkt_pull(pkt, VR_VLAN_HLEN);
+    if (!new_eth)
+        return -1;
+
+    memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
+    return 0;
+}
+
+
+int
+vr_replace_pkt_tag(struct vr_packet *pkt, unsigned short new_vlan_id)
+{
+    struct vr_eth *eth;
+    unsigned short *vlan_tag;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (eth->eth_proto != htons(VR_ETH_PROTO_VLAN))
+        return 0;
+
+    /* Ensure there is enought head space to look into the vlan header */
+    if (pkt_head_len(pkt) < (VR_ETHER_HLEN + VR_VLAN_HLEN))
+        return -1;
+
+    vlan_tag = (unsigned short *)(eth + 1);
+    *vlan_tag = htons(new_vlan_id);
+
+    return 0;
+}
+
+int
+vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
+{
+    struct vr_eth *new_eth, *eth;
+    unsigned short *vlan_tag;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (eth->eth_proto != htons(VR_ETH_PROTO_VLAN))
+        return 0;
+
+    new_eth = (struct vr_eth *)pkt_push(pkt, VR_VLAN_HLEN);
+    if (!new_eth)
+        return -1;
+
+    memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
+    new_eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
+    vlan_tag = (unsigned short *)(new_eth + 1);
+    *vlan_tag = htons(vlan_id);
+    return 0;
+}
