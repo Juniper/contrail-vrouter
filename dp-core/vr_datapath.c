@@ -20,7 +20,7 @@ int vr_l3_input(unsigned short, struct vr_packet *,
                               struct vr_forwarding_md *);
 int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
 
-extern unsigned int vr_route_flags(unsigned int, unsigned int);
+extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 
 static inline bool
 vr_grat_arp(struct vr_arp *sarp)
@@ -81,11 +81,6 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
             return PKT_ARP_PROXY;
     }
 
-    if (vr_grat_arp(arp)) {
-        if (vif->vif_type == VIF_TYPE_PHYSICAL)
-            return PKT_ARP_TRAP_XCONNECT;
-        return PKT_ARP_DROP;
-    }
 
     rt.rtr_req.rtr_vrf_id = vif->vif_vrf;
     rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
@@ -97,6 +92,18 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
     rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
+
+    if (vr_grat_arp(arp)) {
+        if (vif->vif_type == VIF_TYPE_PHYSICAL)
+            return PKT_ARP_TRAP_XCONNECT;
+        if (vif_is_virtual(vif)) {
+            if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_TRAP_FLAG) {
+                return PKT_ARP_TRAP;
+            }
+        }
+        return PKT_ARP_DROP;
+    }
+
     if (!nh || nh->nh_type == NH_DISCARD)
         return PKT_ARP_DROP;
 
@@ -188,6 +195,10 @@ vr_handle_arp_request(unsigned short vrf, struct vr_arp *sarp,
         }
         vr_trap(pkt, vrf, AGENT_TRAP_ARP, NULL);
         break;
+    case PKT_ARP_TRAP:
+        vr_preset(pkt);
+        vr_trap(pkt, vrf, AGENT_TRAP_ARP, NULL);
+        break;
     case PKT_ARP_FLOOD:
         if (nh) {
             nh_output(vrf, pkt, nh, fmd);
@@ -213,14 +224,23 @@ vr_handle_arp_reply(unsigned short vrf, struct vr_arp *sarp,
 {
     struct vr_interface *vif = pkt->vp_if;
     struct vr_packet *cloned_pkt;
+    unsigned int rt_flags;
 
     if (vif_mode_xconnect(vif) || vif->vif_type == VIF_TYPE_HOST)
         return vif_xconnect(vif, pkt);
 
     if (vif->vif_type != VIF_TYPE_PHYSICAL) {
+        if (vif_is_virtual(vif)) {
+            rt_flags = vr_inet_route_flags(vrf, sarp->arp_dpa);
+            if (rt_flags & VR_RT_ARP_TRAP_FLAG) {
+                vr_preset(pkt);
+                return vr_trap(pkt, vrf, AGENT_TRAP_ARP, NULL);
+            }
+        }
         vr_pfree(pkt, VP_DROP_INVALID_IF);
         return 0;
     }
+
 
     cloned_pkt = vr_pclone(pkt);
     if (cloned_pkt) {
@@ -284,9 +304,6 @@ vr_arp_input(unsigned short vrf, struct vr_packet *pkt,
         break;
 
     case VR_ARP_OP_REPLY:
-        /* ARP reply from virual interface need not be processed */
-        if (vif_is_virtual(pkt->vp_if))
-            return 0;
         vr_handle_arp_reply(vrf, &sarp, pkt, fmd);
         break;
 
