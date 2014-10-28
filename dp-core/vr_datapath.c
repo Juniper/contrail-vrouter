@@ -186,6 +186,8 @@ vr_handle_arp_request(unsigned short vrf, struct vr_arp *sarp,
             vr_preset(cloned_pkt);
             vif_xconnect(vif, cloned_pkt);
         }
+        /* Fall through */
+    case PKT_ARP_TRAP:
         vr_trap(pkt, vrf, AGENT_TRAP_ARP, NULL);
         break;
     case PKT_ARP_FLOOD:
@@ -271,6 +273,9 @@ vr_arp_input(unsigned short vrf, struct vr_packet *pkt,
              struct vr_forwarding_md *fmd)
 {
     struct vr_arp sarp;
+    struct vr_route_req rt;
+    unsigned int rt_prefix;
+    struct vr_nexthop *nh;
 
     if (!pkt_get_network_header_off(pkt)) {
         vr_pfree(pkt, VP_DROP_INVALID_PACKET);
@@ -285,8 +290,23 @@ vr_arp_input(unsigned short vrf, struct vr_packet *pkt,
 
     case VR_ARP_OP_REPLY:
         /* ARP reply from virual interface need not be processed */
-        if (vif_is_virtual(pkt->vp_if))
+        if (vif_is_virtual(pkt->vp_if)) {
+
+            memset(&rt, 0, sizeof(rt));
+            rt.rtr_req.rtr_vrf_id = vrf;
+            rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
+            *(uint32_t*)rt.rtr_req.rtr_prefix = (sarp.arp_dpa);
+            rt.rtr_req.rtr_prefix_size = 4;
+            rt.rtr_req.rtr_prefix_len = 32;
+
+            nh = vr_inet_route_lookup(vrf, &rt, NULL);
+            if (nh && nh->nh_type != NH_DISCARD &&
+                    (rt.rtr_req.rtr_label_flags & VR_RT_ARP_TRAP_FLAG)) {
+                vr_trap(pkt, vrf, AGENT_TRAP_ARP, NULL);
+                return 1;
+            }
             return 0;
+        }
         vr_handle_arp_reply(vrf, &sarp, pkt, fmd);
         break;
 
