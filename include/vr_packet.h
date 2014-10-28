@@ -75,15 +75,21 @@
  * used only as an aid in fragmentation
  */
 #define VP_TYPE_NULL            0
-#define VP_TYPE_IP              1
-#define VP_TYPE_IPOIP           2
+
+/* keep all the l3 types between ARP & IP6 */
+#define VP_TYPE_ARP             1
+#define VP_TYPE_IP              2
 #define VP_TYPE_IP6             3
-#define VP_TYPE_L2              4
-#define VP_TYPE_L2OIP           5
-#define VP_TYPE_VXLAN           6
-#define VP_TYPE_AGENT           7
-#define VP_TYPE_ARP             8
-#define VP_TYPE_IP6OIP          9
+
+#define VP_TYPE_IPOIP           4
+#define VP_TYPE_IP6OIP          5
+
+/* keep all the L2 packets within VP_TYPE_L2 and VP_TYPE_VXLAN */
+#define VP_TYPE_L2              6
+#define VP_TYPE_L2OIP           7
+#define VP_TYPE_VXLAN           8
+
+#define VP_TYPE_AGENT           9
 #define VP_TYPE_MAX             10
 
 /*
@@ -228,6 +234,16 @@ struct vr_packet {
     unsigned char vp_type;
     unsigned char vp_ttl;
 };
+
+
+static inline bool
+pkt_is_l2(struct vr_packet *pkt)
+{
+    if ((pkt->vp_type >= VP_TYPE_L2) &&
+            (pkt->vp_type <= VP_TYPE_VXLAN))
+        return true;
+    return false;
+}
 
 struct vr_packet_node {
     struct vr_list_node pl_node;
