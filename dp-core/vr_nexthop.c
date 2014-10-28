@@ -152,9 +152,12 @@ nh_resolve(unsigned short vrf, struct vr_packet *pkt,
 }
 
 static int
-nh_vxlan_vrf(unsigned short vrf, struct vr_packet *pkt,
+nh_vrf_translate(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
+    if (!pkt_is_l2(pkt))
+        return vr_forward(nh->nh_router, nh->nh_vrf, pkt, fmd);
+
     return vr_bridge_input(nh->nh_router, nh->nh_vrf, pkt, fmd);
 }
 
@@ -1619,9 +1622,9 @@ nh_rcv_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 }
 
 static int
-nh_vxlan_vrf_add(struct vr_nexthop *nh, vr_nexthop_req *req)
+nh_vrf_translate_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    nh->nh_reach_nh = nh_vxlan_vrf;
+    nh->nh_reach_nh = nh_vrf_translate;
     return 0;
 }
 
@@ -2065,8 +2068,8 @@ vr_nexthop_add(vr_nexthop_req *req)
             ret = nh_composite_add(nh, req);
             break;
 
-        case NH_VXLAN_VRF:
-            ret = nh_vxlan_vrf_add(nh, req);
+        case NH_VRF_TRANSLATE:
+            ret = nh_vrf_translate_add(nh, req);
             break;
 
         default:

@@ -25,9 +25,11 @@ enum nexthop_type {
     NH_RESOLVE,
     NH_DISCARD,
     NH_COMPOSITE,
-    NH_VXLAN_VRF,
+    NH_VRF_TRANSLATE,
     NH_MAX,
 };
+
+#define NH_VXLAN_VRF                        NH_VRF_TRANSLATE
 
 #define NH_FLAG_VALID                       0x00001
 #define NH_FLAG_POLICY_ENABLED              0x00002

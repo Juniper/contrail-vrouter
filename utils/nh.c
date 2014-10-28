@@ -70,8 +70,8 @@ nh_type(uint32_t type)
            return "Resolve";
        case NH_COMPOSITE:
            return "Composite";
-       case NH_VXLAN_VRF:
-           return "Vxlan Vrf";
+       case NH_VRF_TRANSLATE:
+           return "Vrf_Translate";
        default:
            return "Invalid";
     }
@@ -222,7 +222,7 @@ vr_nexthop_req_process(void *s_req)
         }
     }
 
-    if (req->nhr_type == NH_VXLAN_VRF) {
+    if (req->nhr_type == NH_VRF_TRANSLATE) {
         printf("\tVrf:%d\n", req->nhr_vrf);
     }
 
@@ -687,7 +687,7 @@ validate_options()
                 opt_set(LBL_OPT_IND);
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
-            } else if (type != NH_VXLAN_VRF) {
+            } else if (type != NH_VRF_TRANSLATE) {
                 cmd_usage();
             }
             break;

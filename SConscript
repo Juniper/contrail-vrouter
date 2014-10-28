@@ -66,8 +66,9 @@ if sys.platform != 'darwin':
         BUILD_TARGETS.append('vrouter/uvrouter')
         BUILD_TARGETS.append('vrouter/utils')
 
-    kern = env.Command('vrouter.ko', makefile, make_cmd, chdir=dp_dir)
+    kern = env.Command('vrouter.ko', None, make_cmd, chdir=dp_dir)
     env.Default(kern)
+    env.AlwaysBuild(kern)
 
     env.Depends(kern, env.Install(
                 '#build/kbuild/sandesh/gen-c',
