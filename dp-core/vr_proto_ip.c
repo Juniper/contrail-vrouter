@@ -657,3 +657,23 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
 
     return 1;
 }
+
+
+unsigned int
+vr_inet_route_flags(unsigned int vrf, unsigned int ip)
+{
+    struct vr_route_req rt;
+    uint32_t rt_prefix;
+
+    memset(&rt, 0, sizeof(rt));
+    rt.rtr_req.rtr_vrf_id = vrf;
+    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
+    *(uint32_t*)rt.rtr_req.rtr_prefix = ntohl(ip);
+    rt.rtr_req.rtr_prefix_size = 4;
+    rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
+
+    (void)vr_inet_route_lookup(vrf, &rt, NULL);
+
+    return rt.rtr_req.rtr_label_flags;
+}
+
