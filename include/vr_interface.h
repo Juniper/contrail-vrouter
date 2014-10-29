@@ -55,6 +55,7 @@
 #define VIF_FLAG_DHCP_ENABLED       0x100
 /* The physical interface corresponds to a vhost interface */
 #define VIF_FLAG_VHOST_PHYS         0x200
+#define VIF_FLAG_PROMISCOUS         0x400
 
 
 #define VIF_VRF_TABLE_ENTRIES       1024
