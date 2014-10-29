@@ -604,6 +604,14 @@ vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
+    if (vr_untag_pkt(pkt)) {
+        stats->vis_ierrors++;
+        vr_pfree(pkt, VP_DROP_PULL);
+        return 0;
+    }
+
+    vr_pset_data(pkt, pkt_head_space(pkt));
+
     return vr_virtual_input(vif->vif_vrf, vif, pkt, VLAN_ID_INVALID);
 }
 
@@ -617,6 +625,13 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     stats->vis_obytes += pkt_len(pkt);
     stats->vis_opackets++;
+
+    if (vif_is_vlan(vif) && vif->vif_ovlan_id) {
+        if (vr_tag_pkt(pkt, vif->vif_ovlan_id)) {
+            goto drop;
+        }
+    }
+
 
     pvif = vif->vif_parent;
     if (!pvif)
