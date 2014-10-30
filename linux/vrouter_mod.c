@@ -232,14 +232,18 @@ lh_preset(struct vr_packet *pkt)
     return;
 }
 
+
 static void
 lh_pset_data(struct vr_packet *pkt, unsigned short offset)
 {
+    unsigned int skb_head_len;
     struct sk_buff *skb;
+
     skb = vp_os_packet(pkt);
     skb->data = pkt->vp_head + offset;
-
-    return;
+    skb_head_len = skb_tail_pointer(skb) - skb->data;
+    skb->len = skb_head_len + skb->data_len;
+     return;
 }
 
 static unsigned int
