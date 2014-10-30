@@ -55,6 +55,8 @@
 #define VIF_FLAG_DHCP_ENABLED       0x100
 /* The physical interface corresponds to a vhost interface */
 #define VIF_FLAG_VHOST_PHYS         0x200
+/* untagged packets should be treated as packets with tag 0 */
+#define VIF_FLAG_NATIVE_VLAN_TAG    0x800
 
 
 #define VIF_VRF_TABLE_ENTRIES       1024

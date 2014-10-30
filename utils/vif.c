@@ -135,24 +135,36 @@ static char *
 vr_if_flags(int flags)
 {
     bzero(flag_string, sizeof(flag_string));
+
     if (flags & VIF_FLAG_POLICY_ENABLED)
         strcat(flag_string, "P");
+
     if (flags & VIF_FLAG_XCONNECT)
         strcat(flag_string, "X");
+
     if (flags & VIF_FLAG_SERVICE_IF)
         strcat(flag_string, "S");
+
     if (flags & VIF_FLAG_MIRROR_TX)
         strcat(flag_string, "Mt");
+
     if (flags & VIF_FLAG_MIRROR_RX)
         strcat(flag_string, "Mr");
+
     if (flags & VIF_FLAG_TX_CSUM_OFFLOAD)
         strcat(flag_string, "Tc");
+
     if (flags & VIF_FLAG_L3_ENABLED)
         strcat(flag_string, "L3");
+
     if (flags & VIF_FLAG_L2_ENABLED)
         strcat(flag_string, "L2");
+
     if (flags & VIF_FLAG_DHCP_ENABLED)
         strcat(flag_string, "D");
+
+    if (flags & VIF_FLAG_NATIVE_VLAN_TAG)
+        strcat(flag_string, "Vnt");
 
 
     return flag_string;

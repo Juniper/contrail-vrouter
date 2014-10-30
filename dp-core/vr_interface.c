@@ -768,6 +768,9 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif_mode_xconnect(vif))
         pkt->vp_flags |= VP_FLAG_TO_ME;
 
+    if (vif->vif_flags & VIF_FLAG_NATIVE_VLAN_TAG)
+        vlan_id = 0;
+
     if (vlan_id != VLAN_ID_INVALID && vlan_id < VLAN_ID_MAX) {
         if (vif->vif_btable) {
             sub_vif = vif_bridge_get_sub_interface(vif->vif_btable, vlan_id,
@@ -776,6 +779,7 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
             if (vif->vif_sub_interfaces)
                 sub_vif = vif->vif_sub_interfaces[vlan_id];
         }
+
         if (sub_vif)
             return sub_vif->vif_rx(sub_vif, pkt, VLAN_ID_INVALID);
     }
