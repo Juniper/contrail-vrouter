@@ -922,8 +922,8 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
 {
     struct vr_ip6 *ip6;
     struct vr_eth *eth;
-    unsigned int trap_res  = 0;
-    unsigned short *t_hdr, sport, dport, eth_off;
+    unsigned int trap_res  = 0, tag_size = 0;
+    unsigned short *t_hdr, sport, dport, eth_off, *eth_proto;
     struct vr_icmp *icmph;
     unsigned char *icmp_opt_ptr;
     int proxy = 0;
@@ -1018,12 +1018,25 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
                        ~(vr_icmp6_checksum(ip6, sizeof(struct vr_ip6) + 
                                                 sizeof(struct vr_icmp) + 24));
              
+             if (vif_is_vlan(vif)) {
+                 tag_size = 4;
+             }
+             eth = (struct vr_eth*) ((char*)ip6 - sizeof(struct vr_eth) - tag_size);
              /* Update Ethernet headr */
-             eth = (struct vr_eth*) ((char*)ip6 - sizeof(struct vr_eth));
              memcpy(eth->eth_dmac, eth->eth_smac, VR_ETHER_ALEN);
              memcpy(eth->eth_smac, vif->vif_mac, VR_ETHER_ALEN);
+             eth_proto = &eth->eth_proto;
+             if (vif_is_vlan(vif)) {
+                 if (vif->vif_ovlan_id) {
+                     *eth_proto = htons(VR_ETH_PROTO_VLAN);
+                     eth_proto++;
+                     *eth_proto = htons(vif->vif_ovlan_id);
+                     eth_proto++;
+                 }
+             }
+             *eth_proto = htons(0x86DD);
 
-             eth_off = pkt_get_network_header_off(pkt) - sizeof(struct vr_eth);
+             eth_off = pkt_get_network_header_off(pkt) - sizeof(struct vr_eth) - tag_size;
 
              pkt_set_data(pkt,eth_off);
 
