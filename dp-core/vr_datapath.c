@@ -22,6 +22,15 @@ vr_grat_arp(struct vr_arp *sarp)
     return false;
 }
 
+static int 
+vr_v6_prefix_is_ll(uint8_t prefix[])  
+{
+    if ((prefix[0] == 0xFE) && (prefix[1] == 0x80)) {
+        return true;
+    }
+    return false;
+}
+
 
 static int
 vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
@@ -504,6 +513,7 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
     struct vr_ip *iph;
     struct vr_ip6 *ip6;
     struct vr_udp *udph;
+    struct vr_icmp *icmph = NULL;
 
     if (vif_is_virtual(pkt->vp_if) &&
             (pkt->vp_flags & VP_FLAG_MULTICAST)) {
@@ -518,10 +528,25 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
             }
         } else { //IPv6
             ip6 = (struct vr_ip6 *)data;
+            // Bridge link-local traffic
+            if (vr_v6_prefix_is_ll(ip6->ip6_dst)) {
+                return false;
+            }
+
             // 0xFF02 is the multicast address used for NDP, DHCPv6 etc
             if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
-                return true;
+                /* 
+                 * Bridge neighbor solicit for link-local addresses 
+                 */
+                if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
+                    icmph = ((char *)ip6 + sizeof(struct vr_ip6));
+                }
+                if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL)
+                          && vr_v6_prefix_is_ll(&icmph->icmp_data)) {
+                    return false;
+                }
             }
+            return true;
         }
     }
 
