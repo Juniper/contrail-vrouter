@@ -757,11 +757,8 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     if (fe->fe_action == VR_FLOW_ACTION_HOLD) {
         if (vr_flow_queue_is_empty(router, fe)) {
             vr_trap_flow(router, fe, pkt, index);
-            return vr_enqueue_flow(fe, pkt, proto, fmd);
-        } else {
-            vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
-            return 0;
         }
+        return vr_enqueue_flow(fe, pkt, proto, fmd);
     }
 
     return vr_flow_action(router, fe, index, pkt, proto, fmd);
