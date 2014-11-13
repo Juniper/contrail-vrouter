@@ -1,0 +1,20 @@
+# ignore .o's generated in source tree
+dp-core/*.o
+dp-core/*.o.cmd
+linux/*.o.cmd
+linux/*.o
+
+# Not sure where this is generated
+.tmp_versions
+
+# vrouter module stuff
+.vrouter.ko.cmd
+.vrouter.mod.o.cmd
+.vrouter.o.cmd
+vrouter.ko
+vrouter.mod.c
+vrouter.mod.o
+vrouter.o
+
+Module.symvers
+modules.order
