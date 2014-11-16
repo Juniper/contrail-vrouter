@@ -1576,6 +1576,8 @@ nh_composite_mcast_validate(struct vr_nexthop *nh, vr_nexthop_req *req)
         if (tmp_nh && ((tmp_nh->nh_type != NH_COMPOSITE) ||
                  (!(tmp_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC)))) {
             for (i = 1; i < nh->nh_component_cnt; i++) {
+                if (!nh->nh_component_nh[i].cnh)
+                    continue;
                 if ((nh->nh_component_nh[i].cnh->nh_type == NH_COMPOSITE) && 
                         (nh->nh_component_nh[i].cnh->nh_flags & 
                                         NH_FLAG_COMPOSITE_FABRIC)) {
