@@ -59,12 +59,14 @@
 /* untagged packets should be treated as packets with tag 0 */
 #define VIF_FLAG_NATIVE_VLAN_TAG    0x800
 
+#define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
+#define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)
 
-#define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
-#define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
+#define VIF_ENCAP_TYPE_ETHER        1
+#define VIF_ENCAP_TYPE_L3           2
 
 struct vr_interface_stats {
     uint64_t vis_ibytes;
@@ -184,6 +186,7 @@ struct vr_host_interface_ops {
     int (*hif_get_settings)(struct vr_interface *,
             struct vr_interface_settings *);
     unsigned int (*hif_get_mtu)(struct vr_interface *);
+    unsigned short (*hif_get_encap)(struct vr_interface *);
 };
 
 extern int vr_interface_init(struct vrouter *);

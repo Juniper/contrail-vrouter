@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <linux/if_arp.h>
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/types.h>
@@ -230,6 +231,12 @@ vhost_if_add(struct vr_interface *vif)
                 (struct net_device *)vif->vif_bridge->vif_os;
             strncpy(vp->vp_phys_name, vp->vp_phys_dev->name,
                     sizeof(vp->vp_phys_name));
+
+            if (vp->vp_phys_dev->type != ARPHRD_ETHER) {
+                dev->flags |= IFF_NOARP;
+            } else {
+                dev->flags &= ~IFF_NOARP;
+            }
 
             if (vp->vp_db_index >= 0)
                 return;
@@ -474,8 +481,11 @@ vhost_dellink(struct net_device *dev, struct list_head *head)
 
     vp = netdev_priv(dev);
     if (vp) {
-        vhost_priv_db[vp->vp_db_index] = NULL;
+        if (vp->vp_db_index >= 0)
+            vhost_priv_db[vp->vp_db_index] = NULL;
+
         vp->vp_db_index = -1;
+
         if (vp->vp_phys_dev) {
             vhost_del_tap_phys(vp->vp_phys_dev);
             vp->vp_phys_dev = NULL;

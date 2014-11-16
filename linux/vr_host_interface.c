@@ -151,7 +151,9 @@ linux_skb_vlan_insert(struct sk_buff *skb, unsigned short vlan_id)
 
     /* now, the TCI */
     veth->h_vlan_TCI = htons(vlan_id);
-    skb->protocol = htons(ETH_P_8021Q);
+
+    skb_reset_mac_header(skb);
+    skb_reset_mac_len(skb);
 
     return skb;
 }
@@ -330,6 +332,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     int err = -ENOMEM;
     struct vr_ip *iph;
     unsigned short iphlen;
+    unsigned short ethlen;
     struct udphdr *udph;
     unsigned short reason = 0;
 
@@ -339,35 +342,41 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
         return linux_xmit(vif, seg, type);
     }
 
-    if (!pskb_may_pull(seg, ETH_HLEN + sizeof(struct vr_ip))) {
+    if (seg->dev->type == ARPHRD_ETHER) {
+        ethlen = ETH_HLEN;
+    } else {
+        ethlen = 0;
+    }
+
+    if (!pskb_may_pull(seg, ethlen + sizeof(struct vr_ip))) {
         reason = VP_DROP_PULL;
         goto exit_xmit;
     }
 
-    iph = (struct vr_ip *)(seg->data + ETH_HLEN);
+    iph = (struct vr_ip *)(seg->data + ethlen);
     iphlen = (iph->ip_hl << 2);
-    if (!pskb_may_pull(seg, ETH_HLEN + iphlen)) {
+    if (!pskb_may_pull(seg, ethlen + iphlen)) {
         reason = VP_DROP_PULL;
         goto exit_xmit;
     }
-    iph = (struct vr_ip *)(seg->data + ETH_HLEN);
-    iph->ip_len = htons(seg->len - ETH_HLEN);
+    iph = (struct vr_ip *)(seg->data + ethlen);
+    iph->ip_len = htons(seg->len - ethlen);
     iph->ip_id = htons(vr_generate_unique_ip_id());
     iph->ip_csum = 0;
     iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
 
     if (iph->ip_proto == VR_IP_PROTO_UDP) {
-        if (!pskb_may_pull(seg, ETH_HLEN + iphlen +
+        if (!pskb_may_pull(seg, ethlen + iphlen +
                     sizeof(struct udphdr))) {
             reason = VP_DROP_PULL;
             goto exit_xmit;
         }
 
         if (vr_udp_coff) {
-            skb_set_network_header(seg, ETH_HLEN);
+            skb_set_network_header(seg, ethlen);
             iph->ip_csum = 0;
 
-            skb_set_transport_header(seg,  iphlen + ETH_HLEN);
+            skb_set_transport_header(seg,  iphlen + ethlen);
             if (!skb_partial_csum_set(seg, skb_transport_offset(seg),
                         offsetof(struct udphdr, check))) {
                 reason = VP_DROP_MISC;
@@ -387,7 +396,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
              * inner packet (if the NIC supports it).
              */
             udph = (struct udphdr *) (((char *)iph) + iphlen);
-            udph->len = htons(seg->len - (ETH_HLEN + iphlen));
+            udph->len = htons(seg->len - (ethlen + iphlen));
             udph->check = 0;
 
             iph->ip_csum = 0;
@@ -1007,8 +1016,9 @@ linux_pull_outer_headers(struct sk_buff *skb)
     struct ipv6hdr *ip6h = NULL;
     struct vr_icmp *icmph;
 
-    offset = 0;
+    offset = skb->mac_len;
     proto = skb->protocol;
+
     while (proto == htons(ETH_P_8021Q)) {
         offset += sizeof(struct vlan_hdr);
         if (!pskb_may_pull(skb, offset))
@@ -1173,14 +1183,23 @@ linux_rx_handler(struct sk_buff **pskb)
     }
 #endif
 
-    skb_push(skb, ETH_HLEN);
-    if (skb->vlan_tci & VLAN_TAG_PRESENT) {
-        if (!(skb = linux_skb_vlan_insert(skb,
-                        skb->vlan_tci & 0xEFFF)))
-            return RX_HANDLER_CONSUMED;
+    if (dev->type == ARPHRD_ETHER) {
+        skb_push(skb, skb->mac_len);
+        if (skb->vlan_tci & VLAN_TAG_PRESENT) {
+            if (!(skb = linux_skb_vlan_insert(skb,
+                            skb->vlan_tci & 0xEFFF)))
+                return RX_HANDLER_CONSUMED;
 
-        vlan_id = skb->vlan_tci & 0xFFF;
-        skb->vlan_tci = 0;
+            vlan_id = skb->vlan_tci & 0xFFF;
+            skb->vlan_tci = 0;
+        }
+    } else {
+        if (skb_headroom(skb) < ETH_HLEN) {
+            ret = pskb_expand_head(skb, ETH_HLEN - skb_headroom(skb) +
+                    ETH_HLEN + sizeof(struct agent_hdr), 0, GFP_ATOMIC);
+            if (ret)
+                goto error;
+        }
     }
 
     ret = linux_pull_outer_headers(skb);
@@ -1408,7 +1427,16 @@ vr_interface_common_hook(struct sk_buff *skb)
         vlan_id = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
     }
 
-    skb_push(skb, ETH_HLEN);
+    if (skb->dev->type == ARPHRD_ETHER) {
+        skb_push(skb, skb->mac_len);
+    } else {
+        if (skb_headroom(skb) < ETH_HLEN) {
+            ret = pskb_expand_head(skb, ETH_HLEN - skb_headroom(skb) +
+                    ETH_HLEN + sizeof(struct agent_hdr), 0, GFP_ATOMIC);
+            if (ret)
+                goto error;
+        }
+    }
 
     pkt = linux_get_packet(skb, vif);
     if (!pkt)
@@ -1601,6 +1629,17 @@ linux_if_get_mtu(struct vr_interface *vif)
         return dev->mtu;
     else
         return vif->vif_mtu;
+}
+
+static unsigned short
+linux_if_get_encap(struct vr_interface *vif)
+{
+    struct net_device *dev = (struct net_device *)vif->vif_os;
+
+    if (dev && (dev->type != ARPHRD_ETHER))
+        return VIF_ENCAP_TYPE_L3;
+
+    return VIF_ENCAP_TYPE_ETHER;
 }
 
 /*
@@ -2042,6 +2081,7 @@ struct vr_host_interface_ops vr_linux_interface_ops = {
     .hif_rx             =       linux_if_rx,
     .hif_get_settings   =       linux_if_get_settings,
     .hif_get_mtu        =       linux_if_get_mtu,
+    .hif_get_encap      =       linux_if_get_encap,
 };
 
 static int
