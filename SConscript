@@ -56,7 +56,7 @@ if sys.platform != 'darwin':
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
-    make_cmd = 'make'
+    make_cmd = 'cd ' + dp_dir + ' && make'
     if GetOption('kernel-dir'):
         make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
     make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
@@ -66,7 +66,7 @@ if sys.platform != 'darwin':
         BUILD_TARGETS.append('vrouter/uvrouter')
         BUILD_TARGETS.append('vrouter/utils')
 
-    kern = env.Command('vrouter.ko', None, make_cmd, chdir=dp_dir)
+    kern = env.Command('vrouter.ko', None, make_cmd)
     env.Default(kern)
     env.AlwaysBuild(kern)
 
@@ -89,7 +89,7 @@ if sys.platform != 'darwin':
                     env['TOP'] + '/tools/sandesh/library/c/' + src))
 
     if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
-        os.system('cd ' + dp_dir + ';' + make_cmd + ' clean')
+        os.system(make_cmd + ' clean')
 
     if GetOption('kernel-dir'):
         kern_version = shellCommand(
