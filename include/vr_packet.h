@@ -7,7 +7,6 @@
 #define __VR_PACKET_H__
 
 #include "vr_defs.h"
-#include "vrouter.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0

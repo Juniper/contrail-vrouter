@@ -5,7 +5,9 @@
  */
 #include <vr_os.h>
 #include <vr_types.h>
+#include <vrouter.h>
 #include <vr_packet.h>
+#include <vr_flow.h>
 #include <vr_nexthop.h>
 #include <vr_vxlan.h>
 #include "vr_message.h"

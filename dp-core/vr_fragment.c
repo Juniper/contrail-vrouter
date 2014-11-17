@@ -5,6 +5,7 @@
  * All rights reserved
  */
 #include <vr_os.h>
+#include <vrouter.h>
 #include <vr_packet.h>
 #include "vr_btable.h"
 #include "vr_fragment.h"

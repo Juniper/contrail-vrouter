@@ -36,6 +36,8 @@
 #endif
 
 #include "vr_types.h"
+#include "vrouter.h"
+#include "vr_packet.h"
 #include "vr_flow.h"
 #include "vr_mirror.h"
 #include "vr_genetlink.h"

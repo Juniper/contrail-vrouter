@@ -14,6 +14,8 @@
 #include <linux/netdevice.h>
 
 #include "vrouter.h"
+#include "vr_packet.h"
+#include "vr_flow.h"
 
 #define MEM_DEV_MINOR_START     0
 #define MEM_DEV_NUM_DEVS        1

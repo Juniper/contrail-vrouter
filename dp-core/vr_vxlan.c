@@ -5,6 +5,7 @@
  */
 #include <vr_os.h>
 #include <vr_types.h>
+#include <vrouter.h>
 #include <vr_packet.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"

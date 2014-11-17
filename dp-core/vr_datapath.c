@@ -7,6 +7,7 @@
 #include <vr_bridge.h>
 #include <vr_datapath.h>
 #include <vr_packet.h>
+#include <vr_flow.h>
 #include <vr_mirror.h>
 
 extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,

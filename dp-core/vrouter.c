@@ -15,9 +15,9 @@
 #include <vr_nexthop.h>
 #include <vr_route.h>
 #include <vr_mpls.h>
-#include <vr_flow.h>
 #include <vr_bridge.h>
 #include <vr_packet.h>
+#include <vr_flow.h>
 #include <vr_mirror.h>
 #include <vr_vxlan.h>
 

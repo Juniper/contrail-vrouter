@@ -6,8 +6,8 @@
 #include <sys/socket.h>
 
 #include "vr_os.h"
-#include "vr_packet.h"
 #include "vrouter.h"
+#include "vr_packet.h"
 #include "host/vr_host.h"
 #include "host/vr_host_packet.h"
 #include "host/vr_host_interface.h"

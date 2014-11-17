@@ -18,15 +18,15 @@
 #include <linux/if_vlan.h>
 #include <linux/icmp.h>
 
-#include "vr_packet.h"
-#include "vr_sandesh.h"
 #include "vrouter.h"
+#include "vr_packet.h"
+#include "vr_flow.h"
+#include "vr_sandesh.h"
 #include "vr_linux.h"
 #include "vr_os.h"
 #include "vr_compat.h"
 #include "vr_hash.h"
 #include "vr_fragment.h"
-#include "vr_flow.h"
 
 unsigned int vr_num_cpus = 1;
 
