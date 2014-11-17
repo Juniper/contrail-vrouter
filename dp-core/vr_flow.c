@@ -5,7 +5,9 @@
  */
 #include <vr_os.h>
 #include <vr_types.h>
+#include <vrouter.h>
 #include <vr_packet.h>
+#include <vr_flow.h>
 #include <vr_mirror.h>
 #include "vr_sandesh.h"
 #include "vr_message.h"
@@ -27,8 +29,6 @@
         sizeof(struct vr_flow_entry))
 
 #define VR_FLOW_ENTRIES_PER_BUCKET  4U
-
-#define VR_MAX_FLOW_QUEUE_ENTRIES   3U
 
 #define VR_MAX_FLOW_TABLE_HOLD_COUNT \
                                     4096
@@ -52,6 +52,9 @@ extern uint16_t vr_icmp6_checksum(void * buffer, int bytes);
 
 static void vr_flush_entry(struct vrouter *, struct vr_flow_entry *,
         struct vr_flow_md *, struct vr_forwarding_md *);
+static void vr_flush_flow_queue(struct vrouter *, struct vr_flow_entry *,
+        struct vr_forwarding_md *, struct vr_flow_queue *);
+
 struct vr_flow_entry *vr_find_flow(struct vrouter *, struct vr_flow_key *,
         unsigned int *);
 unsigned int vr_trap_flow(struct vrouter *, struct vr_flow_entry *,
@@ -320,9 +323,46 @@ vr_get_flow_key(struct vr_flow_key *key, uint16_t vlan, struct vr_packet *pkt,
     return;
 }
 
+static void
+vr_flow_queue_free(struct vrouter *router, void *arg)
+{
+    struct vr_forwarding_md fmd;
+    struct vr_defer_data *defer;
+    struct vr_flow_entry *fe;
+    struct vr_flow_queue *vfq;
+
+    defer = (struct vr_defer_data *)arg;
+    if (!defer)
+        return;
+
+    vr_init_forwarding_md(&fmd);
+
+    vfq = (struct vr_flow_queue *)defer->vdd_data;
+    fe = vr_get_flow_entry(router, vfq->vfq_index);
+    vr_flush_flow_queue(router, fe, &fmd, vfq);
+    vr_free(vfq);
+    return;
+}
+
+static void
+vr_flow_queue_free_defer(struct vr_flow_md *flmd, struct vr_flow_queue *vfq)
+{
+    struct vr_defer_data *vdd = flmd->flmd_defer_data;
+
+    if (!vdd) {
+        vr_free(vfq);
+        return;
+    }
+
+    vdd->vdd_data = (void *)vfq;
+    vr_defer(flmd->flmd_router, vr_flow_queue_free, (void *)vdd);
+
+    return;
+}
+
 static struct vr_flow_entry *
 vr_find_free_entry(struct vrouter *router, struct vr_flow_key *key,
-        unsigned int *fe_index)
+        bool need_hold, unsigned int *fe_index)
 {
     unsigned int i, index, hash;
     struct vr_flow_entry *tmp_fe, *fe = NULL;
@@ -364,7 +404,18 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow_key *key,
 
     if (fe) {
         *fe_index += index;
-        memcpy(&fe->fe_key, key, sizeof(*key));
+        if (need_hold) {
+            fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue));
+            if (!fe->fe_hold_list) {
+                vr_reset_flow_entry(router, fe, *fe_index);
+                fe = NULL;
+            } else {
+                fe->fe_hold_list->vfq_index = *fe_index;
+            }
+        }
+
+        if (fe)
+            memcpy(&fe->fe_key, key, sizeof(*key));
     }
 
     return fe;
@@ -423,39 +474,26 @@ vr_find_flow(struct vrouter *router, struct vr_flow_key *key,
     return flow_e;
 }
 
-static inline bool
-vr_flow_queue_is_empty(struct vrouter *router, struct vr_flow_entry *fe)
-{
-    if (fe->fe_hold_list.node_p)
-        return false;
-    return true;
-}
-
-
 static int
-vr_enqueue_flow(struct vr_flow_entry *fe, struct vr_packet *pkt,
-        unsigned short proto, struct vr_forwarding_md *fmd)
+vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
+        struct vr_packet *pkt, unsigned short proto,
+        unsigned int index, struct vr_forwarding_md *fmd)
 {
-    unsigned int i = 0;
+    unsigned int i;
     unsigned short drop_reason = 0;
-    struct vr_list_node **head = &fe->fe_hold_list.node_p;
+    struct vr_flow_queue *vfq = fe->fe_hold_list;
     struct vr_packet_node *pnode;
 
-    while (*head && ++i) {
-        head = &(*head)->node_n;
-    }
+    if (!vfq)
+        return -EINVAL;
 
+    i = __sync_fetch_and_add(&vfq->vfq_entries, 1);
     if (i >= VR_MAX_FLOW_QUEUE_ENTRIES) {
         drop_reason = VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED;
         goto drop;
     }
 
-    pnode = (struct vr_packet_node *)vr_zalloc(sizeof(struct vr_packet_node));
-    if (!pnode) {
-        drop_reason = VP_DROP_FLOW_NO_MEMORY;
-        goto drop;
-    }
-
+    pnode = &vfq->vfq_pnodes[i];
     /*
      * we cannot cache nexthop here. to cache, we need to hold reference
      * to the nexthop. to hold a reference, we will have to hold a lock,
@@ -467,7 +505,6 @@ vr_enqueue_flow(struct vr_flow_entry *fe, struct vr_packet *pkt,
      */
     pkt->vp_nh = NULL;
 
-    pnode->pl_packet = pkt;
     pnode->pl_proto = proto;
     pnode->pl_vif_idx = pkt->vp_if->vif_idx;
     if (fmd) {
@@ -475,10 +512,13 @@ vr_enqueue_flow(struct vr_flow_entry *fe, struct vr_packet *pkt,
         pnode->pl_label = fmd->fmd_label;
     }
 
-    *head = &pnode->pl_node;
+    __sync_synchronize();
+    pnode->pl_packet = pkt;
+
+    if (!i)
+        vr_trap_flow(router, fe, pkt, index);
 
     return 0;
-
 drop:
     vr_pfree(pkt, drop_reason);
     return 0;
@@ -756,13 +796,8 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         fe->fe_stats.flow_packets_oflow++;
 
     if (fe->fe_action == VR_FLOW_ACTION_HOLD) {
-        if (vr_flow_queue_is_empty(router, fe)) {
-            vr_trap_flow(router, fe, pkt, index);
-            return vr_enqueue_flow(fe, pkt, proto, fmd);
-        } else {
-            vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
-            return 0;
-        }
+        vr_enqueue_flow(router, fe, pkt, proto, index, fmd);
+        return 0;
     }
 
     return vr_flow_action(router, fe, index, pkt, proto, fmd);
@@ -835,7 +870,7 @@ vr_flow_lookup(struct vrouter *router, unsigned short vrf,
             return 0;
         }
 
-        flow_e = vr_find_free_entry(router, key, &fe_index);
+        flow_e = vr_find_free_entry(router, key, true, &fe_index);
         if (!flow_e) {
             vr_pfree(pkt, VP_DROP_FLOW_TABLE_FULL);
             return 0;
@@ -1191,25 +1226,24 @@ vr_flow_inet_input(struct vrouter *router, unsigned short vrf,
 }
 
 static void
-vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
-        struct vr_flow_md *flmd, struct vr_forwarding_md *fmd)
+vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
+        struct vr_forwarding_md *fmd, struct vr_flow_queue *vfq)
 {
-    struct vr_list_node *head;
-    struct vr_packet_node *pnode;
-    struct vr_packet *pkt;
+    unsigned int i;
     struct vr_interface *vif;
+    struct vr_packet *pkt;
+    struct vr_packet_node *pnode;
 
-    head = fe->fe_hold_list.node_p;
-    fe->fe_hold_list.node_p = NULL;
-
-    while (head) {
-        pnode = (struct vr_packet_node *)head;
+    for (i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
+        pnode = &vfq->vfq_pnodes[i];
         if (fmd) {
             fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
             fmd->fmd_label = pnode->pl_label;
         }
 
         pkt = pnode->pl_packet;
+        if (!pkt)
+            continue;
         /* 
          * this is only a security check and not a catch all check. one note
          * of caution. please do not access pkt->vp_if till the if block is
@@ -1218,7 +1252,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
         if (!vif || (pkt->vp_if != vif)) {
             vr_pfree(pkt, VP_DROP_INVALID_IF);
-            goto loop_continue;
+            continue;
         }
 
         if (!pkt->vp_nh) {
@@ -1228,13 +1262,26 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
             }
         }
 
-        vr_flow_action(router, fe, flmd->flmd_index, pkt,
-                pnode->pl_proto, fmd);
-
-loop_continue:
-        head = pnode->pl_node.node_n;
-        vr_free(pnode);
+        vr_flow_action(router, fe, vfq->vfq_index, pkt, pnode->pl_proto, fmd);
+        pnode->pl_packet = NULL;
     }
+
+    return;
+}
+
+static void
+vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
+        struct vr_flow_md *flmd, struct vr_forwarding_md *fmd)
+{
+    struct vr_flow_queue *vfq;
+
+    vfq = fe->fe_hold_list;
+    if (!vfq)
+        return;
+    fe->fe_hold_list = NULL;
+
+    vr_flush_flow_queue(router, fe, fmd, vfq);
+    vr_flow_queue_free_defer(flmd, vfq);
 
     return;
 }
@@ -1326,14 +1373,14 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
 
 static struct vr_flow_entry *
 vr_add_flow(unsigned int rid, struct vr_flow_key *key,
-        unsigned int *fe_index)
+        bool need_hold_queue, unsigned int *fe_index)
 {
     struct vr_flow_entry *flow_e;
     struct vrouter *router = vrouter_get(rid);
 
     flow_e = vr_find_flow(router, key, fe_index);
     if (!flow_e)
-        flow_e = vr_find_free_entry(router, key, fe_index);
+        flow_e = vr_find_free_entry(router, key, need_hold_queue, fe_index);
 
     return flow_e;
 }
@@ -1341,6 +1388,7 @@ vr_add_flow(unsigned int rid, struct vr_flow_key *key,
 static struct vr_flow_entry *
 vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
 {
+    bool need_hold_queue = false;
     struct vr_flow_key key;
     struct vr_flow_entry *fe;
 
@@ -1352,7 +1400,10 @@ vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
     key.key_proto = req->fr_flow_proto;
     key.key_zero = 0;
 
-    fe = vr_add_flow(req->fr_rid, &key, fe_index);
+    if (req->fr_action == VR_FLOW_ACTION_HOLD)
+        need_hold_queue = true;
+
+    fe = vr_add_flow(req->fr_rid, &key, need_hold_queue, fe_index);
     if (fe)
         req->fr_index = *fe_index;
 
@@ -1412,7 +1463,8 @@ static int
 vr_flow_schedule_transition(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
 {
-    struct vr_flow_md *flmd = NULL;
+    struct vr_flow_md *flmd;
+    struct vr_defer_data *defer = NULL;
 
     flmd = (struct vr_flow_md *)vr_malloc(sizeof(*flmd));
     if (!flmd)
@@ -1420,8 +1472,15 @@ vr_flow_schedule_transition(struct vrouter *router, vr_flow_req *req,
 
     flmd->flmd_router = router;
     flmd->flmd_index = req->fr_index;
-    flmd->flmd_action = req->fr_action;
     flmd->flmd_flags = req->fr_flags;
+    if (fe->fe_hold_list) {
+        defer = vr_get_defer_data(sizeof(*defer));
+        if (!defer) {
+            vr_free(flmd);
+            return -ENOMEM;
+        }
+    }
+    flmd->flmd_defer_data = defer;
 
     vr_schedule_work(vr_get_cpu(), vr_flow_flush, (void *)flmd);
     return 0;
@@ -1664,8 +1723,8 @@ vr_flow_table_reset(struct vrouter *router)
     }
 
     if (end) {
+        flmd.flmd_defer_data = NULL;
         vr_init_forwarding_md(&fmd);
-        flmd.flmd_action = VR_FLOW_ACTION_DROP;
         for (i = start; i < end; i++) {
             fe = vr_get_flow_entry(router, i);
             if (fe) {

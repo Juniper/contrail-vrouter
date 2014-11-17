@@ -122,9 +122,25 @@ struct vr_flow_stats {
     uint8_t  flow_packets_oflow;
 } __attribute__((packed));
 
+#define VR_MAX_FLOW_QUEUE_ENTRIES   3U
+
+struct vr_packet_node {
+    unsigned short pl_proto;
+    struct vr_packet *pl_packet;
+    uint32_t pl_outer_src_ip;
+    uint32_t pl_label;
+    uint32_t pl_vif_idx;
+};
+
+struct vr_flow_queue {
+    unsigned int vfq_index;
+    unsigned int vfq_entries;
+    struct vr_packet_node vfq_pnodes[VR_MAX_FLOW_QUEUE_ENTRIES];
+};
+
 struct vr_dummy_flow_entry {
     struct vr_flow_key fe_key;
-    struct vr_list_head fe_hold_list;
+    struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
@@ -144,7 +160,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow_key fe_key;
-    struct vr_list_head fe_hold_list;
+    struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
@@ -174,8 +190,8 @@ struct vr_flow_entry {
 
 struct vr_flow_md {
     struct vrouter *flmd_router;
+    struct vr_defer_data *flmd_defer_data;
     unsigned int flmd_index;
-    unsigned short flmd_action;
     unsigned short flmd_flags;
 };
 
