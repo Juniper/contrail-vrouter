@@ -81,7 +81,7 @@ vr_message_queue_response(char *buf, int len)
         return -ENOMEM;
 
     response->vr_message_buf = buf;
-    response->vr_message_len = len;;
+    response->vr_message_len = len;
     vr_queue_enqueue(&message_h.vm_response_queue,
             &response->vr_message_queue);
 
@@ -171,8 +171,6 @@ vr_message_process_response(int (*cb)(void *, unsigned int, void *),
     while ((response = vr_message_dequeue_response())) {
         proto->mproto_decode(response->vr_message_buf,
                 response->vr_message_len, cb, cb_arg);
-        if (response->vr_message_buf)
-            vr_mtrans_free(response->vr_message_buf);
         vr_message_free(response);
     }
 

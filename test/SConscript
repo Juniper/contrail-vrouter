@@ -1,0 +1,25 @@
+#
+# Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv.Clone()
+
+vrouter_suite = []
+
+# Include paths
+
+# CFLAGS
+env.Append(CCFLAGS = '-g')
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
+env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka'])
+
+test_dep_srcs = ['common_test.c']
+
+dp_core_test = VRouterEnv.MakeTestCmd(env, 'dp_core_test', vrouter_suite, test_dep_srcs)
+
+test = env.TestSuite('vrouter-test', vrouter_suite)
+env.Alias('vrouter:test', test)
+Return('vrouter_suite')
