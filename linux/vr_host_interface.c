@@ -1362,6 +1362,7 @@ vr_interface_common_hook(struct sk_buff *skb)
     if (skb->dev == NULL) {
         goto error;
     }
+    dev = skb->dev;
 
     if (vr_get_vif_ptr(skb->dev) == (&vr_reset_interface)) {
         vdev = vhost_get_vhost_for_phys(skb->dev);
@@ -1418,16 +1419,12 @@ vr_interface_common_hook(struct sk_buff *skb)
     }
 #endif
 
-    ret = linux_pull_outer_headers(skb);
-    if (ret < 0)
-        goto error;
-
     if (skb->protocol == htons(ETH_P_8021Q)) {
         vhdr = (struct vlan_hdr *)skb->data;
         vlan_id = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
     }
 
-    if (skb->dev->type == ARPHRD_ETHER) {
+    if (dev->type == ARPHRD_ETHER) {
         skb_push(skb, skb->mac_len);
     } else {
         if (skb_headroom(skb) < ETH_HLEN) {
@@ -1437,6 +1434,10 @@ vr_interface_common_hook(struct sk_buff *skb)
                 goto error;
         }
     }
+
+    ret = linux_pull_outer_headers(skb);
+    if (ret < 0)
+        goto error;
 
     pkt = linux_get_packet(skb, vif);
     if (!pkt)
