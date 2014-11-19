@@ -253,37 +253,50 @@ vr_handle_arp_reply(unsigned short vrf, struct vr_arp *sarp,
 }
 
 int
-vr_pkt_type(struct vr_packet *pkt)
+vr_get_l3_hdr_offset_from_eth(struct vr_eth *eth, int pkt_len,
+                               unsigned short *l3_proto)
 {
-    unsigned char *data = pkt_data(pkt);
-    unsigned char *eth = data;
-    unsigned short eth_proto;
+    unsigned short pull_len, eth_proto;
+    unsigned char *data = (unsigned char *)eth;
     struct vr_vlan_hdr *vlan;
-    unsigned short pull_len;
 
     pull_len = VR_ETHER_HLEN;
-    if (pkt_head_len(pkt) < pull_len)
+    if (pkt_len < pull_len)
         return -1;
 
-    eth_proto = ntohs(*(unsigned short *)(eth + VR_ETHER_PROTO_OFF));
+    eth_proto = ntohs(*(unsigned short *)(data + VR_ETHER_PROTO_OFF));
     while (eth_proto == VR_ETH_PROTO_VLAN) {
-        if (pkt_head_len(pkt) < (pull_len + sizeof(*vlan)))
+        if (pkt_len < (pull_len + sizeof(*vlan)))
             return -1;
-        vlan = (struct vr_vlan_hdr *)(pkt_data(pkt) + pull_len);
+        vlan = (struct vr_vlan_hdr *)(data + pull_len);
         eth_proto = ntohs(vlan->vlan_proto);
         pull_len += sizeof(*vlan);
     }
 
-    pkt_set_network_header(pkt, pkt->vp_data + pull_len);
-    if (eth_proto == VR_ETH_PROTO_IP)
-        pkt->vp_type = VP_TYPE_IP;
-    else if (eth_proto == VR_ETH_PROTO_IP6)
-        pkt->vp_type = VP_TYPE_IP6;
-    else if (eth_proto == VR_ETH_PROTO_ARP)
-        pkt->vp_type = VP_TYPE_ARP;
-    else
-        pkt->vp_type = VP_TYPE_L2;
+    if (l3_proto)
+        *l3_proto = eth_proto;
 
+    return pull_len;
+
+}
+
+int
+vr_pkt_type(struct vr_packet *pkt)
+{
+    struct vr_eth *eth = (struct vr_eth *)pkt_data(pkt);
+    unsigned short eth_proto;
+    int pull_len;
+
+    pull_len = vr_get_l3_hdr_offset_from_eth(eth, pkt_head_len(pkt),
+                                             &eth_proto);
+    if (pull_len < 0)
+        return -1;
+
+    if (IS_MAC_BMCAST(eth->eth_dmac))
+        pkt->vp_flags |= VP_FLAG_MULTICAST;
+
+    pkt_set_network_header(pkt, pkt->vp_data + pull_len);
+    pkt->vp_type = vr_eth_proto_to_pkt_type(eth_proto);
     return 0;
 }
 
@@ -356,8 +369,9 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
 {
     struct vr_forwarding_md fmd;
     unsigned char *data = pkt_data(pkt);
-    int handled = 0;
-    unsigned short pull_len;
+    int reason, handled = 0;
+    unsigned short pull_len, overlay_len = VROUTER_L2_OVERLAY_LEN;
+    bool my_pkt = false;
 
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
@@ -372,16 +386,34 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         return 0;
     }
 
-    pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (vr_my_pkt(data, vif)) {
-        pkt_pull(pkt, pull_len);
+        my_pkt = true;
+        overlay_len = VROUTER_OVERLAY_LEN;
+    }
+
+    pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+    pkt_pull(pkt, pull_len);
+    pkt_set_inner_network_header(pkt, pkt_get_network_header_off(pkt));
+
+    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6) {
+        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj) {
+            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, overlay_len))) {
+                vr_pfree(pkt, reason);
+                return 0;
+            }
+        }
+    }
+
+    if (my_pkt) {
         handled = vr_l3_input(vrf, pkt, &fmd);
         if (handled)
             return 0;
     }
 
-    if (vr_l2_input(vrf, pkt, &fmd))
+    if (pkt_push(pkt, pull_len)) {
+        if (vr_l2_input(vrf, pkt, &fmd))
             return 0;
+    }
 
     vif_drop_pkt(vif, pkt, 1);
     return 0;
@@ -418,29 +450,12 @@ int
 vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
                               struct vr_forwarding_md *fmd)
 {
-    int reason;
     struct vr_interface *vif = pkt->vp_if;
 
     if (pkt->vp_type == VP_TYPE_IP) {
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
-        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
-            vif_is_virtual(vif)) {
-            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN))) {
-                vr_pfree(pkt, reason);
-                return 1;
-            }
-        }
         vr_flow_inet_input(vif->vif_router, vrf, pkt, VR_ETH_PROTO_IP, fmd);
         return 1;
     } else if (pkt->vp_type == VP_TYPE_IP6) {
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
-        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
-            vif_is_virtual(vif)) {
-            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN))) {
-                vr_pfree(pkt, reason);
-                return 1;
-            }
-        }
          vr_flow_inet6_input(vif->vif_router, vrf, pkt, VR_ETH_PROTO_IP6, fmd);
          return 1;
     } else if (pkt->vp_type == VP_TYPE_ARP) {
@@ -453,55 +468,38 @@ unsigned int
 vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
             struct vr_forwarding_md *fmd)
 {
-    int pull_len = 0;
-    int reason;
+    int pull_len;
     struct vr_interface *vif = pkt->vp_if;
 
-    if (IS_MAC_BMCAST(pkt_data(pkt)))
-        pkt->vp_flags |= VP_FLAG_MULTICAST;
-
+    /* Got to L3 header for L3 processing */
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (!pkt_pull(pkt, pull_len)) {
         vr_pfree(pkt, VP_DROP_INVALID_PACKET);
         return 1;
     }
 
-    /* Only non-vlan tagged are L3 packets */
-    if (fmd->fmd_vlan == VLAN_ID_INVALID) {
-        if ((pkt->vp_flags & VP_FLAG_MULTICAST) &&
-                (vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
-            if (pkt->vp_type == VP_TYPE_ARP || 
-                    vr_l3_well_known_packet(vrf, pkt)) {
-                if (vr_l3_input(vrf, pkt, fmd))
-                    return 1;
-            }
-        }
-    }
+    /* if non-vlan tagged and L3 enabled */
+    if ((fmd->fmd_vlan == VLAN_ID_INVALID) &&
+        (vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
 
-    if (!(vif->vif_flags & VIF_FLAG_L2_ENABLED))
-        return 0;
-
-    /* Even in L2 mode we will have to adjust the MSS for TCP*/
-    if (pkt->vp_type == VP_TYPE_IP) {
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
-        if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
-                            vif_is_virtual(vif)) {
-            if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt,
-                            VROUTER_OVERLAY_LEN_IN_L2_MODE))) {
-                vr_pfree(pkt, reason);
+        /* If Arp or L3 well known packet from Virtual VIF */
+        if ((pkt->vp_type == VP_TYPE_ARP) ||
+                (vif_is_virtual(vif) && vr_l3_well_known_packet(vrf, pkt))) {
+            if (vr_l3_input(vrf, pkt, fmd))
                 return 1;
-            }
         }
     }
-        
+
     /* Restore back the L2 headers */
     if (!pkt_push(pkt, pull_len)) {
         vr_pfree(pkt, VP_DROP_PULL);
         return 1;
     }
 
-    /* Mark the packet as L2 */
-    pkt->vp_type = VP_TYPE_L2;
+    if (!(vif->vif_flags & VIF_FLAG_L2_ENABLED))
+        return 0;
+
+    pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
     vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
     return 1;
 }
@@ -515,37 +513,33 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
     struct vr_udp *udph;
     struct vr_icmp *icmph = NULL;
 
-    if (vif_is_virtual(pkt->vp_if) &&
-            (pkt->vp_flags & VP_FLAG_MULTICAST)) {
-        iph = (struct vr_ip *)data;
-        if (!vr_ip_is_ip6(iph)) {
-            if ((iph->ip_proto == VR_IP_PROTO_UDP) &&
-                              vr_ip_transport_header_valid(iph)) {
-                udph = (struct vr_udp *)(data + iph->ip_hl * 4);
-                if (udph->udp_sport == htons(68)) {
-                    return true;
-                }
-            }
-        } else { //IPv6
-            ip6 = (struct vr_ip6 *)data;
-            // Bridge link-local traffic
-            if (vr_v6_prefix_is_ll(ip6->ip6_dst)) {
-                return false;
-            }
+    if (!(pkt->vp_flags & VP_FLAG_MULTICAST))
+        return false;
 
-            // 0xFF02 is the multicast address used for NDP, DHCPv6 etc
-            if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
-                /* 
-                 * Bridge neighbor solicit for link-local addresses 
-                 */
-                if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
-                    icmph = ((char *)ip6 + sizeof(struct vr_ip6));
-                }
-                if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL)
-                          && vr_v6_prefix_is_ll(&icmph->icmp_data)) {
-                    return false;
-                }
-            }
+    if (pkt->vp_type == VP_TYPE_IP) {
+        iph = (struct vr_ip *)data;
+        if ((iph->ip_proto == VR_IP_PROTO_UDP) &&
+                              vr_ip_transport_header_valid(iph)) {
+            udph = (struct vr_udp *)(data + iph->ip_hl * 4);
+            if (udph->udp_sport == htons(68))
+                return true;
+        }
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        ip6 = (struct vr_ip6 *)data;
+        // Bridge link-local traffic
+        if (vr_v6_prefix_is_ll(ip6->ip6_dst))
+                return false;
+
+        // 0xFF02 is the multicast address used for NDP, DHCPv6 etc
+        if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
+            /*
+             * Bridge neighbor solicit for link-local addresses
+             */
+            if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6)
+                icmph = ((char *)ip6 + sizeof(struct vr_ip6));
+            if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL)
+                          && vr_v6_prefix_is_ll(&icmph->icmp_data))
+                return false;
             return true;
         }
     }

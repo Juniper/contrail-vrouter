@@ -9,6 +9,8 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_vxlan.h"
+#include "vr_bridge.h"
+#include "vr_datapath.h"
 
 int vr_vxlan_trav_cb(unsigned int, void *, void *);
 int vr_vxlan_dump(vr_vxlan_req *);
@@ -21,11 +23,13 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
                                 struct vr_forwarding_md *fmd)
 {
     struct vr_vxlan *vxlan;
-    unsigned int vnid;
+    unsigned int vnid, drop_reason;
     struct vr_nexthop *nh;
-    unsigned short vrf;
+    unsigned short vrf, eth_proto;
     struct vr_forwarding_md c_fmd;
     struct vr_ip *ip;
+    struct vr_eth *eth;
+    int l3_offset;
 
     if (!fmd) {
         vr_init_forwarding_md(&c_fmd);
@@ -36,30 +40,55 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     fmd->fmd_outer_src_ip = ip->ip_saddr;
 
     vxlan = (struct vr_vxlan *)pkt_data(pkt);
-    if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT)
+    if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT) {
+        drop_reason = VP_DROP_INVALID_VNID;
         goto fail;
+    }
 
     vnid = ntohl(vxlan->vxlan_vnid) >> VR_VXLAN_VNID_SHIFT;
     if (!pkt_pull(pkt, sizeof(struct vr_vxlan))) {
-        vr_pfree(pkt, VP_DROP_PULL);
-        return 0;
+        drop_reason = VP_DROP_PULL;
+        goto fail;
     }
+    fmd->fmd_label = vnid;
 
     nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid); 
-    if (nh) {
-        if (nh->nh_vrf >= 0) {
-            vrf = nh->nh_vrf;
-        } else if (nh->nh_dev) {
-            vrf = nh->nh_dev->vif_vrf;
-        } else {
-            vrf = pkt->vp_if->vif_vrf;
-        }
-
-        return nh_output(vrf, pkt, nh, fmd);
+    if (!nh) {
+        drop_reason = VP_DROP_INVALID_VNID;
+        goto fail;
     }
 
+    pkt->vp_flags &= ~VP_FLAG_MULTICAST;
+    pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+
+    l3_offset = vr_get_l3_hdr_offset_from_eth(eth, pkt_head_len(pkt),
+                                              &eth_proto);
+    if (l3_offset < 0) {
+        drop_reason = VP_DROP_INVALID_PACKET;
+        goto fail;
+    }
+    pkt->vp_type = vr_eth_proto_to_pkt_type(eth_proto);
+
+    if (IS_MAC_BMCAST(eth))
+        pkt->vp_flags |= VP_FLAG_MULTICAST;
+
+    pkt_set_inner_network_header(pkt, pkt->vp_data + l3_offset);
+    pkt_set_network_header(pkt, pkt->vp_data + l3_offset);
+
+    if (nh->nh_vrf >= 0) {
+        vrf = nh->nh_vrf;
+    } else if (nh->nh_dev) {
+        vrf = nh->nh_dev->vif_vrf;
+    } else {
+        vrf = pkt->vp_if->vif_vrf;
+    }
+
+    return nh_output(vrf, pkt, nh, fmd);
+
 fail:
-    vr_pfree(pkt, VP_DROP_INVALID_VNID);
+    vr_pfree(pkt, drop_reason);
     return 0;
 }
 

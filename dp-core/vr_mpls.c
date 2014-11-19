@@ -9,10 +9,8 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_mpls.h"
-
-int vr_mpls_input(struct vrouter *, struct vr_packet *,
-        struct vr_forwarding_md *);
-int vr_mpls_del(vr_mpls_req *);
+#include "vr_bridge.h"
+#include "vr_datapath.h"
 
 struct vr_nexthop *
 __vrouter_get_label(struct vrouter *router, unsigned int label)
@@ -248,13 +246,12 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     unsigned int label;
-    unsigned short vrf;
+    unsigned short vrf, drop_reason, eth_proto, pull_len = 0;
     struct vr_nexthop *nh;
-    unsigned char *data;
+    struct vr_eth *eth;
     struct vr_ip *ip;
-    unsigned short drop_reason = 0;
     struct vr_forwarding_md c_fmd;
-    int ttl;
+    int ttl, l3_offset;
 
     if (!fmd) {
         vr_init_forwarding_md(&c_fmd);
@@ -282,21 +279,75 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     pkt->vp_ttl = ttl;
 
     /* drop the TOStack label */
-    data = pkt_pull(pkt, VR_MPLS_HDR_LEN);
-    if (!data) {
+    if (!pkt_pull(pkt, VR_MPLS_HDR_LEN)) {
         drop_reason = VP_DROP_PULL;
         goto dropit;
     }
 
-    /* this is the new network header and inner network header too*/
-    pkt_set_network_header(pkt, pkt->vp_data);
-    pkt_set_inner_network_header(pkt, pkt->vp_data);
-
     nh = router->vr_ilm[label];
     if (!nh) {
+        drop_reason = VP_DROP_INVALID_LABEL;
+        goto dropit;
+    }
+
+    /*
+     * Mark it for GRO. Diag, L2 and multicast nexthops unmark if
+     * required
+     */
+    if (vr_perfr)
+        pkt->vp_flags |= VP_FLAG_GRO;
+
+    /* Reset the flags which get defined below */
+    pkt->vp_flags &= ~(VP_FLAG_MULTICAST | VP_FLAG_L2_PAYLOAD);
+
+    if (nh->nh_family == AF_INET) {
+        ip = (struct vr_ip *)pkt_data(pkt);
+        if (!vr_ip_is_ip6(ip))
+            pkt->vp_type = VP_TYPE_IP;
+        else
+            pkt->vp_type = VP_TYPE_IP6;
+
+        l3_offset = pkt->vp_data;
+
+    } else if (nh->nh_family == AF_BRIDGE) {
+
+        /* All bridge packets are L2 packets */
+        pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
+
+        if (nh->nh_type != NH_COMPOSITE) {
+            eth = (struct vr_eth *)pkt_data(pkt);
+        } else {
+            if (label < VR_MAX_UCAST_LABELS) {
+                eth = (struct vr_eth *)pkt_data(pkt);
+            } else {
+                pull_len = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+                if (pkt_head_len(pkt) < pull_len) {
+                    drop_reason = VP_DROP_INVALID_PACKET;
+                    goto dropit;
+                }
+                eth = (struct vr_eth *)(pkt_data(pkt) + pull_len);
+            }
+        }
+
+        l3_offset = vr_get_l3_hdr_offset_from_eth(eth,
+                            pkt_head_len(pkt) - pull_len, &eth_proto);
+        if (l3_offset < 0) {
+            drop_reason = VP_DROP_INVALID_PACKET;
+            goto dropit;
+        }
+
+        if (IS_MAC_BMCAST(eth->eth_dmac))
+            pkt->vp_flags |= VP_FLAG_MULTICAST;
+
+        pkt->vp_type = vr_eth_proto_to_pkt_type(eth_proto);
+        l3_offset += pkt->vp_data + pull_len;
+    } else {
         drop_reason = VP_DROP_INVALID_NH;
         goto dropit;
     }
+
+    pkt_set_network_header(pkt, l3_offset);
+    pkt_set_inner_network_header(pkt, l3_offset);
 
     /*
      * We are typically looking at interface nexthops, and hence we will
@@ -311,13 +362,6 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         vrf = nh->nh_dev->vif_vrf;
     else
         vrf = pkt->vp_if->vif_vrf;
-
-    /*
-     * Mark it for GRO. Diag, L2 and multicast nexthops unmark if
-     * required
-     */
-    if (vr_perfr) 
-        pkt->vp_flags |= VP_FLAG_GRO;
 
     nh_output(vrf, pkt, nh, fmd);
 

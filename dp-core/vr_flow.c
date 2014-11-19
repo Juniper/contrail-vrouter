@@ -619,6 +619,7 @@ vr_flow_set_forwarding_md(struct vrouter *router, struct vr_flow_entry *fe,
 
     md->fmd_flow_index = index;
     md->fmd_ecmp_nh_index = fe->fe_ecmp_nh_index;
+    md->fmd_udp_src_port = fe->fe_udp_src_port;
     if (fe->fe_flags & VR_RFLOW_VALID) {
         rfe = vr_get_flow_entry(router, fe->fe_rflow);
         if (rfe)
@@ -847,7 +848,6 @@ vr_flow_lookup(struct vrouter *router, unsigned short vrf,
         return 0;
     } 
     
-
     return vr_do_flow_action(router, flow_e, fe_index, pkt, proto, fmd);
 }
 
@@ -888,7 +888,7 @@ vr_flow_parse(struct vrouter *router, struct vr_flow_key *key,
         if (IS_BMCAST_IP(key->key_dest_ip)) {
            /* no flow lookup for multicast or broadcast ip */
            res = VR_FLOW_BYPASS;
-           pkt->vp_flags |= VP_FLAG_MULTICAST | VP_FLAG_FLOW_SET;
+           pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
            /*
             * dhcp packet handling:
