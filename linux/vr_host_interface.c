@@ -1101,7 +1101,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
             icmph = (struct vr_icmp*) ((char *)ip6h + sizeof(struct ipv6hdr));
             if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                 /* ICMP options size for neighbor solicit is 24 bytes */
-                offset += sizeof(struct vr_icmp) + 24;
+                offset += 24;
 
                 if (!pskb_may_pull(skb, offset))
                     goto pull_fail;
