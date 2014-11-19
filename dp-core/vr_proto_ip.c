@@ -114,10 +114,6 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     short plen;
     uint32_t rt_prefix[4];
 
-    if (pkt->vp_flags & VP_FLAG_MULTICAST) { 
-        return vr_mcast_forward(router, vrf, pkt, fmd);
-    }
-
     ip = (struct vr_ip *)pkt_data(pkt);
     if (vr_ip_is_ip6(ip)) {
         family = AF_INET6;

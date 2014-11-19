@@ -288,10 +288,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         goto dropit;
     }
 
-    /* this is the new network header and inner network header too*/
-    pkt_set_network_header(pkt, pkt->vp_data);
-    pkt_set_inner_network_header(pkt, pkt->vp_data);
-
+    pkt_set_network_header(pkt, pkt_get_inner_network_header_off(pkt));
     nh = router->vr_ilm[label];
     if (!nh) {
         drop_reason = VP_DROP_INVALID_NH;

@@ -282,7 +282,7 @@ vr_pkt_type(struct vr_packet *pkt)
     else if (eth_proto == VR_ETH_PROTO_ARP)
         pkt->vp_type = VP_TYPE_ARP;
     else
-        pkt->vp_type = VP_TYPE_L2;
+        pkt->vp_type = VP_TYPE_UNKNOWN;
 
     return 0;
 }
@@ -373,6 +373,7 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     }
 
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+    pkt_set_inner_network_header(pkt, pkt->vp_data + pull_len);
     if (vr_my_pkt(data, vif)) {
         pkt_pull(pkt, pull_len);
         handled = vr_l3_input(vrf, pkt, &fmd);
@@ -422,7 +423,6 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
     struct vr_interface *vif = pkt->vp_if;
 
     if (pkt->vp_type == VP_TYPE_IP) {
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
         if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
             vif_is_virtual(vif)) {
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN))) {
@@ -433,7 +433,6 @@ vr_l3_input(unsigned short vrf, struct vr_packet *pkt,
         vr_flow_inet_input(vif->vif_router, vrf, pkt, VR_ETH_PROTO_IP, fmd);
         return 1;
     } else if (pkt->vp_type == VP_TYPE_IP6) {
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
         if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
             vif_is_virtual(vif)) {
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, VROUTER_OVERLAY_LEN))) {
@@ -483,7 +482,6 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
 
     /* Even in L2 mode we will have to adjust the MSS for TCP*/
     if (pkt->vp_type == VP_TYPE_IP) {
-        pkt_set_inner_network_header(pkt, pkt->vp_data);
         if (vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj &&
                             vif_is_virtual(vif)) {
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt,
@@ -500,8 +498,7 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
         return 1;
     }
 
-    /* Mark the packet as L2 */
-    pkt->vp_type = VP_TYPE_L2;
+    pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
     vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
     return 1;
 }
@@ -515,8 +512,7 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
     struct vr_udp *udph;
     struct vr_icmp *icmph = NULL;
 
-    if (vif_is_virtual(pkt->vp_if) &&
-            (pkt->vp_flags & VP_FLAG_MULTICAST)) {
+    if (vif_is_virtual(pkt->vp_if)) {
         iph = (struct vr_ip *)data;
         if (!vr_ip_is_ip6(iph)) {
             if ((iph->ip_proto == VR_IP_PROTO_UDP) &&

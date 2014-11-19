@@ -228,7 +228,7 @@ buffer sandesh vr_drop_stats_req {
     29: i64             vds_head_alloc_fail;
     30: i64             vds_head_space_reserve_fail;
     31: i64             vds_pcow_fail;
-    32: i64             vds_flood;
+    32: i64             vds_mcast_df_bit;
     33: i64             vds_mcast_clone_fail;
     34: i64             vds_composite_invalid_interface;
     35: i64             vds_rewrite_fail;
