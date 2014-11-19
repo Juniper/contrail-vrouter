@@ -452,7 +452,7 @@ vhost_setup(struct net_device *dev)
     dev->netdev_ops = &vhost_dev_ops;
     dev->destructor = vhost_dev_destructor;
 #ifdef CONFIG_XEN
-    SET_ETHTOOL_OPS(dev, &vhost_ethtool_ops);
+    dev->ethtool_ops = &vhost_ethtool_ops;
     dev->features |= NETIF_F_GRO;
 #endif
 
