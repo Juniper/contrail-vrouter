@@ -45,6 +45,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         return 0;
     }
 
+    pkt_set_network_header(pkt, pkt_get_inner_network_header_off(pkt));
     nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid); 
     if (nh) {
         if (nh->nh_vrf >= 0) {
