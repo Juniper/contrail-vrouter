@@ -13,19 +13,6 @@
 
 extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
                 struct vr_route_req *, struct vr_packet *);
-extern int vr_mpls_input(struct vrouter *, struct vr_packet *,
-        struct vr_forwarding_md *);
-
-struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *, struct vr_packet *);
-int vr_forward(struct vrouter *, unsigned short, struct vr_packet *, struct vr_forwarding_md *);
-unsigned int vr_udp_input(struct vrouter *, struct vr_packet *,
-    struct vr_forwarding_md *);
-int vr_ip_input(struct vrouter *, unsigned short, struct vr_packet *,
-    struct vr_forwarding_md *);
-unsigned int vr_gre_input(struct vrouter *, struct vr_packet *,
-        struct vr_forwarding_md *);
-void vr_ip_update_csum(struct vr_packet *, unsigned int, unsigned int);
-unsigned int vr_route_flags(unsigned int, unsigned int);
 
 static unsigned short vr_ip_id;
 
@@ -77,19 +64,19 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
         return NULL;
 
     rt.rtr_req.rtr_vrf_id = vrf;
-    if (!vr_ip_is_ip6(ip)) {
-        pkt->vp_type = VP_TYPE_IP;
+    if (pkt->vp_type == VP_TYPE_IP) {
         rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
         *(uint32_t*)rt.rtr_req.rtr_prefix = (ip->ip_saddr);
         rt.rtr_req.rtr_prefix_size = 4;
         rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
-    } else {
+        rt.rtr_req.rtr_family = AF_INET;
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
         ip6 = (struct vr_ip6 *)pkt_data(pkt);
-        pkt->vp_type = VP_TYPE_IP6;
         rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
-        rt.rtr_req.rtr_prefix_size = 16;
         memcpy(rt.rtr_req.rtr_prefix, ip6->ip6_src, 16);
+        rt.rtr_req.rtr_prefix_size = 16;
         rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
+        rt.rtr_req.rtr_family = AF_INET6;
     }
     rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
     rt.rtr_req.rtr_nh_id = 0;
@@ -113,10 +100,6 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     int family = AF_INET, status, encap_len = 0;
     short plen;
     uint32_t rt_prefix[4];
-
-    if (pkt->vp_flags & VP_FLAG_MULTICAST) { 
-        return vr_mcast_forward(router, vrf, pkt, fmd);
-    }
 
     ip = (struct vr_ip *)pkt_data(pkt);
     if (vr_ip_is_ip6(ip)) {

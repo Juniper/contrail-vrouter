@@ -131,12 +131,14 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_cksum_err);
     printf("No Fmd                        %" PRIu64 "\n",
             stats->vds_no_fmd);
-    printf("Ivalid VNID                   %" PRIu64 "\n",
+    printf("Invalid VNID                  %" PRIu64 "\n",
             stats->vds_invalid_vnid);
     printf("Fragment errors               %" PRIu64 "\n",
             stats->vds_frag_err);
     printf("Invalid Source                %" PRIu64 "\n",
             stats->vds_invalid_source);
+    printf("Jumbo Mcast Pkt with DF Bit   %" PRIu64 "\n",
+            stats->vds_mcast_df_bit);
     printf("\n");
     return;
 }

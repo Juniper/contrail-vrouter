@@ -376,17 +376,12 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     char bcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     char *mac;
 
-    /* First mark the packet as L2 */
-    pkt->vp_type = VP_TYPE_L2;
-
     mac = (char *)pkt_data(pkt);
     rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
     rt.rtr_req.rtr_mac =(int8_t *) mac;
     /* If multicast L2 packet, use broadcast composite nexthop */
-    if (IS_MAC_BMCAST(mac)) {
+    if (IS_MAC_BMCAST(mac))
         rt.rtr_req.rtr_mac = (int8_t *)bcast_mac;
-        pkt->vp_flags |= VP_FLAG_MULTICAST;
-    }
 
     rt.rtr_req.rtr_vrf_id = vrf;
     nh = vr_bridge_lookup(vrf, &rt, pkt);
