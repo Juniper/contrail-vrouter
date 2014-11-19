@@ -13,17 +13,17 @@
 #include "vr_mcast.h"
 #include "vr_bridge.h"
 #include "vr_datapath.h"
+#include "vr_hash.h"
 
-static int nh_discard(unsigned short, struct vr_packet *,
-        struct vr_nexthop *, struct vr_forwarding_md *);
 extern unsigned int vr_forward(struct vrouter *, unsigned short,
         struct vr_packet *, struct vr_forwarding_md *);
-extern void vr_init_forwarding_md(struct vr_forwarding_md *);
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
-struct vr_nexthop *vr_inet_src_lookup(unsigned short, struct vr_ip *,
-        struct vr_packet *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
+extern struct vr_nexthop * vr_inet_src_lookup(unsigned short ,
+                                struct vr_ip *, struct vr_packet *);
+
+
 struct vr_nexthop *ip4_default_nh;
 struct vr_nexthop *ip6_default_nh;
 
@@ -155,7 +155,7 @@ static int
 nh_vrf_translate(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
-    if (!pkt_is_l2(pkt))
+    if (!vr_pkt_is_l2(pkt))
         return vr_forward(nh->nh_router, nh->nh_vrf, pkt, fmd);
 
     return vr_bridge_input(nh->nh_router, nh->nh_vrf, pkt, fmd);
@@ -254,7 +254,6 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
     ip->ip_csum = 0;
     ip->ip_csum = vr_ip_csum(ip);    
 
-    pkt_set_network_header(pkt, pkt->vp_data);
     return true;
 }
 
@@ -275,13 +274,15 @@ nh_vxlan_tunnel_helper(unsigned short vrf, struct vr_packet *pkt,
         pkt = tmp_pkt;
     }
 
-    /* Change the packet type to VXLAN as we added the vxlan header */
-    pkt->vp_type = VP_TYPE_VXLAN;
-   
+    if (fmd->fmd_udp_src_port)
+        udp_src_port = fmd->fmd_udp_src_port;
+
     /*
-     * The UDP source port is a hash of the inner headers
+     * The UDP source port is a hash of the inner headers. For IPV6
+     * the standard port is used till flow processing is done
      */
-    if (vr_get_udp_src_port) {
+    if ((!fmd->fmd_udp_src_port) && (pkt->vp_type != VP_TYPE_IP6) &&
+            vr_get_udp_src_port)  {
         udp_src_port = vr_get_udp_src_port(pkt, fmd, vrf);
         if (udp_src_port == 0) {
             return false;
@@ -482,8 +483,9 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
     unsigned short drop_reason;
     struct vr_packet *new_pkt;
     struct vr_vrf_stats *stats;
-    unsigned int evpn_src;
+    unsigned int evpn_src, hashval, port_range;
     unsigned short pull_len, label, pkt_vrf;
+    unsigned char *eth;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
     if (stats)
@@ -495,9 +497,6 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
         drop_reason = VP_DROP_NO_FMD;
         goto drop;
     }
-
-    /* Mark the packet as Multicast */
-    pkt->vp_flags |= VP_FLAG_MULTICAST;
 
     evpn_src = 0;
     if (nh->nh_validate_src) {
@@ -516,6 +515,50 @@ nh_composite_mcast_l2(unsigned short vrf, struct vr_packet *pkt,
      */
 
     label = fmd->fmd_label;
+
+    if (!fmd->fmd_udp_src_port) {
+        eth = NULL;
+        if (vif_is_virtual(pkt->vp_if)) {
+            eth = pkt_data(pkt);
+        } else if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) {
+            if (evpn_src)
+                eth = pkt_data(pkt);
+            else {
+                eth = pkt_data_at_offset(pkt, pkt->vp_data +
+                        VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
+            }
+        }
+
+        if (!eth) {
+            drop_reason = VP_DROP_INVALID_PACKET;
+            goto drop;
+        }
+
+        if (hashrnd_inited == 0) {
+            get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
+            hashrnd_inited = 1;
+        }
+        hashval = vr_hash(pkt_data(pkt), sizeof(struct vr_eth), vr_hashrnd);
+        /* Include the VRF to calculate the hash */
+        hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
+
+        /*
+         * Convert the hash value to a value in the port range that we want
+         * for dynamic UDP ports
+         */
+        port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
+        fmd->fmd_udp_src_port = (uint16_t) (((uint64_t) hashval * port_range) >> 32);
+
+        if (fmd->fmd_udp_src_port > port_range) {
+           /*
+            * Shouldn't happen...
+            */
+            fmd->fmd_udp_src_port = 0;
+        }
+
+        fmd->fmd_udp_src_port += VR_MUDP_PORT_RANGE_START;
+    }
+
     for (i = 0; i < nh->nh_component_cnt; i++) {
 
         clone_size = 0;
@@ -601,7 +644,7 @@ drop:
 
 static int
 nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
-        struct vr_nexthop *nh, struct vr_forwarding_md *fmd) 
+        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
     struct vr_vrf_stats *stats;
     unsigned short drop_reason, pkt_vrf;
@@ -619,9 +662,6 @@ nh_composite_mcast_l3(unsigned short vrf, struct vr_packet *pkt,
         drop_reason = VP_DROP_NO_FMD;
         goto drop;
     }
-
-    /* Mark the packet as Multicast */
-    pkt->vp_flags |= VP_FLAG_MULTICAST;
 
     if (nh->nh_validate_src) {
         if (nh->nh_validate_src(vrf, pkt, nh, fmd, NULL) == NH_SOURCE_INVALID) {
@@ -842,9 +882,7 @@ nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
          * If L2 multicast packet from VM, we need to update Vxlan
          * with right values
          */
-        if ((new_pkt->vp_type == VP_TYPE_L2) &&
-                 (new_pkt->vp_flags & VP_FLAG_MULTICAST) && 
-                (vif_is_virtual(new_pkt->vp_if))) {
+        if (vif_is_virtual(new_pkt->vp_if)) {
             /*
              * The L2 multicast bridge entry will have VNID as label. If fmd
              * does not valid label/vnid, skip the processing
@@ -882,61 +920,6 @@ drop:
     return 0;
 }
 
-static int
-nh_composite_multi_proto(unsigned short vrf, struct vr_packet *pkt,
-        struct vr_nexthop *nh, struct vr_forwarding_md *fmd) 
-{
-    uint32_t *ctrl_data;
-    unsigned short drop_reason;
-    struct vr_vrf_stats *stats;
-    unsigned short pkt_type_flag;
-    int i;
-    struct vr_nexthop *dir_nh;
-
-    stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
-    if (stats)
-        stats->vrf_multi_proto_composites++;
-
-    if (!fmd) {
-        drop_reason = VP_DROP_NO_FMD;
-        goto drop;
-    }
-
-    /* Mark the packet as Multicast */
-    pkt->vp_flags |= VP_FLAG_MULTICAST;
-
-    /* Identify whether L2 or L3 packet */
-    pkt_type_flag = NH_FLAG_COMPOSITE_L2;
-    ctrl_data = (uint32_t *)pkt_data(pkt);
-    if (*ctrl_data != VR_L2_MCAST_CTRL_DATA) {
-        pkt_type_flag = NH_FLAG_COMPOSITE_L3;
-        pkt->vp_type = VP_TYPE_IP;
-    } else {
-        /* Mark the packet as L2. Let the control information flow till
-         * the L2 mcast nexthop */
-        pkt->vp_type = VP_TYPE_L2;
-    }
-
-    /* 
-     * Look for the same nexthop flags and forward to the first nexthop
-     */
-    for(i = 0; i < nh->nh_component_cnt; i++) {
-        /* If direct nexthop is not valid, dont process it */
-        dir_nh = nh->nh_component_nh[i].cnh;
-        if ((!dir_nh) || (!(dir_nh->nh_flags & NH_FLAG_VALID)))
-            continue;
-
-        if (dir_nh->nh_flags & pkt_type_flag) {
-            nh_output(vrf, pkt, dir_nh, fmd);
-            return 0;
-        }
-    }
-
-    drop_reason = VP_DROP_INVALID_NH;
-drop:
-    vr_pfree(pkt, drop_reason);
-    return 0;
-}
 
 static int
 nh_discard(unsigned short vrf, struct vr_packet *pkt,
@@ -979,6 +962,7 @@ nh_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
                              nh->nh_udp_tun_dip) == false) {
         goto send_fail;
     }
+    pkt_set_network_header(pkt, pkt->vp_data);
 
     if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
         goto send_fail;
@@ -1022,6 +1006,7 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
+    unsigned short overhead_len;
 
     if (!fmd) {
         reason = VP_DROP_NO_FMD;
@@ -1040,19 +1025,27 @@ nh_vxlan_tunnel(unsigned short vrf, struct vr_packet *pkt,
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
 
+    overhead_len = VR_VXLAN_HDR_LEN;
+    overhead_len += pkt_get_network_header_off(pkt) - pkt->vp_data;
+
     if (pkt->vp_type == VP_TYPE_IP) {
-        if (vr_has_to_fragment(nh->nh_dev, pkt, VR_VXLAN_HDR_LEN) &&
+        if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
-            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - VR_VXLAN_HDR_LEN;
+            if (pkt->vp_flags & VP_FLAG_MULTICAST) {
+                reason = VP_DROP_MCAST_DF_BIT;
+                goto send_fail;
+            }
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - overhead_len;
             trap_arg.df_flow_index = fmd->fmd_flow_index;
             return vr_trap(pkt, vrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
         }
     }
 
     if (nh_vxlan_tunnel_helper(vrf, pkt, fmd, nh->nh_udp_tun_sip,
-                                            nh->nh_udp_tun_dip) == false) {
+                                            nh->nh_udp_tun_dip) == false)
         goto send_fail;
-    }
+
+    pkt_set_network_header(pkt, pkt->vp_data);
 
     if (pkt_head_space(pkt) < nh->nh_udp_tun_encap_len) {
         tmp_pkt = vr_pexpand_head(pkt, nh->nh_udp_tun_encap_len - pkt_head_space(pkt));
@@ -1100,7 +1093,7 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     unsigned char *tun_encap;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
-    unsigned int tun_sip, tun_dip, head_space;
+    unsigned int tun_sip, tun_dip, overhead_len, mudp_head_space;
     uint16_t tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT;
     unsigned short reason = VP_DROP_PUSH;
     struct vr_packet *tmp_pkt;
@@ -1128,10 +1121,16 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     if (!fmd || fmd->fmd_label < 0)
         return vr_forward(nh->nh_router, vrf, pkt, fmd);
 
+    if (fmd->fmd_udp_src_port)
+        udp_src_port = fmd->fmd_udp_src_port;
+
     /*
-     * The UDP source port is a hash of the inner IP src/dst address and vrf 
+     * The UDP source port is a hash of the inner IP src/dst address and
+     * vrf. For the IPV6 standard source port is used till flow
+     * procesing is done
      */
-    if (vr_get_udp_src_port) {
+    if ((!fmd->fmd_udp_src_port) && (pkt->vp_type != VP_TYPE_IP6) &&
+            vr_get_udp_src_port) {
         udp_src_port = vr_get_udp_src_port(pkt, fmd, vrf);
         if (udp_src_port == 0) {
             reason = VP_DROP_PULL;
@@ -1140,21 +1139,26 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     }
 
     /* Calculate the head space for mpls,udp ip and eth */
-    head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
+    mudp_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
 
     if (pkt->vp_type == VP_TYPE_IP) {
-        if (vr_has_to_fragment(nh->nh_dev, pkt, head_space) &&
+        overhead_len = mudp_head_space + pkt_get_network_header_off(pkt) - pkt->vp_data;
+        if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
-            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - head_space;
+            if (pkt->vp_flags & VP_FLAG_MULTICAST) {
+                reason = VP_DROP_MCAST_DF_BIT;
+                goto send_fail;
+            }
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - overhead_len;
             trap_arg.df_flow_index = fmd->fmd_flow_index;
             return vr_trap(pkt, vrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
         }
     }
 
-    head_space += tun_encap_len;
+    mudp_head_space += tun_encap_len;
 
-    if (pkt_head_space(pkt) < head_space) {
-        tmp_pkt = vr_pexpand_head(pkt, head_space - pkt_head_space(pkt));
+    if (pkt_head_space(pkt) < mudp_head_space) {
+        tmp_pkt = vr_pexpand_head(pkt, mudp_head_space - pkt_head_space(pkt));
         if (!tmp_pkt) 
             goto send_fail;
 
@@ -1171,11 +1175,9 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     /*
      * Change the packet type
      */
-    if (pkt->vp_type == VP_TYPE_L2)
-        pkt->vp_type = VP_TYPE_L2OIP;
-    else if (pkt->vp_type == VP_TYPE_IP6)
+    if (pkt->vp_type == VP_TYPE_IP6)
         pkt->vp_type = VP_TYPE_IP6OIP;
-    else
+    else if (pkt->vp_type == VP_TYPE_IP)
         pkt->vp_type = VP_TYPE_IPOIP;
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
@@ -1183,6 +1185,8 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
                              tun_sip, tun_dip) == false) {
         goto send_fail;
     }
+
+    pkt_set_network_header(pkt, pkt->vp_data);
 
     /* slap l2 header */
     vif = nh->nh_dev;
@@ -1197,7 +1201,6 @@ nh_mpls_udp_tunnel(unsigned short vrf, struct vr_packet *pkt,
     return 0;
 
 send_fail:
-
     vr_pfree(pkt, reason);
     return 0;
 
@@ -1218,7 +1221,7 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
         struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
 {
     unsigned int id;
-    int gre_head_space;
+    int overhead_len, gre_head_space;
     unsigned short drop_reason = VP_DROP_INVALID_NH;
     struct vr_gre *gre_hdr;
     struct vr_ip *ip;
@@ -1255,7 +1258,7 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
 
-    if (pkt->vp_type != VP_TYPE_L2) {
+    if (pkt->vp_type == VP_TYPE_IP) {
         ip = (struct vr_ip *)pkt_network_header(pkt);
         id = ip->ip_id;
     } else {
@@ -1266,10 +1269,19 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     gre_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) +
         sizeof(struct vr_gre);
 
+
     if (pkt->vp_type == VP_TYPE_IP) {
-        if (vr_has_to_fragment(nh->nh_dev, pkt, gre_head_space) &&
+        /* If there are any L2 headers lets add those as well. For L3
+         * unicast, folloowing will add no extra overhead */
+        overhead_len = gre_head_space + pkt_get_network_header_off(pkt) - pkt->vp_data;
+        if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
-            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - gre_head_space;
+            if (pkt->vp_flags & VP_FLAG_MULTICAST) {
+                drop_reason = VP_DROP_MCAST_DF_BIT;
+                goto send_fail;
+            }
+
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - overhead_len;
             trap_arg.df_flow_index = fmd->fmd_flow_index;
             return vr_trap(pkt, vrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
         }
@@ -1304,11 +1316,9 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
         goto send_fail;
     }
     pkt_set_network_header(pkt, pkt->vp_data);
-    if (pkt->vp_type == VP_TYPE_L2)
-        pkt->vp_type = VP_TYPE_L2OIP;
-    else if (pkt->vp_type == VP_TYPE_IP6)
+    if (pkt->vp_type == VP_TYPE_IP6)
         pkt->vp_type = VP_TYPE_IP6OIP;
-    else 
+    else  if (pkt->vp_type == VP_TYPE_IP)
         pkt->vp_type = VP_TYPE_IPOIP;
 
     ip->ip_version = 4;
@@ -1366,43 +1376,40 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
         return 0;
     }
 
-    if (pkt->vp_type == VP_TYPE_IP) {
-        /*
-         * If the packet has not gone through flow lookup once
-         * (!VP_FLAG_FLOW_SET), we need to determine whether it has to undergo
-         * flow lookup now or not. There are two cases:
-         *
-         * 1. when policy flag is set in the nexthop, and
-         * 2. when the source is an ECMP.
-         * 
-         * When the source is an ECMP, we would like the packet to reach the
-         * same place from where it came from, and hence a flow has to be setup
-         * so that DP knows where to send the packet to (from an ECMP NH).
-         * Typical example for this situation is when the packet reaches the
-         * target VM's server from an ECMP-ed service chain.
-         */
-        ip = (struct vr_ip *)pkt_network_header(pkt);
-        if (vr_ip_is_ip6(ip)) {
-            pkt->vp_type = VP_TYPE_IP6;
-            vr_flow_inet6_input(nh->nh_router, vrf, pkt, VR_ETH_PROTO_IP6, fmd);
-            return 1;
-        }
-        if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
-            if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
-                need_flow_lookup = true;
-            } else {
-                src_nh = vr_inet_src_lookup(vrf, ip, pkt);
-                if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
-                        src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
+    if (!vr_pkt_is_l2(pkt)) {
+        if (pkt->vp_type == VP_TYPE_IP) {
+            /*
+             * If the packet has not gone through flow lookup once
+             * (!VP_FLAG_FLOW_SET), we need to determine whether it has to undergo
+             * flow lookup now or not. There are two cases:
+             *
+             * 1. when policy flag is set in the nexthop, and
+             * 2. when the source is an ECMP.
+             *
+             * When the source is an ECMP, we would like the packet to reach the
+             * same place from where it came from, and hence a flow has to be setup
+             * so that DP knows where to send the packet to (from an ECMP NH).
+             * Typical example for this situation is when the packet reaches the
+             * target VM's server from an ECMP-ed service chain.
+            */
+            ip = (struct vr_ip *)pkt_network_header(pkt);
+            if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
+                if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
                     need_flow_lookup = true;
+                } else {
+                    src_nh = vr_inet_src_lookup(vrf, ip, pkt);
+                    if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
+                            src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
+                        need_flow_lookup = true;
+                    }
                 }
-            }
 
-            if (need_flow_lookup) {
-                pkt->vp_flags |= VP_FLAG_FLOW_GET;
-                vr_flow_inet_input(nh->nh_router, vrf,
-                        pkt, VR_ETH_PROTO_IP, fmd);
-                return 1;
+                if (need_flow_lookup) {
+                    pkt->vp_flags |= VP_FLAG_FLOW_GET;
+                    vr_flow_inet_input(nh->nh_router, vrf,
+                            pkt, VR_ETH_PROTO_IP, fmd);
+                    return 1;
+                }
             }
         }
     }
@@ -1469,7 +1476,6 @@ nh_encap_l2(unsigned short vrf, struct vr_packet *pkt,
      * Mark the packet as L2 and make it inelgible for GRO
      */
     pkt->vp_flags &= ~VP_FLAG_GRO;
-    pkt->vp_type = VP_TYPE_L2;
 
     vif = nh->nh_dev;
     vif->vif_tx(vif, pkt);
@@ -1783,8 +1789,6 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_validate_src = nh_composite_ecmp_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_FABRIC) {
         nh->nh_reach_nh = nh_composite_fabric;
-    } else if (req->nhr_flags & NH_FLAG_COMPOSITE_MULTI_PROTO) {
-        nh->nh_reach_nh = nh_composite_multi_proto;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_EVPN) {
         nh->nh_reach_nh = nh_composite_evpn;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ENCAP) {

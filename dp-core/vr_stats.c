@@ -47,7 +47,7 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_head_alloc_fail = stats->vds_head_alloc_fail;
     response->vds_head_space_reserve_fail = stats->vds_head_space_reserve_fail;
     response->vds_pcow_fail = stats->vds_pcow_fail;
-    response->vds_flood = stats->vds_flood;
+    response->vds_mcast_df_bit = stats->vds_mcast_df_bit;
     response->vds_mcast_clone_fail = stats->vds_mcast_clone_fail;
     response->vds_composite_invalid_interface =
         stats->vds_composite_invalid_interface;
@@ -115,7 +115,7 @@ vr_drop_stats_get(void)
         stats->vds_head_alloc_fail += stats_block->vds_head_alloc_fail;
         stats->vds_head_space_reserve_fail += stats_block->vds_head_space_reserve_fail;
         stats->vds_pcow_fail += stats_block->vds_pcow_fail;
-        stats->vds_flood += stats_block->vds_flood;
+        stats->vds_mcast_df_bit += stats_block->vds_mcast_df_bit;
         stats->vds_mcast_clone_fail += stats_block->vds_mcast_clone_fail;
         stats->vds_composite_invalid_interface +=
             stats_block->vds_composite_invalid_interface;
