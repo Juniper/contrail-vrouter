@@ -28,6 +28,9 @@ extern int vr_mpls_get(vr_mpls_req *);
 extern int vr_mpls_add(vr_mpls_req *);
 extern int vr_mpls_tunnel_type(unsigned int , unsigned int, unsigned short *);
 extern struct vr_nexthop *__vrouter_get_label(struct vrouter *, unsigned int);
+extern int vr_mpls_input(struct vrouter *, struct vr_packet *,
+                        struct vr_forwarding_md *);
+
 
 
 static inline bool 

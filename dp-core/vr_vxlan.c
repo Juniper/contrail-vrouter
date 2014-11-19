@@ -9,19 +9,15 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_vxlan.h"
-
-int vr_vxlan_trav_cb(unsigned int, void *, void *);
-int vr_vxlan_dump(vr_vxlan_req *);
-int vr_vxlan_get(vr_vxlan_req *);
-int vr_vxlan_del(vr_vxlan_req *);
-int vr_vxlan_add(vr_vxlan_req *);
+#include "vr_bridge.h"
+#include "vr_datapath.h"
 
 int
 vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt, 
                                 struct vr_forwarding_md *fmd)
 {
     struct vr_vxlan *vxlan;
-    unsigned int vnid;
+    unsigned int vnid, drop_reason;
     struct vr_nexthop *nh;
     unsigned short vrf;
     struct vr_forwarding_md c_fmd;
@@ -36,30 +32,44 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     fmd->fmd_outer_src_ip = ip->ip_saddr;
 
     vxlan = (struct vr_vxlan *)pkt_data(pkt);
-    if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT)
+    if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT) {
+        drop_reason = VP_DROP_INVALID_VNID;
         goto fail;
+    }
 
     vnid = ntohl(vxlan->vxlan_vnid) >> VR_VXLAN_VNID_SHIFT;
     if (!pkt_pull(pkt, sizeof(struct vr_vxlan))) {
-        vr_pfree(pkt, VP_DROP_PULL);
-        return 0;
+        drop_reason = VP_DROP_PULL;
+        goto fail;
     }
+    fmd->fmd_label = vnid;
 
     nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid); 
-    if (nh) {
-        if (nh->nh_vrf >= 0) {
-            vrf = nh->nh_vrf;
-        } else if (nh->nh_dev) {
-            vrf = nh->nh_dev->vif_vrf;
-        } else {
-            vrf = pkt->vp_if->vif_vrf;
-        }
-
-        return nh_output(vrf, pkt, nh, fmd);
+    if (!nh) {
+        drop_reason = VP_DROP_INVALID_VNID;
+        goto fail;
     }
 
+    /* Vxlan carried packets are always L2 payload packets */
+    pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
+
+    if (vr_pkt_type(pkt, 0) < 0) {
+        drop_reason = VP_DROP_INVALID_PACKET;
+        goto fail;
+    }
+
+    if (nh->nh_vrf >= 0) {
+        vrf = nh->nh_vrf;
+    } else if (nh->nh_dev) {
+        vrf = nh->nh_dev->vif_vrf;
+    } else {
+        vrf = pkt->vp_if->vif_vrf;
+    }
+
+    return nh_output(vrf, pkt, nh, fmd);
+
 fail:
-    vr_pfree(pkt, VP_DROP_INVALID_VNID);
+    vr_pfree(pkt, drop_reason);
     return 0;
 }
 

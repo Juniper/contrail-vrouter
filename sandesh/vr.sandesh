@@ -241,4 +241,5 @@ buffer sandesh vr_drop_stats_req {
     42: i64             vds_invalid_vnid;
     43: i64             vds_frag_err;
     44: i64             vds_invalid_source;
+    45: i64             vds_mcast_df_bit;
 }
