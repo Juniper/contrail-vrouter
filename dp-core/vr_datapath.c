@@ -282,7 +282,7 @@ vr_pkt_type(struct vr_packet *pkt)
     else if (eth_proto == VR_ETH_PROTO_ARP)
         pkt->vp_type = VP_TYPE_ARP;
     else
-        pkt->vp_type = VP_TYPE_L2;
+        pkt->vp_type = VP_TYPE_UNKNOWN;
 
     return 0;
 }
@@ -500,8 +500,7 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
         return 1;
     }
 
-    /* Mark the packet as L2 */
-    pkt->vp_type = VP_TYPE_L2;
+    pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
     vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
     return 1;
 }
@@ -515,8 +514,8 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
     struct vr_udp *udph;
     struct vr_icmp *icmph = NULL;
 
-    if (vif_is_virtual(pkt->vp_if) &&
-            (pkt->vp_flags & VP_FLAG_MULTICAST)) {
+    if ((pkt->vp_flags & VP_FLAG_MULTICAST) &&
+        (vif_is_virtual(pkt->vp_if))) {
         iph = (struct vr_ip *)data;
         if (!vr_ip_is_ip6(iph)) {
             if ((iph->ip_proto == VR_IP_PROTO_UDP) &&

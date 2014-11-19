@@ -61,7 +61,7 @@
 #define VP_FLAG_FLOW_GET        (1 << 2)
 /* packet already went through one round of policy lookup */
 #define VP_FLAG_FLOW_SET        (1 << 3)
-/* The native packet is multicast packet */
+/*The native packet is multicast packet */
 #define VP_FLAG_MULTICAST       (1 << 4)
 /* Partially checksummed by VM */
 #define VP_FLAG_CSUM_PARTIAL    (1 << 5)
@@ -69,6 +69,8 @@
 #define VP_FLAG_GRO             (1 << 6)
 /* Attempt to do segmentation on inner packet */
 #define VP_FLAG_GSO             (1 << 7)
+/* Mark the packet as L2 payload packet */
+#define VP_FLAG_L2_PAYLOAD      (1 << 8)
 
 /* 
  * possible 256 values of what a packet can be. currently, this value is
@@ -84,13 +86,9 @@
 #define VP_TYPE_IPOIP           4
 #define VP_TYPE_IP6OIP          5
 
-/* keep all the L2 packets within VP_TYPE_L2 and VP_TYPE_VXLAN */
-#define VP_TYPE_L2              6
-#define VP_TYPE_L2OIP           7
-#define VP_TYPE_VXLAN           8
-
-#define VP_TYPE_AGENT           9
-#define VP_TYPE_MAX             10
+#define VP_TYPE_AGENT           6
+#define VP_TYPE_UNKNOWN         7
+#define VP_TYPE_MAX             8
 
 /*
  * Values to define how to proceed with handling a packet.
@@ -236,15 +234,6 @@ struct vr_packet {
     unsigned char vp_ttl;
 };
 
-
-static inline bool
-pkt_is_l2(struct vr_packet *pkt)
-{
-    if ((pkt->vp_type >= VP_TYPE_L2) &&
-            (pkt->vp_type <= VP_TYPE_VXLAN))
-        return true;
-    return false;
-}
 
 struct vr_packet_node {
     struct vr_list_node pl_node;
@@ -412,8 +401,7 @@ static inline bool
 vr_pkt_is_ip(struct vr_packet *pkt)
 {
     if (pkt->vp_type == VP_TYPE_IPOIP || pkt->vp_type == VP_TYPE_IP ||
-              pkt->vp_type == VP_TYPE_L2 || pkt->vp_type == VP_TYPE_L2OIP ||
-              pkt->vp_type == VP_TYPE_VXLAN || pkt->vp_type == VP_TYPE_IP6OIP)
+              pkt->vp_type == VP_TYPE_IP6OIP)
         return true;
 
     return false;
@@ -422,8 +410,7 @@ vr_pkt_is_ip(struct vr_packet *pkt)
 static inline bool
 vr_pkt_type_is_overlay(unsigned short type)
 {
-    if (type == VP_TYPE_IPOIP || type == VP_TYPE_L2OIP ||
-              type == VP_TYPE_VXLAN || type == VP_TYPE_IP6OIP)
+    if (type == VP_TYPE_IPOIP || type == VP_TYPE_IP6OIP)
         return true;
 
     return false;

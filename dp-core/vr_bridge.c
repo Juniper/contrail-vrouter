@@ -376,9 +376,6 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     char bcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     char *mac;
 
-    /* First mark the packet as L2 */
-    pkt->vp_type = VP_TYPE_L2;
-
     mac = (char *)pkt_data(pkt);
     rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
     rt.rtr_req.rtr_mac =(int8_t *) mac;

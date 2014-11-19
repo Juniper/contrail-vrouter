@@ -97,8 +97,8 @@ struct host_os {
                                    int (*is_label_l2)(unsigned int,
                                        unsigned int, unsigned short *));
     int  (*hos_pcow)(struct vr_packet *, unsigned short); 
-    uint16_t (*hos_get_udp_src_port)(struct vr_packet *,
-                                  struct vr_forwarding_md *, unsigned short);
+    uint16_t (*hos_get_udp_src_port)(struct vr_packet *, struct vr_forwarding_md *,
+                                     unsigned short, void *);
     int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *, unsigned short);
     int  (*hos_pull_inner_headers_fast)(struct vr_packet *,
                                         unsigned char, int
