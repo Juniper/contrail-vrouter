@@ -1323,6 +1323,9 @@ vr_interface_common_hook(struct sk_buff *skb)
         vif = vr_get_vif_ptr(skb->dev);
     }
 
+    if (!vif)
+        goto error;
+
 #if 0
     if(vrouter_dbg) {
         __skb_dump_info("vr_intf_br_hk:", skb, vif);

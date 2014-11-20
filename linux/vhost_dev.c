@@ -226,6 +226,15 @@ vhost_if_add(struct vr_interface *vif)
     vp->vp_vifp = vif;
     if (vif->vif_type == VIF_TYPE_HOST) {
         if (vif->vif_bridge) {
+            /*
+             * if there already was an association, need to remove that
+             */
+            if ((vp->vp_phys_dev) &&
+                    (vp->vp_phys_dev !=
+                     ((struct net_device *)vif->vif_bridge->vif_os))) {
+                vhost_del_tap_phys(vp->vp_phys_dev);
+            }
+
             vp->vp_phys_dev =
                 (struct net_device *)vif->vif_bridge->vif_os;
             strncpy(vp->vp_phys_name, vp->vp_phys_dev->name,
