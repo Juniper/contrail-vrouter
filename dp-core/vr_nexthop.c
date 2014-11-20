@@ -1478,6 +1478,7 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
     struct vr_ip *ip;
+    unsigned short *proto_p;
 
     stats = vr_inet_vrf_stats(vrf, pkt->vp_cpu);
 
@@ -1540,22 +1541,19 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
             pkt_pull(pkt, VR_MPLS_HDR_LEN);
         }
     } else {
-
-        /* 
-         * Same NH for both V4 and V6, update the rewrite data with correct ethtype
-         */
-        if (pkt->vp_type == VP_TYPE_IP6) {
-            nh->nh_data[nh->nh_encap_len-2] = 0x86;
-            nh->nh_data[nh->nh_encap_len-1] = 0xDD;
-        } else {
-            nh->nh_data[nh->nh_encap_len-2] = 0x08;
-            nh->nh_data[nh->nh_encap_len-1] = 0x00;
-        }
-            
         if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data,
                 nh->nh_encap_len)) {
             vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
             return 0;
+        }
+
+        if (nh->nh_encap_len) {
+            proto_p = (unsigned short *)(pkt_data(pkt) +
+                    nh->nh_encap_len - 2);
+            if (pkt->vp_type == VP_TYPE_IP6)
+                *proto_p = htons(VR_ETH_PROTO_IP6);
+            else
+                *proto_p = htons(VR_ETH_PROTO_IP);
         }
     }
 
