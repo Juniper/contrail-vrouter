@@ -2,7 +2,7 @@
  * vr_host_message.c -- messaging infrastructure to interface with dp-core when
  *                      run as a library
  *
- * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved. 
+ * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include "vr_os.h"
 #include "vr_queue.h"
@@ -24,7 +24,7 @@ struct diet_message {
 };
 
 struct diet_object_md {
-    /* 
+    /*
      * when encoded, how much length will this object take. since encode
      * and decode does not do much to the object, encode/decode lengths
      * are the same
@@ -37,7 +37,7 @@ struct diet_object_md {
     int (*obj_response)(struct diet_message *, void *,
             int (*)(void *, unsigned int, void *), void *);
 };
-
+int diet_dropstats_object_copy(char *, unsigned int, void *);
 int diet_interface_object_copy(char *, unsigned int, void *);
 int diet_nexthop_object_copy(char *, unsigned int, void *);
 int diet_mpls_object_copy(char *, unsigned int, void *);
@@ -53,7 +53,7 @@ struct diet_object_md diet_md[] = {
     },
     [VR_INTERFACE_OBJECT_ID]    =   {
         .obj_len                =       sizeof(vr_interface_req) +
-                                        VR_ETHER_ALEN, 
+                                        VR_ETHER_ALEN,
 
         .obj_copy               =       diet_interface_object_copy,
         .obj_request            =       vr_interface_req_process,
@@ -61,7 +61,7 @@ struct diet_object_md diet_md[] = {
     },
     [VR_NEXTHOP_OBJECT_ID]    =   {
         .obj_len                =       sizeof(vr_nexthop_req) +
-                                        VR_ETHER_HLEN, 
+                                        VR_ETHER_HLEN,
 
         .obj_copy               =       diet_nexthop_object_copy,
         .obj_request            =       vr_nexthop_req_process,
@@ -84,7 +84,24 @@ struct diet_object_md diet_md[] = {
         .obj_copy               =       diet_response_object_copy,
         .obj_response           =       diet_object_response,
     },
+    [VR_DROP_STATS_OBJECT_ID]   =   {
+        .obj_len                =       sizeof(vr_drop_stats_req),
+        .obj_copy               =       diet_dropstats_object_copy,
+        .obj_response           =       diet_object_response,
+     }
 };
+
+int
+diet_dropstats_object_copy(char *dst, unsigned int buf_len, void *object)
+{
+    vr_drop_stats_req *src = (vr_drop_stats_req *)object;
+
+    if (buf_len < diet_md[VR_DROP_STATS_OBJECT_ID].obj_len)
+        return -ENOSPC;
+
+    memcpy(dst, src, sizeof(*src));
+    return sizeof(*src);
+}
 
 int
 diet_route_object_copy(char *dst, unsigned int buf_len, void *object)
@@ -179,9 +196,9 @@ diet_object_response(struct diet_message *hdr, void *object,
             diet_md[hdr->m_oid].obj_len, object);
 
     if (ret > 0) {
-        if (cb(arg, hdr->m_oid, dst_buf))
-            vr_mtrans_free(dst_buf);
-    } 
+        cb(arg, hdr->m_oid, dst_buf);
+    }
+    vr_mtrans_free(dst_buf);
 
     return ret;
 }
