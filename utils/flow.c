@@ -126,7 +126,8 @@ dump_table(struct flow_table *ft)
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
     const char *drop_reason = NULL;
-    struct in_addr in_src, in_dest;
+    char in_src[64], in_dest[64];
+    int family = AF_INET;
 
     printf("Flow table\n\n");
     printf(" Index              Source:Port           Destination:Port    \tProto(V)\n");
@@ -138,18 +139,22 @@ dump_table(struct flow_table *ft)
         need_drop_reason = 0;
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
-            in_src.s_addr = fe->fe_key.key_src_ip;
-            in_dest.s_addr = fe->fe_key.key_dest_ip;
+            if (fe->fe_key.key_src_ip[15] != 0)
+                family = AF_INET6;
+            else
+                family = AF_INET;
+
+            inet_ntop(family, fe->fe_key.key_src_ip, in_src, 64);
+            inet_ntop(family, fe->fe_key.key_dest_ip, in_dest, 64);
             printf("%6d", i);
             if (fe->fe_rflow >= 0)
                 printf("<=>%-6d", fe->fe_rflow);
             else
                 printf("         ");
 
-            printf("   %12s:%-5d    ", inet_ntoa(in_src),
-                    ntohs(fe->fe_key.key_src_port));
-            printf("%16s:%-5d    %d (%d",
-                    inet_ntoa(in_dest),
+            printf("   %20s:%-5d    ", in_src, ntohs(fe->fe_key.key_src_port));
+            printf("%20s:%-5d    %d (%d",
+                    in_dest,
                     ntohs(fe->fe_key.key_dst_port),
                     fe->fe_key.key_proto,
                     fe->fe_vrf);
@@ -564,8 +569,8 @@ flow_validate(int flow_index, char action)
     flow_req.fr_op = FLOW_OP_FLOW_SET;
     flow_req.fr_index = flow_index;
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    flow_req.fr_flow_sip = fe->fe_key.key_src_ip;
-    flow_req.fr_flow_dip = fe->fe_key.key_dest_ip;
+    memcpy(flow_req.fr_flow_sip, fe->fe_key.key_src_ip, 16);
+    memcpy(flow_req.fr_flow_dip, fe->fe_key.key_dest_ip, 16);
     flow_req.fr_flow_proto = fe->fe_key.key_proto;
     flow_req.fr_flow_sport = fe->fe_key.key_src_port;
     flow_req.fr_flow_dport = fe->fe_key.key_dst_port;
