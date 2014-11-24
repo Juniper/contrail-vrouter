@@ -23,7 +23,7 @@ vr_grat_arp(struct vr_arp *sarp)
 }
 
 static int 
-vr_v6_prefix_is_ll(uint8_t prefix[])  
+vr_v6_prefix_is_ll(uint8_t *prefix)
 {
     if ((prefix[0] == 0xFE) && (prefix[1] == 0x80)) {
         return true;
@@ -470,7 +470,7 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
     if (fmd->fmd_vlan == VLAN_ID_INVALID) {
         if ((pkt->vp_flags & VP_FLAG_MULTICAST) &&
                 (vif->vif_flags & VIF_FLAG_L3_ENABLED)) {
-            if (pkt->vp_type == VP_TYPE_ARP || 
+            if (pkt->vp_type == VP_TYPE_ARP ||
                     vr_l3_well_known_packet(vrf, pkt)) {
                 if (vr_l3_input(vrf, pkt, fmd))
                     return 1;
@@ -493,7 +493,7 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
             }
         }
     }
-        
+
     /* Restore back the L2 headers */
     if (!pkt_push(pkt, pull_len)) {
         vr_pfree(pkt, VP_DROP_PULL);
@@ -539,10 +539,11 @@ vr_l3_well_known_packet(unsigned short vrf, struct vr_packet *pkt)
                  * Bridge neighbor solicit for link-local addresses 
                  */
                 if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
-                    icmph = ((char *)ip6 + sizeof(struct vr_ip6));
+                    icmph = (struct vr_icmp *)((char *)ip6
+                                        + sizeof(struct vr_ip6));
                 }
                 if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL)
-                          && vr_v6_prefix_is_ll(&icmph->icmp_data)) {
+                          && vr_v6_prefix_is_ll(&icmph->icmp_data[0])) {
                     return false;
                 }
             }
@@ -560,7 +561,7 @@ vr_trap_l2_well_known_packets(unsigned short vrf, struct vr_packet *pkt,
 
     if (vif_is_virtual(pkt->vp_if) && well_known_mac(pkt_data(pkt))) {
         vr_trap(pkt, vrf,  AGENT_TRAP_L2_PROTOCOLS, NULL);
-        return 1;   
+        return 1;
     }
 
     return 0;
@@ -617,4 +618,3 @@ vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
     *vlan_tag = htons(vlan_id);
     return 0;
 }
-
