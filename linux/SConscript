@@ -10,6 +10,10 @@ if 'install' in COMMAND_LINE_TARGETS:
     env.Install(env['SRC_INSTALL_TARGET'], Glob('*.c'))
     env.Alias('install', env['SRC_INSTALL_TARGET'])
 
+env.Append(SRC_INSTALL_TARGET = '/linux/')
+env.Install(env['SRC_INSTALL_TARGET'], Glob('*.c'))
+env.Alias('compute-node-install', env['SRC_INSTALL_TARGET'])
+
 # Local Variables:
 # mode: python
 # End:

@@ -44,6 +44,14 @@ if 'install' in COMMAND_LINE_TARGETS:
     env.Install(env['SRC_INSTALL_TARGET'] + 'library/c/transport/', sandesh_transport_sources)
     env.Alias('install', env['SRC_INSTALL_TARGET'])
 
+
+env.Append(SRC_INSTALL_TARGET = '/sandesh/')
+env.Install(env['SRC_INSTALL_TARGET'] + 'gen-c/', sandesh_generateds)
+env.Install(env['SRC_INSTALL_TARGET'] + 'library/c/', sandesh_sources)
+env.Install(env['SRC_INSTALL_TARGET'] + 'library/c/protocol/', sandesh_protocol_sources)
+env.Install(env['SRC_INSTALL_TARGET'] + 'library/c/transport/', sandesh_transport_sources)
+env.Alias('compute-node-install', env['SRC_INSTALL_TARGET'])
+
 # Local Variables:
 # mode: python
 # End:

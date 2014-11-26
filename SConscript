@@ -112,6 +112,7 @@ if sys.platform != 'darwin':
     libmod_dir = install_root
     libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
     env.Alias('build-kmodule', env.Install(libmod_dir, kern))
+    env.Alias('compute-node-install', env.Install(libmod_dir, kern))
 
 # Local Variables:
 # mode: python
