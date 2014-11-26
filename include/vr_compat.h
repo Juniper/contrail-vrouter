@@ -9,7 +9,7 @@
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0))
 #if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 5)))
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 5)))
 typedef u64 netdev_features_t;
 #endif
 #endif
@@ -138,7 +138,7 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 
 #ifndef ISRHOSKERNEL
 #if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 5)))
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 5)))
 static bool can_checksum_protocol(netdev_features_t features, __be16 protocol)
 {
         return ((features & NETIF_F_GEN_CSUM) ||
