@@ -334,7 +334,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
         unsigned short type)
 {
     int err = -ENOMEM;
-    struct vr_ip *iph;
+    struct vr_ip *iph, *i_iph = NULL;
     unsigned short iphlen;
     unsigned short ethlen;
     struct udphdr *udph;
@@ -365,7 +365,20 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     }
     iph = (struct vr_ip *)(seg->data + ethlen);
     iph->ip_len = htons(seg->len - ethlen);
-    iph->ip_id = htons(vr_generate_unique_ip_id());
+
+    if (type == VP_TYPE_IPOIP)
+        i_iph = (struct vr_ip *)skb_network_header(seg);
+
+    /*
+     * it is important that we copy the inner network header's
+     * ip id to outer. For now, agent diagnostics (traceroute)
+     * depends on this behavior.
+     */
+    if (i_iph)
+        iph->ip_id = i_iph->ip_id;
+    else
+        iph->ip_id = htons(vr_generate_unique_ip_id());
+
     iph->ip_csum = 0;
     iph->ip_csum = ip_fast_csum(iph, iph->ip_hl);
 
@@ -957,6 +970,7 @@ linux_get_packet(struct sk_buff *skb, struct vr_interface *vif)
     if (skb->ip_summed == CHECKSUM_PARTIAL)
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
+    pkt->vp_ttl = 64;
     pkt->vp_type = VP_TYPE_NULL;
 
     return pkt;

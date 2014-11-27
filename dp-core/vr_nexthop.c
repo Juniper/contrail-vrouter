@@ -236,7 +236,13 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
     ip->ip_tos = 0;
     ip->ip_id = htons(vr_generate_unique_ip_id());
     ip->ip_frag_off = 0;
-    ip->ip_ttl = 64;
+
+    if (vr_pkt_is_diag(pkt)) {
+        ip->ip_ttl = pkt->vp_ttl;
+    } else {
+        ip->ip_ttl = 64;
+    }
+
     ip->ip_proto = VR_IP_PROTO_UDP;
     ip->ip_saddr = sip;
     ip->ip_daddr = dip;
@@ -1310,7 +1316,13 @@ nh_gre_tunnel(unsigned short vrf, struct vr_packet *pkt,
     ip->ip_tos = 0;
     ip->ip_id = id;
     ip->ip_frag_off = 0;
-    ip->ip_ttl = 64;
+
+    if (vr_pkt_is_diag(pkt)) {
+        ip->ip_ttl = pkt->vp_ttl;
+    } else {
+        ip->ip_ttl = 64;
+    }
+
     ip->ip_proto = VR_IP_PROTO_GRE;
     ip->ip_saddr = nh->nh_gre_tun_sip;
     ip->ip_daddr = nh->nh_gre_tun_dip;
@@ -1341,6 +1353,10 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
     struct vr_nexthop *src_nh = NULL;
     struct vr_ip *ip;
     bool need_flow_lookup = false;
+
+    if (!pkt->vp_ttl) {
+        return vr_trap(pkt, vrf, AGENT_TRAP_ZERO_TTL, NULL);
+    }
 
     pkt->vp_nh = nh;
 
@@ -1486,23 +1502,15 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
     ip = (struct vr_ip *)pkt_network_header(pkt);
     if (vr_ip_is_ip6(ip)) {
         pkt->vp_type = VP_TYPE_IP6;
-        if (stats) {
-            if ((pkt->vp_flags & VP_FLAG_GRO) &&
-                    vif_is_virtual(vif)) {
-                stats->vrf_gros++;
-            } else {
-                stats->vrf_encaps++;
-            }
-        }
     } else {
         pkt->vp_type = VP_TYPE_IP;
-#ifdef VROUTER_CONFIG_DIAG
-    if (ip->ip_csum == VR_DIAG_IP_CSUM) {
+    }
+
+    if (vr_pkt_is_diag(pkt)) {
         pkt->vp_flags &= ~VP_FLAG_GRO;
         if (stats)
             stats->vrf_diags++;
     } else {
-#else
         if (stats) {
             if ((pkt->vp_flags & VP_FLAG_GRO) &&
                     vif_is_virtual(vif)) {
@@ -1511,10 +1519,6 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
                 stats->vrf_encaps++;
             }
         }
-#endif
-#ifdef VROUTER_CONFIG_DIAG
-    }
-#endif
     }
 
     /*
@@ -1557,16 +1561,14 @@ nh_encap_l3_unicast(unsigned short vrf, struct vr_packet *pkt,
         }
     }
 
-#ifdef VROUTER_CONFIG_DIAG
     /*
      * Look if this is the Diag packet to trap to agent
      */
-    if (ip->ip_csum == VR_DIAG_IP_CSUM) {
+    if (vr_pkt_is_diag(pkt)) {
         pkt->vp_if = vif;
         vr_pset_data(pkt, pkt->vp_data);
         return vr_trap(pkt, vrf, AGENT_TRAP_DIAG, &vif->vif_idx);
     }
-#endif
 
     vif->vif_tx(vif, pkt);
 

@@ -296,6 +296,13 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
             agent_vif = vif;
         }
         pkt->vp_if = agent_vif;
+
+        if (ntohl(hdr->hdr_cmd_param) == CMD_PARAM_PACKET_CTRL) {
+            if (ntohl(hdr->hdr_cmd_param_1) == CMD_PARAM_1_DIAG) {
+                pkt->vp_flags |= VP_FLAG_DIAG;
+            }
+        }
+
         vr_virtual_input(ntohs(hdr->hdr_vrf), agent_vif, pkt, VLAN_ID_INVALID);
     } else {
         vif = __vrouter_get_interface(vrouter_get(0), ntohs(hdr->hdr_ifindex));
@@ -345,6 +352,7 @@ agent_trap_may_truncate(int trap_reason)
     case AGENT_TRAP_FLOW_MISS:
     case AGENT_TRAP_ECMP_RESOLVE:
     case AGENT_TRAP_HANDLE_DF:
+    case AGENT_TRAP_ZERO_TTL:
         return 1;
 
     case AGENT_TRAP_ARP:
@@ -371,9 +379,11 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_df_trap_arg *dta;
     bool truncate = false;
 
+
     vr_preset(pkt);
 
-    if (params->trap_reason == AGENT_TRAP_HANDLE_DF) {
+    if ((params->trap_reason == AGENT_TRAP_HANDLE_DF) ||
+            (params->trap_reason == AGENT_TRAP_ZERO_TTL)) {
         if (pkt_len(pkt) > VR_AGENT_MIN_PACKET_LEN)
             truncate = true;
     }
@@ -433,6 +443,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
     default:
         hdr->hdr_cmd_param = 0;
+        hdr->hdr_cmd_param_1 = 0;
         break;
     }
 

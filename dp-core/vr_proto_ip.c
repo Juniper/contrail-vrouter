@@ -6,6 +6,8 @@
 #include <vr_os.h>
 #include <vr_types.h>
 #include <vr_packet.h>
+
+#include "vr_datapath.h"
 #include "vr_mpls.h"
 #include "vr_vxlan.h"
 #include "vr_mcast.h"
@@ -99,6 +101,24 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
     return nh;
 }
 
+static inline unsigned char
+vr_ip_decrement_ttl(struct vr_ip *ip)
+{
+    unsigned int diff = 0xfffe;
+    unsigned int csum;
+
+    csum = (~ip->ip_csum) & 0xffff;
+    csum += diff;
+    csum = (csum >> 16) + (csum & 0xffff);
+    if (csum >> 16)
+        csum = (csum & 0xffff) + 1;
+
+    --ip->ip_ttl;
+    ip->ip_csum = ~(csum & 0xffff);
+
+    return ip->ip_ttl;
+}
+
 int
 vr_forward(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
@@ -110,7 +130,8 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     struct vr_icmp *icmph;
     struct vr_forwarding_md rt_fmd;
     struct vr_interface *vif;
-    int family = AF_INET, status, encap_len = 0;
+    int family, status, encap_len = 0;
+    unsigned char ttl;
     short plen;
     uint32_t rt_prefix[4];
 
@@ -122,11 +143,22 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     if (vr_ip_is_ip6(ip)) {
         family = AF_INET6;
         ip6 = (struct vr_ip6 *)pkt_data(pkt);
+        /* ttl = --ip6->ip6_hlim */
+        ttl = ip6->ip6_hlim;
         pkt->vp_type = VP_TYPE_IP6;
     } else {
+        family = AF_INET;
+        if (!ip->ip_ttl) {
+            vr_pfree(pkt, VP_DROP_TTL_EXCEEDED);
+            return 0;
+        }
+
+        ttl = vr_ip_decrement_ttl(ip);
         pkt->vp_type = VP_TYPE_IP;
     }
  
+    pkt->vp_ttl = ttl;
+
     rt.rtr_req.rtr_vrf_id = vrf;
     rt.rtr_req.rtr_family = family;
     if (family == AF_INET) {
@@ -211,6 +243,61 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     status =  nh_output(vrf, pkt, nh, fmd);
 
     return status;
+}
+
+unsigned int
+vr_icmp_input(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    int ret;
+    unsigned int offset = 0, pull_len = 0;
+    unsigned int unhandled = 1, handled = 0;
+    struct vr_icmp *icmph;
+    struct vr_ip *iph;
+    struct vr_udp *udph;
+
+    icmph = (struct vr_icmp *)(pkt_data(pkt) + offset);
+    pull_len += sizeof(*icmph);
+
+    if (vr_icmp_error(icmph)) {
+        pull_len += sizeof(*iph);
+        ret = vr_pkt_may_pull(pkt, pull_len);
+        if (ret)
+            return unhandled;
+
+        offset += sizeof(*icmph);
+        iph = (struct vr_ip *)(pkt_data(pkt) + offset);
+        if ((iph->ip_proto != VR_IP_PROTO_GRE) &&
+                (iph->ip_proto != VR_IP_PROTO_UDP))
+            return unhandled;
+
+        pull_len += ((iph->ip_hl * 4) - sizeof(*iph));
+        ret = vr_pkt_may_pull(pkt, pull_len);
+        if (ret)
+            return unhandled;
+
+        iph = (struct vr_ip *)(pkt_data(pkt) + offset);
+        if (iph->ip_proto == VR_IP_PROTO_UDP) {
+            /* for sport and dport */
+            pull_len += 4;
+            offset += (iph->ip_hl * 4);
+            ret = vr_pkt_may_pull(pkt, pull_len);
+            if (ret)
+                return unhandled;
+            /*
+             * Note - we can't look at any other data other than ports
+             * since we pull only the first 4 bytes
+             */
+            udph = (struct vr_udp *)(pkt_data(pkt) + offset);
+            if (ntohs(udph->udp_dport) != VR_MPLS_OVER_UDP_DST_PORT)
+                return unhandled;
+        }
+
+        vr_trap(pkt, pkt->vp_if->vif_vrf, AGENT_TRAP_ICMP_ERROR, 0);
+        return handled;
+    }
+
+    return unhandled;
 }
 
 /*
@@ -392,10 +479,24 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
             unhandled = vr_gre_input(router, pkt, fmd);
         } else if (ip->ip_proto == VR_IP_PROTO_UDP) {
             unhandled = vr_udp_input(router, pkt, fmd);
+        } else if (ip->ip_proto == VR_IP_PROTO_ICMP) {
+            unhandled = vr_icmp_input(router, pkt, fmd);
         }
     }
 
     if (unhandled) {
+        /*
+         * the gre, udp, icmp handlers could have pulled the packet. so
+         * reset the notion of ip header
+         */
+        if (!(ip = (struct vr_ip *)pkt_push(pkt, hlen))) {
+            drop_reason = VP_DROP_PUSH;
+            goto drop_pkt;
+        }
+
+        /* ...and position the data back to l4 header */
+        pkt_pull(pkt, hlen);
+
         if (pkt->vp_nh) {
 
             /*
