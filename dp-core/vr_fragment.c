@@ -304,7 +304,7 @@ vr_fragment_table_init(struct vrouter *router)
         router->vr_fragment_table = vr_btable_alloc(num_entries,
                 sizeof(struct vr_fragment));
         if (!router->vr_fragment_table)
-            return vr_module_error(-EINVAL, __FUNCTION__,
+            return vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, num_entries);
     }
 
@@ -313,7 +313,7 @@ vr_fragment_table_init(struct vrouter *router)
         router->vr_fragment_otable = vr_btable_alloc(num_entries,
                 sizeof(struct vr_fragment));
         if (!router->vr_fragment_otable)
-            return vr_module_error(-EINVAL, __FUNCTION__,
+            return vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, num_entries);
     }
 
