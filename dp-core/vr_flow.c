@@ -1770,7 +1770,7 @@ vr_flow_init(struct vrouter *router)
 {
     int ret;
 
-    if ((ret = vr_fragment_table_init(router) < 0))
+    if ((ret = vr_fragment_table_init(router)) < 0)
         return ret;
 
     if ((ret = vr_flow_table_init(router)))
