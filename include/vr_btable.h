@@ -6,7 +6,7 @@
 #ifndef __VR_BTABLE_H__
 #define __VR_BTABLE_H__
 
-#define VR_SINGLE_ALLOC_LIMIT   (4  * 1024 * 1024)
+#define VR_SINGLE_ALLOC_LIMIT   (4  * 32 * 1024)
 
 struct vr_btable_partition {
     unsigned int vb_offset;
