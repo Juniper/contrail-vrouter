@@ -44,4 +44,9 @@
 unsigned int
 vr_bridge_input(struct vrouter *, unsigned short , struct vr_packet *, 
                             struct vr_forwarding_md *);
+int vr_get_bridge_entry_mac_by_index(unsigned int , unsigned char *);
+extern int (*vr_find_bridge_entry_index)(unsigned int, struct vr_route_req *,
+                unsigned int *);
+
+
 #endif

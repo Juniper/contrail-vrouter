@@ -27,8 +27,14 @@ struct rtable_fspec;
 
 struct vr_route_req {
     vr_route_req        rtr_req;
-    struct vr_nexthop   *rtr_nh;
+    union {
+        struct vr_nexthop   *rre_nh;
+        unsigned long rre_bridge_index;
+    } route_req_entry;
 };
+
+#define rtr_nh  route_req_entry.rre_nh
+#define rtr_bridge_index route_req_entry.rre_bridge_index
 
 struct vr_vrf_stats {
     uint64_t vrf_discards;
@@ -65,7 +71,7 @@ struct vr_route {
 struct vr_rtable {
     int (*algo_add)(struct vr_rtable *, struct vr_route_req *);
     int (*algo_del)(struct vr_rtable *, struct vr_route_req *);
-    struct vr_nexthop *(*algo_lookup)(unsigned int, struct vr_route_req *,
+    bool (*algo_lookup)(unsigned int, struct vr_route_req *,
             struct vr_packet *);
     int (*algo_get)(unsigned int, struct vr_route_req *);
     int (*algo_dump)(struct vr_rtable *, struct vr_route_req *);

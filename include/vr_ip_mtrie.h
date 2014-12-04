@@ -12,16 +12,25 @@ extern "C" {
 struct ip_bucket;
 
 /*
- * Override the least significant bit of a pointer to indicate whether it
- * points to a bucket or nexthop.
+ * The last two bits of the pointer indicate the entry type
+ * 00 - Nexthop
+ * 01 - Index
+ * 10 - Bucket
  */
-#define ENTRY_IS_BUCKET(EPtr)        (((EPtr)->entry_long_i) & 0x1ul)
-#define ENTRY_IS_NEXTHOP(EPtr)       !ENTRY_IS_BUCKET(EPtr)
+#define ENTRY_IS_BUCKET(EPtr)        ((((EPtr)->entry_long_i) & 0x3ul) == 0x2ul)
+#define ENTRY_IS_NEXTHOP(EPtr)       ((((EPtr)->entry_long_i) & 0x3ul) == 0)
+#define ENTRY_IS_INDEX(EPtr)         ((((EPtr)->entry_long_i) & 0x3ul) == 0x1ul)
 
-#define PTR_IS_BUCKET(ptr)           ((ptr) & 0x1ul)
-#define PTR_IS_NEXTHOP(ptr)          !PTR_IS_BUCKET(ptr)
-#define PTR_TO_BUCKET(ptr)           ((struct ip_bucket *)((ptr) ^ 0x1ul))
-#define PTR_TO_NEXTHOP(ptr)          ((struct vr_nexthop *)(ptr))
+#define DATA_IS_BUCKET(ptr)           (((ptr) & 0x3ul) == 0x2ul)
+#define DATA_IS_INDEX(ptr)            (((ptr) & 0x3ul) == 0x1ul)
+#define DATA_IS_NEXTHOP(ptr)          (((ptr) & 0x3ul) == 0)
+
+#define DATA_TO_BUCKET(ptr)           ((struct ip_bucket *)((ptr) ^ 0x2ul))
+#define DATA_TO_INDEX(ptr)            (((unsigned long)(ptr)) >> 2)
+#define DATA_TO_NEXTHOP(ptr)          ((struct vr_nexthop *)(ptr))
+
+#define BUCKET_TO_DATA(index)         (((unsigned long)(index)) | 0x2ul)
+#define INDEX_TO_DATA(index)          ((((unsigned long)(index)) << 2) | 0x1ul)
 
 struct ip_bucket_entry {
     union {

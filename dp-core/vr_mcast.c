@@ -78,7 +78,7 @@ vr_find_free_mcast_entry(struct vr_mcast_entry_key *key)
     return vr_find_free_hentry(vn_rtable, key, NULL);
 }
 
-static struct vr_nexthop *
+static bool
 mcast_lookup(unsigned int vrf_id, struct vr_route_req *rt,
         struct vr_packet *pkt) 
 {
@@ -100,21 +100,20 @@ mcast_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     if (ent) {
         rt->rtr_req.rtr_label_flags = ent->flags;
         rt->rtr_nh = ent->nh;
-        return rt->rtr_nh;
+        return true;
     }
 
-    return NULL;
+    return false;
 }
 
 static int
 mcast_get(unsigned int vrf_id, struct vr_route_req *rt)
 {
-    struct vr_nexthop *nh;
-
     rt->rtr_req.rtr_nh_id = NH_DISCARD_ID;
-    nh = mcast_lookup(vrf_id, rt, NULL);
-    if (nh)
-        rt->rtr_req.rtr_nh_id = nh->nh_id;
+    if (mcast_lookup(vrf_id, rt, NULL))
+        rt->rtr_req.rtr_nh_id = rt->rtr_nh->nh_id;
+    else
+        rt->rtr_req.rtr_nh_id = -1;
     return 0;
 }
 
@@ -385,10 +384,10 @@ vr_mcast_forward(struct vrouter *router, unsigned short vrf,
         *(uint32_t*)rt.rtr_req.rtr_src = ntohl(ip->ip_saddr);
     }
 
-    nh = mcast_lookup(vrf, &rt, pkt);
-    if (!nh) {
+    if (mcast_lookup(vrf, &rt, pkt))
+        nh = rt.rtr_nh;
+    else
         nh = ip4_default_nh;
-    }
 
     return nh_output(vrf, pkt, nh, fmd);
 }
