@@ -1377,7 +1377,7 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
     }
 
     if (!vr_pkt_is_l2(pkt)) {
-        if (pkt->vp_type == VP_TYPE_IP) {
+        if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
             /*
              * If the packet has not gone through flow lookup once
              * (!VP_FLAG_FLOW_SET), we need to determine whether it has to undergo
@@ -1406,8 +1406,13 @@ nh_output(unsigned short vrf, struct vr_packet *pkt,
 
                 if (need_flow_lookup) {
                     pkt->vp_flags |= VP_FLAG_FLOW_GET;
-                    vr_flow_inet_input(nh->nh_router, vrf,
+                    if (pkt->vp_type == VP_TYPE_IP) {
+                        vr_flow_inet_input(nh->nh_router, vrf,
                             pkt, VR_ETH_PROTO_IP, fmd);
+                    } else {
+                        vr_flow_inet6_input(nh->nh_router, vrf,
+                            pkt, VR_ETH_PROTO_IP6, fmd);
+                    }
                     return 1;
                 }
             }

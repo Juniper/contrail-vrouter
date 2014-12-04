@@ -64,8 +64,8 @@ struct vr_flow_key {
     unsigned short key_src_port;
     unsigned short key_dst_port;
     /* we should be doing memcpy for the two ips */
-    unsigned int key_src_ip;
-    unsigned int key_dest_ip;
+    unsigned char key_src_ip[16];
+    unsigned char key_dest_ip[16];
     unsigned short key_nh_id;
     unsigned char key_proto;
     unsigned char key_zero;
@@ -137,9 +137,10 @@ struct vr_dummy_flow_entry {
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
     unsigned short fe_udp_src_port;
+    unsigned int fe_flow_family;
 } __attribute__((packed));
 
-#define VR_FLOW_ENTRY_PACK (64 - sizeof(struct vr_dummy_flow_entry))
+#define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
 
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
@@ -157,6 +158,7 @@ struct vr_flow_entry {
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
     unsigned short fe_udp_src_port;
+    unsigned int fe_flow_family;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 

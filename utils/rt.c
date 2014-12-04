@@ -99,7 +99,7 @@ void
 vr_route_req_process(void *s_req)
 {
     int ret = 0, i;
-    int8_t addr[16];
+    int8_t addr[64];
     char flags[4];
     vr_route_req *rt = (vr_route_req *)s_req;
 
@@ -144,7 +144,7 @@ vr_route_req_process(void *s_req)
         if (rt->rtr_rt_type == RT_UCAST) {
             
             if (rt->rtr_prefix_size) {
-                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 16);
+                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 64);
                 ret = printf("%s/%-2d", addr, rt->rtr_prefix_len);
             }
             for (i = ret; i < 21; i++)
@@ -181,10 +181,10 @@ vr_route_req_process(void *s_req)
             printf("\n");
         } else { 
             if (rt->rtr_src_size)
-                inet_ntop(rt->rtr_family, rt->rtr_src, addr, 16);
+                inet_ntop(rt->rtr_family, rt->rtr_src, addr, 64);
             ret = printf("%s,", addr);
             if (rt->rtr_prefix_size)
-                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 16);
+                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 64);
             ret += printf("%s", addr);
             for (i = ret; i < 33; i++)
                 printf(" ");
