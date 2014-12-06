@@ -10,7 +10,6 @@
 #include "vr_datapath.h"
 #include "vr_mpls.h"
 #include "vr_vxlan.h"
-#include "vr_mcast.h"
 #include "vr_ip_mtrie.h"
 
 extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
@@ -80,7 +79,7 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
         rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
         rt.rtr_req.rtr_family = AF_INET6;
     }
-    rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
+    rt.rtr_req.rtr_marker_size = 0;
     rt.rtr_req.rtr_nh_id = 0;
 
     nh = vr_inet_route_lookup(vrf, &rt, pkt);
@@ -156,7 +155,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
         rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
     }
     rt.rtr_req.rtr_nh_id = 0;
-    rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
+    rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(vrf, &rt, pkt);
     if (rt.rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG) {
@@ -732,8 +731,8 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
     *(uint32_t*)rt.rtr_req.rtr_prefix = (ip);
     rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
     rt.rtr_req.rtr_prefix_size = 4;
-    rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
     rt.rtr_req.rtr_nh_id = 0;
+    rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
 

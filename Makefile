@@ -64,7 +64,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += dp-core/vr_mpls.o dp-core/vr_ip_mtrie.o
 	vrouter-y += dp-core/vr_response.o dp-core/vr_flow.o
 	vrouter-y += dp-core/vr_mirror.o dp-core/vr_vrf_assign.o
-	vrouter-y += dp-core/vr_index_table.o dp-core/vr_mcast.o
+	vrouter-y += dp-core/vr_index_table.o
 	vrouter-y += dp-core/vr_stats.o dp-core/vr_btable.o
 	vrouter-y += dp-core/vr_bridge.o dp-core/vr_htable.o
 	vrouter-y += dp-core/vr_vxlan.o dp-core/vr_fragment.o

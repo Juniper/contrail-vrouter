@@ -11,7 +11,6 @@
 #include <vr_mirror.h>
 #include "vr_sandesh.h"
 #include "vr_message.h"
-#include "vr_mcast.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
 #include "vr_datapath.h"
@@ -992,7 +991,6 @@ vr_flow_inet6_input(struct vrouter *router, unsigned short vrf,
             rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
             rt.rtr_req.rtr_nh_id = 0;
             rt.rtr_req.rtr_label_flags = 0;
-            rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
         
             nh = vr_inet_route_lookup(vrf, &rt, NULL);
             if (!nh || nh->nh_type == NH_DISCARD) {

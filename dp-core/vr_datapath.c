@@ -90,7 +90,7 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
     rt.rtr_req.rtr_prefix_len = 32;
     rt.rtr_req.rtr_nh_id = 0;
     rt.rtr_req.rtr_label_flags = 0;
-    rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
+    rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
 
@@ -117,7 +117,7 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
          * If not l3 vpn route, we default to flooding
          */
         if ((nh->nh_type == NH_COMPOSITE) &&
-                (nh->nh_flags & NH_FLAG_COMPOSITE_EVPN)) {
+                (nh->nh_flags & NH_FLAG_MCAST)) {
             if (ret_nh)
                 *ret_nh = nh;
             return PKT_ARP_FLOOD;
@@ -290,7 +290,7 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset)
 
 int
 vr_arp_input(unsigned short vrf, struct vr_packet *pkt,
-             struct vr_forwarding_md *fmd)
+                            struct vr_forwarding_md *fmd)
 {
     struct vr_arp sarp;
 
@@ -491,6 +491,69 @@ vr_l2_input(unsigned short vrf, struct vr_packet *pkt,
     pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
     vr_bridge_input(pkt->vp_if->vif_router, vrf, pkt, fmd);
     return 1;
+}
+
+
+int
+vr_tor_input(unsigned short vrf, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    struct vr_route_req rt;
+    struct vr_arp *arp;
+    struct vr_interface *vif = pkt->vp_if;
+    struct vr_nexthop *nh;
+    unsigned int rt_prefix, pull_len;
+    struct vr_eth *eth;
+
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+        if (pkt_pull(pkt, pull_len) < 0) {
+            vr_pfree(pkt, VP_DROP_PULL);
+            return 1;
+        }
+        if (vr_l3_well_known_packet(vrf, pkt)) {
+            vr_trap(pkt, vrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+            return 1;
+        }
+        pkt_push(pkt, pull_len);
+    } else if (pkt->vp_type == VP_TYPE_ARP) {
+        arp = (struct vr_arp *)pkt_network_header(pkt);
+
+        /* Dnot handle ARP reply */
+        if (arp->arp_op == VR_ARP_OP_REPLY) {
+            goto unhandled;
+        }
+
+        rt.rtr_req.rtr_vrf_id = vrf;
+        rt.rtr_req.rtr_prefix = (uint8_t *)&rt_prefix;
+        *(uint32_t*)rt.rtr_req.rtr_prefix = arp->arp_dpa;
+        rt.rtr_req.rtr_prefix_size = 4;
+        rt.rtr_req.rtr_prefix_len = 32;
+        rt.rtr_req.rtr_nh_id = 0;
+        rt.rtr_req.rtr_label_flags = 0;
+        rt.rtr_req.rtr_marker_size = 0;
+
+        nh = vr_inet_route_lookup(vrf, &rt, NULL);
+        if (!nh || nh->nh_type ==  NH_DISCARD)
+            goto unhandled;
+
+        if (rt.rtr_req.rtr_label_flags & VR_RT_HOSTED_FLAG) {
+            eth = (struct vr_eth *)pkt_data(pkt);
+            VR_MAC_COPY(eth->eth_dmac, eth->eth_smac);
+            VR_MAC_COPY(eth->eth_smac, vif->vif_mac);
+            arp->arp_op = htons(VR_ARP_OP_REPLY);
+            VR_MAC_COPY(arp->arp_dha, arp->arp_sha);
+            VR_MAC_COPY(arp->arp_sha, vif->vif_mac);
+            arp->arp_dpa = arp->arp_spa;
+            arp->arp_spa = rt_prefix;
+            vr_bridge_input(vrouter_get(0), vrf, pkt, NULL);
+            return 1;
+        }
+    }
+
+unhandled:
+    return 0;
 }
 
 bool

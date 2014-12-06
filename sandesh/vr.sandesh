@@ -91,18 +91,16 @@ buffer sandesh vr_route_req {
     1:  sandesh_op  h_op;
     2:  i32         rtr_vrf_id;
     3:  i32         rtr_family;
-    4:  i32         rtr_rt_type;
-    5:  list<byte>  rtr_prefix;
-    6:  list<byte>  rtr_src;
-    7:  i32         rtr_prefix_len;
-    8:  i16         rtr_rid;
-    9:  i16         rtr_label_flags;
-   10:  i32         rtr_label;
-   11:  i32         rtr_nh_id;
-   12:  list<byte>  rtr_marker;
-   13:  i32         rtr_marker_plen;
-   14:  list<byte>  rtr_mac;
-   15:  i32         rtr_replace_plen;
+    4:  list<byte>  rtr_prefix;
+    5:  i32         rtr_prefix_len;
+    6:  i16         rtr_rid;
+    7:  i16         rtr_label_flags;
+    8:  i32         rtr_label;
+    9:  i32         rtr_nh_id;
+   10:  list<byte>  rtr_marker;
+   11:  i32         rtr_marker_plen;
+   12:  list<byte>  rtr_mac;
+   13:  i32         rtr_replace_plen;
 }
 
 buffer sandesh vr_mpls_req {
@@ -171,20 +169,18 @@ buffer sandesh vr_vrf_stats_req {
     7:  i64                 vsr_resolves;
     8:  i64                 vsr_receives;
     9:  i64                 vsr_ecmp_composites;
-   10:  i64                 vsr_l3_mcast_composites;
-   11:  i64                 vsr_l2_mcast_composites;
-   12:  i64                 vsr_fabric_composites;
-   13:  i64                 vsr_multi_proto_composites;
-   14:  i64                 vsr_udp_tunnels;
-   15:  i64                 vsr_udp_mpls_tunnels;
-   16:  i64                 vsr_gre_mpls_tunnels;
-   17:  i64                 vsr_l2_encaps;
-   18:  i64                 vsr_encaps;
-   19:  i16                 vsr_marker;
-   20:  i64                 vsr_gros;
-   21:  i64                 vsr_diags;
-   22:  i64                 vsr_encap_composites;
-   23:  i64                 vsr_evpn_composites;
+   10:  i64                 vsr_l2_mcast_composites;
+   11:  i64                 vsr_fabric_composites;
+   12:  i64                 vsr_udp_tunnels;
+   13:  i64                 vsr_udp_mpls_tunnels;
+   14:  i64                 vsr_gre_mpls_tunnels;
+   15:  i64                 vsr_l2_encaps;
+   16:  i64                 vsr_encaps;
+   17:  i16                 vsr_marker;
+   18:  i64                 vsr_gros;
+   19:  i64                 vsr_diags;
+   20:  i64                 vsr_encap_composites;
+   21:  i64                 vsr_evpn_composites;
 }
 
 buffer sandesh vr_response {
