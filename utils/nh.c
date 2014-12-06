@@ -89,7 +89,7 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
 
 
     strcpy(ptr,"");
-    for(i = 0, mask = 1; (i < 16); i++, mask = mask << 1) {
+    for(i = 0, mask = 1; (i < 18); i++, mask = mask << 1) {
         switch(flags & mask) {
         case NH_FLAG_VALID:
             strcat(ptr, "Valid, ");
@@ -118,11 +118,6 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
                 strcat(ptr, "Udp, ");
             break;
 
-        case NH_FLAG_COMPOSITE_L3:
-            if (type == NH_COMPOSITE)
-                strcat(ptr, "L3, ");
-            break;
-
         case NH_FLAG_COMPOSITE_L2:
             if (type == NH_COMPOSITE)
                 strcat(ptr, "L2, ");
@@ -142,15 +137,14 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
             if (type == NH_COMPOSITE)
                 strcat(ptr, "Evpn, ");
             break;
+        case NH_FLAG_COMPOSITE_TOR:
+            if (type == NH_COMPOSITE)
+                strcat(ptr, "Tor, ");
+            break;
 
         case NH_FLAG_COMPOSITE_ENCAP:
             if (type == NH_COMPOSITE)
                 strcat(ptr, "Encap, ");
-            break;
-
-        case NH_FLAG_COMPOSITE_MULTI_PROTO:
-            if (type == NH_COMPOSITE)
-                strcat(ptr, "Multi Proto, ");
             break;
 
         case NH_FLAG_MCAST:
@@ -262,7 +256,7 @@ vr_response_process(void *s)
 
 int 
 vr_nh_op(int opt, int mode, uint32_t nh_id, uint32_t if_id, uint32_t vrf_id, 
-        int8_t *dst, int8_t  *src, struct in_addr sip, struct in_addr dip, uint32_t flags)
+        int8_t *dst, int8_t  *src, struct in_addr sip, struct in_addr dip, uint16_t flags)
 {
     vr_nexthop_req nh_req;
     char *buf;
@@ -328,9 +322,6 @@ op_retry:
 
     if ((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2)) 
         nh_req.nhr_family = AF_BRIDGE;
-    else if ((mode == NH_COMPOSITE) && (flags &
-                NH_FLAG_COMPOSITE_MULTI_PROTO))
-        nh_req.nhr_family = AF_UNSPEC;
     else
         nh_req.nhr_family = AF_INET;
 
@@ -411,12 +402,12 @@ cmd_usage()
            "                [DISCARD_NH options]\n"
            "                [COMPOSITE_NH options]\n"
            "                    [--cni <nh_id> composite nexthop member id]\n"
-           "                    [--cl3 composite l3 nexhop]\n"
            "                    [--cl2 composite l2 nexhop]\n"
-           "                    [--cmp composit multiprotocol ]\n"
            "                    [--cfa composit fabric ]\n"
            "                    [--cen composit encap ]\n"
            "                    [--cevpn composit evpn ]\n"
+           "                        [--lbl <lbl> label for composit fabric ]\n"
+           "                    [--tor composit tor ]\n"
            "                        [--lbl <lbl> label for composit fabric ]\n"
            "                [VxlanVRF options]\n");
 
@@ -451,14 +442,13 @@ enum opt_index {
     UDP_OPT_IND,
     VXLAN_OPT_IND,
     CNI_OPT_IND,
-    CMP_OPT_IND,
-    CL3_OPT_IND,
     CL2_OPT_IND,
     CFA_OPT_IND,
     MC_OPT_IND,
     EL2_OPT_IND,
     CEN_OPT_IND,
     CEVPN_OPT_IND,
+    TOR_OPT_IND,
     LBL_OPT_IND,
     LST_OPT_IND,
     GET_OPT_IND,
@@ -495,14 +485,13 @@ static struct option long_options[] = {
     [UDP_OPT_IND]       = {"udp",   no_argument,        &opt[UDP_OPT_IND],      1},
     [VXLAN_OPT_IND]     = {"vxlan", no_argument,        &opt[VXLAN_OPT_IND],    1},
     [CNI_OPT_IND]       = {"cni",   required_argument,  &opt[CNI_OPT_IND],      1},
-    [CMP_OPT_IND]       = {"cmp",   no_argument,        &opt[CMP_OPT_IND],      1},
-    [CL3_OPT_IND]       = {"cl3",   no_argument,        &opt[CL3_OPT_IND],      1},
     [CL2_OPT_IND]       = {"cl2",   no_argument,        &opt[CL2_OPT_IND],      1},
     [CFA_OPT_IND]       = {"cfa",   no_argument,        &opt[CFA_OPT_IND],      1},
     [MC_OPT_IND]        = {"mc",    no_argument,        &opt[MC_OPT_IND],       1},
     [EL2_OPT_IND]       = {"el2",   no_argument,        &opt[EL2_OPT_IND],      1},
     [CEN_OPT_IND]       = {"cen",   no_argument,        &opt[CEN_OPT_IND],      1},
     [CEVPN_OPT_IND]     = {"cevpn", no_argument,        &opt[CEVPN_OPT_IND],    1},
+    [TOR_OPT_IND]       = {"tor",   no_argument,        &opt[TOR_OPT_IND],    1},
     [LBL_OPT_IND]       = {"lbl",   required_argument,  &opt[LBL_OPT_IND],      1},
     [LST_OPT_IND]       = {"list",  no_argument,        &opt[LST_OPT_IND],      1},
     [GET_OPT_IND]       = {"get",   required_argument,  &opt[GET_OPT_IND],      1},
@@ -672,18 +661,16 @@ validate_options()
                 if (!opt_set(CNI_OPT_IND))
                     cmd_usage();
 
-                if (opt_set(CL3_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_L3;
                 if (opt_set(CL2_OPT_IND))
                     flags |= NH_FLAG_COMPOSITE_L2;
                 if (opt_set(CFA_OPT_IND))
                     flags |= NH_FLAG_COMPOSITE_FABRIC;
-                if (opt_set(CMP_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_MULTI_PROTO;
                 if (opt_set(CEN_OPT_IND))
                     flags |= NH_FLAG_COMPOSITE_ENCAP;
                 if (opt_set(CEVPN_OPT_IND))
                     flags |= NH_FLAG_COMPOSITE_EVPN;
+                if (opt_set(TOR_OPT_IND))
+                    flags |= NH_FLAG_COMPOSITE_TOR;
                 opt_set(LBL_OPT_IND);
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();

@@ -48,7 +48,6 @@ SRCS += vr_message.c \
        vr_flow.c \
        vr_mirror.c \
        vr_vrf_assign.c \
-       vr_mcast.c \
        vr_stats.c \
        vr_btable.c \
        vr_bridge.c \

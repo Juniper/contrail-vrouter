@@ -511,14 +511,13 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
     resp->rtr_family = req->rtr_family;
     memcpy(resp->rtr_prefix, prefix, RT_IP_ADDR_SIZE(req->rtr_family));
     resp->rtr_prefix_size = req->rtr_prefix_size;
-    resp->rtr_marker_size = resp->rtr_src_size = 0;
-    resp->rtr_marker = resp->rtr_src = NULL;
+    resp->rtr_marker_size = 0;
+    resp->rtr_marker = NULL;
     resp->rtr_prefix_len = prefix_len;
     resp->rtr_rid = req->rtr_rid;
     resp->rtr_label_flags = ent->entry_label_flags;
     resp->rtr_label = ent->entry_label;
     resp->rtr_nh_id = ent->entry_nh_p->nh_id;
-    resp->rtr_rt_type = RT_UCAST;
     resp->rtr_mac_size = 0;
     resp->rtr_mac = NULL;
     resp->rtr_replace_plen = ent->entry_prefix_len;
@@ -708,11 +707,8 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_ecmp_composites += stats->vrf_ecmp_composites;
             response->vsr_encap_composites += stats->vrf_encap_composites;
             response->vsr_evpn_composites += stats->vrf_evpn_composites;
-            response->vsr_l3_mcast_composites += stats->vrf_l3_mcast_composites;
             response->vsr_l2_mcast_composites += stats->vrf_l2_mcast_composites;
             response->vsr_fabric_composites += stats->vrf_fabric_composites;
-            response->vsr_multi_proto_composites +=
-                stats->vrf_multi_proto_composites;
             response->vsr_udp_tunnels  += stats->vrf_udp_tunnels;
             response->vsr_udp_mpls_tunnels  += stats->vrf_udp_mpls_tunnels;
             response->vsr_gre_mpls_tunnels  += stats->vrf_gre_mpls_tunnels;
@@ -730,11 +726,10 @@ static bool
 mtrie_stats_empty(vr_vrf_stats_req *r)
 {
     if (r->vsr_discards || r->vsr_resolves || r->vsr_receives || 
-            r->vsr_ecmp_composites || r->vsr_l3_mcast_composites ||
-            r->vsr_l2_mcast_composites || r->vsr_fabric_composites ||
-            r->vsr_multi_proto_composites || r->vsr_udp_tunnels || 
+            r->vsr_ecmp_composites || r->vsr_l2_mcast_composites || 
+            r->vsr_fabric_composites || r->vsr_udp_tunnels || 
             r->vsr_udp_mpls_tunnels || r->vsr_gre_mpls_tunnels || 
-            r->vsr_l2_encaps || r->vsr_encaps || r->vsr_gros ||
+            r->vsr_l2_encaps || r->vsr_encaps || r->vsr_gros || 
             r->vsr_diags)
         return false;
 

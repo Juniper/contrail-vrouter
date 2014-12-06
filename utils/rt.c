@@ -48,7 +48,6 @@ static bool cmd_trap_set = false;
 
 static int cmd_set, dump_set;
 static int family_set, help_set;
-static int table_set;
 
 static int cmd_prefix_set;
 static int cmd_dst_mac_set;
@@ -60,7 +59,6 @@ static int cmd_nh_id = -1;
 static uint8_t cmd_prefix[16], cmd_src[16];
 static uint32_t cmd_plen = 0;
 static int32_t cmd_label;
-static int cmd_rt_type = RT_UCAST;
 static uint32_t cmd_replace_plen = 100;
 static char cmd_dst_mac[6];
 static void Usage(void);
@@ -70,18 +68,6 @@ static void usage_internal(void);
 #define BRIDGE_FAMILY_STRING    "bridge"
 #define INET6_FAMILY_STRING      "inet6"
 
-#define UCST_TABLE_STRING       "ucst"
-#define MCST_TABLE_STRING       "mcst"
-
-static int
-table_string_to_id(char *tname)
-{
-    if (!strncmp(tname, UCST_TABLE_STRING, strlen(UCST_TABLE_STRING)))
-        return RT_UCAST;
-    else if (!strncmp(tname, MCST_TABLE_STRING, strlen(MCST_TABLE_STRING)))
-        return RT_MCAST;
-    return -1;
-}
 static int
 family_string_to_id(char *fname)
 {
@@ -106,10 +92,9 @@ vr_route_req_process(void *s_req)
     if (!rt_req.rtr_prefix) {
         rt_req.rtr_prefix = rt_prefix;
         rt_req.rtr_marker = rt_marker;
-        rt_req.rtr_src    = rt_src;
             
     }
-    rt_req.rtr_prefix_size = rt_req.rtr_marker_size = rt_req.rtr_src_size = 0;
+    rt_req.rtr_prefix_size = rt_req.rtr_marker_size = 0;
 
 
     if (rt->rtr_prefix_size) {
@@ -121,15 +106,7 @@ vr_route_req_process(void *s_req)
         memset(rt_req.rtr_marker, 0, 16);
     }
         
-    if (rt->rtr_src_size) {
-        memcpy(rt_req.rtr_src, rt->rtr_src, RT_IP_ADDR_SIZE(rt->rtr_family));
-        rt_req.rtr_src_size = RT_IP_ADDR_SIZE(rt->rtr_family);
-    } else {
-        memset(rt_req.rtr_src, 0, 16);
-    }
-
     rt_req.rtr_prefix_len = rt->rtr_prefix_len;
-    rt_req.rtr_rt_type = rt->rtr_rt_type;
     if (rt->rtr_mac) {
         if (!rt_req.rtr_mac) {
             rt_req.rtr_mac_size = 6;
@@ -141,8 +118,6 @@ vr_route_req_process(void *s_req)
 
     if ((rt->rtr_family == AF_INET) ||
         (rt->rtr_family == AF_INET6)) {
-        if (rt->rtr_rt_type == RT_UCAST) {
-            
             if (rt->rtr_prefix_size) {
                 inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 16);
                 ret = printf("%s/%-2d", addr, rt->rtr_prefix_len);
@@ -179,19 +154,6 @@ vr_route_req_process(void *s_req)
 
             printf("%7d", rt->rtr_nh_id);
             printf("\n");
-        } else { 
-            if (rt->rtr_src_size)
-                inet_ntop(rt->rtr_family, rt->rtr_src, addr, 16);
-            ret = printf("%s,", addr);
-            if (rt->rtr_prefix_size)
-                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 16);
-            ret += printf("%s", addr);
-            for (i = ret; i < 33; i++)
-                printf(" ");
-            printf(" ");
-            printf("%7d", rt->rtr_nh_id);
-            printf("\n");
-        }
     } else {
         ret = printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
         for(i = ret; i < 21; i++)
@@ -230,7 +192,7 @@ vr_response_process(void *s)
 static vr_route_req *
 vr_build_route_request(unsigned int op, int family, int8_t *prefix, 
         unsigned int p_len, unsigned int nh_id, unsigned int vrf, int label, 
-        unsigned int rt_type, int8_t *src, char *eth, uint32_t replace_plen)
+        char *eth, uint32_t replace_plen)
 {
     int i;
     char buf[64];
@@ -242,9 +204,8 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
     if (!rt_req.rtr_prefix) {
         rt_req.rtr_prefix = rt_prefix;
         rt_req.rtr_marker = rt_marker;
-        rt_req.rtr_src    = rt_src;
     }
-    rt_req.rtr_prefix_size = rt_req.rtr_marker_size = rt_req.rtr_src_size = 0;
+    rt_req.rtr_prefix_size = rt_req.rtr_marker_size = 0;
 
     switch (rt_req.h_op) {
     case SANDESH_OP_DUMP:
@@ -256,15 +217,8 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
             memset(rt_req.rtr_prefix, 0, 16);
             memset(rt_req.rtr_marker, 0, 16);
         }
-        if (src) {
-            memcpy(rt_req.rtr_src, src, RT_IP_ADDR_SIZE(family));
-            rt_req.rtr_src_size = RT_IP_ADDR_SIZE(family);
-        } else {
-            memset(rt_req.rtr_src, 0, 16);
-        }
 
         rt_req.rtr_marker_plen = p_len;
-        rt_req.rtr_rt_type = rt_type;
         rt_req.rtr_vrf_id = vrf;
         if (!rt_req.rtr_mac) {
             rt_req.rtr_mac_size = 6;
@@ -291,7 +245,6 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
             
         rt_req.rtr_prefix_len = p_len;
         rt_req.rtr_label_flags = 0;
-        rt_req.rtr_rt_type = rt_type;
         rt_req.rtr_replace_plen = replace_plen;
 
         if (cmd_proxy_set)
@@ -302,12 +255,6 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
 
         if ((family == AF_INET) ||
             (family == AF_INET6)) {
-            if (rt_type == RT_UCAST) {
-                *rt_req.rtr_src = 0;
-            } else {
-                memcpy(rt_req.rtr_src, src, RT_IP_ADDR_SIZE(family));
-                rt_req.rtr_src_size = RT_IP_ADDR_SIZE(family);
-            }
             if (label != -1) {
                 rt_req.rtr_label = label;
                 rt_req.rtr_label_flags |= VR_RT_LABEL_VALID_FLAG;
@@ -382,7 +329,7 @@ vr_route_dump(void)
     while (vr_send_one_message() != 0) {
         vr_build_route_request(SANDESH_OP_DUMP, rt_req.rtr_family, rt_req.rtr_marker,
                 rt_req.rtr_marker_plen, 0, rt_req.rtr_vrf_id, 0, 
-                rt_req.rtr_rt_type, rt_req.rtr_src, (char *)rt_req.rtr_mac, 0);
+                (char *)rt_req.rtr_mac, 0);
         vr_build_netlink_request(&rt_req);
     }
 
@@ -407,23 +354,18 @@ vr_route_op(void)
     int ret;
 
     req = vr_build_route_request(cmd_op, cmd_family_id, cmd_prefix, cmd_plen,
-            cmd_nh_id, cmd_vrf_id, cmd_label, cmd_rt_type,
-            cmd_src, cmd_dst_mac, cmd_replace_plen);
+            cmd_nh_id, cmd_vrf_id, cmd_label, cmd_dst_mac, 
+            cmd_replace_plen);
     if (!req)
         return -errno;
 
     if (cmd_op == SANDESH_OP_DUMP) {
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            if (cmd_rt_type == RT_UCAST) {
-                printf("Kernel IP routing table %d/%d/unicast\n", req->rtr_rid, cmd_vrf_id);
-                printf("Destination	        PPL        Flags        Label        Nexthop\n");
-            } else {
-                printf("Kernel IP routing table %d/%d/multicast\n", req->rtr_rid, cmd_vrf_id);
-                printf("(Src,Group)                       Nexthop\n");
-            }
+            printf("Kernel IP routing table %d/%d/unicast\n", req->rtr_rid, cmd_vrf_id);
+            printf("Destination	        PPL        Flags        Label        Nexthop\n");
         } else {
-                printf("Kernel L2 Bridge table %d/%d\n", req->rtr_rid, cmd_vrf_id);
-                printf("DestMac                 Vrf    Label/VNID     Nexthop\n");
+            printf("Kernel L2 Bridge table %d/%d\n", req->rtr_rid, cmd_vrf_id);
+            printf("DestMac                 Vrf    Label/VNID     Nexthop\n");
         }
     }
 
@@ -472,25 +414,17 @@ validate_options(void)
         if (set > 1 && !family_set)
             goto usage;
 
-        if (cmd_family_id == AF_BRIDGE &&
-                cmd_rt_type == RT_MCAST) {
-            printf("There is no separate multicast table\n");
-            Usage();
-        }
-
         break;
 
     case SANDESH_OP_DELETE:
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            if (cmd_rt_type == RT_UCAST) {
-                if ((cmd_replace_plen < 0 || 
-                    ( cmd_replace_plen > (RT_IP_ADDR_SIZE(cmd_family_id)*4)))) {
-                    goto usage_internal;
-                }
-
-                if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
-                    goto usage_internal;
+            if ((cmd_replace_plen < 0 || 
+                ( cmd_replace_plen > (RT_IP_ADDR_SIZE(cmd_family_id)*4)))) {
+                goto usage_internal;
             }
+
+            if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
+                goto usage_internal;
         } else if (cmd_family_id == AF_BRIDGE) {
             if (!cmd_dst_mac_set || cmd_vrf_id < 0)
                 goto usage_internal;
@@ -500,10 +434,8 @@ validate_options(void)
 
     case SANDESH_OP_ADD:
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            if (cmd_rt_type == RT_UCAST) {
-                if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
-                    goto usage_internal;
-            }
+            if (!cmd_prefix_set || cmd_plen < 0 || cmd_nh_id  < 0 || cmd_vrf_id < 0)
+                goto usage_internal;
         } else if (cmd_family_id == AF_BRIDGE) {
             if (!cmd_dst_mac_set || cmd_vrf_id < 0 || cmd_nh_id < 0)
                 goto usage_internal;
@@ -531,7 +463,6 @@ enum opt_flow_index {
     DUMP_OPT_INDEX,
     FAMILY_OPT_INDEX,
     HELP_OPT_INDEX,
-    TABLE_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -540,21 +471,18 @@ static struct option long_options[] = {
     [DUMP_OPT_INDEX]      = {"dump",   required_argument, &dump_set,   1},
     [FAMILY_OPT_INDEX]    = {"family", required_argument, &family_set, 1},
     [HELP_OPT_INDEX]      = {"help",   no_argument,       &help_set,   1},
-    [TABLE_OPT_INDEX]     = {"table",  required_argument, &table_set,  1},
     [MAX_OPT_INDEX]       = { NULL,    0,                 0,           0},
 };
 
 static void
 Usage(void)
 {
-    printf("Usage:   rt --dump <vrf_id> [--family <inet|bridge>][--table <ucst|mcst>\n");
+    printf("Usage:   rt --dump <vrf_id> [--family <inet|bridge>]>\n");
     printf("         rt --help\n");
     printf("\n");
     printf("--dump   Dumps the routing table corresponding to vrf_id\n");
     printf("--family Optional family specification to --dump command\n");
     printf("         Specification should be one of \"inet\" or \"bridge\"\n");
-    printf("--table  Specify the type of the table to dump. Valid only for inet\n");
-    printf("         Type can be one of \"ucst\" or \"mcst\"\n");
     printf("--help   Prints this help message\n");
 
     exit(1);
@@ -581,13 +509,6 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         if (cmd_family_id != AF_INET &&
                 cmd_family_id != AF_BRIDGE &&
                 cmd_family_id != AF_INET6)
-            Usage();
-        break;
-
-    case TABLE_OPT_INDEX:
-        cmd_rt_type = table_string_to_id(opt_arg);
-        if (cmd_rt_type != RT_UCAST &&
-                cmd_rt_type != RT_MCAST)
             Usage();
         break;
 
@@ -671,17 +592,12 @@ int main(int argc, char *argv[])
                     inet_pton(AF_INET6, optarg, cmd_src);
                 break;
 
-            case 'm':
-                cmd_rt_type = RT_MCAST;
-                break;
-
             case 'f':
                 cmd_family_id = atoi(optarg);
                 if (cmd_family_id == 0) {
                     cmd_family_id = AF_INET;
                 } else if (cmd_family_id == 1) {
                     cmd_family_id = AF_BRIDGE;
-                    cmd_rt_type = RT_UCAST;
                 } else {
                     cmd_family_id = AF_INET6;
                 }

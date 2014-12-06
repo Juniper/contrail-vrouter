@@ -226,11 +226,6 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
             return PKT_MPLS_TUNNEL_L2_MCAST_EVPN;
         }
         return PKT_MPLS_TUNNEL_L2_MCAST;
-    case AF_UNSPEC:
-        if (control_data == VR_L2_MCAST_CTRL_DATA)
-            return PKT_MPLS_TUNNEL_L2_MCAST;
-        else 
-            return PKT_MPLS_TUNNEL_L3;
     default:
         res = VP_DROP_INVALID_NH;
     }

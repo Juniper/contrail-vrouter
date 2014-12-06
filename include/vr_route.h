@@ -90,8 +90,8 @@ struct rtable_fspec {
     int (*route_del)(struct rtable_fspec *, struct vr_route_req *);
     int (*route_dump)(struct rtable_fspec *, struct vr_route_req *);
 
-    algo_init_decl algo_init[RT_MAX];
-    algo_deinit_decl algo_deinit[RT_MAX];
+    algo_init_decl algo_init;
+    algo_deinit_decl algo_deinit;
 };
 
 extern int vr_fib_init(struct vrouter *);

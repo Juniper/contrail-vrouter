@@ -33,7 +33,8 @@
 #define AGENT_TRAP_HANDLE_DF        11
 #define AGENT_TRAP_ZERO_TTL         12
 #define AGENT_TRAP_ICMP_ERROR       13
-#define MAX_AGENT_HDR_COMMANDS      14
+#define AGENT_TRAP_TOR_CONTROL_PKT  14
+#define MAX_AGENT_HDR_COMMANDS      15
 
 enum rt_type{
     RT_UCAST = 0,

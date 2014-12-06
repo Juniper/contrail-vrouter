@@ -42,15 +42,14 @@ enum nexthop_type {
  */
 #define NH_FLAG_MCAST                       0x00020
 #define NH_FLAG_TUNNEL_UDP_MPLS             0x00040
-#define NH_FLAG_COMPOSITE_ECMP              0x00080
-#define NH_FLAG_COMPOSITE_L2                0x00100
-#define NH_FLAG_COMPOSITE_L3                0x00200
-#define NH_FLAG_COMPOSITE_FABRIC            0x00400
-#define NH_FLAG_COMPOSITE_MULTI_PROTO       0x00800
-#define NH_FLAG_TUNNEL_VXLAN                0x01000
-#define NH_FLAG_RELAXED_POLICY              0x02000
-#define NH_FLAG_COMPOSITE_EVPN              0x04000
-#define NH_FLAG_COMPOSITE_ENCAP             0x08000
+#define NH_FLAG_TUNNEL_VXLAN                0x00080
+#define NH_FLAG_RELAXED_POLICY              0x00100
+#define NH_FLAG_COMPOSITE_FABRIC            0x00200
+#define NH_FLAG_COMPOSITE_ECMP              0x00400
+#define NH_FLAG_COMPOSITE_L2                0x00800
+#define NH_FLAG_COMPOSITE_EVPN              0x01000
+#define NH_FLAG_COMPOSITE_ENCAP             0x02000
+#define NH_FLAG_COMPOSITE_TOR               0x04000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
@@ -69,11 +68,10 @@ struct vr_nexthop {
     uint8_t         nh_type;
     /*
      * nh_family is going to be AF_INET for L3 nexthops, AF_BRIDGE for L2
-     * nexthops and AF_UNSPEC for composite multiprotocol nexthops. For
-     * an eg, an L2 Encap nexthop would contain family as AF_BRIDGE
+     * nexthops 
      */
     uint8_t         nh_family;
-    uint16_t        nh_flags;
+    uint32_t        nh_flags;
     int             nh_vrf;
     unsigned int    nh_id;
     unsigned int    nh_rid;
