@@ -1585,8 +1585,18 @@ linux_if_del(struct vr_interface *vif)
     else if (vif->vif_type == VIF_TYPE_PHYSICAL)
         vhost_if_del_phys((struct net_device *)vif->vif_os);
     else if (vif->vif_type == VIF_TYPE_VIRTUAL) {
-        napi_disable(&vif->vr_napi);
-        netif_napi_del(&vif->vr_napi);
+        /*
+         * if the napi structure was not initialised in the first place, we
+         * should not touch it now, since doing a netif_napi_del results in a
+         * crash. however, there are no reliable checks. hence, for now we
+         * will check for poll. ideally, we should not have had the napi
+         * structure itself in the interface structure and that would have
+         * clearly told us what to do with napi
+         */
+        if (vif->vr_napi.poll) {
+            napi_disable(&vif->vr_napi);
+            netif_napi_del(&vif->vr_napi);
+        }
         skb_queue_purge(&vif->vr_skb_inputq);
     }
 
