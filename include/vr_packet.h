@@ -216,15 +216,6 @@ struct vr_packet {
     unsigned char vp_ttl;
 };
 
-struct vr_packet_node {
-    struct vr_list_node pl_node;
-    unsigned short pl_proto;
-    struct vr_packet *pl_packet;
-    uint32_t pl_outer_src_ip;
-    uint32_t pl_label;
-    uint32_t pl_vif_idx;
-};
-
 extern void pkt_reset(struct vr_packet *);
 extern struct vr_packet *pkt_copy(struct vr_packet *, unsigned short,
         unsigned short);
