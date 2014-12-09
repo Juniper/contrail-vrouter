@@ -349,13 +349,6 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
     if (!router)
         return -EINVAL;
 
-    /*
-    printk("%d %d %d %d %x %d %d %d\n", req->rtr_req.rtr_vrf_id,
-           req->rtr_req.rtr_family, req->rtr_req.rtr_prefix_len,
-           req->rtr_req.rtr_rid, req->rtr_req.rtr_label_flags,
-           req->rtr_req.rtr_label, req->rtr_req.rtr_nh_id,
-           req->rtr_req.rtr_prefix_size);
-    */
     /* V4 and V6 only */
     if (req->rtr_req.rtr_family != AF_INET &&
         req->rtr_req.rtr_family != AF_INET6)
@@ -449,7 +442,7 @@ inet_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
         return 0;
 
     router->vr_inet_rtable = vr_zalloc(sizeof(struct vr_rtable));
-    if (!router->vr_inet_rtable) 
+    if (!router->vr_inet_rtable)
         return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
 
     ret = fs->algo_init(router->vr_inet_rtable, fs);

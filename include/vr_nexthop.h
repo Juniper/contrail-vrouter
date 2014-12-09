@@ -68,7 +68,7 @@ struct vr_nexthop {
     uint8_t         nh_type;
     /*
      * nh_family is going to be AF_INET for L3 nexthops, AF_BRIDGE for L2
-     * nexthops 
+     * nexthops
      */
     uint8_t         nh_family;
     uint32_t        nh_flags;

@@ -356,7 +356,7 @@ struct vr_ip6 {
 #define MCAST_IP                        (0xE0000000)
 #define MCAST_IP_MASK                   (0xF0000000)
 #define IS_BMCAST_IP(ip) \
-            (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF)) 
+            (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF))
 
 static inline unsigned char
 vr_eth_proto_to_pkt_type(unsigned short eth_proto)

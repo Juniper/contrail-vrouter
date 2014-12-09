@@ -478,8 +478,8 @@ nh_composite_mcast_validate_src(unsigned short vrf, struct vr_packet *pkt,
         if (!fabric_nh || !(fabric_nh->nh_flags & NH_FLAG_VALID))
             continue;
 
-        if (fabric_nh->nh_type != NH_COMPOSITE || 
-            !(fabric_nh->nh_flags & (NH_FLAG_COMPOSITE_FABRIC | 
+        if (fabric_nh->nh_type != NH_COMPOSITE ||
+            !(fabric_nh->nh_flags & (NH_FLAG_COMPOSITE_FABRIC |
               NH_FLAG_COMPOSITE_EVPN | NH_FLAG_COMPOSITE_TOR)))
             continue;
 
@@ -880,7 +880,7 @@ vr_l2_mcast_control_data_add(struct vr_packet *pkt)
 
     *data = VR_L2_MCAST_CTRL_DATA;
     return true;
-}   
+}
 
 static int
 nh_composite_fabric(unsigned short vrf, struct vr_packet *pkt,
@@ -1680,7 +1680,7 @@ nh_composite_mcast_validate(struct vr_nexthop *nh, vr_nexthop_req *req)
     struct vr_nexthop *tmp_nh;
 
     /* Fabric and EVPN nexthop*/
-    if (req->nhr_flags & (NH_FLAG_COMPOSITE_FABRIC | 
+    if (req->nhr_flags & (NH_FLAG_COMPOSITE_FABRIC |
                 NH_FLAG_COMPOSITE_EVPN | NH_FLAG_COMPOSITE_TOR)) {
         for (i = 0; i < req->nhr_nh_list_size; i++) {
             tmp_nh = nh->nh_component_nh[i].cnh;
