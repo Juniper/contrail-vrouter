@@ -163,6 +163,8 @@ vr_route_req_process(void *s_req)
                 strcat(flags, "H");
             if (rt->rtr_label_flags & VR_RT_ARP_TRAP_FLAG)
                 strcat(flags, "T");
+            if (rt->rtr_label_flags & VR_RT_ARP_FLOOD_FLAG)
+                strcat(flags, "F");
 
             printf("%5s", flags);
 

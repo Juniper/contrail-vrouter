@@ -8,6 +8,7 @@
 #include <vr_datapath.h>
 #include <vr_packet.h>
 #include <vr_mirror.h>
+#include <vr_bridge.h>
 
 extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 
@@ -30,12 +31,10 @@ vr_v6_prefix_is_ll(uint8_t prefix[])
 
 
 static int
-vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
-                                                   struct vr_nexthop **ret_nh)
+vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp)
 {
-    struct vr_route_req rt;
-    struct vr_nexthop *nh;
-    uint32_t rt_prefix;
+    uint32_t rt_flags;
+    bool grat_arp = vr_grat_arp(arp);
 
     /*
      * Packet from VM :
@@ -79,50 +78,26 @@ vr_arp_request_treatment(struct vr_interface *vif, struct vr_arp *arp,
             return PKT_ARP_PROXY;
     }
 
-    if (vr_grat_arp(arp) && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+    if (grat_arp && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
         return PKT_ARP_TRAP_XCONNECT;
     }
 
-    rt.rtr_req.rtr_vrf_id = vif->vif_vrf;
-    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
-    *(uint32_t*)rt.rtr_req.rtr_prefix = (arp->arp_dpa);
-    rt.rtr_req.rtr_prefix_size = 4;
-    rt.rtr_req.rtr_prefix_len = 32;
-    rt.rtr_req.rtr_nh_id = 0;
-    rt.rtr_req.rtr_label_flags = 0;
-    rt.rtr_req.rtr_src_size = rt.rtr_req.rtr_marker_size = 0;
-
-    nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
-
-    if (vr_grat_arp(arp) && vif_is_virtual(vif)) {
-        if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_TRAP_FLAG) {
-            return PKT_ARP_TRAP;
-        }
-        return PKT_ARP_DROP;
-    }
-
-    if (!nh || nh->nh_type == NH_DISCARD)
-        return PKT_ARP_DROP;
-
-    if (rt.rtr_req.rtr_label_flags & VR_RT_HOSTED_FLAG)
-        return PKT_ARP_PROXY;
-
-    /*
-     * If an L3VPN route is learnt, we need to proxy
-     */
+    rt_flags = vr_inet_route_flags(vif->vif_vrf, arp->arp_dpa);
     if (vif_is_virtual(vif)) {
-        if (nh->nh_type == NH_TUNNEL)
-            return PKT_ARP_PROXY;
-        /*
-         * If not l3 vpn route, we default to flooding
-         */
-        if ((nh->nh_type == NH_COMPOSITE) &&
-                (nh->nh_flags & NH_FLAG_COMPOSITE_EVPN)) {
-            if (ret_nh)
-                *ret_nh = nh;
-            return PKT_ARP_FLOOD;
+        if (grat_arp) {
+            if (rt_flags & VR_RT_ARP_TRAP_FLAG)
+                return PKT_ARP_TRAP;
+            else
+                return PKT_ARP_DROP;
         }
+        if (rt_flags & VR_RT_ARP_FLOOD_FLAG)
+            return PKT_ARP_FLOOD;
+
+        return PKT_ARP_PROXY;
     }
+
+    if (rt_flags & VR_RT_HOSTED_FLAG)
+        return PKT_ARP_PROXY;
 
     if (vif->vif_type == VIF_TYPE_HOST)
         return PKT_ARP_XCONNECT;
@@ -136,16 +111,16 @@ vr_handle_arp_request(unsigned short vrf, struct vr_arp *sarp,
 {
     struct vr_packet *cloned_pkt;
     struct vr_interface *vif = pkt->vp_if;
-    unsigned short proto = htons(VR_ETH_PROTO_ARP);
+    unsigned short *eth_proto, proto = htons(VR_ETH_PROTO_ARP),
+                   pull_tail_len = VR_ETHER_HLEN;
     struct vr_eth *eth;
-    unsigned short *eth_proto;
-    unsigned short pull_tail_len = VR_ETHER_HLEN;
     struct vr_arp *arp;
     unsigned int dpa;
     int arp_result;
+    struct vr_route_req rt;
     struct vr_nexthop *nh;
 
-    arp_result = vr_arp_request_treatment(vif, sarp, &nh);
+    arp_result = vr_arp_request_treatment(vif, sarp);
 
     switch (arp_result) {
     case PKT_ARP_PROXY:
@@ -197,6 +172,13 @@ vr_handle_arp_request(unsigned short vrf, struct vr_arp *sarp,
         vr_trap(pkt, vrf, AGENT_TRAP_ARP, NULL);
         break;
     case PKT_ARP_FLOOD:
+
+        memset(&rt, 0, sizeof(rt));
+        rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        rt.rtr_req.rtr_mac = vr_bcast_mac;
+        rt.rtr_req.rtr_vrf_id = vrf;
+
+        nh = vr_bridge_lookup(vrf, &rt, pkt);
         if (nh) {
             vr_preset(pkt);
             nh_output(vrf, pkt, nh, fmd);

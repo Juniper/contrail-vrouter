@@ -362,8 +362,6 @@ struct vr_ip6 {
     unsigned char ip6_dst[16];       /* destination address */
 } __attribute__((packed));
 
-
-
 static inline unsigned char
 vr_eth_proto_to_pkt_type(unsigned short eth_proto)
 {

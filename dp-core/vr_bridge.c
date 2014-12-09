@@ -39,8 +39,7 @@ struct vr_bridge_entry {
 unsigned int vr_bridge_entries = VR_DEF_BRIDGE_ENTRIES;
 unsigned int vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
 static vr_htable_t vn_rtable;
-
-extern int vr_reach_l3_hdr(struct vr_packet *, unsigned short *);
+char vr_bcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 struct vr_nexthop *(*vr_bridge_lookup)(unsigned int, struct vr_route_req *, 
         struct vr_packet *);
@@ -48,9 +47,10 @@ struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
 int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
 void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 unsigned int vr_l2_input(unsigned short, struct vr_packet *,
-                struct vr_forwarding_md *);
+                         struct vr_forwarding_md *);
 struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
 struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
+
 
 static bool
 bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry, 
@@ -373,7 +373,6 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     struct vr_route_req rt;
     struct vr_nexthop *nh;
     struct vr_forwarding_md cmd;
-    char bcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     char *mac;
 
     mac = (char *)pkt_data(pkt);
@@ -381,7 +380,7 @@ vr_bridge_input(struct vrouter *router, unsigned short vrf,
     rt.rtr_req.rtr_mac =(int8_t *) mac;
     /* If multicast L2 packet, use broadcast composite nexthop */
     if (IS_MAC_BMCAST(mac))
-        rt.rtr_req.rtr_mac = (int8_t *)bcast_mac;
+        rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
 
     rt.rtr_req.rtr_vrf_id = vrf;
     nh = vr_bridge_lookup(vrf, &rt, pkt);
