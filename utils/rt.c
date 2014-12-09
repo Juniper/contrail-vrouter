@@ -138,6 +138,8 @@ vr_route_req_process(void *s_req)
                 strcat(flags, "H");
             if (rt->rtr_label_flags & VR_RT_ARP_TRAP_FLAG)
                 strcat(flags, "T");
+            if (rt->rtr_label_flags & VR_RT_ARP_FLOOD_FLAG)
+                strcat(flags, "F");
 
             printf("%5s", flags);
 
@@ -354,7 +356,7 @@ vr_route_op(void)
     int ret;
 
     req = vr_build_route_request(cmd_op, cmd_family_id, cmd_prefix, cmd_plen,
-            cmd_nh_id, cmd_vrf_id, cmd_label, cmd_dst_mac, 
+            cmd_nh_id, cmd_vrf_id, cmd_label, cmd_dst_mac,
             cmd_replace_plen);
     if (!req)
         return -errno;
@@ -418,7 +420,7 @@ validate_options(void)
 
     case SANDESH_OP_DELETE:
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            if ((cmd_replace_plen < 0 || 
+            if ((cmd_replace_plen < 0 ||
                 ( cmd_replace_plen > (RT_IP_ADDR_SIZE(cmd_family_id)*4)))) {
                 goto usage_internal;
             }
