@@ -57,14 +57,11 @@ vr_vrf_stats_req_process(void *s_req)
     printf("Vrf: %d\n", stats->vsr_vrf);
     printf("Discards %" PRIu64 ", Resolves %" PRIu64 ", Receives %" PRIu64 "\n",
             stats->vsr_discards, stats->vsr_resolves, stats->vsr_receives);
-    printf("Ecmp Composites %" PRIu64 ", L3 Mcast Composites %" PRIu64
-            ", L2 Mcast Composites %" PRIu64 ", Fabric Composites %"
-            PRIu64 ", Multi Proto Composites %" PRIu64 ", Encap Composites %" PRIu64
-            ", Evpn Composites %" PRIu64 "\n",
-            stats->vsr_ecmp_composites, stats->vsr_l3_mcast_composites,
+    printf("Ecmp Composites %" PRIu64 ", L2 Mcast Composites %" PRIu64 
+            ", Fabric Composites %" PRIu64 ", Encap Composites %" PRIu64 
+            ", Evpn Composites %" PRIu64 "\n", stats->vsr_ecmp_composites,
             stats->vsr_l2_mcast_composites, stats->vsr_fabric_composites,
-            stats->vsr_multi_proto_composites, stats->vsr_encap_composites,
-            stats->vsr_evpn_composites);
+            stats->vsr_encap_composites, stats->vsr_evpn_composites);
     printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64 
             ", Gre Mpls Tunnels %" PRIu64 "\n", stats->vsr_udp_tunnels,
             stats->vsr_udp_mpls_tunnels, stats->vsr_gre_mpls_tunnels);
@@ -107,7 +104,6 @@ vr_build_vrf_stats_request(void)
     stats_req.h_op = stats_op;
     stats_req.vsr_rid = 0;
     stats_req.vsr_family = AF_INET;
-    stats_req.vsr_type = RT_UCAST;
 
     switch (stats_req.h_op) {
     case SANDESH_OP_GET:

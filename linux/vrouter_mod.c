@@ -804,6 +804,7 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         opt_len = hlen - sizeof(struct vr_ip);
     }
 
+
     if (proto != VR_IP_PROTO_TCP) {
         goto out;
     }
@@ -814,7 +815,6 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         return VP_DROP_PULL;
     }
 
-    iph = (struct vr_ip *) (skb->head + pkt->vp_data);
     tcph = (struct tcphdr *) ((char *) iph +  hlen);
 
     if ((tcph->doff << 2) <= (sizeof(struct tcphdr))) {
@@ -1106,6 +1106,12 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
         if (ntohs(eth_proto) == VR_ETH_PROTO_IP) {
             iph = (struct vr_ip *)(va + pull_len);
             pull_len += sizeof(struct iphdr);
+            if (frag_size < pull_len)
+                goto slow_path;
+        }
+
+        if (ntohs(eth_proto) == VR_ETH_PROTO_ARP) {
+            pull_len += sizeof(struct vr_arp);
             if (frag_size < pull_len)
                 goto slow_path;
         }
@@ -1514,6 +1520,12 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
             if (frag_size < pull_len)
                 goto slow_path;
         }
+
+        if (ntohs(eth_proto) == VR_ETH_PROTO_ARP) {
+            pull_len += sizeof(struct vr_arp);
+            if (frag_size < pull_len)
+                goto slow_path;
+        }
     }
 
     if (iph) {
@@ -1909,6 +1921,12 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
             iph = (struct vr_ip *) (skb->head + hoff);
+        }
+
+        if (ntohs(eth_proto) == VR_ETH_PROTO_ARP) {
+            pull_len += sizeof(struct vr_arp);
+            if (!pskb_may_pull(skb, pull_len))
+                goto error;
         }
     }
 

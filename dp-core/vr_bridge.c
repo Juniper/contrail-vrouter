@@ -240,7 +240,6 @@ bridge_entry_make_req(struct vr_route_req *resp, struct vr_bridge_entry *ent)
     resp->rtr_req.rtr_vrf_id = ent->be_key.be_vrf_id;
     if (ent->be_nh)
         resp->rtr_req.rtr_nh_id = ent->be_nh->nh_id;
-    resp->rtr_req.rtr_rt_type =  RT_UCAST;
     resp->rtr_req.rtr_family = AF_BRIDGE;
     resp->rtr_req.rtr_label = ent->be_label;
     if (ent->be_flags & VR_BE_FLAG_LABEL_VALID)
