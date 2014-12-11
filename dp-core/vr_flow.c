@@ -1045,6 +1045,8 @@ vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
         pkt = pnode->pl_packet;
         if (!pkt)
             continue;
+
+        pnode->pl_packet = NULL;
         /* 
          * this is only a security check and not a catch all check. one note
          * of caution. please do not access pkt->vp_if till the if block is
@@ -1064,7 +1066,6 @@ vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
         }
 
         vr_flow_action(router, fe, vfq->vfq_index, pkt, pnode->pl_proto, fmd);
-        pnode->pl_packet = NULL;
     }
 
     return;
