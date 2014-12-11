@@ -2311,7 +2311,7 @@ static struct ctl_path vrouter_path[] =
     { }
 };
 
-static ctl_table vrouter_table[] =
+static struct ctl_table vrouter_table[] =
 {
     {
         .procname       = "perfr",
