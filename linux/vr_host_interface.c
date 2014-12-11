@@ -1879,11 +1879,19 @@ linux_pkt_dev_init(char *name, void (*setup)(struct net_device *),
     int err = 0;
     struct net_device *pdev = NULL;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,17,0)
     if (!(pdev = alloc_netdev_mqs(0, name, setup,
                                   1, num_present_cpus()))) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
         return NULL;
     }
+#else
+    if (!(pdev = alloc_netdev_mqs(0, name, 1, setup,
+                                  1, num_present_cpus()))) {
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
+        return NULL;
+    }
+#endif
 
     rtnl_lock();
 
