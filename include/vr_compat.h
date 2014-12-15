@@ -194,3 +194,7 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
 #endif
 
 #endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0)
+#define alloc_netdev_mqs(sizeof_priv, name, setup, txqs, rxqs) alloc_netdev_mqs(sizeof_priv, name, NET_NAME_PREDICTABLE, setup, txqs, rxqs)
+#endif
