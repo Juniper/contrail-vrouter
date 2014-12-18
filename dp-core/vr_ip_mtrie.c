@@ -509,7 +509,7 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
 
     resp->rtr_vrf_id = req->rtr_vrf_id;
     resp->rtr_family = req->rtr_family;
-    memcpy(resp->rtr_prefix, prefix, RT_IP_ADDR_SIZE(req->rtr_family));
+    memcpy(resp->rtr_prefix, prefix, prefix_len / IPBUCKET_LEVEL_BITS);
     resp->rtr_prefix_size = req->rtr_prefix_size;
     resp->rtr_marker_size = resp->rtr_src_size = 0;
     resp->rtr_marker = resp->rtr_src = NULL;
@@ -582,6 +582,7 @@ mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip_bucket_entry *ent,
                 return -1;
         }
     } else if (ent_p->entry_nh_p) {
+        memset(rt_prefix, 0, sizeof(rt_prefix));
         dump_resp.rtr_prefix = (uint8_t*)&rt_prefix;
         mtrie_dumper_make_response(dumper, &dump_resp, ent_p, prefix,
                 ip_bkt_info[level - 1].bi_pfx_len);
