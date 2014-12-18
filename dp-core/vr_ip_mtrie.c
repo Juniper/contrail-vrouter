@@ -587,6 +587,7 @@ mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip_bucket_entry *ent,
 
         ret = mtrie_dumper_route_encode(dumper, &dump_resp);
 
+        memset(rt_prefix, 0, sizeof(rt_prefix));
         dump_resp.rtr_prefix = NULL;
         if (ret <= 0)
            return -1;
@@ -612,6 +613,7 @@ mtrie_walk(struct vr_message_dumper *dumper, unsigned int family)
     ent = &mtrie->root;
 
     if (ENTRY_IS_BUCKET(ent)) {
+        memset(rt_prefix, 0, sizeof(rt_prefix));
         ret =  mtrie_dump_entry(dumper, ent, (uint8_t*)&rt_prefix, 0);
     }
 
