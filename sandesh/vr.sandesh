@@ -101,6 +101,7 @@ buffer sandesh vr_route_req {
    11:  i32         rtr_marker_plen;
    12:  list<byte>  rtr_mac;
    13:  i32         rtr_replace_plen;
+   14:  i32         rtr_index;
 }
 
 buffer sandesh vr_mpls_req {
@@ -181,6 +182,18 @@ buffer sandesh vr_vrf_stats_req {
    19:  i64                 vsr_diags;
    20:  i64                 vsr_encap_composites;
    21:  i64                 vsr_evpn_composites;
+   22:  i64                 vsr_vrf_translates;
+   23:  i64                 vsr_vxlan_tunnels;
+   24:  i64                 vsr_arp_virtual_proxy;
+   25:  i64                 vsr_arp_virtual_stitch;
+   26:  i64                 vsr_arp_virtual_flood;
+   27:  i64                 vsr_arp_physical_stitch;
+   28:  i64                 vsr_arp_tor_proxy;
+   29:  i64                 vsr_arp_physical_flood;
+   30:  i64                 vsr_encap_arp_responses;
+   31:  i64                 vsr_tunnel_arp_responses;
+   32:  i64                 vsr_drop_arp_responses;
+   33:  i64                 vsr_l2_receives;
 }
 
 buffer sandesh vr_response {
@@ -198,7 +211,7 @@ buffer sandesh vr_drop_stats_req {
     3:  i64             vds_discard;
     4:  i64             vds_pull;
     5:  i64             vds_invalid_if;
-    6:  i64             vds_arp_not_me;
+    6:  i64             vds_arp_no_where_to_go;
     7:  i64             vds_garp_from_vm;
     8:  i64             vds_invalid_arp;
     9:  i64             vds_trap_no_if;
@@ -238,4 +251,7 @@ buffer sandesh vr_drop_stats_req {
     43: i64             vds_frag_err;
     44: i64             vds_invalid_source;
     45: i64             vds_mcast_df_bit;
+    46: i64             vds_arp_no_route;
+    47: i64             vds_l2_no_route;
+    48: i64             vds_arp_reply_no_route;
 }

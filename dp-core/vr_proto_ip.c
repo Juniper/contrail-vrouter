@@ -11,9 +11,7 @@
 #include "vr_mpls.h"
 #include "vr_vxlan.h"
 #include "vr_ip_mtrie.h"
-
-extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
-                struct vr_route_req *, struct vr_packet *);
+#include "vr_fragment.h"
 
 static unsigned short vr_ip_id;
 
@@ -25,32 +23,6 @@ vr_generate_unique_ip_id()
         vr_ip_id++;
 
     return vr_ip_id;
-}
-
-/* 
- * Calculates ICMP6 checksum
- * buffer is pointer to ip6 header, all values other than src, dst and plen are ZERO
- * bytes is total length of ip6 header, icmp header and icmp option 
- */
-uint16_t
-vr_icmp6_checksum (void * buffer, int bytes) {
-   uint32_t   total;
-   uint16_t * ptr;
-   int        num_words;
-
-   total = 0;
-   ptr   = (uint16_t *) buffer;
-   num_words = (bytes + 1) / 2; 
-
-   while (num_words--) total += *ptr++;
-
-   /*
-    *   Fold in any carries
-    *   - the addition may cause another carry so we loop
-    */
-   while (total & 0xffff0000) total = (total >> 16) + (total & 0xffff);
-
-   return (uint16_t) total;
 }
 
 struct vr_nexthop *
@@ -82,7 +54,7 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_ip *ip, struct vr_packet *pkt)
     rt.rtr_req.rtr_marker_size = 0;
     rt.rtr_req.rtr_nh_id = 0;
 
-    nh = vr_inet_route_lookup(vrf, &rt, pkt);
+    nh = vr_inet_route_lookup(vrf, &rt);
 
     return nh;
 }
@@ -105,9 +77,110 @@ vr_ip_decrement_ttl(struct vr_ip *ip)
     return ip->ip_ttl;
 }
 
+void
+vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
+{
+    struct vr_ip *ip;
+    struct vr_tcp *tcp;
+    struct vr_udp *udp;
+    unsigned int csum;
+    unsigned short *csump;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    ip->ip_csum = vr_ip_csum(ip);
+
+    if (ip->ip_proto == VR_IP_PROTO_TCP) {
+        tcp = (struct vr_tcp *)((unsigned char *)ip + ip->ip_hl * 4);
+        csump = &tcp->tcp_csum;
+    } else if (ip->ip_proto == VR_IP_PROTO_UDP) {
+        udp = (struct vr_udp *)((unsigned char *)ip + ip->ip_hl * 4);
+        csump = &udp->udp_csum;
+    } else {
+        return;
+    }
+
+    if (vr_ip_transport_header_valid(ip)) {
+        /*
+         * for partial checksums, the actual value is stored rather
+         * than the complement
+         */
+        if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
+            csum = (*csump) & 0xffff;
+            inc = ip_inc; 
+        } else {
+            csum = ~(*csump) & 0xffff;
+        }
+
+        csum += inc;
+        if (csum < inc)
+            csum += 1;
+
+        csum = (csum & 0xffff) + (csum >> 16);
+        if (csum >> 16)
+            csum = (csum & 0xffff) + 1;
+
+        if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
+            *csump = csum & 0xffff;
+        } else {
+            *csump = ~(csum) & 0xffff;
+        }
+    }
+
+    return;
+}
+
+unsigned short
+vr_ip_csum(struct vr_ip *ip)
+{
+    int sum = 0;
+    unsigned short *ptr = (unsigned short *)ip;
+    unsigned short answer = 0;
+    unsigned short *w = ptr;
+    int len = ip->ip_hl * 4;
+    int nleft = len;
+
+    ip->ip_csum = 0;
+
+    while (nleft > 1) {
+        sum += *w++;
+        nleft -= 2;
+    }
+
+    /* mop up an odd byte, if necessary */
+    if (nleft == 1) {
+        *(unsigned char *)(&answer) = *(unsigned char *)w;
+        sum += answer;
+    }
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    answer = ~sum;
+
+    return answer;
+}
+
+unsigned short
+vr_ip_partial_csum(struct vr_ip *ip)
+{
+    unsigned long long s;
+    unsigned int sum;
+    unsigned short csum, proto;
+
+    proto = ip->ip_proto;
+    s = ip->ip_saddr;
+    s += ip->ip_daddr;
+    s += htons(ntohs(ip->ip_len) - (ip->ip_hl * 4));
+    s += htons(proto);
+
+    s = (s & 0xFFFFFFFF) + (s >> 32);
+    sum = (s & 0xFFFF) + (s >> 16);
+    csum = (sum & 0xFFFF) + (sum >> 16);
+    return csum;
+}
+
 int
-vr_forward(struct vrouter *router, unsigned short vrf,
-        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+vr_forward(struct vrouter *router, struct vr_packet *pkt,
+           struct vr_forwarding_md *fmd)
 {
     struct vr_route_req rt;
     struct vr_nexthop *nh;
@@ -121,6 +194,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     short plen;
     uint32_t rt_prefix[4];
 
+    ip6 = NULL;
     ip = (struct vr_ip *)pkt_data(pkt);
     if (vr_ip_is_ip6(ip)) {
         family = AF_INET6;
@@ -141,7 +215,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
  
     pkt->vp_ttl = ttl;
 
-    rt.rtr_req.rtr_vrf_id = vrf;
+    rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     rt.rtr_req.rtr_family = family;
     if (family == AF_INET) {
         rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
@@ -157,7 +231,7 @@ vr_forward(struct vrouter *router, unsigned short vrf,
     rt.rtr_req.rtr_nh_id = 0;
     rt.rtr_req.rtr_marker_size = 0;
 
-    nh = vr_inet_route_lookup(vrf, &rt, pkt);
+    nh = vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
     if (rt.rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG) {
         if (!fmd) {
             vr_init_forwarding_md(&rt_fmd);
@@ -217,12 +291,12 @@ vr_forward(struct vrouter *router, unsigned short vrf,
                pkt_set_network_header(pkt, pkt->vp_data);
 
                memcpy(rt.rtr_req.rtr_prefix, outer_ip6->ip6_dst, 16);
-               nh = vr_inet_route_lookup(vrf, &rt, pkt);
+               nh = vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
            }
        }
     }
     
-    status =  nh_output(vrf, pkt, nh, fmd);
+    status =  nh_output(pkt, nh, fmd);
 
     return status;
 }
@@ -517,8 +591,8 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                                 goto drop_pkt;
                              }
                             /* Subject it to flow for Linklocal */
-                            return vr_flow_inet_input(pkt->vp_nh->nh_router,
-                                pkt->vp_nh->nh_vrf, pkt, VR_ETH_PROTO_IP, fmd);
+                            if (!vr_flow_forward(router, pkt, fmd))
+                                return 0;
                         }
                     }
                 }
@@ -561,9 +635,318 @@ drop_pkt:
     return 0;
 }
 
+flow_result_t
+vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
+                 struct vr_forwarding_md *fmd)
+{
+    bool hdr_update = false;
+    unsigned int ip_inc, inc = 0;
+    unsigned short *t_sport, *t_dport;
+
+    struct vrouter *router = pkt->vp_if->vif_router;
+    struct vr_flow_entry *rfe;
+    struct vr_ip *ip, *icmp_pl_ip;
+    struct vr_icmp *icmph;
+
+    if (fe->fe_rflow < 0)
+        goto drop;
+
+    rfe = vr_get_flow_entry(router, fe->fe_rflow);
+    if (!rfe)
+        goto drop;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (ip->ip_proto == VR_IP_PROTO_ICMP) {
+        icmph = (struct vr_icmp *)((unsigned char *)ip + (ip->ip_hl * 4));
+        if (vr_icmp_error(icmph)) {
+            icmp_pl_ip = (struct vr_ip *)(icmph + 1);
+            if (fe->fe_flags & VR_FLOW_FLAG_SNAT) {
+                icmp_pl_ip->ip_daddr = rfe->fe_key.flow4_dip;
+                hdr_update = true;
+            }
+
+            if (fe->fe_flags & VR_FLOW_FLAG_DNAT) {
+                icmp_pl_ip->ip_saddr = rfe->fe_key.flow4_sip;
+                hdr_update = true;
+            }
+
+            if (hdr_update)
+                icmp_pl_ip->ip_csum = vr_ip_csum(icmp_pl_ip);
+
+            t_sport = (unsigned short *)((unsigned char *)icmp_pl_ip +
+                    (icmp_pl_ip->ip_hl * 4));
+            t_dport = t_sport + 1;
+            if (fe->fe_flags & VR_FLOW_FLAG_SPAT)
+                *t_dport = rfe->fe_key.flow4_dport;
+
+            if (fe->fe_flags & VR_FLOW_FLAG_DPAT)
+                *t_sport = rfe->fe_key.flow4_sport;
+        }
+    }
+
+
+    if ((fe->fe_flags & VR_FLOW_FLAG_SNAT) &&
+            (ip->ip_saddr == fe->fe_key.flow4_sip)) {
+        vr_incremental_diff(ip->ip_saddr, rfe->fe_key.flow4_dip, &inc);
+        ip->ip_saddr = rfe->fe_key.flow4_dip;
+    }
+
+    if (fe->fe_flags & VR_FLOW_FLAG_DNAT) {
+        vr_incremental_diff(ip->ip_daddr, rfe->fe_key.flow4_sip, &inc);
+        ip->ip_daddr = rfe->fe_key.flow4_sip;
+    }
+
+    ip_inc = inc;
+
+    if (vr_ip_transport_header_valid(ip)) {
+        t_sport = (unsigned short *)((unsigned char *)ip +
+                (ip->ip_hl * 4));
+        t_dport = t_sport + 1;
+
+        if (fe->fe_flags & VR_FLOW_FLAG_SPAT) {
+            vr_incremental_diff(*t_sport, rfe->fe_key.flow4_dport, &inc);
+            *t_sport = rfe->fe_key.flow4_dport;
+        }
+
+        if (fe->fe_flags & VR_FLOW_FLAG_DPAT) {
+            vr_incremental_diff(*t_dport, rfe->fe_key.flow4_sport, &inc);
+            *t_dport = rfe->fe_key.flow4_sport;
+        }
+    }
+
+    if (!vr_pkt_is_diag(pkt))
+        vr_ip_update_csum(pkt, ip_inc, inc);
+
+    if ((fe->fe_flags & VR_FLOW_FLAG_VRFT) &&
+            pkt->vp_nh && pkt->vp_nh->nh_vrf != fmd->fmd_dvrf) {
+        pkt->vp_nh = NULL;
+    }
+
+    return FLOW_FORWARD;
+
+drop:
+    vr_pfree(pkt, VP_DROP_FLOW_NAT_NO_RFLOW);
+    return FLOW_CONSUMED;
+}
+
+static void
+vr_inet_flow_swap(struct vr_flow *key_p)
+{
+    unsigned short port;
+    unsigned int ipaddr;
+
+    port = key_p->flow4_sport;
+    key_p->flow4_sport = key_p->flow4_dport;
+    key_p->flow4_dport = port;
+
+    ipaddr = key_p->flow4_sip;
+    key_p->flow4_sip = key_p->flow4_dip;
+    key_p->flow4_dip = ipaddr;
+
+    return;
+}
+
+static unsigned short
+vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
+{
+    unsigned short nh_id;
+
+    if (vif_is_fabric(pkt->vp_if) && pkt->vp_nh) {
+        /* this is more a requirement from agent */
+        if ((pkt->vp_nh->nh_type == NH_ENCAP)) {
+            nh_id = pkt->vp_nh->nh_dev->vif_nh_id;
+        } else {
+            nh_id = pkt->vp_nh->nh_id;
+        }
+    } else if (vif_is_service(pkt->vp_if)) {
+        nh_id = vif_vrf_table_get_nh(pkt->vp_if, vlan);
+    } else {
+        nh_id = pkt->vp_if->vif_nh_id;
+    }
+
+    return nh_id;
+}
+
+void
+vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
+        uint32_t sip, uint32_t dip, uint8_t proto,
+        uint16_t sport, uint16_t dport)
+{
+    /* copy both source and destinations */
+    flow_p->flow4_sip = sip;
+    flow_p->flow4_dip = dip;
+    flow_p->flow4_proto = proto;
+    flow_p->flow4_nh_id = nh_id;
+    flow_p->flow4_sport = sport;
+    flow_p->flow4_dport = dport;
+
+    flow_p->key_len = sizeof(struct vr_inet_flow);
+
+    return;
+}
+
+static int
+vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
+        struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p)
+{
+    uint16_t sport, dport;
+    unsigned short nh_id;
+
+    struct vr_fragment *frag;
+    struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
+
+    frag = vr_fragment_get(router, vrf, ip);
+    if (!frag) {
+        return -1;
+    }
+
+    sport = frag->f_sport;
+    dport = frag->f_dport;
+    if (vr_ip_fragment_tail(ip))
+        vr_fragment_del(frag);
+
+    nh_id = vr_inet_flow_nexthop(pkt, vlan);
+    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
+            ip->ip_proto, sport, dport);
+    return 0;
+}
+
+static int
+vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
+        struct vr_packet *pkt, uint16_t vlan, struct vr_ip *ip,
+        struct vr_flow *flow_p)
+{
+    unsigned short *t_hdr, sport, dport;
+    unsigned short nh_id;
+
+    struct vr_icmp *icmph;
+
+    t_hdr = (unsigned short *)((char *)ip + (ip->ip_hl * 4));
+
+    if (ip->ip_proto == VR_IP_PROTO_ICMP) {
+        icmph = (struct vr_icmp *)t_hdr;
+        if (vr_icmp_error(icmph)) {
+            if ((unsigned char *)ip == pkt_network_header(pkt)) {
+                vr_inet_proto_flow(router, vrf, pkt, vlan,
+                        (struct vr_ip *)(icmph + 1), flow_p);
+                vr_inet_flow_swap(flow_p);
+            }
+
+            return 0;
+        } else if (vr_icmp_echo(icmph)) {
+            sport = icmph->icmp_eid;
+            dport = VR_ICMP_TYPE_ECHO_REPLY;
+        } else {
+            sport = 0;
+            dport = icmph->icmp_type;
+        }
+    } else {
+        sport = *t_hdr;
+        dport = *(t_hdr + 1);
+    }
+
+    nh_id = vr_inet_flow_nexthop(pkt, vlan);
+    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
+            ip->ip_proto, sport, dport);
+
+    return 0;
+}
+
+static int
+vr_inet_form_flow(struct vrouter *router, unsigned short vrf, 
+        struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p)
+{
+    int ret;
+    struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
+
+    if (vr_ip_transport_header_valid(ip)) {
+        ret = vr_inet_proto_flow(router, vrf, pkt, vlan, ip, flow_p);
+    } else {
+        ret = vr_inet_fragment_flow(router, vrf, pkt, vlan, flow_p);
+        if (ret < 0)
+            vr_pfree(pkt, VP_DROP_FRAGMENTS);
+    }
+
+    return ret;
+}
+
+static bool
+vr_inet_should_trap(struct vr_packet *pkt, struct vr_flow *flow_p)
+{
+    uint32_t proto_port;
+
+    /*
+     * dhcp packet handling:
+     *
+     * for now we handle dhcp requests from only VMs and that too only
+     * for VMs that are not in the fabric VRF. dhcp refresh packets will
+     * anyway hit the route entry and get trapped from there.
+     */
+    if (vif_is_virtual(pkt->vp_if) && vif_dhcp_enabled(pkt->vp_if)) {
+        proto_port = (flow_p->flow4_proto << VR_FLOW_PROTO_SHIFT) |
+            flow_p->flow4_sport;
+        if (proto_port == VR_UDP_DHCP_CPORT) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+flow_result_t
+vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
+                    struct vr_forwarding_md *fmd)
+{
+    int ret;
+    bool lookup = false;
+    struct vr_flow flow, *flow_p = &flow;
+    struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
+
+    /*
+     * if the packet has already done one round of flow lookup, there
+     * is no point in doing it again, eh?
+     */
+    if (pkt->vp_flags & VP_FLAG_FLOW_SET)
+        return FLOW_FORWARD;
+
+    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow_p);
+    if (ret < 0)
+        return FLOW_CONSUMED;
+
+    /* no flow lookup for multicast or broadcast ip */
+    if (IS_BMCAST_IP(ip->ip_daddr)) {
+        /* but then we have to trap some packets */
+        if (vr_inet_should_trap(pkt, flow_p)) {
+            return FLOW_TRAP;
+        }
+        return FLOW_FORWARD;
+    }
+
+    /*
+     * if the interface is policy enabled, or if somebody else (eg:nexthop)
+     * has requested for a policy lookup, packet has to go through a lookup
+     */
+    if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
+            (pkt->vp_flags & VP_FLAG_FLOW_GET)) {
+        lookup = true;
+    }
+
+    if (lookup) {
+        if (vr_ip_fragment_head(ip)) {
+            vr_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
+                    flow_p->flow4_dport);
+        }
+
+        return vr_flow_lookup(router, flow_p, pkt, fmd);
+    }
+
+    return FLOW_FORWARD;
+}
+
+
 int
-vr_ip_input(struct vrouter *router, unsigned short vrf, 
-        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+vr_ip_input(struct vrouter *router, struct vr_packet *pkt,
+            struct vr_forwarding_md *fmd)
 {
     struct vr_ip *ip;
 
@@ -571,112 +954,21 @@ vr_ip_input(struct vrouter *router, unsigned short vrf,
     if (ip->ip_version == 4 && ip->ip_hl < 5) 
         goto corrupt_pkt;
 
-    return vr_forward(router, vrf, pkt, fmd);
+    /*
+     * interface is in a mode where it wants all packets to be received
+     * without doing lookups to figure out whether packets were destined
+     * to me or not
+     */
+    if (pkt->vp_flags & VP_FLAG_TO_ME)
+        return vr_ip_rcv(router, pkt, fmd);
+    
+    if (!vr_flow_forward(router, pkt, fmd))
+        return 0;
 
+    return vr_forward(router, pkt, fmd);
 corrupt_pkt:
     vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
     return 0;
-}
-
-void
-vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
-{
-    struct vr_ip *ip;
-    struct vr_tcp *tcp;
-    struct vr_udp *udp;
-    unsigned int csum;
-    unsigned short *csump;
-
-    ip = (struct vr_ip *)pkt_data(pkt);
-    ip->ip_csum = vr_ip_csum(ip);
-
-    if (ip->ip_proto == VR_IP_PROTO_TCP) {
-        tcp = (struct vr_tcp *)((unsigned char *)ip + ip->ip_hl * 4);
-        csump = &tcp->tcp_csum;
-    } else if (ip->ip_proto == VR_IP_PROTO_UDP) {
-        udp = (struct vr_udp *)((unsigned char *)ip + ip->ip_hl * 4);
-        csump = &udp->udp_csum;
-    } else {
-        return;
-    }
-
-    if (vr_ip_transport_header_valid(ip)) {
-        /*
-         * for partial checksums, the actual value is stored rather
-         * than the complement
-         */
-        if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
-            csum = (*csump) & 0xffff;
-            inc = ip_inc; 
-        } else {
-            csum = ~(*csump) & 0xffff;
-        }
-
-        csum += inc;
-        if (csum < inc)
-            csum += 1;
-
-        csum = (csum & 0xffff) + (csum >> 16);
-        if (csum >> 16)
-            csum = (csum & 0xffff) + 1;
-
-        if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
-            *csump = csum & 0xffff;
-        } else {
-            *csump = ~(csum) & 0xffff;
-        }
-    }
-
-    return;
-}
-
-unsigned short
-vr_ip_csum(struct vr_ip *ip)
-{
-    int sum = 0;
-    unsigned short *ptr = (unsigned short *)ip;
-    unsigned short answer = 0;
-    unsigned short *w = ptr;
-    int len = ip->ip_hl * 4;
-    int nleft = len;
-
-    ip->ip_csum = 0;
-
-    while (nleft > 1) {
-        sum += *w++;
-        nleft -= 2;
-    }
-
-    /* mop up an odd byte, if necessary */
-    if (nleft == 1) {
-        *(unsigned char *)(&answer) = *(unsigned char *)w;
-        sum += answer;
-    }
-
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum += (sum >> 16);
-    answer = ~sum;
-
-    return answer;
-}
-
-unsigned short
-vr_ip_partial_csum(struct vr_ip *ip)
-{
-    unsigned long long s;
-    unsigned int sum;
-    unsigned short csum, proto;
-
-    proto = ip->ip_proto;
-    s = ip->ip_saddr;
-    s += ip->ip_daddr;
-    s += htons(ntohs(ip->ip_len) - (ip->ip_hl * 4));
-    s += htons(proto);
-
-    s = (s & 0xFFFFFFFF) + (s >> 32);
-    sum = (s & 0xFFFF) + (s >> 16);
-    csum = (sum & 0xFFFF) + (sum >> 16);
-    return csum;
 }
 
 bool
@@ -734,7 +1026,7 @@ vr_myip(struct vr_interface *vif, unsigned int ip)
     rt.rtr_req.rtr_nh_id = 0;
     rt.rtr_req.rtr_marker_size = 0;
 
-    nh = vr_inet_route_lookup(vif->vif_vrf, &rt, NULL);
+    nh = vr_inet_route_lookup(vif->vif_vrf, &rt);
 
     if (!nh || nh->nh_type != NH_RCV)
         return 0;
@@ -757,8 +1049,29 @@ vr_inet_route_flags(unsigned int vrf, unsigned int ip)
     rt.rtr_req.rtr_prefix_size = 4;
     rt.rtr_req.rtr_prefix_len = IP4_PREFIX_LEN;
 
-    (void)vr_inet_route_lookup(vrf, &rt, NULL);
+    (void)vr_inet_route_lookup(vrf, &rt);
 
     return rt.rtr_req.rtr_label_flags;
+}
+
+bool
+vr_ip_well_known_packet(struct vr_packet *pkt)
+{
+    unsigned char *data = pkt_data(pkt);
+    struct vr_ip *iph;
+    struct vr_udp *udph;
+
+    if ((pkt->vp_type != VP_TYPE_IP) ||
+         (!(pkt->vp_flags & VP_FLAG_MULTICAST)))
+        return false;
+
+    iph = (struct vr_ip *)data;
+    if ((iph->ip_proto == VR_IP_PROTO_UDP) &&
+                              vr_ip_transport_header_valid(iph)) {
+        udph = (struct vr_udp *)(data + iph->ip_hl * 4);
+        if (udph->udp_sport == htons(VR_DHCP_SRC_PORT))
+            return true;
+    }
+    return false;
 }
 

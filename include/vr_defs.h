@@ -43,7 +43,7 @@ enum rt_type{
 };
 
 #define VR_RT_LABEL_VALID_FLAG      0x1
-#define VR_RT_HOSTED_FLAG           0x2
+#define VR_RT_ARP_PROXY_FLAG        0x2
 #define VR_RT_ARP_TRAP_FLAG         0x4
 #define VR_RT_ARP_FLOOD_FLAG        0x8
 

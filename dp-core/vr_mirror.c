@@ -457,7 +457,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec/1000);
     }
 
-    nh_output((unsigned short)nh->nh_vrf, pkt, nh, fmd);
+    fmd->fmd_dvrf = nh->nh_vrf;
+    nh_output(pkt, nh, fmd);
     return 0;
 
 fail:

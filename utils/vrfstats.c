@@ -55,20 +55,33 @@ vr_vrf_stats_req_process(void *s_req)
 
     stats_req.vsr_marker = stats->vsr_vrf;
     printf("Vrf: %d\n", stats->vsr_vrf);
-    printf("Discards %" PRIu64 ", Resolves %" PRIu64 ", Receives %" PRIu64 "\n",
-            stats->vsr_discards, stats->vsr_resolves, stats->vsr_receives);
-    printf("Ecmp Composites %" PRIu64 ", L2 Mcast Composites %" PRIu64
-            ", Fabric Composites %" PRIu64 ", Encap Composites %" PRIu64
+    printf("Discards %" PRIu64 ", Resolves %" PRIu64 ", Receives %"
+            PRIu64 ", L2 Receives %" PRIu64 ", Vrf Translates %" PRIu64 "\n",
+            stats->vsr_discards, stats->vsr_resolves, stats->vsr_receives,
+            stats->vsr_l2_receives, stats->vsr_vrf_translates);
+    printf("Ecmp Composites %" PRIu64 ", L2 Mcast Composites %"
+            PRIu64 ", Fabric Composites %" PRIu64 ", Encap Composites %" PRIu64
             ", Evpn Composites %" PRIu64 "\n", stats->vsr_ecmp_composites,
             stats->vsr_l2_mcast_composites, stats->vsr_fabric_composites,
             stats->vsr_encap_composites, stats->vsr_evpn_composites);
     printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64 
-            ", Gre Mpls Tunnels %" PRIu64 "\n", stats->vsr_udp_tunnels,
-            stats->vsr_udp_mpls_tunnels, stats->vsr_gre_mpls_tunnels);
+            ", Gre Mpls Tunnels %" PRIu64 ", Vxlan Tunnels %" PRIu64 "\n",
+            stats->vsr_udp_tunnels, stats->vsr_udp_mpls_tunnels,
+            stats->vsr_gre_mpls_tunnels, stats->vsr_vxlan_tunnels);
     printf("L2 Encaps %" PRIu64 ", Encaps %" PRIu64 "\n",
             stats->vsr_l2_encaps, stats->vsr_encaps);
     printf("GROs %" PRIu64 ", Diags %" PRIu64 "\n",
             stats->vsr_gros, stats->vsr_diags);
+    printf("Arp Virtual Proxys %" PRIu64 ", Arp Virtual Stitchs %" PRIu64
+           ", Arp Virtual Floods %" PRIu64 ", Arp Physical Stitchs %" PRIu64
+           ", Arp Tor Proxys %" PRIu64 ", Arp Physical Floods %" PRIu64 "\n"
+           ", Encap Arp responses %" PRIu64 ", Tunnel ARP Responses %" PRIu64
+           ", Drop Arp responses %" PRIu64 "\n",
+            stats->vsr_arp_virtual_proxy, stats->vsr_arp_virtual_stitch,
+            stats->vsr_arp_virtual_flood, stats->vsr_arp_physical_stitch,
+            stats->vsr_arp_tor_proxy, stats->vsr_arp_physical_flood,
+            stats->vsr_encap_arp_responses, stats->vsr_tunnel_arp_responses,
+            stats->vsr_drop_arp_responses);
 
     printf("\n");
     return;

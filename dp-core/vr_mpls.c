@@ -241,7 +241,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     unsigned int label;
-    unsigned short vrf, drop_reason;
+    unsigned short drop_reason;
     struct vr_nexthop *nh;
     struct vr_ip *ip;
     struct vr_forwarding_md c_fmd;
@@ -292,7 +292,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         pkt->vp_flags |= VP_FLAG_GRO;
 
     /* Reset the flags which get defined below */
-    pkt->vp_flags &= ~(VP_FLAG_MULTICAST | VP_FLAG_L2_PAYLOAD);
+    pkt->vp_flags &= ~VP_FLAG_MULTICAST;
 
     if (nh->nh_family == AF_INET) {
         ip = (struct vr_ip *)pkt_data(pkt);
@@ -306,15 +306,12 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     } else if (nh->nh_family == AF_BRIDGE) {
 
-        /* All bridge packets are L2 payload packets */
-        pkt->vp_flags |= VP_FLAG_L2_PAYLOAD;
-
         if (nh->nh_type == NH_COMPOSITE) {
             if (label >= VR_MAX_UCAST_LABELS)
                 l2_offset = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
         }
 
-        if (vr_pkt_type(pkt, l2_offset) < 0) {
+        if (vr_pkt_type(pkt, l2_offset, fmd) < 0) {
             drop_reason = VP_DROP_INVALID_PACKET;
             goto dropit;
         }
@@ -332,13 +329,13 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
      * will forward the packet in the vrf in which it came i.e fabric
      */
     if (nh->nh_vrf >= 0)
-        vrf = nh->nh_vrf;
+        fmd->fmd_dvrf = nh->nh_vrf;
     else if (nh->nh_dev)
-        vrf = nh->nh_dev->vif_vrf;
+        fmd->fmd_dvrf = nh->nh_dev->vif_vrf;
     else
-        vrf = pkt->vp_if->vif_vrf;
+        fmd->fmd_dvrf = pkt->vp_if->vif_vrf;
 
-    nh_output(vrf, pkt, nh, fmd);
+    nh_output(pkt, nh, fmd);
 
     return 0;
 

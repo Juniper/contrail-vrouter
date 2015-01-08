@@ -41,6 +41,7 @@
 #include "vr_genetlink.h"
 #include "nl_util.h"
 #include "vr_os.h"
+#include "vr_packet.h"
 
 #define TABLE_FLAG_VALID        0x1
 #define MEM_DEV                 "/dev/flow"
@@ -138,21 +139,26 @@ dump_table(struct flow_table *ft)
         need_drop_reason = 0;
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
-            in_src.s_addr = fe->fe_key.key_src_ip;
-            in_dest.s_addr = fe->fe_key.key_dest_ip;
+            if (fe->fe_type == VP_TYPE_IP) {
+                in_src.s_addr = fe->fe_key.flow4_sip;
+                in_dest.s_addr = fe->fe_key.flow4_dip;
+            }
+
             printf("%6d", i);
             if (fe->fe_rflow >= 0)
                 printf("<=>%-6d", fe->fe_rflow);
             else
                 printf("         ");
 
-            printf("   %12s:%-5d    ", inet_ntoa(in_src),
-                    ntohs(fe->fe_key.key_src_port));
-            printf("%16s:%-5d    %d (%d",
-                    inet_ntoa(in_dest),
-                    ntohs(fe->fe_key.key_dst_port),
-                    fe->fe_key.key_proto,
-                    fe->fe_vrf);
+            if (fe->fe_type == VP_TYPE_IP) {
+                printf("   %12s:%-5d    ", inet_ntoa(in_src),
+                        ntohs(fe->fe_key.flow4_sport));
+                printf("%16s:%-5d    %d (%d",
+                        inet_ntoa(in_dest),
+                        ntohs(fe->fe_key.flow4_dport),
+                        fe->fe_key.flow4_proto,
+                        fe->fe_vrf);
+            }
 
             if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
                 printf("->%d", fe->fe_dvrf);
@@ -206,7 +212,9 @@ dump_table(struct flow_table *ft)
             }
 
             printf("\t(");
-            printf("K(nh):%u, ", fe->fe_key.key_nh_id);
+            if (fe->fe_type == VP_TYPE_IP)
+                printf("K(nh):%u, ", fe->fe_key.flow4_nh_id);
+
             printf("Action:%c", action);
             if (need_flag_print)
                 printf("(%s)", flag_string);
@@ -560,16 +568,18 @@ flow_validate(int flow_index, char action)
     memset(&flow_req, 0, sizeof(flow_req));
 
     fe = flow_get(flow_index);
+    if (fe->fe_type != VP_TYPE_IP)
+        return;
 
     flow_req.fr_op = FLOW_OP_FLOW_SET;
     flow_req.fr_index = flow_index;
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    flow_req.fr_flow_sip = fe->fe_key.key_src_ip;
-    flow_req.fr_flow_dip = fe->fe_key.key_dest_ip;
-    flow_req.fr_flow_proto = fe->fe_key.key_proto;
-    flow_req.fr_flow_sport = fe->fe_key.key_src_port;
-    flow_req.fr_flow_dport = fe->fe_key.key_dst_port;
-    flow_req.fr_flow_nh_id = fe->fe_key.key_nh_id;
+    flow_req.fr_flow_sip = fe->fe_key.flow4_sip;
+    flow_req.fr_flow_dip = fe->fe_key.flow4_dip;
+    flow_req.fr_flow_proto = fe->fe_key.flow4_proto;
+    flow_req.fr_flow_sport = fe->fe_key.flow4_sport;
+    flow_req.fr_flow_dport = fe->fe_key.flow4_dport;
+    flow_req.fr_flow_nh_id = fe->fe_key.flow4_nh_id;
 
     switch (action) {
     case 'd':

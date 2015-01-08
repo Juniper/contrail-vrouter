@@ -39,13 +39,13 @@
 
 #define VR_BE_FLAG_VALID                 0x01
 #define VR_BE_FLAG_LABEL_VALID           0x02
+#define VR_BE_INVALID_INDEX              ((unsigned int)-1)
 
 extern char vr_bcast_mac[];
 unsigned int
-vr_bridge_input(struct vrouter *, unsigned short , struct vr_packet *, 
+vr_bridge_input(struct vrouter *, struct vr_packet *,
                             struct vr_forwarding_md *);
-
 extern struct vr_nexthop *(*vr_bridge_lookup)(unsigned int,
-        struct vr_route_req *, struct vr_packet *);
+        struct vr_route_req *);
 
 #endif

@@ -13,9 +13,13 @@
 #define VR_FLOW_ACTION_FORWARD      0x2
 #define VR_FLOW_ACTION_NAT          0x4
 
-#define VR_FLOW_LOOKUP              0x0
-#define VR_FLOW_BYPASS              0x1
-#define VR_FLOW_TRAP                0x2
+typedef enum {
+    FLOW_HELD,
+    FLOW_FORWARD,
+    FLOW_DROP,
+    FLOW_TRAP,
+    FLOW_CONSUMED,
+} flow_result_t;
 
 #define VR_FLOW_FLAG_ACTIVE         0x1
 #define VR_RFLOW_VALID              0x1000
@@ -60,16 +64,29 @@
 
 struct vr_forwarding_md;
 
-struct vr_flow_key {
-    unsigned short key_src_port;
-    unsigned short key_dst_port;
-    /* we should be doing memcpy for the two ips */
-    unsigned int key_src_ip;
-    unsigned int key_dest_ip;
-    unsigned short key_nh_id;
-    unsigned char key_proto;
-    unsigned char key_zero;
+struct vr_inet_flow {
+    unsigned short ip4_sport;
+    unsigned short ip4_dport;
+    unsigned int ip4_sip;
+    unsigned int ip4_dip;
+    unsigned short ip4_nh_id;
+    unsigned char ip4_proto;
 } __attribute__((packed));
+
+struct vr_flow {
+    union {
+        struct vr_inet_flow ip4_key;
+    } key_u;
+
+    uint8_t key_len;
+};
+
+#define flow4_sport     key_u.ip4_key.ip4_sport
+#define flow4_dport     key_u.ip4_key.ip4_dport
+#define flow4_sip       key_u.ip4_key.ip4_sip
+#define flow4_dip       key_u.ip4_key.ip4_dip
+#define flow4_nh_id     key_u.ip4_key.ip4_nh_id
+#define flow4_proto     key_u.ip4_key.ip4_proto
 
 /* 
  * Limit the number of outstanding flows in hold state. The flow rate can
@@ -124,12 +141,14 @@ struct vr_flow_stats {
 
 #define VR_MAX_FLOW_QUEUE_ENTRIES   3U
 
+#define PN_FLAG_LABEL_IS_VNID       0x1
+
 struct vr_packet_node {
-    unsigned short pl_proto;
     struct vr_packet *pl_packet;
     uint32_t pl_outer_src_ip;
     uint32_t pl_label;
     uint32_t pl_vif_idx;
+    uint32_t pl_flags;
 };
 
 struct vr_flow_queue {
@@ -139,7 +158,7 @@ struct vr_flow_queue {
 };
 
 struct vr_dummy_flow_entry {
-    struct vr_flow_key fe_key;
+    struct vr_flow fe_key;
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -153,13 +172,14 @@ struct vr_dummy_flow_entry {
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
     unsigned short fe_udp_src_port;
+    uint8_t fe_type;
 } __attribute__((packed));
 
 #define VR_FLOW_ENTRY_PACK (64 - sizeof(struct vr_dummy_flow_entry))
 
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
-    struct vr_flow_key fe_key;
+    struct vr_flow fe_key;
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -173,6 +193,7 @@ struct vr_flow_entry {
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
     unsigned short fe_udp_src_port;
+    uint8_t fe_type;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 
@@ -205,19 +226,29 @@ struct vrouter;
 
 extern int vr_flow_init(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);
-extern unsigned int vr_flow_inet_input(struct vrouter *, unsigned short, 
-        struct vr_packet *, unsigned short, struct vr_forwarding_md *);
-extern unsigned int vr_flow_inet6_input(struct vrouter *, unsigned short, 
-        struct vr_packet *, unsigned short, struct vr_forwarding_md *);
 
-extern int vr_flow_forward(unsigned short vrf, struct vr_packet *pkt,
-        unsigned short proto, struct vr_forwarding_md *fmd);
-extern inline unsigned int
-vr_flow_bypass(struct vrouter *, struct vr_flow_key *, struct vr_packet *, unsigned int *);
+extern bool vr_flow_forward(struct vrouter *,
+        struct vr_packet *, struct vr_forwarding_md *);
+
 void *vr_flow_get_va(struct vrouter *, uint64_t);
+
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
-struct vr_flow_entry * vr_get_flow_entry(struct vrouter *, int );
-bool vr_valid_link_local_port(struct vrouter *, int , int , int );
+
+struct vr_flow_entry *vr_get_flow_entry(struct vrouter *, int);
+flow_result_t vr_flow_lookup(struct vrouter *, struct vr_flow *,
+                             struct vr_packet *, struct vr_forwarding_md *);
+
+flow_result_t vr_inet_flow_lookup(struct vrouter *, struct vr_packet *,
+                                  struct vr_forwarding_md *);
+extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
+        struct vr_packet *, struct vr_forwarding_md *);
+extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
+                uint32_t, uint32_t, uint8_t, uint16_t, uint16_t);
+
+extern unsigned int vr_reinject_packet(struct vr_packet *,
+        struct vr_forwarding_md *);
+
+bool vr_valid_link_local_port(struct vrouter *, int, int, int);
 
 #endif /* __VR_FLOW_H__ */

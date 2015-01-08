@@ -49,8 +49,8 @@ vr_drop_stats_req_process(void *s_req)
 
     printf("GARP                          %" PRIu64 "\n",
             stats->vds_garp_from_vm);
-    printf("ARP notme                     %" PRIu64 "\n",
-            stats->vds_arp_not_me);
+    printf("ARP no where to go            %" PRIu64 "\n",
+            stats->vds_arp_no_where_to_go);
     printf("Invalid ARPs                  %" PRIu64 "\n",
             stats->vds_invalid_arp);
     printf("\n");
@@ -139,6 +139,12 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_invalid_source);
     printf("Jumbo Mcast Pkt with DF Bit   %" PRIu64 "\n",
             stats->vds_mcast_df_bit);
+    printf("ARP No Route                  %" PRIu64 "\n",
+            stats->vds_arp_no_route);
+    printf("ARP Reply No Route            %" PRIu64 "\n",
+            stats->vds_arp_reply_no_route);
+    printf("No L2 Route                   %" PRIu64 "\n",
+            stats->vds_l2_no_route);
     printf("\n");
     return;
 }

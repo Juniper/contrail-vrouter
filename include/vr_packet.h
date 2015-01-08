@@ -27,6 +27,7 @@
 #define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
 #define VR_GRE_FLAG_KEY         (ntohs(0x2000)) 
 #define VR_DHCP_SRC_PORT        68
+#define VR_DHCP6_SRC_PORT       546
 
 /* Size of basic GRE header */
 #define VR_GRE_BASIC_HDR_LEN    4
@@ -71,8 +72,6 @@
 #define VP_FLAG_GSO             (1 << 7)
 /* Diagnostic packet */
 #define VP_FLAG_DIAG            (1 << 8)
-/* Mark the packet as L2 payload packet */
-#define VP_FLAG_L2_PAYLOAD      (1 << 9)
 
 /* 
  * possible 256 values of what a packet can be. currently, this value is
@@ -108,6 +107,17 @@
 #define PKT_MPLS_TUNNEL_L2_MCAST        0x03
 #define PKT_MPLS_TUNNEL_L2_MCAST_EVPN   0x04
 
+
+/*
+ * Values to defaine the srouce of Multicast packet
+ */
+#define PKT_SRC_TOR_REPL_TREE      0x1
+#define PKT_SRC_INGRESS_REPL_TREE  0x2
+#define PKT_SRC_EDGE_REPL_TREE     0x4
+#define PKT_SRC_ANY_REPL_TREE      (PKT_SRC_TOR_REPL_TREE | \
+                PKT_SRC_SRC_REPL_TREE | PKT_SRC_EDGE_REPL_TREE)
+
+
 /*
  * Values to define the encap type of outgoing packet
  */
@@ -115,22 +125,11 @@
 #define PKT_ENCAP_VXLAN 0x02
 
 
-/*
- * Values to define handling of ARP packet
- */
-#define PKT_ARP_DROP            0x00
-#define PKT_ARP_PROXY           0x01
-#define PKT_ARP_XCONNECT        0x02
-#define PKT_ARP_FLOOD           0x03
-#define PKT_ARP_TRAP_XCONNECT   0x04
-#define PKT_ARP_TRAP            0x05
-
-
 /* packet drop reasons */
 #define VP_DROP_DISCARD                     0
 #define VP_DROP_PULL                        1
 #define VP_DROP_INVALID_IF                  2
-#define VP_DROP_ARP_NOT_ME                  3
+#define VP_DROP_ARP_NO_WHERE_TO_GO          3
 #define VP_DROP_GARP_FROM_VM                4
 #define VP_DROP_INVALID_ARP                 5
 #define VP_DROP_TRAP_NO_IF                  6
@@ -169,13 +168,17 @@
 #define VP_DROP_INVALID_VNID                39
 #define VP_DROP_FRAGMENTS                   40
 #define VP_DROP_INVALID_SOURCE              41
-#define VP_DROP_MAX                         42
+#define VP_DROP_ARP_NO_ROUTE                42
+#define VP_DROP_L2_NO_ROUTE                 43
+#define VP_DROP_ARP_REPLY_NO_ROUTE          44
+#define VP_DROP_MAX                         45
+
 
 struct vr_drop_stats {
     uint64_t vds_discard;
     uint64_t vds_pull;
     uint64_t vds_invalid_if;
-    uint64_t vds_arp_not_me;
+    uint64_t vds_arp_no_where_to_go;
     uint64_t vds_garp_from_vm;
     uint64_t vds_invalid_arp;
     uint64_t vds_trap_no_if;
@@ -214,6 +217,10 @@ struct vr_drop_stats {
     uint64_t vds_invalid_vnid;
     uint64_t vds_frag_err;
     uint64_t vds_invalid_source;
+    uint64_t vds_arp_no_route;
+    uint64_t vds_l2_no_route;
+    uint64_t vds_arp_reply_no_route;
+
 };
 
 /*
@@ -279,6 +286,16 @@ struct vr_arp {
     unsigned int arp_dpa;
 } __attribute__((packed));
 
+typedef enum {
+    MR_DROP,
+    MR_FLOOD,
+    MR_PROXY,
+    MR_NOT_ME,
+    MR_TRAP,
+    MR_TRAP_X,
+    MR_XCONNECT,
+} mac_response_t;
+
 #define VR_IP_DF    (0x1 << 14)
 #define VR_IP_MF    (0x1 << 13)
 #define VR_IP_FRAG_OFFSET_MASK (VR_IP_MF - 1)
@@ -320,6 +337,8 @@ struct vr_ip {
     unsigned int ip_daddr;
 } __attribute__((packed));
 
+#define VR_IP6_ADDRESS_LEN      16
+
 struct vr_ip6 {
 #ifdef __KERNEL__
 #if defined(__LITTLE_ENDIAN_BITFIELD)
@@ -346,11 +365,11 @@ struct vr_ip6 {
                ip6_flow:20;
 #endif
 #endif
-    unsigned short  ip6_plen;        /* payload length */
-    unsigned char   ip6_nxt;         /* next header */
-    unsigned char   ip6_hlim;        /* hop limit */
-    unsigned char ip6_src[16];       /* source address */
-    unsigned char ip6_dst[16];       /* destination address */
+    unsigned short  ip6_plen;
+    unsigned char   ip6_nxt;
+    unsigned char   ip6_hlim;
+    unsigned char ip6_src[VR_IP6_ADDRESS_LEN];
+    unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
 #define MCAST_IP                        (0xE0000000)
@@ -413,15 +432,6 @@ vr_pkt_is_ip(struct vr_packet *pkt)
 {
     if (pkt->vp_type == VP_TYPE_IPOIP || pkt->vp_type == VP_TYPE_IP ||
               pkt->vp_type == VP_TYPE_IP6OIP)
-        return true;
-
-    return false;
-}
-
-static inline bool
-vr_pkt_is_l2(struct vr_packet *pkt)
-{
-    if (pkt->vp_flags & VP_FLAG_L2_PAYLOAD)
         return true;
 
     return false;
@@ -556,6 +566,18 @@ struct vr_icmp {
     uint16_t icmp_eseq;
     uint8_t  icmp_data[0]; // Compatibility with ICMPv6
 } __attribute__((packed));
+
+static inline bool
+vr_icmp_echo(struct vr_icmp *icmph)
+{
+    uint8_t type = icmph->icmp_type;
+
+    if ((type == VR_ICMP_TYPE_ECHO) ||
+            (type == VR_ICMP_TYPE_ECHO_REPLY))
+        return true;
+
+    return false;
+}
 
 static inline bool
 vr_icmp_error(struct vr_icmp *icmph)

@@ -43,6 +43,7 @@ SRCS += vr_message.c \
        vr_interface.c \
        vr_packet.c \
        vr_proto_ip.c \
+	   vr_proto_ip6.c \
        vr_mpls.c \
        vr_response.c \
        vr_flow.c \

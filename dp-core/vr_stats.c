@@ -19,7 +19,7 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_discard = stats->vds_discard;
     response->vds_pull = stats->vds_pull;
     response->vds_invalid_if = stats->vds_invalid_if;
-    response->vds_arp_not_me = stats->vds_arp_not_me;
+    response->vds_arp_no_where_to_go = stats->vds_arp_no_where_to_go;
     response->vds_garp_from_vm = stats->vds_garp_from_vm;
     response->vds_invalid_arp = stats->vds_invalid_arp;
     response->vds_trap_no_if = stats->vds_trap_no_if;
@@ -62,6 +62,9 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_invalid_vnid = stats->vds_invalid_vnid;
     response->vds_frag_err = stats->vds_frag_err;
     response->vds_invalid_source = stats->vds_invalid_source;
+    response->vds_arp_no_route = stats->vds_arp_no_route;
+    response->vds_l2_no_route = stats->vds_l2_no_route;
+    response->vds_arp_reply_no_route = stats->vds_arp_reply_no_route;
 
     return;
 }
@@ -72,7 +75,7 @@ vr_drop_stats_get(void)
     int ret = 0;
     unsigned int cpu;
     struct vrouter *router = vrouter_get(0);
-    vr_drop_stats_req response;
+    vr_drop_stats_req *response;
     struct vr_drop_stats *stats_block, *stats = NULL;
 
     if (!router && (ret = -ENOENT))
@@ -87,7 +90,8 @@ vr_drop_stats_get(void)
         stats->vds_discard += stats_block->vds_discard;
         stats->vds_pull += stats_block->vds_pull;
         stats->vds_invalid_if += stats_block->vds_invalid_if;
-        stats->vds_arp_not_me += stats_block->vds_arp_not_me;
+        stats->vds_arp_no_where_to_go +=
+            stats_block->vds_arp_no_where_to_go;
         stats->vds_garp_from_vm += stats_block->vds_garp_from_vm;
         stats->vds_invalid_arp += stats_block->vds_invalid_arp;
         stats->vds_trap_no_if += stats_block->vds_trap_no_if;
@@ -129,14 +133,28 @@ vr_drop_stats_get(void)
         stats->vds_invalid_vnid += stats_block->vds_invalid_vnid;
         stats->vds_frag_err += stats_block->vds_frag_err;
         stats->vds_invalid_source += stats_block->vds_invalid_source;
+        stats->vds_arp_no_route += stats_block->vds_arp_no_route;
+        stats->vds_l2_no_route += stats_block->vds_l2_no_route;
+        stats->vds_arp_reply_no_route +=
+            stats_block->vds_arp_reply_no_route;
     }
 
-    vr_drop_stats_fill_response(&response, stats);
+    response = vr_zalloc(sizeof(*response));
+    if (!response) {
+        vr_module_error(-ENOMEM, __FUNCTION__,
+                __LINE__, sizeof(*response));
+        ret = -ENOMEM;
+        goto exit_get;
+    }
+
+    vr_drop_stats_fill_response(response, stats);
 
 exit_get:
-    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : &response, ret);
+    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : response, ret);
     if (stats != NULL)
         vr_free(stats);
+    if (response != NULL)
+        vr_free(response);
     return;
 }
 

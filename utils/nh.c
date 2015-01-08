@@ -59,7 +59,9 @@ nh_type(uint32_t type)
        case NH_DEAD:
            return "Dead";
        case NH_RCV:
-           return "Receieve";
+           return "Receive";
+       case NH_L2_RCV:
+           return "L2 Receive";
        case NH_ENCAP:
            return "Encap";
        case NH_TUNNEL:
@@ -151,13 +153,9 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
             strcat(ptr, "Multicast, ");
             break;
 
-        case NH_FLAG_ENCAP_L2:
-            if (type == NH_ENCAP)
-                strcat(ptr, "L2, ");
-            break;
-
         case NH_FLAG_TUNNEL_VXLAN:
-                strcat(ptr, "Vxlan, ");
+        case NH_FLAG_VNID:
+            strcat(ptr, "Vxlan, ");
             break;
         }
     }
@@ -183,9 +181,10 @@ vr_nexthop_req_process(void *s_req)
     else 
         strcpy(fam, "N/A");
 
-    printf("Id:%03d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d\n", 
+    printf("Id:%03d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d Vrf:%d\n",
                 req->nhr_id, nh_type(req->nhr_type), fam,
-                nh_flags(req->nhr_flags, req->nhr_type, flags_mem), req->nhr_rid, req->nhr_ref_cnt);
+                nh_flags(req->nhr_flags, req->nhr_type, flags_mem),
+                req->nhr_rid, req->nhr_ref_cnt, req->nhr_vrf);
 
     if (req->nhr_type == NH_RCV)
         printf("\tOif:%d\n", req->nhr_encap_oif_id);
@@ -376,8 +375,12 @@ cmd_usage()
            "       [--vrf <vrf_id> ]\n"
            "       [--pol NH with policy]\n"
            "       [--rpol NH with relaxed policy]\n"
-           "       [--type <type> type of the tunnel 1 - rcv, 2 - encap, 3 - tunnel, 4 - resolve, 5 - discard, 6 - Composite, 7 - Vxlan VRF] \n"
+           "       [--type <type> type of the tunnel 1 - rcv, 2 - encap \n"
+           "                       3 - tunnel, 4 - resolve, 5 - discard, 6 - Composite\n"
+           "                       7 - Vxlan VRF, 8 - L2 Rcv NH] \n"
            "                [RCV_NH options]\n"
+           "                    [--oif <if_id> out going interface index]\n"
+           "                [L2RCV_NH options]\n"
            "                    [--oif <if_id> out going interface index]\n"
            "                [ENCAP_NH optionsi - default L3]\n"
            "                    [--el2 encap L2 ]\n"
@@ -455,6 +458,7 @@ enum opt_index {
     CRT_OPT_IND,
     DEL_OPT_IND,
     CMD_OPT_IND,
+    RL2_OPT_IND,
     HLP_OPT_IND,
     MAX_OPT_IND
 };
@@ -615,6 +619,9 @@ validate_options()
             if (type == NH_RCV) {
                 if (!opt_set(OIF_OPT_IND))
                     cmd_usage();
+                if (memcmp(opt, zero_opt, sizeof(opt)))
+                    cmd_usage();
+            } else if (type == NH_L2_RCV) {
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
             } else if (type == NH_ENCAP) {

@@ -559,14 +559,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         hashrnd_inited = 1;
     }
 
-    if (vr_pkt_is_l2(pkt)) {
-        if (pkt_head_len(pkt) < ETH_HLEN)
-            goto error;
-
-        hashval = vr_hash(pkt_data(pkt), ETH_HLEN, vr_hashrnd);
-        /* Include the VRF to calculate the hash */
-        hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
-    } else  {
+    if (pkt->vp_type == VP_TYPE_IP) {
         /* Ideally the below code is only for VP_TYPE_IP and not
          * for IP6. But having explicit check for IP only break IP6
          */
@@ -646,6 +639,18 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         hash_key[4] = dport;
 
         hashval = jhash(hash_key, 20, vr_hashrnd);
+    } else {
+
+        /* We treat all non-ip packets as L2 here. For V6 we can extract
+         * the required fieleds explicity and manipulate the src port
+         */
+
+        if (pkt_head_len(pkt) < ETH_HLEN)
+            goto error;
+
+        hashval = vr_hash(pkt_data(pkt), ETH_HLEN, vr_hashrnd);
+        /* Include the VRF to calculate the hash */
+        hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
     }
 
 

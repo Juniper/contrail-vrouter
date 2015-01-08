@@ -1915,7 +1915,6 @@ static rx_handler_result_t
 pkt_gro_dev_rx_handler(struct sk_buff **pskb)
 {
     unsigned int label;
-    unsigned short vrf;
     struct vr_nexthop *nh;
     struct vr_interface *vif;
     struct vr_interface *gro_vif;
@@ -1923,6 +1922,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     struct sk_buff *skb = *pskb;
     struct vr_packet *pkt;
     struct vrouter *router = vrouter_get(0);  
+    struct vr_forwarding_md fmd;
 
     pkt = linux_get_packet(skb, NULL);
     if (!pkt)
@@ -1961,8 +1961,6 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
         return RX_HANDLER_CONSUMED;
     }
 
-    vrf = nh->nh_dev->vif_vrf;
-
     /*
      * since vif was not available when we did linux_get_packet, set vif
      * manually here
@@ -1976,7 +1974,10 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
      */
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
-    nh_output(vrf, pkt, nh, NULL);
+    vr_init_forwarding_md(&fmd);
+    fmd.fmd_dvrf = nh->nh_dev->vif_vrf;
+
+    nh_output(pkt, nh, &fmd);
     return RX_HANDLER_CONSUMED;
 }
 

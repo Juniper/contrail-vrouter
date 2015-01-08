@@ -8,6 +8,7 @@
 #include "vr_message.h"
 #include "vr_packet.h"
 #include "vr_route.h"
+#include "vr_bridge.h"
 #include "vr_ip_mtrie.h"
 
 extern struct vr_nexthop *ip4_default_nh; 
@@ -15,8 +16,7 @@ extern struct vr_nexthop *ip4_default_nh;
 static struct vr_vrf_stats **mtrie_vrf_stats;
 static struct vr_vrf_stats *invalid_vrf_stats;
 
-struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int, struct vr_route_req *,
-        struct vr_packet *);
+struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int, struct vr_route_req *);
 struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 
 static struct ip_mtrie *mtrie_alloc_vrf(unsigned int, unsigned int);
@@ -141,7 +141,7 @@ set_entry_to_nh(struct ip_bucket_entry *entry, struct vr_nexthop *nh)
          * 1. no new nexthop was created (& hence the null check)
          * 2. new nexthop has taken it's place (in which case, we need to
          *    put the reference we took above
-         */ 
+         */
         if (tmp_nh)
             vrouter_put_nexthop(tmp_nh);
 
@@ -195,6 +195,7 @@ mtrie_alloc_bucket(struct mtrie_bkt_info *ip_bkt_info, unsigned char level, stru
         ent->entry_prefix_len = parent->entry_prefix_len;
         ent->entry_label_flags = parent->entry_label_flags;
         ent->entry_label = parent->entry_label;
+        ent->entry_bridge_index = parent->entry_bridge_index;
     }
 
     return bkt;
@@ -227,6 +228,7 @@ add_to_tree(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
             ent->entry_prefix_len = rt->rtr_req.rtr_prefix_len;
             ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
             ent->entry_label = rt->rtr_req.rtr_label;
+            ent->entry_bridge_index = rt->rtr_req.rtr_index;
         }
     }
 
@@ -363,6 +365,7 @@ __mtrie_add(struct ip_mtrie *mtrie, struct vr_route_req *rt)
                     ent->entry_prefix_len = rt->rtr_req.rtr_prefix_len;
                     ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
                     ent->entry_label = rt->rtr_req.rtr_label;
+                    ent->entry_bridge_index = rt->rtr_req.rtr_index;
                 }
                 if (fin) {
                     /* Repeat the loop 'fin' times only */
@@ -423,6 +426,7 @@ free_bucket(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
     set_entry_to_nh(ent, rt->rtr_nh);
     ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
     ent->entry_label = rt->rtr_req.rtr_label;
+    ent->entry_bridge_index = rt->rtr_req.rtr_index;
     
     ip_bucket_sched_for_free(bkt, level);
 }
@@ -466,6 +470,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
                 tmp_ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
                 tmp_ent->entry_label = rt->rtr_req.rtr_label;
                 tmp_ent->entry_prefix_len = rt->rtr_req.rtr_replace_plen;
+                tmp_ent->entry_bridge_index = rt->rtr_req.rtr_index;
             } else 
                 __mtrie_delete(rt, tmp_ent, level + 1);
         }
@@ -506,6 +511,7 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
         struct ip_bucket_entry *ent, int8_t *prefix, unsigned int prefix_len)
 {
     vr_route_req *req = (vr_route_req *)dumper->dump_req;
+     struct vr_route_req lreq;
 
     resp->rtr_vrf_id = req->rtr_vrf_id;
     resp->rtr_family = req->rtr_family;
@@ -518,8 +524,18 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
     resp->rtr_label_flags = ent->entry_label_flags;
     resp->rtr_label = ent->entry_label;
     resp->rtr_nh_id = ent->entry_nh_p->nh_id;
-    resp->rtr_mac_size = 0;
-    resp->rtr_mac = NULL;
+    resp->rtr_index = ent->entry_bridge_index;
+    if (resp->rtr_index != VR_BE_INVALID_INDEX) {
+        resp->rtr_mac = vr_zalloc(VR_ETHER_ALEN);
+        resp->rtr_mac_size = VR_ETHER_ALEN;
+        lreq.rtr_req.rtr_mac = resp->rtr_mac;
+        lreq.rtr_req.rtr_index = resp->rtr_index;
+        lreq.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        vr_bridge_lookup(resp->rtr_vrf_id, &lreq);
+    } else {
+        resp->rtr_mac_size = 0;
+        resp->rtr_mac = NULL;
+    }
     resp->rtr_replace_plen = ent->entry_prefix_len;
 
     return;
@@ -587,6 +603,11 @@ mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip_bucket_entry *ent,
                 ip_bkt_info[level - 1].bi_pfx_len);
 
         ret = mtrie_dumper_route_encode(dumper, &dump_resp);
+        if (dump_resp.rtr_mac_size) {
+            vr_free(dump_resp.rtr_mac);
+            dump_resp.rtr_mac_size = 0;
+            dump_resp.rtr_mac = NULL;
+        }
 
         dump_resp.rtr_prefix = NULL;
         if (ret <= 0)
@@ -659,6 +680,7 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
     int vrf_id = rt->rtr_req.rtr_vrf_id;
     struct ip_mtrie *rtable;
+    struct vr_route_req lreq;
 
     rtable = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     if (!rtable)
@@ -667,6 +689,19 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
     if (!rt->rtr_nh)
         return -ENOENT;
+
+
+    rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    if ((rt->rtr_req.rtr_mac_size == VR_ETHER_ALEN) &&
+                (!IS_MAC_ZERO(rt->rtr_req.rtr_mac))) {
+        lreq.rtr_req.rtr_index = rt->rtr_req.rtr_index;
+        lreq.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        lreq.rtr_req.rtr_mac = rt->rtr_req.rtr_mac;
+        lreq.rtr_req.rtr_vrf_id = vrf_id;
+        if (!vr_bridge_lookup(vrf_id, &lreq))
+            return -ENOENT;
+        rt->rtr_req.rtr_index = lreq.rtr_req.rtr_index;
+    }
 
     __mtrie_delete(rt, &rtable->root, 0);
     vrouter_put_nexthop(rt->rtr_nh);
@@ -685,7 +720,6 @@ mtrie_stats(unsigned short vrf, unsigned int cpu)
 
     return NULL;
 }
-
 static int
 mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
 {
@@ -705,6 +739,7 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_discards += stats->vrf_discards;
             response->vsr_resolves += stats->vrf_resolves;
             response->vsr_receives += stats->vrf_receives;
+            response->vsr_l2_receives += stats->vrf_l2_receives;
             response->vsr_ecmp_composites += stats->vrf_ecmp_composites;
             response->vsr_encap_composites += stats->vrf_encap_composites;
             response->vsr_evpn_composites += stats->vrf_evpn_composites;
@@ -717,6 +752,15 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_encaps += stats->vrf_encaps;
             response->vsr_gros += stats->vrf_gros;
             response->vsr_diags += stats->vrf_diags;
+            response->vsr_vxlan_tunnels += stats->vrf_vxlan_tunnels;
+            response->vsr_arp_virtual_proxy += stats->vrf_arp_virtual_proxy;
+            response->vsr_arp_virtual_stitch += stats->vrf_arp_virtual_stitch;
+            response->vsr_arp_virtual_flood += stats->vrf_arp_virtual_flood;
+            response->vsr_arp_physical_stitch += stats->vrf_arp_physical_stitch;
+            response->vsr_arp_tor_proxy += stats->vrf_arp_tor_proxy;
+            response->vsr_arp_physical_flood += stats->vrf_arp_physical_flood;
+            response->vsr_encap_arp_responses += stats->vrf_encap_arp_responses;
+            response->vsr_tunnel_arp_responses += stats->vrf_tunnel_arp_responses;
         }
     }
 
@@ -783,8 +827,7 @@ generate_response:
  * returns the nexthop of the LPM route
  */
 static struct vr_nexthop *
-mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
-        struct vr_packet *pkt)
+mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 {
     unsigned int        level, index;
     unsigned long       ptr;
@@ -811,15 +854,18 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     ent = &table->root;
 
     ptr = ent->entry_long_i;
-    if (!ptr)
+    if (!ptr) {
+        rt->rtr_nh = default_nh;
         return default_nh;
+    }
 
     if (PTR_IS_NEXTHOP(ptr)) {
         rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
         rt->rtr_req.rtr_label = ent->entry_label;
         rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
+        rt->rtr_req.rtr_index = ent->entry_bridge_index;
         ret_nh = PTR_TO_NEXTHOP(ptr);
-
+        rt->rtr_nh = ret_nh;
         return ret_nh;
     }
 
@@ -835,7 +881,9 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
             rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
             rt->rtr_req.rtr_label = ent->entry_label;
             rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
+            rt->rtr_req.rtr_index = ent->entry_bridge_index;
             ret_nh = PTR_TO_NEXTHOP(ptr);
+            rt->rtr_nh = ret_nh;
             return ret_nh;
         }
 
@@ -845,6 +893,7 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt,
     /* no nexthop; assert */
     ASSERT(0);
 
+    rt->rtr_nh = ret_nh;
     return NULL;
 }
 
@@ -858,6 +907,7 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     unsigned int            vrf_id = rt->rtr_req.rtr_vrf_id;
     struct ip_mtrie       *mtrie = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     int ret;
+    struct vr_route_req tmp_req;
 
     mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id, rt->rtr_req.rtr_family));
     if (!mtrie)
@@ -871,6 +921,20 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
                  (rt->rtr_nh->nh_type == NH_TUNNEL)) {
         vrouter_put_nexthop(rt->rtr_nh);
         return -EINVAL;
+    }
+
+
+    rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    if ((rt->rtr_req.rtr_mac_size == VR_ETHER_ALEN) &&
+            (!IS_MAC_ZERO(rt->rtr_req.rtr_mac))) {
+
+        tmp_req.rtr_req.rtr_index = rt->rtr_req.rtr_index;
+        tmp_req.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        tmp_req.rtr_req.rtr_mac = rt->rtr_req.rtr_mac;
+        tmp_req.rtr_req.rtr_vrf_id = rt->rtr_req.rtr_vrf_id;
+        if (!vr_bridge_lookup(tmp_req.rtr_req.rtr_vrf_id, &tmp_req))
+            return -ENOENT;
+        rt->rtr_req.rtr_index = tmp_req.rtr_req.rtr_index;
     }
 
     ret = __mtrie_add(mtrie, rt);
@@ -887,7 +951,7 @@ mtrie_get(unsigned int vrf_id, struct vr_route_req *rt)
 {
     struct vr_nexthop *nh;
 
-    nh = mtrie_lookup(vrf_id, rt, NULL);
+    nh = mtrie_lookup(vrf_id, rt);
     if (nh)
         rt->rtr_req.rtr_nh_id = nh->nh_id;
     else
@@ -908,6 +972,7 @@ mtrie_alloc_vrf(unsigned int vrf_id, unsigned int family)
     mtrie = vr_zalloc(sizeof(struct ip_mtrie));
     if (mtrie) {
         mtrie->root.entry_nh_p = vrouter_get_nexthop(0, NH_DISCARD_ID);
+        mtrie->root.entry_bridge_index =  VR_BE_INVALID_INDEX;
         mtrie_table = vn_rtable[index];
         mtrie_table[vrf_id] = mtrie;
     }
