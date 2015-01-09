@@ -674,6 +674,7 @@ struct vr_forwarding_md {
     uint32_t fmd_outer_src_ip;
     uint16_t fmd_vlan;
     uint16_t fmd_udp_src_port;
+    uint8_t fmd_to_me;
 };
 
 static inline void
@@ -687,6 +688,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_outer_src_ip = 0;
     fmd->fmd_vlan = 4096;
     fmd->fmd_udp_src_port = 0;
+    fmd->fmd_to_me = 0;
     return;
 }
 

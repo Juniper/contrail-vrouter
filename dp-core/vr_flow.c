@@ -567,7 +567,10 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
 
 
     if (fe->fe_flags & VR_FLOW_FLAG_VRFT) {
-        fmd->fmd_dvrf = fe->fe_dvrf;
+        if (fmd->fmd_dvrf != fe->fe_dvrf) {
+            fmd->fmd_dvrf = fe->fe_dvrf;
+            fmd->fmd_to_me = 1;
+        }
     }
 
     if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
