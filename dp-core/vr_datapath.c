@@ -461,6 +461,7 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
         return 0;
     }
 
+
     return vr_bridge_input(vif->vif_router, pkt, fmd);
 }
 
@@ -518,9 +519,8 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
         return vif_xconnect(vif, pkt);
 
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-
-
     pkt_pull(pkt, pull_len);
+
     if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6)
         handled = vr_l3_input(pkt, &fmd);
     else if (pkt->vp_type == VP_TYPE_ARP)

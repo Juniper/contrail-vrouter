@@ -394,7 +394,19 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     struct vr_forwarding_md cmd;
     struct vr_nexthop *nh;
     unsigned short pull_len, overlay_len = VROUTER_L2_OVERLAY_LEN;
-    int reason;
+    int reason, handled;
+
+    if (fmd->fmd_to_me) {
+        pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+        if (!pkt_pull(pkt, pull_len)) {
+            vr_pfree(pkt, VP_DROP_PULL);
+            return 0;
+        }
+        handled = vr_l3_input(pkt, fmd);
+        if (!handled)
+            vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
+        return 0;
+    }
 
     rt.rtr_req.rtr_label_flags = 0;
     rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;

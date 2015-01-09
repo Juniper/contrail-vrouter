@@ -196,6 +196,7 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (stats)
         stats->vrf_l2_receives++;
 
+    fmd->fmd_to_me = 1;
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (pkt_pull(pkt, pull_len) < 0) {
         vr_pfree(pkt, VP_DROP_PULL);
