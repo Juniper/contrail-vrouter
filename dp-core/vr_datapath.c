@@ -447,10 +447,6 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     struct vr_interface *vif = pkt->vp_if;
     int handled;
 
-    vr_printf("%s: from %d in vrf %d type %d data %d network %d\n",
-            __FUNCTION__, pkt->vp_if->vif_idx, fmd->fmd_dvrf,
-            pkt->vp_type, pkt->vp_data, pkt->vp_network_h);
-
     if (pkt->vp_nh)
         return pkt->vp_nh->nh_reach_nh(pkt, pkt->vp_nh, fmd);
 
