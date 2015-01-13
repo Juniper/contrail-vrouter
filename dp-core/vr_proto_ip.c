@@ -12,6 +12,7 @@
 #include "vr_vxlan.h"
 #include "vr_ip_mtrie.h"
 #include "vr_fragment.h"
+#include "vr_bridge.h"
 
 static unsigned short vr_ip_id;
 
@@ -593,6 +594,11 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                             /* Subject it to flow for Linklocal */
                             if (!vr_flow_forward(router, pkt, fmd))
                                 return 0;
+                            if (!vr_l3_input(pkt, fmd)) {
+                                drop_reason = VP_DROP_NOWHERE_TO_GO;
+                                goto drop_pkt;
+                            }
+                            return 0;
                         }
                     }
                 }
