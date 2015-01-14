@@ -11,6 +11,7 @@
 #endif
 #include "vr_types.h"
 #include "vr_sandesh.h"
+#include <vr_packet.h>
 #include <vr_interface.h>
 #include <vr_nexthop.h>
 #include <vr_route.h>

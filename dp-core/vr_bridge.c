@@ -3,6 +3,7 @@
  */
 #include <vr_os.h>
 #include <vr_packet.h>
+#include "vr_interface.h"
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_bridge.h"
@@ -426,8 +427,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     if (nh->nh_type == NH_L2_RCV)
         overlay_len = VROUTER_OVERLAY_LEN;
 
-    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6) {
-
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         if (vif_is_virtual(pkt->vp_if) &&
                 vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj) {
 
@@ -441,6 +441,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                 vr_pfree(pkt, reason);
                 return 0;
             }
+
             if (!pkt_push(pkt, pull_len)) {
                 vr_pfree(pkt, VP_DROP_PUSH);
                 return 0;
