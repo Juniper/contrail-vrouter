@@ -114,10 +114,6 @@ struct vr_nexthop {
     int                 (*nh_reach_nh)(struct vr_packet *,
                                        struct vr_nexthop *,
                                        struct vr_forwarding_md *);
-    int                 (*nh_arp_response)(struct vr_packet *,
-                                           struct vr_nexthop *,
-                                           struct vr_forwarding_md *);
-
     struct vr_interface *nh_dev;
     void                (*nh_destructor)(struct vr_nexthop *);
     uint8_t             nh_data[0];
