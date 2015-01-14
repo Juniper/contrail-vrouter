@@ -17,9 +17,10 @@
 #include <asm/bug.h>
 
 #include "vr_os.h"
+#include "vr_packet.h"
+#include "vr_interface.h"
 #include "vrouter.h"
 #include "vhost.h"
-#include "vr_packet.h"
 
 /*
  * When agent dies, cross connect logic would need the list of vhost

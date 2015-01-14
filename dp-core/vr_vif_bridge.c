@@ -11,6 +11,7 @@
 #include "vr_sandesh.h"
 #include "vr_htable.h"
 #include "vr_defs.h"
+#include "vr_packet.h"
 #include "vr_interface.h"
 #include "vr_bridge.h"
 

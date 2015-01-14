@@ -9,6 +9,7 @@
 #include <vr_packet.h>
 #include <vr_flow.h>
 #include <vr_mirror.h>
+#include "vr_interface.h"
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include "vr_btable.h"
