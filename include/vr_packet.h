@@ -274,6 +274,12 @@ struct vr_vlan_hdr {
 
 #define VR_DIAG_CSUM         0xffff
 
+#ifdef arp_op
+#undef arp_op
+#endif
+
+#define VR_ARP_HW_TYPE_ETHER    1
+
 struct vr_arp {
     unsigned short arp_hw;
     unsigned short arp_proto;
@@ -286,19 +292,19 @@ struct vr_arp {
     unsigned int arp_dpa;
 } __attribute__((packed));
 
-typedef enum {
-    MR_DROP,
-    MR_FLOOD,
-    MR_PROXY,
-    MR_NOT_ME,
-    MR_TRAP,
-    MR_TRAP_X,
-    MR_XCONNECT,
-} mac_response_t;
+static inline bool
+vr_grat_arp(struct vr_arp *sarp)
+{
+    if (sarp->arp_spa == sarp->arp_dpa)
+        return true;
+    return false;
+}
 
 #define VR_IP_DF    (0x1 << 14)
 #define VR_IP_MF    (0x1 << 13)
 #define VR_IP_FRAG_OFFSET_MASK (VR_IP_MF - 1)
+
+#define VR_IP_ADDRESS_LEN   4
 
 struct vr_ip {
 #if defined(__KERNEL__) && defined(__linux__)
@@ -657,6 +663,11 @@ extern unsigned short vr_generate_unique_ip_id(void);
 extern void vr_proto_fragment(struct vr_interface *, struct vr_packet *);
 extern unsigned short vr_ip_partial_csum(struct vr_ip *);
 
+enum {
+    UNKNOWN_SOURCE,
+    TOR_SOURCE,
+};
+
 /*
  * forwarding metadata is something that is carried through out the
  * forwarding path. we are constrained by what can be held in the
@@ -675,6 +686,7 @@ struct vr_forwarding_md {
     uint16_t fmd_vlan;
     uint16_t fmd_udp_src_port;
     uint8_t fmd_to_me;
+    uint8_t fmd_src;
 };
 
 static inline void
@@ -689,6 +701,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_vlan = 4096;
     fmd->fmd_udp_src_port = 0;
     fmd->fmd_to_me = 0;
+    fmd->fmd_src = 0;
     return;
 }
 
