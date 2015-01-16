@@ -457,7 +457,9 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec/1000);
     }
 
-    fmd->fmd_dvrf = nh->nh_vrf;
+    if (nh->nh_vrf >= 0)
+        fmd->fmd_dvrf = nh->nh_vrf;
+
     nh_output(pkt, nh, fmd);
     return 0;
 
