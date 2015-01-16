@@ -1061,7 +1061,7 @@ vr_inet_route_flags(unsigned int vrf, unsigned int ip)
 }
 
 bool
-vr_ip_well_known_packet(struct vr_packet *pkt)
+vr_ip_well_known_packet(struct vr_packet *pkt, unsigned int pkt_src)
 {
     unsigned char *data = pkt_data(pkt);
     struct vr_ip *iph;
@@ -1075,8 +1075,12 @@ vr_ip_well_known_packet(struct vr_packet *pkt)
     if ((iph->ip_proto == VR_IP_PROTO_UDP) &&
                               vr_ip_transport_header_valid(iph)) {
         udph = (struct vr_udp *)(data + iph->ip_hl * 4);
-        if (udph->udp_sport == htons(VR_DHCP_SRC_PORT))
-            return true;
+        if (udph->udp_sport == htons(VR_DHCP_SRC_PORT)) {
+            if ((pkt_src == PKT_SRC_TOR_REPL_TREE) ||
+                    (pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED)) {
+                return true;
+            }
+        }
     }
     return false;
 }

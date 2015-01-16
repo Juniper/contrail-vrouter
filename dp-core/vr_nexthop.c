@@ -25,7 +25,7 @@ extern int vr_ip6_neighbor_solicitation_input(struct vr_packet *,
                                            struct vr_forwarding_md *, int);
 extern bool vr_ip6_well_known_packet(struct vr_packet *);
 extern bool vr_ip6_dhcp_packet(struct vr_packet *);
-extern bool vr_ip_well_known_packet(struct vr_packet *);
+extern bool vr_ip_well_known_packet(struct vr_packet *, unsigned int);
 
 
 struct vr_nexthop *ip4_default_nh;
@@ -639,7 +639,7 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
                 return 0;
         } else if (pkt->vp_type == VP_TYPE_IP) {
             if (pkt_src == PKT_SRC_TOR_REPL_TREE || (!pkt_src)) {
-                if (vr_ip_well_known_packet(pkt)) {
+                if (vr_ip_well_known_packet(pkt, pkt_src)) {
                     vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
                     return 0;
                 }
