@@ -27,7 +27,7 @@ unsigned int vr_fabric_input(struct vr_interface *, struct vr_packet *,
 
 int vr_l3_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_l2_input(struct vr_packet *, struct vr_forwarding_md *);
-int vr_arp_input(struct vr_packet *, struct vr_forwarding_md *, int);
+int vr_arp_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_ip_input(struct vrouter *, struct vr_packet *,
                 struct vr_forwarding_md *);
 int vr_ip6_input(struct vrouter *, struct vr_packet *,
@@ -48,5 +48,11 @@ mac_response_t vr_get_l3_stitching_info(struct vr_packet *, struct vr_route_req 
 int vr_handle_mac_response(struct vr_packet *, struct vr_forwarding_md *,
                            mac_response_t , int );
 
+mac_response_t vr_get_proxy_mac(struct vr_packet *, struct vr_forwarding_md *,
+                struct vr_route_req *, unsigned char *);
+mac_response_t vm_arp_request(struct vr_interface *, struct vr_packet *,
+        struct vr_forwarding_md *, unsigned char *);
+mac_response_t vm_neighbor_request(struct vr_interface *, struct vr_packet *,
+        struct vr_forwarding_md *, unsigned char *);
 
 #endif /* __VR_DATAPATH_H__ */

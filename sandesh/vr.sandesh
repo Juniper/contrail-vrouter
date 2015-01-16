@@ -190,10 +190,7 @@ buffer sandesh vr_vrf_stats_req {
    27:  i64                 vsr_arp_physical_stitch;
    28:  i64                 vsr_arp_tor_proxy;
    29:  i64                 vsr_arp_physical_flood;
-   30:  i64                 vsr_encap_arp_responses;
-   31:  i64                 vsr_tunnel_arp_responses;
-   32:  i64                 vsr_drop_arp_responses;
-   33:  i64                 vsr_l2_receives;
+   30:  i64                 vsr_l2_receives;
 }
 
 buffer sandesh vr_response {

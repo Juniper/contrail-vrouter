@@ -870,7 +870,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             skb_set_network_header(skb, (network_off - skb_headroom(skb)));
             skb_reset_mac_len(skb);
         }
-    } else if (vr_pkt_is_ip(pkt)) {
+    } else if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         network_off = pkt_get_inner_network_header_off(pkt);
 
         if (network_off) {
@@ -1112,7 +1112,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
                 }
             }
         } else if (ip_proto == VR_IP_PROTO_ICMP6) {
-            icmph = (struct vr_icmp*) ((char *)ip6h + sizeof(struct ipv6hdr));
+            icmph = (struct vr_icmp *) ((char *)ip6h + sizeof(struct ipv6hdr));
             if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                 /* ICMP options size for neighbor solicit is 24 bytes */
                 offset += 24;
