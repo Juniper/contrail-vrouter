@@ -779,10 +779,25 @@ static int
 vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
       unsigned short vlan_id)
 {
+    struct vr_interface *sub_vif = NULL;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
+    struct vr_eth *eth = (struct vr_eth *)pkt_data(pkt);
 
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
+
+    if (vlan_id != VLAN_ID_INVALID && vlan_id < VLAN_ID_MAX) {
+        if (vif->vif_btable) {
+            sub_vif = vif_bridge_get_sub_interface(vif->vif_btable, vlan_id,
+                                                    eth->eth_smac);
+        } else {
+            if (vif->vif_sub_interfaces)
+                sub_vif = vif->vif_sub_interfaces[vlan_id];
+        }
+
+        if (sub_vif)
+            return sub_vif->vif_rx(sub_vif, pkt, VLAN_ID_INVALID);
+    }
 
     return vr_virtual_input(vif->vif_vrf, vif, pkt, vlan_id);
 }
@@ -1064,6 +1079,8 @@ static struct vr_interface_driver vif_drivers[VIF_TYPE_MAX] = {
     [VIF_TYPE_VIRTUAL] = {
         .drv_add                    =   eth_drv_add,
         .drv_delete                 =   eth_drv_del,
+        .drv_add_sub_interface      =   eth_drv_add_sub_interface,
+        .drv_delete_sub_interface   =   eth_drv_del_sub_interface,
     },
     [VIF_TYPE_VIRTUAL_VLAN] = {
         .drv_add                    =   vlan_drv_add,
