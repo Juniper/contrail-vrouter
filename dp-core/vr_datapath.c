@@ -92,7 +92,8 @@ vr_get_l3_stitching_info(struct vr_packet *pkt, struct vr_route_req *rt,
                      *   Stitch the Mac if there is a tunnel to
                      *   other compute node
                      */
-                    if ((nh->nh_type == NH_ENCAP) ||
+                    if (((nh->nh_type == NH_ENCAP) && ((nh->nh_dev &&
+                          nh->nh_dev->vif_type != VIF_TYPE_AGENT))) ||
                             ((pkt_ingress_type == PKT_SRC_TOR_REPL_TREE) &&
                                  nh->nh_type == NH_TUNNEL)) {
                         if (stats)
