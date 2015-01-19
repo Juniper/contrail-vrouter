@@ -393,59 +393,61 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 {
     struct vr_route_req rt;
     struct vr_forwarding_md cmd;
-    struct vr_nexthop *nh;
-    unsigned short pull_len, overlay_len = VROUTER_L2_OVERLAY_LEN;
+    struct vr_nexthop *nh = NULL;
+    unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
     int reason, handled;
 
-    if (fmd->fmd_to_me) {
+    /* Do the bridge lookup for the packets not meant for "me" */
+    if (!fmd->fmd_to_me) {
+        rt.rtr_req.rtr_label_flags = 0;
+        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+        rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        rt.rtr_req.rtr_mac =(int8_t *) pkt_data(pkt);
+        /* If multicast L2 packet, use broadcast composite nexthop */
+        if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
+            rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
+        rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
+
+        nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
+        if (!nh) {
+            vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
+            return 0;
+        }
+
+        if (nh->nh_type != NH_L2_RCV)
+            overlay_len = VROUTER_L2_OVERLAY_LEN;
+    }
+
+
+    /* Adjust MSS for V4 and V6 packets */
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
+
         pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
         if (!pkt_pull(pkt, pull_len)) {
             vr_pfree(pkt, VP_DROP_PULL);
             return 0;
         }
-        handled = vr_l3_input(pkt, fmd);
-        if (!handled)
-            vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
-        return 0;
-    }
 
-    rt.rtr_req.rtr_label_flags = 0;
-    rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-    rt.rtr_req.rtr_mac =(int8_t *) pkt_data(pkt);
-    /* If multicast L2 packet, use broadcast composite nexthop */
-    if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
-        rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
-    rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
-
-    nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
-    if (!nh) {
-        vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-        return 0;
-    }
-
-    if (nh->nh_type == NH_L2_RCV)
-        overlay_len = VROUTER_OVERLAY_LEN;
-
-    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         if (vif_is_virtual(pkt->vp_if) &&
                 vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj) {
-
-            pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-            if (!pkt_pull(pkt, pull_len)) {
-                vr_pfree(pkt, VP_DROP_PULL);
-                return 0;
-            }
 
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, overlay_len))) {
                 vr_pfree(pkt, reason);
                 return 0;
             }
+        }
 
-            if (!pkt_push(pkt, pull_len)) {
-                vr_pfree(pkt, VP_DROP_PUSH);
-                return 0;
+        if (fmd->fmd_to_me) {
+            handled = vr_l3_input(pkt, fmd);
+            if (!handled) {
+                vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
             }
+            return 0;
+        }
+
+        if (!pkt_push(pkt, pull_len)) {
+            vr_pfree(pkt, VP_DROP_PUSH);
+            return 0;
         }
     }
 
