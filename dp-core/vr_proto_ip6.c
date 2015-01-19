@@ -142,10 +142,10 @@ vr_ip6_neighbor_solicitation_input(struct vr_packet *pkt, struct vr_forwarding_m
     if (pkt->vp_type != VP_TYPE_IP6)
         return 0;
 
-    ip6 = (struct vr_ip6 *)pkt_data(pkt);
-    if (!ip6)
+    if (pkt->vp_len < sizeof(*ip6))
         goto drop;
 
+    ip6 = (struct vr_ip6 *)pkt_data(pkt);
     if (ip6->ip6_nxt != VR_IP_PROTO_ICMP6)
         return 0;
 
@@ -158,27 +158,21 @@ vr_ip6_neighbor_solicitation_input(struct vr_packet *pkt, struct vr_forwarding_m
     if (!icmph)
         goto drop;
 
-    if (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL) {
-        pkt_push(pkt, pull_len);
+    if (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL)
         return 0;
-    }
 
     pull_len += sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
     nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + pull_len);
     if (!nopt)
-        goto drop;
-
-    if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION) {
-        pkt_push(pkt, pull_len);
         return 0;
-    }
+
+    if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION)
+        return 0;
 
     VR_MAC_COPY(dst_mac, nopt->vno_value);
     /* We let DAD packets bridged */
-    if (IS_MAC_ZERO(dst_mac)) {
-        pkt_push(pkt, pull_len);
+    if (IS_MAC_ZERO(dst_mac))
         return 0;
-    }
 
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     rt.rtr_req.rtr_family = AF_INET6;
@@ -265,6 +259,7 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
     unsigned char *data = pkt_data(pkt);
     struct vr_ip6 *ip6;
     struct vr_icmp *icmph = NULL;
+    struct vr_udp *udph = NULL;
 
     if ((pkt->vp_type != VP_TYPE_IP6) ||
          (!(pkt->vp_flags & VP_FLAG_MULTICAST)))
@@ -280,12 +275,17 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
         /*
          * Bridge neighbor solicit for link-local addresses
          */
-        if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6)
+        if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
             icmph = (struct vr_icmp *)((char *)ip6 + sizeof(struct vr_ip6));
-        if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL))
-            return false;
+            if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL))
+                return true;
+        }
 
-        return true;
+        if (ip6->ip6_nxt == VR_IP_PROTO_UDP) {
+            udph = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
+            if (udph && (udph->udp_sport == htons(VR_DHCP6_SRC_PORT)))
+                return true;
+        }
     }
 
     return false;
