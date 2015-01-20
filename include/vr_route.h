@@ -57,6 +57,7 @@ struct vr_vrf_stats {
     uint64_t vrf_arp_physical_stitch;
     uint64_t vrf_arp_tor_proxy;
     uint64_t vrf_arp_physical_flood;
+    uint64_t vrf_arp_physical_proxy;
     uint64_t vrf_encap_arp_responses;
     uint64_t vrf_tunnel_arp_responses;
     uint64_t vrf_drop_arp_responses;
