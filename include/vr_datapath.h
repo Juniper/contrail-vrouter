@@ -30,6 +30,8 @@ int vr_l2_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_arp_input(struct vr_packet *, struct vr_forwarding_md *, int);
 int vr_ip_input(struct vrouter *, struct vr_packet *,
                 struct vr_forwarding_md *);
+int vr_ip6_neighbor_solicitation_input(struct vr_packet *,
+                                           struct vr_forwarding_md *, int);
 int vr_ip6_input(struct vrouter *, struct vr_packet *,
                  struct vr_forwarding_md *);
 extern void vr_ip_update_csum(struct vr_packet *, unsigned int, unsigned int);
@@ -48,5 +50,7 @@ mac_response_t vr_get_l3_stitching_info(struct vr_packet *, struct vr_route_req 
 int vr_handle_mac_response(struct vr_packet *, struct vr_forwarding_md *,
                            mac_response_t , int );
 
+extern int vif_plug_mac_request(struct vr_interface *, struct vr_packet *,
+        struct vr_forwarding_md *);
 
 #endif /* __VR_DATAPATH_H__ */

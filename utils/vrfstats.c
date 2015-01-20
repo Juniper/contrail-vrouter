@@ -74,14 +74,15 @@ vr_vrf_stats_req_process(void *s_req)
             stats->vsr_gros, stats->vsr_diags);
     printf("Arp Virtual Proxys %" PRIu64 ", Arp Virtual Stitchs %" PRIu64
            ", Arp Virtual Floods %" PRIu64 ", Arp Physical Stitchs %" PRIu64
-           ", Arp Tor Proxys %" PRIu64 ", Arp Physical Floods %" PRIu64 "\n"
+           ", Arp Tor Proxys %" PRIu64 ", Arp Physical Floods %" PRIu64
+           ", Arp Physical Proxys %" PRIu64 "\n",
            ", Encap Arp responses %" PRIu64 ", Tunnel ARP Responses %" PRIu64
            ", Drop Arp responses %" PRIu64 "\n",
             stats->vsr_arp_virtual_proxy, stats->vsr_arp_virtual_stitch,
             stats->vsr_arp_virtual_flood, stats->vsr_arp_physical_stitch,
             stats->vsr_arp_tor_proxy, stats->vsr_arp_physical_flood,
-            stats->vsr_encap_arp_responses, stats->vsr_tunnel_arp_responses,
-            stats->vsr_drop_arp_responses);
+            stats->vsr_arp_physical_proxy, stats->vsr_encap_arp_responses,
+            stats->vsr_tunnel_arp_responses, stats->vsr_drop_arp_responses);
 
     printf("\n");
     return;

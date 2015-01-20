@@ -148,6 +148,8 @@ extern int nh_output(struct vr_packet *,
 extern int vr_nexthop_add(vr_nexthop_req *);
 extern int vr_nexthop_get(vr_nexthop_req *);
 extern int vr_nexthop_dump(vr_nexthop_req *);
+extern bool vr_gw_nh(struct vr_nexthop *);
+
 
 extern struct vr_nexthop *vr_discard_nh;
 

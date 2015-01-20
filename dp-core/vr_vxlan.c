@@ -49,6 +49,8 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         goto fail;
     }
 
+    fmd->fmd_vlan = VLAN_ID_INVALID;
+
     if (vr_pkt_type(pkt, 0, fmd) < 0) {
         drop_reason = VP_DROP_INVALID_PACKET;
         goto fail;

@@ -293,6 +293,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     /* Reset the flags which get defined below */
     pkt->vp_flags &= ~VP_FLAG_MULTICAST;
+    fmd->fmd_vlan = VLAN_ID_INVALID;
 
     if (nh->nh_family == AF_INET) {
         ip = (struct vr_ip *)pkt_data(pkt);
