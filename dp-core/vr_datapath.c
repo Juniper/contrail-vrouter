@@ -156,6 +156,9 @@ proxy:
     VR_MAC_COPY(src_mac, vif->vif_mac);
 
 stitch:
+    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)
+        return MR_PROXY;
+
     memset(rt, 0, sizeof(*rt));
     rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
     rt->rtr_req.rtr_mac_size = VR_ETHER_ALEN;
@@ -185,7 +188,10 @@ vr_handle_mac_response(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     switch (result) {
     case MR_PROXY:
-        pkt->vp_nh->nh_arp_response(pkt, pkt->vp_nh, fmd);
+        if (pkt->vp_nh)
+            pkt->vp_nh->nh_arp_response(pkt, pkt->vp_nh, fmd);
+        else
+            pkt->vp_if->vif_tx(pkt->vp_if, pkt, fmd);
         break;
     case MR_XCONNECT:
         vif_xconnect(pkt->vp_if, pkt, fmd);
@@ -218,7 +224,7 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
 {
     int drop_reason = VP_DROP_ARP_NO_WHERE_TO_GO;
     mac_response_t arp_result;
-    bool grat_arp, l3_proxy = false;
+    bool grat_arp;
     struct vr_route_req rt;
     uint32_t rt_prefix, dpa;
     struct vr_eth *eth;
@@ -226,6 +232,7 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
     struct vr_interface *vif = pkt->vp_if;
     char arp_src_mac[VR_ETHER_ALEN];
 
+    pkt->vp_nh = NULL;
     if (vif_mode_xconnect(vif)) {
         arp_result = MR_XCONNECT;
         goto result;
@@ -234,7 +241,6 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
     if (vif->vif_type == VIF_TYPE_XEN_LL_HOST ||
             vif->vif_type == VIF_TYPE_GATEWAY) {
         arp_result = MR_PROXY;
-        l3_proxy = true;
         VR_MAC_COPY(arp_src_mac, vif->vif_mac);
         goto result;
     }
@@ -242,7 +248,6 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
     /* All link local IP's have to be proxied */
     if (vif->vif_type == VIF_TYPE_HOST) {
         if (IS_LINK_LOCAL_IP(sarp->arp_dpa)) {
-            l3_proxy = true;
             arp_result = MR_PROXY;
             VR_MAC_COPY(arp_src_mac, vif->vif_mac);
         } else {
@@ -325,11 +330,6 @@ result:
 
         memcpy(arp, sarp, sizeof(*sarp));
         pkt_pull_tail(pkt, sizeof(*arp));
-
-        if (l3_proxy) {
-            vif->vif_tx(vif, pkt, fmd);
-            return 1;
-        }
     }
 done:
     return vr_handle_mac_response(pkt, fmd, arp_result, drop_reason);
