@@ -22,33 +22,62 @@ vr_v6_prefix_is_ll(uint8_t prefix[])
 }
 
 
+/* TODO: consolidate all sum calculation routines */
+static inline uint16_t
+vr_sum(unsigned char *buf, unsigned int length)
+{
+   int num_words;
+   uint32_t total;
+   uint16_t *ptr;
+
+   total = 0;
+   ptr = (uint16_t *)buf;
+   num_words = (length + 1) / 2;
+
+   while (num_words--)
+       total += *ptr++;
+
+   while (total & 0xffff0000)
+       total = (total >> 16) + (total & 0xffff);
+
+   return (uint16_t)total;
+}
+
+static inline uint16_t
+vr_ip6_pseudo_header_sum(struct vr_ip6 *ip6)
+{
+   struct vr_ip6_pseudo ip6_ph;
+
+   memcpy(ip6_ph.ip6_src, ip6->ip6_src, VR_IP6_ADDRESS_LEN);
+   memcpy(ip6_ph.ip6_dst, ip6->ip6_dst, VR_IP6_ADDRESS_LEN);
+   /*
+    * XXX: length should be the length of (l4 header + data). But here, we
+    * use the ip6 payload length, assuming that there are no extension
+    * headers. This asusmption has to be fixed when we extend ipv6 support.
+    */
+   ip6_ph.ip6_l4_length = ip6->ip6_plen;
+   ip6_ph.ip6_zero = 0;
+   ip6_ph.ip6_zero_nh = (ip6->ip6_nxt << 24);
+
+   return vr_sum((unsigned char *)&ip6_ph, sizeof(ip6_ph));
+}
+
 /*
  * buffer is pointer to ip6 header, all values other than src, dst and
  * plen are ZERO. bytes is total length of ip6 header, icmp header and
  * icmp option
  */
 uint16_t
-vr_icmp6_checksum(void *buffer, unsigned int bytes)
+vr_icmp6_checksum(struct vr_ip6 *ip6, struct vr_icmp *icmph)
 {
-   uint32_t total;
-   uint16_t *ptr;
-   int num_words;
+    uint16_t sum[2];
 
-   total = 0;
-   ptr   = (uint16_t *)buffer;
-   num_words = (bytes + 1) / 2;
+    sum[0] = vr_ip6_pseudo_header_sum(ip6);
 
-   while (num_words--)
-       total += *ptr++;
+    icmph->icmp_csum = 0;
+    sum[1] = vr_sum((unsigned char *)icmph, ntohs(ip6->ip6_plen));
 
-   /*
-    *   Fold in any carries
-    *   - the addition may cause another carry so we loop
-    */
-   while (total & 0xffff0000)
-       total = (total >> 16) + (total & 0xffff);
-
-   return (uint16_t)total;
+    return vr_sum((unsigned char *)sum, sizeof(sum));
 }
 
 static bool
@@ -195,10 +224,7 @@ vr_ip6_neighbor_solicitation_input(struct vr_packet *pkt, struct vr_forwarding_m
         nopt->vno_length = (sizeof(struct vr_neighbor_option) + VR_ETHER_ALEN) / 8;
         VR_MAC_COPY(nopt->vno_value, src_mac);
 
-        icmph->icmp_csum =
-        ~(vr_icmp6_checksum(ip6, sizeof(struct vr_ip6) +
-                    sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN +
-                    nopt->vno_length));
+        icmph->icmp_csum = ~(vr_icmp6_checksum(ip6, icmph));
 
 
         eth = (struct vr_eth *)pkt_push(pkt, VR_ETHER_HLEN);

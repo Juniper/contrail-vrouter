@@ -348,6 +348,14 @@ struct vr_neighbor_option {
 
 #define VR_IP6_ADDRESS_LEN      16
 
+struct vr_ip6_pseudo {
+    unsigned char ip6_src[VR_IP6_ADDRESS_LEN];
+    unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
+    unsigned short ip6_l4_length;
+    unsigned short ip6_zero;
+    unsigned int ip6_zero_nh;
+} __attribute__((packed));
+
 struct vr_ip6 {
 #ifdef __KERNEL__
 #if defined(__LITTLE_ENDIAN_BITFIELD)

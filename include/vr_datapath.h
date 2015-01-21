@@ -35,7 +35,7 @@ int vr_ip6_neighbor_solicitation_input(struct vr_packet *,
 int vr_ip6_input(struct vrouter *, struct vr_packet *,
                  struct vr_forwarding_md *);
 extern void vr_ip_update_csum(struct vr_packet *, unsigned int, unsigned int);
-extern uint16_t vr_icmp6_checksum(void *, unsigned int);
+extern uint16_t vr_icmp6_checksum(struct vr_ip6 *, struct vr_icmp *);
 
 int vr_untag_pkt(struct vr_packet *);
 int vr_tag_pkt(struct vr_packet *, unsigned short);

@@ -307,8 +307,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
                }
 
                /* Calculate ICMP6 checksum */
-               icmph->icmp_csum = ~(vr_icmp6_checksum(outer_ip6, 
-                                    sizeof(struct vr_ip6) + sizeof(struct vr_icmp)));
+               icmph->icmp_csum = ~(vr_icmp6_checksum(outer_ip6, icmph));
 
                /* Update packet pointers, perform route lookup and forward */
                pkt_set_network_header(pkt, pkt->vp_data);
