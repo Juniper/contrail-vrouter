@@ -467,11 +467,11 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         if (pkt->vp_len < (nheader + sizeof(*sarp)))
             goto unhandled;
 
-        pkt_pull(pkt, nheader);
-
-        sarp = (struct vr_arp *)pkt_data(pkt);
+        sarp = (struct vr_arp *)(pkt_data(pkt) + nheader);
         if (ntohs(sarp->arp_op) != VR_ARP_OP_REQUEST)
             goto unhandled;
+
+        pkt_pull(pkt, nheader);
 
         handled = vr_arp_input(pkt, fmd, 0);
         if (!handled) {
