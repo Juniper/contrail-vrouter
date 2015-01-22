@@ -343,7 +343,26 @@ struct vr_ip {
     unsigned int ip_daddr;
 } __attribute__((packed));
 
+#define SOURCE_LINK_LAYER_ADDRESS_OPTION    1
+#define TARGET_LINK_LAYER_ADDRESS_OPTION    2
+
+struct vr_neighbor_option {
+    uint8_t vno_type;
+    uint8_t vno_length;
+    uint8_t vno_value[0];
+} __attribute__((packed));
+
+
 #define VR_IP6_ADDRESS_LEN      16
+
+struct vr_ip6_pseudo {
+    unsigned char ip6_src[VR_IP6_ADDRESS_LEN];
+    unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
+    unsigned short ip6_l4_length;
+    unsigned short ip6_zero;
+    unsigned int ip6_zero_nh;
+} __attribute__((packed));
+
 
 struct vr_ip6 {
 #ifdef __KERNEL__
@@ -698,7 +717,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_label = -1;
     fmd->fmd_dvrf = -1;
     fmd->fmd_outer_src_ip = 0;
-    fmd->fmd_vlan = 4096;
+    fmd->fmd_vlan = VLAN_ID_INVALID;
     fmd->fmd_udp_src_port = 0;
     fmd->fmd_to_me = 0;
     fmd->fmd_src = 0;

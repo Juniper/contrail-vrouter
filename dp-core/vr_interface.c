@@ -51,7 +51,8 @@ vif_get_stats(struct vr_interface *vif, unsigned short cpu)
 }
 
 static int
-vif_discard_tx(struct vr_interface *vif, struct vr_packet *pkt)
+vif_discard_tx(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
 {
     vr_pfree(pkt, VP_DROP_INTERFACE_TX_DISCARD);
     return 0;
@@ -205,7 +206,8 @@ vif_remove_xconnect(struct vr_interface *vif)
 }
 
 int
-vif_xconnect(struct vr_interface *vif, struct vr_packet *pkt)
+vif_xconnect(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
 {
     struct vr_interface *bridge;
     
@@ -215,7 +217,7 @@ vif_xconnect(struct vr_interface *vif, struct vr_packet *pkt)
     bridge = vif->vif_bridge;
     if (bridge) {
         vr_preset(pkt);
-        return bridge->vif_tx(bridge, pkt);
+        return bridge->vif_tx(bridge, pkt, fmd);
     }
 
 free_pkt:
@@ -267,6 +269,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id __attribute__((unused)))
 {
     struct agent_hdr *hdr;
+    struct vr_forwarding_md fmd;
     struct vr_interface *agent_vif;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
@@ -315,18 +318,22 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
             return 0;
         }
 
+        vr_init_forwarding_md(&fmd);
+        fmd.fmd_dvrf = ntohs(hdr->hdr_vrf);
+
         pkt->vp_type = VP_TYPE_AGENT;
         pkt_set_network_header(pkt, pkt->vp_data + sizeof(struct vr_eth));
         pkt_set_inner_network_header(pkt, 
                                      pkt->vp_data + sizeof(struct vr_eth));
-        return vif->vif_tx(vif, pkt);
+        return vif->vif_tx(vif, pkt, &fmd);
     }
 
     return 0;
 }
 
 static int
-agent_tx(struct vr_interface *vif, struct vr_packet *pkt)
+agent_tx(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
 {
     int ret;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -372,6 +379,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
                 void *ifspecific)
 {
     int len;
+    struct vr_forwarding_md fmd;
     struct agent_hdr *hdr;
     unsigned char *rewrite;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -456,7 +464,8 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
     memcpy(rewrite, vif->vif_rewrite, VR_ETHER_HLEN);
 
-    return vif->vif_tx(vif, pkt);
+    vr_init_forwarding_md(&fmd);
+    return vif->vif_tx(vif, pkt, &fmd);
 
 drop:
     stats->vis_oerrors++;
@@ -527,20 +536,24 @@ static int
 vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id __attribute__((unused)))
 {
+    struct vr_forwarding_md fmd;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
     /* please see the text on xconnect mode */
+    vr_init_forwarding_md(&fmd);
+    fmd.fmd_dvrf = vif->vif_vrf;
     if (vif_mode_xconnect(vif))
-        return vif_xconnect(vif, pkt);
+        return vif_xconnect(vif, pkt, &fmd);
 
     return vr_fabric_input(vif, pkt, vlan_id);
 }
 
 static int
-vhost_tx(struct vr_interface *vif, struct vr_packet *pkt)
+vhost_tx(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
 {
     int ret;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -667,7 +680,8 @@ vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
 
 
 static int
-vlan_tx(struct vr_interface *vif, struct vr_packet *pkt)
+vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
 {
     int ret = 0;
     struct vr_interface *pvif;
@@ -690,7 +704,7 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     pkt->vp_if = pvif;
 
-    ret = pvif->vif_tx(pvif, pkt);
+    ret = pvif->vif_tx(pvif, pkt, fmd);
     if (ret < 0) {
         ret = 0;
         goto drop;
@@ -932,11 +946,18 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 static int
-eth_tx(struct vr_interface *vif, struct vr_packet *pkt)
+eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
 {
-    int ret;
-    struct vr_forwarding_md fmd;
+    int ret, handled;
+    struct vr_forwarding_md m_fmd;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
+
+    if (vif_is_virtual(vif)) {
+        handled = vif_plug_mac_request(vif, pkt, fmd);
+        if (handled)
+            return 0;
+    }
 
     /*
      * GRO packets come here twice - once with VP_FLAG_GRO set and
@@ -949,9 +970,9 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
     if (vif->vif_flags & VIF_FLAG_MIRROR_TX) {
-        vr_init_forwarding_md(&fmd);
-        fmd.fmd_dvrf = vif->vif_vrf;
-        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
+        vr_init_forwarding_md(&m_fmd);
+        m_fmd.fmd_dvrf = vif->vif_vrf;
+        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &m_fmd);
     }
         
     ret = hif_ops->hif_tx(vif, pkt);

@@ -19,13 +19,14 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         struct vr_route_req *rt, unsigned char *dmac)
 {
     bool from_fabric, stitched, flood;
-    unsigned char *resp_mac;
+    bool to_gateway, no_proxy;
 
-    struct vr_nexthop *nh;
+    unsigned char *resp_mac;
+    struct vr_nexthop *nh = NULL;
     struct vr_interface *vif = pkt->vp_if;
     struct vr_vrf_stats *stats;
 
-    from_fabric = stitched = flood = false;
+    from_fabric = stitched = flood = to_gateway = no_proxy = false;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     /* here we will not check for stats, but will check before use */
@@ -33,8 +34,21 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     if (vif->vif_type == VIF_TYPE_PHYSICAL)
         from_fabric = true;
 
+    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)
+        no_proxy = true;
+
     if (rt->rtr_req.rtr_label_flags & VR_RT_ARP_FLOOD_FLAG)
         flood = true;
+
+    if (vr_gateway_nexthop(rt->rtr_nh))
+        to_gateway = true;
+
+    /*
+     * the no_proxy flag is set for the vcp ports. From such ports
+     * vrouter should proxy only for the gateway ip.
+     */
+    if (no_proxy && !to_gateway)
+        return MR_DROP;
 
     resp_mac = vif->vif_mac;
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
@@ -56,12 +70,28 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
      * . arp request from a baremetal arriving at a TSN, which if posesses the
      *   mac information for the destination vm, should proxy. If it does not
      *   hold the mac information, the request should be flooded
+     *
+     * . arp request from the uplink port of a vcp
      */
     if (from_fabric) {
-        if (!stitched) {
+        if (flood && !stitched) {
             if (stats)
                 stats->vrf_arp_physical_flood++;
             return MR_FLOOD;
+        }
+
+        /*
+         * arp requests to gateway coming from the fabric should be dropped
+         * unless the request was for the TSN DNS service (which appears as
+         * the gateway, with the current set of checks). We should not respond
+         * for gateway ip if we are TSN and the request came from baremetal.
+         * TSN does not have gateway route and hence the to_gateway will be
+         * true only for the DNS ip.
+         */
+        if (to_gateway) {
+            if (fmd->fmd_src != TOR_SOURCE) {
+                return MR_DROP;
+            }
         }
 
         /*
@@ -140,7 +170,7 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
     vr_pkt_type(pkt, 0, &fmd_new);
 
     if (vif_is_vhost(vif)) {
-        vif->vif_tx(vif, pkt);
+        vif->vif_tx(vif, pkt, fmd);
     } else {
         vr_bridge_input(vif->vif_router, pkt, &fmd_new);
     }
@@ -166,13 +196,13 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
         break;
 
     case MR_XCONNECT:
-        vif_xconnect(pkt->vp_if, pkt);
+        vif_xconnect(pkt->vp_if, pkt, fmd);
         break;
 
     case MR_TRAP_X:
         pkt_c = vr_pclone(pkt);
         if (pkt_c)
-            vif_xconnect(pkt->vp_if, pkt_c);
+            vif_xconnect(pkt->vp_if, pkt_c, fmd);
 
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
         break;
@@ -207,7 +237,7 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
     struct vr_packet *cloned_pkt;
 
     if (vif_mode_xconnect(vif) || vif->vif_type == VIF_TYPE_HOST)
-        return vif_xconnect(vif, pkt);
+        return vif_xconnect(vif, pkt, fmd);
 
     if (vif->vif_type != VIF_TYPE_PHYSICAL) {
         if (vif_is_virtual(vif)) {
@@ -222,10 +252,67 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
     cloned_pkt = vr_pclone(pkt);
     if (cloned_pkt) {
         vr_preset(cloned_pkt);
-        vif_xconnect(vif, cloned_pkt);
+        vif_xconnect(vif, cloned_pkt, fmd);
     }
 
     return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+}
+
+/*
+ * handle unicast arp requests and neighbor refreshes. In many cases,
+ * we wouldn't like the unicast arp requests from gateway (such as MX)
+ * to reach the VMs and change the gateway mac to ip(6) binding, since
+ * for vms the gateway is always agent. We would like such requests
+ * to go only if the mode is l2
+ */
+int
+vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    int handled = 1;
+    int nheader;
+
+    struct vr_arp *sarp;
+
+    if (pkt->vp_flags & VP_FLAG_MULTICAST)
+        goto unhandled;
+
+    nheader = pkt_network_header(pkt) - pkt_data(pkt);
+    if (nheader < 0 || (pkt->vp_data + nheader > pkt->vp_end))
+        goto unhandled;
+
+    if (pkt->vp_type == VP_TYPE_ARP) {
+        if (pkt->vp_len < (nheader + sizeof(*sarp)))
+            goto unhandled;
+
+        sarp = (struct vr_arp *)(pkt_data(pkt) + nheader);
+        if (ntohs(sarp->arp_op) != VR_ARP_OP_REQUEST)
+            goto unhandled;
+
+        pkt_pull(pkt, nheader);
+
+        handled = vr_arp_input(pkt, fmd);
+        if (!handled) {
+            pkt_push(pkt, nheader);
+        }
+        return handled;
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        if (pkt->vp_len < (nheader + sizeof(struct vr_ip6) +
+                    sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN +
+                    sizeof(struct vr_neighbor_option) + VR_ETHER_ALEN))
+            goto unhandled;
+
+        pkt_pull(pkt, nheader);
+
+        handled = vr_neighbor_input(pkt, fmd);
+        if (!handled) {
+            pkt_push(pkt, nheader);
+        }
+        return handled;
+    }
+
+unhandled:
+    return !handled;
 }
 
 /*
@@ -409,7 +496,7 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     if (pkt->vp_type == VP_TYPE_IP6)
-        return vif_xconnect(vif, pkt);
+        return vif_xconnect(vif, pkt, &fmd);
 
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     pkt_pull(pkt, pull_len);
@@ -421,7 +508,7 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
 
     if (!handled) {
         pkt_push(pkt, pull_len);
-        return vif_xconnect(vif, pkt);
+        return vif_xconnect(vif, pkt, &fmd);
     }
 
     return 0;

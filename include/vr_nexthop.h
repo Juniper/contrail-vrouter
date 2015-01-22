@@ -132,6 +132,7 @@ struct vr_nexthop {
 #define nh_component_cnt        nh_u.nh_composite.cnt
 #define nh_component_nh         nh_u.nh_composite.component
 
+
 extern int vr_nexthop_init(struct vrouter *);
 extern void vr_nexthop_exit(struct vrouter *, bool);
 extern struct vr_nexthop *__vrouter_get_nexthop(struct vrouter *, unsigned int);
@@ -148,6 +149,7 @@ extern int vr_nexthop_dump(vr_nexthop_req *);
 extern struct vr_nexthop *vr_discard_nh;
 
 extern struct vr_nexthop *vr_discard_nh;
+extern bool vr_gateway_nexthop(struct vr_nexthop *);
 
 #ifdef __cplusplus
 }
