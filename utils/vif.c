@@ -162,12 +162,15 @@ vr_if_flags(int flags)
 
     if (flags & VIF_FLAG_DHCP_ENABLED)
         strcat(flag_string, "D");
-     if (flags & VIF_FLAG_PROMISCOUS)
+
+    if (flags & VIF_FLAG_PROMISCOUS)
         strcat(flag_string, "Pr");
 
     if (flags & VIF_FLAG_NATIVE_VLAN_TAG)
         strcat(flag_string, "Vnt");
 
+    if (flags & VIF_FLAG_NO_ARP_PROXY)
+        strcat(flag_string, "Anp");
 
     return flag_string;
 }
