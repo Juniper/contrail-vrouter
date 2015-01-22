@@ -19,9 +19,10 @@
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
-extern struct vr_nexthop * vr_inet_src_lookup(unsigned short ,
+extern struct vr_nexthop *vr_inet6_sip_lookup(unsigned short, uint8_t *);
+extern struct vr_nexthop *vr_inet_sip_lookup(unsigned short, uint32_t);
+extern struct vr_nexthop *vr_inet_src_lookup(unsigned short ,
                                 struct vr_ip *, struct vr_packet *);
-extern int vr_neighbor_input(struct vr_packet *, struct vr_forwarding_md *);
 extern bool vr_ip6_well_known_packet(struct vr_packet *);
 extern bool vr_ip6_dhcp_packet(struct vr_packet *);
 extern bool vr_ip_well_known_packet(struct vr_packet *);
@@ -123,6 +124,21 @@ nh_del(struct vr_nexthop *nh)
     return;
 }
 
+bool
+vr_nexthop_is_gateway(struct vr_nexthop *nh)
+{
+    if (nh) {
+        if (!nh->nh_dev)
+            return false;
+
+        if ((nh->nh_type == NH_ENCAP) &&
+                (nh->nh_dev->vif_type == VIF_TYPE_AGENT))
+            return true;
+    }
+
+    return false;
+}
+
 static int
 nh_resolve(struct vr_packet *pkt, struct vr_nexthop *nh,
            struct vr_forwarding_md *fmd)
@@ -145,7 +161,7 @@ nh_resolve(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt_clone = vr_pclone(pkt);
         if (pkt_clone) {
             vr_preset(pkt_clone);
-            vif_xconnect(pkt->vp_if, pkt_clone);
+            vif_xconnect(pkt->vp_if, pkt_clone, fmd);
         }
     }
 
@@ -568,13 +584,16 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 {
 
     int i, clone_size;
-    struct vr_nexthop *dir_nh;
-    unsigned short drop_reason;
+    bool flood_to_vms = true;
+    unsigned short drop_reason, pull_len, label, pkt_vrf;
+    unsigned int tun_src, pkt_src, hashval, port_range, handled;
+
+    unsigned char *eth;
+    struct vr_arp *sarp;
+    struct vr_ip6 *ip6;
+    struct vr_nexthop *dir_nh, *src_nh;
     struct vr_packet *new_pkt;
     struct vr_vrf_stats *stats;
-    unsigned int tun_src, pkt_src, hashval, port_range, handled;
-    unsigned short pull_len, label, pkt_vrf;
-    unsigned char *eth;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
@@ -626,6 +645,14 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             handled = vr_arp_input(pkt, fmd);
             if (handled)
                 return 0;
+
+            if (pkt_src) {
+                sarp = (struct vr_arp *)pkt_data(pkt);
+                src_nh = vr_inet_sip_lookup(fmd->fmd_dvrf, sarp->arp_spa);
+                if (vr_nexthop_is_gateway(src_nh)) {
+                    flood_to_vms = false;
+                }
+            }
         } else if (pkt->vp_type == VP_TYPE_IP) {
             if (pkt_src == PKT_SRC_TOR_REPL_TREE || (!pkt_src)) {
                 if (vr_ip_well_known_packet(pkt)) {
@@ -645,9 +672,18 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
                     return 0;
                 }
             }
+
             handled = vr_neighbor_input(pkt, fmd);
             if (handled)
                 return 0;
+
+            if (pkt_src) {
+                ip6 = (struct vr_ip6 *)pkt_data(pkt);
+                src_nh = vr_inet6_sip_lookup(fmd->fmd_dvrf, ip6->ip6_src);
+                if (vr_nexthop_is_gateway(src_nh)) {
+                    flood_to_vms = false;
+                }
+            }
         }
 
         pkt_push(pkt, pull_len);
@@ -716,6 +752,8 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             continue;
 
         if (dir_nh->nh_flags & NH_FLAG_COMPOSITE_ENCAP) {
+            if (!flood_to_vms)
+                continue;
 
             if (!(new_pkt = nh_mcast_clone(pkt, 0))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
@@ -1191,8 +1229,6 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_GSO;
 
     overhead_len = VR_VXLAN_HDR_LEN;
-    overhead_len += pkt_get_network_header_off(pkt) - pkt->vp_data;
-
     if (pkt->vp_type == VP_TYPE_IP) {
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
@@ -1200,7 +1236,9 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                 reason = VP_DROP_MCAST_DF_BIT;
                 goto send_fail;
             }
-            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - overhead_len;
+
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
+                (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
             trap_arg.df_flow_index = fmd->fmd_flow_index;
             return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
         }
@@ -1237,7 +1275,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto send_fail;
     }
 
-    vif->vif_tx(vif, pkt);
+    vif->vif_tx(vif, pkt, fmd);
 
     return 0;
 
@@ -1317,14 +1355,15 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     mudp_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
 
     if (pkt->vp_type == VP_TYPE_IP) {
-        overhead_len = mudp_head_space + pkt_get_network_header_off(pkt) - pkt->vp_data;
+        overhead_len = mudp_head_space;
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
             if (pkt->vp_flags & VP_FLAG_MULTICAST) {
                 reason = VP_DROP_MCAST_DF_BIT;
                 goto send_fail;
             }
-            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - overhead_len;
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
+                (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
             trap_arg.df_flow_index = fmd->fmd_flow_index;
             return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
         }
@@ -1373,7 +1412,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto send_fail;
     }
 
-    vif->vif_tx(vif, pkt);
+    vif->vif_tx(vif, pkt, fmd);
 
     return 0;
 
@@ -1450,7 +1489,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (pkt->vp_type == VP_TYPE_IP) {
         /* If there are any L2 headers lets add those as well. For L3
          * unicast, folloowing will add no extra overhead */
-        overhead_len = gre_head_space + pkt_get_network_header_off(pkt) - pkt->vp_data;
+        overhead_len = gre_head_space;
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
             if (pkt->vp_flags & VP_FLAG_MULTICAST) {
@@ -1458,7 +1497,8 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                 goto send_fail;
             }
 
-            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) - overhead_len;
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
+                (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
             trap_arg.df_flow_index = fmd->fmd_flow_index;
             return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
         }
@@ -1530,7 +1570,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         drop_reason = VP_DROP_PUSH;
         goto send_fail;
     }
-    vif->vif_tx(vif, pkt);
+    vif->vif_tx(vif, pkt, fmd);
     return 0;
 
 send_fail:
@@ -1620,7 +1660,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         VR_MAC_COPY(pkt_data(pkt), nh->nh_data);
 
     vif = nh->nh_dev;
-    vif->vif_tx(vif, pkt);
+    vif->vif_tx(vif, pkt, fmd);
 
     return 0;
 }
@@ -1718,7 +1758,7 @@ nh_encap_l3_unicast(struct vr_packet *pkt, struct vr_nexthop *nh,
         return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_DIAG, &vif->vif_idx);
     }
 
-    vif->vif_tx(vif, pkt);
+    vif->vif_tx(vif, pkt, fmd);
 
     return 0;
 }

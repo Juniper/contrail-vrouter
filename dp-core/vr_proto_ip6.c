@@ -13,16 +13,6 @@
 #include <vr_ip_mtrie.h>
 #include <vr_bridge.h>
 
-#define SOURCE_LINK_LAYER_ADDRESS_OPTION    1
-#define TARGET_LINK_LAYER_ADDRESS_OPTION    2
-
-struct vr_neighbor_option {
-    uint8_t vno_type;
-    uint8_t vno_length;
-    uint8_t vno_value[0];
-} __attribute__((packed));
-
-
 static int
 vr_v6_prefix_is_ll(uint8_t prefix[])
 {
@@ -33,33 +23,57 @@ vr_v6_prefix_is_ll(uint8_t prefix[])
 }
 
 
-/*
- * buffer is pointer to ip6 header, all values other than src, dst and
- * plen are ZERO. bytes is total length of ip6 header, icmp header and
- * icmp option
- */
-uint16_t
-vr_icmp6_checksum(void *buffer, unsigned int bytes)
+/* TODO: consolidate all sum calculation routines */
+static inline uint16_t
+vr_sum(unsigned char *buf, unsigned int length)
 {
+   int num_words;
    uint32_t total;
    uint16_t *ptr;
-   int num_words;
 
    total = 0;
-   ptr   = (uint16_t *)buffer;
-   num_words = (bytes + 1) / 2;
+   ptr = (uint16_t *)buf;
+   num_words = (length + 1) / 2;
 
    while (num_words--)
        total += *ptr++;
 
-   /*
-    *   Fold in any carries
-    *   - the addition may cause another carry so we loop
-    */
    while (total & 0xffff0000)
        total = (total >> 16) + (total & 0xffff);
 
    return (uint16_t)total;
+}
+
+static inline uint16_t
+vr_ip6_pseudo_header_sum(struct vr_ip6 *ip6)
+{
+   struct vr_ip6_pseudo ip6_ph;
+
+   memcpy(ip6_ph.ip6_src, ip6->ip6_src, VR_IP6_ADDRESS_LEN);
+   memcpy(ip6_ph.ip6_dst, ip6->ip6_dst, VR_IP6_ADDRESS_LEN);
+   /*
+    * XXX: length should be the length of (l4 header + data). But here, we
+    * use the ip6 payload length, assuming that there are no extension
+    * headers. This asusmption has to be fixed when we extend ipv6 support.
+    */
+   ip6_ph.ip6_l4_length = ip6->ip6_plen;
+   ip6_ph.ip6_zero = 0;
+   ip6_ph.ip6_zero_nh = (ip6->ip6_nxt << 24);
+
+   return vr_sum((unsigned char *)&ip6_ph, sizeof(ip6_ph));
+}
+
+uint16_t
+vr_icmp6_checksum(struct vr_ip6 *ip6, struct vr_icmp *icmph)
+{
+    uint16_t sum[2];
+
+    sum[0] = vr_ip6_pseudo_header_sum(ip6);
+
+    icmph->icmp_csum = 0;
+    sum[1] = vr_sum((unsigned char *)icmph, ntohs(ip6->ip6_plen));
+
+    return vr_sum((unsigned char *)sum, sizeof(sum));
 }
 
 static bool
@@ -169,9 +183,7 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
 
     icmph->icmp_csum =
-        ~(vr_icmp6_checksum(ip6, sizeof(struct vr_ip6) +
-                    sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN +
-                    nopt->vno_length));
+        ~(vr_icmp6_checksum(ip6, icmph));
 
     vr_bridge_input(vif->vif_router, pkt, fmd);
 
@@ -247,8 +259,10 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 
     pkt_pull(pkt, pull_len);
     icmph = (struct vr_icmp *)pkt_data(pkt);
-    if (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL)
+    if (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL) {
+        pkt_push(pkt, pull_len);
         return !handled;
+    }
 
     if (pkt->vp_len < (sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN +
                 sizeof(struct vr_neighbor_option)))
@@ -272,13 +286,13 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
         break;
 
     case MR_XCONNECT:
-        vif_xconnect(pkt->vp_if, pkt);
+        vif_xconnect(pkt->vp_if, pkt, fmd);
         break;
 
     case MR_TRAP_X:
         pkt_c = vr_pclone(pkt);
         if (pkt_c)
-            vif_xconnect(pkt->vp_if, pkt_c);
+            vif_xconnect(pkt->vp_if, pkt_c, fmd);
 
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
         break;
@@ -321,7 +335,7 @@ vr_ip6_dhcp_packet(struct vr_packet *pkt)
     ip6 = (struct vr_ip6 *)data;
 
     if (vr_v6_prefix_is_ll(ip6->ip6_dst))
-            return false;
+        return false;
 
     /* 0xFF02 is the multicast address used for NDP, DHCPv6 etc */
     if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
@@ -342,6 +356,7 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
 {
     unsigned char *data = pkt_data(pkt);
     struct vr_ip6 *ip6;
+    struct vr_udp *udph = NULL;
     struct vr_icmp *icmph = NULL;
 
     if ((pkt->vp_type != VP_TYPE_IP6) ||
@@ -358,12 +373,15 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
         /*
          * Bridge neighbor solicit for link-local addresses
          */
-        if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6)
+        if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
             icmph = (struct vr_icmp *)((char *)ip6 + sizeof(struct vr_ip6));
-        if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL))
-            return false;
-
-        return true;
+            if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL))
+                return true;
+        } else if (ip6->ip6_nxt == VR_IP_PROTO_UDP) {
+            udph = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
+            if (udph && (udph->udp_sport == htons(VR_DHCP6_SRC_PORT)))
+                return true;
+        }
     }
 
     return false;

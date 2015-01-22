@@ -30,10 +30,11 @@ int vr_l2_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_arp_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_ip_input(struct vrouter *, struct vr_packet *,
                 struct vr_forwarding_md *);
+int vr_neighbor_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_ip6_input(struct vrouter *, struct vr_packet *,
                  struct vr_forwarding_md *);
 extern void vr_ip_update_csum(struct vr_packet *, unsigned int, unsigned int);
-extern uint16_t vr_icmp6_checksum(void *, unsigned int);
+extern uint16_t vr_icmp6_checksum(struct vr_ip6 *, struct vr_icmp *);
 
 int vr_untag_pkt(struct vr_packet *);
 int vr_tag_pkt(struct vr_packet *, unsigned short);
@@ -54,5 +55,7 @@ mac_response_t vm_arp_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *, unsigned char *);
 mac_response_t vm_neighbor_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *, unsigned char *);
+extern int vif_plug_mac_request(struct vr_interface *, struct vr_packet *,
+        struct vr_forwarding_md *);
 
 #endif /* __VR_DATAPATH_H__ */
