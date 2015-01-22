@@ -58,6 +58,7 @@
 #define VIF_FLAG_PROMISCOUS         0x400
 /* untagged packets should be treated as packets with tag 0 */
 #define VIF_FLAG_NATIVE_VLAN_TAG    0x800
+#define VIF_FLAG_NO_ARP_PROXY       0x1000
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
@@ -101,6 +102,7 @@ struct vr_df_trap_arg {
 };
 
 struct vr_interface;
+struct vr_forwarding_md;
 
 struct vr_interface_driver {
     int     (*drv_add)(struct vr_interface *, vr_interface_req *);
@@ -148,7 +150,8 @@ struct vr_interface {
     int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
     unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
             unsigned char *, unsigned short);
-    int (*vif_tx)(struct vr_interface *, struct vr_packet *);
+    int (*vif_tx)(struct vr_interface *, struct vr_packet *,
+            struct vr_forwarding_md *);
     /*
      * we are forced to pass the final argument, vlan id, since linux
      * untags the packet and stores the id in skb member. with no space
@@ -215,7 +218,8 @@ extern struct vr_interface *vif_find(struct vrouter *, char *);
 extern unsigned int vif_get_mtu(struct vr_interface *);
 extern void vif_set_xconnect(struct vr_interface *);
 extern void vif_remove_xconnect(struct vr_interface *);
-extern int vif_xconnect(struct vr_interface *, struct vr_packet *);
+extern int vif_xconnect(struct vr_interface *, struct vr_packet *,
+        struct vr_forwarding_md *);
 extern void vif_drop_pkt(struct vr_interface *, struct vr_packet *, bool);
 extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
