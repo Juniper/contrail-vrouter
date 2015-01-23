@@ -12,7 +12,11 @@ pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
     struct vr_packet *pkt_c;
     unsigned short head_space;
 
-    head_space = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
+    /*
+     * one eth header for agent, and one more for packets from
+     * tun interfaces
+     */
+    head_space = (2 * sizeof(struct vr_eth)) + sizeof(struct agent_hdr);
     pkt_c = vr_palloc(head_space + len);
     if (!pkt_c)
         return pkt_c;
