@@ -375,7 +375,10 @@ static int
 agent_send(struct vr_interface *vif, struct vr_packet *pkt,
                 void *ifspecific)
 {
-    int len;
+    unsigned short encap = VIF_ENCAP_TYPE_ETHER;
+    int len, head_space;
+    struct vr_eth *eth;
+
     struct vr_forwarding_md fmd;
     struct agent_hdr *hdr;
     unsigned char *rewrite;
@@ -396,7 +399,14 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
             truncate = true;
     }
 
-    if (truncate || pkt_head_space(pkt) < AGENT_PKT_HEAD_SPACE) {
+    if (hif_ops->hif_get_encap)
+        encap = hif_ops->hif_get_encap(pkt->vp_if);
+
+    head_space = AGENT_PKT_HEAD_SPACE;
+    if (encap == VIF_ENCAP_TYPE_L3)
+        head_space += VR_ETHER_HLEN;
+
+    if (truncate || (pkt_head_space(pkt) < head_space)) {
         len = pkt_len(pkt);
 
         if (agent_trap_may_truncate(params->trap_reason)) {
@@ -411,6 +421,20 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     pkt->vp_type = VP_TYPE_AGENT;
+
+    if (encap == VIF_ENCAP_TYPE_L3) {
+        eth = (struct vr_eth *)(pkt_push(pkt, VR_ETHER_HLEN));
+        if (!eth)
+            goto drop;
+
+        memcpy(eth->eth_dmac, vif->vif_mac, VR_ETHER_ALEN);
+        memcpy(eth->eth_smac, vif->vif_mac, VR_ETHER_ALEN);
+        if (pkt->vp_type == VP_TYPE_IP6)
+            eth->eth_proto = htons(VR_ETH_PROTO_IP6);
+        else
+            eth->eth_proto = htons(VR_ETH_PROTO_IP);
+    }
+
     pkt_set_network_header(pkt, pkt->vp_data + sizeof(struct vr_eth));
     pkt_set_inner_network_header(pkt,
             pkt->vp_data + sizeof(struct vr_eth));
