@@ -1690,6 +1690,11 @@ nh_encap_l3_unicast(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (stats)
             stats->vrf_diags++;
     } else {
+
+        /* Disable the GRO for subinterfaces */
+        if (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN)
+            pkt->vp_flags |= ~VP_FLAG_GRO;
+
         if (stats) {
             if ((pkt->vp_flags & VP_FLAG_GRO) &&
                     vif_is_virtual(vif)) {
