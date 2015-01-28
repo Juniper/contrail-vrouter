@@ -72,6 +72,26 @@ static struct ether_addr *mac_opt;
 
 static void Usage(void);
 
+static struct vr_intf_flags {
+    unsigned int vif_flag;
+    unsigned char *vif_flag_symbol;
+    unsigned char *vif_flag_string;
+} flag_metadata[] = {
+    {VIF_FLAG_POLICY_ENABLED,   "P",    "Policy"            },
+    {VIF_FLAG_XCONNECT,         "X",    "Cross Connect"     },
+    {VIF_FLAG_SERVICE_IF,       "S",    "Service Chain"     },
+    {VIF_FLAG_MIRROR_RX,        "Mr",   "Receive Mirror"    },
+    {VIF_FLAG_MIRROR_TX,        "Mt",   "Transmit Mirror"   },
+    {VIF_FLAG_TX_CSUM_OFFLOAD,  "Tc",   "Transmit Checksum Offload"},
+    {VIF_FLAG_L3_ENABLED,       "L3",   "Layer 3"           },
+    {VIF_FLAG_L2_ENABLED,       "L2",   "Layer 2"           },
+    {VIF_FLAG_DHCP_ENABLED,     "D",    "DHCP"              },
+    {VIF_FLAG_VHOST_PHYS,       "Vp",   "Vhost Physical"    },
+    {VIF_FLAG_PROMISCOUS,       "Pr",   "Promiscuous"       },
+    {VIF_FLAG_NATIVE_VLAN_TAG,  "Vnt",  "Native Vlan Tagged"},
+    {VIF_FLAG_NO_ARP_PROXY,     "Mnp",  "No MAC Proxy"      },
+};
+
 static char *
 vr_get_if_type_string(int t)
 {
@@ -135,44 +155,42 @@ vr_get_if_type(char *type_str)
 static char *
 vr_if_flags(int flags)
 {
+    unsigned int i, array_size;
+
     bzero(flag_string, sizeof(flag_string));
 
-    if (flags & VIF_FLAG_POLICY_ENABLED)
-        strcat(flag_string, "P");
-
-    if (flags & VIF_FLAG_XCONNECT)
-        strcat(flag_string, "X");
-
-    if (flags & VIF_FLAG_SERVICE_IF)
-        strcat(flag_string, "S");
-
-    if (flags & VIF_FLAG_MIRROR_TX)
-        strcat(flag_string, "Mt");
-
-    if (flags & VIF_FLAG_MIRROR_RX)
-        strcat(flag_string, "Mr");
-
-    if (flags & VIF_FLAG_TX_CSUM_OFFLOAD)
-        strcat(flag_string, "Tc");
-
-    if (flags & VIF_FLAG_L3_ENABLED)
-        strcat(flag_string, "L3");
-
-    if (flags & VIF_FLAG_L2_ENABLED)
-        strcat(flag_string, "L2");
-
-    if (flags & VIF_FLAG_DHCP_ENABLED)
-        strcat(flag_string, "D");
-     if (flags & VIF_FLAG_PROMISCOUS)
-        strcat(flag_string, "Pr");
-
-    if (flags & VIF_FLAG_NATIVE_VLAN_TAG)
-        strcat(flag_string, "Vnt");
-
-    if (flags & VIF_FLAG_NO_ARP_PROXY)
-        strcat(flag_string, "Anp");
+    array_size = sizeof(flag_metadata) / sizeof(flag_metadata[0]);
+    for (i = 0; i < array_size; i++) {
+        if (flags & flag_metadata[i].vif_flag)
+            strcat(flag_string, flag_metadata[i].vif_flag_symbol);
+    }
 
     return flag_string;
+}
+
+static void
+vr_interface_print_header(void)
+{
+    unsigned int i, array_size;
+
+    array_size = sizeof(flag_metadata) / sizeof(flag_metadata[0]);
+
+    printf("Vrouter Interface Table\n\n");
+    printf("Flags: ");
+
+    for (i = 0; i < array_size; i++) {
+        if (i) {
+            if (!(i % 4))
+                printf("\n       ");
+            else
+                printf(", ");
+        }
+        printf("%s=%s", flag_metadata[i].vif_flag_symbol,
+                flag_metadata[i].vif_flag_string);
+    }
+
+    printf("\n\n");
+    return;
 }
 
 void
@@ -187,7 +205,7 @@ vr_vrf_assign_req_process(void *s)
 }
 
 static void
-vr_interface_print_header(void)
+vr_interface_print_head_space(void)
 {
     int i;
 
@@ -234,19 +252,19 @@ vr_interface_req_process(void *s)
 
     printf("\n");
 
-    vr_interface_print_header();
+    vr_interface_print_head_space();
     printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
             vr_get_if_type_string(req->vifr_type),
             MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
-    vr_interface_print_header();
+    vr_interface_print_head_space();
     printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
             req->vifr_mtu, req->vifr_ref_cnt);
-    vr_interface_print_header();
+    vr_interface_print_head_space();
     printf("RX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_ipackets,
             req->vifr_ibytes, req->vifr_ierrors);
-    vr_interface_print_header();
+    vr_interface_print_head_space();
     printf("TX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors);
@@ -502,6 +520,9 @@ op_retry:
         break;
     }
 
+    if ((op == SANDESH_OP_DUMP) || (op == SANDESH_OP_GET))
+        vr_interface_print_header();
+
     ret = vr_intf_send_msg(&intf_req, "vr_interface_req");
     if (ret < 0)
         return ret;
@@ -525,7 +546,7 @@ Usage()
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
     printf("\t   \t--type [vhost|agent|physical|virtual]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
-    printf( "[--policy, --vhost-phys, --dhcp-enable]]\n");
+    printf("\t   \t--policy, --vhost-phys, --dhcp-enable]]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
