@@ -72,11 +72,7 @@ static struct ether_addr *mac_opt;
 
 static void Usage(void);
 
-static struct vr_intf_flags {
-    unsigned int vif_flag;
-    unsigned char *vif_flag_symbol;
-    unsigned char *vif_flag_string;
-} flag_metadata[] = {
+static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_POLICY_ENABLED,   "P",    "Policy"            },
     {VIF_FLAG_XCONNECT,         "X",    "Cross Connect"     },
     {VIF_FLAG_SERVICE_IF,       "S",    "Service Chain"     },
@@ -161,8 +157,8 @@ vr_if_flags(int flags)
 
     array_size = sizeof(flag_metadata) / sizeof(flag_metadata[0]);
     for (i = 0; i < array_size; i++) {
-        if (flags & flag_metadata[i].vif_flag)
-            strcat(flag_string, flag_metadata[i].vif_flag_symbol);
+        if (flags & flag_metadata[i].vuf_flag)
+            strcat(flag_string, flag_metadata[i].vuf_flag_symbol);
     }
 
     return flag_string;
@@ -185,8 +181,8 @@ vr_interface_print_header(void)
             else
                 printf(", ");
         }
-        printf("%s=%s", flag_metadata[i].vif_flag_symbol,
-                flag_metadata[i].vif_flag_string);
+        printf("%s=%s", flag_metadata[i].vuf_flag_symbol,
+                flag_metadata[i].vuf_flag_string);
     }
 
     printf("\n\n");

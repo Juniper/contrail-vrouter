@@ -68,6 +68,51 @@ static void usage_internal(void);
 #define BRIDGE_FAMILY_STRING    "bridge"
 #define INET6_FAMILY_STRING     "inet6"
 
+struct vr_util_flags inet_flags[] = {
+    {VR_RT_LABEL_VALID_FLAG,    "L",    "Label Valid"   },
+    {VR_RT_ARP_PROXY_FLAG,      "P",    "Proxy ARP"     },
+    {VR_RT_ARP_TRAP_FLAG,       "T",    "Trap ARP"      },
+    {VR_RT_ARP_FLOOD_FLAG,      "F",    "Flood ARP"     },
+};
+
+struct vr_util_flags bridge_flags[] = {
+    {VR_RT_LABEL_VALID_FLAG,    "L",    "Label Valid"   },
+};
+
+static void
+dump_legend(int family)
+{
+    unsigned int i, array_size;
+    struct vr_util_flags *rt_flags;
+
+    switch (family) {
+    case AF_INET:
+    case AF_INET6:
+        array_size = sizeof(inet_flags) / sizeof(inet_flags[0]);
+        rt_flags = inet_flags;
+        break;
+
+    case AF_BRIDGE:
+        array_size = sizeof(bridge_flags) / sizeof(bridge_flags[0]);
+        rt_flags = bridge_flags;
+        break;
+
+    default:
+        return;
+    }
+
+    printf("Flags: ");
+    for (i = 0; i < array_size; i++) {
+        printf("%s=%s", rt_flags[i].vuf_flag_symbol,
+                rt_flags[i].vuf_flag_string);
+        if (i != (array_size - 1))
+            printf(", ");
+    }
+
+    printf("\n\n");
+    return;
+}
+
 static int
 family_string_to_id(char *fname)
 {
@@ -377,10 +422,12 @@ vr_route_op(void)
 
     if (cmd_op == SANDESH_OP_DUMP) {
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            printf("Kernel IP routing table %d/%d/unicast\n", req->rtr_rid, cmd_vrf_id);
+            printf("Kernel IP routing table %d/%d/unicast\n\n", req->rtr_rid, cmd_vrf_id);
+            dump_legend(cmd_family_id);
             printf("Destination	        PPL        Flags        Label        Nexthop    Stitched MAC\n");
         } else {
-            printf("Kernel L2 Bridge table %d/%d\n", req->rtr_rid, cmd_vrf_id);
+            printf("Kernel L2 Bridge table %d/%d\n\n", req->rtr_rid, cmd_vrf_id);
+            dump_legend(cmd_family_id);
             printf("DestMac                 Vrf    Label/VNID     Nexthop\n");
         }
     }
