@@ -120,6 +120,19 @@ flow_get_drop_reason(uint8_t drop_code)
 }
 
 static void
+dump_legend(void)
+{
+    printf("Action:F=Forward, D=Drop ");
+    printf("N=NAT(S=SNAT, D=DNAT, Ps=SPAT, Pd=DPAT, ");
+    printf("L=Link Local Port)\n");
+
+    printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
+    printf("\n");
+
+    return;
+}
+
+static void
 dump_table(struct flow_table *ft)
 {
     unsigned int i, j, fi, need_flag_print = 0;
@@ -130,6 +143,7 @@ dump_table(struct flow_table *ft)
     struct in_addr in_src, in_dest;
 
     printf("Flow table\n\n");
+    dump_legend();
     printf(" Index              Source:Port           Destination:Port    \tProto(V)\n");
     printf("-----------------------------------------------------------------");
     printf("--------\n");
