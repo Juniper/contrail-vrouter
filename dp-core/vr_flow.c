@@ -475,6 +475,8 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
     if (fmd) {
         pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
         pnode->pl_label = fmd->fmd_label;
+        if (fmd->fmd_to_me)
+            pnode->pl_flags |= PN_FLAG_TO_ME;
     }
 
     __sync_synchronize();
@@ -805,6 +807,8 @@ vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
             memset(fmd, 0, sizeof(*fmd));
             fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
             fmd->fmd_label = pnode->pl_label;
+            if (pnode->pl_flags & PN_FLAG_TO_ME)
+                fmd->fmd_to_me = 1;
         }
 
         pkt = pnode->pl_packet;

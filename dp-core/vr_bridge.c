@@ -421,7 +421,6 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
     /* Adjust MSS for V4 and V6 packets */
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
-
         pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
         if (!pkt_pull(pkt, pull_len)) {
             vr_pfree(pkt, VP_DROP_PULL);
