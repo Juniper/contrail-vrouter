@@ -19,6 +19,7 @@
 #include <linux/icmp.h>
 
 #include "vr_packet.h"
+#include "vr_interface.h"
 #include "vr_sandesh.h"
 #include "vrouter.h"
 #include "vr_linux.h"
@@ -639,6 +640,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         hash_key[4] = dport;
 
         hashval = jhash(hash_key, 20, vr_hashrnd);
+        lh_reset_skb_fields(pkt);
     } else {
 
         /* We treat all non-ip packets as L2 here. For V6 we can extract
@@ -653,8 +655,6 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
     }
 
-
-    lh_reset_skb_fields(pkt);
 
     /*
      * Convert the hash value to a value in the port range that we want

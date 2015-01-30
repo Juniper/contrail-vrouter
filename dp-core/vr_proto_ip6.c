@@ -7,6 +7,7 @@
 #include <vr_os.h>
 #include <vr_types.h>
 #include <vr_packet.h>
+#include <vr_interface.h>
 
 #include <vr_datapath.h>
 #include <vr_ip_mtrie.h>
@@ -89,7 +90,6 @@ vr_icmp6_input(struct vrouter *router, struct vr_packet *pkt,
 
     icmph = (struct vr_icmp *)pkt_data(pkt);
     switch (icmph->icmp_type) {
-
     case VR_ICMP6_TYPE_ROUTER_SOL:
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_L3_PROTOCOLS, NULL);
         break;
@@ -144,102 +144,189 @@ vr_ip6_input(struct vrouter *router, struct vr_packet *pkt,
     return vr_forward(router, pkt, fmd);
 }
 
-int
-vr_ip6_neighbor_solicitation_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
-                                   int pkt_src)
+void
+vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+        unsigned char *dmac)
 {
-    struct vr_ip6 *ip6;
-    struct vr_neighbor_option *nopt;
-    struct vr_icmp *icmph;
-    char dst_mac[VR_ETHER_ALEN], src_mac[VR_ETHER_ALEN];
-    mac_response_t ndisc_result;
-    uint32_t rt_prefix[4], pull_len;
-    struct vr_route_req rt;
-    int drop_reason;
     struct vr_eth *eth;
+    struct vr_ip6 *ip6;
+    struct vr_icmp *icmph;
+    struct vr_neighbor_option *nopt;
+    struct vr_interface *vif = pkt->vp_if;
 
-    if (pkt->vp_type != VP_TYPE_IP6)
-        return 0;
 
-    if (pkt->vp_len < sizeof(*ip6))
-        goto drop;
+    icmph = (struct vr_icmp *)pkt_data(pkt);
+    nopt = (struct vr_neighbor_option *)((unsigned char *)icmph +
+            sizeof(*icmph) + VR_IP6_ADDRESS_LEN);
 
-    ip6 = (struct vr_ip6 *)pkt_data(pkt);
-    if (ip6->ip6_nxt != VR_IP_PROTO_ICMP6)
-        return 0;
+    eth = (struct vr_eth *)pkt_push(pkt, sizeof(*ip6) + sizeof(*eth));
+    if (!eth) {
+        vr_pfree(pkt, VP_DROP_PUSH);
+        return;
+    }
+    ip6 = (struct vr_ip6 *)((unsigned char *)eth + sizeof(*eth));
 
-    /* Link local neighbour discovery is bridged */
-    if (vr_v6_prefix_is_ll(ip6->ip6_dst))
-        return 0;
 
-    pull_len = sizeof(*ip6);
-    if (pkt->vp_len < (pull_len + sizeof(*icmph)))
-        goto drop;
-    icmph = (struct vr_icmp *)(pkt_data(pkt) + pull_len);
+    /* Update Ethernet headr */
+    VR_MAC_COPY(eth->eth_dmac, nopt->vno_value);
+    VR_MAC_COPY(eth->eth_smac, dmac);
+    eth->eth_proto = htons(VR_ETH_PROTO_IP6);
 
-    if (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL)
-        return 0;
+    memcpy(ip6->ip6_dst, ip6->ip6_src, sizeof(ip6->ip6_src));
+    memcpy(ip6->ip6_src, &icmph->icmp_data, sizeof(ip6->ip6_src));
+    /* Mimic a different source ip */
+    ip6->ip6_src[15] = 0xFF;
 
-    pull_len += sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
-    if (pkt->vp_len < (pull_len + sizeof(*nopt)))
-        goto drop;
+    /* Update ICMP header and options */
+    icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD;
+    icmph->icmp_eid = htons(0x4000);
 
+    /* length in units of 8 octets */
+    nopt->vno_type = TARGET_LINK_LAYER_ADDRESS_OPTION;
+    nopt->vno_length = (sizeof(struct vr_neighbor_option) + VR_ETHER_ALEN) / 8;
+    VR_MAC_COPY(nopt->vno_value, dmac);
+
+    icmph->icmp_csum =
+        ~(vr_icmp6_checksum(ip6, icmph));
+
+    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY) {
+        vif->vif_tx(vif, pkt, fmd);
+    } else {
+        vr_bridge_input(vif->vif_router, pkt, fmd);
+    }
+
+    return;
+}
+
+mac_response_t
+vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned char *dmac)
+{
+    uint32_t rt6_prefix[4], pull_len;
+    unsigned char mac[VR_ETHER_ALEN];
+
+    struct vr_icmp *icmph;
+    struct vr_route_req rt;
+    struct vr_neighbor_option *nopt;
+
+    icmph = (struct vr_icmp *)pkt_data(pkt);
+    pull_len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
     nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + pull_len);
-    if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION)
-        goto drop;
-
-    if (pkt->vp_len < (pull_len + nopt->vno_length * 8))
-        goto drop;
-
-    VR_MAC_COPY(dst_mac, nopt->vno_value);
     /* We let DAD packets bridged */
-    if (IS_MAC_ZERO(dst_mac))
-        return 0;
+    if (IS_MAC_ZERO(nopt->vno_value))
+        return MR_NOT_ME;
 
+
+    memset(&rt, 0, sizeof(rt));
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     rt.rtr_req.rtr_family = AF_INET6;
-    rt.rtr_req.rtr_prefix = (uint8_t *)&rt_prefix;
+    rt.rtr_req.rtr_prefix = (uint8_t *)&rt6_prefix;
     memcpy(rt.rtr_req.rtr_prefix, icmph->icmp_data, 16);
     rt.rtr_req.rtr_prefix_size = 16;
     rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
-    rt.rtr_req.rtr_nh_id = 0;
-    rt.rtr_req.rtr_label_flags = 0;
+    rt.rtr_req.rtr_mac = mac;
 
     vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
 
-    ndisc_result = vr_get_l3_stitching_info(pkt, &rt, fmd, src_mac,
-                                          dst_mac, pkt_src, &drop_reason);
-    if (ndisc_result == MR_PROXY) {
-        memcpy(ip6->ip6_dst, ip6->ip6_src, sizeof(ip6->ip6_src));
-        memcpy(ip6->ip6_src, &icmph->icmp_data, sizeof(ip6->ip6_src));
-        /* Mimic a different source ip */
-        ip6->ip6_src[15] = 0xFF;
+    if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_PROXY_FLAG)
+        return vr_get_proxy_mac(pkt, fmd, &rt, dmac);
 
-        /* Update ICMP header and options */
-        icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD;
-        icmph->icmp_eid = htons(0x4000);
+    return MR_FLOOD;
+}
 
-        /* length in units of 8 octets */
-        nopt->vno_type = TARGET_LINK_LAYER_ADDRESS_OPTION;
-        nopt->vno_length = (sizeof(struct vr_neighbor_option) + VR_ETHER_ALEN) / 8;
-        VR_MAC_COPY(nopt->vno_value, src_mac);
+int
+vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    int handled = 1;
+    uint32_t pull_len;
+    unsigned char dmac[VR_ETHER_ALEN];
+    mac_response_t ndisc_result;
 
-        icmph->icmp_csum = ~(vr_icmp6_checksum(ip6, icmph));
+    struct vr_ip6 *ip6;
+    struct vr_icmp *icmph;
+    struct vr_packet *pkt_c;
+    struct vr_neighbor_option *nopt;
+    struct vr_interface *vif = pkt->vp_if;
 
-
-        eth = (struct vr_eth *)pkt_push(pkt, VR_ETHER_HLEN);
-
-        /* Update Ethernet headr */
-        VR_MAC_COPY(eth->eth_dmac, dst_mac);
-        VR_MAC_COPY(eth->eth_smac, src_mac);
-        eth->eth_proto = htons(VR_ETH_PROTO_IP6);
+    pull_len = sizeof(*ip6);
+    if (pkt->vp_len < pull_len) {
+        vr_pfree(pkt, VP_DROP_INVALID_PACKET);
+        return handled;
     }
 
-    return vr_handle_mac_response(pkt, fmd, ndisc_result, drop_reason);
+    ip6 = (struct vr_ip6 *)pkt_data(pkt);
+    if (ip6->ip6_nxt != VR_IP_PROTO_ICMP6)
+        return !handled;
+
+    /* Link local neighbour discovery is bridged */
+    if (vr_v6_prefix_is_ll(ip6->ip6_dst))
+        return !handled;
+
+    if (pkt->vp_len < pull_len + sizeof(struct vr_icmp))
+        goto drop;
+
+    pkt_pull(pkt, pull_len);
+    icmph = (struct vr_icmp *)pkt_data(pkt);
+    if (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL) {
+        pkt_push(pkt, pull_len);
+        return !handled;
+    }
+
+    if (pkt->vp_len < (sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN +
+                sizeof(struct vr_neighbor_option)))
+        goto drop;
+
+    pull_len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
+    if (pkt->vp_len < (pull_len + sizeof(struct vr_neighbor_option)))
+        goto drop;
+
+    nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + pull_len);
+    if (pkt->vp_len < (pull_len + (nopt->vno_length * 8)))
+        goto drop;
+
+    if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION)
+        goto drop;
+
+    ndisc_result = vif->vif_mac_request(vif, pkt, fmd, dmac);
+    switch (ndisc_result) {
+    case MR_PROXY:
+        vr_neighbor_proxy(pkt, fmd, dmac);
+        break;
+
+    case MR_XCONNECT:
+        vif_xconnect(pkt->vp_if, pkt, fmd);
+        break;
+
+    case MR_TRAP_X:
+        pkt_c = vr_pclone(pkt);
+        if (pkt_c)
+            vif_xconnect(pkt->vp_if, pkt_c, fmd);
+
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+        break;
+
+    case MR_TRAP:
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+        break;
+
+    case MR_DROP:
+        vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        break;
+
+    case MR_FLOOD:
+    default:
+        handled = false;
+        break;
+    }
+
+    if (!handled)
+        pkt_push(pkt, pull_len);
+
+    return handled;
 
 drop:
     vr_pfree(pkt, VP_DROP_INVALID_PACKET);
-    return 1;
+    return handled;
 }
 
 bool
