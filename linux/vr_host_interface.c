@@ -317,16 +317,11 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
     if (vif->vif_type == VIF_TYPE_AGENT)
         skb_shinfo(skb)->gso_size = 0;
 
-    if (vif->vif_type != VIF_TYPE_PHYSICAL ||
-            skb->len <= skb->dev->mtu + skb->dev->hard_header_len) {
-        return dev_queue_xmit(skb);
-    }
-
-    if (type == VP_TYPE_IPOIP)
+    if ((type == VP_TYPE_IPOIP) &&
+            (skb->len > skb->dev->mtu + skb->dev->hard_header_len))
         return linux_inet_fragment(vif, skb, type);
 
-    lh_pfree_skb(skb, VP_DROP_NOWHERE_TO_GO);
-    return -ENOMEM;
+    return dev_queue_xmit(skb);
 }
 
 static int
@@ -870,7 +865,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             skb_set_network_header(skb, (network_off - skb_headroom(skb)));
             skb_reset_mac_len(skb);
         }
-    } else if (vr_pkt_is_ip(pkt)) {
+    } else if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         network_off = pkt_get_inner_network_header_off(pkt);
 
         if (network_off) {

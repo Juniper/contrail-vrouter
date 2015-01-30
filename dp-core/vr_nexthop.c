@@ -1254,6 +1254,10 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto send_fail;
 
     pkt_set_network_header(pkt, pkt->vp_data);
+    if (pkt->vp_type == VP_TYPE_IP6)
+        pkt->vp_type = VP_TYPE_IP6OIP;
+    else if (pkt->vp_type == VP_TYPE_IP)
+        pkt->vp_type = VP_TYPE_IPOIP;
 
     if (pkt_head_space(pkt) < nh->nh_udp_tun_encap_len) {
         tmp_pkt = vr_pexpand_head(pkt, nh->nh_udp_tun_encap_len - pkt_head_space(pkt));
