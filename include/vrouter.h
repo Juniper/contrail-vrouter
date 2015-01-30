@@ -12,7 +12,6 @@ extern "C" {
 
 #include "sandesh.h"
 #include "vr_types.h"
-#include "vr_interface.h"
 #include "vr_flow.h"
 #include "vr_nexthop.h"
 #include "vr_route.h"

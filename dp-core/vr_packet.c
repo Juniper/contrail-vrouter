@@ -6,18 +6,6 @@
 #include <vr_os.h>
 #include <vr_packet.h>
 
-void
-pkt_reset(struct vr_packet *pkt)
-{
-    vr_preset(pkt);
-
-    pkt->vp_tail = pkt->vp_data;
-    pkt->vp_len = 0;
-    pkt->vp_network_h = pkt->vp_data;
-
-    return;
-}
-
 struct vr_packet *
 pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
 {

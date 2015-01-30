@@ -7,6 +7,7 @@
 #include <vr_types.h>
 #include <vr_packet.h>
 
+#include "vr_interface.h"
 #include "vr_datapath.h"
 #include "vr_mpls.h"
 #include "vr_vxlan.h"
@@ -15,6 +16,8 @@
 #include "vr_bridge.h"
 
 static unsigned short vr_ip_id;
+extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
+                                                 unsigned int);
 
 unsigned short
 vr_generate_unique_ip_id()
@@ -968,6 +971,48 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     }
 
     return FLOW_FORWARD;
+}
+
+mac_response_t
+vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned char *dmac)
+{
+    uint32_t rt_prefix;
+    unsigned char mac[VR_ETHER_ALEN];
+
+    struct vr_arp *sarp;
+    struct vr_vrf_stats *stats;
+    struct vr_route_req rt;
+
+    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    /* here we will not check for stats, but will check before use */
+
+    sarp = (struct vr_arp *)pkt_data(pkt);
+
+    memset(&rt, 0, sizeof(rt));
+    rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
+    rt.rtr_req.rtr_family = AF_INET;
+    rt.rtr_req.rtr_prefix = (uint8_t *)&rt_prefix;
+    *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_dpa);
+    rt.rtr_req.rtr_prefix_size = 4;
+    rt.rtr_req.rtr_prefix_len = 32;
+    rt.rtr_req.rtr_mac = mac;
+
+    vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
+
+    if (vr_grat_arp(sarp)) {
+        if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_TRAP_FLAG)
+            return MR_TRAP;
+        return MR_FLOOD;
+    }
+
+    if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_PROXY_FLAG)
+        return vr_get_proxy_mac(pkt, fmd, &rt, dmac);
+
+    if (stats)
+        stats->vrf_arp_virtual_flood++;
+
+    return MR_FLOOD;
 }
 
 
