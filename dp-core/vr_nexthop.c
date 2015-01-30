@@ -2108,14 +2108,10 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 static int
 nh_discard_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    if (nh->nh_id != NH_DISCARD_ID) {
-        return -EINVAL;
-    }
     nh->nh_family = req->nhr_family;
     nh->nh_type = NH_DISCARD;
     nh->nh_router = vrouter_get(0);
     nh->nh_reach_nh = nh_discard;
-    ip4_default_nh = nh;
     return 0;
 }
 
