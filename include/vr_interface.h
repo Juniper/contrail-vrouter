@@ -69,6 +69,16 @@
 #define VIF_ENCAP_TYPE_ETHER        1
 #define VIF_ENCAP_TYPE_L3           2
 
+typedef enum {
+    MR_DROP,
+    MR_FLOOD,
+    MR_PROXY,
+    MR_NOT_ME,
+    MR_TRAP,
+    MR_TRAP_X,
+    MR_XCONNECT,
+} mac_response_t;
+
 struct vr_interface_stats {
     uint64_t vis_ibytes;
     uint64_t vis_ipackets;
@@ -151,6 +161,8 @@ struct vr_interface {
      * for sure...
      */
     int (*vif_rx)(struct vr_interface *, struct vr_packet *, unsigned short);
+    mac_response_t (*vif_mac_request)(struct vr_interface *,
+            struct vr_packet *, struct vr_forwarding_md *, unsigned char *);
 
     struct vr_interface **vif_sub_interfaces;
     struct vr_interface_driver *vif_driver;

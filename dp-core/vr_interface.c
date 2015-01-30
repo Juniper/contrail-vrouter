@@ -12,6 +12,7 @@
 #include "vr_mirror.h"
 #include "vr_htable.h"
 #include "vr_datapath.h"
+#include "vr_bridge.h"
 
 volatile bool agent_alive = false;
 
@@ -20,6 +21,9 @@ static struct vr_host_interface_ops *hif_ops;
 static int vm_srx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int vm_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
+static mac_response_t vm_mac_request(struct vr_interface *, struct vr_packet *,
+                struct vr_forwarding_md *, unsigned char *);
+
 
 void vif_attach(struct vr_interface *);
 void vif_detach(struct vr_interface *);
@@ -533,6 +537,28 @@ agent_drv_add(struct vr_interface *vif,
 /* end agent driver */
 
 /* vhost driver */
+static mac_response_t
+vhost_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned char *dmac)
+{
+    struct vr_arp *sarp;
+
+    if (pkt->vp_type == VP_TYPE_ARP) {
+        sarp = (struct vr_arp *)pkt_data(pkt);
+        if (IS_LINK_LOCAL_IP(sarp->arp_dpa) ||
+                (vif->vif_type == VIF_TYPE_GATEWAY)) {
+            VR_MAC_COPY(dmac, vif->vif_mac);
+            return MR_PROXY;
+        }
+    }
+
+    if (vif->vif_type == VIF_TYPE_GATEWAY)
+        return MR_DROP;
+
+    return MR_XCONNECT;
+}
+
+
 static int
 vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id __attribute__((unused)))
@@ -637,6 +663,7 @@ vhost_drv_add(struct vr_interface *vif,
     vif->vif_set_rewrite = vif_cmn_rewrite;
     vif->vif_tx = vhost_tx;
     vif->vif_rx = vhost_rx;
+    vif->vif_mac_request = vhost_mac_request;
 
     ret = hif_ops->hif_add(vif);
     if (ret)
@@ -766,6 +793,7 @@ vlan_drv_add(struct vr_interface *vif, vr_interface_req *vifr)
     vif->vif_set_rewrite = vif_cmn_rewrite;
     vif->vif_tx = vlan_tx;
     vif->vif_rx = vlan_rx;
+    vif->vif_mac_request = vm_mac_request;
     vif->vif_vlan_id = vifr->vifr_vlan_id;
     vif->vif_ovlan_id = vifr->vifr_ovlan_id;
 
@@ -815,9 +843,23 @@ vm_srx(struct vr_interface *vif, struct vr_packet *pkt,
     return vr_virtual_input(vrf, vif, pkt, vlan_id);
 }
 
+static mac_response_t
+vm_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned char *dmac)
+{
+    if (pkt->vp_type == VP_TYPE_ARP) {
+        return vm_arp_request(vif, pkt, fmd, dmac);
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        return vm_neighbor_request(vif, pkt, fmd, dmac);
+    }
+
+    return MR_DROP;
+}
+
+
 static int
 vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
-      unsigned short vlan_id)
+        unsigned short vlan_id)
 {
     struct vr_interface *sub_vif = NULL;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -895,6 +937,26 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
     return 0;
 }
 
+static mac_response_t
+eth_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned char *dmac)
+{
+    struct vr_arp *sarp;
+
+    if (vif_mode_xconnect(vif))
+        return MR_XCONNECT;
+
+    if (fmd->fmd_label >= 0)
+        return vm_mac_request(vif, pkt, fmd, dmac);
+
+    if (pkt->vp_type == VP_TYPE_ARP) {
+        sarp = (struct vr_arp *)pkt_data(pkt);
+        if (vr_grat_arp(sarp))
+            return MR_TRAP_X;
+    }
+
+    return MR_XCONNECT;
+}
 
 static int
 eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
@@ -1086,10 +1148,13 @@ eth_drv_add(struct vr_interface *vif,
 
     if (vif->vif_type != VIF_TYPE_STATS) {
         vif->vif_tx = eth_tx;
-        if (vif_is_virtual(vif))
+        if (vif_is_virtual(vif)) {
             vif->vif_rx = vm_rx;
-        else
+            vif->vif_mac_request = vm_mac_request;
+        } else {
             vif->vif_rx = eth_rx;
+            vif->vif_mac_request = eth_mac_request;
+        }
     }
 
     if (vif->vif_flags & VIF_FLAG_SERVICE_IF) {

@@ -114,10 +114,6 @@ struct vr_nexthop {
     int                 (*nh_reach_nh)(struct vr_packet *,
                                        struct vr_nexthop *,
                                        struct vr_forwarding_md *);
-    int                 (*nh_arp_response)(struct vr_packet *,
-                                           struct vr_nexthop *,
-                                           struct vr_forwarding_md *);
-
     struct vr_interface *nh_dev;
     void                (*nh_destructor)(struct vr_nexthop *);
     uint8_t             nh_data[0];
@@ -136,6 +132,16 @@ struct vr_nexthop {
 #define nh_component_cnt        nh_u.nh_composite.cnt
 #define nh_component_nh         nh_u.nh_composite.component
 
+static inline bool
+vr_nexthop_is_vcp(struct vr_nexthop *nh)
+{
+    if (nh && (nh->nh_type == NH_RESOLVE))
+        return true;
+
+    return false;
+}
+
+
 extern int vr_nexthop_init(struct vrouter *);
 extern void vr_nexthop_exit(struct vrouter *, bool);
 extern struct vr_nexthop *__vrouter_get_nexthop(struct vrouter *, unsigned int);
@@ -148,7 +154,7 @@ extern int nh_output(struct vr_packet *,
 extern int vr_nexthop_add(vr_nexthop_req *);
 extern int vr_nexthop_get(vr_nexthop_req *);
 extern int vr_nexthop_dump(vr_nexthop_req *);
-extern bool vr_gw_nh(struct vr_nexthop *);
+extern bool vr_gateway_nexthop(struct vr_nexthop *);
 
 
 extern struct vr_nexthop *vr_discard_nh;
