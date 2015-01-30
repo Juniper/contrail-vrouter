@@ -712,10 +712,14 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_interface *pvif;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
-    stats->vis_obytes += pkt_len(pkt);
-    stats->vis_opackets++;
+    if (!(pkt->vp_flags & VP_FLAG_GRO)) {
+        stats->vis_obytes += pkt_len(pkt);
+        stats->vis_opackets++;
+    }
 
+    fmd->fmd_vlan = vif->vif_vlan_id;
     if (vif_is_vlan(vif) && vif->vif_ovlan_id) {
+        fmd->fmd_vlan = vif->vif_ovlan_id;
         if (vr_tag_pkt(pkt, vif->vif_ovlan_id)) {
             goto drop;
         }
@@ -726,8 +730,6 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
     pvif = vif->vif_parent;
     if (!pvif)
         goto drop;
-
-    pkt->vp_if = pvif;
 
     ret = pvif->vif_tx(pvif, pkt, fmd);
     if (ret < 0) {
@@ -860,9 +862,6 @@ vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
     struct vr_eth *eth = (struct vr_eth *)pkt_data(pkt);
 
-    stats->vis_ibytes += pkt_len(pkt);
-    stats->vis_ipackets++;
-
     if (vlan_id != VLAN_ID_INVALID && vlan_id < VLAN_ID_MAX) {
         if (vif->vif_btable) {
             sub_vif = vif_bridge_get_sub_interface(vif->vif_btable, vlan_id,
@@ -875,6 +874,20 @@ vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
         if (sub_vif)
             return sub_vif->vif_rx(sub_vif, pkt, VLAN_ID_INVALID);
     }
+
+    /*
+     * there is a requirement that stats be not counted in both the
+     * underlying interface and in the sub-interface (double count).
+     * this behavior is a specific requirement for VM interfaces since
+     * the VM interface and the sub-interface on top are considered
+     * two different VMIs and can be in two different VRFs. Counting
+     * stats in both interfaces will wrongly put statistics in a VRF
+     * where the statistics should not have been counted. hence the
+     * stats count block is below and not the first thing that we do
+     * in this function.
+     */
+    stats->vis_ibytes += pkt_len(pkt);
+    stats->vis_ipackets++;
 
     return vr_virtual_input(vif->vif_vrf, vif, pkt, vlan_id);
 }
@@ -990,6 +1003,8 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     int ret, handled;
+    bool stats_count = true, from_subvif = false;
+
     struct vr_forwarding_md m_fmd;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
@@ -997,14 +1012,29 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
         handled = vif_plug_mac_request(vif, pkt, fmd);
         if (handled)
             return 0;
+
+        /*
+         * GRO packets come here twice - once with VP_FLAG_GRO set and
+         * once without the flag set. Don't count them twice. Also,
+         * if the packet came from the sub interface on top, we should
+         * not be counting them twice. The way we determine that the
+         * packet has come from sub-interface is by looking at nexthop
+         * and checking whether nh_dev is not the same as vif, or in
+         * the absence of nh and the packet ingressed from agent interface,
+         * the vlan id is set.
+         */
+        if (pkt->vp_flags & VP_FLAG_GRO)
+            stats_count = false;
+
+        if ((pkt->vp_nh && (pkt->vp_nh->nh_dev != vif)) ||
+            ((pkt->vp_if->vif_type == VIF_TYPE_AGENT) &&
+                 (fmd->fmd_vlan != VLAN_ID_INVALID))) {
+                from_subvif = true;
+                stats_count = false;
+        }
     }
 
-    /*
-     * GRO packets come here twice - once with VP_FLAG_GRO set and
-     * once without the flag set. Don't count them twice.
-     */
-    if (((pkt->vp_flags & VP_FLAG_GRO) == 0) ||
-             (!vif_is_virtual(vif))) {
+    if (stats_count) {
         stats->vis_obytes += pkt_len(pkt);
         stats->vis_opackets++;
     }
@@ -1017,8 +1047,11 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
         
     ret = hif_ops->hif_tx(vif, pkt);
     if (ret != 0) {
-        ret = 0;
-        stats->vis_oerrors++;
+        if (!from_subvif)
+            ret = 0;
+
+        if (stats_count)
+            stats->vis_oerrors++;
     }
 
     return ret;
