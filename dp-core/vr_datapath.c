@@ -5,8 +5,9 @@
  */
 #include <vr_os.h>
 #include <vr_bridge.h>
-#include <vr_datapath.h>
 #include <vr_packet.h>
+#include <vr_interface.h>
+#include <vr_datapath.h>
 #include <vr_mirror.h>
 #include <vr_bridge.h>
 
@@ -14,325 +15,227 @@ extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
                                                  unsigned int);
 
-
-static inline bool
-vr_grat_arp(struct vr_arp *sarp)
-{
-    if (sarp->arp_spa == sarp->arp_dpa)
-        return true;
-    return false;
-}
-
-/*
- * src_mac is the mac that should be sent in ARP response which could be
- * the result of stithcing/proxy
- * dst_mac is the mac of he ARP request that we received
- * pkt_ingress_type identifies who is the source of ARP
- */
 mac_response_t
-vr_get_l3_stitching_info(struct vr_packet *pkt, struct vr_route_req *rt,
-                         struct vr_forwarding_md *fmd, char *src_mac,
-                         char *dst_mac, int pkt_ingress_type, int *drop_reason)
-{
+vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+        struct vr_route_req *rt, unsigned char *dmac)
+{   
+    bool from_fabric, stitched, flood;
+    bool to_gateway, no_proxy, to_vcp;
+
+    unsigned char *resp_mac;
+    struct vr_nexthop *nh = NULL;
     struct vr_interface *vif = pkt->vp_if;
-    struct vr_nexthop *nh;
     struct vr_vrf_stats *stats;
 
-    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    from_fabric = stitched = flood = to_gateway = to_vcp = no_proxy = false;
 
-    if (vif_is_virtual(vif)) {
+    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    /* here we will not check for stats, but will check before use */
+
+    if (vif->vif_type == VIF_TYPE_PHYSICAL)
+        from_fabric = true;
+
+    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)
+        no_proxy = true;
+
+    if (rt->rtr_req.rtr_label_flags & VR_RT_ARP_FLOOD_FLAG)
+        flood = true;
+
+    if (vr_gateway_nexthop(rt->rtr_nh))
+        to_gateway = true;
+
+    /*
+     * the no_proxy flag is set for the vcp ports. From such ports
+     * vrouter should proxy only for the gateway ip.
+     */
+    if (no_proxy && !to_gateway)
+        return MR_DROP;
+
+    if (from_fabric) {
+        if (vr_nexthop_is_vcp(rt->rtr_nh)) {
+            to_vcp = true;
+        }
+    }
+
+    resp_mac = vif->vif_mac;
+    if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
+        if ((nh = vr_bridge_lookup(fmd->fmd_dvrf, rt))) {
+            resp_mac = rt->rtr_req.rtr_mac;
+            stitched = true;
+        }
+    }
+
+
+    /*
+     * situations that are handled here (from_fabric)
+     *
+     * . arp request from vm, but not proxied at the source because of lack
+     *   of information at the source. only the compute that hosts the
+     *   destination should respond, and that too only if the mac information
+     *   is present (and hence the ENCAP check).
+     *
+     * . arp request from a baremetal arriving at a TSN, which if posesses the
+     *   mac information for the destination vm, should proxy. If it does not
+     *   hold the mac information, the request should be flooded
+     *
+     * . arp request from the uplink port of a vcp
+     */
+    if (from_fabric) {
+        if (flood && !stitched) {
+            if (stats)
+                stats->vrf_arp_physical_flood++;
+            return MR_FLOOD;
+        }
 
         /*
-         * If interface is marked with "No ARP Porxy"
-         * we respond only to Gw
+         * arp requests to gateway coming from the fabric should be dropped
+         * unless the request was for the TSN DNS service (which appears as
+         * the gateway, with the current set of checks). We should not respond
+         * for gateway ip if we are TSN and the request came from baremetal.
+         * TSN does not have gateway route and hence the to_gateway will be
+         * true only for the DNS ip.
          */
-        if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY) {
-            if (!vr_gw_nh(rt->rtr_nh)) {
-                *drop_reason = VP_DROP_INVALID_ARP;
+        if (to_gateway) {
+            if (fmd->fmd_src != TOR_SOURCE) {
                 return MR_DROP;
             }
         }
         /*
-         * Request from VM:
-         * If Proxy Bit Set -
-         *    - If stitched : Proxy with Stitched MAC
-         *    - If not stitched :
-         *           - If Flood Flag : Flood
-         *           - If no Flood Flag : Proxy with VIF's MAC
-         * If no route is found : Flood
-         *
+         * if nh is not of ENCAP type, that means that the vm is not hosted by
+         * us or the request is for a host in vcp port. if the request is for
+         * a host in the vcp port, we should proxy. else, we should proxy only
+         * if
+         * i am a TSN, i have the mac information and the originator is a bare
+         * metal
          */
-        if (rt->rtr_req.rtr_label_flags & VR_RT_ARP_PROXY_FLAG) {
-            if (rt->rtr_req.rtr_index == VR_BE_INVALID_INDEX) {
-                if (rt->rtr_req.rtr_label_flags & VR_RT_ARP_FLOOD_FLAG) {
-                    if (stats)
-                        stats->vrf_arp_virtual_flood++;
-                    return MR_FLOOD;
-                }
+        if (!to_vcp && nh && nh->nh_type != NH_ENCAP) {
+            if (fmd->fmd_src != TOR_SOURCE) {
                 if (stats)
-                    stats->vrf_arp_virtual_proxy++;
-                goto proxy;
-            }
-
-            rt->rtr_req.rtr_mac = src_mac;
-            if (vr_bridge_lookup(fmd->fmd_dvrf, rt)) {
-                if (stats)
-                    stats->vrf_arp_virtual_stitch++;
-                goto stitch;
+                    stats->vrf_arp_physical_flood++;
+                return MR_FLOOD;
             }
         }
 
         if (stats)
-            stats->vrf_arp_virtual_flood++;
-        return MR_FLOOD;
+            stats->vrf_arp_physical_stitch++;
+    } else {
+        /*
+         * if there is no stitching information, but flood flag is set
+         * we should flood
+         */
+        if (!stitched && flood) {
+            if (stats)
+                stats->vrf_arp_virtual_flood++;
+            return MR_FLOOD;
+        }
 
-    }
-
-    /*
-     * Request from Physical:
-     * If from Fabric n/w : Proxy
-     * if Proxy bit  set:
-     *  - If the VM is hosted on this node (Encap NH) : Proxy with VM's MAC
-     *  - If from Tor, meant for DNS server (Rcv NH) : Proy with VIF's MAC
-     *  - else : Flood
-     */
-    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
-        if (rt->rtr_req.rtr_label_flags & VR_RT_ARP_PROXY_FLAG) {
-            if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
-                rt->rtr_req.rtr_mac = src_mac;
-                if ((nh = vr_bridge_lookup(fmd->fmd_dvrf, rt))) {
-
-                    /* Tor/Non Tor case :
-                     *   Stitch the Mac if VM is hosted in the
-                     *   same compute node
-                     * Tor Case :
-                     *   Stitch the Mac if there is a tunnel to
-                     *   other compute node
-                     */
-                    if (((nh->nh_type == NH_ENCAP) && !vr_gw_nh(nh)) ||
-                            ((pkt_ingress_type == PKT_SRC_TOR_REPL_TREE) &&
-                                 nh->nh_type == NH_TUNNEL)) {
-                        if (stats)
-                            stats->vrf_arp_physical_stitch++;
-                        goto stitch;
-                    }
-                }
+        if (stats) {
+            if (stitched) {
+                stats->vrf_arp_virtual_stitch++;
             } else {
-
-                /*
-                 * If no stitching information found:
-                 * If Tor:
-                 *     - Proxy for DNS Server
-                 * If Not Tor:
-                 *     - Proxy for VCP
-                 */
-                nh = rt->rtr_nh;
-                if (pkt_ingress_type == PKT_SRC_TOR_REPL_TREE) {
-                    if (vr_gw_nh(nh)) {
-                        if (stats)
-                            stats->vrf_arp_tor_proxy++;
-                        goto proxy;
-                    }
-                } else {
-                    if ((nh->nh_type == NH_RESOLVE) ||
-                            ((nh->nh_type == NH_ENCAP) && !vr_gw_nh(nh))) {
-                        if (stats)
-                            stats->vrf_arp_physical_proxy++;
-                        goto proxy;
-                    }
-
-                }
+                stats->vrf_arp_virtual_proxy++;
             }
         }
-        if (stats)
-            stats->vrf_arp_physical_flood++;
-        return MR_FLOOD;
     }
 
-    *drop_reason = VP_DROP_ARP_NO_WHERE_TO_GO;
-    return MR_DROP;
+    VR_MAC_COPY(dmac, resp_mac);
 
-proxy:
-    VR_MAC_COPY(src_mac, vif->vif_mac);
-
-stitch:
-    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)
-        return MR_PROXY;
-
-    memset(rt, 0, sizeof(*rt));
-    rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    rt->rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-    rt->rtr_req.rtr_mac = dst_mac;
-    rt->rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
-    if (!vr_bridge_lookup(fmd->fmd_dvrf, rt)) {
-        *drop_reason = VP_DROP_ARP_REPLY_NO_ROUTE;
-        return MR_DROP;
-    }
-    nh = rt->rtr_nh;
-    if ((!nh) || ((nh->nh_type != NH_ENCAP) &&
-                    (nh->nh_type != NH_TUNNEL))) {
-        *drop_reason = VP_DROP_ARP_REPLY_NO_ROUTE;
-        return MR_DROP;
-    }
-    if (rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
-        fmd->fmd_label = rt->rtr_req.rtr_label;
-    pkt->vp_nh = nh;
     return MR_PROXY;
 }
 
-int
-vr_handle_mac_response(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
-                        mac_response_t result, int drop_reason)
+static void
+vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned char *dmac)
 {
-    struct vr_packet *cloned_pkt;
+    struct vr_eth *eth;
+    struct vr_arp *arp;
+    struct vr_forwarding_md fmd_new;
+    struct vr_interface *vif = pkt->vp_if;
 
-    switch (result) {
-    case MR_PROXY:
-        if (pkt->vp_nh)
-            pkt->vp_nh->nh_arp_response(pkt, pkt->vp_nh, fmd);
-        else
-            pkt->vp_if->vif_tx(pkt->vp_if, pkt, fmd);
-        break;
-    case MR_XCONNECT:
-        vif_xconnect(pkt->vp_if, pkt, fmd);
-        break;
-    case MR_TRAP_X:
-        cloned_pkt = vr_pclone(pkt);
-        if (cloned_pkt) {
-            vr_preset(cloned_pkt);
-            vif_xconnect(pkt->vp_if, cloned_pkt, fmd);
-        }
-        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
-        break;
-    case MR_TRAP:
-        vr_preset(pkt);
-        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
-        break;
-    case MR_FLOOD:
-        return 0;
-    case MR_DROP:
-    default:
-        vr_pfree(pkt, drop_reason);
+    eth = (struct vr_eth *)pkt_push(pkt, sizeof(*eth));
+    if (!eth) {
+        vr_pfree(pkt, VP_DROP_PUSH);
+        return;
     }
 
-    return 1;
+    memcpy(eth->eth_dmac, sarp->arp_sha, VR_ETHER_ALEN);
+    memcpy(eth->eth_smac, dmac, VR_ETHER_ALEN);
+    eth->eth_proto = htons(VR_ETH_PROTO_ARP);
+
+    arp = (struct vr_arp *)(pkt_data(pkt) + sizeof(*eth));
+    arp->arp_hw = htons(VR_ARP_HW_TYPE_ETHER);
+    arp->arp_proto = htons(VR_ETH_PROTO_IP);
+    arp->arp_hwlen = VR_ETHER_ALEN;
+    arp->arp_protolen = VR_IP_ADDRESS_LEN;
+    arp->arp_op = htons(VR_ARP_OP_REPLY);
+    memcpy(arp->arp_sha, dmac, VR_ETHER_ALEN);
+    memcpy(arp->arp_dha, sarp->arp_sha, VR_ETHER_ALEN);
+    memcpy(&arp->arp_dpa, &sarp->arp_spa, sizeof(sarp->arp_spa));
+    memcpy(&arp->arp_spa, &sarp->arp_dpa, sizeof(sarp->arp_dpa));
+
+    vr_init_forwarding_md(&fmd_new);
+    fmd_new.fmd_dvrf = fmd->fmd_dvrf;
+    vr_pkt_type(pkt, 0, &fmd_new);
+
+    /*
+     * XXX: for vcp ports, there won't be bridge table entries. to avoid
+     * doing vr_bridge_input, we check for the flag NO_ARP_PROXY and
+     * and if set, directly send out on that interface
+     */
+    if (vif_is_vhost(vif) ||
+            (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)) {
+        vif->vif_tx(vif, pkt, fmd);
+    } else {
+        vr_bridge_input(vif->vif_router, pkt, &fmd_new);
+    }
+
+    return;
 }
 
 static int
 vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
-                      struct vr_forwarding_md *fmd, int arp_ingress_type)
+                      struct vr_forwarding_md *fmd)
 {
-    int drop_reason = VP_DROP_ARP_NO_WHERE_TO_GO;
+    bool handled = true;
+    unsigned char dmac[VR_ETHER_ALEN];
     mac_response_t arp_result;
-    bool grat_arp;
-    struct vr_route_req rt;
-    uint32_t rt_prefix, dpa;
-    struct vr_eth *eth;
-    struct vr_arp *arp;
+
+    struct vr_packet *pkt_c;
     struct vr_interface *vif = pkt->vp_if;
-    char arp_src_mac[VR_ETHER_ALEN];
 
-    pkt->vp_nh = NULL;
-    if (vif_mode_xconnect(vif)) {
-        arp_result = MR_XCONNECT;
-        goto result;
+    arp_result = vif->vif_mac_request(vif, pkt, fmd, dmac);
+    switch (arp_result) {
+    case MR_PROXY:
+        vr_arp_proxy(sarp, pkt, fmd, dmac);
+        break;
+
+    case MR_XCONNECT:
+        vif_xconnect(pkt->vp_if, pkt, fmd);
+        break;
+
+    case MR_TRAP_X:
+        pkt_c = vr_pclone(pkt);
+        if (pkt_c)
+            vif_xconnect(pkt->vp_if, pkt_c, fmd);
+
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+        break;
+
+    case MR_TRAP:
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+        break;
+
+    case MR_DROP:
+        vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        break;
+
+    case MR_FLOOD:
+    default:
+        handled = false;
+        break;
     }
 
-    if (vif->vif_type == VIF_TYPE_XEN_LL_HOST ||
-            vif->vif_type == VIF_TYPE_GATEWAY) {
-        arp_result = MR_PROXY;
-        VR_MAC_COPY(arp_src_mac, vif->vif_mac);
-        goto result;
-    }
-
-    /* All link local IP's have to be proxied */
-    if (vif->vif_type == VIF_TYPE_HOST) {
-        if (IS_LINK_LOCAL_IP(sarp->arp_dpa)) {
-            arp_result = MR_PROXY;
-            VR_MAC_COPY(arp_src_mac, vif->vif_mac);
-        } else {
-            arp_result = MR_XCONNECT;
-        }
-        goto result;
-    }
-
-    grat_arp = vr_grat_arp(sarp);
-    /*
-     * Grat ARP from Fabric need to be cross connected to Vhost
-     * and Flooded Flooded if received from another compute node
-     * or BMS
-     */
-
-    if (vif->vif_type == VIF_TYPE_PHYSICAL) {
-        if (!arp_ingress_type) {
-            if (grat_arp)
-                arp_result = MR_TRAP_X;
-            else
-                arp_result = MR_XCONNECT;
-            goto result;
-        } else {
-            if (grat_arp) {
-                arp_result = MR_FLOOD;
-                goto result;
-            }
-        }
-    }
-
-    memset(&rt, 0, sizeof(rt));
-    rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
-    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
-    *(uint32_t*)rt.rtr_req.rtr_prefix = (sarp->arp_dpa);
-    rt.rtr_req.rtr_prefix_size = 4;
-    rt.rtr_req.rtr_prefix_len = 32;
-
-    vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
-
-    if (vif_is_virtual(vif)) {
-        /*
-         * Grat ARP from VM need to be Trapped to Agent if Trap Set
-         * else need to be flooded
-         */
-        if (grat_arp) {
-            if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_TRAP_FLAG)
-                arp_result = MR_TRAP;
-            else
-                arp_result = MR_FLOOD;
-            goto result;
-        }
-    }
-
-    arp_result = vr_get_l3_stitching_info(pkt, &rt, fmd, arp_src_mac,
-                                          sarp->arp_sha, arp_ingress_type,
-                                          &drop_reason);
-result:
-    if (arp_result == MR_PROXY) {
-        pkt_reset(pkt);
-        eth = (struct vr_eth *)pkt_data(pkt);
-        if (!eth) {
-            drop_reason = VP_DROP_HEAD_SPACE_RESERVE_FAIL;
-            arp_result = MR_DROP;
-            goto done;
-        }
-
-        memcpy(eth->eth_dmac, sarp->arp_sha, VR_ETHER_ALEN);
-        memcpy(eth->eth_smac, arp_src_mac, VR_ETHER_ALEN);
-        eth->eth_proto = htons(VR_ETH_PROTO_ARP);
-
-        arp = (struct vr_arp *)pkt_pull_tail(pkt, VR_ETHER_HLEN);
-
-        sarp->arp_op = htons(VR_ARP_OP_REPLY);
-        memcpy(sarp->arp_sha, arp_src_mac, VR_ETHER_ALEN);
-        memcpy(sarp->arp_dha, eth->eth_dmac, VR_ETHER_ALEN);
-        dpa = sarp->arp_dpa;
-        memcpy(&sarp->arp_dpa, &sarp->arp_spa, sizeof(sarp->arp_dpa));
-        memcpy(&sarp->arp_spa, &dpa, sizeof(sarp->arp_spa));
-
-        memcpy(arp, sarp, sizeof(*sarp));
-        pkt_pull_tail(pkt, sizeof(*arp));
-    }
-done:
-    return vr_handle_mac_response(pkt, fmd, arp_result, drop_reason);
+    return handled;
 }
 
 /*
@@ -413,20 +316,26 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
 }
 
 int
-vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
-             int arp_ingress_type)
+vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+             
 {
+    int handled = 1;
     struct vr_arp sarp;
 
     /* If vlan tagged packet, we let the VM handle the ARP packets */
     if ((pkt->vp_type != VP_TYPE_ARP) || (fmd->fmd_vlan != VLAN_ID_INVALID))
-        return 0;
+        return !handled;
+
+    if (pkt->vp_len < sizeof(struct vr_arp)) {
+        vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        return handled;
+    }
 
     memcpy(&sarp, pkt_data(pkt), sizeof(struct vr_arp));
 
     switch (ntohs(sarp.arp_op)) {
     case VR_ARP_OP_REQUEST:
-        return vr_handle_arp_request(&sarp, pkt, fmd, arp_ingress_type);
+        return vr_handle_arp_request(&sarp, pkt, fmd);
         break;
 
     case VR_ARP_OP_REPLY:
@@ -437,7 +346,7 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         vr_pfree(pkt, VP_DROP_INVALID_ARP);
     }
 
-    return 1;
+    return handled;
 }
 
 /*
@@ -473,7 +382,7 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
 
         pkt_pull(pkt, nheader);
 
-        handled = vr_arp_input(pkt, fmd, 0);
+        handled = vr_arp_input(pkt, fmd);
         if (!handled) {
             pkt_push(pkt, nheader);
         }
@@ -486,7 +395,7 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
 
         pkt_pull(pkt, nheader);
 
-        handled = vr_ip6_neighbor_solicitation_input(pkt, fmd, 0);
+        handled = vr_neighbor_input(pkt, fmd);
         if (!handled) {
             pkt_push(pkt, nheader);
         }
@@ -611,7 +520,7 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6)
         handled = vr_l3_input(pkt, &fmd);
     else if (pkt->vp_type == VP_TYPE_ARP)
-        handled = vr_arp_input(pkt, &fmd, 0);
+        handled = vr_arp_input(pkt, &fmd);
 
     if (!handled) {
         pkt_push(pkt, pull_len);
