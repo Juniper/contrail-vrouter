@@ -934,6 +934,21 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
     return 0;
 }
 
+static unsigned char *
+eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
+        unsigned char *rewrite, unsigned short len)
+{
+    if (!len)
+        return pkt_data(pkt);
+
+    if (pkt->vp_if->vif_type == VIF_TYPE_HOST) {
+        vr_preset(pkt);
+        return pkt_data(pkt);
+    }
+
+    return vif_cmn_rewrite(vif, pkt, rewrite, len);
+}
+
 static mac_response_t
 eth_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *dmac)
@@ -1143,16 +1158,17 @@ eth_drv_add(struct vr_interface *vif,
             vif->vif_mtu = 1514;
     }
 
-    vif->vif_set_rewrite = vif_cmn_rewrite;
 
     if (vif->vif_type != VIF_TYPE_STATS) {
         vif->vif_tx = eth_tx;
 
         if (vif_is_virtual(vif)) {
             vif->vif_rx = vm_rx;
+            vif->vif_set_rewrite = vif_cmn_rewrite;
             vif->vif_mac_request = vm_mac_request;
         } else {
             vif->vif_rx = eth_rx;
+            vif->vif_set_rewrite = eth_set_rewrite;
             vif->vif_mac_request = eth_mac_request;
         }
     }
