@@ -26,7 +26,7 @@ static mac_response_t vm_mac_request(struct vr_interface *, struct vr_packet *,
 
 void vif_attach(struct vr_interface *);
 void vif_detach(struct vr_interface *);
-int vr_gro_vif_add(struct vrouter *, unsigned int, char *);
+int vr_gro_vif_add(struct vrouter *, unsigned int, char *, unsigned short);
 struct vr_interface_stats *vif_get_stats(struct vr_interface *, unsigned short);
 struct vr_interface *__vrouter_get_interface_os(struct vrouter *, unsigned int);
 
@@ -1123,13 +1123,14 @@ eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     vrouter_put_interface(pvif);
     vif->vif_parent = NULL;
 
+    hif_ops->hif_del(vif);
     return 0;
 }
 
 static int
 eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
-    int ret;
+    int ret = 0;
 
     if (vif->vif_src_mac) {
         if (!pvif->vif_btable) {
@@ -1154,8 +1155,9 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     }
 
     pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
+    ret = hif_ops->hif_add(vif);
 
-    return 0;
+    return ret;
 }
 
 static int
@@ -1723,6 +1725,8 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_mtu = req->vifr_mtu;
     vif->vif_idx = req->vifr_idx;
     vif->vif_os_idx = req->vifr_os_idx;
+    if (req->vifr_os_idx == -1)
+        vif->vif_os_idx = 0;
     vif->vif_rid = req->vifr_rid;
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
 
@@ -2109,7 +2113,8 @@ vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
 
 
 int
-vr_gro_vif_add(struct vrouter *router, unsigned int os_idx, char *name)
+vr_gro_vif_add(struct vrouter *router, unsigned int os_idx, char *name,
+        unsigned short idx)
 {
     int ret = 0;
     vr_interface_req *req = vr_interface_req_get();
@@ -2121,7 +2126,7 @@ vr_gro_vif_add(struct vrouter *router, unsigned int os_idx, char *name)
     req->vifr_type = VIF_TYPE_STATS;
     req->vifr_flags = 0;
     req->vifr_vrf = 65535;
-    req->vifr_idx = router->vr_max_interfaces - 1;
+    req->vifr_idx = idx;
     req->vifr_rid = 0;
     req->vifr_os_idx = os_idx;
     req->vifr_mtu = 9136;

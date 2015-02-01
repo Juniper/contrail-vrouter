@@ -58,6 +58,8 @@ mac_response_t vm_neighbor_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *, unsigned char *);
 extern int vif_plug_mac_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *);
+int vr_gro_input(struct vr_packet *, struct vr_nexthop *);
+
 
 
 #endif /* __VR_DATAPATH_H__ */

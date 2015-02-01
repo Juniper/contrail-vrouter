@@ -175,7 +175,9 @@ struct vr_interface {
 #ifdef __KERNEL__
 #if defined(__linux__)
     struct napi_struct vr_napi;
+    struct napi_struct vr_l2_napi;
     struct sk_buff_head vr_skb_inputq;
+    struct sk_buff_head vr_skb_l2_inputq;
 #elif defined(__FreeBSD__)
     struct mbuf;
     void (*saved_if_input) (struct ifnet *, struct mbuf *);
