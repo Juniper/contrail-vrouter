@@ -1271,6 +1271,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                                             nh->nh_udp_tun_dip) == false)
         goto send_fail;
 
+    pkt_set_network_header(pkt, pkt->vp_data);
     /*
      * Change the packet type
      */
@@ -1280,8 +1281,6 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_type = VP_TYPE_IPOIP;
     else
         pkt->vp_type = VP_TYPE_IP;
-
-    pkt_set_network_header(pkt, pkt->vp_data);
 
     if (pkt_head_space(pkt) < nh->nh_udp_tun_encap_len) {
         tmp_pkt = vr_pexpand_head(pkt, nh->nh_udp_tun_encap_len - pkt_head_space(pkt));
@@ -1673,18 +1672,29 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
 
-    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
-    if (stats)
-        stats->vrf_l2_encaps++;
+    /* No GRO for multicast and user packets */
+    if ((pkt->vp_flags & VP_FLAG_MULTICAST) ||
+            (fmd->fmd_vlan != VLAN_ID_INVALID))
+        pkt->vp_flags &= ~VP_FLAG_GRO;
 
-    /*
-     * Mark the packet as L2 and make it inelgible for GRO
-     */
-    pkt->vp_flags &= ~VP_FLAG_GRO;
+    vif = nh->nh_dev;
+
+    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+
+    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif)) {
+        if (vr_gro_input(pkt, nh)) {
+            if (stats)
+                stats->vrf_gros++;
+            return 0;
+        }
+    }
+
     if (!VR_MAC_CMP(pkt_data(pkt), nh->nh_data))
         VR_MAC_COPY(pkt_data(pkt), nh->nh_data);
 
-    vif = nh->nh_dev;
+    if (stats)
+        stats->vrf_l2_encaps++;
+
     vif->vif_tx(vif, pkt, fmd);
 
     return 0;
@@ -1701,7 +1711,7 @@ nh_encap_l3_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
 }
 
 static int
-nh_encap_l3_unicast(struct vr_packet *pkt, struct vr_nexthop *nh,
+nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
                     struct vr_forwarding_md *fmd)
 {
     struct vr_interface *vif;
@@ -1724,14 +1734,8 @@ nh_encap_l3_unicast(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (stats)
             stats->vrf_diags++;
     } else {
-
-        /* Disable the GRO for subinterfaces */
-        if (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN)
-            pkt->vp_flags &= ~VP_FLAG_GRO;
-
         if (stats) {
-            if ((pkt->vp_flags & VP_FLAG_GRO) &&
-                    vif_is_virtual(vif)) {
+            if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif)) {
                 stats->vrf_gros++;
             } else {
                 stats->vrf_encaps++;
@@ -1739,44 +1743,22 @@ nh_encap_l3_unicast(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
-    /*
-     * For packets being sent up a tap interface, retain the MPLS label
-     * if we are attempting GRO. We will need the label later to figure
-     * out which interface to send the packet to.
-     */
-    if ((pkt->vp_flags & VP_FLAG_GRO) &&
-                 (vif->vif_type == VIF_TYPE_VIRTUAL)) {
-        /*
-         * ECMP case. When we send the packet up for GRO, the label typically
-         * points to the composite nexthop. When the packet lands back in DP,
-         * there is no flow information, and hence there is no way to get back
-         * ECMP NH index without doing a flow lookup again. To workaround that
-         * issue, overwrite the label with the component (unicast) nexthop's
-         * label, which is passed in forwarding metadata. The below if comes
-         * into play (as of now) only in that case.
-         */
-        if (fmd && fmd->fmd_label >= 0) {
-            if (nh_push_mpls_header(pkt, fmd->fmd_label) < 0) {
-                vr_pfree(pkt, VP_DROP_PUSH);
-                return 0;
-            }
-            pkt_pull(pkt, VR_MPLS_HDR_LEN);
-        }
-    } else {
-        if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data,
-                nh->nh_encap_len)) {
-            vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
+    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif)) {
+        if (vr_gro_input(pkt, nh))
             return 0;
-        }
+    }
 
-        if (nh->nh_encap_len) {
-            proto_p = (unsigned short *)(pkt_data(pkt) +
-                    nh->nh_encap_len - 2);
-            if (pkt->vp_type == VP_TYPE_IP6)
-                *proto_p = htons(VR_ETH_PROTO_IP6);
-            else
-                *proto_p = htons(VR_ETH_PROTO_IP);
-        }
+    if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data, nh->nh_encap_len)) {
+        vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
+        return 0;
+    }
+
+    if (nh->nh_encap_len) {
+        proto_p = (unsigned short *)(pkt_data(pkt) + nh->nh_encap_len - 2);
+        if (pkt->vp_type == VP_TYPE_IP6)
+            *proto_p = htons(VR_ETH_PROTO_IP6);
+        else
+            *proto_p = htons(VR_ETH_PROTO_IP);
     }
 
     /*
@@ -2088,7 +2070,7 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         }
         nh->nh_reach_nh = nh_encap_l2;
     } else {
-        nh->nh_reach_nh = nh_encap_l3_unicast;
+        nh->nh_reach_nh = nh_encap_l3;
         nh->nh_validate_src = nh_encap_l3_validate_src;
     }
 
