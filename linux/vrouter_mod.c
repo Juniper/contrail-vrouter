@@ -67,6 +67,7 @@ extern int vr_mem_init(void);
 extern void vr_mem_exit(void);
 
 extern void vhost_exit(void);
+extern int lh_gro_process(struct vr_packet *, struct vr_interface *, bool);
 
 static void lh_reset_skb_fields(struct vr_packet *pkt);
 
@@ -2353,6 +2354,7 @@ struct host_os linux_host = {
     .hos_get_udp_src_port           =       lh_get_udp_src_port,
     .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj,
     .hos_pkt_may_pull               =       lh_pkt_may_pull,
+    .hos_gro_process                =       lh_gro_process,
 };
     
 struct host_os *
