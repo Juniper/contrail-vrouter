@@ -10,6 +10,7 @@
 #include <vr_datapath.h>
 #include <vr_mirror.h>
 #include <vr_bridge.h>
+#include <vr_packet.h>
 
 extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
@@ -595,3 +596,19 @@ vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
     return 0;
 }
 
+int
+vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
+{
+    unsigned short *nh_id;
+
+    if (!vr_gro_process)
+        return 0;
+
+    nh_id = (unsigned short *)pkt_push(pkt, sizeof(*nh_id));
+    if (!nh_id)
+        return 0;
+
+    *nh_id = nh->nh_id;
+    vr_gro_process(pkt, nh->nh_dev, (nh->nh_family == AF_BRIDGE));
+    return 1;
+}

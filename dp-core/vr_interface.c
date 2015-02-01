@@ -1094,13 +1094,14 @@ eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     vrouter_put_interface(pvif);
     vif->vif_parent = NULL;
 
+    hif_ops->hif_del(vif);
     return 0;
 }
 
 static int
 eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
-    int ret;
+    int ret = 0;
 
     if (vif->vif_src_mac) {
         if (!pvif->vif_btable) {
@@ -1125,8 +1126,9 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     }
 
     pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
+    ret = hif_ops->hif_add(vif);
 
-    return 0;
+    return ret;
 }
 
 static int
