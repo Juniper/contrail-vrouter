@@ -1124,13 +1124,14 @@ eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     vrouter_put_interface(pvif);
     vif->vif_parent = NULL;
 
+    hif_ops->hif_del(vif);
     return 0;
 }
 
 static int
 eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
-    int ret;
+    int ret = 0;
 
     if (vif->vif_src_mac) {
         if (!pvif->vif_btable) {
@@ -1155,8 +1156,9 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     }
 
     pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
+    ret = hif_ops->hif_add(vif);
 
-    return 0;
+    return ret;
 }
 
 static int
@@ -1723,6 +1725,8 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_mtu = req->vifr_mtu;
     vif->vif_idx = req->vifr_idx;
     vif->vif_os_idx = req->vifr_os_idx;
+    if (req->vifr_os_idx == -1)
+        vif->vif_os_idx = 0;
     vif->vif_rid = req->vifr_rid;
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
 

@@ -21,6 +21,9 @@ extern "C" {
 #include "vr_index_table.h"
 
 #define VR_NATIVE_VRF       0
+#define VR_L3_GRO_DEV_NAME  "pkt1"
+#define VR_L2_GRO_DEV_NAME  "pkt3"
+#define VR_RPS_DEV_NAME     "pkt2"
 
 #define VR_CPU_MASK     0xff
 extern unsigned int vr_num_cpus;
@@ -106,6 +109,7 @@ struct host_os {
                                             unsigned int, unsigned short *), 
                                         int *, int *);
     int (*hos_pkt_may_pull)(struct vr_packet *, unsigned int);
+    void (*hos_gro_process)(struct vr_packet *, struct vr_interface *, bool);
 };
 
 #define vr_malloc                       vrouter_host->hos_malloc
@@ -145,6 +149,7 @@ struct host_os {
 #define vr_get_udp_src_port             vrouter_host->hos_get_udp_src_port
 #define vr_pkt_from_vm_tcp_mss_adj      vrouter_host->hos_pkt_from_vm_tcp_mss_adj
 #define vr_pkt_may_pull                 vrouter_host->hos_pkt_may_pull
+#define vr_gro_process                  vrouter_host->hos_gro_process
 
 struct vrouter {
     unsigned int vr_num_if;
