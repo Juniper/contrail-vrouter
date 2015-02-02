@@ -448,7 +448,7 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     if (pkt->vp_nh)
         return pkt->vp_nh->nh_reach_nh(pkt, pkt->vp_nh, fmd);
 
-    if (vif->vif_type == VIF_TYPE_HOST) {
+    if (vif_is_vhost(vif)) {
         handled = vr_l3_input(pkt, fmd);
         if (!handled)
             vif_drop_pkt(vif, pkt, 1);
