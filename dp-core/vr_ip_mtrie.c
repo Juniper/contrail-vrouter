@@ -7,8 +7,10 @@
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include "vr_packet.h"
+#include "vr_interface.h"
 #include "vr_route.h"
 #include "vr_bridge.h"
+#include "vr_datapath.h"
 #include "vr_ip_mtrie.h"
 
 extern struct vr_nexthop *ip4_default_nh; 

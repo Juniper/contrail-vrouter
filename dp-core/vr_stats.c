@@ -75,7 +75,7 @@ vr_drop_stats_get(void)
     int ret = 0;
     unsigned int cpu;
     struct vrouter *router = vrouter_get(0);
-    vr_drop_stats_req *response;
+    vr_drop_stats_req *response = NULL;
     struct vr_drop_stats *stats_block, *stats = NULL;
 
     if (!router && (ret = -ENOENT))
@@ -84,6 +84,11 @@ vr_drop_stats_get(void)
     stats = vr_zalloc(sizeof(*stats));
     if (!stats && (ret = -ENOMEM))
         goto exit_get;
+
+    response = vr_zalloc(sizeof(*response));
+    if (!response && (ret = -ENOMEM))
+        goto exit_get;
+
 
     for (cpu = 0; cpu < vr_num_cpus; cpu++) {
         stats_block = (struct vr_drop_stats *)router->vr_pdrop_stats[cpu];
@@ -139,13 +144,6 @@ vr_drop_stats_get(void)
             stats_block->vds_arp_reply_no_route;
     }
 
-    response = vr_zalloc(sizeof(*response));
-    if (!response) {
-        vr_module_error(-ENOMEM, __FUNCTION__,
-                __LINE__, sizeof(*response));
-        ret = -ENOMEM;
-        goto exit_get;
-    }
 
     vr_drop_stats_fill_response(response, stats);
 
@@ -153,8 +151,10 @@ exit_get:
     vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : response, ret);
     if (stats != NULL)
         vr_free(stats);
+
     if (response != NULL)
         vr_free(response);
+
     return;
 }
 

@@ -77,7 +77,8 @@ struct vr_util_flags inet_flags[] = {
 };
 
 struct vr_util_flags bridge_flags[] = {
-    {VR_RT_LABEL_VALID_FLAG,    "L",    "Label Valid"   },
+    {VR_BE_LABEL_VALID_FLAG,    "L",    "Label Valid"   },
+    {VR_BE_FLOOD_DHCP_FLAG,     "Df",   "DHCP flood"    },
 };
 
 static void
@@ -132,7 +133,7 @@ vr_route_req_process(void *s_req)
 {
     int ret = 0, i;
     int8_t addr[17];
-    char flags[4];
+    char flags[32];
     vr_route_req *rt = (vr_route_req *)s_req;
 
     if (!rt_req.rtr_prefix) {
@@ -212,20 +213,24 @@ vr_route_req_process(void *s_req)
 
             printf("\n");
     } else {
+        bzero(flags, sizeof(flags));
+        if (rt->rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
+            strcat(flags, "L");
+        if (rt->rtr_label_flags & VR_BE_FLOOD_DHCP_FLAG)
+            strcat(flags, "Df");
+
         ret = printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
-        for(i = ret; i < 21; i++)
+        for (i = ret; i < 21; i++)
             printf(" ");
 
-        ret = printf("%5d", rt->rtr_vrf_id);
-        for(i = ret; i < 12; i++)
-            printf(" ");
-        if (rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
-            ret = printf("%5d", rt->rtr_label);
+        printf(" %16s", flags);
+
+        if (rt->rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
+            ret = printf(" %16d", rt->rtr_label);
         else
-            ret = printf("%5c", '-');
-        for(i = ret; i < 12; i++)
-            printf(" ");
-        printf("%7d\n",rt->rtr_nh_id);
+            ret = printf(" %16c", '-');
+
+        printf(" %12d\n", rt->rtr_nh_id);
     }
 
     return;
@@ -330,7 +335,7 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
             memcpy(rt_req.rtr_mac, eth, 6); 
             if (label != -1) {
                 rt_req.rtr_label = label;
-                rt_req.rtr_label_flags |= VR_RT_LABEL_VALID_FLAG;
+                rt_req.rtr_label_flags |= VR_BE_LABEL_VALID_FLAG;
             }
         }
         break;
@@ -426,13 +431,15 @@ vr_route_op(void)
 
     if (cmd_op == SANDESH_OP_DUMP) {
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            printf("Kernel IP routing table %d/%d/unicast\n\n", req->rtr_rid, cmd_vrf_id);
+            printf("Vrouter inet%c routing table %d/%d/unicast\n",
+                    (cmd_family_id == AF_INET) ? '4' : '6',
+                    req->rtr_rid, cmd_vrf_id);
             dump_legend(cmd_family_id);
             printf("Destination	        PPL        Flags        Label        Nexthop    Stitched MAC\n");
         } else {
             printf("Kernel L2 Bridge table %d/%d\n\n", req->rtr_rid, cmd_vrf_id);
             dump_legend(cmd_family_id);
-            printf("DestMac                 Vrf    Label/VNID     Nexthop\n");
+            printf("DestMac                          Flags       Label/VNID      Nexthop\n");
         }
     }
 
@@ -588,7 +595,8 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     return;
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
     int ret;
     int opt;

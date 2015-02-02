@@ -1125,8 +1125,8 @@ vr_inet_route_flags(unsigned int vrf, unsigned int ip)
     return rt.rtr_req.rtr_label_flags;
 }
 
-bool
-vr_ip_well_known_packet(struct vr_packet *pkt, unsigned int pkt_src)
+l4_pkt_type_t
+vr_ip_well_known_packet(struct vr_packet *pkt)
 {
     unsigned char *data = pkt_data(pkt);
     struct vr_ip *iph;
@@ -1134,19 +1134,17 @@ vr_ip_well_known_packet(struct vr_packet *pkt, unsigned int pkt_src)
 
     if ((pkt->vp_type != VP_TYPE_IP) ||
          (!(pkt->vp_flags & VP_FLAG_MULTICAST)))
-        return false;
+        return L4_TYPE_UNKNOWN;
 
     iph = (struct vr_ip *)data;
     if ((iph->ip_proto == VR_IP_PROTO_UDP) &&
                               vr_ip_transport_header_valid(iph)) {
         udph = (struct vr_udp *)(data + iph->ip_hl * 4);
         if (udph->udp_sport == htons(VR_DHCP_SRC_PORT)) {
-            if ((pkt_src == PKT_SRC_TOR_REPL_TREE) ||
-                    (pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED)) {
-                return true;
-            }
+            return L4_TYPE_DHCP_REQUEST;
         }
     }
-    return false;
+
+    return L4_TYPE_UNKNOWN;
 }
 
