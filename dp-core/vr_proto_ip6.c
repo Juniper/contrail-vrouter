@@ -356,7 +356,7 @@ vr_ip6_dhcp_packet(struct vr_packet *pkt)
     return false;
 }
 
-bool
+l4_pkt_type_t
 vr_ip6_well_known_packet(struct vr_packet *pkt)
 {
     unsigned char *data = pkt_data(pkt);
@@ -366,12 +366,12 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
 
     if ((pkt->vp_type != VP_TYPE_IP6) ||
          (!(pkt->vp_flags & VP_FLAG_MULTICAST)))
-        return false;
+        return L4_TYPE_UNKNOWN;
 
     ip6 = (struct vr_ip6 *)data;
 
     if (vr_v6_prefix_is_ll(ip6->ip6_dst))
-        return false;
+        return L4_TYPE_UNKNOWN;
 
     /* 0xFF02 is the multicast address used for NDP, DHCPv6 etc */
     if (ip6->ip6_dst[0] == 0xFF && ip6->ip6_dst[1] == 0x02) {
@@ -381,16 +381,16 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
         if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
             icmph = (struct vr_icmp *)((char *)ip6 + sizeof(struct vr_ip6));
             if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL))
-                return true;
+                return L4_TYPE_ROUTER_SOLICITATION;
         }
 
         if (ip6->ip6_nxt == VR_IP_PROTO_UDP) {
             udph = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
             if (udph && (udph->udp_sport == htons(VR_DHCP6_SRC_PORT)))
-                return true;
+                return L4_TYPE_DHCP_REQUEST;
         }
     }
 
-    return false;
+    return L4_TYPE_UNKNOWN;
 }
 

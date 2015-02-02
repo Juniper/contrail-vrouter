@@ -42,10 +42,16 @@ enum rt_type{
     RT_MAX,
 };
 
+/* for inet(6) routes */
 #define VR_RT_LABEL_VALID_FLAG      0x1
 #define VR_RT_ARP_PROXY_FLAG        0x2
 #define VR_RT_ARP_TRAP_FLAG         0x4
 #define VR_RT_ARP_FLOOD_FLAG        0x8
+
+/* for bridge routes */
+#define VR_BE_VALID_FLAG                 0x01
+#define VR_BE_LABEL_VALID_FLAG           0x02
+#define VR_BE_FLOOD_DHCP_FLAG            0x04
 
 struct agent_hdr {
     unsigned short hdr_ifindex;
