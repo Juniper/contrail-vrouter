@@ -268,6 +268,8 @@ static int
 agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id __attribute__((unused)))
 {
+    unsigned short cmd;
+
     struct agent_hdr *hdr;
     struct vr_forwarding_md fmd;
     struct vr_interface *agent_vif;
@@ -288,7 +290,11 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
      * l2 header of the injected packet
      */
     vr_pset_data(pkt, pkt->vp_data);
-    if (ntohs(hdr->hdr_cmd) & AGENT_CMD_ROUTE) {
+
+    cmd = ntohs(hdr->hdr_cmd);
+
+    switch (cmd) {
+    case AGENT_CMD_ROUTE:
         /*
          * XXX 
          * Packet with command "route" from agent may 
@@ -310,7 +316,10 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         }
 
         vr_virtual_input(ntohs(hdr->hdr_vrf), agent_vif, pkt, VLAN_ID_INVALID);
-    } else {
+
+        break;
+
+    case AGENT_CMD_SWITCH:
         vif = __vrouter_get_interface(vrouter_get(0), ntohs(hdr->hdr_ifindex));
         if (!vif) {
             stats->vis_ierrors++;
@@ -326,6 +335,12 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         pkt_set_inner_network_header(pkt, 
                                      pkt->vp_data + sizeof(struct vr_eth));
         return vif->vif_tx(vif, pkt, &fmd);
+
+        break;
+
+    default:
+        vr_pfree(pkt, VP_DROP_INVALID_PACKET);
+        break;
     }
 
     return 0;

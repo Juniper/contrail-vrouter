@@ -59,7 +59,7 @@ bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry,
     if (!htable || !be)
         return false;
 
-    if (be->be_flags & VR_BE_FLAG_VALID)
+    if (be->be_flags & VR_BE_VALID_FLAG)
         return true;
 
     return false;
@@ -103,6 +103,8 @@ __bridge_table_add(struct vr_route_req *rt)
     struct vr_nexthop *old_nh;
     struct vr_bridge_entry_key key;
 
+    rt->rtr_req.rtr_label_flags &= ~VR_BE_VALID_FLAG;
+
     VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
     key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
 
@@ -116,7 +118,7 @@ __bridge_table_add(struct vr_route_req *rt)
 
         VR_MAC_COPY(be->be_key.be_mac, rt->rtr_req.rtr_mac);
         be->be_key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
-        be->be_flags |= VR_BE_FLAG_VALID;
+        be->be_flags = VR_BE_VALID_FLAG;
     }
 
     if (be->be_nh != rt->rtr_nh) {
@@ -129,10 +131,11 @@ __bridge_table_add(struct vr_route_req *rt)
             vrouter_put_nexthop(old_nh);
     }
 
-    if (rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG) {
+    if (rt->rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
         be->be_label = rt->rtr_req.rtr_label;
-        be->be_flags |= VR_BE_FLAG_LABEL_VALID;
-    }
+
+    be->be_flags &= VR_BE_VALID_FLAG;
+    be->be_flags |= rt->rtr_req.rtr_label_flags;
 
     return 0;
 }
@@ -153,7 +156,7 @@ bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!rt->rtr_nh)
         return -ENOENT;
 
-    if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
+    if ((!(rt->rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)) &&
         (rt->rtr_nh->nh_type == NH_TUNNEL)) {
         vrouter_put_nexthop(rt->rtr_nh);
         return -EINVAL;
@@ -173,7 +176,7 @@ bridge_table_entry_free(vr_htable_t table, vr_hentry_t hentry,
         return;
 
     /* Mark this entry as invalid */
-    be->be_flags &= ~VR_BE_FLAG_VALID;
+    be->be_flags &= ~VR_BE_VALID_FLAG;
 
     if (be->be_nh)
         vrouter_put_nexthop(be->be_nh);
@@ -208,11 +211,15 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
     struct vr_bridge_entry *be;
     struct vr_bridge_entry_key key;
 
+    rt->rtr_req.rtr_label_flags = 0;
+
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
         be = vr_get_hentry_by_index(vn_rtable, rt->rtr_req.rtr_index);
         if (!be)
             return NULL;
 
+        rt->rtr_req.rtr_label_flags = be->be_flags;
+        rt->rtr_req.rtr_label = be->be_label;
         rt->rtr_nh = be->be_nh;
         if (rt->rtr_req.rtr_mac)
             VR_MAC_COPY(rt->rtr_req.rtr_mac, be->be_key.be_mac);
@@ -228,14 +235,30 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 
     be = vr_find_bridge_entry(&key);
     if (be) {
-        if (be->be_flags & VR_BE_FLAG_LABEL_VALID)
-            rt->rtr_req.rtr_label_flags |= VR_RT_LABEL_VALID_FLAG;
+        rt->rtr_req.rtr_label_flags = be->be_flags;
         rt->rtr_req.rtr_label = be->be_label;
         rt->rtr_nh = be->be_nh;
         rt->rtr_req.rtr_index = be->be_index;
     }
 
     return rt->rtr_nh;
+}
+
+
+unsigned short
+vr_bridge_route_flags(unsigned int vrf_id, unsigned char *mac)
+{
+    struct vr_bridge_entry *be;
+    struct vr_bridge_entry_key key;
+
+    VR_MAC_COPY(key.be_mac, mac);
+    key.be_vrf_id = vrf_id;
+
+    be = vr_find_bridge_entry(&key);
+    if (be && (be->be_flags & VR_BE_VALID_FLAG))
+        return be->be_flags;
+
+    return 0;
 }
 
 
@@ -265,8 +288,8 @@ bridge_entry_make_req(struct vr_route_req *resp, struct vr_bridge_entry *ent)
         resp->rtr_req.rtr_nh_id = ent->be_nh->nh_id;
     resp->rtr_req.rtr_family = AF_BRIDGE;
     resp->rtr_req.rtr_label = ent->be_label;
-    if (ent->be_flags & VR_BE_FLAG_LABEL_VALID)
-        resp->rtr_req.rtr_label_flags = VR_RT_LABEL_VALID_FLAG;
+    resp->rtr_req.rtr_label_flags = ent->be_flags;
+
     return 0;
 }
 
@@ -290,7 +313,7 @@ __bridge_table_dump(struct vr_message_dumper *dumper)
         be = (struct vr_bridge_entry *) vr_get_hentry_by_index(vn_rtable, i);
         if (!be) 
             continue;
-        if (be->be_flags & VR_BE_FLAG_VALID) {
+        if (be->be_flags & VR_BE_VALID_FLAG) {
             if (be->be_key.be_vrf_id != req->rtr_req.rtr_vrf_id)
                 continue;
             if (dumper->dump_been_to_marker == 0) {
@@ -455,7 +478,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
      * If there is a label attached to this bridge entry add the
      * label
      */
-    if (rt.rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG) {
+    if (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG) {
         if (!fmd) {
             vr_init_forwarding_md(&cmd);
             fmd = &cmd;

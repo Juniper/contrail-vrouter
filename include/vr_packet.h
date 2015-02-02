@@ -249,6 +249,12 @@ extern struct vr_packet *pkt_copy(struct vr_packet *, unsigned short,
         unsigned short);
 extern int vr_myip(struct vr_interface *, unsigned int);
 
+typedef enum {
+    L4_TYPE_UNKNOWN,
+    L4_TYPE_DHCP_REQUEST,
+    L4_TYPE_ROUTER_SOLICITATION,
+} l4_pkt_type_t;
+
 struct vr_eth {
     unsigned char eth_dmac[VR_ETHER_ALEN];
     unsigned char eth_smac[VR_ETHER_ALEN];

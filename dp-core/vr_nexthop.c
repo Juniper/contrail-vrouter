@@ -23,9 +23,8 @@ extern struct vr_nexthop *vr_inet6_sip_lookup(unsigned short, uint8_t *);
 extern struct vr_nexthop *vr_inet_sip_lookup(unsigned short, uint32_t);
 extern struct vr_nexthop *vr_inet_src_lookup(unsigned short ,
                                 struct vr_ip *, struct vr_packet *);
-extern bool vr_ip6_well_known_packet(struct vr_packet *);
-extern bool vr_ip6_dhcp_packet(struct vr_packet *);
-extern bool vr_ip_well_known_packet(struct vr_packet *);
+extern l4_pkt_type_t vr_ip6_well_known_packet(struct vr_packet *);
+extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
 
 
 struct vr_nexthop *ip4_default_nh;
@@ -584,11 +583,12 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 {
 
     int i, clone_size;
-    bool flood_to_vms = true;
-    unsigned short drop_reason, pull_len, label, pkt_vrf;
+    bool flood_to_vms = true, trap = false;
+    unsigned short drop_reason, pull_len, label, pkt_vrf, rt_flags;
     unsigned int tun_src, pkt_src, hashval, port_range, handled;
+    l4_pkt_type_t l4_type;
 
-    unsigned char *eth;
+    struct vr_eth *eth = NULL;
     struct vr_arp *sarp;
     struct vr_ip6 *ip6;
     struct vr_nexthop *dir_nh, *src_nh;
@@ -632,6 +632,18 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
        }
     }
 
+    if (pkt_src == PKT_SRC_EDGE_REPL_TREE) {
+        eth = (struct vr_eth *)pkt_data_at_offset(pkt, pkt->vp_data +
+                VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
+    } else {
+        eth = (struct vr_eth *)pkt_data(pkt);
+    }
+
+    if (!eth) {
+        drop_reason = VP_DROP_INVALID_PACKET;
+        goto drop;
+    }
+
     /* L3 processing only for non-vlan tagged packets */
     if (fmd->fmd_vlan == VLAN_ID_INVALID) {
 
@@ -654,22 +666,45 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
                 }
             }
         } else if (pkt->vp_type == VP_TYPE_IP) {
-            if (pkt_src == PKT_SRC_TOR_REPL_TREE || (!pkt_src)) {
-                if (vr_ip_well_known_packet(pkt)) {
-                    vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return 0;
+            if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
+                l4_type = vr_ip_well_known_packet(pkt);
+                if (l4_type != L4_TYPE_UNKNOWN) {
+                    trap = true;
+                    if (l4_type == L4_TYPE_DHCP_REQUEST) {
+                        rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
+                                eth->eth_smac);
+                        if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
+                            trap = false;
+                    }
+
+                    if (trap) {
+                        vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+                        return 0;
+                    }
                 }
             }
         } else if (pkt->vp_type == VP_TYPE_IP6) {
-            if (!pkt_src) {
-                if (vr_ip6_well_known_packet(pkt)) {
-                    vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return 0;
-                }
-            } else if (pkt_src == PKT_SRC_TOR_REPL_TREE) {
-                if (vr_ip6_dhcp_packet(pkt)) {
-                    vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return 0;
+            if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
+                l4_type = vr_ip6_well_known_packet(pkt);
+                if (l4_type != L4_TYPE_UNKNOWN) {
+                    if (!pkt_src) {
+                        trap = true;
+                    }
+
+                    if (l4_type == L4_TYPE_DHCP_REQUEST) {
+                        if (pkt_src)
+                            trap = true;
+
+                        rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
+                                eth->eth_smac);
+                        if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
+                            trap = false;
+                    }
+
+                    if (trap) {
+                        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_L3_PROTOCOLS, NULL);
+                        return 0;
+                    }
                 }
             }
 
@@ -696,19 +731,6 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
      */
 
     if (!fmd->fmd_udp_src_port) {
-        eth = NULL;
-        if (pkt_src == PKT_SRC_EDGE_REPL_TREE) {
-            eth = pkt_data_at_offset(pkt, pkt->vp_data +
-                        VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
-        } else {
-            eth = pkt_data(pkt);
-        }
-
-        if (!eth) {
-            drop_reason = VP_DROP_INVALID_PACKET;
-            goto drop;
-        }
-
         if (hashrnd_inited == 0) {
             get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
             hashrnd_inited = 1;

@@ -43,11 +43,12 @@ int vr_pkt_type(struct vr_packet *, unsigned short, struct vr_forwarding_md *);
 int vr_trap(struct vr_packet *, unsigned short, unsigned short, void *);
 extern int vr_forward(struct vrouter *, struct vr_packet *,
                       struct vr_forwarding_md *);
-
-mac_response_t vr_get_l3_stitching_info(struct vr_packet *, struct vr_route_req *,
-                         struct vr_forwarding_md *, char *, char *, int , int *);
-int vr_handle_mac_response(struct vr_packet *, struct vr_forwarding_md *,
-                           mac_response_t , int );
+unsigned int
+vr_bridge_input(struct vrouter *, struct vr_packet *,
+                                    struct vr_forwarding_md *);
+extern struct vr_nexthop *(*vr_bridge_lookup)(unsigned int,
+                struct vr_route_req *);
+extern unsigned short vr_bridge_route_flags(unsigned int, unsigned char *);
 
 mac_response_t vr_get_proxy_mac(struct vr_packet *, struct vr_forwarding_md *,
                 struct vr_route_req *, unsigned char *);
@@ -57,5 +58,6 @@ mac_response_t vm_neighbor_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *, unsigned char *);
 extern int vif_plug_mac_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *);
+
 
 #endif /* __VR_DATAPATH_H__ */
