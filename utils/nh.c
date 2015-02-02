@@ -377,7 +377,7 @@ cmd_usage()
            "       [--rpol NH with relaxed policy]\n"
            "       [--type <type> type of the tunnel 1 - rcv, 2 - encap \n"
            "                       3 - tunnel, 4 - resolve, 5 - discard, 6 - Composite\n"
-           "                       7 - Vxlan VRF, 8 - L2 Rcv NH] \n"
+           "                       7 - VRF Translate, 8 - L2 Rcv NH] \n"
            "                [RCV_NH options]\n"
            "                    [--oif <if_id> out going interface index]\n"
            "                [L2RCV_NH options]\n"
@@ -412,7 +412,8 @@ cmd_usage()
            "                        [--lbl <lbl> label for composit fabric ]\n"
            "                    [--tor composit tor ]\n"
            "                        [--lbl <lbl> label for composit fabric ]\n"
-           "                [VxlanVRF options]\n");
+           "                [VRF Translate options]\n"
+           "                    [--vxlan Vxlan VRF Translation]\n");
 
     exit(-EINVAL);
 }
@@ -681,7 +682,10 @@ validate_options()
                 opt_set(LBL_OPT_IND);
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
-            } else if (type != NH_VRF_TRANSLATE) {
+            } else if (type == NH_VRF_TRANSLATE) {
+                if (opt_set(VXLAN_OPT_IND))
+                    flags |= NH_FLAG_VNID;
+            } else {
                 cmd_usage();
             }
             break;
