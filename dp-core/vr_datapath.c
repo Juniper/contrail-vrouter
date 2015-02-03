@@ -177,7 +177,13 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
     fmd_new.fmd_dvrf = fmd->fmd_dvrf;
     vr_pkt_type(pkt, 0, &fmd_new);
 
-    if (vif_is_vhost(vif)) {
+    /*
+     * XXX: for vcp ports, there won't be bridge table entries. to avoid
+     * doing vr_bridge_input, we check for the flag NO_ARP_PROXY and
+     * and if set, directly send out on that interface
+     */
+    if (vif_is_vhost(vif) ||
+            (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)) {
         vif->vif_tx(vif, pkt, fmd);
     } else {
         vr_bridge_input(vif->vif_router, pkt, &fmd_new);

@@ -181,11 +181,14 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     nopt->vno_length = (sizeof(struct vr_neighbor_option) + VR_ETHER_ALEN) / 8;
     VR_MAC_COPY(nopt->vno_value, dmac);
 
-
     icmph->icmp_csum =
         ~(vr_icmp6_checksum(ip6, icmph));
 
-    vr_bridge_input(vif->vif_router, pkt, fmd);
+    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY) {
+        vif->vif_tx(vif, pkt, fmd);
+    } else {
+        vr_bridge_input(vif->vif_router, pkt, fmd);
+    }
 
     return;
 }
@@ -230,7 +233,7 @@ int
 vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
     int handled = 1;
-    uint32_t pull_len;
+    uint32_t pull_len, len;
     unsigned char dmac[VR_ETHER_ALEN];
     mac_response_t ndisc_result;
 
@@ -268,12 +271,9 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
                 sizeof(struct vr_neighbor_option)))
         goto drop;
 
-    pull_len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
-    if (pkt->vp_len < (pull_len + sizeof(struct vr_neighbor_option)))
-        goto drop;
-
-    nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + pull_len);
-    if (pkt->vp_len < (pull_len + (nopt->vno_length * 8)))
+    len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
+    nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + len);
+    if (pkt->vp_len < (len + (nopt->vno_length * 8)))
         goto drop;
 
     if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION)

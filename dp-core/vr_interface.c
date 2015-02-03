@@ -518,16 +518,17 @@ vhost_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
 {
     struct vr_arp *sarp;
 
-    if (vif->vif_type == VIF_TYPE_GATEWAY)
-        return MR_DROP;
-
     if (pkt->vp_type == VP_TYPE_ARP) {
         sarp = (struct vr_arp *)pkt_data(pkt);
-        if (IS_LINK_LOCAL_IP(sarp->arp_dpa)) {
+        if (IS_LINK_LOCAL_IP(sarp->arp_dpa) ||
+                (vif->vif_type == VIF_TYPE_GATEWAY)) {
             VR_MAC_COPY(dmac, vif->vif_mac);
             return MR_PROXY;
         }
     }
+
+    if (vif->vif_type == VIF_TYPE_GATEWAY)
+        return MR_DROP;
 
     return MR_XCONNECT;
 }
