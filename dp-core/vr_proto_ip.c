@@ -555,8 +555,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
      * route lookup->receive nexthop->vr_ip_rcv or through
      * VP_FLAG_TO_ME(NO route lookup(!vp->vp_nh))->vr_ip_rcv 
      */
-    if ((pkt->vp_nh) || (!pkt->vp_nh &&
-                    vr_myip(pkt->vp_if, ip->ip_saddr))) {
+    if ((pkt->vp_nh) || (vr_myip(pkt->vp_if, ip->ip_daddr))) {
         if (ip->ip_proto == VR_IP_PROTO_GRE) {
             unhandled = vr_gre_input(router, pkt, fmd);
         } else if (ip->ip_proto == VR_IP_PROTO_UDP) {
