@@ -172,7 +172,6 @@ vr_route_req_process(void *s_req)
             for (i = ret; i < 21; i++)
                 printf(" ");
 
-            printf("  ");
             printf("%4d", rt->rtr_replace_plen);
 
             for (i = 0; i < 8; i++)
@@ -203,13 +202,15 @@ vr_route_req_process(void *s_req)
 
             printf("%7d", rt->rtr_nh_id);
 
-            for (i = 0; i < 10; i++)
+            for (i = 0; i < 8; i++)
                 printf(" ");
 
-            if (rt->rtr_mac && (!IS_MAC_ZERO(rt->rtr_mac)))
-                printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
-            else
+            if (rt->rtr_mac_size) {
+                printf("%s(%d)", ether_ntoa((struct ether_addr *)(rt->rtr_mac)),
+                                 rt->rtr_index);
+            } else {
                 printf("-");
+            }
 
             printf("\n");
     } else {
@@ -219,8 +220,12 @@ vr_route_req_process(void *s_req)
         if (rt->rtr_label_flags & VR_BE_FLOOD_DHCP_FLAG)
             strcat(flags, "Df");
 
+        printf("%5d", rt->rtr_index);
+        for (i = 0; i < 5; i++)
+            printf(" ");
+
         ret = printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
-        for (i = ret; i < 21; i++)
+        for (i = ret; i < 20; i++)
             printf(" ");
 
         printf(" %16s", flags);
@@ -230,7 +235,7 @@ vr_route_req_process(void *s_req)
         else
             ret = printf(" %16c", '-');
 
-        printf(" %12d\n", rt->rtr_nh_id);
+        printf(" %10d\n", rt->rtr_nh_id);
     }
 
     return;
@@ -297,7 +302,7 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
 
             inet_ntop(family, rt_req.rtr_prefix, buf, sizeof(buf));
             printf ("Adding prefix %s \n Prefix: ", buf);
-            for (i=0; i< RT_IP_ADDR_SIZE(family); i++) {
+            for (i = 0; i < RT_IP_ADDR_SIZE(family); i++) {
                  printf("%x:", prefix[i]);
             }
             printf ("\n");
@@ -435,11 +440,11 @@ vr_route_op(void)
                     (cmd_family_id == AF_INET) ? '4' : '6',
                     req->rtr_rid, cmd_vrf_id);
             dump_legend(cmd_family_id);
-            printf("Destination	        PPL        Flags        Label        Nexthop    Stitched MAC\n");
+            printf("Destination	      PPL        Flags        Label         Nexthop    Stitched MAC(Index)\n");
         } else {
             printf("Kernel L2 Bridge table %d/%d\n\n", req->rtr_rid, cmd_vrf_id);
             dump_legend(cmd_family_id);
-            printf("DestMac                          Flags       Label/VNID      Nexthop\n");
+            printf("Index     DestMac                          Flags       Label/VNID      Nexthop\n");
         }
     }
 
