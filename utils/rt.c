@@ -45,6 +45,7 @@ static vr_route_req rt_req;
 static uint8_t rt_prefix[16], rt_src[16], rt_marker[16];
 static bool cmd_proxy_set = false;
 static bool cmd_trap_set = false;
+static bool cmd_flood_set = false;
 
 static int cmd_set, dump_set;
 static int family_set, help_set;
@@ -311,6 +312,9 @@ vr_build_route_request(unsigned int op, int family, int8_t *prefix,
         if (cmd_proxy_set)
             rt_req.rtr_label_flags |= VR_RT_ARP_PROXY_FLAG;
 
+        if (cmd_flood_set)
+            rt_req.rtr_label_flags |= VR_RT_ARP_FLOOD_FLAG;
+
         if (cmd_trap_set)
             rt_req.rtr_label_flags |= VR_RT_ARP_TRAP_FLAG;
 
@@ -457,6 +461,7 @@ usage_internal()
            "       n <nhop_id> \n"
            "       p <prefix in dotted decimal form> \n"
            "       P <do proxy arp for this route> \n"
+           "       F <do arp Flood for this route> \n"
            "       l <prefix_length>\n"
            "       t <label/vnid>\n"
            "       f <family 0 - AF_INET 1 - AF_BRIDGE 2 - AF_INET6 >\n"
@@ -602,7 +607,7 @@ main(int argc, char *argv[])
     cmd_label = -1;
     cmd_family_id = AF_INET;
 
-    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:",
+    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:F",
                     long_options, &option_index)) >= 0) { 
             switch (opt) {
             case 'c':
@@ -684,6 +689,10 @@ main(int argc, char *argv[])
 
             case 'P':
                 cmd_proxy_set = true;
+                break;
+
+            case 'F':
+                cmd_flood_set = true;
                 break;
 
             case 'T':
