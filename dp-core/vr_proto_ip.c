@@ -540,8 +540,9 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
     struct vr_interface *vif = NULL;
     unsigned char *l2_hdr;
     unsigned int hlen;
-    unsigned short drop_reason;
+    unsigned short drop_reason, l4_port = 0;
     int ret = 0, unhandled = 1;
+    struct vr_fragment *frag;
 
     ip = (struct vr_ip *)pkt_data(pkt);
     hlen = ip->ip_hl * 4;
@@ -579,6 +580,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         pkt_pull(pkt, hlen);
 
         if (pkt->vp_nh) {
+            vif = pkt->vp_nh->nh_dev;
 
             /*
              * If flow processing is already not done, relaxed policy
@@ -586,35 +588,31 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
              * lets subject it to flow processing.
              */
             if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
-                unsigned short l4_size = 0;
-                unsigned char ip_proto = ip->ip_proto;
-                if (ip_proto == VR_IP_PROTO_UDP) {
-                    l4_size = sizeof(struct vr_udp);
-                } else if (ip_proto == VR_IP_PROTO_TCP) {
-                    l4_size = sizeof(struct vr_tcp);
-                }
+                if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) &&
+                      !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
 
-                if (l4_size) {
-                    unsigned short l4_port = 0;
-                    if (vr_pkt_may_pull(pkt, l4_size)) {
-                        drop_reason = VP_DROP_PUSH;
-                        goto drop_pkt;
-                    }
+                    if ((ip->ip_proto == VR_IP_PROTO_UDP) ||
+                        (ip->ip_proto == VR_IP_PROTO_TCP)) {
 
-                    l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
-                    if (vr_valid_link_local_port(router, AF_INET,
-                            ip_proto, ntohs(l4_port))) {
-                        if (!(pkt->vp_flags & VP_FLAG_FLOW_SET) &&
-                            !(pkt->vp_flags & (VP_FLAG_TO_ME |
-                                               VP_FLAG_FROM_DP))) {
-                             /* Force the flow lookup */
-                             pkt->vp_flags |= VP_FLAG_FLOW_GET;
+                        if (vr_ip_transport_header_valid(ip)) {
+                            l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
+                        } else {
+                            frag = vr_fragment_get(router, fmd->fmd_dvrf, ip);
+                            if (frag)
+                                l4_port = frag->f_dport;
+                        }
 
-                             /* Get back the IP header */
-                             if (!pkt_push(pkt, hlen)) {
+                        if (l4_port && vr_valid_link_local_port(router, AF_INET,
+                                         ip->ip_proto, ntohs(l4_port))) {
+
+                            /* Force the flow lookup */
+                            pkt->vp_flags |= VP_FLAG_FLOW_GET;
+
+                            /* Get back the IP header */
+                            if (!pkt_push(pkt, hlen)) {
                                 drop_reason = VP_DROP_PUSH;
                                 goto drop_pkt;
-                             }
+                            }
                             /* Subject it to flow for Linklocal */
                             if (!vr_flow_forward(router, pkt, fmd))
                                 return 0;
@@ -627,7 +625,6 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                     }
                 }
             }
-            vif = pkt->vp_nh->nh_dev;
         }
 
         if (!vif && !(vif = pkt->vp_if->vif_bridge) &&
