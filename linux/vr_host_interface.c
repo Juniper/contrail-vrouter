@@ -1920,7 +1920,7 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
 {
     int handled = 1;
     struct sk_buff *skb = vp_os_packet(pkt);
-#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+#ifdef XEN_HYPERVISOR
     unsigned char *data;
     if (l2_pkt)
         return !handled;
@@ -1930,7 +1930,7 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     skb->len = pkt_len(pkt);
     skb_set_tail_pointer(skb, pkt_head_len(pkt));
 
-#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+#ifdef XEN_HYPERVISOR
     /*
      * The nexthop id has been added as L2 header here. For Xen,
      * Ethernet header is the L2 header for GRO
@@ -1981,7 +1981,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     struct vr_packet *pkt = NULL;
     struct vrouter *router = vrouter_get(0);
     struct vr_forwarding_md fmd;
-#if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+#ifdef XEN_HYPERVISOR
     unsigned char *data;
 
     data = skb_mac_header(skb);
