@@ -1921,6 +1921,7 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     int handled = 1;
     struct sk_buff *skb = vp_os_packet(pkt);
 #if CONFIG_XEN && (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+    unsigned char *data;
     if (l2_pkt)
         return !handled;
 #endif
@@ -1935,7 +1936,8 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
      * Ethernet header is the L2 header for GRO
      */
     if (unlikely(skb_headroom(skb) < (ETH_HLEN - sizeof(unsigned short)))) {
-        struct sk_buff *nskb = skb_realloc_headroom(skb, LL_RESERVED_SPACE(dev));
+        struct sk_buff *nskb = skb_realloc_headroom(skb,
+                LL_RESERVED_SPACE(skb->dev));
         if (!nskb) {
             vif_drop_pkt(vif, pkt, false);
             if (net_ratelimit())
