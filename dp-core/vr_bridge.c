@@ -289,6 +289,7 @@ bridge_entry_make_req(struct vr_route_req *resp, struct vr_bridge_entry *ent)
     resp->rtr_req.rtr_family = AF_BRIDGE;
     resp->rtr_req.rtr_label = ent->be_label;
     resp->rtr_req.rtr_label_flags = ent->be_flags;
+    resp->rtr_req.rtr_index = ent->be_index;
 
     return 0;
 }
