@@ -40,7 +40,7 @@ __vrouter_get_nexthop(struct vrouter *router, unsigned int index)
 }
 
 struct vr_nexthop *
-vrouter_get_nexthop(unsigned int rid, unsigned int index) 
+vrouter_get_nexthop(unsigned int rid, unsigned int index)
 {
     struct vr_nexthop *nh;
     struct vrouter *router;
@@ -98,10 +98,10 @@ vrouter_add_nexthop(struct vr_nexthop *nh)
      * NH change just copies the field
      * over to nexthop, incase of change
      * just return
-     */  
+     */
     if (router->vr_nexthops[nh->nh_id])
         return 0;
- 
+
     nh->nh_users++;
     router->vr_nexthops[nh->nh_id] = nh;
     return 0;
@@ -111,9 +111,9 @@ static void
 nh_del(struct vr_nexthop *nh)
 {
     struct vrouter *router = vrouter_get(nh->nh_rid);
-    
+
     if (!router || nh->nh_id > router->vr_max_nexthops)
-        return; 
+        return;
 
     if (router->vr_nexthops[nh->nh_id]) {
         router->vr_nexthops[nh->nh_id] = NULL;
@@ -253,7 +253,7 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label)
     if (!lbl)
         return -ENOSPC;
 
-    /* Use the ttl from packet. If not ttl, 
+    /* Use the ttl from packet. If not ttl,
      * initialise to some arbitrary value */
     ttl = pkt->vp_ttl;
     if (!ttl) {
@@ -271,8 +271,8 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label)
  */
 static bool
 nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
-                     unsigned short dport, unsigned int sip, 
-                     unsigned int dip) 
+                     unsigned short dport, unsigned int sip,
+                     unsigned int dip)
 {
     struct vr_ip *ip;
     struct vr_udp *udp;
@@ -311,16 +311,12 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
     ip->ip_daddr = dip;
     ip->ip_len = htons(pkt_len(pkt));
 
-    /* 
-     * header checksum 
-     */
-    ip->ip_csum = 0;
-    ip->ip_csum = vr_ip_csum(ip);    
+    /* checksum will be calculated in vif_tx */
 
     return true;
 }
 
-static bool 
+static bool
 nh_vxlan_tunnel_helper(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                        unsigned int sip, unsigned int dip)
 {
@@ -356,7 +352,7 @@ nh_vxlan_tunnel_helper(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     vxlanh->vxlan_vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
     vxlanh->vxlan_flags = htonl(VR_VXLAN_IBIT);
 
-    return nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
+    return nh_udp_tunnel_helper(pkt, htons(udp_src_port),
                              htons(VR_VXLAN_UDP_DST_PORT), sip, dip);
 }
 
@@ -412,7 +408,7 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             cnh = nh->nh_component_nh[i].cnh;
             /* If direct nexthop is not valid, dont process it */
-            if (!cnh || !(cnh->nh_flags & NH_FLAG_VALID) || 
+            if (!cnh || !(cnh->nh_flags & NH_FLAG_VALID) ||
                                             !cnh->nh_validate_src)
                 continue;
 
@@ -724,7 +720,7 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt_push(pkt, pull_len);
     }
 
-    /* 
+    /*
      * The packet can come to this nexthp either from Fabric or from VM.
      * Incase of Fabric, the packet would contain the Vxlan header and
      * control information. From VM, it contains neither of them
@@ -1119,7 +1115,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
                 break;
             }
 
-            /* 
+            /*
              * Add vxlan encapsulation. The vxlan id need to be taken
              * from Bridge entry
              */
@@ -1176,11 +1172,11 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (pkt_head_space(pkt) < VR_UDP_HEAD_SPACE) {
         tmp = vr_palloc_head(pkt, VR_UDP_HEAD_SPACE);
-        if (!tmp) 
+        if (!tmp)
             goto send_fail;
 
         pkt = tmp;
-        if (!pkt_reserve_head_space(pkt, VR_UDP_HEAD_SPACE)) 
+        if (!pkt_reserve_head_space(pkt, VR_UDP_HEAD_SPACE))
             goto send_fail;
     }
 
@@ -1193,8 +1189,8 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
         goto send_fail;
-    /* 
-     * Incase of mirroring set the inner network header to the newly added 
+    /*
+     * Incase of mirroring set the inner network header to the newly added
      * header so that this is fragmented and checksummed
      */
     pkt_set_inner_network_header(pkt, pkt->vp_data);
@@ -1291,7 +1287,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data, 
+    if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data,
                                      nh->nh_udp_tun_encap_len)) {
         goto send_fail;
     }
@@ -1346,7 +1342,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         tun_sip = nh->nh_udp_tun_sip;
         tun_dip = nh->nh_udp_tun_dip;
         tun_encap_len = nh->nh_udp_tun_encap_len;
-    }    
+    }
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
@@ -1394,7 +1390,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (pkt_head_space(pkt) < mudp_head_space) {
         tmp_pkt = vr_pexpand_head(pkt, mudp_head_space - pkt_head_space(pkt));
-        if (!tmp_pkt) 
+        if (!tmp_pkt)
             goto send_fail;
 
         pkt = tmp_pkt;
@@ -1405,8 +1401,8 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
-   
-   
+
+
     /*
      * Change the packet type
      */
@@ -1417,7 +1413,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     else
         pkt->vp_type = VP_TYPE_IP;
 
-    if (nh_udp_tunnel_helper(pkt, htons(udp_src_port), 
+    if (nh_udp_tunnel_helper(pkt, htons(udp_src_port),
                              htons(VR_MPLS_OVER_UDP_DST_PORT),
                              tun_sip, tun_dip) == false) {
         goto send_fail;
@@ -1427,7 +1423,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    tun_encap = vif->vif_set_rewrite(vif, pkt, nh->nh_data, 
+    tun_encap = vif->vif_set_rewrite(vif, pkt, nh->nh_data,
                                      tun_encap_len);
     if (!tun_encap) {
         goto send_fail;
@@ -1487,7 +1483,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
      * when ECMP source initiates traffic to a target in a remote (not in
      * the same) server. vr_forward->tunnel_nh->nh_output sets pkt->vp_nh
      * (source is ECMP)->pass through flow lookup->
-     */ 
+     */
     if (!fmd || fmd->fmd_label < 0)
         return vr_forward(nh->nh_router, pkt, fmd);
 
@@ -1809,12 +1805,12 @@ nh_l2_rcv_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 static int
 nh_rcv_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    struct vr_interface  *vif, *old_vif;
+    struct vr_interface *vif, *old_vif;
     vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
     if (!vif)
         return -ENODEV;
-    /* 
-     *  We need to delete the reference to old_vif only after new vif is
+    /*
+     * We need to delete the reference to old_vif only after new vif is
      * added to NH
      */
     old_vif = nh->nh_dev;
@@ -1939,12 +1935,12 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         return 0;
 
     nh->nh_component_nh = vr_zalloc(req->nhr_nh_list_size *
-            sizeof(struct vr_component_nh)); 
+            sizeof(struct vr_component_nh));
     if (!nh->nh_component_nh) {
         return -ENOMEM;
     }
     for (i = 0; i < req->nhr_nh_list_size; i++) {
-        nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid, 
+        nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid,
                                                     req->nhr_nh_list[i]);
         nh->nh_component_nh[i].cnh_label = req->nhr_label_list[i];
     }
@@ -2053,11 +2049,11 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     struct vr_interface *vif, *old_vif;;
 
     vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
-    if (!vif) 
+    if (!vif)
         return -ENODEV;
 
-    /* 
-     *  We need to delete the reference to old_vif only after new vif is
+    /*
+     * We need to delete the reference to old_vif only after new vif is
      * added to NH
      */
     old_vif = nh->nh_dev;
@@ -2167,7 +2163,7 @@ vr_nexthop_add(vr_nexthop_req *req)
 
         nh->nh_data_size = len - sizeof(struct vr_nexthop);
     } else {
-        /* 
+        /*
          * If modification of old_nh change the action to discard and ensure
          * everybody sees that
          */
@@ -2177,12 +2173,12 @@ vr_nexthop_add(vr_nexthop_req *req)
         }
 
         /* Lets track if invalid to valid change */
-        if ((req->nhr_flags & NH_FLAG_VALID) && 
+        if ((req->nhr_flags & NH_FLAG_VALID) &&
                 !(nh->nh_flags & NH_FLAG_VALID))
             invalid_to_valid = true;
 
         /* If valid to invalid lets propogate flags immediagtely */
-        if (!(req->nhr_flags & NH_FLAG_VALID) && 
+        if (!(req->nhr_flags & NH_FLAG_VALID) &&
                 (nh->nh_flags & NH_FLAG_VALID))
             nh->nh_flags = req->nhr_flags;
 
@@ -2200,7 +2196,7 @@ vr_nexthop_add(vr_nexthop_req *req)
     nh->nh_router = vrouter_get(nh->nh_rid);
     nh->nh_vrf = req->nhr_vrf;
 
-    /* 
+    /*
      * If invalid to valid, lets make it valid after the whole nexthop
      * is cookedup. For invalid to invalid, valid to valid, lets
      * copy the flags as is
@@ -2436,7 +2432,7 @@ vr_nexthop_get(vr_nexthop_req *req)
     if (!router || (unsigned int)req->nhr_id >= router->vr_max_nexthops) {
         ret = -ENODEV;
         goto generate_response;
-    } 
+    }
 
     nh = __vrouter_get_nexthop(router, req->nhr_id);
     if (nh) {
@@ -2488,7 +2484,7 @@ vr_nexthop_dump(vr_nexthop_req *r)
            if (ret || ((ret = vr_message_dump_object(dumper,
                            VR_NEXTHOP_OBJECT_ID, resp)) <= 0)) {
                vr_nexthop_req_destroy(resp);
-               if (ret <= 0) 
+               if (ret <= 0)
                    break;
            }
 

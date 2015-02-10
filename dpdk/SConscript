@@ -1,0 +1,72 @@
+#
+# Copyright (c) 2014 Semihalf. All rights reserved.
+#
+import os
+
+Import('VRouterEnv')
+
+env = VRouterEnv.Clone()
+
+# Include paths
+
+# CFLAGS
+env.Append(CCFLAGS = '-Werror -Wall')
+env.Append(CCFLAGS = '-D__DPDK__')
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
+env.Append(LIBPATH = ['#third_party/dpdk/build/lib'])
+
+env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
+
+# Add all dpdk libraries
+env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
+    'rte_hash', 'rte_mempool', 'rte_ring', 'rte_mbuf', 'rte_eal', 'rte_malloc',
+    'rte_port', 'rte_timer', 'ethdev'])
+
+# Add libraries required by dpdk
+env.Append(LIBS = ['rt', 'dl', 'pthread'])
+env.Append(LIBS = ['urcu-qsbr'])
+
+env.Append(LINKCOM =
+    ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
+
+dpdk_dir ='#third_party/dpdk/'
+make_dir = Dir(dpdk_dir).srcnode().abspath
+
+make_cmd = 'make config T=x86_64-native-linuxapp-gcc; make'
+dpdk_lib = env.Command('dpdk_lib', None, make_cmd, chdir=make_dir)
+env.AlwaysBuild(dpdk_lib)
+env.Default(dpdk_lib)
+
+dpdk_vrouter_src = [ 'dpdk_vrouter.c',
+                     'vr_dpdk_ethdev.c',
+                     'vr_dpdk_flow_mem.c',
+                     'vr_dpdk_host.c',
+                     'vr_dpdk_interface.c',
+                     'vr_dpdk_knidev.c',
+                     'vr_dpdk_lcore.c',
+                     'vr_dpdk_netlink.c',
+                     'vr_dpdk_packet.c',
+                     'vr_dpdk_ringdev.c',
+                     'vr_dpdk_usocket.c',
+                     'vr_dpdk_virtio.c',
+                     'vr_uvhost.c',
+                     'vr_uvhost_util.c',
+                     'vr_uvhost_msg.c',
+                     'vr_uvhost_client.c'
+                   ]
+
+dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_vrouter_src)
+env.Requires(dpdk_vrouter, dpdk_lib)
+
+if GetOption('clean'):
+    os.system('cd ' + make_dir + ';' + make_cmd + ' clean')
+# to make sure that all are built when you do 'scons' @ the top level
+env.Default(dpdk_vrouter)
+
+env.Alias('install', env.Install(env['INSTALL_BIN'], dpdk_vrouter))
+
+# Local Variables:
+# mode: python
+# End:

@@ -35,7 +35,7 @@
      (((uint16_t *)dst)[2] == 0xffff))  \
 
 #define IS_MAC_BMCAST(dst) \
-     (((uint8_t *)dst)[0]& 0x1) 
+     (((uint8_t *)dst)[0]& 0x1)
 
 #define VR_BE_INVALID_INDEX              ((unsigned int)-1)
 

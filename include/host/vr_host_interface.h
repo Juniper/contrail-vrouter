@@ -6,7 +6,7 @@
 #ifndef __HOST_VR_HOST_INTERFACE_H__
 #define __HOST_VR_HOST_INTERFACE_H__
 
-/* 
+/*
  * has to be a power of 2. increasing this will need some
  * more changes in the sources.
  */

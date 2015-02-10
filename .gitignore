@@ -18,3 +18,12 @@ vrouter.o
 
 Module.symvers
 modules.order
+*.o
+*.o.cmd
+*.ko.cmd
+*.mod
+*.mod.c
+*.ko
+*.swp
+*.order
+*.symvers
