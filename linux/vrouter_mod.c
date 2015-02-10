@@ -33,9 +33,6 @@
 
 unsigned int vr_num_cpus = 1;
 
-extern int vr_flow_entries;
-extern int vr_oflow_entries;
-
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
 
@@ -69,6 +66,19 @@ extern void vr_mem_exit(void);
 extern void vhost_exit(void);
 
 static void lh_reset_skb_fields(struct vr_packet *pkt);
+
+static int
+lh_printk(const char *format, ...)
+{
+    int printed;
+    va_list args;
+
+    va_start(args, format);
+    printed = printk(format, args);
+    va_end(args);
+
+    return printed;
+}
 
 static void *
 lh_malloc(unsigned int size)
@@ -2313,6 +2323,7 @@ lh_create_timer(struct vr_timer *vtimer)
 }
 
 struct host_os linux_host = {
+    .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
     .hos_zalloc                     =       lh_zalloc,
     .hos_free                       =       lh_free,

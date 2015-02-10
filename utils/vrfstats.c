@@ -38,6 +38,7 @@
 #include "nl_util.h"
 #include "vr_mpls.h"
 #include "vr_defs.h"
+#include "ini_parser.h"
 
 static struct nl_client *cl;
 static int resp_code;
@@ -47,6 +48,7 @@ static int vrf = -1;
 static int get_set, dump_set;
 static int help_set;
 static bool dump_pending = false;
+static bool response_pending = true;
 
 void
 vr_vrf_stats_req_process(void *s_req)
@@ -64,7 +66,7 @@ vr_vrf_stats_req_process(void *s_req)
             ", Evpn Composites %" PRIu64 "\n", stats->vsr_ecmp_composites,
             stats->vsr_l2_mcast_composites, stats->vsr_fabric_composites,
             stats->vsr_encap_composites, stats->vsr_evpn_composites);
-    printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64 
+    printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64
             ", Gre Mpls Tunnels %" PRIu64 ", Vxlan Tunnels %" PRIu64 "\n",
             stats->vsr_udp_tunnels, stats->vsr_udp_mpls_tunnels,
             stats->vsr_gre_mpls_tunnels, stats->vsr_vxlan_tunnels);
@@ -80,6 +82,8 @@ vr_vrf_stats_req_process(void *s_req)
             stats->vsr_arp_tor_proxy, stats->vsr_arp_physical_flood);
 
     printf("\n");
+
+    response_pending = false;
     return;
 }
 
@@ -91,15 +95,21 @@ vr_response_process(void *s)
     stats_resp = (vr_response *)s;
     resp_code = stats_resp->resp_code;
 
+    response_pending = false;
     if (stats_resp->resp_code < 0) {
         printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
         exit(-1);
     } else {
         if (stats_op == SANDESH_OP_DUMP) {
-            if (resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
+            if (stats_resp->resp_code > 0)
+                response_pending = true;
+
+            if (resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
                 dump_pending = true;
-            else 
+                response_pending = true;
+            } else {
                 dump_pending = false;
+            }
         }
     }
 
@@ -145,7 +155,7 @@ vr_build_netlink_request(vr_vrf_stats_req *req)
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_vrf_stats_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(req, "vr_vrf_stats_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -164,17 +174,21 @@ vr_send_one_message(void)
 {
     int ret;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
+    response_pending = true;
     ret = nl_sendmsg(cl);
     if (ret <= 0)
         return 0;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST)
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+    while (response_pending) {
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST)
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                               vr_find_sandesh_info, &ret);
+        }
     }
-
     return resp_code;
 }
 
@@ -205,7 +219,7 @@ vr_do_stats_op(void)
     return;
 }
 
-static int 
+static int
 vr_stats_op(void)
 {
     int ret;
@@ -319,9 +333,16 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
+    parse_ini_file();
+
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
     if (ret <= 0) {
-       exit(1);
+        exit(1);
+    }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
+        exit(1);
     }
 
     if (vrouter_get_family_id(cl) <= 0) {

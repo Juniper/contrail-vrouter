@@ -35,6 +35,7 @@
 #include "vr_genetlink.h"
 #include "nl_util.h"
 #include "vr_os.h"
+#include "ini_parser.h"
 
 static struct nl_client *cl;
 static int resp_code;
@@ -160,7 +161,7 @@ vr_response_process(void *s)
     if (stats_resp->resp_code < 0) {
         printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
         exit(-1);
-    } 
+    }
 
     return;
 }
@@ -191,7 +192,7 @@ vr_build_netlink_request(vr_drop_stats_req *req)
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_drop_stats_req", vr_find_sandesh_info, 
+    ret = sandesh_encode(req, "vr_drop_stats_req", vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
 
@@ -210,12 +211,13 @@ vr_send_one_message(void)
 {
     int ret;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
     ret = nl_sendmsg(cl);
     if (ret <= 0)
         return 0;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
+    if((ret = nl_recvmsg(cl)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp->nl_op == SANDESH_REQUEST)
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
@@ -231,7 +233,7 @@ vr_drop_stats_op(void)
     return;
 }
 
-static int 
+static int
 vr_get_drop_stats(void)
 {
     int ret;
@@ -289,8 +291,15 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
+    parse_ini_file();
+
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
     if (ret <= 0) {
+       exit(1);
+    }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
        exit(1);
     }
 

@@ -10,7 +10,10 @@
 #include "vr_types.h"
 #include "vr_htable.h"
 
-/* 2 interfaces/VM + maximum vlan interfaces */
+/*
+ * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
+ * be the same as VR_UVH_MAX_CLIENTS.
+ */
 #define VR_MAX_INTERFACES           (256 + 4096)
 
 #define VIF_TYPE_HOST               0
@@ -22,13 +25,14 @@
 #define VIF_TYPE_VIRTUAL_VLAN       6
 #define VIF_TYPE_STATS              7
 #define VIF_TYPE_VLAN               8
-#define VIF_TYPE_MAX                9
+#define VIF_TYPE_MONITORING         9
+#define VIF_TYPE_MAX               10
 
 #define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
-#define vif_is_fabric(vif)          (vif->vif_type == VIF_TYPE_PHYSICAL) 
+#define vif_is_fabric(vif)          (vif->vif_type == VIF_TYPE_PHYSICAL)
 #define vif_is_vlan(vif)            ((vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
-                                        
+
 #define vif_is_tap(vif)             ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_AGENT))
 
@@ -40,6 +44,11 @@
 #define vif_needs_dev(vif)          ((vif->vif_type != VIF_TYPE_VIRTUAL_VLAN))
 
 #define VR_INTERFACE_NAME_LEN       64
+
+#define VIF_TRANSPORT_VIRTUAL       0
+#define VIF_TRANSPORT_ETH           1
+#define VIF_TRANSPORT_PMD           2
+#define VIF_TRANSPORT_SOCKET        3
 
 #define VR_IF_ADD                   0
 #define VR_IF_DEL                   1
@@ -59,9 +68,21 @@
 /* untagged packets should be treated as packets with tag 0 */
 #define VIF_FLAG_NATIVE_VLAN_TAG    0x800
 #define VIF_FLAG_NO_ARP_PROXY       0x1000
+#define VIF_FLAG_PMD                0x2000
+/* The physical interface supports hardware filtering */
+#define VIF_FLAG_FILTERING_OFFLOAD  0x4000
+/*
+ * The interface is being monitored,
+ * so we copy all the packets to another interface
+ */
+#define VIF_FLAG_MONITORED          0x8000
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
+#define VIF_TRANSPORT_VIRTUAL       0
+#define VIF_TRANSPORT_ETH           1
+#define VIF_TRANSPORT_PMD           2
+#define VIF_TRANSPORT_SOCKET        3
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)
@@ -139,6 +160,7 @@ struct vr_interface {
     unsigned short vif_ovlan_id;
     unsigned short vif_nh_id;
     unsigned short vif_vrf_table_users;
+    uint8_t vif_transport;
     /*
      * unsigned short does not cut it, because initial value for
      * each entry in the table is -1. negative value of table

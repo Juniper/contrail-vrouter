@@ -29,6 +29,9 @@ typedef enum {
 
 /* rest of the flags are action specific */
 
+/* for shared memory */
+#define VR_FLOW_SHMEM_NAME          "vr_flows"
+
 /* for NAT */
 #define VR_FLOW_FLAG_SNAT           0x2
 #define VR_FLOW_FLAG_SPAT           0x4
@@ -88,7 +91,7 @@ struct vr_flow {
 #define flow4_nh_id     key_u.ip4_key.ip4_nh_id
 #define flow4_proto     key_u.ip4_key.ip4_proto
 
-/* 
+/*
  * Limit the number of outstanding flows in hold state. The flow rate can
  * be much more than what agent can handle. In such cases, to make sure that
  *
@@ -126,7 +129,7 @@ struct vr_flow_table_info {
     uint32_t vfti_hold_count[0];
 };
 
-/* 
+/*
  * flow bytes and packets are of same width. this should be
  * ok since agent really has to take care of overflows. this
  * is also better probably because processor does not have to
@@ -210,6 +213,14 @@ struct vr_flow_entry {
 
 #define VR_DNS_SERVER_PORT  htons(53)
 
+extern unsigned int vr_flow_entries, vr_oflow_entries;
+
+#define VR_FLOW_TABLE_SIZE          (vr_flow_entries * \
+                sizeof(struct vr_flow_entry))
+
+#define VR_OFLOW_TABLE_SIZE         (vr_oflow_entries *\
+                sizeof(struct vr_flow_entry))
+
 struct vr_flow_md {
     struct vrouter *flmd_router;
     struct vr_defer_data *flmd_defer_data;
@@ -231,8 +242,9 @@ extern void vr_flow_exit(struct vrouter *, bool);
 extern bool vr_flow_forward(struct vrouter *,
         struct vr_packet *, struct vr_forwarding_md *);
 
+#ifndef __DPDK__
 void *vr_flow_get_va(struct vrouter *, uint64_t);
-
+#endif /* __DPDK__ */
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
 
