@@ -3,7 +3,8 @@
 #
 
 Import('VRouterEnv')
-env = VRouterEnv
+env = VRouterEnv.Clone()
+VRutilsEnv = env;
  
 vr_root = '../'
 
@@ -14,6 +15,14 @@ if system_header_path:
 # CFLAGS
 env.Append(CCFLAGS = '-g')
 
+if 'install' in COMMAND_LINE_TARGETS:
+    VRutilsEnv.Append(SRC_INSTALL_TARGET = '/utils/')
+
+subdirs = ['dkms']
+for sdir in  subdirs:
+    env.SConscript(sdir + '/SConscript',
+                    exports='VRutilsEnv',
+                    duplicate = 0)
 
 # Build libvrutil
 libvrutil = 'vrutil'

@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2015 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRutilsEnv')
+env = VRutilsEnv.Clone()
+
+if 'install' in COMMAND_LINE_TARGETS:
+    env.Append(SRC_INSTALL_TARGET = '/dkms/')
+    env.Install(env['SRC_INSTALL_TARGET'], Glob('*.sh'))
+    env.Alias('install', env['SRC_INSTALL_TARGET'])
+
+# Local Variables:
+# mode: python
+# End:
