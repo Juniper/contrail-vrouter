@@ -39,6 +39,8 @@ extern int vr_oflow_entries;
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
 
+extern char *ContrailBuildInfo;
+
 int vrouter_dbg;
 
 extern struct vr_packet *linux_get_packet(struct sk_buff *,
@@ -2548,7 +2550,8 @@ vrouter_linux_init(void)
 {
     int ret;
 
-	printk("vrouter version: %s\n", VROUTER_VERSIONID);
+    printk("vrouter version: %s\n", ContrailBuildInfo);
+
     vr_num_cpus = num_present_cpus() & VR_CPU_MASK;
     if (!vr_num_cpus) {
         printk("%s:%d Failed to get number of CPUs\n",

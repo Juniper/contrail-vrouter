@@ -24,7 +24,8 @@ env.Append(CPPPATH = ['#tools/sandesh/library/c'])
 
 vr_root = './'
 makefile = vr_root + 'Makefile'
-dp_dir = Dir(vr_root).srcnode().abspath
+dp_dir = Dir(vr_root).srcnode().abspath + '/'
+make_dir = dp_dir
 
 def MakeTestCmdFn(self, env, test_name, test_list, deps):
     sources = copy.copy(deps)
@@ -46,8 +47,8 @@ def shellCommand(cmd):
     return output.strip()
 
 if sys.platform.startswith('freebsd'):
-    dp_dir = dp_dir + '/freebsd'
-    env['ENV']['MAKEOBJDIR'] = dp_dir
+    make_dir = make_dir + '/freebsd'
+    env['ENV']['MAKEOBJDIR'] = make_dir
 
 if sys.platform != 'darwin':
 
@@ -60,6 +61,9 @@ if sys.platform != 'darwin':
     env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
     env.Alias('install', src_root)
 
+    buildinfo = env.GenerateBuildInfoCCode(target = ['vr_buildinfo.c'],
+            source = [], path = dp_dir + 'dp-core')
+
     subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter', 'test']
     for sdir in  subdirs:
         env.SConscript(sdir + '/SConscript',
@@ -67,7 +71,7 @@ if sys.platform != 'darwin':
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
-    make_cmd = 'cd ' + dp_dir + ' && make'
+    make_cmd = 'cd ' + make_dir + ' && make'
     if GetOption('kernel-dir'):
         make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
     make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
@@ -81,6 +85,7 @@ if sys.platform != 'darwin':
     env.Default(kern)
     env.AlwaysBuild(kern)
 
+    env.Depends(kern, buildinfo)
     env.Depends(kern, env.Install(
                 '#build/kbuild/sandesh/gen-c',
                 env['TOP'] + '/vrouter/sandesh/gen-c/vr_types.c'))

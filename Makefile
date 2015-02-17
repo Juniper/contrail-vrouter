@@ -68,7 +68,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += dp-core/vr_stats.o dp-core/vr_btable.o
 	vrouter-y += dp-core/vr_bridge.o dp-core/vr_htable.o
 	vrouter-y += dp-core/vr_vxlan.o dp-core/vr_fragment.o
-	vrouter-y += dp-core/vr_proto_ip6.o
+	vrouter-y += dp-core/vr_proto_ip6.o dp-core/vr_buildinfo.o
 
 	ccflags-y += -I$(src)/include -I$(SANDESH_HEADER_PATH)/sandesh/gen-c
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)
@@ -93,6 +93,7 @@ endif
 ifneq ($(SANDESH_SRC_ROOT),)
 	$(RM) $(SANDESH_BINS) $(SANDESH_LIB_BINS)
 endif
+	-$(RM) dp-core/vr_buildinfo.c
 
 cscope:
 	find -L . -name "*.[cChHyYSsmM]" > cscope.files
