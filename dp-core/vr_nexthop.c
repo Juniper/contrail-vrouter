@@ -1686,7 +1686,8 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
-    if (!VR_MAC_CMP(pkt_data(pkt), nh->nh_data))
+    if ((!(pkt->vp_flags & VP_FLAG_MULTICAST)) &&
+                (!VR_MAC_CMP(pkt_data(pkt), nh->nh_data)))
         VR_MAC_COPY(pkt_data(pkt), nh->nh_data);
 
     if (stats)
