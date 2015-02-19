@@ -110,7 +110,7 @@ vr_skb_set_rxhash(struct sk_buff *skb, __u32 val)
 {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     skb->rxhash = val;
 #endif
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
@@ -129,7 +129,7 @@ vr_skb_get_rxhash(struct sk_buff *skb)
 {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     return skb->rxhash;
 #else
     return 0;
@@ -2166,8 +2166,13 @@ vr_napi_poll(struct napi_struct *napi, int budget)
     struct vr_interface *gro_vif = NULL;
     struct vr_interface_stats *gro_vif_stats = NULL;
     struct sk_buff_head *head;
-    gro_result_t ret;
-
+#if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
+    int ret, napi_gro_err = NET_RX_DROP;
+#else
+    gro_result_t ret, napi_gro_err = GRO_DROP;
+#endif
+    
     if (napi->dev == pkt_gro_dev) {
         vif = vif_from_napi(napi);
         gro_vif = (struct vr_interface *)pkt_gro_dev->ml_priv;
@@ -2185,7 +2190,7 @@ vr_napi_poll(struct napi_struct *napi, int budget)
         vr_skb_set_rxhash(skb, 0);
 
         ret = napi_gro_receive(napi, skb);
-        if (ret == GRO_DROP) {
+        if (ret == napi_gro_err) {
             if (gro_vif_stats)
                 gro_vif_stats->vis_ierrors++;
         }
