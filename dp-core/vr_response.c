@@ -11,7 +11,7 @@
 int vr_generate_response(vr_response *, int code, unsigned char *, int);
 
 void
-vr_response_process(void *s_req) 
+vr_response_process(void *s_req)
 {
 }
 

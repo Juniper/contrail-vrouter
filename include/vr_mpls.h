@@ -36,7 +36,7 @@ extern int vr_mpls_input(struct vrouter *, struct vr_packet *,
 
 
 
-static inline bool 
+static inline bool
 vr_mpls_is_label_mcast(unsigned int lbl)
 {
     if (lbl < VR_MAX_UCAST_LABELS) {

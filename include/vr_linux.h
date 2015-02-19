@@ -6,8 +6,8 @@
 
 #include "vrouter.h"
 
-static inline struct sk_buff * 
-vp_os_packet(struct vr_packet *pkt) 
+static inline struct sk_buff *
+vp_os_packet(struct vr_packet *pkt)
 {
     return CONTAINER_OF(cb, struct sk_buff, pkt);
 }

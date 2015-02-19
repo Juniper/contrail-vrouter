@@ -21,6 +21,7 @@ env.Replace(CPPPATH = '#vrouter/include')
 env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
 env.Append(CPPPATH = ['#tools'])
 env.Append(CPPPATH = ['#tools/sandesh/library/c'])
+env.Append(CPPPATH = ['#third_party/dpdk/build/include'])
 
 vr_root = './'
 makefile = vr_root + 'Makefile'
@@ -64,7 +65,8 @@ if sys.platform != 'darwin':
     buildinfo = env.GenerateBuildInfoCCode(target = ['vr_buildinfo.c'],
             source = [], path = dp_dir + 'dp-core')
 
-    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', 'utils', 'uvrouter', 'test']
+    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', \
+                            'utils', 'uvrouter', 'test', 'dpdk']
     for sdir in  subdirs:
         env.SConscript(sdir + '/SConscript',
                        exports='VRouterEnv',
@@ -79,6 +81,7 @@ if sys.platform != 'darwin':
     make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#tools/').abspath
     if 'vrouter' in COMMAND_LINE_TARGETS:
         BUILD_TARGETS.append('vrouter/uvrouter')
+        BUILD_TARGETS.append('vrouter/dpdk')
         BUILD_TARGETS.append('vrouter/utils')
 
     kern = env.Command('vrouter.ko', None, make_cmd)

@@ -14,7 +14,7 @@
 #include "vr_datapath.h"
 
 int
-vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt, 
+vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
                                 struct vr_forwarding_md *fmd)
 {
     struct vr_vxlan *vxlan;
@@ -44,7 +44,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     }
     fmd->fmd_label = vnid;
 
-    nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid); 
+    nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid);
     if (!nh) {
         drop_reason = VP_DROP_INVALID_VNID;
         goto fail;
@@ -131,7 +131,7 @@ vr_vxlan_get(vr_vxlan_req *req)
     if (!router) {
         ret = -ENODEV;
     } else {
-        nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, req->vxlanr_vnid); 
+        nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, req->vxlanr_vnid);
         if (!nh)
             ret = -ENOENT;
     }
@@ -182,11 +182,11 @@ vr_vxlan_add(vr_vxlan_req *req)
     }
 
     nh = vrouter_get_nexthop(req->vxlanr_rid, req->vxlanr_nhid);
-    if (!nh)  {
+    if (!nh) {
         ret = -EINVAL;
         goto generate_resp;
     }
-    
+
     nh_old = vr_itable_set(router->vr_vxlan_table, req->vxlanr_vnid, nh);
     if (nh_old) {
         if (nh_old == VR_ITABLE_ERR_PTR) {

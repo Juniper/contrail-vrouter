@@ -52,7 +52,7 @@ struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
 
 
 static bool
-bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry, 
+bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry,
                                               unsigned int index)
 {
     struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
@@ -144,7 +144,7 @@ static int
 bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
 {
     int ret;
-    
+
     if (!vn_rtable)
         return -EINVAL;
 
@@ -171,7 +171,7 @@ static void
 bridge_table_entry_free(vr_htable_t table, vr_hentry_t hentry,
         unsigned int index, void *data)
 {
-    struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry; 
+    struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
     if (!be)
         return;
 
@@ -312,7 +312,7 @@ __bridge_table_dump(struct vr_message_dumper *dumper)
 
     for(i = 0; i < (vr_bridge_entries + vr_bridge_oentries); i++) {
         be = (struct vr_bridge_entry *) vr_get_hentry_by_index(vn_rtable, i);
-        if (!be) 
+        if (!be)
             continue;
         if (be->be_flags & VR_BE_VALID_FLAG) {
             if (be->be_key.be_vrf_id != req->rtr_req.rtr_vrf_id)
@@ -372,14 +372,14 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 
     rtable->algo_data = vr_htable_create(vr_bridge_entries,
             vr_bridge_oentries, sizeof(struct vr_bridge_entry),
-            sizeof(struct vr_bridge_entry_key), bridge_entry_valid);  
+            sizeof(struct vr_bridge_entry_key), bridge_entry_valid);
 
     if (!rtable->algo_data)
-        return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 
+        return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
                 vr_bridge_entries);
 
     /* Max VRF's does not matter as Bridge table is not per VRF. But
-     * still this can be maintained in table 
+     * still this can be maintained in table
      */
     rtable->algo_max_vrfs = fs->rtb_max_vrfs;
     rtable->algo_add = bridge_table_add;
