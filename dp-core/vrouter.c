@@ -87,7 +87,7 @@ static struct vr_module modules[] = {
         .init           =       vr_vxlan_init,
         .exit           =       vr_vxlan_exit,
     },
-    
+
 };
 
 
@@ -96,10 +96,13 @@ static struct vr_module modules[] = {
  * TODO For BSD we turn off all performance tweaks for now, it will
  * be implemented later.
  */
+#ifdef __DPDK__
+int vr_perfr = 0;    /* GRO */
+int vr_perfs = 0;    /* segmentation in software */
 /*
  * Enable changes for better performance
  */
-#if defined(__linux__)
+#elif defined(__linux__)
 int vr_perfr = 1;    /* GRO */
 int vr_perfs = 1;    /* segmentation in software */
 #elif defined(__FreeBSD__)
@@ -252,7 +255,7 @@ vrouter_exit(bool soft_reset)
 
     return;
 }
-    
+
 int
 vrouter_init(void)
 {
@@ -266,8 +269,10 @@ vrouter_init(void)
     for (i = 0; i < VR_NUM_MODULES; i++) {
         module_under_init = &modules[i];
         ret = modules[i].init(&router);
-        if (ret)
+        if (ret) {
+            vr_printf("vrouter module %u init error (%d)\n", i, ret);
             goto init_fail;
+        }
     }
 
     module_under_init = NULL;
@@ -300,8 +305,8 @@ vrouter_ops_process(void *s_req)
     switch (ops->h_op) {
     case SANDESH_OP_RESET:
         vr_printf("vrouter soft reset start\n");
-        ret = vrouter_soft_reset();        
-        vr_printf("vrouter soft reset done(%d)\n", ret);
+        ret = vrouter_soft_reset();
+        vr_printf("vrouter soft reset done (%d)\n", ret);
         break;
     default:
         ret = -EOPNOTSUPP;

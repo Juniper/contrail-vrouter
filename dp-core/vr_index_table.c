@@ -34,7 +34,7 @@ vr_stride_empty(void **ptr, unsigned int cnt)
 }
 
 /* Default print function */
-static int 
+static int
 print_ind(unsigned int index, void *data, void *udata)
 {
     vr_printf("Index %d Data 0x%p\n", index, data);
@@ -49,7 +49,7 @@ get_page_shift(void)
 }
 #else
 static unsigned int
-get_page_shift(void) 
+get_page_shift(void)
 {
     return ffs(getpagesize());
 }
@@ -58,16 +58,16 @@ get_page_shift(void)
 
 
 static int
-__vr_itable_del(struct vr_itbl *table, unsigned int index, 
+__vr_itable_del(struct vr_itbl *table, unsigned int index,
                         void **ptr, unsigned int cnt, void **old)
 {
     unsigned int id;
 
     if (cnt == table->stride_cnt-1) {
-        id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1); 
+        id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1);
         *old = ptr[id];
 
-        /* 
+        /*
          * IF an entry exists to delete, mark it null. If the whole
          * stride is null, delete the stride itself
          */
@@ -80,15 +80,15 @@ __vr_itable_del(struct vr_itbl *table, unsigned int index,
         }
         return 0;
     }
-    
+
     if ((cnt < (table->stride_cnt - 1)) && ptr) {
-        id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1); 
-        if (ptr[id] && __vr_itable_del(table, index, (void **)(ptr[id]), 
+        id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1);
+        if (ptr[id] && __vr_itable_del(table, index, (void **)(ptr[id]),
                                             (cnt+1), old) == 1) {
 
-            /* 
-             * If a later stride is deleted, check for the 
-             * earliter stride as well 
+            /*
+             * If a later stride is deleted, check for the
+             * earliter stride as well
              */
             ptr[id] = NULL;
             if (vr_stride_empty(ptr, table->stride_len[cnt]) == 1) {
@@ -107,8 +107,8 @@ __vr_itable_del(struct vr_itbl *table, unsigned int index,
     return 0;
 }
 
-static int 
-__vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr, 
+static int
+__vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
         unsigned int cnt, unsigned int index, unsigned int marker, void *udata)
 {
     unsigned int i, j;
@@ -136,11 +136,11 @@ __vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
         return res;
     }
 
-    for (i = 0; i < table->stride_len[cnt]; i++) { 
+    for (i = 0; i < table->stride_len[cnt]; i++) {
 
         /* Rectursively call all strides */
         if (ptr[i]) {
-            res = __vr_itable_dump(table, func, (void **)ptr[i], (cnt + 1), 
+            res = __vr_itable_dump(table, func, (void **)ptr[i], (cnt + 1),
                     (index | (i << table->stride_shift[cnt])), marker, udata);
 
             /* No more traversal if upper stride stopped it */
@@ -154,7 +154,7 @@ __vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
 }
 
 static void
-__vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func, 
+__vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
                         void **ptr, unsigned int cnt, unsigned int index)
 {
     unsigned int i, j;
@@ -182,9 +182,9 @@ __vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
         return;
     }
 
-    for (i = 0; i < table->stride_len[cnt]; i++) { 
+    for (i = 0; i < table->stride_len[cnt]; i++) {
         if (ptr[i]) {
-            __vr_itable_exit(table, func, (void **)ptr[i], (cnt + 1), 
+            __vr_itable_exit(table, func, (void **)ptr[i], (cnt + 1),
                     (index | (i << table->stride_shift[cnt])));
 
             /* Upper strides are deleted. Delete the current */
@@ -207,7 +207,7 @@ vr_print_table_struct(vr_itable_t t)
 {
     struct vr_itbl *table = (struct vr_itbl *)t;
     unsigned int i;
-    
+
     if (!table) {
         return;
     }
@@ -223,7 +223,7 @@ vr_print_table_struct(vr_itable_t t)
 }
 
 int
-vr_itable_trav(vr_itable_t t, vr_itable_trav_cb_t func, 
+vr_itable_trav(vr_itable_t t, vr_itable_trav_cb_t func,
                                      unsigned int marker, void *udata)
 {
     struct vr_itbl *table = (struct vr_itbl *) t;
@@ -238,7 +238,7 @@ vr_itable_trav(vr_itable_t t, vr_itable_trav_cb_t func,
         func = print_ind;
     }
 
-    return  __vr_itable_dump(table, func, ptr, 0, 0, marker, udata);
+    return __vr_itable_dump(table, func, ptr, 0, 0, marker, udata);
 }
 
 void *
@@ -271,7 +271,7 @@ vr_itable_get(vr_itable_t t, unsigned int index)
 
     /* Go till last stride as long as data exists */
     for (i = 0, ptr = table->data; (i < table->stride_cnt) && ptr; i++) {
-        id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1); 
+        id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
         ptr = (void **)(ptr[id]);
     }
 
@@ -279,8 +279,8 @@ vr_itable_get(vr_itable_t t, unsigned int index)
 }
 
 /*
- * Insert an entry into index table. 
- * Returns the old entry at that index in success case. The old entry can be null. 
+ * Insert an entry into index table.
+ * Returns the old entry at that index in success case. The old entry can be null.
  * Incase of error returns ((void *)-1)
  */
 
@@ -297,8 +297,8 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
         return VR_ITABLE_ERR_PTR;
     }
 
-    if (index & (~(((0x1 << (table->index_len - 1)) - 1) | 
-				(0x1 << (table->index_len - 1 ))))) {
+    if (index & (~(((0x1 << (table->index_len - 1)) - 1) |
+        (0x1 << (table->index_len - 1 ))))) {
         vr_printf("Index %x has more bits than %d Ignoring MSB\n",
                 index, table->index_len);
     }
@@ -312,7 +312,7 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
     ptr = table->data;
 
     for (i = 0; i < table->stride_cnt - 1; i++) {
-        id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1); 
+        id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
 
         if (!ptr[id]) {
             ptr[id] = vr_zalloc(table->stride_len[i + 1] * sizeof(void *));
@@ -326,7 +326,7 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
     }
 
     /* Store the data in the last stride */
-    id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1); 
+    id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
 
     /* Return the old data */
     old = ptr[id];
@@ -334,7 +334,7 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
     return old;
 }
 
-/* 
+/*
  * Delete the whole index table. After deleting the individual entries
  * Delete all strides. After strides delete table management data as well
  */
@@ -360,10 +360,10 @@ vr_itable_delete(vr_itable_t t, vr_itable_del_cb_t func)
 
 /*
  * index_len - How many bits does index consist of. Max is 32 and any length
- * of bits can be used. 
- * stride_cnt - How many strides user wants. Minimum of 2. 
- * Varable arguments follow to identify how many bits is each stride. 
- * 
+ * of bits can be used.
+ * stride_cnt - How many strides user wants. Minimum of 2.
+ * Varable arguments follow to identify how many bits is each stride.
+ *
  */
 
 vr_itable_t
@@ -395,7 +395,7 @@ vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...)
     table->stride_cnt = stride_cnt;
 
     table->stride_shift = vr_zalloc(table->stride_cnt * sizeof(unsigned int));
-    if (!table->stride_shift) { 
+    if (!table->stride_shift) {
         goto fail;
     }
 

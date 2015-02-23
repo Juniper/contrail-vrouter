@@ -1,14 +1,14 @@
 /*
- *  vr_compat.h - compatibility definitions
- *  
- *  Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+ * vr_compat.h - compatibility definitions
+ *
+ * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 
 #ifndef __VRCOMPAT_H__
 #define __VRCOMPAT_H__
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0))
-#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
+#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 5)))
 typedef u64 netdev_features_t;
 #endif
@@ -37,7 +37,7 @@ skb_get_rxhash(struct sk_buff *skb)
 static inline __u32
 skb_get_rxhash(struct sk_buff *skb)
 {
-#if defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
+#if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
     struct iphdr *ip;
     u32 ports = 0;
@@ -105,26 +105,26 @@ static inline void skb_frag_size_sub(skb_frag_t *frag, int delta)
 {
         frag->size -= delta;
 }
-    
+
 #endif
-    
+
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 enum rx_handler_result {
-	RX_HANDLER_CONSUMED,
-	RX_HANDLER_ANOTHER,
-	RX_HANDLER_EXACT,
-	RX_HANDLER_PASS,
+    RX_HANDLER_CONSUMED,
+    RX_HANDLER_ANOTHER,
+    RX_HANDLER_EXACT,
+    RX_HANDLER_PASS,
 };
 
 typedef enum rx_handler_result rx_handler_result_t;
 
-#define VLAN_CFI_MASK    0x1000
-#define VLAN_TAG_PRESENT VLAN_CFI_MASK
-#define ARPHRD_VOID    0xFFFF
+#define VLAN_CFI_MASK       0x1000
+#define VLAN_TAG_PRESENT    VLAN_CFI_MASK
+#define ARPHRD_VOID         0xFFFF
 
-#if (RHEL_MAJOR != 6) && (RHEL_MINOR != 4) 
+#if (RHEL_MAJOR != 6) && (RHEL_MINOR != 4)
 
 #define alloc_netdev_mqs(sizeof_priv, name, setup, count1, count2) \
         alloc_netdev_mq(sizeof_priv, name, setup, count1)
@@ -137,7 +137,7 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 #endif
 
 #ifndef ISRHOSKERNEL
-#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
+#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 5)))
 static bool can_checksum_protocol(netdev_features_t features, __be16 protocol)
 {

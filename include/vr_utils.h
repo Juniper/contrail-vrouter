@@ -21,8 +21,8 @@ struct vn_if {
 
 struct vr_util_flags {
     unsigned int vuf_flag;
-    unsigned char *vuf_flag_symbol;
-    unsigned char *vuf_flag_string;
+    char *vuf_flag_symbol;
+    char *vuf_flag_string;
 };
 
 #ifdef __cplusplus

@@ -21,6 +21,7 @@ extern "C" {
 #include "vr_index_table.h"
 
 #define VR_NATIVE_VRF       0
+#define VR_UNIX_PATH_MAX    108
 
 #define VR_CPU_MASK     0xff
 extern unsigned int vr_num_cpus;
@@ -55,6 +56,7 @@ struct vr_timer {
 };
 
 struct host_os {
+    int (*hos_printf)(const char *, ...);
     void *(*hos_malloc)(unsigned int);
     void *(*hos_zalloc)(unsigned int);
     void (*hos_free)(void *);
@@ -95,7 +97,7 @@ struct host_os {
                                    unsigned short, unsigned short *,
                                    int (*is_label_l2)(unsigned int,
                                        unsigned int, unsigned short *));
-    int  (*hos_pcow)(struct vr_packet *, unsigned short); 
+    int  (*hos_pcow)(struct vr_packet *, unsigned short);
     uint16_t (*hos_get_udp_src_port)(struct vr_packet *,
                                      struct vr_forwarding_md *,
                                      unsigned short);
@@ -103,12 +105,15 @@ struct host_os {
     int  (*hos_pull_inner_headers_fast)(struct vr_packet *,
                                         unsigned char, int
                                         (*is_label_l2)(unsigned int,
-                                            unsigned int, unsigned short *), 
+                                            unsigned int, unsigned short *),
                                         int *, int *);
     int (*hos_pkt_may_pull)(struct vr_packet *, unsigned int);
     int (*hos_gro_process)(struct vr_packet *, struct vr_interface *, bool);
+    void (*hos_add_mpls)(struct vrouter *, unsigned);
+    void (*hos_del_mpls)(struct vrouter *, unsigned);
 };
 
+#define vr_printf                       vrouter_host->hos_printf
 #define vr_malloc                       vrouter_host->hos_malloc
 #define vr_zalloc                       vrouter_host->hos_zalloc
 #define vr_free                         vrouter_host->hos_free

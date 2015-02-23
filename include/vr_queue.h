@@ -1,5 +1,5 @@
 /*
- * vr_queue.h -- 
+ * vr_queue.h --
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */

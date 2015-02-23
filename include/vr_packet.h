@@ -22,10 +22,10 @@
 #define VR_IP_PROTO_IGMP        2
 #define VR_IP_PROTO_TCP         6
 #define VR_IP_PROTO_UDP         17
-#define	VR_IP_PROTO_GRE         47
+#define VR_IP_PROTO_GRE         47
 #define VR_IP_PROTO_ICMP6       58
 #define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
-#define VR_GRE_FLAG_KEY         (ntohs(0x2000)) 
+#define VR_GRE_FLAG_KEY         (ntohs(0x2000))
 #define VR_DHCP_SRC_PORT        68
 #define VR_DHCP6_SRC_PORT       546
 
@@ -73,7 +73,7 @@
 /* Diagnostic packet */
 #define VP_FLAG_DIAG            (1 << 8)
 
-/* 
+/*
  * possible 256 values of what a packet can be. currently, this value is
  * used only as an aid in fragmentation.
  */
@@ -121,8 +121,8 @@
 /*
  * Values to define the encap type of outgoing packet
  */
-#define PKT_ENCAP_MPLS  0x01
-#define PKT_ENCAP_VXLAN 0x02
+#define PKT_ENCAP_MPLS          0x01
+#define PKT_ENCAP_VXLAN         0x02
 
 
 /* packet drop reasons */
@@ -625,7 +625,7 @@ vr_icmp_error(struct vr_icmp *icmph)
 struct vr_gre {
     unsigned short gre_flags;
     unsigned short gre_proto;
-}  __attribute__((packed));
+} __attribute__((packed));
 
 struct vr_pcap {
     /* timestamp seconds */
@@ -633,7 +633,7 @@ struct vr_pcap {
     /* timestamp microseconds */
     unsigned int pcap_ts_usec;
     /* number of octets of packet saved in file */
-    unsigned int pcap_incl_len;         
+    unsigned int pcap_incl_len;
     /* actual length of packet */
     unsigned int pcap_orig_len;
 };
@@ -781,7 +781,7 @@ pkt_get_inner_network_header_off(struct vr_packet *pkt)
 
 }
 
-static inline void 
+static inline void
 pkt_set_network_header(struct vr_packet *pkt, unsigned short off)
 {
     pkt->vp_network_h = off;
@@ -801,7 +801,6 @@ pkt_network_header(struct vr_packet *pkt)
         return pkt->vp_head + pkt->vp_network_h;
 
     return vr_network_header(pkt);
-    
 }
 
 static inline unsigned char *

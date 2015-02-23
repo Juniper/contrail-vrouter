@@ -27,7 +27,7 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_flow_queue_limit_exceeded =
         stats->vds_flow_queue_limit_exceeded;
     response->vds_flow_no_memory = stats->vds_flow_no_memory;
-    response->vds_flow_invalid_protocol = 
+    response->vds_flow_invalid_protocol =
         stats->vds_flow_invalid_protocol;
     response->vds_flow_nat_no_rflow = stats->vds_flow_nat_no_rflow;
     response->vds_flow_action_drop = stats->vds_flow_action_drop;
@@ -101,7 +101,7 @@ vr_drop_stats_get(void)
         stats->vds_invalid_arp += stats_block->vds_invalid_arp;
         stats->vds_trap_no_if += stats_block->vds_trap_no_if;
         stats->vds_nowhere_to_go += stats_block->vds_nowhere_to_go;
-        stats->vds_flow_queue_limit_exceeded += 
+        stats->vds_flow_queue_limit_exceeded +=
             stats_block->vds_flow_queue_limit_exceeded;
         stats->vds_flow_no_memory += stats_block->vds_flow_no_memory;
         stats->vds_flow_invalid_protocol +=
@@ -166,7 +166,7 @@ vr_drop_stats_req_process(void *s_req)
 
     if ((req->h_op != SANDESH_OP_GET) && (ret = -EOPNOTSUPP))
         vr_send_response(ret);
-    
+
     vr_drop_stats_get();
     return;
 }
