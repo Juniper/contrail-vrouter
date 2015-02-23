@@ -33,9 +33,6 @@
 
 unsigned int vr_num_cpus = 1;
 
-extern int vr_flow_entries;
-extern int vr_oflow_entries;
-
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
 
@@ -72,6 +69,19 @@ extern void vhost_exit(void);
 extern int lh_gro_process(struct vr_packet *, struct vr_interface *, bool);
 
 static void lh_reset_skb_fields(struct vr_packet *pkt);
+
+static int
+lh_printk(const char *format, ...)
+{
+    int printed;
+    va_list args;
+
+    va_start(args, format);
+    printed = vprintk(format, args);
+    va_end(args);
+
+    return printed;
+}
 
 static void *
 lh_malloc(unsigned int size)
@@ -2173,7 +2183,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                  }
              } else {
                  if (!ip6h && !vr_ip_fragment(iph)) {
-                     if (iph->ip_proto == VR_IP_PROTO_TCP)  {
+                     if (iph->ip_proto == VR_IP_PROTO_TCP) {
                          lh_handle_checksum_complete_skb(skb);
                          tcpoff = (char *)tcph - (char *) skb->data;
 
@@ -2316,6 +2326,7 @@ lh_create_timer(struct vr_timer *vtimer)
 }
 
 struct host_os linux_host = {
+    .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
     .hos_zalloc                     =       lh_zalloc,
     .hos_free                       =       lh_free,

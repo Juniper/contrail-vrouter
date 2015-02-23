@@ -18,21 +18,21 @@ struct vr_htable {
     is_hentry_valid is_valid_entry;
 };
 
-void 
-vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb, 
+void
+vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
                                                                 void *data)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
     vr_hentry_t ent;
     unsigned int i;
-    
+
     if (!table || !cb)
         return;
 
     if (marker < table->hentries) {
         for (i = marker; i < table->hentries; i++) {
             ent = vr_btable_get(table->htable, i);
-            if(ent && table->is_valid_entry(htable, ent, i) == true) 
+            if(ent && table->is_valid_entry(htable, ent, i) == true)
                 cb(htable, ent, i, data);
         }
     }
@@ -41,8 +41,8 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
     if (marker < table->oentries) {
         for (i = marker; i < table->oentries; i++) {
             ent = vr_btable_get(table->htable, i);
-            if(ent && table->is_valid_entry(htable, ent, 
-                        (i + table->hentries)) == true) 
+            if(ent && table->is_valid_entry(htable, ent,
+                        (i + table->hentries)) == true)
                 cb(htable, ent, (i + table->hentries), data);
         }
     }
@@ -122,7 +122,7 @@ vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t hentry)
         ent = vr_btable_get(table->htable, ind);
         if (table->is_valid_entry(htable, ent, ind) == false)
             continue;
-        if ((ent == hentry) || (memcmp(ent, hentry, table->key_size) != 0)) 
+        if ((ent == hentry) || (memcmp(ent, hentry, table->key_size) != 0))
             continue;
         return ind;
     }
@@ -207,7 +207,7 @@ vr_htable_delete(vr_htable_t htable)
 }
 
 vr_htable_t
-vr_htable_create(unsigned int entries, unsigned int oentries, 
+vr_htable_create(unsigned int entries, unsigned int oentries,
         unsigned int entry_size, unsigned int key_size,
         is_hentry_valid is_valid_entry)
 {
@@ -228,7 +228,7 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
                                        sizeof(struct vr_htable));
         return NULL;
     }
-    
+
     table->htable = vr_btable_alloc(entries, entry_size);
     if (!table->htable) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, entries);

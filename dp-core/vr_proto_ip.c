@@ -264,8 +264,8 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
             fmd = &rt_fmd;
         }
         fmd->fmd_label = rt.rtr_req.rtr_label;
-    } 
-    
+    }
+
     vif = nh->nh_dev;
 
     if (vif) {
@@ -414,7 +414,7 @@ vr_udp_input(struct vrouter *router, struct vr_packet *pkt,
         /* Fall through to the slower path */
         ASSERT(ret == PKT_RET_SLOW_PATH);
     }
-   
+
     udph = (struct vr_udp *)vr_pheader_pointer(pkt, sizeof(struct vr_udp),
                                                 &udp);
     if (udph == NULL) {
@@ -553,7 +553,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
      * me or not. there are two ways a packet can reach here. either through
      *
      * route lookup->receive nexthop->vr_ip_rcv or through
-     * VP_FLAG_TO_ME(NO route lookup(!vp->vp_nh))->vr_ip_rcv 
+     * VP_FLAG_TO_ME(NO route lookup(!vp->vp_nh))->vr_ip_rcv
      */
     if ((pkt->vp_nh) || (vr_myip(pkt->vp_if, ip->ip_daddr))) {
         if (ip->ip_proto == VR_IP_PROTO_GRE) {

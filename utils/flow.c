@@ -41,10 +41,13 @@
 #include "vr_genetlink.h"
 #include "nl_util.h"
 #include "vr_os.h"
+#include "ini_parser.h"
 #include "vr_packet.h"
 
 #define TABLE_FLAG_VALID        0x1
+
 #define MEM_DEV                 "/dev/flow"
+int mem_fd;
 
 static int dvrf_set, mir_set, help_set;
 static unsigned short dvrf;
@@ -58,9 +61,9 @@ struct flow_table {
     u_int64_t ft_span;
     unsigned int ft_num_entries;
     unsigned int ft_flags;
+    char flow_table_path[256];
 } main_table;
 
-int mem_fd;
 struct nl_client *cl;
 vr_flow_req flow_req;
 
@@ -346,14 +349,20 @@ flow_stats(void)
             }
         }
 
-        system("clear");
+        /* On Ubuntu system() is declared with warn_unused_result
+         * attribute, so we suppress the warning
+         */
+        if (system("clear") == -1) {
+            printf("Error: system() failed\n");
+        }
+
         struct tm *tm;
         char fmt[64], buf[64];
         if((tm = localtime(&now.tv_sec)) != NULL)
         {
             strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S %z", tm);
             snprintf(buf, sizeof buf, fmt, now.tv_usec);
-            printf("%s\n", buf); 
+            printf("%s\n", buf);
         }
 
         printf("Flow Statistics\n");
@@ -450,18 +459,26 @@ flow_table_map(vr_flow_req *req)
 {
     int ret;
     struct flow_table *ft = &main_table;
+    const char *flow_path;
 
     if (req->fr_ftable_dev < 0)
         exit(ENODEV);
 
-    ret = mknod(MEM_DEV, S_IFCHR | O_RDWR,
-            makedev(req->fr_ftable_dev, req->fr_rid));
-    if (ret && errno != EEXIST) {
-        perror(MEM_DEV);
-        exit(errno);
+    const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
+    if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
+                (strcmp(platform, PLATFORM_NIC) == 0))) {
+        flow_path = req->fr_file_path;
+    } else {
+        flow_path = MEM_DEV;
+        ret = mknod(MEM_DEV, S_IFCHR | O_RDWR,
+                makedev(req->fr_ftable_dev, req->fr_rid));
+        if (ret && errno != EEXIST) {
+            perror(MEM_DEV);
+            exit(errno);
+        }
     }
 
-    mem_fd = open(MEM_DEV, O_RDONLY | O_SYNC);
+    mem_fd = open(flow_path, O_RDONLY | O_SYNC);
     if (mem_fd <= 0) {
         perror(MEM_DEV);
         exit(errno);
@@ -531,7 +548,7 @@ make_flow_req(vr_flow_req *req)
     if (ret <= 0)
         return ret;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
+    if ((ret = nl_recvmsg(cl)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp->nl_op == SANDESH_REQUEST) {
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
@@ -563,8 +580,13 @@ flow_table_setup(void)
     if (!cl)
         return -ENOMEM;
 
-    ret = nl_socket(cl, NETLINK_GENERIC);
+    parse_ini_file();
+    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
     if (ret <= 0)
+        return ret;
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0)
         return ret;
 
     ret = vrouter_get_family_id(cl);

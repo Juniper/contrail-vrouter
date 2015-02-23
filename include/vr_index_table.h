@@ -12,7 +12,7 @@ typedef void (*vr_itable_del_cb_t)(unsigned int index, void *data);
 
 vr_itable_t vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...);
 void vr_itable_delete(vr_itable_t t, vr_itable_del_cb_t func);
-    
+
 void *vr_itable_get(vr_itable_t t, unsigned int index);
 void *vr_itable_del(vr_itable_t t, unsigned int index);
 void *vr_itable_set(vr_itable_t t, unsigned int index, void *data);

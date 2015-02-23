@@ -35,7 +35,6 @@
 #include <net/netlink.h>
 #include <net/genetlink.h>
 
-#define vr_printf(format, arg...)   printk(format, ##arg)
 #define ASSERT(x) BUG_ON(!(x));
 
 #else /* __KERNEL */
@@ -49,7 +48,6 @@
 #include <assert.h>
 #include <sys/types.h>
 
-#define vr_printf(format, arg...)   printf(format, ##arg)
 #define ASSERT(x) assert((x));
 
 typedef __signed__ char __s8;

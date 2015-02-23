@@ -46,6 +46,12 @@ struct nl_client {
     struct nl_response resp;
     unsigned int cl_resp_buf_len;
     uint8_t *cl_resp_buf;
+    int cl_socket_domain;
+    int cl_socket_type;
+    int cl_socket_proto;
+    struct sockaddr *cl_sa;
+    uint32_t cl_sa_len;
+    int (*cl_recvmsg)(struct nl_client *);
 };
 
 
@@ -62,8 +68,11 @@ struct genl_ctrl_message {
 
 extern struct nl_client *nl_register_client(void);
 extern void nl_free_client(struct nl_client *cl);
-extern int nl_socket(struct nl_client *, unsigned int);
+extern int nl_socket(struct nl_client *, int, int , int);
+extern int nl_connect(struct nl_client *, uint32_t, uint16_t);
 extern int nl_sendmsg(struct nl_client *);
+extern int nl_client_datagram_recvmsg(struct nl_client *);
+extern int nl_client_stream_recvmsg(struct nl_client *);
 extern int nl_recvmsg(struct nl_client *);
 extern struct nl_response *nl_parse_reply(struct nl_client *);
 extern struct nl_response *nl_parse_gen_nh(struct nl_client *);
@@ -92,6 +101,7 @@ extern uint8_t *nl_get_buf_ptr(struct nl_client *cl);
 extern uint32_t nl_get_buf_len(struct nl_client *cl);
 extern void nl_build_attr(struct nl_client *cl, int len, int attr);
 extern int vrouter_get_family_id(struct nl_client *cl);
+extern int get_vrouter_pid(void);
 
 #ifdef __cplusplus
 }

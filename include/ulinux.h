@@ -4,26 +4,26 @@
 #include <time.h>
 
 struct list_head {
-	struct list_head *next, *prev;
+    struct list_head *next, *prev;
 };
 
 struct dummy_timer_list {
-        /*
- * All fields that change during normal runtime grouped to the
- * same cacheline
- */
-	struct list_head entry;
-	unsigned long expires;
-	struct tvec_base *base;
+    /*
+     * All fields that change during normal runtime grouped to the
+     * same cacheline
+     */
+    struct list_head entry;
+    unsigned long expires;
+    struct tvec_base *base;
 
-	void (*function)(unsigned long);
-	unsigned long data;
+    void (*function)(unsigned long);
+    unsigned long data;
 
-	int slack;
+    int slack;
 
-	int start_pid;
-	void *start_site;
-	char start_comm[16];
+    int start_pid;
+    void *start_site;
+    char start_comm[16];
 };
 
 time_t get_time(void);

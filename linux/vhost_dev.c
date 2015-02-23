@@ -240,7 +240,7 @@ vhost_if_add(struct vr_interface *vif)
             vp->vp_phys_dev =
                 (struct net_device *)vif->vif_bridge->vif_os;
             strncpy(vp->vp_phys_name, vp->vp_phys_dev->name,
-                    sizeof(vp->vp_phys_name));
+                    sizeof(vp->vp_phys_name) - 1);
 
             if (vp->vp_phys_dev->type != ARPHRD_ETHER) {
                 dev->flags |= IFF_NOARP;
