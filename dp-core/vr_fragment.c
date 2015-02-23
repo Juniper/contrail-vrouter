@@ -81,7 +81,7 @@ vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
     index = (hash % FRAG_TABLE_ENTRIES) * FRAG_TABLE_BUCKETS;
     for (i = 0; i < FRAG_TABLE_BUCKETS; i++) {
         fe = fragment_entry_get(router, index + i);
-        if (fe && !fe->f_dip  && fragment_entry_alloc(fe)) {
+        if (fe && !fe->f_dip && fragment_entry_alloc(fe)) {
             fragment_entry_set(fe, vrf, iph, sport, dport);
             break;
         } else {
@@ -112,7 +112,7 @@ vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
 
 struct vr_fragment *
 vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
-{   
+{
     unsigned int hash, index, i;
     struct vr_fragment_key key;
     struct vr_fragment *fe;
@@ -263,7 +263,7 @@ vr_fragment_table_scanner_exit(struct vrouter *router)
 
 void
 vr_fragment_table_exit(struct vrouter *router)
-{   
+{
     vr_fragment_table_scanner_exit(router);
 
     if (router->vr_fragment_table)

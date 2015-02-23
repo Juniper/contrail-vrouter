@@ -1,6 +1,6 @@
 /*
  * vr_genetlink.h -- a place for all the common definitions required by the
- * generic netlink part 
+ * generic netlink part
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */

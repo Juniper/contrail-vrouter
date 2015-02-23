@@ -120,7 +120,7 @@ vr_route_get(vr_route_req *req)
     int ret = 0;
     uint32_t rt_prefix[4];
 	struct vr_rtable *rtable;
-   
+
     vr_req.rtr_req = *req;
 
     vr_req.rtr_req.rtr_marker_size = 0;
@@ -159,7 +159,7 @@ vr_route_dump(vr_route_req *req)
     struct vr_rtable *rtable = NULL;
     int ret;
     uint32_t rt_prefix[4], rt_marker[4];
-   
+
     vr_req.rtr_req = *req;
     vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
     if (req->rtr_prefix_size) {
@@ -251,7 +251,7 @@ vr_inet_vrf_stats_dump(struct vrouter *router, vr_vrf_stats_req *req)
 
 generate_error:
     vr_send_response(ret);
-    return; 
+    return;
 }
 
 static void
@@ -267,7 +267,7 @@ vr_inet_vrf_stats_get(struct vrouter *router, vr_vrf_stats_req *req)
         goto generate_error;
     }
 
-    if (req->vsr_vrf >= 0 && 
+    if (req->vsr_vrf >= 0 &&
             (unsigned int)req->vsr_vrf >= rtable->algo_max_vrfs) {
         ret = -EINVAL;
         goto generate_error;
@@ -312,7 +312,7 @@ vr_vrf_stats_op(vr_vrf_stats_req *req)
         goto generate_error;
     }
 
-    return; 
+    return;
 
 generate_error:
     vr_send_response(ret);
@@ -417,7 +417,7 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
 }
 
 static void
-inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
+inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
                                                         bool soft_reset)
 {
 
@@ -426,7 +426,7 @@ inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
         vr_free(router->vr_inet_rtable);
         router->vr_inet_rtable = NULL;
     }
-   
+
     return;
 }
 
@@ -493,7 +493,7 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
 {
     int ret;
     struct vr_rtable *table = NULL;
-    
+
     if (router->vr_bridge_rtable)
         return 0;
 
@@ -512,7 +512,7 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
 }
 
 static void
-bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router, 
+bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
                                                             bool soft_reset)
 {
 
@@ -576,7 +576,7 @@ vr_fib_exit(struct vrouter *router, bool soft_reset)
     return;
 }
 
-int 
+int
 vr_fib_init(struct vrouter *router)
 {
     int i;

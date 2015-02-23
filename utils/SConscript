@@ -5,7 +5,7 @@
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 VRutilsEnv = env;
- 
+
 vr_root = '../'
 
 system_header_path = GetOption('system-header-path')
@@ -26,7 +26,8 @@ for sdir in  subdirs:
 
 # Build libvrutil
 libvrutil = 'vrutil'
-libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo', 'udp_util.c')]
+libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo', 'udp_util.c'),
+                  env.Object('ini_parser.lo', 'ini_parser.c')]
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
@@ -63,8 +64,9 @@ vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan]
+scripts  = ['vifdump']
 env.Default(binaries)
-env.Alias('install', env.Install(env['INSTALL_BIN'], binaries))
+env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))
 # Local Variables:
 # mode: python
 # End:

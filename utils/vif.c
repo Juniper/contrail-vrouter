@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "vr_os.h"
 
@@ -38,6 +39,7 @@
 #include "vhost.h"
 #include "vr_genetlink.h"
 #include "nl_util.h"
+#include "ini_parser.h"
 
 
 #define VHOST_TYPE_STRING       "vhost"
@@ -48,22 +50,27 @@
 #define GATEWAY_TYPE_STRING     "gateway"
 #define VIRTUAL_VLAN_TYPE_STRING    "virtual-vlan"
 #define STATS_TYPE_STRING       "stats"
+#define MONITORING_TYPE_STRING  "monitoring"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
 static int if_kindex = -1, vrf_id, vr_ifindex = -1;
+static int if_pmdindex = -1, vif_index = -1;
 static bool need_xconnect_if = false;
+static bool need_vif_id = false;
 static int if_xconnect_kindex = -1;
+static int if_vif_index = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
-static int vrf_set, mac_set, delete_set, policy_set;
-static int xconnect_set, vhost_phys_set;
+static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
+static int xconnect_set, vif_set, vhost_phys_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
+static bool response_pending = true;
 static bool vr_vrf_assign_dump = false;
 static int dump_marker = -1, var_marker = -1;
 
@@ -86,6 +93,9 @@ static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_PROMISCOUS,       "Pr",   "Promiscuous"       },
     {VIF_FLAG_NATIVE_VLAN_TAG,  "Vnt",  "Native Vlan Tagged"},
     {VIF_FLAG_NO_ARP_PROXY,     "Mnp",  "No MAC Proxy"      },
+    {VIF_FLAG_PMD,              "Dpdk", "DPDK PMD Interface"},
+    {VIF_FLAG_FILTERING_OFFLOAD,"Rfl",  "Receive Filtering Offload"},
+    {VIF_FLAG_MONITORED,        "Mon",  "Interface is Monitored"},
 };
 
 static char *
@@ -108,6 +118,8 @@ vr_get_if_type_string(int t)
         return "Stats";
     case VIF_TYPE_VIRTUAL_VLAN:
         return "Virtual(Vlan)";
+    case VIF_TYPE_MONITORING:
+        return "Monitoring";
     default:
         return "Invalid";
     }
@@ -142,6 +154,9 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, STATS_TYPE_STRING,
                 strlen(STATS_TYPE_STRING)))
         return VIF_TYPE_STATS;
+    else if (!strncmp(type_str, MONITORING_TYPE_STRING,
+                strlen(MONITORING_TYPE_STRING)))
+        return VIF_TYPE_MONITORING;
     else
         Usage();
 
@@ -210,12 +225,39 @@ vr_interface_print_head_space(void)
     return;
 }
 
+char *
+vr_if_transport_string(vr_interface_req *req)
+{
+    switch (req->vifr_transport) {
+    case VIF_TRANSPORT_VIRTUAL:
+        return "Virtual";
+        break;
+
+    case VIF_TRANSPORT_ETH:
+        return "Ethernet";
+        break;
+
+    case VIF_TRANSPORT_PMD:
+        return "PMD";
+        break;
+
+    case VIF_TRANSPORT_SOCKET:
+        return "Socket";
+        break;
+
+    default:
+        break;
+    }
+
+    return "Unknown";
+}
 void
 vr_interface_req_process(void *s)
 {
     char name[50];
     vr_interface_req *req = (vr_interface_req *)s;
     unsigned int printed = 0;
+    int platform = get_platform();
 
     if (add_set)
         vr_ifindex = req->vifr_idx;
@@ -226,8 +268,33 @@ vr_interface_req_process(void *s)
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
     for (; printed < 12; printed++)
         printf(" ");
-    printf("OS: %s", req->vifr_os_idx ?
-        if_indextoname(req->vifr_os_idx, name): "NULL");
+
+    if (req->vifr_flags & VIF_FLAG_PMD) {
+        printf("PMD: %d", req->vifr_os_idx);
+    } else if (platform == DPDK_PLATFORM) {
+        switch (req->vifr_type) {
+        case VIF_TYPE_PHYSICAL:
+            printf("PCI: %d:%d:%d.%d",
+                    (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
+                    (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+            break;
+
+        case VIF_TYPE_MONITORING:
+            printf("Monitoring: %s for vif%d/%d", req->vifr_name,
+                    req->vifr_rid, req->vifr_os_idx);
+            break;
+
+        default:
+            if (req->vifr_name)
+                printf("%s: %s", vr_if_transport_string(req),
+                        req->vifr_name);
+            break;
+        }
+
+    } else {
+        printf("OS: %s", req->vifr_os_idx ?
+                if_indextoname(req->vifr_os_idx, name): "NULL");
+    }
 
     if (req->vifr_type == VIF_TYPE_PHYSICAL) {
         if (req->vifr_speed >= 0) {
@@ -275,6 +342,7 @@ vr_interface_req_process(void *s)
         vr_ifindex = req->vifr_idx;
     }
 
+    response_pending = false;
     return;
 }
 
@@ -284,14 +352,20 @@ vr_response_process(void *s)
 {
     vr_response *resp = (vr_response *)s;
 
+    response_pending = false;
     if (resp->resp_code < 0 && !ignore_error)
         printf("%s\n", strerror(-resp->resp_code));
 
     if (vr_op == SANDESH_OP_DUMP) {
-            if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)
-                dump_pending = true;
-            else
-                dump_pending = false;
+        if (resp->resp_code > 0)
+            response_pending = true;
+
+        if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
+            response_pending = true;
+            dump_pending = true;
+        } else {
+            dump_pending = false;
+        }
     } else if (vr_op == SANDESH_OP_GET && vr_vrf_assign_dump) {
         if (!(resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)) {
             vr_vrf_assign_dump = false;
@@ -313,8 +387,8 @@ vhost_create(void)
     struct nl_response *resp;
 
     bzero(&vhost, sizeof(vhost));
-    strncpy(vhost.if_name, if_name, sizeof(vhost.if_name));
-    strncpy(vhost.if_kind, VHOST_KIND, sizeof(vhost.if_kind));
+    strncpy(vhost.if_name, if_name, sizeof(vhost.if_name) - 1);
+    strncpy(vhost.if_kind, VHOST_KIND, sizeof(vhost.if_kind) - 1);
     memcpy(vhost.if_mac, vr_ifmac, sizeof(vhost.if_mac));
     ret = nl_build_if_create_msg(cl, &vhost, 0);
     if (ret)
@@ -324,7 +398,7 @@ vhost_create(void)
     if (ret <= 0)
         return ret;
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
+    if ((ret = nl_recvmsg(cl)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp && resp->nl_op)
             printf("%s\n", strerror(resp->nl_op));
@@ -342,7 +416,7 @@ vhost_create(void)
         goto ending;
     }
 
-    strncpy(ifr.ifr_name, if_name, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, if_name, sizeof(ifr.ifr_name) - 1);
 
     ret = ioctl(s, SIOCIFCREATE, &ifr);
     if (ret < 0) {
@@ -379,8 +453,9 @@ ending:
 static int
 vr_intf_send_msg(void *request, char *request_string)
 {
-    int ret, error, attr_len; 
+    int ret, error, attr_len;
     struct nl_response *resp;
+    struct nlmsghdr *nlh;
 
     /* nlmsg header */
     ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
@@ -408,14 +483,22 @@ vr_intf_send_msg(void *request, char *request_string)
     nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
     nl_update_nlh(cl);
 
+    response_pending = true;
     /* Send the request to kernel */
     ret = nl_sendmsg(cl);
 
-    while ((ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST) {
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+    while (response_pending) {
+        if ((ret = nl_recvmsg(cl)) > 0) {
+            resp = nl_parse_reply(cl);
+            if (resp->nl_op == SANDESH_REQUEST) {
+                sandesh_decode(resp->nl_data, resp->nl_len,
+                               vr_find_sandesh_info, &ret);
+            }
         }
+
+        nlh = (struct nlmsghdr *)cl->cl_buf;
+        if (!nlh->nlmsg_flags)
+            break;
     }
 
     return 0;
@@ -452,12 +535,13 @@ vr_vrf_assign_dump_request(void)
 
     return 0;
 }
- 
-static int 
+
+static int
 vr_intf_op(unsigned int op)
 {
-    int ret; 
+    int ret;
     vr_interface_req intf_req;
+    int platform = get_platform();
     if (create_set)
         return vhost_create();
 op_retry:
@@ -483,11 +567,24 @@ op_retry:
         intf_req.vifr_os_idx = if_kindex;
         if (vr_ifindex < 0)
             vr_ifindex = if_kindex;
-        intf_req.vifr_idx = vr_ifindex;
+        if (vindex_set)
+            intf_req.vifr_idx = vif_index;
+        else
+            intf_req.vifr_idx = vr_ifindex;
         intf_req.vifr_rid = 0;
         intf_req.vifr_type = vr_if_type;
-        if (vr_if_type == VIF_TYPE_HOST)
+        if (vr_if_type == VIF_TYPE_HOST) {
             intf_req.vifr_cross_connect_idx = if_xconnect_kindex;
+        } else if (vr_if_type == VIF_TYPE_MONITORING) {
+            if (platform == DPDK_PLATFORM) {
+                /* we carry vif index in OS index field */
+                intf_req.vifr_os_idx = if_vif_index;
+            } else {
+                printf("Error adding interface: " MONITORING_TYPE_STRING
+                    " type should be used for vRouter/DPDK only\n");
+                exit(-EINVAL);
+            }
+        }
         intf_req.vifr_flags = vr_ifflags;
 
         break;
@@ -540,9 +637,11 @@ Usage()
 {
     printf("Usage: vif [--create <intf_name> --mac <mac>]\n");
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
-    printf("\t   \t--type [vhost|agent|physical|virtual]\n");
+    printf("\t   \t--type [vhost|agent|physical|virtual|monitoring]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
-    printf("\t   \t--policy, --vhost-phys, --dhcp-enable]]\n");
+    printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
+    printf("\t   \t--vif <vif ID>]\n");
+    printf( "[--id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -562,14 +661,18 @@ enum if_opt_index {
     MAC_OPT_INDEX,
     DELETE_OPT_INDEX,
     POLICY_OPT_INDEX,
+    PMD_OPT_INDEX,
+    PCI_OPT_INDEX,
     KINDEX_OPT_INDEX,
     TYPE_OPT_INDEX,
     SET_OPT_INDEX,
     VLAN_OPT_INDEX,
     XCONNECT_OPT_INDEX,
+    VIF_OPT_INDEX,
     DHCP_OPT_INDEX,
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
+    VINDEX_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -582,14 +685,18 @@ static struct option long_options[] = {
     [MAC_OPT_INDEX]         =   {"mac",         required_argument,  &mac_set,           1},
     [DELETE_OPT_INDEX]      =   {"delete",      required_argument,  &delete_set,        1},
     [POLICY_OPT_INDEX]      =   {"policy",      no_argument,        &policy_set,        1},
+    [PMD_OPT_INDEX]         =   {"pmd",         no_argument,        &pmd_set,           1},
+    [PCI_OPT_INDEX]         =   {"pci",         no_argument,        &pci_set,           1},
     [KINDEX_OPT_INDEX]      =   {"kernel",      no_argument,        &kindex_set,        1},
     [TYPE_OPT_INDEX]        =   {"type",        required_argument,  &type_set,          1},
     [SET_OPT_INDEX]         =   {"set",         required_argument,  &set_set,           1},
     [VLAN_OPT_INDEX]        =   {"vlan",        required_argument,  &vlan_set,          1},
     [VHOST_PHYS_OPT_INDEX]  =   {"vhost-phys",  no_argument,        &vhost_phys_set,    1},
     [XCONNECT_OPT_INDEX]    =   {"xconnect",    required_argument,  &xconnect_set,      1},
+    [VIF_OPT_INDEX]         =   {"vif",         required_argument,  &vif_set,           1},
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
+    [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,      1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -603,13 +710,15 @@ parse_long_opts(int option_index, char *opt_arg)
 
     switch (option_index) {
     case ADD_OPT_INDEX:
-        strncpy(if_name, opt_arg, sizeof(if_name));
+        strncpy(if_name, opt_arg, sizeof(if_name) - 1);
         if_kindex = if_nametoindex(opt_arg);
+        if (isdigit(opt_arg[0]))
+            if_pmdindex = strtol(opt_arg, NULL, 0);
         vr_op = SANDESH_OP_ADD;
         break;
 
     case CREATE_OPT_INDEX:
-        strncpy(if_name, opt_arg, sizeof(if_name));
+        strncpy(if_name, opt_arg, sizeof(if_name) - 1);
         break;
 
     case VRF_OPT_INDEX:
@@ -638,8 +747,18 @@ parse_long_opts(int option_index, char *opt_arg)
             Usage();
         break;
 
+    case VINDEX_OPT_INDEX:
+        vif_index = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
     case POLICY_OPT_INDEX:
         vr_ifflags |= VIF_FLAG_POLICY_ENABLED;
+        break;
+
+    case PMD_OPT_INDEX:
+        vr_ifflags |= VIF_FLAG_PMD;
         break;
 
     case LIST_OPT_INDEX:
@@ -650,6 +769,14 @@ parse_long_opts(int option_index, char *opt_arg)
         vr_if_type = vr_get_if_type(optarg);
         if (vr_if_type == VIF_TYPE_HOST)
             need_xconnect_if = true;
+        if (vr_if_type == VIF_TYPE_MONITORING) {
+            need_vif_id = true;
+            /* set default values for mac and vrf */
+            vrf_id = 0;
+            vrf_set = 1;
+            vr_ifmac[0] = 0x2; /* locally administered */
+            mac_set = 1;
+        }
         break;
 
     case SET_OPT_INDEX:
@@ -668,12 +795,19 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case XCONNECT_OPT_INDEX:
         if_xconnect_kindex = if_nametoindex(opt_arg);
-        if (!if_xconnect_kindex) {
+        if (isdigit(opt_arg[0])) {
+            if_pmdindex = strtol(opt_arg, NULL, 0);
+        } else if (!if_xconnect_kindex) {
             printf("%s does not seem to be a  valid physical interface name\n",
                     opt_arg);
             Usage();
         }
 
+        break;
+
+    case VIF_OPT_INDEX:
+        if_vif_index = strtol(opt_arg, NULL, 0);
+        vr_ifmac[sizeof(vr_ifmac) - 1] = if_vif_index & 0xFF;
         break;
 
     case DHCP_OPT_INDEX:
@@ -705,6 +839,11 @@ validate_options(void)
     if (!sum_opt || help_set)
         Usage();
 
+    if (pmd_set || pci_set) {
+        if_kindex = if_pmdindex;
+        if_xconnect_kindex = if_pmdindex;
+    }
+
     if (create_set) {
         if ((sum_opt > 1) && (sum_opt != 2 || !mac_set))
             Usage();
@@ -730,6 +869,8 @@ validate_options(void)
             Usage();
         if (need_xconnect_if && !xconnect_set)
             Usage();
+        if (need_vif_id && !vif_set)
+            Usage();
         return;
     }
 
@@ -746,13 +887,13 @@ int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
-    /* 
+    /*
      * the proto of the socket changes based on whether we are creating an
      * interface in linux or doing an operation in vrouter
      */
     unsigned int sock_proto = NETLINK_GENERIC;
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:DPi:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'a':
@@ -796,14 +937,29 @@ main(int argc, char *argv[])
                 parse_long_opts(VRF_OPT_INDEX, optarg);
                 break;
 
-            case 'p':  
+            case 'p':
                 policy_set = 1;
                 parse_long_opts(POLICY_OPT_INDEX, NULL);
+                break;
+
+            case 'D':
+                pmd_set = 1;
+                parse_long_opts(PMD_OPT_INDEX, NULL);
+                break;
+
+            case 'P':
+                pci_set = 1;
+                parse_long_opts(PCI_OPT_INDEX, NULL);
                 break;
 
             case 't':
                 type_set = 1;
                 parse_long_opts(TYPE_OPT_INDEX, optarg);
+                break;
+
+            case 'i':
+                vindex_set = 1;
+                parse_long_opts(VINDEX_OPT_INDEX, NULL);
                 break;
 
             case 0:
@@ -825,11 +981,21 @@ main(int argc, char *argv[])
 #if defined(__linux__)
     if (create_set)
         sock_proto = NETLINK_ROUTE;
+    else
+        sock_proto = get_protocol();
 #endif
 
-    ret = nl_socket(cl, sock_proto);
-    if (ret <= 0)
-       exit(ret);
+    parse_ini_file();
+
+    ret = nl_socket(cl, get_domain(), get_type(), sock_proto);
+    if (ret <= 0) {
+        exit(1);
+    }
+
+    ret = nl_connect(cl, get_ip(), get_port());
+    if (ret < 0) {
+        exit(1);
+    }
 
     if (sock_proto == NETLINK_GENERIC)
         if (vrouter_get_family_id(cl) <= 0)

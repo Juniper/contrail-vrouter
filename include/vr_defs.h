@@ -1,4 +1,4 @@
-/* 
+/*
  * vr_defs.h - definitions
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
@@ -60,7 +60,7 @@ struct agent_hdr {
     unsigned int hdr_cmd_param;
     unsigned int hdr_cmd_param_1;
 } __attribute__((packed));
-    
+
 #define CMD_PARAM_PACKET_CTRL       0x1
 #define CMD_PARAM_1_DIAG            0x1
 #define MAX_CMD_PARAMS                3

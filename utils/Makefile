@@ -18,7 +18,7 @@ BIN_FLAGS += -L .
 BIN_FLAGS += -lsandesh-c -lvrutil
 
 LIB_NAME = libvrutil.a
-LIBOBJS = nl_util.lo 
+LIBOBJS = nl_util.lo
 
 VIF = vif
 NH = nh

@@ -14,7 +14,7 @@ struct vr_packet;
 
 extern int vr_vxlan_init(struct vrouter *);
 extern void vr_vxlan_exit(struct vrouter *, bool);
-extern int vr_vxlan_input(struct vrouter *, struct vr_packet *, 
+extern int vr_vxlan_input(struct vrouter *, struct vr_packet *,
                                     struct vr_forwarding_md *);
 
 
