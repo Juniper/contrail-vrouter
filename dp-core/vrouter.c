@@ -154,13 +154,13 @@ int vr_use_linux_br = 0; /* nop if netdev_rx_handler_register() is used */
 #else
 
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
 
 int vr_perfr1 = 0;
 int vr_perfr2 = 1;
 int vr_perfr3 = 1;
 int vr_perfp = 1;
-int vr_use_linux_br = 0; /* Centos 6.4 */
+int vr_use_linux_br = 0; /* Centos 6.4 or higher */
 
 #else
 

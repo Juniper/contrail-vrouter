@@ -38,7 +38,7 @@ static inline __u32
 skb_get_rxhash(struct sk_buff *skb)
 {
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR)  && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     struct iphdr *ip;
     u32 ports = 0;
 

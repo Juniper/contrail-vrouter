@@ -942,7 +942,7 @@ vr_kmap_atomic(struct page *page)
 {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     return kmap_atomic(page, KM_SKB_DATA_SOFTIRQ);
 #else 
     return NULL;
@@ -962,7 +962,7 @@ vr_kunmap_atomic(void *va)
 {
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
-           (RHEL_MAJOR == 6) && (RHEL_MINOR == 4)
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     kunmap_atomic(va, KM_SKB_DATA_SOFTIRQ); 
 #else 
     return;
