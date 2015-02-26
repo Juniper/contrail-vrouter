@@ -449,8 +449,10 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
     struct vr_flow_queue *vfq = fe->fe_hold_list;
     struct vr_packet_node *pnode;
 
-    if (!vfq)
-        return -EINVAL;
+    if (!vfq) {
+        drop_reason = VP_DROP_FLOW_UNUSABLE;
+        goto drop;
+    }
 
     i = __sync_fetch_and_add(&vfq->vfq_entries, 1);
     if (i >= VR_MAX_FLOW_QUEUE_ENTRIES) {
@@ -1077,6 +1079,9 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
 {
     struct vr_flow_queue *vfq;
 
+    if (fe->fe_action == VR_FLOW_ACTION_HOLD)
+        return;
+
     vfq = fe->fe_hold_list;
     if (!vfq)
         return;
@@ -1347,6 +1352,15 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         fe = vr_add_flow_req(req, &fe_index);
         if (!fe)
             return -ENOSPC;
+    } else {
+        if ((req->fr_action == VR_FLOW_ACTION_HOLD) &&
+                (fe->fe_action != req->fr_action)) {
+            if (!fe->fe_hold_list) {
+                fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue));
+                if (!fe->fe_hold_list)
+                    return -ENOMEM;
+            }
+        }
     }
 
     vr_flow_set_mirror(router, req, fe);
