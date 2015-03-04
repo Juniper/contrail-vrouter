@@ -171,7 +171,7 @@ struct vr_interface {
     void *vif_os;
     int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
     unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
-            unsigned char *, unsigned short);
+            struct vr_forwarding_md *, unsigned char *, unsigned short);
     int (*vif_tx)(struct vr_interface *, struct vr_packet *,
             struct vr_forwarding_md *);
     /*
