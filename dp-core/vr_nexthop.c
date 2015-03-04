@@ -1292,8 +1292,8 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data, 
-                                     nh->nh_udp_tun_encap_len)) {
+    if (!vif->vif_set_rewrite(vif, pkt, fmd,
+                nh->nh_data, nh->nh_udp_tun_encap_len)) {
         goto send_fail;
     }
 
@@ -1429,8 +1429,8 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    tun_encap = vif->vif_set_rewrite(vif, pkt, nh->nh_data, 
-                                     tun_encap_len);
+    tun_encap = vif->vif_set_rewrite(vif, pkt, fmd,
+            nh->nh_data, tun_encap_len);
     if (!tun_encap) {
         goto send_fail;
     }
@@ -1588,8 +1588,8 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    tun_encap = vif->vif_set_rewrite(vif, pkt, nh->nh_data,
-            nh->nh_gre_tun_encap_len);
+    tun_encap = vif->vif_set_rewrite(vif, pkt, fmd,
+            nh->nh_data, nh->nh_gre_tun_encap_len);
     if (!tun_encap) {
         drop_reason = VP_DROP_PUSH;
         goto send_fail;
@@ -1749,7 +1749,7 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
             return 0;
     }
 
-    if (!vif->vif_set_rewrite(vif, pkt, nh->nh_data, nh->nh_encap_len)) {
+    if (!vif->vif_set_rewrite(vif, pkt, fmd, nh->nh_data, nh->nh_encap_len)) {
         vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
         return 0;
     }

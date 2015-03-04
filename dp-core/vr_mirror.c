@@ -417,7 +417,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
                     pkt_nh->nh_encap_len)) 
                 goto fail;
 
-            if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, 
+            if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
                     pkt_nh->nh_data, pkt_nh->nh_encap_len))
                 goto fail;
         }

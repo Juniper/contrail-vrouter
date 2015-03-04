@@ -87,7 +87,8 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
  */
 static unsigned char *
 vif_cmn_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned char *rewrite, unsigned short len)
+        struct vr_forwarding_md *fmd, unsigned char *rewrite,
+        unsigned short len)
 {
     unsigned char *head;
 
@@ -233,7 +234,8 @@ free_pkt:
 
 static unsigned char *
 agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned char *rewrite, unsigned short len)
+        struct vr_forwarding_md *fmd, unsigned char *rewrite,
+        unsigned short len)
 {
     unsigned char *head;
     unsigned int hdr_len;
@@ -257,7 +259,7 @@ agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
 
     hdr = (struct agent_hdr *)(head + len);
     hdr->hdr_ifindex = htons(pkt->vp_if->vif_idx);
-    hdr->hdr_vrf = htons(pkt->vp_if->vif_vrf);
+    hdr->hdr_vrf = htons(fmd->fmd_dvrf);
     /* this needs some thought */
     hdr->hdr_cmd = htons(AGENT_TRAP_NEXTHOP);
     hdr->hdr_cmd_param = 0;
@@ -954,7 +956,8 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
 
 static unsigned char *
 eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned char *rewrite, unsigned short len)
+        struct vr_forwarding_md *fmd, unsigned char *rewrite,
+        unsigned short len)
 {
     if (!len)
         return pkt_data(pkt);
@@ -964,7 +967,7 @@ eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
         return pkt_data(pkt);
     }
 
-    return vif_cmn_rewrite(vif, pkt, rewrite, len);
+    return vif_cmn_rewrite(vif, pkt, fmd, rewrite, len);
 }
 
 static mac_response_t
