@@ -783,7 +783,6 @@ vlan_drv_del(struct vr_interface *vif)
 static int
 vlan_drv_add(struct vr_interface *vif, vr_interface_req *vifr)
 {
-    int ret;
     struct vr_interface *pvif = NULL;
 
     if ((unsigned int)(vifr->vifr_parent_vif_idx) > VR_MAX_INTERFACES)
@@ -820,24 +819,10 @@ vlan_drv_add(struct vr_interface *vif, vr_interface_req *vifr)
 
     vif->vif_parent = pvif;
 
-    if (!pvif->vif_driver->drv_add_sub_interface) {
-        ret = -EINVAL;
-        goto add_fail;
-    }
+    if (!pvif->vif_driver->drv_add_sub_interface)
+        return -EINVAL;
 
-    ret = pvif->vif_driver->drv_add_sub_interface(pvif, vif);
-    if (ret)
-        goto add_fail;
-
-    return 0;
-
-add_fail:
-    if (pvif) {
-        vif->vif_parent = NULL;
-        vrouter_put_interface(pvif);
-    }
-
-    return ret;
+    return pvif->vif_driver->drv_add_sub_interface(pvif, vif);
 }
 /* end vlan driver */
 
@@ -1112,30 +1097,32 @@ eth_drv_del(struct vr_interface *vif)
 static int
 eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
+    int ret = 0;
+
     if (vif->vif_src_mac) {
-        if (pvif->vif_btable)
-            return vif_bridge_delete(pvif, vif);
-        return -EINVAL;
+        ret = vif_bridge_delete(pvif, vif);
+    } else {
+        if (pvif->vif_sub_interfaces[vif->vif_vlan_id] != vif)
+            ret = -ENOENT;
+        pvif->vif_sub_interfaces[vif->vif_vlan_id] = NULL;
     }
 
-    if (!pvif->vif_sub_interfaces)
-        return -EINVAL;
-
-    if (pvif->vif_sub_interfaces[vif->vif_vlan_id] != vif)
-        return -EINVAL;
-
-    pvif->vif_sub_interfaces[vif->vif_vlan_id] = NULL;
-    vrouter_put_interface(pvif);
-    vif->vif_parent = NULL;
-
-    hif_ops->hif_del(vif);
-    return 0;
+    if (!ret) {
+        vrouter_put_interface(pvif);
+        vif->vif_parent = NULL;
+        hif_ops->hif_del(vif);
+    }
+    return ret;
 }
 
 static int
 eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 {
     int ret = 0;
+
+    ret = hif_ops->hif_add(vif);
+    if (ret)
+        return ret;
 
     if (vif->vif_src_mac) {
         if (!pvif->vif_btable) {
@@ -1144,23 +1131,21 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
                 return ret;
         }
 
-        return vif_bridge_add(pvif, vif);
-    }
-
-    if (!pvif->vif_sub_interfaces) {
-        pvif->vif_sub_interfaces = vr_zalloc(VLAN_ID_MAX *
+        ret = vif_bridge_add(pvif, vif);
+    } else {
+        if(!pvif->vif_sub_interfaces) {
+            pvif->vif_sub_interfaces = vr_zalloc(VLAN_ID_MAX *
                 sizeof(struct vr_interface *));
-        if (!pvif->vif_sub_interfaces)
-            return -ENOMEM;
-        /* 
-         * we are not going to free this memory, since it is not guaranteed
-         * that we will get contiguous memory. so hold on to it for the life
-         * time of the interface
-         */
+            if (!pvif->vif_sub_interfaces)
+                return -ENOMEM;
+            /*
+             * we are not going to free this memory, since it is not guaranteed
+             * that we will get contiguous memory. so hold on to it for the life
+             * time of the interface
+             */
+        }
+        pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
     }
-
-    pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
-    ret = hif_ops->hif_add(vif);
 
     return ret;
 }
