@@ -12,6 +12,7 @@ env = VRouterEnv.Clone()
 # CFLAGS
 env.Append(CCFLAGS = '-Werror -Wall')
 env.Append(CCFLAGS = '-D__DPDK__')
+env.Append(CCFLAGS = '-msse4.2')
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
