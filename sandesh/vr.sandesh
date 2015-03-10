@@ -202,6 +202,16 @@ buffer sandesh vr_response {
 buffer sandesh vrouter_ops {
     1: sandesh_op   h_op;
 }
+buffer sandesh vr_drop_stats_register {
+    1: sandesh_op   h_op;
+    2: i32			source_ip;
+    3: i32			destination_ip;
+    4: i16			source_port;
+    5: i16			destination_port;
+    6: byte			protocol;
+    7: i16			vrf;
+    8: i32			resp_code;
+}
 
 buffer sandesh vr_drop_stats_req {
     1:  sandesh_op      h_op;
@@ -252,4 +262,5 @@ buffer sandesh vr_drop_stats_req {
     46: i64             vds_arp_no_route;
     47: i64             vds_l2_no_route;
     48: i64             vds_arp_reply_no_route;
+    49: i16				vds_is_filtered;
 }

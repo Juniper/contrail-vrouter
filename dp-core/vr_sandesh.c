@@ -57,6 +57,10 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_vxlan_req),
         .obj_type_string        =       "vr_vxlan_req",
     },
+    [VR_DROP_STATS_REGISTER_OBJ_ID]     =   {
+            .obj_len                =       4 * sizeof(vr_drop_stats_register),
+            .obj_type_string        =       "vr_drop_stats_register",
+    },
 };
 
 static unsigned int

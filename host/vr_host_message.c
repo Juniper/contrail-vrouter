@@ -38,6 +38,7 @@ struct diet_object_md {
             int (*)(void *, unsigned int, void *), void *);
 };
 int diet_dropstats_object_copy(char *, unsigned int, void *);
+int diet_dropstat_register_object_copy(char *, unsigned int, void *);
 int diet_interface_object_copy(char *, unsigned int, void *);
 int diet_nexthop_object_copy(char *, unsigned int, void *);
 int diet_mpls_object_copy(char *, unsigned int, void *);
@@ -88,9 +89,24 @@ struct diet_object_md diet_md[] = {
         .obj_len                =       sizeof(vr_drop_stats_req),
         .obj_copy               =       diet_dropstats_object_copy,
         .obj_response           =       diet_object_response,
-     }
+     },
+    [VR_DROP_STATS_REGISTER_OBJ_ID] = {
+		.obj_len                =       sizeof(vr_drop_stats_register),
+		.obj_copy               =       diet_dropstat_register_object_copy,
+		.obj_response           =       diet_object_response,
+    }
 };
 
+int
+diet_dropstat_register_object_copy(char *dst, unsigned int buf_len, void *object)
+{
+	vr_drop_stats_register *src = (vr_drop_stats_register *)object;
+    if (buf_len < diet_md[VR_DROP_STATS_REGISTER_OBJ_ID].obj_len)
+        return -ENOSPC;
+
+    memcpy(dst, src, sizeof(*src));
+    return sizeof(*src);
+}
 int
 diet_dropstats_object_copy(char *dst, unsigned int buf_len, void *object)
 {

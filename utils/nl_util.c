@@ -45,6 +45,7 @@ extern void vr_vrf_assign_req_process(void *s_req) __attribute__((weak));
 extern void vr_vrf_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_drop_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_vxlan_req_process(void *s_req) __attribute__((weak));
+extern void vr_drop_stats_register_process(void *register_req )  __attribute__((weak));
 
 void
 vrouter_ops_process(void *s_req) 
@@ -118,6 +119,12 @@ void
 vr_vxlan_req_process(void *s_req) 
 {
     return;
+}
+
+void
+vr_drop_stats_register_process(void *register_req)
+{
+	return;
 }
 
 struct nl_response *
