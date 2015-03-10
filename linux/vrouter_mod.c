@@ -31,11 +31,12 @@
 #include "vr_bridge.h"
 #include "vr_packet.h"
 
+
 unsigned int vr_num_cpus = 1;
 
 extern int vr_flow_entries;
 extern int vr_oflow_entries;
-
+extern int drop_stats_filter_set;
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
 
@@ -270,9 +271,12 @@ lh_pfree(struct vr_packet *pkt, unsigned short reason)
     if (!skb)
         return;
 
-    if (router)
+    if (router) {
         ((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
-
+        if (pkt->is_matched_filter) {
+            ((uint64_t *)(router->vr_pdrop_filter_stats[pkt->vp_cpu]))[reason]++;
+        }
+    }
     kfree_skb(skb);
     return;
 }

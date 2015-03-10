@@ -472,7 +472,6 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, unsigned short vlan_id)
 {
     struct vr_forwarding_md fmd;
-
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
     fmd.fmd_dvrf = vrf;
@@ -486,7 +485,7 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         vif_drop_pkt(vif, pkt, 1);
         return 0;
     }
-
+    vr_set_pkt_filter(vif->vif_router, pkt, vif->vif_vrf);
     if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, &fmd))
         return 0;
 

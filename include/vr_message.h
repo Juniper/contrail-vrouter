@@ -27,6 +27,7 @@
 #define VR_VRF_STATS_OBJECT_ID          9
 #define VR_DROP_STATS_OBJECT_ID         10
 #define VR_VXLAN_OBJECT_ID              11
+#define VR_DROP_STATS_FILTER_OBJECT_ID  12
 
 #define VR_MESSAGE_PAGE_SIZE            (4096 - 128)
 

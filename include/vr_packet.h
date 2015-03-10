@@ -173,6 +173,9 @@
 #define VP_DROP_ARP_REPLY_NO_ROUTE          44
 #define VP_DROP_MAX                         45
 
+/* Values to return on drop stats filter query */
+#define NO_FILTER_REGISTERED      1
+#define FILTER_ALREADY_REGISTERED 2
 
 struct vr_drop_stats {
     uint64_t vds_discard;
@@ -222,6 +225,16 @@ struct vr_drop_stats {
     uint64_t vds_arp_reply_no_route;
 
 };
+struct vr_registered_tuple {
+    unsigned int src_ip;
+    unsigned int dst_ip;
+    unsigned short src_port;
+    unsigned short dst_port;
+    unsigned char protocol;
+    unsigned short vrf;
+};
+
+extern void vr_set_pkt_filter(struct vrouter *router, struct vr_packet *pkt, short vrf);
 
 /*
  * NOTE: Please do not add any more fields without ensuring
@@ -241,6 +254,7 @@ struct vr_packet {
     unsigned char vp_cpu;
     unsigned char vp_type;
     unsigned char vp_ttl;
+    bool is_matched_filter;
 };
 
 

@@ -182,6 +182,8 @@ struct vrouter {
     struct vr_timer *vr_fragment_otable_scanner;
 
     uint64_t **vr_pdrop_stats;
+    uint64_t **vr_pdrop_filter_stats;
+    vr_drop_stats_filter_req *vr_drop_stats_filter;
 
     uint16_t vr_link_local_ports_size;
     unsigned char *vr_link_local_ports;
@@ -189,6 +191,7 @@ struct vrouter {
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;
     struct vr_interface *vr_eth_if;
+
 };
 
 struct vr_defer_data {

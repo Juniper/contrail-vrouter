@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <getopt.h>
-
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #if defined(__linux__)
@@ -35,17 +35,27 @@
 #include "vr_genetlink.h"
 #include "nl_util.h"
 #include "vr_os.h"
+#include "vr_packet.h"
 
 static struct nl_client *cl;
 static int resp_code;
 static vr_drop_stats_req stats_req;
+static vr_drop_stats_filter_req register_req;
 static int help_set;
+static int proto_set,src_ip_set,dst_ip_set,src_port_set;
+static int dst_port_set,filtered_set,vrf_set,get_filter_set;
+static int register_set,unregister_set;
+static char *proto,*src_ip,*dst_ip,*src_port,*dst_port,*vrf;
+static char str[INET_ADDRSTRLEN];
+static unsigned int stats_op;
 
 void
 vr_drop_stats_req_process(void *s_req)
 {
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
-
+    if (!stats) {
+        printf("Unable to retrive stats\n");
+    }
 
     printf("GARP                          %" PRIu64 "\n",
             stats->vds_garp_from_vm);
@@ -153,15 +163,18 @@ void
 vr_response_process(void *s)
 {
     vr_response *stats_resp;
-
     stats_resp = (vr_response *)s;
     resp_code = stats_resp->resp_code;
 
     if (stats_resp->resp_code < 0) {
-        printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
+        if(stats_resp->resp_code == -NO_FILTER_REGISTERED)
+            printf("NO filter is registered for counting drop stats\n");
+        else if(stats_resp->resp_code == -FILTER_ALREADY_REGISTERED)
+            printf("Filter already registered, please unregister the current register\n");
+        else
+            printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
         exit(-1);
-    } 
-
+    }
     return;
 }
 
@@ -171,12 +184,70 @@ vr_build_drop_stats_request(void)
 {
     stats_req.h_op = SANDESH_OP_GET;
     stats_req.vds_rid = 0;
-
+    if(filtered_set)
+        stats_req.vds_is_filtered=1;
+    else
+        stats_req.vds_is_filtered=0;
     return &stats_req;
 }
 
+static unsigned int
+pton(char *ipst)
+{
+    struct in_addr ip;
+    if(ipst)
+        if(inet_aton(ipst,&ip))
+            return ip.s_addr;
+        else
+            return -1;
+
+    else
+        return -1;
+}
+
 static int
-vr_build_netlink_request(vr_drop_stats_req *req)
+ntop(int ip)
+{
+    struct sockaddr_in sa;
+    sa.sin_addr.s_addr = ip;
+    if(inet_ntop(AF_INET, &(sa.sin_addr), str, INET_ADDRSTRLEN))
+        return 1;
+    else
+        return 0;
+}
+
+static vr_drop_stats_filter_req *
+vr_build_drop_stats_register(void)
+{
+    int ret=0;
+    memset(&register_req, 0, sizeof(vr_drop_stats_filter_req));
+    if (register_set) {
+        register_req.h_op = SANDESH_OP_ADD;
+        if (src_ip && (register_req.source_ip=pton(src_ip)) < 0)
+            goto error;
+        if (dst_ip && (register_req.destination_ip=pton(dst_ip)) < 0)
+            goto error;
+        if (src_port && (register_req.source_port = atoi(src_port))< 0)
+            goto error;
+        if (dst_port && (register_req.destination_port = atoi(dst_port))< 0)
+            goto error;
+        if (proto && (register_req.protocol = atoi(proto))< 0)
+            goto error;
+        if (vrf && (register_req.vrf = atoi(vrf)) < 0)
+            goto error;
+    }
+    else if (get_filter_set)
+        register_req.h_op = SANDESH_OP_GET;
+    else
+        register_req.h_op = SANDESH_OP_DELETE;
+
+    return &register_req;
+error:
+    return NULL;
+}
+
+static int
+vr_build_netlink_request(void *req, char *op)
 {
     int ret, error = 0, attr_len;
 
@@ -191,9 +262,9 @@ vr_build_netlink_request(vr_drop_stats_req *req)
         return ret;
 
     attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_drop_stats_req", vr_find_sandesh_info, 
-                             (nl_get_buf_ptr(cl) + attr_len),
-                             (nl_get_buf_len(cl) - attr_len), &error);
+    ret = sandesh_encode(req, op, vr_find_sandesh_info,
+            (nl_get_buf_ptr(cl) + attr_len),
+            (nl_get_buf_len(cl) - attr_len), &error);
 
     if ((ret <= 0) || error)
         return -1;
@@ -201,7 +272,6 @@ vr_build_netlink_request(vr_drop_stats_req *req)
     /* Add sandesh attribute */
     nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
     nl_update_nlh(cl);
-
     return 0;
 }
 
@@ -241,7 +311,7 @@ vr_get_drop_stats(void)
     if (!req)
         return -errno;
 
-    ret = vr_build_netlink_request(req);
+    ret = vr_build_netlink_request(req,"vr_drop_stats_req");
     if (ret < 0)
         return ret;
 
@@ -250,21 +320,172 @@ vr_get_drop_stats(void)
     return 0;
 }
 
+static int
+vr_register_drop_stats(void)
+{
+    int ret;
+    vr_drop_stats_filter_req *reg_req;
+    reg_req = vr_build_drop_stats_register();
+    if (!reg_req)
+        return -errno;
+
+    ret = vr_build_netlink_request(reg_req,"vr_drop_stats_filter_req");
+    if (ret < 0)
+        return ret;
+
+    vr_drop_stats_op();
+    return 0;
+}
+
 enum opt_index {
+    REGISTER,
+    UNREGISTER,
+    PROTOCOL_INDEX,
+    SOURCE_IP_INDEX,
+    DESTINATION_IP_INDEX,
+    SOURCE_PORT_INDEX,
+    DESTINATION_PORT_INDEX,
+    VRF_INDEX,
+    FILTERED_OPT_INDEX,
+    GET_FILTER_OPT_INDEX,
     HELP_OPT_INDEX,
     MAX_OPT_INDEX,
+
 };
 
 static struct option long_options[] = {
-    [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
-    [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
+        [REGISTER]          = {"register",no_argument, &register_set, 1},
+        [UNREGISTER]        = {"unregister",no_argument, &unregister_set, 1},
+        [PROTOCOL_INDEX]    = {"proto", optional_argument, &proto_set, 1 },
+        [SOURCE_IP_INDEX]   = {"src_ip",    optional_argument, &src_ip_set, 1 },
+        [DESTINATION_IP_INDEX]  = {"dst_ip",    optional_argument, &dst_ip_set,1 },
+        [SOURCE_PORT_INDEX] = {"src_port",  optional_argument, &src_port_set, 1 },
+        [DESTINATION_PORT_INDEX]    = {"dst_port",  optional_argument, &dst_port_set,1 },
+        [VRF_INDEX]         = {"vrf", optional_argument, &vrf_set,1},
+        [FILTERED_OPT_INDEX] = {"filtered",no_argument,&filtered_set,1},
+        [GET_FILTER_OPT_INDEX] = {"get_filter",no_argument,&get_filter_set,1},
+        [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
+        [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
 static void
 Usage()
 {
     printf("Usage: drop_stats [--help]\n");
+    printf("Usage: drop_stats --register --proto=<proto> --src_ip=<ip>\n");
+    printf("               --src_port=<src port> --dst_ip=<dst ip>\n");
+    printf("                --dst_port=<dst port> --vrf=<vrf>\n");
+    printf("\n");
+    printf("Usage: drop_stats --unregister\n");
+    printf("Usage: drop_stats --filtered\n");
+    printf("Usage: drop_stats --get_filter\n");
     exit(-EINVAL);
+}
+
+static void
+parse_long_opts(int opt_index, char *opt_arg)
+{
+    errno = 0;
+    switch (opt_index) {
+    case REGISTER:
+        stats_op = SANDESH_OP_ADD;
+        break;
+    case UNREGISTER:
+        stats_op = SANDESH_OP_DELETE;
+        break;
+    case PROTOCOL_INDEX:
+        proto = opt_arg;
+        break;
+    case SOURCE_IP_INDEX:
+        src_ip=opt_arg;
+        break;
+    case DESTINATION_IP_INDEX:
+        dst_ip=opt_arg;
+        break;
+    case SOURCE_PORT_INDEX:
+        src_port=opt_arg;
+        break;
+    case DESTINATION_PORT_INDEX:
+        dst_port=opt_arg;
+        break;
+    case VRF_INDEX:
+        vrf = opt_arg;
+        break;
+    case FILTERED_OPT_INDEX:
+        stats_op = SANDESH_OP_GET;
+        break;
+    case GET_FILTER_OPT_INDEX:
+        stats_op = SANDESH_OP_GET;
+        break;
+    default:
+        break;
+    }
+    return;
+}
+
+static void
+validate_options(void)
+{
+    int options;
+    options = proto_set + src_ip_set+dst_ip_set+src_port_set+dst_ip_set+vrf_set;
+    if(filtered_set || unregister_set || get_filter_set)
+        if (options)
+            Usage();
+    if(register_set)
+        if (!options)
+            Usage();
+    if (help_set)
+        Usage();
+
+    return;
+}
+
+void
+vr_drop_stats_filter_req_process(void *response )
+{
+    vr_drop_stats_filter_req *filter  = (vr_drop_stats_filter_req *)response;
+
+    if (filter) {
+        printf("Registered Filter \n");
+        if (filter->source_ip){
+            ntop(filter->source_ip);
+            printf("Source IP: %s\n",str);
+        }
+        else {
+            printf("Source IP: *\n");
+        }
+
+        if (filter->destination_ip) {
+            ntop(filter->destination_ip);
+            printf("Destination IP: %s\n",str);
+        }
+        else {
+            printf("Destination IP: *\n");
+        }
+
+        if (filter->source_port)
+            printf("Source Port: %d\n",filter->source_port);
+        else
+            printf("source Port: *\n");
+
+        if (filter->destination_port)
+            printf("Destination Port: %d\n",filter->destination_port);
+        else
+            printf("Destination Port: *\n");
+
+        if (filter->protocol)
+            printf("Protocol: %d\n",filter->protocol);
+        else
+            printf("Protocol: *\n");
+
+        if (filter->vrf)
+            printf("VRF: %d\n",filter->vrf);
+        else
+            printf("VRF: *\n");
+    }
+    else {
+        printf("Unable to get filter \n");
+    }
 }
 
 int
@@ -274,31 +495,36 @@ main(int argc, char *argv[])
     int ret, option_index;
 
     while (((opt = getopt_long(argc, argv, "",
-                        long_options, &option_index)) >= 0)) {
+            long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 0:
+            parse_long_opts(option_index, optarg);
             break;
 
         default:
             Usage();
         }
     }
-
+    validate_options();
     cl = nl_register_client();
     if (!cl) {
         exit(1);
     }
 
-    ret = nl_socket(cl, NETLINK_GENERIC);    
+    ret = nl_socket(cl, NETLINK_GENERIC);
     if (ret <= 0) {
-       exit(1);
+        exit(1);
     }
 
     if (vrouter_get_family_id(cl) <= 0) {
         return -1;
     }
-
-    vr_get_drop_stats();
-
+    if (register_set||unregister_set || get_filter_set) {
+        if (vr_register_drop_stats()<0)
+            printf("Unable to complete the operation\n");
+    }
+    else {
+        vr_get_drop_stats();
+    }
     return 0;
 }
