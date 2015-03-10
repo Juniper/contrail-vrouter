@@ -14,7 +14,7 @@
 #include "vr_ip_mtrie.h"
 #include "vr_fragment.h"
 #include "vr_bridge.h"
-
+#include "vr_stats.h"
 static unsigned short vr_ip_id;
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
                                                  unsigned int);
@@ -531,7 +531,6 @@ unhandled:
     return 1;
 }
 
-
 int
 vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
@@ -543,7 +542,6 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
     unsigned short drop_reason, l4_port = 0;
     int ret = 0, unhandled = 1;
     struct vr_fragment *frag;
-
     ip = (struct vr_ip *)pkt_data(pkt);
     hlen = ip->ip_hl * 4;
     pkt_pull(pkt, hlen);
@@ -563,6 +561,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         } else if (ip->ip_proto == VR_IP_PROTO_ICMP) {
             unhandled = vr_icmp_input(router, pkt, fmd);
         }
+        set_pkt_filter(router, pkt,fmd->fmd_dvrf);
     }
 
     if (unhandled) {

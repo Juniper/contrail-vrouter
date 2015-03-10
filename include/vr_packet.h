@@ -241,6 +241,7 @@ struct vr_packet {
     unsigned char vp_cpu;
     unsigned char vp_type;
     unsigned char vp_ttl;
+    unsigned short is_matched_filter;
 };
 
 

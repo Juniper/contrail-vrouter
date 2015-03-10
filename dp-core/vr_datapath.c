@@ -11,7 +11,7 @@
 #include <vr_mirror.h>
 #include <vr_bridge.h>
 #include <vr_packet.h>
-
+#include <vr_stats.h>
 extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
                                                  unsigned int);
@@ -472,7 +472,6 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, unsigned short vlan_id)
 {
     struct vr_forwarding_md fmd;
-
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
     fmd.fmd_dvrf = vrf;
@@ -486,7 +485,7 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         vif_drop_pkt(vif, pkt, 1);
         return 0;
     }
-
+    set_pkt_filter(vif->vif_router, pkt,vif->vif_vrf);
     if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, &fmd))
         return 0;
 
