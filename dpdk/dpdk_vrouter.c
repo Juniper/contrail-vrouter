@@ -15,6 +15,7 @@
  */
 #define _GNU_SOURCE
 #include <sched.h>
+#include <unistd.h>
 
 #include <getopt.h>
 #include <signal.h>
@@ -127,21 +128,17 @@ dpdk_mempools_create(void)
  *
  * Returns:
  *      new core mask on success
- *      VR_DPDK_LCORE_MASK on failure
+ *      VR_DPDK_DEF_LCORE_MASK on failure
  */
 static uint64_t
 dpdk_core_mask_get(void) {
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
-    unsigned int cpu_core_mask_ones, vr_dpdk_lcore_mask_ones;
+    long system_cpus_count, core_mask_count;
 
-    /*
-     * If it is impossible to get the cpu_set_t structure, return
-     * VR_DPDK_LCORE_MASK as a default value.
-     */
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0)
-        return VR_DPDK_LCORE_MASK;
+        return VR_DPDK_DEF_LCORE_MASK;
 
     /*
      * Go through all the CPUs in the cpu_set_t structure to check
@@ -156,33 +153,23 @@ dpdk_core_mask_get(void) {
             cpu_core_mask |= (uint64_t)1 << i;
     }
 
-    if(!cpu_core_mask)
-        return VR_DPDK_LCORE_MASK;
+    if (!cpu_core_mask)
+        return VR_DPDK_DEF_LCORE_MASK;
 
     /*
-     * After successfully building the affinity mask, we should return one of
-     * the following:
-     *
-     * return cpu_core_mask, if:
-     *      * we have as many CPUs (bits set) as in VR_DPDK_LCORE_MASK.
-     *      CPUs may have different affinity than set in the default mask
-     *      and we want to prioritize that setting.
-     *
-     *      * we have less CPUs than defined in VR_DPDK_LCORE_MASK.
-     *
-     * return (cpu_core_mask & VR_DPDK_LCORE_MASK), if:
-     *      * we have more CPUs (bits set) than defined in VR_DPDK_LCORE_MASK.
-     *      This will left some CPUs available for other tasks, eg. VMs.
+     * Do not allow to run vRouter on all the cores available, as some have
+     * to be left for virtual machines.
      */
-    cpu_core_mask_ones
-                = __builtin_popcountll((unsigned long long)cpu_core_mask);
-    vr_dpdk_lcore_mask_ones
-                = __builtin_popcountll((unsigned long long)VR_DPDK_LCORE_MASK);
+    system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
+    if (system_cpus_count == -1)
+        return VR_DPDK_DEF_LCORE_MASK;
 
-    if(cpu_core_mask_ones > vr_dpdk_lcore_mask_ones)
-        return (cpu_core_mask & VR_DPDK_LCORE_MASK);
-    else
-        return cpu_core_mask;
+    core_mask_count
+        = __builtin_popcountll((unsigned long long)cpu_core_mask);
+    if (core_mask_count == system_cpus_count)
+        return VR_DPDK_DEF_LCORE_MASK;
+
+    return cpu_core_mask;
 }
 
 /* Updates parameters of EAL initialization in dpdk_argv[]. */
@@ -297,7 +284,7 @@ dpdk_timer_loop(__attribute__((unused)) void *dummy)
         rte_timer_manage();
 
         /* check for the global stop flag */
-        if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
 
         usleep(VR_DPDK_SLEEP_TIMER_US);
@@ -313,7 +300,7 @@ dpdk_kni_loop(__attribute__((unused)) void *dummy)
         vr_dpdk_knidev_all_handle();
 
         /* check for the global stop flag */
-        if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
 
         usleep(VR_DPDK_SLEEP_KNI_US);
@@ -323,12 +310,13 @@ dpdk_kni_loop(__attribute__((unused)) void *dummy)
 
 /* Set stop flag for all lcores */
 static void
-dpdk_stop_flag_set(void) {
+dpdk_stop_flag_set(void)
+{
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
 
     /* check if the flag is already set */
-    if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+    if (unlikely(vr_dpdk_is_stop_flag_set()))
         return;
 
     RTE_LCORE_FOREACH(lcore_id) {
@@ -337,6 +325,16 @@ dpdk_stop_flag_set(void) {
     }
 
     rte_atomic16_inc(&vr_dpdk.stop_flag);
+}
+
+/* Check if the stop flag is set */
+int
+vr_dpdk_is_stop_flag_set(void)
+{
+    if (unlikely(rte_atomic16_read(&vr_dpdk.stop_flag)))
+        return -1;
+
+    return 0;
 }
 
 /* Custom handling of signals */
@@ -457,7 +455,8 @@ main(int argc, char *argv[])
 {
     int ret, opt, option_index;
 
-    fprintf(stdout, "vRouter/DPDK version: %s\n", ContrailBuildInfo);
+    fprintf(stdout, "Starting vRouter/DPDK...\nBuild information: %s\n",
+                ContrailBuildInfo);
     fflush(stdout);
 
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
@@ -481,14 +480,14 @@ main(int argc, char *argv[])
             return -1;
     }
 
-    /* Create user space vhost thread */
-    if ((ret = vr_uvhost_init(&vr_dpdk.uvh_thread, vr_dpdk_exit_trigger))) {
-        return ret;
-    }
-
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();
     if (ret != 0) {
+        return ret;
+    }
+
+    /* Create user space vhost thread */
+    if ((ret = vr_uvhost_init(&vr_dpdk.uvh_thread, vr_dpdk_exit_trigger))) {
         return ret;
     }
 
@@ -534,5 +533,5 @@ main(int argc, char *argv[])
     vr_dpdk_host_exit();
     dpdk_exit();
 
-    return ret;
+    rte_exit(ret, "vRouter/DPDK is stopped.\n");
 }

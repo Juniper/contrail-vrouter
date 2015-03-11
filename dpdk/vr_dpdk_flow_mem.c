@@ -192,7 +192,7 @@ vr_dpdk_flow_mem_init(void)
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }
-        bzero(vr_dpdk.flow_table, flow_table_size);
+        memset(vr_dpdk.flow_table, 0, flow_table_size);
         vr_flow_path = (unsigned char *)touse_file_name;
     }
 

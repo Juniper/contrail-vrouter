@@ -23,6 +23,9 @@
 #include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
 #include "vr_dpdk_virtio.h"
+#include "vr_dpdk_usocket.h"
+
+#include <rte_hexdump.h>
 
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
 
@@ -360,7 +363,8 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     }
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
-        vr_uvhost_log("Calling handler for message %d\n", msg->request);
+        vr_uvhost_log("Calling handler for message %d client %s\n",
+                                    msg->request, vru_cl->vruc_path);
         return vr_uvhost_cl_msg_handlers[msg->request](vru_cl);
     } else {
         vr_uvhost_log("No handler defined for message %d\n", msg->request);
@@ -467,6 +471,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                    vru_cl->vruc_num_fds_sent = (cmsg->cmsg_len - CMSG_LEN(0))/
                                                    sizeof(int);
                    if (vru_cl->vruc_num_fds_sent > VHOST_MEMORY_MAX_NREGIONS) {
+                        vr_uvhost_log("Too many FDs sent: %d\n",
+                                        vru_cl->vruc_num_fds_sent);
                        vru_cl->vruc_num_fds_sent = VHOST_MEMORY_MAX_NREGIONS;
                    }
 
@@ -498,13 +504,24 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
     if (read_len) {
         ret = read(fd, (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read),
                    read_len);
+#ifdef VR_DPDK_RX_PKT_DUMP
+        if (ret > 0) {
+            RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read %d bytes\n", __func__,
+                pthread_self(), fd, ret);
+            rte_hexdump(stdout, "uvhost message dump:",
+                (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read), ret);
+        } else if (ret < 0) {
+            RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
+                pthread_self(), fd, ret, strerror(errno), errno);
+        }
+#endif
         if (ret < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 return 0;
             }
 
             vr_uvhost_log(
-                "Read returned %d, %d %d %d in vhost server for client %s\n",
+                "Error: read returned %d, %d %d %d in vhost server for client %s\n",
                 ret, errno, read_len,
                 vru_cl->vruc_msg_bytes_read, vru_cl->vruc_path);
             return -1;
@@ -562,7 +579,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 static int
 vr_uvh_cl_listen_handler(int fd, void *arg)
 {
-    int s = 0;
+    int s = 0, err;
     struct sockaddr_un sun;
     socklen_t len = sizeof(sun);
     vr_uvh_client_t *vru_cl = (vr_uvh_client_t *) arg;
@@ -578,10 +595,6 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
         return -1;
     }
 
-    /*
-     * Don't need to listen on the socket any more.
-     */
-    vr_uvhost_del_fd(fd, UVH_FD_READ);
     vr_uvhost_cl_set_fd(vru_cl, s);
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_msg_handler)) {
@@ -594,6 +607,7 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
 
 error:
 
+    err = errno;
     if (s) {
         close(s);
     }
@@ -601,6 +615,7 @@ error:
     if (vru_cl) {
         vr_uvhost_del_client(vru_cl);
     }
+    errno = err;
 
     return -1;
 }
@@ -652,7 +667,7 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
 static int
 vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 {
-    int s = 0, ret = -1;
+    int s = 0, ret = -1, err;
     struct sockaddr_un sun;
     int flags;
     vr_uvh_client_t *vru_cl = NULL;
@@ -663,14 +678,16 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         return -1;
     }
 
-    vr_uvhost_log("NetLink adding vif %s...\n", msg->vrnu_vif_name);
+    vr_uvhost_log("Adding vif %d virtual device %s\n", msg->vrnu_vif_idx,
+                        msg->vrnu_vif_name);
     s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (s == -1) {
         vr_uvhost_log("\terror creating socket: %s (%d)\n",
                         strerror(errno), errno);
         goto error;
     }
-    vr_uvhost_log("\tvif %s socket FD is %d\n", msg->vrnu_vif_name, s);
+    vr_uvhost_log("\tvirtual device %s socket FD is %d\n",
+                            msg->vrnu_vif_name, s);
 
     memset(&sun, 0, sizeof(sun));
     strncpy(sun.sun_path, VR_UVH_VIF_PREFIX, sizeof(sun.sun_path) - 1);
@@ -678,6 +695,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         sizeof(sun.sun_path) - strlen(sun.sun_path) - 1);
     sun.sun_family = AF_UNIX;
 
+    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
     unlink(sun.sun_path);
 
     /*
@@ -732,6 +750,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 
 error:
 
+    err = errno;
     if (s) {
         close(s);
     }
@@ -739,6 +758,7 @@ error:
     if (vru_cl) {
         vr_uvhost_del_client(vru_cl);
     }
+    errno = err;
 
     return ret;
 }
@@ -807,15 +827,15 @@ vr_uvh_nl_listen_handler(int fd, void *arg)
     struct sockaddr_un sun;
     socklen_t len = sizeof(sun);
 
-    vr_uvhost_log("Handling NetLink connection FD %d...\n", fd);
+    vr_uvhost_log("Handling connection FD %d...\n", fd);
     s = accept(fd, (struct sockaddr *) &sun, &len);
     if (s < 0) {
-        vr_uvhost_log("\terror accepting NetLink connection FD %d\n", fd);
+        vr_uvhost_log("\terror accepting connection FD %d\n", fd);
         return -1;
     }
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_msg_handler)) {
-        vr_uvhost_log("\terror adding NetLink %s FD %d read handler\n",
+        vr_uvhost_log("\terror adding socket %s FD %d read handler\n",
                       sun.sun_path, fd);
         return -1;
     }

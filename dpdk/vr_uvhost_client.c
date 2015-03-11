@@ -66,6 +66,7 @@ void
 vr_uvhost_del_client(vr_uvh_client_t *vru_cl)
 {
     vru_cl->vruc_fd = -1;
+    unlink(vru_cl->vruc_path);
 
     return;
 }
