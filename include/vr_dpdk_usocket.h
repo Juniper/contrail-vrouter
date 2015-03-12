@@ -63,7 +63,7 @@
 
 #define USOCK_MAX_CHILD_FDS     64
 #define USOCK_RX_BUF_LEN        4096
-#define USOCK_EVENT_BUF_LEN     8
+#define USOCK_EVENT_BUF_LEN     sizeof(uint64_t)
 
 #define PKT0_MBUF_POOL_SIZE     512
 #define PKT0_MBUF_POOL_CACHE_SZ (VR_DPDK_MAX_BURST_SZ*8)
@@ -128,8 +128,10 @@ int vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
     unsigned int len);
 
 #define VR_NETLINK_TCP_PORT         20914
-#define VR_NETLINK_UNIX_FILE        "/tmp/dpdk_netlink"
-#define VR_PACKET_UNIX_FILE         "/tmp/dpdk_pkt0"
-#define VR_PACKET_AGENT_UNIX_FILE   "/tmp/agent_pkt0"
+#define VR_SOCKET_DIR               "/var/run/vrouter"
+#define VR_SOCKET_DIR_MODE          (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
+#define VR_NETLINK_UNIX_FILE        VR_SOCKET_DIR"/dpdk_netlink"
+#define VR_PACKET_UNIX_FILE         VR_SOCKET_DIR"/dpdk_pkt0"
+#define VR_PACKET_AGENT_UNIX_FILE   VR_SOCKET_DIR"/agent_pkt0"
 
 #endif /* __VR_DPDK_USOCKET_H__ */

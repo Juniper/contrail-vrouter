@@ -975,8 +975,13 @@ main(int argc, char *argv[])
     validate_options();
 
     cl = nl_register_client();
-    if (!cl)
+    if (!cl) {
+        printf("Error registering NetLink client: %s (%d)\n",
+                strerror(errno), errno);
         exit(-ENOMEM);
+    }
+
+    parse_ini_file();
 
 #if defined(__linux__)
     if (create_set)
@@ -985,21 +990,26 @@ main(int argc, char *argv[])
         sock_proto = get_protocol();
 #endif
 
-    parse_ini_file();
-
     ret = nl_socket(cl, get_domain(), get_type(), sock_proto);
     if (ret <= 0) {
+        printf("Error creating NetLink socket: %s (%d)\n",
+                strerror(errno), errno);
         exit(1);
     }
 
     ret = nl_connect(cl, get_ip(), get_port());
     if (ret < 0) {
+        printf("Error connecting to NetLink socket: %s (%d)\n",
+                strerror(errno), errno);
         exit(1);
     }
 
     if (sock_proto == NETLINK_GENERIC)
-        if (vrouter_get_family_id(cl) <= 0)
+        if (vrouter_get_family_id(cl) <= 0) {
+            printf("Error getting NetLink family: %s (%d)\n",
+                    strerror(errno), errno);
             return -1;
+        }
 
     if (add_set) {
         /*
