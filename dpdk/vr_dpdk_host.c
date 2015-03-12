@@ -134,7 +134,6 @@ static void
 dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     struct vrouter *router = vrouter_get(0);
-    struct rte_mbuf *m;
 
     if (!pkt)
         rte_panic("Null packet");
@@ -142,12 +141,17 @@ dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
     if (router)
         ((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
 
-    /* Fetch original mbuf from packet structure */
-    m = vr_dpdk_pkt_to_mbuf(pkt);
-    rte_pktmbuf_free(m);
+    rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
 
     return;
 }
+
+void
+vr_dpdk_pfree(struct rte_mbuf *mbuf, unsigned short reason)
+{
+    dpdk_pfree(vr_dpdk_mbuf_to_pkt(mbuf), reason);
+}
+
 
 static void
 dpdk_preset(struct vr_packet *pkt)
@@ -489,13 +493,8 @@ dpdk_work_timer(struct rte_timer *timer, void *arg)
 static void
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    uint64_t hz, ticks;
-
     struct rte_timer *timer;
     struct vr_timer *vtimer;
-
-    hz = rte_get_timer_hz();
-    ticks = hz / 10000;
 
     timer = dpdk_malloc(sizeof(struct rte_timer));
     if (!timer) {
@@ -512,11 +511,14 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
     vtimer->vt_timer = fn;
     vtimer->vt_vr_arg = arg;
     vtimer->vt_os_arg = timer;
-    vtimer->vt_msecs = ticks * 1000;
+    vtimer->vt_msecs = 1;
 
     rte_timer_init(timer);
 
-    if (rte_timer_reset(timer, ticks, SINGLE, rte_lcore_id(),
+    RTE_LOG(DEBUG, VROUTER, "%s[%u]: reset timer %p REINJECTING: lcore_id %u\n",
+            __func__, rte_lcore_id(), timer, vr_dpdk.packet_lcore_id);
+    /* schedule task to pkt0 lcore */
+    if (rte_timer_reset(timer, 0, SINGLE, vr_dpdk.packet_lcore_id,
         dpdk_work_timer, vtimer) == -1) {
         RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
         rte_free(timer);
@@ -525,6 +527,8 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
         return;
     }
 
+    /* wake up pkt0 lcore */
+    vr_dpdk_packet_wakeup(vr_dpdk.lcores[vr_dpdk.packet_lcore_id]);
     return;
 }
 
@@ -1162,3 +1166,82 @@ init_fail:
     return ret;
 }
 
+/* Retry socket connection */
+int
+vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
+                        socklen_t alen)
+{
+    int nsec;
+
+    for (nsec = 1; nsec < VR_DPDK_RETRY_CONNECT_SECS; nsec <<= 1) {
+        if (connect(sockfd, addr, alen) == 0)
+            return 0;
+
+        if (nsec < VR_DPDK_RETRY_CONNECT_SECS/2) {
+            sleep(nsec);
+            RTE_LOG(INFO, VROUTER, "Retrying connection for socket %d...\n",
+                    sockfd);
+        }
+    }
+
+    return -1;
+}
+
+/* Returns a string hash */
+static inline uint32_t
+dpdk_strhash(const char *k, uint32_t initval)
+{
+    uint32_t a, b, c;
+
+    a = b = RTE_JHASH_GOLDEN_RATIO;
+    c = initval;
+
+    do {
+        if (*k) {
+            a += k[0];
+            k++;
+        }
+        if (*k) {
+            b += k[0];
+            k++;
+        }
+        if (*k) {
+            c += k[0];
+            k++;
+        }
+        __rte_jhash_mix(a, b, c);
+    } while (*k);
+
+    return c;
+}
+
+/* Generates unique log message */
+int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
+                    const char *format, ...)
+{
+    va_list ap;
+    int ret = 0;
+    uint32_t hash;
+    char buf[256];
+
+    /* fallback to rte_log */
+    if (last_hash == NULL) {
+        va_start(ap, format);
+        ret = rte_log(level, logtype, "%s", buf);
+        va_end(ap);
+    } else {
+        /* calculate message hash */
+        va_start(ap, format);
+        vsnprintf(buf, sizeof(buf) - 1, format, ap);
+        va_end(ap);
+        buf[sizeof(buf) - 1] = '\0';
+        hash = dpdk_strhash(buf, level + logtype);
+
+        if (hash != *last_hash) {
+            *last_hash = hash;
+            ret = rte_log(level, logtype, "%s", buf);
+        }
+    }
+
+    return ret;
+}

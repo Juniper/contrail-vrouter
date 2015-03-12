@@ -14,15 +14,13 @@
 
 int dpdk_packet_core_id = -1;
 
-int
-vr_dpdk_packet_tx(void)
+void
+vr_dpdk_packet_wakeup(struct vr_dpdk_lcore *lcorep)
 {
     int ret;
     uint64_t event = 1;
-    unsigned int lcore_id = rte_lcore_id();
-    struct vr_dpdk_lcore *lcorep = vr_dpdk.lcores[lcore_id];
 
-    if (lcorep->lcore_event_sock) {
+    if (likely(lcorep->lcore_event_sock != NULL)) {
         ret = vr_usocket_write(lcorep->lcore_event_sock, (unsigned char *)&event,
                 sizeof(event));
         if (ret < 0) {
@@ -30,8 +28,6 @@ vr_dpdk_packet_tx(void)
             lcorep->lcore_event_sock = NULL;
         }
     }
-
-    return 0;
 }
 
 int
@@ -41,6 +37,8 @@ dpdk_packet_io(void)
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
 wait_for_connection:
+    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: waiting for packet transport\n",
+                __func__, pthread_self());
     while (!vr_dpdk.packet_transport) {
         /* handle an IPC command */
         if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
@@ -48,6 +46,8 @@ wait_for_connection:
         usleep(VR_DPDK_SLEEP_SERVICE_US);
     }
 
+    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+                ((struct vr_usocket *)vr_dpdk.packet_transport)->usock_fd);
     ret = vr_usocket_io(vr_dpdk.packet_transport);
     if (ret < 0) {
         vr_dpdk.packet_transport = NULL;
@@ -80,54 +80,56 @@ dpdk_packet_socket_close(void)
 int
 dpdk_packet_socket_init(void)
 {
-    int ret, i;
-    unsigned int netlink_lcore_id = rte_lcore_id();
-    unsigned short lcore_count = rte_lcore_count();
+    unsigned lcore_id;
     struct vr_dpdk_lcore *lcorep;
+    void *event_sock = NULL;
+    int err;
 
     vr_dpdk.packet_transport = (void *)vr_usocket(PACKET, RAW);
     if (!vr_dpdk.packet_transport)
         return -1;
 
-    if (lcore_count == VR_DPDK_MIN_LCORES)
+    if (rte_lcore_count() == VR_DPDK_MIN_LCORES) {
+        RTE_LOG(INFO, VROUTER, "\tsetting packet socket to non-blocking\n");
         vr_usocket_non_blocking(vr_dpdk.packet_transport);
+    }
 
     if (!vr_dpdk.packet_ring) {
         vr_dpdk.packet_ring = rte_ring_lookup("pkt0_tx");
         if (!vr_dpdk.packet_ring) {
+            /* multi-producers single-consumer ring */
             vr_dpdk.packet_ring = rte_ring_create("pkt0_tx", VR_DPDK_TX_RING_SZ,
-                    SOCKET_ID_ANY, 0);
+                    SOCKET_ID_ANY, RING_F_SC_DEQ);
             if (!vr_dpdk.packet_ring) {
-                ret = -ENOMEM;
+                RTE_LOG(ERR, VROUTER, "\terror creating pkt0 ring\n");
                 goto error;
             }
         }
     }
 
-    for (i = 0; i < lcore_count; i++) {
-        if (i == netlink_lcore_id)
-            continue;
-
-        lcorep = vr_dpdk.lcores[i];
-        lcorep->lcore_event_sock = (void *)vr_usocket(EVENT, RAW);
-        if (!lcorep->lcore_event_sock) {
-            ret = -ENOMEM;
+    /* socket events to wake up the pkt0 lcore */
+    RTE_LCORE_FOREACH(lcore_id) {
+        lcorep = vr_dpdk.lcores[lcore_id];
+        event_sock = (void *)vr_usocket(EVENT, RAW);
+        if (!event_sock) {
             goto error;
         }
 
         if (vr_usocket_bind_usockets(vr_dpdk.packet_transport,
-                    lcorep->lcore_event_sock))
+                    event_sock))
             goto error;
+        lcorep->lcore_event_sock = event_sock;
     }
-
 
     return 0;
 
 error:
-    if (vr_dpdk.packet_transport) {
-        vr_usocket_close(vr_dpdk.packet_transport);
-        vr_dpdk.packet_transport = NULL;
-    }
+    err = errno;
+    if (event_sock)
+        vr_usocket_close(event_sock);
+    vr_usocket_close(vr_dpdk.packet_transport);
+    vr_dpdk.packet_transport = NULL;
+    errno = err;
 
-    return ret;
+    return -ENOMEM;
 }

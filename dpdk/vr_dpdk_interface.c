@@ -510,8 +510,11 @@ dpdk_agent_if_add(struct vr_interface *vif)
 
     /* init packet device */
     ret = dpdk_packet_socket_init();
-    if (ret)
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "\terror initializing packet socket: %s (%d)\n",
+            strerror(errno), errno);
         return ret;
+    }
 
     vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
 
@@ -537,6 +540,9 @@ extern void vhost_remove_xconnect(void);
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
+    if (vr_dpdk_is_stop_flag_set())
+        return -EINPROGRESS;
+
     if (vif_is_fabric(vif)) {
         return dpdk_fabric_if_add(vif);
     } else if (vif_is_virtual(vif)) {
@@ -564,6 +570,9 @@ dpdk_if_add(struct vr_interface *vif)
 static int
 dpdk_if_del(struct vr_interface *vif)
 {
+    if (vr_dpdk_is_stop_flag_set())
+        return -EINPROGRESS;
+
     if (vif_is_fabric(vif)) {
         return dpdk_fabric_if_del(vif);
     } else if (vif_is_virtual(vif)) {
@@ -712,6 +721,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    int ret;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -726,17 +736,27 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
-            if (likely(p_clone != NULL))
+            if (likely(p_clone != NULL)) {
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                     vr_dpdk_pkt_to_mbuf(p_clone));
+            }
         }
     }
 
     if (unlikely(vif->vif_type == VIF_TYPE_AGENT)) {
-        rte_ring_enqueue_burst(vr_dpdk.packet_ring, (void *)&m, 1);
+        ret = rte_ring_mp_enqueue(vr_dpdk.packet_ring, m);
+        if (ret != 0) {
+            /* TODO: a separate counter for this drop */
+            vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
+            return -1;
+        }
 #ifdef VR_DPDK_TX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+        if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
         rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
+        vr_dpdk_packet_wakeup(lcore);
         return 0;
     }
 
@@ -774,11 +794,22 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 //    }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+    if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (likely(tx_queue->txq_ops.f_tx != NULL))
+    if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
+        if (lcore_id == vr_dpdk.packet_lcore_id)
+            tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    } else {
+        RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
+                __func__, vif->vif_name, lcore_id);
+        vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
+        return -1;
+    }
 
     return 0;
 }
@@ -807,18 +838,30 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_clone = vr_pclone(pkt);
-            if (likely(p_clone != NULL))
+            if (likely(p_clone != NULL)) {
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                     vr_dpdk_pkt_to_mbuf(p_clone));
+            }
         }
     }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
+#ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
+    if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+#endif
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (likely(tx_queue->txq_ops.f_tx != NULL))
+    if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
+        if (lcore_id == vr_dpdk.packet_lcore_id)
+            tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    } else {
+        RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
+                __func__, vif->vif_name, lcore_id);
+        vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
+        return -1;
+    }
 
     return 0;
 }

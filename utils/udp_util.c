@@ -112,8 +112,8 @@ udp_recvmsg(struct udp_client *cl)
     struct iovec iov;
 
     memset(&msg, 0, sizeof(msg));
-
     memset(&sa, 0, sizeof(sa));
+
     sa.sin_family = AF_INET;
     msg.msg_name = &sa;
     msg.msg_namelen = sizeof(sa);
