@@ -588,6 +588,8 @@ struct vr_udp {
 #define VR_ICMP6_TYPE_NEIGH_SOL    135
 #define VR_ICMP6_TYPE_NEIGH_AD     136
 
+#define VR_IP6_PROTO_FRAG          44
+
 struct vr_icmp {
     uint8_t icmp_type;
     uint8_t icmp_code;

@@ -340,11 +340,9 @@ nh_vxlan_tunnel_helper(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         udp_src_port = fmd->fmd_udp_src_port;
 
     /*
-     * The UDP source port is a hash of the inner headers. For IPV6
-     * the standard port is used till flow processing is done
+     * The UDP source port is a hash of the inner headers
      */
-    if ((!fmd->fmd_udp_src_port) && (pkt->vp_type != VP_TYPE_IP6) &&
-            vr_get_udp_src_port) {
+    if ((!fmd->fmd_udp_src_port) && vr_get_udp_src_port) {
         udp_src_port = vr_get_udp_src_port(pkt, fmd, fmd->fmd_dvrf);
         if (udp_src_port == 0) {
          return false;
@@ -1359,11 +1357,9 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /*
      * The UDP source port is a hash of the inner IP src/dst address and
-     * vrf. For the IPV6 standard source port is used till flow
-     * procesing is done
+     * vrf. 
      */
-    if ((!fmd->fmd_udp_src_port) && (pkt->vp_type != VP_TYPE_IP6) &&
-            vr_get_udp_src_port) {
+    if ((!fmd->fmd_udp_src_port)  && vr_get_udp_src_port) {
         udp_src_port = vr_get_udp_src_port(pkt, fmd, fmd->fmd_dvrf);
         if (udp_src_port == 0) {
             reason = VP_DROP_PULL;
@@ -1619,7 +1615,7 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
         return 0;
     }
 
-    if (pkt->vp_type == VP_TYPE_IP) {
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         /*
          * If the packet has not gone through flow lookup once
          * (!VP_FLAG_FLOW_SET), we need to determine whether it has to undergo

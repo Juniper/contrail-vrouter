@@ -97,6 +97,99 @@ vr_icmp6_input(struct vrouter *router, struct vr_packet *pkt,
     return handled;
 }
 
+void
+vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned short nh_id, 
+        unsigned char *ip, uint8_t proto, uint16_t sport, uint16_t dport)
+{
+    /* copy both source and destinations */
+    memcpy(flow_p->flow_ip, ip, 2*VR_FLOW_IPV6_ADDR_SIZE);
+    flow_p->flow6_proto = proto;
+    flow_p->flow6_nh_id = nh_id;
+    flow_p->flow6_sport = sport;
+    flow_p->flow6_dport = dport;
+    flow_p->flow6_family = AF_INET6;
+
+    flow_p->flow_key_len = VR_FLOW_IPV6_KEY_SIZE; 
+
+    return;
+}
+
+static int
+vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
+        struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
+        struct vr_flow *flow_p)
+{
+    unsigned short *t_hdr, sport, dport;
+    unsigned short nh_id;
+
+    struct vr_icmp *icmph;
+
+    /* Skip flow lookup for V6 frags */
+    if (ip6->ip6_nxt == VR_IP6_PROTO_FRAG) 
+        return 1;
+
+    t_hdr = (unsigned short *)((char *)ip6 + sizeof(struct vr_ip6));
+    if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
+        icmph = (struct vr_icmp *)t_hdr;
+        if ((icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REQ) ||
+            (icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REPLY)) {
+            sport = icmph->icmp_eid;
+            dport = ntohs(VR_ICMP6_TYPE_ECHO_REPLY);
+        } else {
+            sport = 0;
+            dport = icmph->icmp_type;
+        }
+    } else {
+        sport = *t_hdr;
+        dport = *(t_hdr + 1);
+    }
+
+    nh_id = vr_inet_flow_nexthop(pkt, vlan);
+    vr_inet6_fill_flow(flow_p, nh_id, (unsigned char *)&ip6->ip6_src,
+            ip6->ip6_nxt, sport, dport);
+
+    return 0;
+}
+
+flow_result_t
+vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
+                    struct vr_forwarding_md *fmd)
+{
+    int ret;
+    bool lookup = false;
+    struct vr_flow flow, *flow_p = &flow;
+    struct vr_ip6 *ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+
+    /*
+     * if the packet has already done one round of flow lookup, there
+     * is no point in doing it again, eh?
+     */
+    if (pkt->vp_flags & VP_FLAG_FLOW_SET)
+        return FLOW_FORWARD;
+
+    ret = vr_inet6_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, ip6, flow_p);
+    if (ret < 0)
+        return FLOW_CONSUMED;
+
+    /*
+     * if the interface is policy enabled, or if somebody else (eg:nexthop)
+     * has requested for a policy lookup, packet has to go through a lookup
+     */
+    if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
+            (pkt->vp_flags & VP_FLAG_FLOW_GET)) {
+        lookup = true;
+    }
+
+
+    if (lookup) {
+
+        return vr_flow_lookup(router, flow_p, pkt, fmd);
+    }
+
+    return FLOW_FORWARD;
+}
+
+
 int
 vr_ip6_input(struct vrouter *router, struct vr_packet *pkt,
              struct vr_forwarding_md *fmd)
