@@ -32,20 +32,26 @@
 #include <rte_port.h>
 
 #define RTE_LOGTYPE_VROUTER         RTE_LOGTYPE_USER1
+#define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
+#define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #undef RTE_LOG_LEVEL
 #define RTE_LOG_LEVEL               RTE_LOG_INFO
+
 /*
  * Debug options:
  *
 #define RTE_LOG_LEVEL               RTE_LOG_DEBUG
 #define VR_DPDK_NETLINK_DEBUG
 #define VR_DPDK_NETLINK_PKT_DUMP
+#define VR_DPDK_USOCK_DUMP
 #define VR_DPDK_RX_PKT_DUMP
 #define VR_DPDK_TX_PKT_DUMP
+#define VR_DPDK_PKT_DUMP_VIF_FILTER(vif) (vif->vif_type == VIF_TYPE_AGENT \
+                                        || vif->vif_type == VIF_TYPE_VIRTUAL)
  */
 
-/* lcore mask */
-#define VR_DPDK_LCORE_MASK          0x3f
+/* Default lcore mask. Used only when sched_getaffinity() is failed */
+#define VR_DPDK_DEF_LCORE_MASK      0xf
 /* Number of service lcores */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
@@ -129,6 +135,8 @@
 #define VR_DPDK_INVALID_PORT_ID     0xFF
 /* Invalid queue ID */
 #define VR_DPDK_INVALID_QUEUE_ID    0xFFFF
+/* Socket connection retry timeout in seconds (use power of 2) */
+#define VR_DPDK_RETRY_CONNECT_SECS  64
 
 /*
  * VRouter/DPDK Data Structures
@@ -358,6 +366,8 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
  */
 /* pktmbuf constructor with vr_packet support */
 void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i);
+/* Check if the stop flag is set */
+int vr_dpdk_is_stop_flag_set(void);
 
 /*
  * vr_dpdk_ethdev.c
@@ -397,6 +407,30 @@ int vr_dpdk_host_init(void);
 void vr_dpdk_host_exit(void);
 /* Convert internal packet fields */
 struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif);
+void vr_dpdk_pfree(struct rte_mbuf *mbuf, unsigned short reason);
+/* Retry socket connection */
+int vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
+                            socklen_t alen);
+/* Generates unique log message */
+int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
+                    const char *format, ...);
+#define DPDK_ULOG(l, t, h, ...)                         \
+    (void)(((RTE_LOG_ ## l <= RTE_LOG_LEVEL) &&         \
+    (RTE_LOG_ ## l <= rte_logs.level) &&                \
+    (RTE_LOGTYPE_ ## t & rte_logs.type)) ?              \
+    vr_dpdk_ulog(RTE_LOG_ ## l,                         \
+        RTE_LOGTYPE_ ## t, h, # t ": " __VA_ARGS__) : 0)
+
+#if RTE_LOG_LEVEL == RTE_LOG_DEBUG
+#define DPDK_DEBUG_VAR(v) v
+#define DPDK_UDEBUG(t, h, ...)                          \
+    (void)(((RTE_LOGTYPE_ ## t & rte_logs.type)) ?      \
+    vr_dpdk_ulog(RTE_LOG_DEBUG,                         \
+        RTE_LOGTYPE_ ## t, h, # t ": " __VA_ARGS__) : 0)
+#else
+#define DPDK_DEBUG_VAR(v)
+#define DPDK_UDEBUG(t, h, ...)
+#endif
 
 /*
  * vr_dpdk_interface.c
@@ -429,7 +463,7 @@ void vr_dpdk_knidev_all_handle(void);
 /*
  * vr_dpdk_packet.c
  */
-int vr_dpdk_packet_tx(void);
+void vr_dpdk_packet_wakeup(struct vr_dpdk_lcore *lcorep);
 int dpdk_packet_socket_init(void);
 void dpdk_packet_socket_close(void);
 int dpdk_packet_io(void);
@@ -460,7 +494,6 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
         tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
     }
-    vr_dpdk_packet_tx();
 }
 /* Send a burst of vr_packets to vRouter */
 void

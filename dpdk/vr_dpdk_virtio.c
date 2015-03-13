@@ -124,10 +124,8 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
         vr_dpdk_phys_lcore_least_used_get();
     if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id ==
-        RTE_MAX_LCORE) {
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
-            vr_dpdk_lcore_least_used_get();
-    }
+        RTE_MAX_LCORE)
+        goto error;
 
     dpdk_ring_to_push_add(
         vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id,
@@ -153,6 +151,10 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     return rx_queue;
 
 error:
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring) {
+        rte_free(vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring);
+        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring = NULL;
+    }
     RTE_LOG(ERR, VROUTER, "\terror creating lcore %u RX ring for queue %u vif %u\n",
         lcore_id, queue_id, vif_idx);
     return NULL;
@@ -278,6 +280,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     uint32_t pkt_len;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
+        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p is not ready\n",
+                __func__, vq);
         return 0;
     }
 
@@ -288,6 +292,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
      */
     num_pkts = vq_hard_avail_idx - vq->vdv_soft_avail_idx;
     if (num_pkts == 0) {
+        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p has no packets\n",
+                    __func__, vq);
         return 0;
     }
 
@@ -295,7 +301,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         num_pkts = max_pkts;
     }
 
-    RTE_LOG(DEBUG, VROUTER, "%s: num_pkts=%u\n", __func__, num_pkts);
+    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p num_pkts=%u\n",
+            __func__, vq, num_pkts);
     for (i = 0; i < num_pkts; i++) {
         next_avail_idx = (vq->vdv_soft_avail_idx + i) &
                              (vq->vdv_vvs.num - 1);
@@ -314,10 +321,14 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             /*
              * TODO - make sure desc->next is sane
              */
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u F_NEXT\n",
+                __func__, vq, i);
             desc = &vq->vdv_desc[desc->next];
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             pkt_len = desc->len;
         } else {
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
+                __func__, vq, i);
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             if (pkt_addr) {
                 pkt_addr += sizeof(struct virtio_net_hdr);
@@ -326,10 +337,14 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         }
 
         if (pkt_addr) {
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
+                __func__, vq, i, pkt_addr);
             mbuf = rte_pktmbuf_alloc(vr_dpdk_virtio_get_mempool());
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
+                __func__, vq, i, mbuf);
             if (mbuf != NULL) {
                 mbuf->pkt.data_len = pkt_len;
-                mbuf->pkt.pkt_len = mbuf->pkt.data_len;
+                mbuf->pkt.pkt_len = pkt_len;
 
                 rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
                 pkts[pkts_sent] = mbuf;
@@ -346,6 +361,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
     *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
 
+    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkts_sent %u\n",
+            __func__, vq, pkts_sent);
     return pkts_sent;
 }
 
@@ -356,17 +373,16 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
  * Returns nothing.
  */
 static int
-dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *pkt)
+dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *mbuf)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
-        rte_pktmbuf_free(pkt);
-
-        return 0;
+        vr_dpdk_pfree(mbuf, VP_DROP_INTERFACE_DROP);
+        return -1;
     }
 
-    vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = pkt;
+    vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = mbuf;
     if (vq->vdv_tx_mbuf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ) {
         dpdk_virtio_to_vm_flush(vq);
     }
@@ -429,7 +445,7 @@ dpdk_virtio_to_vm_flush(void *arg)
         desc = &vq->vdv_desc[next_desc_idx];
         buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
         if (buf_addr == NULL) {
-            rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
+            vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
             continue;
         }
 
@@ -454,7 +470,7 @@ dpdk_virtio_to_vm_flush(void *arg)
 
             buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             if (buf_addr == NULL) {
-                rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
+                vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
                 continue;
             }
 
@@ -479,10 +495,7 @@ dpdk_virtio_to_vm_flush(void *arg)
      * post receive buffers soon enough.
      */
     for (; i < vq->vdv_tx_mbuf_count; i++) {
-        /*
-         * TODO: increment stats here
-         */
-        rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
+        vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
     }
 
     vq->vdv_tx_mbuf_count = 0;
@@ -766,11 +779,16 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
 {
     vr_dpdk_virtioq_t *vq;
     struct rte_ring *vq_pring;
+    int nb_enq;
 
     vq = (vr_dpdk_virtioq_t *) rx_queue->q_queue_h;
     vq_pring = vq->vdv_pring;
 
-    rte_ring_sp_enqueue_bulk(vq_pring, (void **) pkt_arr, npkts);
+    RTE_LOG(DEBUG, VROUTER, "%s: enqueue %u pakets to ring %p\n",
+                __func__, npkts, vq_pring);
+    nb_enq = rte_ring_sp_enqueue_burst(vq_pring, (void **) pkt_arr, npkts);
+    for ( ; nb_enq < npkts; nb_enq++)
+        vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
 
     return;
 }

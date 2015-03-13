@@ -426,7 +426,7 @@ nl_free(struct nl_client *cl)
 }
 
 int
-nl_socket(struct nl_client *cl,int domain, int type, int protocol)
+nl_socket(struct nl_client *cl, int domain, int type, int protocol)
 {
     if (cl->cl_sock >= 0)
         return -EEXIST;
