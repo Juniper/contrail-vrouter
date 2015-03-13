@@ -143,7 +143,7 @@ dump_table(struct flow_table *ft)
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
     const char *drop_reason = NULL;
-    struct in_addr in_src, in_dest;
+    char in_src[64], in_dest[64];
 
     printf("Flow table\n\n");
     dump_legend();
@@ -156,9 +156,11 @@ dump_table(struct flow_table *ft)
         need_drop_reason = 0;
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
-            if (fe->fe_type == VP_TYPE_IP) {
-                in_src.s_addr = fe->fe_key.flow4_sip;
-                in_dest.s_addr = fe->fe_key.flow4_dip;
+            if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
+                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip, in_src, 64);
+                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), 
+                      &fe->fe_key.flow_ip[VR_FLOW_IP_ADDR_SIZE(fe->fe_type)], 
+                      in_dest, 64);
             }
 
             printf("%6d", i);
@@ -167,14 +169,10 @@ dump_table(struct flow_table *ft)
             else
                 printf("         ");
 
-            if (fe->fe_type == VP_TYPE_IP) {
-                printf("   %12s:%-5d    ", inet_ntoa(in_src),
-                        ntohs(fe->fe_key.flow4_sport));
-                printf("%16s:%-5d    %d (%d",
-                        inet_ntoa(in_dest),
-                        ntohs(fe->fe_key.flow4_dport),
-                        fe->fe_key.flow4_proto,
-                        fe->fe_vrf);
+            if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
+                printf("   %24s:%-5d    ", in_src, ntohs(fe->fe_key.flow_sport));
+                printf("%24s:%-5d    %d (%d", in_dest, ntohs(fe->fe_key.flow_dport),
+                        fe->fe_key.flow_proto, fe->fe_vrf);
             }
 
             if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
@@ -229,8 +227,8 @@ dump_table(struct flow_table *ft)
             }
 
             printf("\t(");
-            if (fe->fe_type == VP_TYPE_IP)
-                printf("K(nh):%u, ", fe->fe_key.flow4_nh_id);
+            if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6))
+                printf("K(nh):%u, ", fe->fe_key.flow_nh_id);
 
             printf("Action:%c", action);
             if (need_flag_print)
@@ -606,18 +604,20 @@ flow_validate(int flow_index, char action)
     memset(&flow_req, 0, sizeof(flow_req));
 
     fe = flow_get(flow_index);
-    if (fe->fe_type != VP_TYPE_IP)
+    if ((fe->fe_type != VP_TYPE_IP) && (fe->fe_type != VP_TYPE_IP6)) 
         return;
 
     flow_req.fr_op = FLOW_OP_FLOW_SET;
     flow_req.fr_index = flow_index;
+    flow_req.fr_family = VR_FLOW_FAMILY(fe->fe_type);
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    flow_req.fr_flow_sip = fe->fe_key.flow4_sip;
-    flow_req.fr_flow_dip = fe->fe_key.flow4_dip;
-    flow_req.fr_flow_proto = fe->fe_key.flow4_proto;
-    flow_req.fr_flow_sport = fe->fe_key.flow4_sport;
-    flow_req.fr_flow_dport = fe->fe_key.flow4_dport;
-    flow_req.fr_flow_nh_id = fe->fe_key.flow4_nh_id;
+    memcpy(flow_req.fr_flow_ip, fe->fe_key.flow_ip, 
+              2*VR_FLOW_IP_ADDR_SIZE(fe->fe_type));
+    flow_req.fr_flow_ip_size = 2*VR_FLOW_IP_ADDR_SIZE(fe->fe_type);
+    flow_req.fr_flow_proto = fe->fe_key.flow_proto;
+    flow_req.fr_flow_sport = fe->fe_key.flow_sport;
+    flow_req.fr_flow_dport = fe->fe_key.flow_dport;
+    flow_req.fr_flow_nh_id = fe->fe_key.flow_nh_id;
 
     switch (action) {
     case 'd':

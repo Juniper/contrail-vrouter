@@ -132,8 +132,8 @@ buffer sandesh vr_flow_req {
     6: i32          fr_ftable_size;
     7: i16          fr_ftable_dev;
     8: i32          fr_rindex;
-    9: i32          fr_flow_sip;
-   10: i32          fr_flow_dip;
+    9: i32          fr_family;
+   10: list<byte>   fr_flow_ip;
    11: i16          fr_flow_sport;
    12: i16          fr_flow_dport;
    13: byte         fr_flow_proto;
