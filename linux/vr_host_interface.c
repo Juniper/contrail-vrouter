@@ -1074,7 +1074,9 @@ linux_rx_handler(struct sk_buff **pskb)
         vif = __vrouter_get_interface(router,
                   ((vr_rps_t *)skb->cb)->vif_idx);
         if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL) && vif->vif_os) {
-            dev = (struct net_device *) vif->vif_os;
+            dev = (struct net_device *)vif->vif_os;
+            if (!dev || (vif != rcu_dereference(dev->rx_handler_data)))
+                goto error;
             rpsdev = 1;
         } else {
             goto error;
