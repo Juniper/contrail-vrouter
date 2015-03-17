@@ -102,23 +102,26 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
 
         /*
-         * if nh is not of ENCAP type, that means that the vm is not hosted by
-         * us or the request is for a host in vcp port. if the request is for
-         * a host in the vcp port, we should proxy. else, we should proxy only
-         * if
-         * i am a TSN, i have the mac information and the originator is a bare
-         * metal
+         * we should proxy if the vm is hosted by us, in which case nh will be
+         * of ENCAP type. we should also proxy for a host in vcp port. In all
+         * other cases, we should proxy only if
+         *
+         * i am a TSN(fmd->fmd_src),
+         * i amd the dns IP or
+         * i have the mac information (nh - (mostly tunnel)) and
+         * the originator is a bare metal (fmd->fmd_src)
          */
-        if (!to_vcp && nh && nh->nh_type != NH_ENCAP) {
-            if (fmd->fmd_src != TOR_SOURCE) {
-                if (stats)
-                    stats->vrf_arp_physical_flood++;
-                return MR_FLOOD;
-            }
+        if (to_vcp || to_gateway ||
+                ((nh) &&
+                 ((nh->nh_type == NH_ENCAP) ||
+                  (fmd->fmd_src == TOR_SOURCE)))) {
+            if (stats)
+                stats->vrf_arp_physical_stitch++;
+        } else {
+            if (stats)
+                stats->vrf_arp_physical_flood++;
+            return MR_FLOOD;
         }
-
-        if (stats)
-            stats->vrf_arp_physical_stitch++;
     } else {
         /*
          * if there is no stitching information, but flood flag is set
