@@ -494,6 +494,7 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
     uint32_t nb_pkts;
     struct vr_packet *pkt_arr[VR_DPDK_MAX_BURST_SZ];
     int pkti;
+    struct vr_interface_stats *stats;
 
     /* for all RX queues */
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
@@ -502,6 +503,9 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
                 rx_queue->rxq_burst_size);
         if (likely(nb_pkts > 0)) {
             total_pkts += nb_pkts;
+            stats = vif_get_stats(rx_queue->q_vif, rte_lcore_id());
+            stats->vis_deqpackets += nb_pkts;
+
             /* transmit packets to vrouter */
             if (vif_is_virtual(rx_queue->q_vif)) {
                 for (pkti = 0; pkti < nb_pkts; pkti++) {

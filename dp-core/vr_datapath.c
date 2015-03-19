@@ -462,7 +462,7 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     if (vif_is_vhost(vif)) {
         handled = vr_l3_input(pkt, fmd);
         if (!handled)
-            vif_drop_pkt(vif, pkt, 1);
+            vif_drop_pkt(vif, pkt, 1, VP_DROP_INTERFACE_DROP);
         return 0;
     }
 
@@ -491,7 +491,7 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     }
 
     if (vr_pkt_type(pkt, 0, &fmd) < 0) {
-        vif_drop_pkt(vif, pkt, 1);
+        vif_drop_pkt(vif, pkt, 1, VP_DROP_INTERFACE_DROP);
         return 0;
     }
 
@@ -516,7 +516,7 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     fmd.fmd_dvrf = vif->vif_vrf;
 
     if (vr_pkt_type(pkt, 0, &fmd) < 0) {
-        vif_drop_pkt(vif, pkt, 1);
+        vif_drop_pkt(vif, pkt, 1, VP_DROP_INTERFACE_DROP);
         return 0;
     }
 

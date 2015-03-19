@@ -459,6 +459,7 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
     struct vr_packet *pkt;
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_interface_stats *stats;
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
@@ -473,6 +474,9 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         vr_dpdk_packets_vroute(usockp->usock_vif, &pkt, 1);
         /* flush pkt0 TX queues immediately */
         vr_dpdk_lcore_flush(lcore);
+
+        stats = vif_get_stats(usockp->usock_vif, lcore_id);
+        stats->vis_deqpackets++;
 
         rcu_quiescent_state();
     } else {
@@ -1231,4 +1235,3 @@ return_from_io:
 
     return ret;
 }
-

@@ -65,18 +65,24 @@ vr_drop_stats_fill_response(vr_drop_stats_req *response,
     response->vds_arp_no_route = stats->vds_arp_no_route;
     response->vds_l2_no_route = stats->vds_l2_no_route;
     response->vds_arp_reply_no_route = stats->vds_arp_reply_no_route;
+    response->vds_enqueue_fail = stats->vds_enqueue_fail;
+    response->vds_dequeue_fail = stats->vds_dequeue_fail;
 
     return;
 }
 
 static void
-vr_drop_stats_get(void)
+vr_drop_stats_get(short core)
 {
     int ret = 0;
     unsigned int cpu;
     struct vrouter *router = vrouter_get(0);
     vr_drop_stats_req *response = NULL;
     struct vr_drop_stats *stats_block, *stats = NULL;
+    short real_core;
+
+    if ((unsigned int)core > vr_num_cpus)
+        goto exit_get;
 
     if (!router && (ret = -ENOENT))
         goto exit_get;
@@ -89,62 +95,131 @@ vr_drop_stats_get(void)
     if (!response && (ret = -ENOMEM))
         goto exit_get;
 
-
-    for (cpu = 0; cpu < vr_num_cpus; cpu++) {
-        stats_block = (struct vr_drop_stats *)router->vr_pdrop_stats[cpu];
-        stats->vds_discard += stats_block->vds_discard;
-        stats->vds_pull += stats_block->vds_pull;
-        stats->vds_invalid_if += stats_block->vds_invalid_if;
-        stats->vds_arp_no_where_to_go +=
+    if (core == 0) { //all cores
+        for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+            stats_block = (struct vr_drop_stats *)router->vr_pdrop_stats[cpu];
+            stats->vds_discard += stats_block->vds_discard;
+            stats->vds_pull += stats_block->vds_pull;
+            stats->vds_invalid_if += stats_block->vds_invalid_if;
+            stats->vds_arp_no_where_to_go +=
+                stats_block->vds_arp_no_where_to_go;
+            stats->vds_garp_from_vm += stats_block->vds_garp_from_vm;
+            stats->vds_invalid_arp += stats_block->vds_invalid_arp;
+            stats->vds_trap_no_if += stats_block->vds_trap_no_if;
+            stats->vds_nowhere_to_go += stats_block->vds_nowhere_to_go;
+            stats->vds_flow_queue_limit_exceeded +=
+                stats_block->vds_flow_queue_limit_exceeded;
+            stats->vds_flow_no_memory += stats_block->vds_flow_no_memory;
+            stats->vds_flow_invalid_protocol +=
+                stats_block->vds_flow_invalid_protocol;
+            stats->vds_flow_nat_no_rflow += stats_block->vds_flow_nat_no_rflow;
+            stats->vds_flow_action_drop += stats_block->vds_flow_action_drop;
+            stats->vds_flow_action_invalid +=
+                stats_block->vds_flow_action_invalid;
+            stats->vds_flow_unusable += stats_block->vds_flow_unusable;
+            stats->vds_flow_table_full += stats_block->vds_flow_table_full;
+            stats->vds_interface_tx_discard +=
+                stats_block->vds_interface_tx_discard;
+            stats->vds_interface_drop += stats_block->vds_interface_drop;
+            stats->vds_duplicated += stats_block->vds_duplicated;
+            stats->vds_push += stats_block->vds_push;
+            stats->vds_ttl_exceeded += stats_block->vds_ttl_exceeded;
+            stats->vds_invalid_nh += stats_block->vds_invalid_nh;
+            stats->vds_invalid_label += stats_block->vds_invalid_label;
+            stats->vds_invalid_protocol += stats_block->vds_invalid_protocol;
+            stats->vds_interface_rx_discard +=
+                stats_block->vds_interface_rx_discard;
+            stats->vds_invalid_mcast_source +=
+                stats_block->vds_invalid_mcast_source;
+            stats->vds_head_alloc_fail += stats_block->vds_head_alloc_fail;
+            stats->vds_head_space_reserve_fail +=
+                stats_block->vds_head_space_reserve_fail;
+            stats->vds_pcow_fail += stats_block->vds_pcow_fail;
+            stats->vds_mcast_df_bit += stats_block->vds_mcast_df_bit;
+            stats->vds_mcast_clone_fail += stats_block->vds_mcast_clone_fail;
+            stats->vds_composite_invalid_interface +=
+                stats_block->vds_composite_invalid_interface;
+            stats->vds_rewrite_fail += stats_block->vds_rewrite_fail;
+            stats->vds_misc += stats_block->vds_misc;
+            stats->vds_invalid_packet += stats_block->vds_invalid_packet;
+            stats->vds_cksum_err += stats_block->vds_cksum_err;
+            stats->vds_clone_fail += stats_block->vds_clone_fail;
+            stats->vds_no_fmd += stats_block->vds_no_fmd;
+            stats->vds_cloned_original += stats_block->vds_cloned_original;
+            stats->vds_invalid_vnid += stats_block->vds_invalid_vnid;
+            stats->vds_frag_err += stats_block->vds_frag_err;
+            stats->vds_invalid_source += stats_block->vds_invalid_source;
+            stats->vds_arp_no_route += stats_block->vds_arp_no_route;
+            stats->vds_l2_no_route += stats_block->vds_l2_no_route;
+            stats->vds_arp_reply_no_route +=
+                stats_block->vds_arp_reply_no_route;
+            stats->vds_enqueue_fail += stats_block->vds_enqueue_fail;
+            stats->vds_dequeue_fail += stats_block->vds_dequeue_fail;
+        }
+    } else if (core > 0) {
+        /* Core in request is incremented by one, for 0 to mean 'all the cores'.
+         * It is decremented now to get a valid number.
+         */
+        real_core = core - 1;
+        stats_block = (struct vr_drop_stats *)router->vr_pdrop_stats[real_core];
+        stats->vds_discard = stats_block->vds_discard;
+        stats->vds_pull = stats_block->vds_pull;
+        stats->vds_invalid_if = stats_block->vds_invalid_if;
+        stats->vds_arp_no_where_to_go =
             stats_block->vds_arp_no_where_to_go;
-        stats->vds_garp_from_vm += stats_block->vds_garp_from_vm;
-        stats->vds_invalid_arp += stats_block->vds_invalid_arp;
-        stats->vds_trap_no_if += stats_block->vds_trap_no_if;
-        stats->vds_nowhere_to_go += stats_block->vds_nowhere_to_go;
-        stats->vds_flow_queue_limit_exceeded +=
+        stats->vds_garp_from_vm = stats_block->vds_garp_from_vm;
+        stats->vds_invalid_arp = stats_block->vds_invalid_arp;
+        stats->vds_trap_no_if = stats_block->vds_trap_no_if;
+        stats->vds_nowhere_to_go = stats_block->vds_nowhere_to_go;
+        stats->vds_flow_queue_limit_exceeded =
             stats_block->vds_flow_queue_limit_exceeded;
-        stats->vds_flow_no_memory += stats_block->vds_flow_no_memory;
-        stats->vds_flow_invalid_protocol +=
+        stats->vds_flow_no_memory = stats_block->vds_flow_no_memory;
+        stats->vds_flow_invalid_protocol =
             stats_block->vds_flow_invalid_protocol;
-        stats->vds_flow_nat_no_rflow += stats_block->vds_flow_nat_no_rflow;
-        stats->vds_flow_action_drop += stats_block->vds_flow_action_drop;
-        stats->vds_flow_action_invalid += stats_block->vds_flow_action_invalid;
-        stats->vds_flow_unusable += stats_block->vds_flow_unusable;
-        stats->vds_flow_table_full += stats_block->vds_flow_table_full;
-        stats->vds_interface_tx_discard += stats_block->vds_interface_tx_discard;
-        stats->vds_interface_drop += stats_block->vds_interface_drop;
-        stats->vds_duplicated += stats_block->vds_duplicated;
-        stats->vds_push += stats_block->vds_push;
-        stats->vds_ttl_exceeded += stats_block->vds_ttl_exceeded;
-        stats->vds_invalid_nh += stats_block->vds_invalid_nh;
-        stats->vds_invalid_label += stats_block->vds_invalid_label;
-        stats->vds_invalid_protocol += stats_block->vds_invalid_protocol;
-        stats->vds_interface_rx_discard += stats_block->vds_interface_rx_discard;
-        stats->vds_invalid_mcast_source += stats_block->vds_invalid_mcast_source;
-        stats->vds_head_alloc_fail += stats_block->vds_head_alloc_fail;
-        stats->vds_head_space_reserve_fail += stats_block->vds_head_space_reserve_fail;
-        stats->vds_pcow_fail += stats_block->vds_pcow_fail;
-        stats->vds_mcast_df_bit += stats_block->vds_mcast_df_bit;
-        stats->vds_mcast_clone_fail += stats_block->vds_mcast_clone_fail;
-        stats->vds_composite_invalid_interface +=
+        stats->vds_flow_nat_no_rflow = stats_block->vds_flow_nat_no_rflow;
+        stats->vds_flow_action_drop = stats_block->vds_flow_action_drop;
+        stats->vds_flow_action_invalid = stats_block->vds_flow_action_invalid;
+        stats->vds_flow_unusable = stats_block->vds_flow_unusable;
+        stats->vds_flow_table_full = stats_block->vds_flow_table_full;
+        stats->vds_interface_tx_discard = stats_block->vds_interface_tx_discard;
+        stats->vds_interface_drop = stats_block->vds_interface_drop;
+        stats->vds_duplicated = stats_block->vds_duplicated;
+        stats->vds_push = stats_block->vds_push;
+        stats->vds_ttl_exceeded = stats_block->vds_ttl_exceeded;
+        stats->vds_invalid_nh = stats_block->vds_invalid_nh;
+        stats->vds_invalid_label = stats_block->vds_invalid_label;
+        stats->vds_invalid_protocol = stats_block->vds_invalid_protocol;
+        stats->vds_interface_rx_discard = stats_block->vds_interface_rx_discard;
+        stats->vds_invalid_mcast_source = stats_block->vds_invalid_mcast_source;
+        stats->vds_head_alloc_fail = stats_block->vds_head_alloc_fail;
+        stats->vds_head_space_reserve_fail =
+            stats_block->vds_head_space_reserve_fail;
+        stats->vds_pcow_fail = stats_block->vds_pcow_fail;
+        stats->vds_mcast_df_bit = stats_block->vds_mcast_df_bit;
+        stats->vds_mcast_clone_fail = stats_block->vds_mcast_clone_fail;
+        stats->vds_composite_invalid_interface =
             stats_block->vds_composite_invalid_interface;
-        stats->vds_rewrite_fail += stats_block->vds_rewrite_fail;
-        stats->vds_misc += stats_block->vds_misc;
-        stats->vds_invalid_packet += stats_block->vds_invalid_packet;
-        stats->vds_cksum_err += stats_block->vds_cksum_err;
-        stats->vds_clone_fail += stats_block->vds_clone_fail;
-        stats->vds_no_fmd += stats_block->vds_no_fmd;
-        stats->vds_cloned_original += stats_block->vds_cloned_original;
-        stats->vds_invalid_vnid += stats_block->vds_invalid_vnid;
-        stats->vds_frag_err += stats_block->vds_frag_err;
-        stats->vds_invalid_source += stats_block->vds_invalid_source;
-        stats->vds_arp_no_route += stats_block->vds_arp_no_route;
-        stats->vds_l2_no_route += stats_block->vds_l2_no_route;
-        stats->vds_arp_reply_no_route +=
+        stats->vds_rewrite_fail = stats_block->vds_rewrite_fail;
+        stats->vds_misc = stats_block->vds_misc;
+        stats->vds_invalid_packet = stats_block->vds_invalid_packet;
+        stats->vds_cksum_err = stats_block->vds_cksum_err;
+        stats->vds_clone_fail = stats_block->vds_clone_fail;
+        stats->vds_no_fmd = stats_block->vds_no_fmd;
+        stats->vds_cloned_original = stats_block->vds_cloned_original;
+        stats->vds_invalid_vnid = stats_block->vds_invalid_vnid;
+        stats->vds_frag_err = stats_block->vds_frag_err;
+        stats->vds_invalid_source = stats_block->vds_invalid_source;
+        stats->vds_arp_no_route = stats_block->vds_arp_no_route;
+        stats->vds_l2_no_route = stats_block->vds_l2_no_route;
+        stats->vds_arp_reply_no_route =
             stats_block->vds_arp_reply_no_route;
-    }
+        stats->vds_enqueue_fail = stats_block->vds_enqueue_fail;
+        stats->vds_dequeue_fail = stats_block->vds_dequeue_fail;
 
+    } else
+        goto exit_get;
 
+    response->vds_core = core;
     vr_drop_stats_fill_response(response, stats);
 
 exit_get:
@@ -167,7 +242,7 @@ vr_drop_stats_req_process(void *s_req)
     if ((req->h_op != SANDESH_OP_GET) && (ret = -EOPNOTSUPP))
         vr_send_response(ret);
 
-    vr_drop_stats_get();
+    vr_drop_stats_get(req->vds_core);
     return;
 }
 
