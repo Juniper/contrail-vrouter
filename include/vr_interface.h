@@ -107,6 +107,10 @@ struct vr_interface_stats {
     uint64_t vis_obytes;
     uint64_t vis_opackets;
     uint64_t vis_oerrors;
+    uint64_t vis_enqpackets;
+    uint64_t vis_enqerrors;
+    uint64_t vis_deqpackets;
+    uint64_t vis_deqerrors;
 };
 
 struct vr_packet;
@@ -244,11 +248,13 @@ extern void vif_set_xconnect(struct vr_interface *);
 extern void vif_remove_xconnect(struct vr_interface *);
 extern int vif_xconnect(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *);
-extern void vif_drop_pkt(struct vr_interface *, struct vr_packet *, bool);
+extern void vif_drop_pkt(struct vr_interface *, struct vr_packet *, bool,
+        unsigned short);
 extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
         short, unsigned short);
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *, unsigned short);
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
