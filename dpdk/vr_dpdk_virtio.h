@@ -44,6 +44,7 @@ typedef struct vr_dpdk_virtioq {
     struct rte_ring *vdv_pring;
     unsigned vdv_pring_dst_lcore_id;
     int vdv_callfd;
+    struct vr_interface *vif;
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
 } vr_dpdk_virtioq_t;
 

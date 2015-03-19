@@ -40,13 +40,15 @@
 static struct nl_client *cl;
 static int resp_code;
 static vr_drop_stats_req stats_req;
-static int help_set;
+static int help_set, core_set;
+static short core = -1;
 
 void
 vr_drop_stats_req_process(void *s_req)
 {
-    vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
+    int platform = get_platform();
 
+    vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
 
     printf("GARP                          %" PRIu64 "\n",
             stats->vds_garp_from_vm);
@@ -66,6 +68,12 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_interface_drop);
     printf("IF RX Discard                 %" PRIu64 "\n",
             stats->vds_interface_rx_discard);
+    if (platform == DPDK_PLATFORM) {
+        printf("Packet Enqueue Fail           %" PRIu64 "\n",
+                stats->vds_enqueue_fail);
+        printf("Packet Dequeue Fail           %" PRIu64 "\n",
+                stats->vds_dequeue_fail);
+    }
     printf("\n");
 
     printf("Flow Unusable                 %" PRIu64 "\n",
@@ -173,6 +181,15 @@ vr_build_drop_stats_request(void)
     stats_req.h_op = SANDESH_OP_GET;
     stats_req.vds_rid = 0;
 
+    /* To maintain compatibility, it is needed for vds_core == 0 to mean
+     * 'all cores'. Meanwhile, it's handy for the user to enumerate cores
+     * starting with 0. When user asks for core 0, we send core 1 request,
+     * vRouter decrements and sends back core 0 reply. When there comes a request
+     * with no core set, vRouter understands it as 0 and generates a response
+     * for all cores.
+     */
+    stats_req.vds_core = ++core;
+
     return &stats_req;
 }
 
@@ -253,19 +270,44 @@ vr_get_drop_stats(void)
 
 enum opt_index {
     HELP_OPT_INDEX,
+    CORE_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
 static struct option long_options[] = {
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
+    [CORE_OPT_INDEX]    =   {"core",    required_argument,  &core_set,      1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
 static void
 Usage()
 {
-    printf("Usage: drop_stats [--help]\n");
+    printf("Usage: dropstats [--help|-h]\n");
+    printf("Usage: dropstats [--core|-c] <core number>\n");
+    printf("\n");
+
+    printf("--core <core number>\t Show statistics for a specified core\n");
     exit(-EINVAL);
+}
+
+static void
+parse_long_opts(int opt_index, char *opt_arg)
+{
+    errno = 0;
+    switch (opt_index) {
+    case CORE_OPT_INDEX:
+        core = (short)strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case HELP_OPT_INDEX:
+    default:
+        Usage();
+    }
+
+    return;
 }
 
 int
@@ -274,12 +316,18 @@ main(int argc, char *argv[])
     char opt;
     int ret, option_index;
 
-    while (((opt = getopt_long(argc, argv, "",
+    while (((opt = getopt_long(argc, argv, "h:c:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
-        case 0:
+        case 'c':
+            parse_long_opts(CORE_OPT_INDEX, optarg);
             break;
 
+        case 0:
+            parse_long_opts(option_index, optarg);
+            break;
+
+        case 'h':
         default:
             Usage();
         }

@@ -142,6 +142,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_zero_copy = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vif = vif;
     rx_queue->q_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
     rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
     rx_queue->q_vif = vif;
@@ -219,6 +220,7 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vif = vif;
     tx_queue->q_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
     tx_queue->q_vif = vif;
 
@@ -401,10 +403,11 @@ static int
 dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *mbuf)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+    struct vr_interface *vif = vq->vif;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
-        vr_dpdk_pfree(mbuf, VP_DROP_INTERFACE_DROP);
-        return -1;
+        vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(mbuf), 0, VP_DROP_ENQUEUE_FAIL);
+        return 0;
     }
 
     vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = mbuf;
@@ -425,6 +428,8 @@ static int
 dpdk_virtio_to_vm_flush(void *arg)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+    struct vr_interface *vif = vq->vif;
+    struct vr_interface_stats *stats;
     uint16_t i;
     uint16_t num_buf_posted, vq_hard_avail_idx, vq_hard_used_idx, num_pkts;
     uint16_t next_desc_idx, next_avail_idx, size;
@@ -470,7 +475,8 @@ dpdk_virtio_to_vm_flush(void *arg)
         desc = &vq->vdv_desc[next_desc_idx];
         buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
         if (buf_addr == NULL) {
-            vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
+            vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(vq->vdv_tx_mbuf[i]), 0,
+                    VP_DROP_DEQUEUE_FAIL);
             continue;
         }
 
@@ -495,7 +501,8 @@ dpdk_virtio_to_vm_flush(void *arg)
 
             buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             if (buf_addr == NULL) {
-                vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
+                vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(vq->vdv_tx_mbuf[i]), 0,
+                        VP_DROP_DEQUEUE_FAIL);
                 continue;
             }
 
@@ -512,6 +519,9 @@ dpdk_virtio_to_vm_flush(void *arg)
             sizeof(struct virtio_net_hdr) +
             rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
 
+        stats = vif_get_stats(vif, vr_dpdk_mbuf_to_pkt(vq->vdv_tx_mbuf[i])->vp_cpu);
+        stats->vis_enqpackets++;
+
         rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
     }
 
@@ -520,7 +530,8 @@ dpdk_virtio_to_vm_flush(void *arg)
      * post receive buffers soon enough.
      */
     for (; i < vq->vdv_tx_mbuf_count; i++) {
-        vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
+        vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(vq->vdv_tx_mbuf[i]), 0,
+                VP_DROP_DEQUEUE_FAIL);
     }
 
     vq->vdv_tx_mbuf_count = 0;
@@ -809,12 +820,16 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
 
     vq = (vr_dpdk_virtioq_t *) rx_queue->q_queue_h;
     vq_pring = vq->vdv_pring;
+    if (!vq_pring)
+        return;
 
     RTE_LOG(DEBUG, VROUTER, "%s: enqueue %u pakets to ring %p\n",
                 __func__, npkts, vq_pring);
     nb_enq = rte_ring_sp_enqueue_burst(vq_pring, (void **) pkt_arr, npkts);
-    for ( ; nb_enq < npkts; nb_enq++)
-        vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
+
+    for ( ; nb_enq < npkts; nb_enq++) {
+        vif_drop_pkt(pkt_arr[nb_enq]->vp_if, pkt_arr[nb_enq], 0, VP_DROP_ENQUEUE_FAIL);
+    }
 
     return;
 }

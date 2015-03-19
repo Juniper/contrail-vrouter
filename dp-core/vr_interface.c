@@ -27,7 +27,6 @@ static mac_response_t vm_mac_request(struct vr_interface *, struct vr_packet *,
 void vif_attach(struct vr_interface *);
 void vif_detach(struct vr_interface *);
 int vr_gro_vif_add(struct vrouter *, unsigned int, char *, unsigned short);
-struct vr_interface_stats *vif_get_stats(struct vr_interface *, unsigned short);
 struct vr_interface *__vrouter_get_interface_os(struct vrouter *, unsigned int);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
@@ -67,7 +66,8 @@ vif_discard_rx(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 void
-vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
+vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input,
+        unsigned short reason)
 {
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
@@ -75,7 +75,13 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
         stats->vis_ierrors++;
     else
         stats->vis_oerrors++;
-    vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
+
+    if (reason == VP_DROP_ENQUEUE_FAIL)
+        stats->vis_enqerrors++;
+    else if (reason == VP_DROP_DEQUEUE_FAIL)
+        stats->vis_deqerrors++;
+
+    vr_pfree(pkt, reason);
     return;
 }
 
@@ -223,7 +229,7 @@ vif_xconnect(struct vr_interface *vif, struct vr_packet *pkt,
 
 free_pkt:
     if (vif)
-        vif_drop_pkt(vif, pkt, 1);
+        vif_drop_pkt(vif, pkt, 1, VP_DROP_INTERFACE_DROP);
     return 0;
 }
 
@@ -1806,12 +1812,14 @@ generate_resp:
 }
 
 static void
-vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
+vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf, short core)
 {
     unsigned int i;
     struct vr_interface_stats *stats;
     struct vr_interface_settings settings;
+    short real_core;
 
+    req->vifr_core = core;
     req->vifr_type = intf->vif_type;
     req->vifr_flags = intf->vif_flags;
     req->vifr_vrf = intf->vif_vrf;
@@ -1860,15 +1868,41 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
     req->vifr_obytes = 0;
     req->vifr_opackets = 0;
     req->vifr_oerrors = 0;
+    req->vifr_enqpackets = 0;
+    req->vifr_enqerrors = 0;
+    req->vifr_deqpackets = 0;
+    req->vifr_deqerrors = 0;
 
-    for (i = 0; i < vr_num_cpus; i++) {
-        stats = vif_get_stats(intf, i);
-        req->vifr_ibytes += stats->vis_ibytes;
-        req->vifr_ipackets += stats->vis_ipackets;
-        req->vifr_ierrors += stats->vis_ierrors;
-        req->vifr_obytes += stats->vis_obytes;
-        req->vifr_opackets += stats->vis_opackets;
-        req->vifr_oerrors += stats->vis_oerrors;
+    if(req->vifr_core == 0) { //all cores
+        for (i = 0; i < vr_num_cpus; i++) {
+            stats = vif_get_stats(intf, i);
+            req->vifr_ibytes += stats->vis_ibytes;
+            req->vifr_ipackets += stats->vis_ipackets;
+            req->vifr_ierrors += stats->vis_ierrors;
+            req->vifr_obytes += stats->vis_obytes;
+            req->vifr_opackets += stats->vis_opackets;
+            req->vifr_oerrors += stats->vis_oerrors;
+            req->vifr_enqpackets += stats->vis_enqpackets;
+            req->vifr_enqerrors += stats->vis_enqerrors;
+            req->vifr_deqpackets += stats->vis_deqpackets;
+            req->vifr_deqerrors += stats->vis_deqerrors;
+        }
+    } else if (req->vifr_core > 0) {
+        /* Core in request is incremented by one, for 0 to mean 'all the cores'.
+         * It is decremented now to get a valid number.
+         */
+        real_core = req->vifr_core - 1;
+        stats = vif_get_stats(intf, real_core);
+        req->vifr_ibytes = stats->vis_ibytes;
+        req->vifr_ipackets = stats->vis_ipackets;
+        req->vifr_ierrors = stats->vis_ierrors;
+        req->vifr_obytes = stats->vis_obytes;
+        req->vifr_opackets = stats->vis_opackets;
+        req->vifr_oerrors = stats->vis_oerrors;
+        req->vifr_enqpackets = stats->vis_enqpackets;
+        req->vifr_enqerrors = stats->vis_enqerrors;
+        req->vifr_deqpackets = stats->vis_deqpackets;
+        req->vifr_deqerrors = stats->vis_deqerrors;
     }
 
     req->vifr_speed = -1;
@@ -1935,6 +1969,7 @@ vr_interface_get(vr_interface_req *req)
     struct vr_interface *vif = NULL;
     struct vrouter *router;
     vr_interface_req *resp = NULL;
+    short core = req->vifr_core;
 
     router = vrouter_get(req->vifr_rid);
     if (!router) {
@@ -1954,7 +1989,7 @@ vr_interface_get(vr_interface_req *req)
             goto generate_response;
         }
 
-        vr_interface_make_req(resp, vif);
+        vr_interface_make_req(resp, vif, core);
     } else
         ret = -ENOENT;
 
@@ -1974,7 +2009,11 @@ vr_interface_dump(vr_interface_req *r)
     vr_interface_req *resp = NULL;
     struct vr_interface *vif;
     struct vrouter *router = vrouter_get(r->vifr_vrf);
+    short core = r->vifr_core;
     struct vr_message_dumper *dumper = NULL;
+
+    if ((unsigned int)core > vr_num_cpus)
+        goto generate_response;
 
     if (!router && (ret = -ENODEV))
         goto generate_response;
@@ -1998,7 +2037,7 @@ vr_interface_dump(vr_interface_req *r)
             i < router->vr_max_interfaces; i++) {
         vif = router->vr_interfaces[i];
         if (vif) {
-            vr_interface_make_req(resp, vif);
+            vr_interface_make_req(resp, vif, core);
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;
@@ -2271,4 +2310,3 @@ cleanup:
 
     return ret;
 }
-

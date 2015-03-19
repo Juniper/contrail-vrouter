@@ -25,11 +25,13 @@
  */
 struct dpdk_knidev_reader {
     struct rte_kni *kni;
+    struct vr_interface *vif;
 };
 
 struct dpdk_knidev_reader_params {
     /* Pointer to preallocated KNI */
     struct rte_kni *kni;
+    struct vr_interface *vif;
 };
 
 static void *
@@ -55,6 +57,7 @@ dpdk_knidev_reader_create(void *params, int socket_id)
 
     /* Initialization */
     port->kni = conf->kni;
+    port->vif = conf->vif;
 
     return port;
 }
@@ -90,11 +93,13 @@ struct dpdk_knidev_writer {
     uint16_t tx_buf_count;
     uint64_t bsz_mask;
     struct rte_kni *kni;
+    struct vr_interface *vif;
 };
 
 struct dpdk_knidev_writer_params {
     /* Pointer to preallocated KNI */
     struct rte_kni *kni;
+    struct vr_interface *vif;
     /* Recommended burst size */
     uint32_t tx_burst_sz;
 };
@@ -125,6 +130,7 @@ dpdk_knidev_writer_create(void *params, int socket_id)
 
     /* Initialization */
     port->kni = conf->kni;
+    port->vif = conf->vif;
     port->tx_burst_sz = conf->tx_burst_sz;
     port->tx_buf_count = 0;
     port->bsz_mask = 1LLU << (conf->tx_burst_sz - 1);
@@ -135,13 +141,18 @@ dpdk_knidev_writer_create(void *params, int socket_id)
 static inline void
 send_burst(struct dpdk_knidev_writer *p)
 {
-    uint32_t nb_tx;
+    uint32_t nb_tx, i;
+    struct vr_interface_stats *stats;
 
     nb_tx = rte_kni_tx_burst(p->kni, p->tx_buf, p->tx_buf_count);
 
+    for (i = 0; i < nb_tx; i++) {
+        stats = vif_get_stats(p->vif, vr_dpdk_mbuf_to_pkt(p->tx_buf[i])->vp_cpu);
+        stats->vis_enqpackets++;
+    }
+
     for ( ; nb_tx < p->tx_buf_count; nb_tx++)
-        /* TODO: a separate counter for this drop */
-        vr_dpdk_pfree(p->tx_buf[nb_tx], VP_DROP_INTERFACE_DROP);
+        vif_drop_pkt(p->vif, vr_dpdk_mbuf_to_pkt(p->tx_buf[nb_tx]), 0, VP_DROP_ENQUEUE_FAIL);
 
     p->tx_buf_count = 0;
 }
@@ -248,6 +259,7 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* create the queue */
     struct dpdk_knidev_reader_params reader_params = {
         .kni = vif->vif_os,
+        .vif = vif,
     };
     rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
     if (rx_queue->q_queue_h == NULL) {
@@ -313,6 +325,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct dpdk_knidev_writer_params writer_params = {
         .kni = vif->vif_os,
         .tx_burst_sz = VR_DPDK_KNI_TX_BURST_SZ,
+        .vif = vif,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {

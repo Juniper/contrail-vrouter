@@ -183,7 +183,7 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     skb_set_tail_pointer(skb, pkt_head_len(pkt));
 
     if (!dev) {
-        vif_drop_pkt(vif, pkt, false);
+        vif_drop_pkt(vif, pkt, false, VP_DROP_INTERFACE_DROP);
         goto exit_rx;
     }
 
@@ -763,7 +763,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     skb->dev = dev;
     if (!dev) {
-        vif_drop_pkt(vif, pkt, false);
+        vif_drop_pkt(vif, pkt, false, VP_DROP_INTERFACE_DROP);
         return 0;
     }
 
@@ -1146,7 +1146,7 @@ linux_rx_handler(struct sk_buff **pskb)
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
         if ((!(vif->vif_flags & VIF_FLAG_PROMISCOUS)) &&
                 (skb->pkt_type == PACKET_OTHERHOST)) {
-            vif_drop_pkt(vif, pkt, true);
+            vif_drop_pkt(vif, pkt, true, VP_DROP_INTERFACE_DROP);
             return RX_HANDLER_CONSUMED;
         }
     }
@@ -1381,7 +1381,7 @@ vr_interface_common_hook(struct sk_buff *skb)
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
         if ((!(vif->vif_flags & VIF_FLAG_PROMISCOUS)) &&
                 (skb->pkt_type == PACKET_OTHERHOST)) {
-            vif_drop_pkt(vif, pkt, true);
+            vif_drop_pkt(vif, pkt, true, VP_DROP_INTERFACE_DROP);
             return RX_HANDLER_CONSUMED;
         }
     }
@@ -1945,7 +1945,7 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
         struct sk_buff *nskb = skb_realloc_headroom(skb,
                 LL_RESERVED_SPACE(skb->dev));
         if (!nskb) {
-            vif_drop_pkt(vif, pkt, false);
+            vif_drop_pkt(vif, pkt, false, VP_DROP_INTERFACE_DROP);
             if (net_ratelimit())
                 printk(KERN_WARNING
                      "Insufficient memory: %s %d\n",
