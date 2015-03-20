@@ -487,26 +487,28 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
     return;
 }
 
-static struct rte_mbuf *
+static void
 vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
-    int ret;
-    void *objp;
+    int i;
+    unsigned nb_pkts;
+    struct rte_mbuf *mbuf_arr[VR_DPDK_RING_RX_BURST_SZ];
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining pkt0 ring...\n", __func__,
             pthread_self());
-    ret = rte_ring_dequeue(vr_dpdk.packet_ring, &objp);
-    if (ret)
-        return NULL;
-
-    return (struct rte_mbuf *)objp;
+    do {
+        nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
+            (void **)&mbuf_arr, VR_DPDK_RING_RX_BURST_SZ);
+        for (i = 0; i < nb_pkts; i++) {
+            usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]);
+            rte_pktmbuf_free(mbuf_arr[i]);
+        }
+    } while (nb_pkts > 0);
 }
 
 static int
 usock_read_done(struct vr_usocket *usockp)
 {
-    struct rte_mbuf *mbuf;
-
     if (usockp->usock_state == READING_FAULTY_DATA)
         return 0;
 
@@ -516,9 +518,7 @@ usock_read_done(struct vr_usocket *usockp)
         break;
 
     case EVENT:
-        while ((mbuf = vr_dpdk_drain_pkt0_ring(usockp))) {
-            usock_mbuf_write(usockp->usock_parent, mbuf);
-        }
+        vr_dpdk_drain_pkt0_ring(usockp);
         break;
 
     case NETLINK:
