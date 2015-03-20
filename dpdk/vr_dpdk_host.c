@@ -1149,6 +1149,11 @@ vr_dpdk_host_init(void)
         }
     }
 
+    /*
+     * Turn off GRO/GSO as they are not implemented with DPDK.
+     */
+    vr_perfr = vr_perfs = 0;
+
     ret = vrouter_init();
     if (ret)
         return ret;
