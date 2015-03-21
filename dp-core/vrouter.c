@@ -96,13 +96,10 @@ static struct vr_module modules[] = {
  * TODO For BSD we turn off all performance tweaks for now, it will
  * be implemented later.
  */
-#ifdef __DPDK__
-int vr_perfr = 0;    /* GRO */
-int vr_perfs = 0;    /* segmentation in software */
 /*
  * Enable changes for better performance
  */
-#elif defined(__linux__)
+#if defined(__linux__)
 int vr_perfr = 1;    /* GRO */
 int vr_perfs = 1;    /* segmentation in software */
 #elif defined(__FreeBSD__)
