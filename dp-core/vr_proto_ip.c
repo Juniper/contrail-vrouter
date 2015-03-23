@@ -330,12 +330,11 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         }
 
         /*
-         * IF the packet packet is from Vmware, it will be  a tagged
-         * packet. This tagged packets if destined to Vhost, packet
-         * needs to be stripped of all tags
+         * If the packet is tagged (from a vlan interface or from the virtual
+         * vlan interfaces) and if it is destined to vhost, all tags need to
+         * be stripped.
          */
-        if (vif->vif_type == VIF_TYPE_HOST && pkt->vp_if->vif_type ==
-                VIF_TYPE_VIRTUAL_VLAN) {
+        if (vif->vif_type == VIF_TYPE_HOST) {
 
             eth = pkt_data(pkt);
             eth_proto = ntohs(*(unsigned short *)(eth +
