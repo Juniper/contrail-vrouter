@@ -13,6 +13,25 @@
 #include <vr_ip_mtrie.h>
 #include <vr_bridge.h>
 
+struct vr_nexthop *
+vr_inet6_ip_lookup(unsigned short vrf, uint8_t *ip6)
+{
+    uint32_t rt_prefix[4];
+
+    struct vr_route_req rt;
+
+    rt.rtr_req.rtr_vrf_id = vrf;
+    rt.rtr_req.rtr_prefix = (uint8_t*)&rt_prefix;
+    memcpy(rt.rtr_req.rtr_prefix, ip6, 16);
+    rt.rtr_req.rtr_prefix_size = 16;
+    rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
+    rt.rtr_req.rtr_family = AF_INET6;
+    rt.rtr_req.rtr_marker_size = 0;
+    rt.rtr_req.rtr_nh_id = 0;
+
+    return vr_inet_route_lookup(vrf, &rt);
+}
+
 static int
 vr_v6_prefix_is_ll(uint8_t prefix[])
 {
