@@ -111,6 +111,9 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                                             PROT_READ | PROT_WRITE,
                                             MAP_SHARED,
                                             vru_cl->vruc_fds_sent[i], 0);
+            /* the file descriptor is no longer needed */
+            close(vru_cl->vruc_fds_sent[i]);
+            vru_cl->vruc_fds_sent[i] = -1;
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
                 vr_uvhost_log("mmap for size %d failed for FD %d"
@@ -342,6 +345,8 @@ vr_uvhm_set_call_fd(vr_uvh_client_t *vru_cl)
                       vru_cl->vruc_fds_sent[0]);
         return -1;
     }
+    /* set FD to -1, so we do not close it on cleanup */
+    vru_cl->vruc_fds_sent[0] = -1;
 
     return 0;
 }
@@ -380,7 +385,7 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
  * Returns 0 on success, -1 otherwise.
  */
 static int
-vr_uvh_cl_send_reply(vr_uvh_client_t *vru_cl)
+vr_uvh_cl_send_reply(int fd, vr_uvh_client_t *vru_cl)
 {
     int ret;
     VhostUserMsg *msg = &vru_cl->vruc_msg;
@@ -395,7 +400,7 @@ vr_uvh_cl_send_reply(vr_uvh_client_t *vru_cl)
             msg->flags |= VHOST_USER_VERSION;
             msg->flags |= VHOST_USER_REPLY_MASK;
 
-            ret = send(vru_cl->vruc_fd, (void *) msg,
+            ret = send(fd, (void *) msg,
                        VHOST_USER_HSIZE + msg->size, MSG_DONTWAIT);
             if ((ret < 0) || (ret != (VHOST_USER_HSIZE + msg->size))) {
                 /*
@@ -433,7 +438,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
     vr_uvh_client_t *vru_cl = (vr_uvh_client_t *) arg;
     struct msghdr mhdr;
     struct iovec iov;
-    int ret, read_len = 0;
+    int i, err, ret = 0, read_len = 0;
     struct cmsghdr *cmsg;
 
     memset(&mhdr, 0, sizeof(mhdr));
@@ -451,17 +456,20 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
         ret = recvmsg(fd, &mhdr, MSG_DONTWAIT);
         if (ret < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-                return 0;
+                ret = 0;
+                goto cleanup;
             }
 
             vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
                           ret, vru_cl->vruc_path);
-            return -1;
+            ret = -1;
+            goto cleanup;
         } else if (ret > 0) {
             if (mhdr.msg_flags & MSG_CTRUNC) {
                 vr_uvhost_log("Truncated control message from vhost client %s\n",
                              vru_cl->vruc_path);
-                return -1;
+                ret = -1;
+                goto cleanup;
             }
 
             cmsg = CMSG_FIRSTHDR(&mhdr);
@@ -482,7 +490,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 
             vru_cl->vruc_msg_bytes_read = ret;
             if (ret < VHOST_USER_HSIZE) {
-                return 0;
+                ret = 0;
+                goto cleanup;
             }
 
             read_len = vru_cl->vruc_msg.size;
@@ -492,7 +501,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
              */
             vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
                           ret, vru_cl->vruc_path);
-            return -1;
+            ret = -1;
+            goto cleanup;
         }
     } else if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
         read_len = VHOST_USER_HSIZE - vru_cl->vruc_msg_bytes_read;
@@ -517,56 +527,68 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 #endif
         if (ret < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-                return 0;
+                ret = 0;
+                goto cleanup;
             }
 
             vr_uvhost_log(
                 "Error: read returned %d, %d %d %d in vhost server for client %s\n",
                 ret, errno, read_len,
                 vru_cl->vruc_msg_bytes_read, vru_cl->vruc_path);
-            return -1;
+            ret = -1;
+            goto cleanup;
         } else if (ret == 0) {
              vr_uvhost_log("Read returned %d in vhost server for client %s\n",
                            ret, vru_cl->vruc_path);
-            return -1;
+            ret = -1;
+            goto cleanup;
         }
 
         vru_cl->vruc_msg_bytes_read += ret;
         if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
-            return 0;
+            ret = 0;
+            goto cleanup;
         }
 
         if (vru_cl->vruc_msg_bytes_read <
                 (vru_cl->vruc_msg.size + VHOST_USER_HSIZE)) {
-            return 0;
+            ret = 0;
+            goto cleanup;
         }
     }
 
     ret = vr_uvh_cl_call_handler(vru_cl);
     if (ret < 0) {
-        vr_uvhost_log("Error calling message handler for client %s\n",
-                      vru_cl->vruc_path);
-        return -1;
+        vr_uvhost_log("Error calling handler for message %d client %s\n",
+                      vru_cl->vruc_msg.request, vru_cl->vruc_path);
+        ret = -1;
+        goto cleanup;
     }
 
-    ret = vr_uvh_cl_send_reply(vru_cl);
+    ret = vr_uvh_cl_send_reply(fd, vru_cl);
     if (ret < 0) {
-        vr_uvhost_log("Error sending reply to vhost client %s\n",
-                      vru_cl->vruc_path);
-        return -1;
+        vr_uvhost_log("Error sending reply for message %d client %s\n",
+                      vru_cl->vruc_msg.request, vru_cl->vruc_path);
+        ret = -1;
+        goto cleanup;
     }
 
-    /*
-     * Message received successully, so clear state for next message from
-     * this client.
-     */
+cleanup:
+    err = errno;
+    /* close all the FDs received */
+    for (i = 0; i < vru_cl->vruc_num_fds_sent; i++) {
+        if (vru_cl->vruc_fds_sent[i] > 0)
+            close(vru_cl->vruc_fds_sent[i]);
+    }
+    /* clear state for next message from this client. */
     vru_cl->vruc_msg_bytes_read = 0;
     memset(&vru_cl->vruc_msg, 0, sizeof(vru_cl->vruc_msg));
     memset(vru_cl->vruc_cmsg, 0, sizeof(vru_cl->vruc_cmsg));
     memset(vru_cl->vruc_fds_sent, 0, sizeof(vru_cl->vruc_fds_sent));
     vru_cl->vruc_num_fds_sent = 0;
 
-    return 0;
+    errno = err;
+    return ret;
 }
 
 /*
@@ -600,7 +622,10 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
      * and we get vif --add at the VM spawning, not VM (re)starting
      */
 
-    vr_uvhost_cl_set_fd(vru_cl, s);
+    /* Do not set new client FD, since we still need to close parent FD
+     * on vif delete.
+     * We will get the client FD in our handler as an argument.
+     */
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_msg_handler)) {
         vr_uvhost_log("\terror adding client %s FD %d read handler\n",

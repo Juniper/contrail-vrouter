@@ -486,6 +486,8 @@ flow_table_map(vr_flow_req *req)
 
     ft->ft_entries = (struct vr_flow_entry *)mmap(NULL, req->fr_ftable_size,
             PROT_READ, MAP_SHARED, mem_fd, 0);
+    /* the file descriptor is no longer needed */
+    close(mem_fd);
     if (ft->ft_entries == MAP_FAILED) {
         printf("flow table: %s\n", strerror(errno));
         exit(errno);

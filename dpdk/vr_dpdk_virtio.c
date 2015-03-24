@@ -73,7 +73,13 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
     struct vr_dpdk_queue_params *rx_queue_params
                         = &lcore->lcore_rx_queue_params[vif->vif_idx];
+    int fd;
 
+    /* close call FD */
+    fd = ((vr_dpdk_virtioq_t *)rx_queue->q_queue_h)->vdv_callfd;
+    if (fd > 0) {
+        close(fd);
+    }
     /* remove the ring from the list of rings to push */
     dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
             rx_queue_params->qp_ring.ring_p);
@@ -172,10 +178,16 @@ dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
+    int fd;
 
     tx_queue->txq_ops.f_tx = NULL;
     rte_wmb();
 
+    /* close call FD */
+    fd = ((vr_dpdk_virtioq_t *)tx_queue->q_queue_h)->vdv_callfd;
+    if (fd > 0) {
+        close(fd);
+    }
     /* reset the queue */
     memset(tx_queue->q_queue_h, 0, sizeof(vr_dpdk_virtioq_t));
     memset(tx_queue, 0, sizeof(*tx_queue));
@@ -695,6 +707,9 @@ vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
+    if (vq->vdv_callfd > 0) {
+        close(vq->vdv_callfd);
+    }
     vq->vdv_callfd = callfd;
 
     return 0;

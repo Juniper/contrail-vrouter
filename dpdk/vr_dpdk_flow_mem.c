@@ -187,6 +187,8 @@ vr_dpdk_flow_mem_init(void)
         }
         vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
+        /* the file descriptor is no longer needed */
+        close(fd);
         if (vr_dpdk.flow_table == MAP_FAILED) {
             fprintf(stderr, "Error mmapping file %s: %s (%d)\n",
                 touse_file_name, rte_strerror(errno), errno);
