@@ -19,10 +19,10 @@
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
-extern struct vr_nexthop *vr_inet6_sip_lookup(unsigned short, uint8_t *);
-extern struct vr_nexthop *vr_inet_sip_lookup(unsigned short, uint32_t);
-extern struct vr_nexthop *vr_inet_src_lookup(unsigned short ,
-                                struct vr_ip *, struct vr_packet *);
+extern struct vr_nexthop *vr_inet6_ip_lookup(unsigned short, uint8_t *);
+extern struct vr_nexthop *vr_inet_ip_lookup(unsigned short, uint32_t);
+extern struct vr_nexthop *vr_inet_src_lookup(unsigned short,
+        struct vr_packet *);
 extern l4_pkt_type_t vr_ip6_well_known_packet(struct vr_packet *);
 extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
 
@@ -663,7 +663,7 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             if (pkt_src) {
                 sarp = (struct vr_arp *)pkt_data(pkt);
-                src_nh = vr_inet_sip_lookup(fmd->fmd_dvrf, sarp->arp_spa);
+                src_nh = vr_inet_ip_lookup(fmd->fmd_dvrf, sarp->arp_spa);
                 if (vr_gateway_nexthop(src_nh))
                     flood_to_vms = false;
             }
@@ -716,7 +716,7 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             if (pkt_src) {
                 ip6 = (struct vr_ip6 *)pkt_data(pkt);
-                src_nh = vr_inet6_sip_lookup(fmd->fmd_dvrf, ip6->ip6_src);
+                src_nh = vr_inet6_ip_lookup(fmd->fmd_dvrf, ip6->ip6_src);
                 if (vr_gateway_nexthop(src_nh))
                     flood_to_vms = false;
             }
@@ -1608,7 +1608,6 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
     struct vr_nexthop *src_nh = NULL;
-    struct vr_ip *ip;
     bool need_flow_lookup = false;
 
     if (!pkt->vp_ttl) {
@@ -1638,25 +1637,35 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          * Typical example for this situation is when the packet reaches the
          * target VM's server from an ECMP-ed service chain.
          */
-         ip = (struct vr_ip *)pkt_network_header(pkt);
          if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
              if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
                  need_flow_lookup = true;
              } else {
-                 src_nh = vr_inet_src_lookup(fmd->fmd_dvrf, ip, pkt);
+                 src_nh = vr_inet_src_lookup(fmd->fmd_dvrf, pkt);
                  if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
                             src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
                      need_flow_lookup = true;
                  }
              }
+
              if (need_flow_lookup) {
                  pkt->vp_flags |= VP_FLAG_FLOW_GET;
+                 /*
+                  * after vr_flow_forward returns, pkt->vp_nh could have changed
+                  * since in NAT cases the new destination should have been
+                  * looked up.
+                  */
                  if (!vr_flow_forward(nh->nh_router, pkt, fmd))
                      return 0;
 
+                 /* pkt->vp_nh could have changed after vr_flow_forward */
                  if (!pkt->vp_nh) {
                      vr_pfree(pkt, VP_DROP_INVALID_NH);
                      return 0;
+                 }
+
+                 if (nh != pkt->vp_nh) {
+                     return nh_output(pkt, pkt->vp_nh, fmd);
                  }
              }
         }
