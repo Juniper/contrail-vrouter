@@ -452,8 +452,15 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     struct vr_interface *vif = pkt->vp_if;
     int handled;
 
-    if (pkt->vp_nh)
+    if (pkt->vp_nh) {
+        /* If nexthop does not have valid data, drop it */
+        if (!(pkt->vp_nh->nh_flags & NH_FLAG_VALID)) {
+            vr_pfree(pkt, VP_DROP_INVALID_NH);
+            return 0;
+        }
+
         return pkt->vp_nh->nh_reach_nh(pkt, pkt->vp_nh, fmd);
+    }
 
     if (vif_is_vhost(vif)) {
         handled = vr_l3_input(pkt, fmd);
