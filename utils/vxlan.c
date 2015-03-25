@@ -41,7 +41,6 @@
 static struct nl_client *cl;
 static bool dump_pending = false;
 static bool response_pending = true;
-static int op;
 unsigned int dump_marker= 0;
 
 static int vxlan_vnid = 99999;
@@ -76,7 +75,7 @@ vr_response_process(void *s)
     if (resp->resp_code < 0) {
         printf("Error: %s\n", strerror(-resp->resp_code));
     } else {
-        if (op == 4) {
+        if (vxlan_op == SANDESH_OP_DUMP) {
             if (resp->resp_code > 0)
                 response_pending = true;
 
