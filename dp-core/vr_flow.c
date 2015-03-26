@@ -887,11 +887,11 @@ vr_flow_flush(void *arg)
 
     router = flmd->flmd_router;
     if (!router)
-        return;
+        goto exit_flush;
 
     fe = vr_get_flow_entry(router, flmd->flmd_index);
     if (!fe)
-        return;
+        goto exit_flush;
 
     vr_init_forwarding_md(&fmd);
     vr_flow_set_forwarding_md(router, fe, flmd->flmd_index, &fmd);
@@ -901,6 +901,9 @@ vr_flow_flush(void *arg)
     if (!(flmd->flmd_flags & VR_FLOW_FLAG_ACTIVE)) {
         vr_reset_flow_entry(router, fe, flmd->flmd_index);
     }
+
+exit_flush:
+    vr_free(flmd);
 
     return;
 }
