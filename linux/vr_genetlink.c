@@ -169,7 +169,8 @@ vr_genetlink_init(void)
     if (ret)
         return ret;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0))
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)) && \
+     (!(defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7))))
     return genl_register_family_with_ops(&vrouter_genl_family, vrouter_genl_ops,
         ARRAY_SIZE(vrouter_genl_ops));
 #else
