@@ -89,10 +89,10 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
 
     vum_msg = &vru_cl->vruc_msg.memory;
 
-    vr_uvhost_log("Num Regions %d\n", vum_msg->nregions);
+    vr_uvhost_log("Number of memory regions: %d\n", vum_msg->nregions);
     for (i = 0; i < vum_msg->nregions; i++) {
-        vr_uvhost_log("Region %d: physical address 0x%" PRIx64 ", size %"
-                PRIu64 ", offset %" PRIu64 "\n",
+        vr_uvhost_log("Region %d: physical address 0x%" PRIx64 ", size 0x%"
+                PRIx64 ", offset 0x%" PRIx64 "\n",
                 i, vum_msg->regions[i].guest_phys_addr,
                 vum_msg->regions[i].memory_size,
                 vum_msg->regions[i].mmap_offset);
@@ -107,16 +107,18 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
             size = vum_msg->regions[i].mmap_offset +
                        vum_msg->regions[i].memory_size;
             region->vrucmr_mmap_addr = (uint64_t)
-                                            mmap(0, size,
+                                            mmap(0,
+                                            size,
                                             PROT_READ | PROT_WRITE,
                                             MAP_SHARED,
-                                            vru_cl->vruc_fds_sent[i], 0);
+                                            vru_cl->vruc_fds_sent[i],
+                                            0);
             /* the file descriptor is no longer needed */
             close(vru_cl->vruc_fds_sent[i]);
             vru_cl->vruc_fds_sent[i] = -1;
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
-                vr_uvhost_log("mmap for size %d failed for FD %d"
+                vr_uvhost_log("mmap for size 0x%"PRIx64" failed for FD %d"
                         " on vhost client %s (%s)\n",
                         size,
                         vru_cl->vruc_fds_sent[i],
@@ -361,6 +363,7 @@ static int
 vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
 {
     VhostUserMsg *msg = &vru_cl->vruc_msg;
+    int i;
 
     if ((msg->request <= VHOST_USER_NONE) ||
             (msg->request >= VHOST_USER_MAX)) {
@@ -368,11 +371,18 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     }
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
-        vr_uvhost_log("Calling handler for message %d client %s\n",
-                                    msg->request, vru_cl->vruc_path);
+        vr_uvhost_log("%s: calling handler for message %d\n",
+                                    vru_cl->vruc_path, msg->request);
+        if (vru_cl->vruc_num_fds_sent > 0) {
+            for (i = 0; i < vru_cl->vruc_num_fds_sent; i++) {
+                vr_uvhost_log("\tmessage %d sent FD: %d\n",
+                    msg->request, vru_cl->vruc_fds_sent[i]);
+            }
+        }
         return vr_uvhost_cl_msg_handlers[msg->request](vru_cl);
     } else {
-        vr_uvhost_log("No handler defined for message %d\n", msg->request);
+        vr_uvhost_log("%s: no handler defined for message %d\n",
+                                vru_cl->vruc_path, msg->request);
     }
 
     return 0;
@@ -400,6 +410,13 @@ vr_uvh_cl_send_reply(int fd, vr_uvh_client_t *vru_cl)
             msg->flags |= VHOST_USER_VERSION;
             msg->flags |= VHOST_USER_REPLY_MASK;
 
+            if (vru_cl->vruc_owner != pthread_self()) {
+                if (vru_cl->vruc_owner)
+                    RTE_LOG(WARNING, UVHOST, "WARNING: thread %lx is trying to write"
+                        " to uvhost client FD %d owned by thread %lx\n",
+                        pthread_self(), fd, vru_cl->vruc_owner);
+                vru_cl->vruc_owner = pthread_self();
+            }
             ret = send(fd, (void *) msg,
                        VHOST_USER_HSIZE + msg->size, MSG_DONTWAIT);
             if ((ret < 0) || (ret != (VHOST_USER_HSIZE + msg->size))) {
@@ -512,14 +529,22 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
     }
 
     if (read_len) {
+        if (vru_cl->vruc_owner != pthread_self()) {
+            if (vru_cl->vruc_owner)
+                RTE_LOG(WARNING, UVHOST, "WARNING: thread %lx is trying to read"
+                    " uvhost client FD %d owned by thread %lx\n",
+                    pthread_self(), fd, vru_cl->vruc_owner);
+            vru_cl->vruc_owner = pthread_self();
+        }
         ret = read(fd, (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read),
                    read_len);
 #ifdef VR_DPDK_RX_PKT_DUMP
         if (ret > 0) {
             RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read %d bytes\n", __func__,
                 pthread_self(), fd, ret);
-            rte_hexdump(stdout, "uvhost message dump:",
-                (((char *)&vru_cl->vruc_msg) + vru_cl->vruc_msg_bytes_read), ret);
+            rte_hexdump(stdout, "uvhost full message dump:",
+                (((char *)&vru_cl->vruc_msg)),
+                    ret + vru_cl->vruc_msg_bytes_read);
         } else if (ret < 0) {
             RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
                 pthread_self(), fd, ret, strerror(errno), errno);
@@ -616,6 +641,7 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
         vr_uvhost_log("\terror accepting client connection FD %d\n", fd);
         return -1;
     }
+    vr_uvhost_log("\tFD %d accepted new client connection FD %d\n", fd, s);
 
     /* We still need to listen for the original socket to support VM
      * shut off/restart, since we create the socket at vif --add
@@ -862,9 +888,10 @@ vr_uvh_nl_listen_handler(int fd, void *arg)
     vr_uvhost_log("Handling connection FD %d...\n", fd);
     s = accept(fd, (struct sockaddr *) &sun, &len);
     if (s < 0) {
-        vr_uvhost_log("\terror accepting connection FD %d\n", fd);
+        vr_uvhost_log("\terror accepting NetLink connection FD %d\n", fd);
         return -1;
     }
+    vr_uvhost_log("\tFD %d accepted new NetLink connection FD %d\n", fd, s);
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_msg_handler)) {
         vr_uvhost_log("\terror adding socket %s FD %d read handler\n",

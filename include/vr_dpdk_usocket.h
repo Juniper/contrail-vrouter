@@ -8,6 +8,7 @@
 #define __VR_DPDK_USOCKET_H__
 
 #include "vr_queue.h"
+#include <pthread.h>
 
 /*
  * usocket is an object where io happens. while it can represent non
@@ -113,6 +114,7 @@ struct vr_usocket {
 
     struct vr_interface *usock_vif;
     struct pollfd *usock_pfds;
+    pthread_t usock_owner;
 };
 
 void *vr_usocket(int, int);
@@ -126,6 +128,7 @@ void vr_usocket_attach_vif(void *usockp, struct vr_interface *vif);
 int vr_usocket_bind_usockets(void *usock1, void *usock2);
 int vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
     unsigned int len);
+int vr_usocket_write_event(struct vr_usocket *usockp);
 
 #define VR_NETLINK_TCP_PORT         20914
 #define VR_SOCKET_DIR               "/var/run/vrouter"

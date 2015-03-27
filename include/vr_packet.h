@@ -595,7 +595,7 @@ struct vr_icmp {
     /* now only for icmp echo */
     uint16_t icmp_eid;
     uint16_t icmp_eseq;
-    uint8_t  icmp_data[0]; // Compatibility with ICMPv6
+    uint8_t  icmp_data[0]; /* compatibility with ICMPv6 */
 } __attribute__((packed));
 
 static inline bool

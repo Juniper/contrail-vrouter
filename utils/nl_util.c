@@ -542,7 +542,7 @@ nl_client_stream_recvmsg(struct nl_client *cl) {
 
     cl->cl_buf_offset = 0;
 
-    //Read netlink header and get the lenght of sandesh message
+    /* read netlink header and get the lenght of sandesh message */
     ret = recvmsg(cl->cl_sock, &msg, 0);
     if (ret < 0) {
         return ret;
@@ -550,7 +550,7 @@ nl_client_stream_recvmsg(struct nl_client *cl) {
     struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf + cl->cl_buf_offset);
     uint32_t pending_length = nlh->nlmsg_len - sizeof(struct nlmsghdr);
 
-    //Read sandesh message
+    /* read sandesh message */
     iov.iov_base = (void *)(cl->cl_buf + sizeof(struct nlmsghdr));
     iov.iov_len = pending_length;
     msg.msg_iov = &iov;

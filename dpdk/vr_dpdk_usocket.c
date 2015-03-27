@@ -352,6 +352,13 @@ retry_write:
                 __func__, pthread_self(), usockp->usock_fd, len);
     rte_hexdump(stdout, "usock buffer dump:", buf, len);
 #endif
+    if (usockp->usock_owner != pthread_self()) {
+        if (usockp->usock_owner)
+            RTE_LOG(WARNING, USOCK, "WARNING: thread %lx (lcore %u) is trying to write %u bytes"
+                " to usocket FD %d owned by thread %lx\n",
+                pthread_self(), rte_lcore_id(), len, usockp->usock_fd, usockp->usock_owner);
+        usockp->usock_owner = pthread_self();
+    }
     ret = write(usockp->usock_fd, buf, len);
     if (ret > 0) {
         usockp->usock_write_offset += ret;
@@ -594,6 +601,13 @@ __usock_read(struct vr_usocket *usockp)
     }
 
 retry_read:
+    if (usockp->usock_owner != pthread_self()) {
+        if (usockp->usock_owner)
+            RTE_LOG(WARNING, USOCK, "WARNING: thread %lx is trying to read"
+                " usocket FD %d owned by thread %lx\n",
+                pthread_self(), usockp->usock_fd, usockp->usock_owner);
+        usockp->usock_owner = pthread_self();
+    }
     ret = read(usockp->usock_fd, buf + offset, toread);
 #ifdef VR_DPDK_USOCK_DUMP
     if (ret > 0) {
@@ -874,6 +888,20 @@ vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
 }
 
 int
+vr_usocket_write_event(struct vr_usocket *usockp)
+{
+    uint64_t event = 1;
+
+    if (usockp->usock_proto != EVENT)
+        return -1;
+
+    if (write(usockp->usock_fd, &event, sizeof(event)) != sizeof(event))
+        return -1;
+
+    return 0;
+}
+
+int
 vr_usocket_message_write(struct vr_usocket *usockp,
         struct vr_message *message)
 {
@@ -1095,11 +1123,8 @@ vr_usocket_close(void *sock)
 void *
 vr_usocket(int proto, int type)
 {
-    struct vr_usocket *usockp = NULL;
-
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
                 pthread_self(), proto, type);
-    RTE_SET_USED(usockp);
 
     if (!valid_usock(proto, type))
         return NULL;
@@ -1168,11 +1193,16 @@ vr_usocket_io(void *transport)
 
         rcu_thread_offline();
 
-        /* TODO: handle an IPC command only for pkt0 thread
+        /* Handle an IPC command only for pkt0 thread
          * and just check the stop flag for the rest
          */
-        if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
-            break;
+        if (lcore_id == vr_dpdk.packet_lcore_id) {
+            if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
+                break;
+        } else {
+            if (unlikely(vr_dpdk_is_stop_flag_set()))
+                break;
+        }
 
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
                 timeout);

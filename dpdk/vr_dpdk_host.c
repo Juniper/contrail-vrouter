@@ -528,7 +528,7 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
     }
 
     /* wake up pkt0 lcore */
-    vr_dpdk_packet_wakeup(vr_dpdk.lcores[vr_dpdk.packet_lcore_id]);
+    vr_dpdk_packet_wakeup();
     return;
 }
 
