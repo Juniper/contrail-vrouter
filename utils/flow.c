@@ -158,8 +158,8 @@ dump_table(struct flow_table *ft)
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
             if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
                 inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip, in_src, 64);
-                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), 
-                      &fe->fe_key.flow_ip[VR_FLOW_IP_ADDR_SIZE(fe->fe_type)], 
+                inet_ntop(VR_FLOW_FAMILY(fe->fe_type),
+                      &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
                       in_dest, 64);
             }
 
@@ -170,8 +170,8 @@ dump_table(struct flow_table *ft)
                 printf("         ");
 
             if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
-                printf("   %24s:%-5d    ", in_src, ntohs(fe->fe_key.flow_sport));
-                printf("%24s:%-5d    %d (%d", in_dest, ntohs(fe->fe_key.flow_dport),
+                printf("   %40s:%-5d    ", in_src, ntohs(fe->fe_key.flow_sport));
+                printf("%40s:%-5d    %d (%d", in_dest, ntohs(fe->fe_key.flow_dport),
                         fe->fe_key.flow_proto, fe->fe_vrf);
             }
 
@@ -604,16 +604,16 @@ flow_validate(int flow_index, char action)
     memset(&flow_req, 0, sizeof(flow_req));
 
     fe = flow_get(flow_index);
-    if ((fe->fe_type != VP_TYPE_IP) && (fe->fe_type != VP_TYPE_IP6)) 
+    if ((fe->fe_type != VP_TYPE_IP) && (fe->fe_type != VP_TYPE_IP6))
         return;
 
     flow_req.fr_op = FLOW_OP_FLOW_SET;
     flow_req.fr_index = flow_index;
     flow_req.fr_family = VR_FLOW_FAMILY(fe->fe_type);
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    memcpy(flow_req.fr_flow_ip, fe->fe_key.flow_ip, 
-              2*VR_FLOW_IP_ADDR_SIZE(fe->fe_type));
-    flow_req.fr_flow_ip_size = 2*VR_FLOW_IP_ADDR_SIZE(fe->fe_type);
+    memcpy(flow_req.fr_flow_ip, fe->fe_key.flow_ip,
+              2*VR_IP_ADDR_SIZE(fe->fe_type));
+    flow_req.fr_flow_ip_size = 2*VR_IP_ADDR_SIZE(fe->fe_type);
     flow_req.fr_flow_proto = fe->fe_key.flow_proto;
     flow_req.fr_flow_sport = fe->fe_key.flow_sport;
     flow_req.fr_flow_dport = fe->fe_key.flow_dport;

@@ -62,17 +62,13 @@ typedef enum {
 #define VR_FLOW_DR_REVERSE_SG           0x11
 #define VR_FLOW_DR_REVERSE_OUT_SG       0x12
 
-#define VR_FLOW_IPV6_ADDR_SIZE          16
-#define VR_FLOW_IPV4_ADDR_SIZE          4
-#define VR_FLOW_IP_ADDR_SIZE(type) \
-        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_ADDR_SIZE \
-                               : VR_FLOW_IPV4_ADDR_SIZE)
+#define VR_FLOW_IPV6_HASH_SIZE           40
+#define VR_FLOW_IPV4_HASH_SIZE           16
+#define VR_FLOW_HASH_SIZE(type) \
+        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_HASH_SIZE \
+                               : VR_FLOW_IPV4_HASH_SIZE)
 
-#define VR_FLOW_IPV6_KEY_SIZE           40
-#define VR_FLOW_IPV4_KEY_SIZE           16
-#define VR_FLOW_KEY_SIZE(type) \
-        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_KEY_SIZE \
-                               : VR_FLOW_IPV4_KEY_SIZE)
+#define VR_IP6_ADDRESS_LEN      16
 
 #define VR_FLOW_FAMILY(type) \
         ((type == VP_TYPE_IP6) ? AF_INET6 \
@@ -85,7 +81,7 @@ struct vr_common_flow{
     unsigned short ip_nh_id;
     unsigned short ip_sport;
     unsigned short ip_dport;
-    unsigned char  ip_addr[2*VR_FLOW_IPV6_ADDR_SIZE];
+    unsigned char  ip_addr[2*VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
 
@@ -105,8 +101,8 @@ struct vr_inet6_flow {
     unsigned short ip6_nh_id;
     unsigned short ip6_sport;
     unsigned short ip6_dport;
-    unsigned char  ip6_sip[VR_FLOW_IPV6_ADDR_SIZE];
-    unsigned char  ip6_dip[VR_FLOW_IPV6_ADDR_SIZE];
+    unsigned char  ip6_sip[VR_IP6_ADDRESS_LEN];
+    unsigned char  ip6_dip[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
 struct vr_flow {
@@ -115,7 +111,7 @@ struct vr_flow {
         struct vr_inet_flow ip4_key;
         struct vr_inet6_flow ip6_key;
     } key_u;
-    uint32_t   vr_flow_keylen;    
+    uint8_t   vr_flow_keylen;    
 } __attribute__((packed));
 
 #define flow_key_len   vr_flow_keylen
@@ -140,7 +136,7 @@ struct vr_flow {
 #define flow6_nh_id    key_u.ip6_key.ip6_nh_id
 #define flow6_proto    key_u.ip6_key.ip6_proto
 
-/* 
+/*
  * Limit the number of outstanding flows in hold state. The flow rate can
  * be much more than what agent can handle. In such cases, to make sure that
  *
@@ -178,7 +174,7 @@ struct vr_flow_table_info {
     uint32_t vfti_hold_count[0];
 };
 
-/* 
+/*
  * flow bytes and packets are of same width. this should be
  * ok since agent really has to take care of overflows. this
  * is also better probably because processor does not have to
@@ -212,6 +208,7 @@ struct vr_flow_queue {
 
 struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
+    uint8_t vr_flow_key_padding[7];
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -233,6 +230,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow fe_key;
+    uint8_t vr_flow_key_padding[7];
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -309,7 +307,7 @@ unsigned short
 vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
-extern void vr_inet_fill_flow(struct vr_flow *, unsigned short, 
+extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
        unsigned char *, uint8_t, uint16_t, uint16_t);
 extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short, 
        unsigned char *, uint8_t, uint16_t, uint16_t);
