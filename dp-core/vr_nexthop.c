@@ -276,6 +276,16 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 {
     struct vr_ip *ip;
     struct vr_udp *udp;
+    char tos = 0;
+
+    if (vr_tos_copy){
+        if (pkt->vp_type == VP_TYPE_IP){
+            tos = ((struct vr_ip *)pkt_network_header(pkt))->ip_tos;
+        }
+        else if (pkt->vp_type == VP_TYPE_IP6){
+            tos = ((struct vr_ip6 *)pkt_network_header(pkt))->ip6_priority;
+        }
+    }
 
     /* Udp Header */
     udp = (struct vr_udp *)pkt_push(pkt, sizeof(struct vr_udp));
@@ -296,7 +306,7 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 
     ip->ip_version = 4;
     ip->ip_hl = 5;
-    ip->ip_tos = 0;
+    ip->ip_tos = tos;
     ip->ip_id = htons(vr_generate_unique_ip_id());
     ip->ip_frag_off = 0;
 
@@ -1462,6 +1472,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_gre *gre_hdr;
     struct vr_ip *ip;
     unsigned char *tun_encap;
+    char tos = 0;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
     struct vr_packet *tmp_pkt;
@@ -1501,6 +1512,14 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         id = htons(vr_generate_unique_ip_id());
     }
 
+    if (vr_tos_copy){
+        if (pkt->vp_type == VP_TYPE_IP){
+            tos = ((struct vr_ip *)pkt_network_header(pkt))->ip_tos;
+        }
+        else if (pkt->vp_type == VP_TYPE_IP6){
+            tos = ((struct vr_ip6 *)pkt_network_header(pkt))->ip6_priority;
+        }
+    }
 
     gre_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) +
         sizeof(struct vr_gre);
@@ -1562,7 +1581,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     ip->ip_version = 4;
     ip->ip_hl = 5;
-    ip->ip_tos = 0;
+    ip->ip_tos = tos;
     ip->ip_id = id;
     ip->ip_frag_off = 0;
 

@@ -188,6 +188,9 @@ int vr_perfq3 = 0;   /* CPU to send packets to if vr_perfr3 is 1 */
 /* Should NIC perform checksum offload for outer UDP header? */
 int vr_udp_coff = 0;
 
+/* Should TOS fields be copied from inner to outer IP header? */
+int vr_tos_copy = 0;
+
 int
 vr_module_error(int error, const char *func,
         int line, int mod_specific)

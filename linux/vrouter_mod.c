@@ -2514,6 +2514,13 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+        .procname       = "tos_copy",
+        .data           = &vr_tos_copy,
+        .maxlen         = sizeof(int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 
