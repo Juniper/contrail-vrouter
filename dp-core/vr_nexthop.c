@@ -1357,7 +1357,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /*
      * The UDP source port is a hash of the inner IP src/dst address and
-     * vrf. 
+     * vrf.
      */
     if ((!fmd->fmd_udp_src_port)  && vr_get_udp_src_port) {
         udp_src_port = vr_get_udp_src_port(pkt, fmd, fmd->fmd_dvrf);
