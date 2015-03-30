@@ -1054,7 +1054,7 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
         udph = (struct vr_udp *) pkt_data(pkt);
     }
 
-    if (ntohs(udph->udp_dport) == VR_MPLS_OVER_UDP_DST_PORT) {
+    if (vr_mpls_udp_port(ntohs(udph->udp_dport))) {
 
         *encap_type = PKT_ENCAP_MPLS;
         /* Take into consideration, the MPLS header and 4 bytes of
@@ -1901,7 +1901,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
     if (ip_proto == VR_IP_PROTO_UDP) {
        udph = (struct udphdr *)(skb->head + pkt->vp_data); 
        udph_cksum = udph->check;
-       if (ntohs(udph->dest) != VR_MPLS_OVER_UDP_DST_PORT) {
+       if (!vr_mpls_udp_port(ntohs(udph->dest))) {
            /*
             * we assumed earlier that the packet is mpls. now correct the
             * assumption
