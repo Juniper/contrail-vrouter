@@ -237,7 +237,7 @@ vr_udp_input(struct vrouter *router, struct vr_packet *pkt,
         return 0;
     }
 
-    if (ntohs(udph->udp_dport) == VR_MPLS_OVER_UDP_DST_PORT) {
+    if (vr_mpls_udp_port(ntohs(udph->udp_dport))) {
         encap_type = PKT_ENCAP_MPLS;
     } else if (ntohs(udph->udp_dport) == VR_VXLAN_UDP_DST_PORT) {
         encap_type = PKT_ENCAP_VXLAN;
