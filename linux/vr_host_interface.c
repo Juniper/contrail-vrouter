@@ -321,8 +321,7 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
     if (type == VP_TYPE_IPOIP)
         return linux_inet_fragment(vif, skb, type);
 
-    lh_pfree_skb(skb, VP_DROP_NOWHERE_TO_GO);
-    return -ENOMEM;
+    return dev_queue_xmit(skb);
 }
 
 static int
