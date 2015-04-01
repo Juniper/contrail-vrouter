@@ -321,9 +321,6 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
             skb->ip_summed == CHECKSUM_NONE)
         skb->ip_summed = CHECKSUM_UNNECESSARY;
 
-    if (vif->vif_type == VIF_TYPE_AGENT)
-        skb_shinfo(skb)->gso_size = 0;
-
     if ((type == VP_TYPE_IPOIP) &&
             (skb->len > skb->dev->mtu + skb->dev->hard_header_len))
         return linux_inet_fragment(vif, skb, type);
