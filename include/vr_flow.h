@@ -106,6 +106,8 @@ struct vr_flow_key {
  */
 struct vr_flow_table_info {
     uint64_t vfti_action_count;
+    uint64_t vfti_added;
+    uint32_t vfti_oflows;
     uint32_t vfti_hold_count[0];
 };
 
