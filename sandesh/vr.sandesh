@@ -149,6 +149,12 @@ buffer sandesh vr_flow_req {
    23: i32          fr_src_nh_index;
    24: i16          fr_flow_nh_id;
    25: i16          fr_drop_reason;
+   26: i64          fr_processed;
+   27: i64          fr_created;
+   28: i64          fr_added;
+   29: i32          fr_cpus;
+   30: i32          fr_hold_oflows;
+   31: list<i32>    fr_hold_stat;
 }
 
 buffer sandesh vr_vrf_assign_req {
