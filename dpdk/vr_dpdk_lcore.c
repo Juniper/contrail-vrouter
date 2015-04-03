@@ -394,6 +394,7 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     struct vr_dpdk_lcore * lcore;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    int ret;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -412,9 +413,12 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
                 /* convert mbuf to vr_packet */
                 pkt = vr_dpdk_packet_get(mbuf, vif);
                 p_clone = vr_pclone(pkt);
-                if (likely(p_clone != NULL))
-                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
+                if (likely(p_clone != NULL)) {
+                    ret = monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                         vr_dpdk_pkt_to_mbuf(p_clone));
+                    if (ret)
+                        vif_drop_pkt(vif, p_clone, 0, VP_DROP_ENQUEUE_FAIL);
+                }
             }
         }
     }
@@ -447,6 +451,7 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
     struct vr_dpdk_lcore * lcore;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    int ret;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -461,9 +466,12 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
                 rte_prefetch0(pkt);
 
                 p_clone = vr_pclone(pkt);
-                if (likely(p_clone != NULL))
-                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
+                if (likely(p_clone != NULL)) {
+                    ret = monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                         vr_dpdk_pkt_to_mbuf(p_clone));
+                    if (ret)
+                        vif_drop_pkt(vif, p_clone, 0, VP_DROP_ENQUEUE_FAIL);
+                }
             }
         }
     }
@@ -525,7 +533,7 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     uint64_t total_pkts = 0;
     struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ];
     uint32_t nb_pkts;
-    int i;
+    int i, ret;
     struct vr_dpdk_ring_to_push *rtp;
     uint16_t nb_rtp;
     struct rte_ring *ring;
@@ -558,8 +566,10 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
                 /* push packets to the TX queue */
                 /* TODO: use f_tx_bulk instead */
                 for (i = 0; i < nb_pkts; i++) {
-                    rtp->rtp_tx_queue->txq_ops.f_tx(
+                    ret = rtp->rtp_tx_queue->txq_ops.f_tx(
                         rtp->rtp_tx_queue->q_queue_h, pkts[i]);
+                    if (ret)
+                        vif_drop_pkt(rtp->rtp_tx_queue->q_vif, vr_dpdk_mbuf_to_pkt(pkts[i]), 0, VP_DROP_ENQUEUE_FAIL);
                 }
             } else {
                 vr_dpdk_packets_vroute(((struct vr_packet*)pkts[0])->vp_if,
