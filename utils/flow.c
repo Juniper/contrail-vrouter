@@ -56,8 +56,14 @@ struct flow_table {
     struct vr_flow_entry *ft_entries;
     u_int64_t ft_entries_p;
     u_int64_t ft_span;
+    u_int64_t ft_processed;
+    u_int64_t ft_created;
+    u_int64_t ft_added;
     unsigned int ft_num_entries;
     unsigned int ft_flags;
+    unsigned int ft_cpus;
+    unsigned int ft_hold_oflows;
+    u_int32_t ft_hold_stat[64];
 } main_table;
 
 int mem_fd;
@@ -142,7 +148,18 @@ dump_table(struct flow_table *ft)
     const char *drop_reason = NULL;
     struct in_addr in_src, in_dest;
 
-    printf("Flow table\n\n");
+    printf("Flow table(size %lu, entries %u)\n\n", ft->ft_span,
+            ft->ft_num_entries);
+    printf("Entries: Created %lu Added %lu Processed %lu\n",
+            ft->ft_created, ft->ft_added, ft->ft_processed);
+    printf("(Created Flows/CPU: ");
+    for (i = 0; i < ft->ft_cpus; i++) {
+        printf("%u", ft->ft_hold_stat[i]);
+        if (i != (ft->ft_cpus - 1))
+            printf(" ");
+    }
+    printf(")(oflows %u)\n\n", ft->ft_hold_oflows);
+
     dump_legend();
     printf(" Index              Source:Port           Destination:Port    \tProto(V)\n");
     printf("-----------------------------------------------------------------");
@@ -449,6 +466,7 @@ int
 flow_table_map(vr_flow_req *req)
 {
     int ret;
+    unsigned int i;
     struct flow_table *ft = &main_table;
 
     if (req->fr_ftable_dev < 0)
@@ -476,6 +494,18 @@ flow_table_map(vr_flow_req *req)
 
     ft->ft_span = req->fr_ftable_size;
     ft->ft_num_entries = ft->ft_span / sizeof(struct vr_flow_entry);
+    ft->ft_processed = req->fr_processed;
+    ft->ft_created = req->fr_created;
+    ft->ft_hold_oflows = req->fr_hold_oflows;
+    ft->ft_added = req->fr_added;
+    ft->ft_cpus = req->fr_cpus;
+
+    if (req->fr_hold_stat && req->fr_hold_stat_size) {
+        for (i = 0; i < ft->ft_cpus; i++) {
+            ft->ft_hold_stat[i] = req->fr_hold_stat[i];
+        }
+    }
+
     return ft->ft_num_entries;
 }
 

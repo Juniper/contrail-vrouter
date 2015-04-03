@@ -2501,6 +2501,13 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+        .procname       = "flow_hold_limit",
+        .data           = &vr_flow_hold_limit,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 

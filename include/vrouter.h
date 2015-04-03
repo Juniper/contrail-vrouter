@@ -34,6 +34,7 @@ extern int vr_perfq1, vr_perfq2, vr_perfq3;
 extern int vr_from_vm_mss_adj;
 extern int vr_to_vm_mss_adj;
 extern int vr_udp_coff;
+extern unsigned int vr_flow_hold_limit;
 extern int vr_use_linux_br;
 extern int hashrnd_inited;
 extern uint32_t vr_hashrnd;
