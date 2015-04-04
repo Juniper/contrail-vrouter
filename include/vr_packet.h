@@ -735,7 +735,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
 static inline bool
 pkt_is_gso(struct vr_packet *pkt)
 {
-    if (vr_pgso_size(pkt))
+    if (vr_pgso_size && vr_pgso_size(pkt))
         return true;
     return false;
 }

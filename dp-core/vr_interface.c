@@ -413,6 +413,10 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
     vr_preset(pkt);
 
+    if (pkt_is_gso(pkt)) {
+        truncate = true;
+    }
+
     if ((params->trap_reason == AGENT_TRAP_HANDLE_DF) ||
             (params->trap_reason == AGENT_TRAP_ZERO_TTL)) {
         if (pkt_len(pkt) > VR_AGENT_MIN_PACKET_LEN)
