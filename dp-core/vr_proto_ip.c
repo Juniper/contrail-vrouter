@@ -926,9 +926,17 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     if (pkt->vp_flags & VP_FLAG_FLOW_SET)
         return FLOW_FORWARD;
 
-    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow_p);
-    if (ret < 0)
-        return FLOW_CONSUMED;
+    /*
+     * if the interface is policy enabled, or if somebody else (eg:nexthop)
+     * has requested for a policy lookup, packet has to go through a lookup
+     */
+    if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
+            (pkt->vp_flags & VP_FLAG_FLOW_GET)) {
+        lookup = true;
+    }
+
+    if (!lookup)
+        return FLOW_FORWARD;
 
     /* no flow lookup for multicast or broadcast ip */
     if (IS_BMCAST_IP(ip->ip_daddr)) {
@@ -939,25 +947,17 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         return FLOW_FORWARD;
     }
 
-    /*
-     * if the interface is policy enabled, or if somebody else (eg:nexthop)
-     * has requested for a policy lookup, packet has to go through a lookup
-     */
-    if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
-            (pkt->vp_flags & VP_FLAG_FLOW_GET)) {
-        lookup = true;
+    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow_p);
+    if (ret < 0)
+        return FLOW_CONSUMED;
+
+
+    if (vr_ip_fragment_head(ip)) {
+        vr_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
+                flow_p->flow4_dport);
     }
 
-    if (lookup) {
-        if (vr_ip_fragment_head(ip)) {
-            vr_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
-                    flow_p->flow4_dport);
-        }
-
-        return vr_flow_lookup(router, flow_p, pkt, fmd);
-    }
-
-    return FLOW_FORWARD;
+    return vr_flow_lookup(router, flow_p, pkt, fmd);
 }
 
 mac_response_t
