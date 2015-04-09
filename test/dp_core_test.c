@@ -65,12 +65,28 @@ static void teardown(void **state) {
     free(*state);
 }
 
+static void setup_flow(void **state) {
+    struct vrouter *router = vrouter_get(0);
+
+    vr_flow_init(router);
+}
+
+static void teardown_flow(void **state) {
+    struct vrouter *router = vrouter_get(0);
+
+    vr_flow_exit(router, 0);
+}
+
+static void flow_test(void **state) {
+}
+
 int main(void) {
     int ret;
 
     /* test suite */
     const UnitTest tests[] = {
         unit_test_setup_teardown(drop_stats_memory_test, setup, teardown),
+        unit_test_setup_teardown(flow_test, setup_flow, teardown_flow),
     };
 
     vr_diet_message_proto_init();

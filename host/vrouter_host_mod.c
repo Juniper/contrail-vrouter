@@ -46,13 +46,25 @@ vr_lib_create_timer(struct vr_timer *vtimer)
 static void
 vr_lib_delete_timer(struct vr_timer *vtimer)
 {
-	vr_free(vtimer->vt_os_arg);
+    vr_free(vtimer->vt_os_arg);
 }
 
 static void *
 vr_lib_page_alloc(unsigned int size)
 {
-	return malloc(PAGE_SIZE);
+    int pages;
+    void *ptr;
+
+    pages = size / PAGE_SIZE;
+    if (size % PAGE_SIZE)
+        pages++;
+
+    ptr = malloc(pages * PAGE_SIZE);
+
+    /* FIX(safchain): we shouldn't have to do that */
+    memset(ptr, 0, pages * PAGE_SIZE);
+
+    return ptr;
 }
 
 static void
