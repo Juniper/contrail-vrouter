@@ -860,7 +860,6 @@ vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
         forward = __vr_flow_forward(result, pkt, fmd);
         if (forward)
             vr_reinject_packet(pkt, fmd);
-        pnode->pl_packet = NULL;
     }
 
     return;
