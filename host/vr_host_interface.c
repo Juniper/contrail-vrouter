@@ -194,7 +194,7 @@ vr_hinterface_create(unsigned int index, unsigned int hif_type,
     hif = calloc(sizeof(*hif), 1);
     if (!hif)
         return NULL;
-    
+
     switch (hif_type) {
     case HIF_TYPE_UDP:
         ret = vr_hif_udp_create(hif, vif_type);
@@ -356,7 +356,14 @@ vr_host_vif_init(struct vrouter *router)
 void
 vr_host_interface_exit(void)
 {
-    return;
+    struct vr_hinterface *hif;
+    int i;
+
+    for (i = 0; i < HIF_MAX_INTERFACES; i++) {
+        hif = hif_table[i];
+        if (hif)
+            vr_hinterface_delete(hif);
+    }
 }
 
 struct vr_host_interface_ops *
