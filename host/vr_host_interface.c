@@ -223,9 +223,14 @@ cleanup:
 void
 vr_hinterface_destroy(struct vr_hinterface *hif)
 {
+    int index;
+
     switch (hif->hif_type) {
     case HIF_TYPE_UDP:
+        index = hif->hif_index;
+
         vr_hif_udp_destroy(hif);
+        hif_table[index] = NULL;
         break;
 
     default:
