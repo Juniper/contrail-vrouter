@@ -361,7 +361,14 @@ vr_host_vif_init(struct vrouter *router)
 void
 vr_host_interface_exit(void)
 {
-    return;
+    struct vr_hinterface *hif;
+    int i;
+
+    for (i = 0; i < HIF_MAX_INTERFACES; i++) {
+        hif = hif_table[i];
+        if (hif)
+            vr_hinterface_destroy(hif);
+    }
 }
 
 struct vr_host_interface_ops *
