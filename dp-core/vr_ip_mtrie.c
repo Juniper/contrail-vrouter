@@ -992,8 +992,7 @@ mtrie_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs, bool soft_r
 static int
 mtrie_stats_init(struct vr_rtable *rtable)
 {
-    int ret = 0;
-    unsigned int i;
+    int ret = 0, i;
     unsigned int stats_memory;
 
     stats_memory = sizeof(void *) * rtable->algo_max_vrfs;
@@ -1070,9 +1069,11 @@ mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     vr_inet_route_lookup = mtrie_lookup;
     vr_inet_vrf_stats = mtrie_stats;
     /* local cache */
-    vn_rtable[0] = (struct ip_mtrie **)rtable->algo_data; // V4 table
-    vn_rtable[1] = (struct ip_mtrie **)((char*)rtable->algo_data 
-                                                 + fs->rtb_max_vrfs); // V6 table
+    /* ipv4 table */
+    vn_rtable[0] = (struct ip_mtrie **)rtable->algo_data;
+    /* ipv6 table */
+    vn_rtable[1] = (struct ip_mtrie **)((unsigned char **)rtable->algo_data
+                                                 + fs->rtb_max_vrfs);
 
     mtrie_ip_bkt_info_init(ip4_bkt_info, IP4_PREFIX_LEN);
     mtrie_ip_bkt_info_init(ip6_bkt_info, IP6_PREFIX_LEN);
