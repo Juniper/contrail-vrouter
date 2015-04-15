@@ -326,6 +326,8 @@ struct vr_dpdk_global {
      * ATM we use it just to synchronize access between the NetLink interface
      * and kernel KNI events. The datapath is not affected. */
     pthread_mutex_t if_lock;
+    /* VLAN tag */
+    uint16_t vr_dpdk_vlan_tag;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
