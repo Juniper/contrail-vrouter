@@ -794,17 +794,17 @@ __vr_flow_forward(flow_result_t result, struct vr_packet *pkt,
 }
 
 static flow_result_t
-__vr_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
+vr_do_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
     flow_result_t result = FLOW_FORWARD;
 
-    /* Flow processig is only for untagged unicast IP packets */
+    /* Flow processing is only for untagged unicast IP packets */
     if (pkt->vp_type == VP_TYPE_IP)
         result = vr_inet_flow_lookup(router, pkt, fmd);
     else if (pkt->vp_type == VP_TYPE_IP6)
         result = vr_inet6_flow_lookup(router, pkt, fmd);
-    
+
     return result;
 }
 
@@ -816,7 +816,7 @@ vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
 
     if ((!(pkt->vp_flags & VP_FLAG_MULTICAST))
         && ((fmd->fmd_vlan == VLAN_ID_INVALID) || vif_is_service(pkt->vp_if)))
-        result = __vr_flow_lookup(router, pkt, fmd);
+        result = vr_do_flow_lookup(router, pkt, fmd);
 
     return __vr_flow_forward(result, pkt, fmd);
 }
@@ -1013,14 +1013,21 @@ vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
     struct vr_flow key;
     struct vr_flow_entry *fe;
 
-    if (req->fr_family == AF_INET6) {
+    switch (req->fr_family) {
+    case  AF_INET6:
         type = VP_TYPE_IP6;
         vr_inet6_fill_flow(&key, req->fr_flow_nh_id, req->fr_flow_ip,
             req->fr_flow_proto, req->fr_flow_sport, req->fr_flow_dport);
-    } else {
+        break;
+
+    case  AF_INET:
         type = VP_TYPE_IP;
         vr_inet_fill_flow(&key, req->fr_flow_nh_id, req->fr_flow_ip,
             req->fr_flow_proto, req->fr_flow_sport, req->fr_flow_dport);
+        break;
+
+    default:
+        return NULL;
     }
 
     if (req->fr_action == VR_FLOW_ACTION_HOLD)
@@ -1046,7 +1053,7 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
     if (fe) {
         if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
             if (memcmp(req->fr_flow_ip, fe->fe_key.flow_ip, 
-                       2 * VR_FLOW_IP_ADDR_SIZE(fe->fe_type)) ||
+                       2 * VR_IP_ADDR_SIZE(fe->fe_type)) ||
                     (unsigned short)req->fr_flow_sport != fe->fe_key.flow_sport ||
                     (unsigned short)req->fr_flow_dport != fe->fe_key.flow_dport||
                     (unsigned short)req->fr_flow_nh_id != fe->fe_key.flow_nh_id ||
@@ -1141,8 +1148,8 @@ vr_flow_udp_src_port (struct vrouter *router, struct vr_flow_entry *fe)
 
     hash_key[0] = fe->fe_vrf;
     hash_key[1] = (fe->fe_key.flow_sport << 16) | fe->fe_key.flow_dport;
-    memcpy(&hash_key[2], fe->fe_key.flow_ip, 2*VR_FLOW_IP_ADDR_SIZE(fe->fe_type));
-    hash_len = VR_FLOW_KEY_SIZE(fe->fe_type);
+    memcpy(&hash_key[2], fe->fe_key.flow_ip, 2 * VR_IP_ADDR_SIZE(fe->fe_type));
+    hash_len = VR_FLOW_HASH_SIZE(fe->fe_type);
 
     hashval = jhash(hash_key, hash_len, vr_hashrnd);
     port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;

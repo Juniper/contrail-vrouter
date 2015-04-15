@@ -27,9 +27,9 @@
 #include "vr_compat.h"
 #include "vr_hash.h"
 #include "vr_fragment.h"
-#include "vr_flow.h"
 #include "vr_bridge.h"
 #include "vr_packet.h"
+#include "vr_flow.h"
 
 unsigned int vr_num_cpus = 1;
 
@@ -557,14 +557,15 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                     unsigned short vrf)
 {
     struct sk_buff *skb = vp_os_packet(pkt);
-    int pull_len;
-    __u32 ip_src, ip_dst, hashval, port_range;
-    struct vr_ip *iph;
+    int pull_len, hdr_len, hash_len;
+    __u32 hashval, port_range;
+    struct vr_ip *iph = NULL;
+    struct vr_ip6 *ip6h = NULL;
     __u16 port;
     __u16 sport = 0, dport = 0;
     struct vr_fragment *frag;
     struct vrouter *router = vrouter_get(0);
-    __u32 hash_key[5];
+    __u32 hash_key[10];
     __u16 *l4_hdr;
     struct vr_flow_entry *fentry;
 
@@ -573,23 +574,24 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         hashrnd_inited = 1;
     }
 
-    if (pkt->vp_type == VP_TYPE_IP) {
-        /* Ideally the below code is only for VP_TYPE_IP and not
-         * for IP6. But having explicit check for IP only break IP6
-         */
-
+    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6) {
         /*
          * pull_len can be negative in the following calculation. This behavior
          * will be true in case of mirroring. In mirroring, we do preset first
          * which makes vp_data = skb->data, and then we push mirroring headers,
          * which makes pull_len < 0 and thats why pull_len is an integer.
          */
-        pull_len = sizeof(struct iphdr);
+        if (pkt->vp_type == VP_TYPE_IP)
+            hdr_len = sizeof(struct iphdr);
+        else
+            hdr_len = sizeof(struct ipv6hdr);
+
+        pull_len = hdr_len;
         pull_len += pkt_get_network_header_off(pkt);
         pull_len -= skb_headroom(skb);
 
         /* Lets pull only if ip hdr is beyond this skb */
-        if ((pkt_get_network_header_off(pkt) + sizeof(struct iphdr)) >
+        if ((pkt_get_network_header_off(pkt) + hdr_len) >
                 pkt->vp_tail) {
             /* We dont handle if tails are different */
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
@@ -607,7 +609,23 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
 
         iph = (struct vr_ip *)(skb->head + pkt_get_network_header_off(pkt));
-        if (vr_ip_transport_header_valid(iph)) {
+        if (pkt->vp_type == VP_TYPE_IP6) {
+            ip6h = (struct vr_ip6 *)iph;
+            if ((ip6h->ip6_nxt == VR_IP_PROTO_TCP) ||
+                        (ip6h->ip6_nxt == VR_IP_PROTO_UDP)) {
+                /* Pull in L4 ports */
+                pull_len += 4;
+                if ((pull_len > 0) &&
+                            !pskb_may_pull(skb,(unsigned int)pull_len)) {
+                    goto error;
+                }
+                ip6h = (struct vr_ip6 *)(skb->head +
+                        pkt_get_network_header_off(pkt));
+                l4_hdr = (__u16 *) (((char *) ip6h) + sizeof(struct vr_ip6));
+                sport = *l4_hdr;
+                dport = *(l4_hdr + 1);
+            }
+        } else if (vr_ip_transport_header_valid(iph)) {
             if ((iph->ip_proto == VR_IP_PROTO_TCP) ||
                         (iph->ip_proto == VR_IP_PROTO_UDP)) {
                 pull_len += ((iph->ip_hl * 4) - sizeof(struct vr_ip) + 4);
@@ -619,7 +637,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                         pkt_get_network_header_off(pkt));
                 l4_hdr = (__u16 *) (((char *) iph) + (iph->ip_hl * 4));
                 sport = *l4_hdr;
-                dport = *(l4_hdr+1);
+                dport = *(l4_hdr + 1);
             }
         } else {
             /*
@@ -643,16 +661,16 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             }
         }
 
-        ip_src = iph->ip_saddr;
-        ip_dst = iph->ip_daddr;
+        hash_key[0] = vrf;
+        hash_key[1] = (sport << 16) | dport;
+        if (pkt->vp_type == VP_TYPE_IP) 
+            memcpy(&hash_key[2], (char*)&iph->ip_saddr, 2 * VR_IP_ADDRESS_LEN);
+        else
+            memcpy(&hash_key[2], (char*)&ip6h->ip6_src, 2 * VR_IP6_ADDRESS_LEN);
 
-        hash_key[0] = ip_src;
-        hash_key[1] = ip_dst;
-        hash_key[2] = vrf;
-        hash_key[3] = sport;
-        hash_key[4] = dport;
+        hash_len = VR_FLOW_HASH_SIZE(pkt->vp_type);
 
-        hashval = jhash(hash_key, 20, vr_hashrnd);
+        hashval = jhash(hash_key, hash_len, vr_hashrnd);
         lh_reset_skb_fields(pkt);
     } else {
 

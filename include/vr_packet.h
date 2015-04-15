@@ -7,6 +7,7 @@
 #define __VR_PACKET_H__
 
 #include "vr_defs.h"
+#include "vr_flow.h"
 #include "vrouter.h"
 
 /* ethernet header */
@@ -359,8 +360,6 @@ struct vr_neighbor_option {
 } __attribute__((packed));
 
 
-#define VR_IP6_ADDRESS_LEN      16
-
 struct vr_ip6_pseudo {
     unsigned char ip6_src[VR_IP6_ADDRESS_LEN];
     unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
@@ -407,6 +406,10 @@ struct vr_ip6 {
 #define MCAST_IP_MASK                   (0xF0000000)
 #define IS_BMCAST_IP(ip) \
             (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF))
+
+#define VR_IP_ADDR_SIZE(type) \
+        ((type == VP_TYPE_IP6) ? VR_IP6_ADDRESS_LEN \
+                               : VR_IP_ADDRESS_LEN)
 
 static inline unsigned char
 vr_eth_proto_to_pkt_type(unsigned short eth_proto)
