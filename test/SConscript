@@ -10,15 +10,21 @@ vrouter_suite = []
 # Include paths
 
 # CFLAGS
-env.Append(CCFLAGS = '-g')
+env.Append(CFLAGS = '-g')
 
 env.Replace(LIBPATH = env['TOP_LIB'])
-env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka'])
+env.Append(LIBPATH = ['../host', '../sandesh'])
+env.Replace(LIBS = ['dp_sandesh_c', 'dp_sandesh_c', 'sandesh-c', 'cmocka'])
 
-test_dep_srcs = ['common_test.c']
+test_dep_srcs = ['common_test.c', Glob('../dp-core/*.o'), Glob('../host/*.o')]
 
-dp_core_test = VRouterEnv.MakeTestCmd(env, 'dp_core_test', vrouter_suite, test_dep_srcs)
+dropstats_env = env.Clone()
+VRouterEnv.MakeTestCmd(dropstats_env, 'dropstats_test', vrouter_suite, test_dep_srcs)
+
+dp_core_flow_env = env.Clone()
+dp_core_flow_env.Append(LINKFLAGS = ('-Wl,-wrap,__vrouter_get_nexthop '
+                                     '-Wl,-wrap,vr_message_response '))
+VRouterEnv.MakeTestCmd(dp_core_flow_env, 'dp_core_flow_test', vrouter_suite, test_dep_srcs)
 
 test = env.TestSuite('vrouter-test', vrouter_suite)
 env.Alias('vrouter:test', test)
