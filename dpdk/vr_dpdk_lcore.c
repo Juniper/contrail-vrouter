@@ -456,6 +456,9 @@ vr_dpdk_packets_vroute(struct vr_interface *vif, struct vr_packet *pkts[VR_DPDK_
         rte_pktmbuf_dump(stdout, vr_dpdk_pkt_to_mbuf(pkt), 0x60);
 #endif
 
+        if (vr_dpdk_pkt_to_mbuf(pkt)->ol_flags & PKT_TX_IP_CKSUM)
+            pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
+
         /* send the packet to vRouter */
         vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
     }
