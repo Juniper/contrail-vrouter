@@ -28,6 +28,7 @@
 
 #include <rte_errno.h>
 #include <rte_ether.h>
+#include <rte_ip.h>
 
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
@@ -622,13 +623,13 @@ dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     RTE_VERIFY(0 < offset);
 
     /* calculate IP checksum */
-    m->ol_flags |= PKT_TX_IP_CKSUM;
+    m->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
     /* Note: Intel NICs need the checksum set to zero
      * and proper l2/l3 lens to be set.
      */
     iph->ip_csum = 0;
-    m->outer_l3_len = iph_len;
-    m->outer_l2_len = offset - rte_pktmbuf_headroom(m);
+    m->l3_len = iph_len;
+    m->l2_len = offset - rte_pktmbuf_headroom(m);
 
     RTE_LOG(DEBUG, VROUTER, "%s: Outer packet: l2_len = %d, l3_len = %d\n", __func__,
         (int)m->outer_l2_len,
@@ -636,37 +637,46 @@ dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 
     /* calculate TCP/UDP checksum */
     if (likely(iph->ip_proto == VR_IP_PROTO_UDP)) {
-        /* TODO: disable UDP checksuming */
+        m->ol_flags |= PKT_TX_UDP_CKSUM;
         udph = (struct vr_udp *)((char *)iph + iph_len);
         udph->udp_csum = 0;
-/*
-        m->ol_flags |= PKT_TX_UDP_CKSUM;
-        udph->udp_csum = vr_ip_partial_csum(iph);
-*/
+        udph->udp_csum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, m->ol_flags);
     } else if (likely(iph->ip_proto == VR_IP_PROTO_TCP)) {
         m->ol_flags |= PKT_TX_TCP_CKSUM;
         tcph = (struct vr_tcp *)((char *)iph + iph_len);
-        tcph->tcp_csum = vr_ip_partial_csum(iph);
+        tcph->tcp_csum = 0;
+        tcph->tcp_csum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, m->ol_flags);
     }
 }
 
 static inline void
-dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
+dpdk_sw_ip_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
+{
+    struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+
+    RTE_VERIFY(0 < offset);
+
+    iph->ip_csum = vr_ip_csum(iph);
+}
+
+static inline void
+dpdk_sw_udptcp_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
     struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
     unsigned iph_len = iph->ip_hl * 4;
     struct vr_udp *udph;
+    struct vr_tcp *tcph;
 
     RTE_VERIFY(0 < offset);
 
-    /* calculate IP checksum */
-    iph->ip_csum = vr_ip_csum(iph);
-
-    /* TODO: TCP checksums */
     if (iph->ip_proto == VR_IP_PROTO_UDP) {
         udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
-        /* disable UDP checksum */
         udph->udp_csum = 0;
+        udph->udp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, udph);
+    } else if (iph->ip_proto == VR_IP_PROTO_TCP) {
+        tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
+        tcph->tcp_csum = 0;
+        tcph->tcp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, tcph);
     }
 }
 
@@ -677,7 +687,7 @@ dpdk_hw_checksum(struct vr_packet *pkt)
     if (VP_TYPE_IPOIP == pkt->vp_type) {
         /* calculate outer checksum in soft */
         /* TODO: vlan support */
-        dpdk_sw_checksum_at_offset(pkt,
+        dpdk_sw_ip_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum in hardware */
         dpdk_hw_checksum_at_offset(pkt,
@@ -698,15 +708,19 @@ dpdk_sw_checksum(struct vr_packet *pkt)
     if (VP_TYPE_IPOIP == pkt->vp_type) {
         /* calculate outer checksum */
         /* TODO: vlan support */
-        dpdk_sw_checksum_at_offset(pkt,
+        dpdk_sw_ip_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum */
-        dpdk_sw_checksum_at_offset(pkt,
-               pkt_get_inner_network_header_off(pkt));
+        dpdk_sw_ip_checksum_at_offset(pkt,
+            pkt_get_inner_network_header_off(pkt));
+        dpdk_sw_udptcp_checksum_at_offset(pkt,
+            pkt_get_inner_network_header_off(pkt));
     } else {
         /* normal IP packet */
         /* TODO: vlan support */
-        dpdk_sw_checksum_at_offset(pkt,
+        dpdk_sw_ip_checksum_at_offset(pkt,
+            pkt->vp_data + sizeof(struct ether_hdr));
+        dpdk_sw_udptcp_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
@@ -761,7 +775,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         return 0;
     }
 
-    /* TODO: Checksums
+    /*
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
      * i.e. there is no direct equivalent of skb->ip_summed field.
      *
@@ -778,21 +792,19 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             dpdk_hw_checksum(pkt);
         else
             dpdk_sw_checksum(pkt);
-    }
-    /* TODO: checksums */
-//     else if (likely(VP_TYPE_IPOIP == pkt->vp_type)) {
+    } else if (likely(VP_TYPE_IPOIP == pkt->vp_type)) {
         /* always calculate outer checksum for tunnels */
         /* if NIC supports checksum offload */
-//        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
+        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
             /* TODO: vlan support */
-//            dpdk_hw_checksum_at_offset(pkt,
-//                pkt->vp_data + sizeof(struct ether_hdr));
-//        } else {
+            dpdk_hw_checksum_at_offset(pkt,
+                pkt->vp_data + sizeof(struct ether_hdr));
+        } else {
             /* TODO: vlan support */
-//            dpdk_sw_checksum_at_offset(pkt,
-//                pkt->vp_data + sizeof(struct ether_hdr));
-//        }
-//    }
+            dpdk_sw_ip_checksum_at_offset(pkt,
+                pkt->vp_data + sizeof(struct ether_hdr));
+        }
+    }
 
     /* Inject ethertype and vlan tag.
      *
