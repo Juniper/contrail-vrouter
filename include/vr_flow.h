@@ -62,33 +62,85 @@ typedef enum {
 #define VR_FLOW_DR_REVERSE_SG           0x11
 #define VR_FLOW_DR_REVERSE_OUT_SG       0x12
 
+#define VR_FLOW_IPV6_ADDR_SIZE          16
+#define VR_FLOW_IPV4_ADDR_SIZE          4
+#define VR_FLOW_IP_ADDR_SIZE(type) \
+        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_ADDR_SIZE \
+                               : VR_FLOW_IPV4_ADDR_SIZE)
+
+#define VR_FLOW_IPV6_KEY_SIZE           40
+#define VR_FLOW_IPV4_KEY_SIZE           16
+#define VR_FLOW_KEY_SIZE(type) \
+        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_KEY_SIZE \
+                               : VR_FLOW_IPV4_KEY_SIZE)
+
+#define VR_FLOW_FAMILY(type) \
+        ((type == VP_TYPE_IP6) ? AF_INET6 \
+                               : AF_INET)
 struct vr_forwarding_md;
 
+struct vr_common_flow{
+    unsigned char  ip_family;
+    unsigned char  ip_proto;
+    unsigned short ip_nh_id;
+    unsigned short ip_sport;
+    unsigned short ip_dport;
+    unsigned char  ip_addr[2*VR_FLOW_IPV6_ADDR_SIZE];
+} __attribute__((packed));
+
+
 struct vr_inet_flow {
+    unsigned char  ip4_family;
+    unsigned char  ip4_proto;
+    unsigned short ip4_nh_id;
     unsigned short ip4_sport;
     unsigned short ip4_dport;
-    unsigned int ip4_sip;
-    unsigned int ip4_dip;
-    unsigned short ip4_nh_id;
-    unsigned char ip4_proto;
+    unsigned int   ip4_sip;
+    unsigned int   ip4_dip;
+} __attribute__((packed));
+
+struct vr_inet6_flow {
+    unsigned char  ip6_family;
+    unsigned char  ip6_proto;
+    unsigned short ip6_nh_id;
+    unsigned short ip6_sport;
+    unsigned short ip6_dport;
+    unsigned char  ip6_sip[VR_FLOW_IPV6_ADDR_SIZE];
+    unsigned char  ip6_dip[VR_FLOW_IPV6_ADDR_SIZE];
 } __attribute__((packed));
 
 struct vr_flow {
     union {
+        struct vr_common_flow ip_key;
         struct vr_inet_flow ip4_key;
+        struct vr_inet6_flow ip6_key;
     } key_u;
+    uint32_t   vr_flow_keylen;    
+} __attribute__((packed));
 
-    uint8_t key_len;
-};
+#define flow_key_len   vr_flow_keylen
+#define flow_family    key_u.ip_key.ip_family
+#define flow_sport     key_u.ip_key.ip_sport
+#define flow_dport     key_u.ip_key.ip_dport
+#define flow_nh_id     key_u.ip_key.ip_nh_id
+#define flow_proto     key_u.ip_key.ip_proto
+#define flow_ip        key_u.ip_key.ip_addr
+#define flow4_family   key_u.ip4_key.ip4_family
+#define flow4_sip      key_u.ip4_key.ip4_sip
+#define flow4_dip      key_u.ip4_key.ip4_dip
+#define flow4_sport    key_u.ip4_key.ip4_sport
+#define flow4_dport    key_u.ip4_key.ip4_dport
+#define flow4_nh_id    key_u.ip4_key.ip4_nh_id
+#define flow4_proto    key_u.ip4_key.ip4_proto
+#define flow6_family   key_u.ip6_key.ip6_family
+#define flow6_sip      key_u.ip6_key.ip6_sip
+#define flow6_dip      key_u.ip6_key.ip6_sip
+#define flow6_sport    key_u.ip6_key.ip6_sport
+#define flow6_dport    key_u.ip6_key.ip6_dport
+#define flow6_nh_id    key_u.ip6_key.ip6_nh_id
+#define flow6_proto    key_u.ip6_key.ip6_proto
 
-#define flow4_sport     key_u.ip4_key.ip4_sport
-#define flow4_dport     key_u.ip4_key.ip4_dport
-#define flow4_sip       key_u.ip4_key.ip4_sip
-#define flow4_dip       key_u.ip4_key.ip4_dip
-#define flow4_nh_id     key_u.ip4_key.ip4_nh_id
-#define flow4_proto     key_u.ip4_key.ip4_proto
-
-/*
+/* 
  * Limit the number of outstanding flows in hold state. The flow rate can
  * be much more than what agent can handle. In such cases, to make sure that
  *
@@ -128,7 +180,7 @@ struct vr_flow_table_info {
     uint32_t vfti_hold_count[0];
 };
 
-/*
+/* 
  * flow bytes and packets are of same width. this should be
  * ok since agent really has to take care of overflows. this
  * is also better probably because processor does not have to
@@ -178,7 +230,7 @@ struct vr_dummy_flow_entry {
     uint8_t fe_type;
 } __attribute__((packed));
 
-#define VR_FLOW_ENTRY_PACK (64 - sizeof(struct vr_dummy_flow_entry))
+#define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
 
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
@@ -242,6 +294,7 @@ extern bool vr_flow_forward(struct vrouter *,
         struct vr_packet *, struct vr_forwarding_md *);
 
 void *vr_flow_get_va(struct vrouter *, uint64_t);
+
 unsigned int vr_flow_table_size(struct vrouter *);
 unsigned int vr_oflow_table_size(struct vrouter *);
 
@@ -251,10 +304,17 @@ flow_result_t vr_flow_lookup(struct vrouter *, struct vr_flow *,
 
 flow_result_t vr_inet_flow_lookup(struct vrouter *, struct vr_packet *,
                                   struct vr_forwarding_md *);
+flow_result_t vr_inet6_flow_lookup(struct vrouter *, struct vr_packet *,
+                                  struct vr_forwarding_md *);
+
+unsigned short
+vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
-extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
-                uint32_t, uint32_t, uint8_t, uint16_t, uint16_t);
+extern void vr_inet_fill_flow(struct vr_flow *, unsigned short, 
+       unsigned char *, uint8_t, uint16_t, uint16_t);
+extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short, 
+       unsigned char *, uint8_t, uint16_t, uint16_t);
 
 extern unsigned int vr_reinject_packet(struct vr_packet *,
         struct vr_forwarding_md *);
