@@ -20,6 +20,8 @@
 #include <linux/vhost.h>
 
 #include <rte_timer.h>
+#include <rte_config.h>
+#include <rte_ether.h>
 
 #include "vr_dpdk.h"
 #include "vr_uvhost.h"
@@ -381,12 +383,49 @@ vr_dpdk_lcore_if_unschedule(struct vr_interface *vif)
     dpdk_lcore_rxtx_release_all(vif);
 }
 
+/* If we support HW VLAN offload, packet is already stripped. The tag was
+ * saved in mbuf for future use. We need to check if stripping was needed.
+ * If not, packet should be tagged back.
+ *
+ * Return 0 if stripping was needed.
+ * Return 1 if tag was inserted back.
+ */
+static inline unsigned int
+dpdk_hw_vlan_strip(struct rte_mbuf *m) {
+    if (vr_dpdk.vr_dpdk_vlan_tag != m->vlan_tci && m->vlan_tci != 0x0) {
+        rte_vlan_insert(&m);
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Strip VLAN tag. If it was a mistake, add it back. This is how hardware
+ * stripping works, so we need to behave in the same way here.
+ *
+ * Return 0 if stripping was needed.
+ * Return 1 if tag was inserted back or packet has not been stripped.
+ */
+static inline unsigned int
+dpdk_sw_vlan_strip(struct rte_mbuf *m) {
+    if (rte_vlan_strip(m)) {
+        return 1;
+    } else {
+        if (vr_dpdk.vr_dpdk_vlan_tag != m->vlan_tci) {
+            rte_vlan_insert(&m);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 /* Send a burst of packets to vRouter */
 static inline void
 dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ],
     uint32_t nb_pkts)
 {
-    unsigned i;
+    unsigned i, vlan_ret;
     struct rte_mbuf *mbuf;
     struct vr_packet *pkt;
     unsigned lcore_id;
@@ -420,6 +459,27 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
 
     for (i = 0; i < nb_pkts; i++) {
         mbuf = pkts[i];
+
+        /* Strip VLAN tag if present.
+         *
+         * If vRouter works in VLAN, we check if the packet received on physical
+         * interface belongs to our VLAN. If it does, the tag should be stripped.
+         * If not (untagged or another tag), it should be forwarded to the kernel.
+         */
+        if (vr_dpdk.vr_dpdk_vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) {
+            /* TODO: check if hardware VLAN offload is supported
+             * vlan_ret = dpdk_hw_vlan_strip(m)
+             * If it's not, strip in software
+             */
+            vlan_ret = dpdk_sw_vlan_strip(mbuf);
+
+            if (vlan_ret) {/* TODO: forward to kernel instead of dropping */
+                RTE_LOG(DEBUG, VROUTER,"%s: Packet not tagged or tag mismatch. "
+                    "Dropping.\n", __func__);
+                vr_dpdk_pfree(mbuf, VP_DROP_INVALID_PACKET);
+            }
+        }
+
 #ifdef VR_DPDK_RX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
         if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))

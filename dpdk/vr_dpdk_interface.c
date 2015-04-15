@@ -27,6 +27,7 @@
 #include "vr_dpdk_netlink.h"
 
 #include <rte_errno.h>
+#include <rte_ether.h>
 
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
@@ -792,6 +793,23 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 //                pkt->vp_data + sizeof(struct ether_hdr));
 //        }
 //    }
+
+    /* Inject ethertype and vlan tag.
+     *
+     * Tag only packets that are going to be send to the physical interface,
+     * to allow data transfer between compute nodes in the specified VLAN.
+     *
+     * VLAN tag is adjustable by user with --vlan parameter: see dpdk_vrouter.c.
+     * If vRouter is not supposed to work in VLAN (parameter was not specified),
+     * packets should not be tagged.
+     *
+     * TODO: Hardware VLAN tag insert.
+     */
+    if (vr_dpdk.vr_dpdk_vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) {
+        m->vlan_tci = vr_dpdk.vr_dpdk_vlan_tag;
+        if (rte_vlan_insert(&m))
+            RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
+    }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
