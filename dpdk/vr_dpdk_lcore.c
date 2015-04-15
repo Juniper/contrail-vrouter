@@ -19,13 +19,14 @@
 #include <urcu-qsbr.h>
 #include <linux/vhost.h>
 
-#include <rte_timer.h>
-
 #include "vr_dpdk.h"
 #include "vr_uvhost.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk_netlink.h"
+
+#include <rte_timer.h>
+#include <rte_ether.h>
 
 /*
  * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the
@@ -420,6 +421,24 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
 
     for (i = 0; i < nb_pkts; i++) {
         mbuf = pkts[i];
+
+        /* Strip VLAN tag if present.
+         *
+         * If vRouter works in VLAN, we check if the packet received on physical
+         * interface belongs to our VLAN. If it does, the tag should be stripped.
+         * If not (untagged or another tag), it should be forwarded to the kernel.
+         */
+        if (vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) {
+            /* if (TODO: vif does not support HW vlan stripping) */
+                rte_vlan_strip(mbuf);
+
+            if (unlikely(mbuf->vlan_tci != vr_dpdk.vlan_tag)) {
+                /* TODO: forward the packet to kernel */
+                vr_dpdk_pfree(mbuf, VP_DROP_INVALID_PACKET);
+                continue;
+            }
+        }
+
 #ifdef VR_DPDK_RX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
         if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))

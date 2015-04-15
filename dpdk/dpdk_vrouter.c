@@ -26,6 +26,7 @@
 
 #include "vr_dpdk.h"
 #include "vr_uvhost.h"
+#include "vr_packet.h"
 #include "qemu_uvhost.h"
 #include "vr_dpdk_virtio.h"
 
@@ -396,12 +397,15 @@ dpdk_signals_init(void)
 
 enum vr_opt_index {
     DAEMON_OPT_INDEX,
+    VLAN_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
     [DAEMON_OPT_INDEX]              =   {"no-daemon",           no_argument,
                                                     &no_daemon_set,         1},
+    [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
+                                                    NULL,                 'v'},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -424,6 +428,7 @@ int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    vr_dpdk.vlan_tag = VLAN_ID_INVALID;
 
     fprintf(stdout, "Starting vRouter/DPDK...\nBuild information: %s\n",
                 ContrailBuildInfo);
@@ -434,6 +439,14 @@ main(int argc, char *argv[])
         switch (opt) {
         case 0:
             break;
+
+        /* If VLAN tag is set, vRouter will expect tagged packets. The tag
+         * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
+         */
+        case 'v':
+            vr_dpdk.vlan_tag = (uint16_t)atoi(optarg);
+            break;
+
 
         case '?':
         default:

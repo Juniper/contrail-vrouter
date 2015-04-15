@@ -302,6 +302,8 @@ struct vr_dpdk_global {
     struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
     /* Global stop flag */
     rte_atomic16_t stop_flag;
+    /* VLAN tag */
+    uint16_t vlan_tag;
     /* NetLink socket handler */
     void *netlink_sock;
     void *flow_table;
