@@ -41,6 +41,7 @@ env.AlwaysBuild(dpdk_lib)
 env.Default(dpdk_lib)
 
 dpdk_vrouter_src = [ 'dpdk_vrouter.c',
+                     'vr_dpdk_cksum.c',
                      'vr_dpdk_ethdev.c',
                      'vr_dpdk_flow_mem.c',
                      'vr_dpdk_host.c',

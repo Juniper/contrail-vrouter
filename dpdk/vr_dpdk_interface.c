@@ -25,6 +25,7 @@
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk_netlink.h"
+#include "vr_dpdk_cksum.h"
 
 #include <rte_errno.h>
 
@@ -655,18 +656,29 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
     unsigned iph_len = iph->ip_hl * 4;
     struct vr_udp *udph;
+    struct vr_tcp *tcph;
 
     RTE_VERIFY(0 < offset);
 
-    /* calculate IP checksum */
-    iph->ip_csum = vr_ip_csum(iph);
+    iph->ip_csum = 0;
 
-    /* TODO: TCP checksums */
     if (iph->ip_proto == VR_IP_PROTO_UDP) {
         udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
         /* disable UDP checksum */
         udph->udp_csum = 0;
+    } else if (iph->ip_proto == VR_IP_PROTO_TCP){
+        tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
+        tcph->tcp_csum = 0;
+        /*
+         * TODO: rte_ipv4_udptcp_cksum() has been ported from DPDK 2.0.0
+         * and is defined in vr_dpdk_checksum.c. After we move to new DPDK version,
+         * we should use rte_ipv4_udptcp_cksum() from DPDK.
+         */
+        tcph->tcp_csum = rte_ipv4_udptcp_cksum(iph, tcph);
     }
+
+    /* calculate IP checksum */
+    iph->ip_csum = vr_ip_csum(iph);
 }
 
 static inline void
@@ -760,7 +772,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         return 0;
     }
 
-    /* TODO: Checksums
+    /*
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
      * i.e. there is no direct equivalent of skb->ip_summed field.
      *
@@ -777,21 +789,19 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             dpdk_hw_checksum(pkt);
         else
             dpdk_sw_checksum(pkt);
-    }
-    /* TODO: checksums */
-//     else if (likely(VP_TYPE_IPOIP == pkt->vp_type)) {
+    } else if (likely(VP_TYPE_IPOIP == pkt->vp_type)) {
         /* always calculate outer checksum for tunnels */
         /* if NIC supports checksum offload */
-//        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
+        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
             /* TODO: vlan support */
-//            dpdk_hw_checksum_at_offset(pkt,
-//                pkt->vp_data + sizeof(struct ether_hdr));
-//        } else {
+            dpdk_hw_checksum_at_offset(pkt,
+                pkt->vp_data + sizeof(struct ether_hdr));
+        } else {
             /* TODO: vlan support */
-//            dpdk_sw_checksum_at_offset(pkt,
-//                pkt->vp_data + sizeof(struct ether_hdr));
-//        }
-//    }
+            dpdk_sw_checksum_at_offset(pkt,
+                pkt->vp_data + sizeof(struct ether_hdr));
+        }
+    }
 
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
