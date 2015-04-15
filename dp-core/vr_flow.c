@@ -307,6 +307,7 @@ vr_flow_queue_free(struct vrouter *router, void *arg)
     fe = vr_get_flow_entry(router, vfq->vfq_index);
     vr_flush_flow_queue(router, fe, &fmd, vfq);
     vr_free(vfq);
+    vr_free(defer);
     return;
 }
 
