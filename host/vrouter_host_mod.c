@@ -46,20 +46,26 @@ vr_lib_create_timer(struct vr_timer *vtimer)
 static void
 vr_lib_delete_timer(struct vr_timer *vtimer)
 {
-	vr_free(vtimer->vt_os_arg);
+    vr_free(vtimer->vt_os_arg);
 }
 
 static void *
 vr_lib_page_alloc(unsigned int size)
 {
-	return malloc(PAGE_SIZE);
+    int pages;
+
+    pages = size / PAGE_SIZE;
+    if (size % PAGE_SIZE)
+        pages++;
+
+    return calloc(pages, PAGE_SIZE);
 }
 
 static void
 vr_lib_page_free(void *address, unsigned int size)
 {
-	if (address)
-		free(address);
+    if (address)
+	free(address);
 }
 
 static int
