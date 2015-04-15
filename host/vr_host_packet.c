@@ -175,6 +175,7 @@ vr_hpacket_pool_destroy(struct vr_hpacket_pool *pool)
         vr_hpacket_free(hpkt);
         hpkt = n_hpkt;
     }
+    vr_free(pool);
 
     return;
 }
