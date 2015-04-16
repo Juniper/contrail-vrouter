@@ -52,10 +52,10 @@
 
 /* Default lcore mask. Used only when sched_getaffinity() is failed */
 #define VR_DPDK_DEF_LCORE_MASK      0xf
-/* Number of service lcores */
+/* Number of service lcores: NetLink (master) and packet */
 #define VR_DPDK_NB_SERVICE_LCORES   2
 /* Minimum number of lcores */
-#define VR_DPDK_MIN_LCORES          2
+#define VR_DPDK_MIN_LCORES          (VR_DPDK_NB_SERVICE_LCORES + 1)
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "512"
 /* Number of memory channels to use */
@@ -463,7 +463,7 @@ void vr_dpdk_knidev_all_handle(void);
 /*
  * vr_dpdk_packet.c
  */
-void vr_dpdk_packet_wakeup(struct vr_dpdk_lcore *lcorep);
+void vr_dpdk_packet_wakeup(void);
 int dpdk_packet_socket_init(void);
 void dpdk_packet_socket_close(void);
 int dpdk_packet_io(void);
@@ -504,8 +504,7 @@ int
 vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore);
 /* Post an lcore command */
 void
-vr_dpdk_lcore_cmd_post(struct vr_dpdk_lcore *lcore, uint16_t cmd,
-    uint32_t cmd_param);
+vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint32_t cmd_param);
 
 
 /*

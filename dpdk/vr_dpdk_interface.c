@@ -756,7 +756,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 #endif
         rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
-        vr_dpdk_packet_wakeup(lcore);
+        vr_dpdk_packet_wakeup();
         return 0;
     }
 

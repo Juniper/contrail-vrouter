@@ -136,7 +136,7 @@ void
 vr_route_req_process(void *s_req)
 {
     int ret = 0, i;
-    char addr[64];
+    char addr[INET6_ADDRSTRLEN];
     char flags[32];
     vr_route_req *rt = (vr_route_req *)s_req;
 
@@ -169,7 +169,7 @@ vr_route_req_process(void *s_req)
     if ((rt->rtr_family == AF_INET) ||
         (rt->rtr_family == AF_INET6)) {
             if (rt->rtr_prefix_size) {
-                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, 64);
+                inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, sizeof(addr));
                 ret = printf("%s/%-2d", addr, rt->rtr_prefix_len);
             }
             for (i = ret; i < 21; i++)
@@ -275,7 +275,7 @@ vr_build_route_request(unsigned int op, int family, uint8_t *prefix,
         char *eth, uint32_t replace_plen)
 {
     int i;
-    char buf[64];
+    char buf[INET6_ADDRSTRLEN];
     rt_req.rtr_family = family;
     rt_req.rtr_vrf_id = vrf;
     rt_req.rtr_rid = 0;

@@ -35,6 +35,7 @@ typedef struct vr_uvh_client {
     unsigned int vruc_idx;
     unsigned int vruc_nrxqs;
     unsigned int vruc_ntxqs;
+    pthread_t vruc_owner;
 } vr_uvh_client_t;
 
 void vr_uvhost_client_init(void);

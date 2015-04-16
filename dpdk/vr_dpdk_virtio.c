@@ -140,8 +140,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     rx_queue->rxq_ops = dpdk_virtio_reader_ops;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_zero_copy = 0;
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_soft_avail_idx = 0;
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_soft_used_idx = 0;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     rx_queue->q_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
     rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
@@ -217,8 +216,7 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     tx_queue->txq_ops = dpdk_virtio_writer_ops;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_zero_copy = 0;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_soft_avail_idx = 0;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_soft_used_idx = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
     tx_queue->q_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
@@ -279,104 +277,207 @@ vr_dpdk_virtio_get_mempool(void)
  *
  * Returns the number of packets to be sent to vrouter (0 if there is nothing
  * to do).
+ *
+ * This is an adaptation of DPDK rte_vhost_dequeue_burst() function.
+ * Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
  */
 static int
-dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
+dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t count)
 {
-    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
-    uint16_t vq_hard_avail_idx, vq_hard_used_idx, i;
-    uint16_t num_pkts, next_desc_idx, next_avail_idx, pkts_sent = 0;
+    struct rte_mbuf *m, *prev;
+    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *)arg;
     struct vring_desc *desc;
-    char *pkt_addr;
-    struct rte_mbuf *mbuf;
-    uint32_t pkt_len;
+    uint64_t vb_addr = 0;
+    uint32_t head[VR_DPDK_VIRTIO_RX_BURST_SZ];
+    uint32_t used_idx;
+    uint32_t i;
+    uint16_t free_entries, entry_success = 0;
+    uint16_t avail_idx;
 
-    if (vq->vdv_ready_state == VQ_NOT_READY) {
+    struct rte_mempool *mbuf_pool = vr_dpdk_virtio_get_mempool();
+
+    if (unlikely(vq->vdv_ready_state == VQ_NOT_READY)) {
         DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p is not ready\n",
-                __func__, vq);
+                     __func__, vq);
+         return 0;
+    }
+
+    avail_idx =  *((volatile uint16_t *)&vq->vdv_avail->idx);
+
+    /* If there are no available buffers then return. */
+    if (vq->vdv_last_used_idx == avail_idx)
         return 0;
-    }
 
-    vq_hard_avail_idx = (*((volatile uint16_t *)&vq->vdv_avail->idx));
+    /* Prefetch available ring to retrieve head indexes. */
+    rte_prefetch0(&vq->vdv_avail->ring[vq->vdv_last_used_idx & (vq->vdv_size - 1)]);
 
-    /*
-     * Unsigned subtraction gives the right result even with wrap around.
-     */
-    num_pkts = vq_hard_avail_idx - vq->vdv_soft_avail_idx;
-    if (num_pkts == 0) {
-        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p has no packets\n",
-                    __func__, vq);
-        return 0;
-    }
+    /*get the number of free entries in the ring*/
+    free_entries = (avail_idx - vq->vdv_last_used_idx);
 
-    if (num_pkts > max_pkts) {
-        num_pkts = max_pkts;
-    }
+    free_entries = RTE_MIN(free_entries, count);
+    /* limit to VR_DPDK_VIRTIO_RX_BURST_SZ */
+    free_entries = RTE_MIN(free_entries, VR_DPDK_VIRTIO_RX_BURST_SZ);
 
     DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p num_pkts=%u\n",
-            __func__, vq, num_pkts);
-    for (i = 0; i < num_pkts; i++) {
-        next_avail_idx = (vq->vdv_soft_avail_idx + i) &
-                             (vq->vdv_vvs.num - 1);
-        next_desc_idx = vq->vdv_avail->ring[next_avail_idx];
-        desc = &vq->vdv_desc[next_desc_idx];
+            __func__, vq, free_entries);
 
-        /*
-         * Ignore virtio header in first descriptor as we don't support
-         * mergeable receive buffers yet. Before that, move the descriptors
-         * (chain of 2) to the used list. The used index will, however, only
-         * be updated at the end of the loop.
-         */
-        vq->vdv_used->ring[next_avail_idx].id = next_desc_idx;
-        vq->vdv_used->ring[next_avail_idx].len = 0;
-        if (desc->flags & VRING_DESC_F_NEXT) {
-            /*
-             * TODO - make sure desc->next is sane
-             */
-            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u F_NEXT\n",
-                __func__, vq, i);
-            desc = &vq->vdv_desc[desc->next];
-            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
-            pkt_len = desc->len;
-        } else {
-            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
-                __func__, vq, i);
-            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
-            if (pkt_addr) {
-                pkt_addr += sizeof(struct virtio_net_hdr);
-                pkt_len = desc->len - sizeof(struct virtio_net_hdr);
-            }
+    /* Retrieve all of the head indexes first to avoid caching issues. */
+    for (i = 0; i < free_entries; i++)
+        head[i] = vq->vdv_avail->ring[(vq->vdv_last_used_idx + i) & (vq->vdv_size - 1)];
+
+    /* Prefetch descriptor index. */
+    rte_prefetch0(&vq->vdv_desc[head[entry_success]]);
+    rte_prefetch0(&vq->vdv_used->ring[vq->vdv_last_used_idx & (vq->vdv_size - 1)]);
+
+    while (entry_success < free_entries) {
+        uint32_t vb_avail, vb_offset;
+        uint32_t seg_avail, seg_offset;
+        uint32_t cpy_len;
+        uint32_t seg_num = 0;
+        struct rte_mbuf *cur;
+        uint8_t alloc_err = 0;
+
+        desc = &vq->vdv_desc[head[entry_success]];
+
+        /* Discard first buffer as it is the virtio header */
+        desc = &vq->vdv_desc[desc->next];
+
+        /* Buffer address translation. */
+        vb_addr = (uint64_t)vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+        /* Prefetch buffer address. */
+        rte_prefetch0((void *)(uintptr_t)vb_addr);
+
+        used_idx = vq->vdv_last_used_idx & (vq->vdv_size - 1);
+
+        if (entry_success < (free_entries - 1)) {
+            /* Prefetch descriptor index. */
+            rte_prefetch0(&vq->vdv_desc[head[entry_success+1]]);
+            rte_prefetch0(&vq->vdv_used->ring[(used_idx + 1) & (vq->vdv_size - 1)]);
         }
 
-        if (pkt_addr) {
-            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
-                __func__, vq, i, pkt_addr);
-            mbuf = rte_pktmbuf_alloc(vr_dpdk_virtio_get_mempool());
-            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
-                __func__, vq, i, mbuf);
-            if (mbuf != NULL) {
-                mbuf->pkt.data_len = pkt_len;
-                mbuf->pkt.pkt_len = pkt_len;
+        /* Update used index buffer information. */
+        vq->vdv_used->ring[used_idx].id = head[entry_success];
+        vq->vdv_used->ring[used_idx].len = 0;
 
-                rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
-                pkts[pkts_sent] = mbuf;
-                pkts_sent++;
-            }
+        vb_offset = 0;
+        vb_avail = desc->len;
+        /* Allocate an mbuf and populate the structure. */
+        m = rte_pktmbuf_alloc(mbuf_pool);
+        if (unlikely(m == NULL)) {
+            RTE_LOG(ERR, VROUTER,
+                "Error allocating mbuf for VM RX\n");
+            return entry_success;
         }
+        seg_offset = 0;
+        seg_avail = m->buf_len - RTE_PKTMBUF_HEADROOM;
+        cpy_len = RTE_MIN(vb_avail, seg_avail);
+
+        seg_num++;
+        cur = m;
+        prev = m;
+        while (cpy_len != 0) {
+            rte_memcpy((void *)(rte_pktmbuf_mtod(cur, char *) + seg_offset),
+                (void *)((uintptr_t)(vb_addr + vb_offset)),
+                cpy_len);
+
+            seg_offset += cpy_len;
+            vb_offset += cpy_len;
+            vb_avail -= cpy_len;
+            seg_avail -= cpy_len;
+
+            if (vb_avail != 0) {
+                /*
+                 * The segment reachs to its end,
+                 * while the virtio buffer in TX vring has
+                 * more data to be copied.
+                 */
+                cur->pkt.data_len = seg_offset;
+                m->pkt.pkt_len += seg_offset;
+                /* Allocate mbuf and populate the structure. */
+                cur = rte_pktmbuf_alloc(mbuf_pool);
+                if (unlikely(cur == NULL)) {
+                    RTE_LOG(ERR, VROUTER,
+                        "Error allocating mbuf segment for VM RX\n");
+                    rte_pktmbuf_free(m);
+                    alloc_err = 1;
+                    break;
+                }
+
+                seg_num++;
+                prev->pkt.next = cur;
+                prev = cur;
+                seg_offset = 0;
+                seg_avail = cur->buf_len - RTE_PKTMBUF_HEADROOM;
+            } else {
+                if (desc->flags & VRING_DESC_F_NEXT) {
+                    /*
+                     * There are more virtio buffers in
+                     * same vring entry need to be copied.
+                     */
+                    if (seg_avail == 0) {
+                        /*
+                         * The current segment hasn't
+                         * room to accomodate more
+                         * data.
+                         */
+                        cur->pkt.data_len = seg_offset;
+                        m->pkt.pkt_len += seg_offset;
+                        /*
+                         * Allocate an mbuf and
+                         * populate the structure.
+                         */
+                        cur = rte_pktmbuf_alloc(mbuf_pool);
+                        if (unlikely(cur == NULL)) {
+                            RTE_LOG(ERR, VROUTER,
+                                "Error allocating mbuf segment for VM RX\n");
+                            rte_pktmbuf_free(m);
+                            alloc_err = 1;
+                            break;
+                        }
+                        seg_num++;
+                        prev->pkt.next = cur;
+                        prev = cur;
+                        seg_offset = 0;
+                        seg_avail = cur->buf_len - RTE_PKTMBUF_HEADROOM;
+                    }
+
+                    desc = &vq->vdv_desc[desc->next];
+
+                    /* Buffer address translation. */
+                    vb_addr = (uint64_t)vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+                    /* Prefetch buffer address. */
+                    rte_prefetch0((void *)(uintptr_t)vb_addr);
+                    vb_offset = 0;
+                    vb_avail = desc->len;
+                } else {
+                    /* The whole packet completes. */
+                    cur->pkt.data_len = seg_offset;
+                    m->pkt.pkt_len += seg_offset;
+                    vb_avail = 0;
+                }
+            }
+
+            cpy_len = RTE_MIN(vb_avail, seg_avail);
+        }
+
+        if (unlikely(alloc_err == 1))
+            break;
+
+        m->pkt.nb_segs = seg_num;
+
+        pkts[entry_success] = m;
+        vq->vdv_last_used_idx++;
+        entry_success++;
     }
 
-    /*
-     * TODO - might need to kick guest.
-     */
-    rte_wmb();
-    vq->vdv_soft_avail_idx += num_pkts;
-    vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
-    *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
-
-    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkts_sent %u\n",
-            __func__, vq, pkts_sent);
-    return pkts_sent;
+    rte_compiler_barrier();
+    vq->vdv_used->idx += entry_success;
+    /* Kick guest if required. */
+    if (!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))
+        eventfd_write((int)vq->vdv_callfd, 1);
+    return entry_success;
 }
+
 
 /*
  * dpdk_virtio_to_vm_tx - sends a packet from vrouter to a virtio client. The
@@ -432,7 +533,7 @@ dpdk_virtio_to_vm_flush(void *arg)
     /*
      * Unsigned subtraction gives the right result even with wrap around.
      */
-    num_buf_posted = vq_hard_avail_idx - vq->vdv_soft_avail_idx;
+    num_buf_posted = vq_hard_avail_idx - vq->vdv_last_used_idx;
     if (num_buf_posted < vq->vdv_tx_mbuf_count) {
         num_pkts = num_buf_posted;
     } else {
@@ -440,8 +541,8 @@ dpdk_virtio_to_vm_flush(void *arg)
     }
 
     for (i = 0; i < num_pkts; i++) {
-        next_avail_idx = (vq->vdv_soft_avail_idx + i) &
-                             (vq->vdv_vvs.num - 1);
+        next_avail_idx = (vq->vdv_last_used_idx + i) &
+                             (vq->vdv_size - 1);
         next_desc_idx = vq->vdv_avail->ring[next_avail_idx];
 
         /*
@@ -516,7 +617,7 @@ dpdk_virtio_to_vm_flush(void *arg)
      * Now update the used index in the vring.
      * TODO - need memory barrier + VM kick here.
      */
-    vq->vdv_soft_avail_idx += num_pkts;
+    vq->vdv_last_used_idx += num_pkts;
     vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
     *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
 
@@ -601,8 +702,7 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
      * TODO: need memory barrier and rcu_synchronize here.
      */
     vq->vdv_ready_state = VQ_NOT_READY;
-    vq->vdv_soft_avail_idx = 0;
-    vq->vdv_soft_used_idx = 0;
+    vq->vdv_last_used_idx = 0;
 
     return 0;
 }
@@ -676,8 +776,7 @@ vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
-    vq->vdv_vvs.index = vring_idx;
-    vq->vdv_vvs.num = num_desc;
+    vq->vdv_size = num_desc;
 
     return 0;
 }

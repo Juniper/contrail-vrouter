@@ -1130,9 +1130,9 @@ mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     vr_inet_route_lookup = mtrie_lookup;
     vr_inet_vrf_stats = mtrie_stats;
     /* local cache */
-    vn_rtable[0] = (struct ip_mtrie **)rtable->algo_data; // V4 table
+    vn_rtable[0] = (struct ip_mtrie **)rtable->algo_data; /* V4 table */
     vn_rtable[1] = (struct ip_mtrie **)((char*)rtable->algo_data 
-                                                 + fs->rtb_max_vrfs); // V6 table
+                                                 + fs->rtb_max_vrfs); /* V6 table */
 
     mtrie_ip_bkt_info_init(ip4_bkt_info, IP4_PREFIX_LEN);
     mtrie_ip_bkt_info_init(ip6_bkt_info, IP6_PREFIX_LEN);
