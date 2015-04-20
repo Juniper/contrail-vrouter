@@ -52,7 +52,7 @@ vr_mpls_req_process(void *s_req)
 {
    vr_mpls_req *req = (vr_mpls_req *)s_req;
 
-   printf("%8d    %6d\n", (req->mr_label & 0xFFFF), (req->mr_nhid & 0xFFFF));
+   printf("%8d    %6d\n", req->mr_label, req->mr_nhid);
    if (mpls_op == SANDESH_OP_DUMP)
        dump_marker = req->mr_label;
 

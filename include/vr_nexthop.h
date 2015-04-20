@@ -14,7 +14,8 @@ extern "C" {
  * nexthop id is also part of the flow key and is only 16 bits. Hence, you
  * know where you are getting into if you want to increase this limit
  */
-#define NH_TABLE_ENTRIES                65536
+#define VR_DEF_NEXTHOPS                 65536
+#define NH_TABLE_ENTRIES                VR_DEF_NEXTHOPS
 #define NH_DISCARD_ID                   0
 
 enum nexthop_type {

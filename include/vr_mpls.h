@@ -9,7 +9,7 @@
 #define VR_MPLS_LABEL_SHIFT         12
 #define VR_MPLS_HDR_LEN             4
 #define VR_MAX_UCAST_LABELS         1024
-#define VR_MAX_LABELS               5120
+#define VR_DEF_LABELS               5120
 #define VR_MPLS_STACK_BIT           (0x1 << 8)
 
 #define VR_MPLS_OVER_UDP_OLD_DST_PORT   51234

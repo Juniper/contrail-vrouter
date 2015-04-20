@@ -69,7 +69,7 @@ struct vr_inet_flow {
     unsigned short ip4_dport;
     unsigned int ip4_sip;
     unsigned int ip4_dip;
-    unsigned short ip4_nh_id;
+    unsigned int ip4_nh_id;
     unsigned char ip4_proto;
 } __attribute__((packed));
 
@@ -79,7 +79,7 @@ struct vr_flow {
     } key_u;
 
     uint8_t key_len;
-};
+} __attribute__((packed));
 
 #define flow4_sport     key_u.ip4_key.ip4_sport
 #define flow4_dport     key_u.ip4_key.ip4_dport
@@ -160,8 +160,12 @@ struct vr_flow_queue {
     struct vr_packet_node vfq_pnodes[VR_MAX_FLOW_QUEUE_ENTRIES];
 };
 
+/* align to 8 byte boundary */
+#define VR_FLOW_KEY_PAD ((8 - (sizeof(struct vr_flow) % 8)) % 8)
+
 struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
+    uint8_t vr_flow_key_padding[VR_FLOW_KEY_PAD];
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -183,6 +187,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow fe_key;
+    uint8_t vr_flow_key_padding[VR_FLOW_KEY_PAD];
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
