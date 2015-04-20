@@ -761,6 +761,7 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_arp_physical_stitch += stats->vrf_arp_physical_stitch;
             response->vsr_arp_tor_proxy += stats->vrf_arp_tor_proxy;
             response->vsr_arp_physical_flood += stats->vrf_arp_physical_flood;
+            response->vsr_vrf_translates += stats->vrf_vrf_translates;
         }
     }
 
