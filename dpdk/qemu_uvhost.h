@@ -64,7 +64,7 @@ typedef struct VhostUserMsg {
  * VHOST_USER_HSIZE - size of the header of the user space vhost message. This
  * doesn't include the variable part of the message (union above).
  */
-#define VHOST_USER_HSIZE (sizeof(VhostUserRequest) + (2 * sizeof(u_int32_t)))
+#define VHOST_USER_HSIZE (offsetof(VhostUserMsg, u64))
 
 #endif /* __QEMU_UVHOST_H__ */
 

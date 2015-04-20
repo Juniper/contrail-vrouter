@@ -198,14 +198,6 @@ vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
     return 0;
 }
 
-int
-dpdk_netlink_io(void)
-{
-    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
-                ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
-    return vr_usocket_io(vr_dpdk.netlink_sock);
-}
-
 void
 dpdk_netlink_exit(void)
 {
@@ -233,7 +225,7 @@ vr_nl_uvhost_connect(void)
                         strerror(errno), errno);
         goto error;
     }
-    RTE_LOG(INFO, VROUTER, "\tuvhost socket FD is %d\n", s);
+    RTE_LOG(INFO, VROUTER, "\tuvhost Unix socket FD is %d\n", s);
 
     memset(&nl_sun, 0, sizeof(nl_sun));
     nl_sun.sun_family = AF_UNIX;
@@ -293,6 +285,8 @@ dpdk_netlink_init(void)
                 strerror(errno), errno);
         return -1;
     }
+    RTE_LOG(INFO, VROUTER, "\tNetLink TCP socket FD is %d\n",
+            ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
 
     ret = vr_nl_uvhost_connect();
     if (ret != 0) {
@@ -301,11 +295,6 @@ dpdk_netlink_init(void)
 
         RTE_LOG(ERR, VROUTER, "\terror creating uvhost connection\n");
         return -1;
-    }
-
-    if (rte_lcore_count() == VR_DPDK_MIN_LCORES) {
-        RTE_LOG(INFO, VROUTER, "\tsetting NetLink socket to non-blocking\n");
-        vr_usocket_non_blocking(vr_dpdk.netlink_sock);
     }
 
     return 0;

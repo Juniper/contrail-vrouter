@@ -15,15 +15,13 @@
 int dpdk_packet_core_id = -1;
 
 void
-vr_dpdk_packet_wakeup(struct vr_dpdk_lcore *lcorep)
+vr_dpdk_packet_wakeup(void)
 {
-    int ret;
-    uint64_t event = 1;
+    /* to wake up pkt0 thread we always use current lcore event sock */
+    struct vr_dpdk_lcore *lcorep = vr_dpdk.lcores[rte_lcore_id()];
 
     if (likely(lcorep->lcore_event_sock != NULL)) {
-        ret = vr_usocket_write(lcorep->lcore_event_sock, (unsigned char *)&event,
-                sizeof(event));
-        if (ret < 0) {
+        if (vr_usocket_eventfd_write(lcorep->lcore_event_sock) < 0) {
             vr_usocket_close(lcorep->lcore_event_sock);
             lcorep->lcore_event_sock = NULL;
         }
@@ -88,11 +86,6 @@ dpdk_packet_socket_init(void)
     vr_dpdk.packet_transport = (void *)vr_usocket(PACKET, RAW);
     if (!vr_dpdk.packet_transport)
         return -1;
-
-    if (rte_lcore_count() == VR_DPDK_MIN_LCORES) {
-        RTE_LOG(INFO, VROUTER, "\tsetting packet socket to non-blocking\n");
-        vr_usocket_non_blocking(vr_dpdk.packet_transport);
-    }
 
     if (!vr_dpdk.packet_ring) {
         vr_dpdk.packet_ring = rte_ring_lookup("pkt0_tx");

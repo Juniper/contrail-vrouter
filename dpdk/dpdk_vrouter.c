@@ -129,6 +129,7 @@ dpdk_mempools_create(void)
  * Returns:
  *      new core mask on success
  *      VR_DPDK_DEF_LCORE_MASK on failure
+ *      0 if the system does not have enough cores
  */
 static uint64_t
 dpdk_core_mask_get(void) {
@@ -166,20 +167,31 @@ dpdk_core_mask_get(void) {
 
     core_mask_count
         = __builtin_popcountll((unsigned long long)cpu_core_mask);
+
     if (core_mask_count == system_cpus_count)
         return VR_DPDK_DEF_LCORE_MASK;
+
+    if (core_mask_count < VR_DPDK_MIN_LCORES)
+        return 0;
 
     return cpu_core_mask;
 }
 
 /* Updates parameters of EAL initialization in dpdk_argv[]. */
-static void
+static int
 dpdk_argv_update(void) {
     static char core_mask_string[19];
+    uint64_t core_mask = dpdk_core_mask_get();
+
+    if (core_mask == 0) {
+        return -1;
+    }
 
     snprintf(core_mask_string, sizeof(core_mask_string), "0x%" PRIx64,
-                dpdk_core_mask_get());
+                core_mask);
     dpdk_argv[4] = core_mask_string;
+
+    return 0;
 }
 
 /* Init DPDK EAL */
@@ -195,7 +207,11 @@ dpdk_init(void)
         return ret;
     }
 
-    dpdk_argv_update();
+    if (dpdk_argv_update() == -1) {
+        fprintf(stderr, "vRouter/DPDK needs at least %u cores to start\n",
+                VR_DPDK_MIN_LCORES);
+        return -1;
+    }
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (ret < 0) {
@@ -221,20 +237,12 @@ dpdk_init(void)
     nb_sys_ports = rte_eth_dev_count();
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
-    /* Enable all detected lcores */
     vr_dpdk.nb_fwd_lcores = rte_lcore_count();
-    if (vr_dpdk.nb_fwd_lcores >= VR_DPDK_MIN_LCORES) {
-        /* do not use service lcores */
-        vr_dpdk.nb_fwd_lcores -= VR_DPDK_NB_SERVICE_LCORES;
-        if (vr_dpdk.nb_fwd_lcores == 0)
-            vr_dpdk.nb_fwd_lcores = 1;
-        RTE_LOG(INFO, VROUTER, "Using %i forwarding lcore(s)\n", vr_dpdk.nb_fwd_lcores);
-        RTE_LOG(INFO, VROUTER, "Using %i service lcore(s)\n",
-            rte_lcore_count() - vr_dpdk.nb_fwd_lcores);
-    } else {
-        RTE_LOG(CRIT, VROUTER, "Please enable at least 2 lcores\n");
-        return -ENODEV;
-    }
+    vr_dpdk.nb_fwd_lcores -= VR_DPDK_NB_SERVICE_LCORES;
+    RTE_LOG(INFO, VROUTER, "Using %d forwarding lcore(s)\n",
+                            vr_dpdk.nb_fwd_lcores);
+    RTE_LOG(INFO, VROUTER, "Using %d service lcore(s)\n",
+                            VR_DPDK_NB_SERVICE_LCORES);
 
     /* init timer subsystem */
     rte_timer_subsystem_init();
@@ -312,17 +320,11 @@ dpdk_kni_loop(__attribute__((unused)) void *dummy)
 static void
 dpdk_stop_flag_set(void)
 {
-    unsigned lcore_id;
-    struct vr_dpdk_lcore *lcore;
-
     /* check if the flag is already set */
     if (unlikely(vr_dpdk_is_stop_flag_set()))
         return;
 
-    RTE_LCORE_FOREACH(lcore_id) {
-        lcore = vr_dpdk.lcores[lcore_id];
-        vr_dpdk_lcore_cmd_post(lcore, VR_DPDK_LCORE_STOP_CMD, 0);
-    }
+    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0);
 
     rte_atomic16_inc(&vr_dpdk.stop_flag);
 }
@@ -341,7 +343,7 @@ vr_dpdk_is_stop_flag_set(void)
 static void
 dpdk_signal_handler(int signum)
 {
-    RTE_LOG(DEBUG, VROUTER, "Got signal %i on lcore %u\n",
+    RTE_LOG(DEBUG, VROUTER, "Got signal %d on lcore %u\n",
             signum, rte_lcore_id());
 
     dpdk_stop_flag_set();

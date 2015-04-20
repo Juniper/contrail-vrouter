@@ -117,7 +117,7 @@ read_value(const char *section, const char *key)
     }
 
     if (section_end && key_start > section_end) {
-        //Key not found in same section
+        /* key not found in same section */
         return false;
     }
 
