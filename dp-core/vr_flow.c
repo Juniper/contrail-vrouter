@@ -99,7 +99,7 @@ vr_valid_link_local_port(struct vrouter *router, int family,
     if (proto == VR_IP_PROTO_UDP)
         tmp += (router->vr_link_local_ports_size * 8 / 2);
 
-    data = router->vr_link_local_ports[(tmp /8)];
+    data = router->vr_link_local_ports[(tmp / 8)];
     if (data & (1 << (tmp % 8)))
         return true;
 
@@ -110,7 +110,6 @@ static void
 vr_clear_link_local_port(struct vrouter *router, int family,
                        int proto, int port)
 {
-
     unsigned char *data;
     unsigned int tmp;
 
@@ -128,15 +127,16 @@ vr_clear_link_local_port(struct vrouter *router, int family,
     if (proto == VR_IP_PROTO_UDP)
         tmp += (router->vr_link_local_ports_size * 8 / 2);
 
-    data = &router->vr_link_local_ports[(tmp /8)];
+    data = &router->vr_link_local_ports[(tmp / 8)];
     *data &= (~(1 << (tmp % 8)));
+
+    return;
 }
 
 static void
 vr_set_link_local_port(struct vrouter *router, int family,
                        int proto, int port)
 {
-
     unsigned char *data;
     unsigned int tmp;
 
@@ -154,8 +154,10 @@ vr_set_link_local_port(struct vrouter *router, int family,
     if (proto == VR_IP_PROTO_UDP)
         tmp += (router->vr_link_local_ports_size * 8 / 2);
 
-    data = &router->vr_link_local_ports[tmp /8];
+    data = &router->vr_link_local_ports[tmp / 8];
     *data |= (1 << (tmp % 8));
+
+    return;
 }
 
 static void
@@ -193,7 +195,13 @@ vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index)
 {
     memset(&fe->fe_stats, 0, sizeof(fe->fe_stats));
-    memset(&fe->fe_hold_list, 0, sizeof(fe->fe_hold_list));;
+
+    if (fe->fe_hold_list) {
+        vr_printf("vrouter: Potential memory leak @ %s:%d\n",
+                __FILE__, __LINE__);
+    }
+    fe->fe_hold_list = NULL;
+
     fe->fe_key.key_len = 0;
     fe->fe_type = VP_TYPE_NULL;
     memset(&fe->fe_key, 0, sizeof(fe->fe_key));
@@ -314,6 +322,7 @@ vr_flow_queue_free_defer(struct vr_flow_md *flmd, struct vr_flow_queue *vfq)
 
     vdd->vdd_data = (void *)vfq;
     vr_defer(flmd->flmd_router, vr_flow_queue_free, (void *)vdd);
+    flmd->flmd_defer_data = NULL;
 
     return;
 }
@@ -905,6 +914,11 @@ vr_flow_flush(void *arg)
     } 
 
 exit_flush:
+    if (flmd->flmd_defer_data) {
+        vr_put_defer_data(flmd->flmd_defer_data);
+        flmd->flmd_defer_data = NULL;
+    }
+
     vr_free(flmd);
 
     return;
@@ -1478,6 +1492,8 @@ vr_link_local_ports_reset(struct vrouter *router)
         memset(router->vr_link_local_ports,
                0, router->vr_link_local_ports_size);
     }
+
+    return;
 }
 
 static void
@@ -1488,6 +1504,8 @@ vr_link_local_ports_exit(struct vrouter *router)
         router->vr_link_local_ports = NULL;
         router->vr_link_local_ports_size = 0;
     }
+
+    return;
 }
 
 static int
