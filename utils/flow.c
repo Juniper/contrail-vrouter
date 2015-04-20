@@ -149,7 +149,7 @@ dump_table(struct flow_table *ft)
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
     const char *drop_reason = NULL;
-    char in_src[64], in_dest[64];
+    char in_src[INET_ADDRSTRLEN], in_dest[INET6_ADDRSTRLEN];
 
     printf("Flow table(size %lu, entries %u)\n\n", ft->ft_span,
             ft->ft_num_entries);
@@ -175,10 +175,11 @@ dump_table(struct flow_table *ft)
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
             if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
-                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip, in_src, 64);
+                inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip,
+                            in_src, sizeof(in_src));
                 inet_ntop(VR_FLOW_FAMILY(fe->fe_type),
                       &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
-                      in_dest, 64);
+                      in_dest, sizeof(in_dest));
             }
 
             printf("%6d", i);

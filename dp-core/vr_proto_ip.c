@@ -290,7 +290,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
                memcpy(outer_ip6, ip6, sizeof(struct vr_ip6));
                memcpy(outer_ip6->ip6_dst, ip6->ip6_src, 16);
                memcpy(outer_ip6->ip6_src, ip6->ip6_dst, 16);
-               outer_ip6->ip6_src[15] = 0xff; //Mimic the GW IP as the src IP
+               outer_ip6->ip6_src[15] = 0xff; /* mimic the GW IP as the src IP */
                
                if (pkt->vp_if->vif_mtu >= (plen + 2*sizeof(struct vr_ip6) 
                                                     + sizeof(struct vr_icmp))) {
