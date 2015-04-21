@@ -93,8 +93,8 @@ sudo sh -c "echo 1 > /proc/sys/net/ipv6/conf/${MON_IF_NAME}${MON_IF_ID}/disable_
 sudo ifconfig ${MON_IF_NAME}${MON_IF_ID} up
 
 ## set signal handler
-trap "echo ${0##*/}: deleting vif ${MON_VIF_ID}... && \
-    sudo vif --delete ${MON_VIF_ID} && exit 0" \
+trap "echo ${0##*/}: deleting vif ${MON_VIF_ID}...; \
+    sudo vif --delete ${MON_VIF_ID}; exit 0" \
     HUP INT QUIT ABRT PIPE TERM
 
 ## run tcpdump with the rest of arguments

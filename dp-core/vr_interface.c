@@ -637,6 +637,18 @@ vhost_tx(struct vr_interface *vif, struct vr_packet *pkt,
                 }
                 memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
             }
+            /*
+             * Rewrite dst MAC for the link local (169.254/16) addresses.
+             * The replies from VMs are destined to VRRP MAC, hence
+             * they are discarded by the IP stack.
+             * For the Linux platform we fix it by setting skb->pkt_type
+             * to PACKET_HOST in linux_if_rx() function.
+             * The following code fixes MACs for all the platforms.
+             */
+            if (vif_is_virtual(in_vif)) {
+                eth_hdr = (struct vr_eth *)pkt_data(pkt);
+                memcpy(eth_hdr->eth_dmac, vif->vif_mac, VR_ETHER_ALEN);
+            }
         } else {
             eth_hdr = (struct vr_eth *)pkt_push(pkt, VR_ETHER_HLEN);
             memcpy(eth_hdr->eth_dmac, vif->vif_mac, VR_ETHER_ALEN);

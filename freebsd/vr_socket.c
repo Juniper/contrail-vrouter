@@ -208,7 +208,7 @@ contrail_socket_destroy(void)
 {
 	struct domain *dp, *prev = NULL;
 
-	//TODO: make locking/unlocking of dom_mtx public in BSD
+	/* TODO: make locking/unlocking of dom_mtx public in BSD */
 	for (dp = domains; dp != NULL; prev = dp, dp = dp->dom_next)
 		if (dp->dom_family == AF_VENDOR00) {
 			if (!prev) {

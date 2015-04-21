@@ -351,7 +351,6 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
                         " failed (%d)\n", port_id, new_mtu, ret);
     }
     else { /* On success, inform vrouter about new MTU */
-        vr_dpdk_if_lock();
         for (i = 0; i < router->vr_max_interfaces; i++) {
             vif = __vrouter_get_interface(router, i);
             if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
@@ -364,7 +363,6 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
                 }
             }
         }
-        vr_dpdk_if_unlock();
     }
 
     return ret;
@@ -384,12 +382,10 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
         return -EINVAL;
     }
 
-    vr_dpdk_if_lock();
     if (if_up)
         ret = rte_eth_dev_start(port_id);
     else
         rte_eth_dev_stop(port_id);
-    vr_dpdk_if_unlock();
 
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP"
@@ -481,12 +477,11 @@ vr_dpdk_knidev_all_handle(void)
 {
     struct vrouter *router = vrouter_get(0);
     int i;
-    struct vr_interface *vif;
 
+    vr_dpdk_if_lock();
     for (i = 0; i < router->vr_max_interfaces; i++) {
-        vif = __vrouter_get_interface(router, i);
-        if (vif && (vif->vif_type == VIF_TYPE_HOST
-                    || vif->vif_type == VIF_TYPE_MONITORING))
-            rte_kni_handle_request((struct rte_kni *)vif->vif_os);
+        if (vr_dpdk.knis[i])
+            rte_kni_handle_request(vr_dpdk.knis[i]);
     }
+    vr_dpdk_if_unlock();
 }

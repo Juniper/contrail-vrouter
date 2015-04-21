@@ -58,7 +58,7 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, VROUTER, "Deleting FD %d from the select pool...\n", fd);
+    RTE_LOG(DEBUG, UVHOST, "Deleting FD %d from the select pool...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
@@ -74,7 +74,9 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     }
 
     if (i == MAX_UVHOST_FDS) {
-        vr_uvhost_log("Error deleting FD %d: not found\n", fd);
+        /* The descriptor could be deleted on read error, so no need to
+         * print the error message.
+         */
         return -1;
     }
 
@@ -101,7 +103,7 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, VROUTER, "Adding FD %d to the select pool...\n", fd);
+    RTE_LOG(DEBUG, UVHOST, "Adding FD %d to the select pool...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
