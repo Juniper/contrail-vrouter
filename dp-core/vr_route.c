@@ -371,7 +371,7 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
         if (req->rtr_req.rtr_family == AF_INET)
             pmask = ~((1 << (32 - req->rtr_req.rtr_prefix_len)) - 1);
         else
-            pmask = 0; //TBD: Assume V6 prefix length will be multiple of 8
+            pmask = 0; /* TBD: Assume V6 prefix length will be multiple of 8 */
             
         pmask_byte = req->rtr_req.rtr_prefix_len/8;
         if (pmask_byte < (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)-1)) {
