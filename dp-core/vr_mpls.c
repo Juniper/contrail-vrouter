@@ -16,7 +16,7 @@
 struct vr_nexthop *
 __vrouter_get_label(struct vrouter *router, unsigned int label)
 {
-    if (!router || label > router->vr_max_labels)
+    if (!router || label >= router->vr_max_labels)
         return NULL;
 
     return router->vr_ilm[label];
@@ -28,6 +28,17 @@ vrouter_get_label(unsigned int rid, unsigned int label)
     struct vrouter *router = vrouter_get(rid);
 
     return __vrouter_get_label(router, label);
+}
+
+static void
+__vr_mpls_del(struct vrouter *router, unsigned int label)
+{
+    if (router->vr_ilm[label])
+        vrouter_put_nexthop(router->vr_ilm[label]);
+
+    router->vr_ilm[label] = NULL;
+
+    return;
 }
 
 int
@@ -42,16 +53,12 @@ vr_mpls_del(vr_mpls_req *req)
         goto generate_resp;
     }
 
-    if (req->mr_label > (int)router->vr_max_labels) {
+    if ((unsigned int)req->mr_label >= router->vr_max_labels) {
         ret = -EINVAL;
         goto generate_resp;
     }
 
-    if (router->vr_ilm[req->mr_label])
-        vrouter_put_nexthop(router->vr_ilm[req->mr_label]);
-
-    router->vr_ilm[req->mr_label] = NULL;
-
+    __vr_mpls_del(router, (unsigned int)req->mr_label);
 generate_resp:
     vr_send_response(ret);
 
@@ -71,10 +78,12 @@ vr_mpls_add(vr_mpls_req *req)
         goto generate_resp;
     }
 
-    if ((unsigned int)req->mr_label > router->vr_max_labels) {
+    if ((unsigned int)req->mr_label >= router->vr_max_labels) {
         ret = -EINVAL;
         goto generate_resp;
     }
+
+    __vr_mpls_del(router, (unsigned int)req->mr_label);
 
     nh = vrouter_get_nexthop(req->mr_rid, req->mr_nhid);
     if (!nh)  {
@@ -146,17 +155,26 @@ vr_mpls_get(vr_mpls_req *req)
     struct vrouter *router;
 
     router = vrouter_get(req->mr_rid);
-    if (!router || req->mr_label > (int)router->vr_max_labels) {
+    if (!router) {
         ret = -ENODEV;
-    } else {
-        nh = vrouter_get_label(req->mr_rid, req->mr_label);
-        if (!nh)
-            ret = -ENOENT;
+        goto generate_response;
     }
 
-    if (!ret)
-        vr_mpls_make_req(req, nh, req->mr_label);
-    else
+    if ((unsigned int)req->mr_label >= router->vr_max_labels) {
+        ret = -EINVAL;
+        goto generate_response;
+    }
+
+    nh = vrouter_get_label(req->mr_rid, req->mr_label);
+    if (!nh) {
+        ret = -ENOENT;
+        goto generate_response;
+    }
+
+    vr_mpls_make_req(req, nh, req->mr_label);
+
+generate_response:
+    if (ret)
         req = NULL;
 
     vr_message_response(VR_MPLS_OBJECT_ID, req, ret);

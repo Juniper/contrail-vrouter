@@ -91,7 +91,7 @@ vrouter_add_nexthop(struct vr_nexthop *nh)
 {
     struct vrouter *router = vrouter_get(nh->nh_rid);
 
-    if (!router || nh->nh_id > router->vr_max_nexthops)
+    if (!router || nh->nh_id >= router->vr_max_nexthops)
         return -EINVAL;
 
     /*
@@ -112,7 +112,7 @@ nh_del(struct vr_nexthop *nh)
 {
     struct vrouter *router = vrouter_get(nh->nh_rid);
     
-    if (!router || nh->nh_id > router->vr_max_nexthops)
+    if (!router || nh->nh_id >= router->vr_max_nexthops)
         return; 
 
     if (router->vr_nexthops[nh->nh_id]) {
