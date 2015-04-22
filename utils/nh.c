@@ -40,7 +40,7 @@ static nh_set;
 static struct nl_client *cl;
 static int8_t src_mac[6], dst_mac[6];
 static uint32_t nh_id, if_id, vrf_id ;
-static uint16_t flags;
+static uint32_t flags;
 static struct in_addr sip, dip;
 static uint16_t sport, dport;
 static int command;
@@ -80,7 +80,7 @@ nh_type(uint32_t type)
 }
 
 char *
-nh_flags(uint16_t flags, uint8_t type, char *ptr)
+nh_flags(uint32_t flags, uint8_t type, char *ptr)
 {
     int i;
     uint32_t mask;
@@ -91,7 +91,7 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
 
 
     strcpy(ptr,"");
-    for(i = 0, mask = 1; (i < 18); i++, mask = mask << 1) {
+    for(i = 0, mask = 1; (i < 32); i++, mask = mask << 1) {
         switch(flags & mask) {
         case NH_FLAG_VALID:
             strcat(ptr, "Valid, ");
@@ -151,6 +151,10 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
 
         case NH_FLAG_MCAST:
             strcat(ptr, "Multicast, ");
+            break;
+
+        case NH_FLAG_VRF_TRANSLATE:
+            strcat(ptr, "VrfT, ");
             break;
 
         case NH_FLAG_TUNNEL_VXLAN:
@@ -255,7 +259,7 @@ vr_response_process(void *s)
 
 int 
 vr_nh_op(int opt, int mode, uint32_t nh_id, uint32_t if_id, uint32_t vrf_id, 
-        int8_t *dst, int8_t  *src, struct in_addr sip, struct in_addr dip, uint16_t flags)
+        int8_t *dst, int8_t  *src, struct in_addr sip, struct in_addr dip, uint32_t flags)
 {
     vr_nexthop_req nh_req;
     char *buf;
@@ -413,7 +417,8 @@ cmd_usage()
            "                    [--tor composit tor ]\n"
            "                        [--lbl <lbl> label for composit fabric ]\n"
            "                [VRF Translate options]\n"
-           "                    [--vxlan Vxlan VRF Translation]\n");
+           "                    [--vxlan Vxlan VRF Translation]\n"
+           "                    [--vrft VRF translation ]\n");
 
     exit(-EINVAL);
 }
@@ -453,6 +458,7 @@ enum opt_index {
     CEN_OPT_IND,
     CEVPN_OPT_IND,
     TOR_OPT_IND,
+    VRFT_OPT_IND,
     LBL_OPT_IND,
     LST_OPT_IND,
     GET_OPT_IND,
@@ -496,7 +502,8 @@ static struct option long_options[] = {
     [EL2_OPT_IND]       = {"el2",   no_argument,        &opt[EL2_OPT_IND],      1},
     [CEN_OPT_IND]       = {"cen",   no_argument,        &opt[CEN_OPT_IND],      1},
     [CEVPN_OPT_IND]     = {"cevpn", no_argument,        &opt[CEVPN_OPT_IND],    1},
-    [TOR_OPT_IND]       = {"tor",   no_argument,        &opt[TOR_OPT_IND],    1},
+    [TOR_OPT_IND]       = {"tor",   no_argument,        &opt[TOR_OPT_IND],      1},
+    [VRFT_OPT_IND]      = {"vrft",  no_argument,        &opt[VRFT_OPT_IND],     1},
     [LBL_OPT_IND]       = {"lbl",   required_argument,  &opt[LBL_OPT_IND],      1},
     [LST_OPT_IND]       = {"list",  no_argument,        &opt[LST_OPT_IND],      1},
     [GET_OPT_IND]       = {"get",   required_argument,  &opt[GET_OPT_IND],      1},
@@ -685,6 +692,8 @@ validate_options()
             } else if (type == NH_VRF_TRANSLATE) {
                 if (opt_set(VXLAN_OPT_IND))
                     flags |= NH_FLAG_VNID;
+                if (opt_set(VRFT_OPT_IND))
+                    flags |= NH_FLAG_VRF_TRANSLATE;
             } else {
                 cmd_usage();
             }
