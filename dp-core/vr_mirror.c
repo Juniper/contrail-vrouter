@@ -373,7 +373,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     struct vr_pcap *pcap;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
-    unsigned int captured_len;
+    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE;
     unsigned int mirror_md_len = 0;
     unsigned char default_mme[2] = {0xff, 0x0};
     void *mirror_md;
@@ -397,6 +397,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         mirror_md = default_mme;
     }
 
+    clone_len += mirror_md_len;
     nh = mirror->mir_nh;
     pkt = vr_pclone(pkt);
     if (!pkt)
@@ -409,23 +410,27 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     reset = true;
     if (pkt->vp_if && pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) {
         pkt_nh = pkt->vp_nh;
-        if (pkt_nh && pkt_nh->nh_type == NH_ENCAP && pkt_nh->nh_dev &&
-            pkt_nh->nh_dev->vif_set_rewrite && pkt_nh->nh_encap_len) {
+        if (pkt_nh && (pkt_nh->nh_flags & NH_FLAG_VALID) &&
+                    (pkt_nh->nh_type == NH_ENCAP)) {
 
             reset = false;
-            if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len +
-                    pkt_nh->nh_encap_len)) 
+            if (pkt_nh->nh_family == AF_INET)
+                clone_len += pkt_nh->nh_encap_len;
+
+            if (vr_pcow(pkt, clone_len))
                 goto fail;
 
-            if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
+            if (pkt_nh->nh_family == AF_INET) {
+                if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
                     pkt_nh->nh_data, pkt_nh->nh_encap_len))
                 goto fail;
+            }
         }
     }
 
     if (reset) {
         vr_preset(pkt);
-        if (vr_pcow(pkt,  VR_MIRROR_PKT_HEAD_SPACE + mirror_md_len))
+        if (vr_pcow(pkt, clone_len))
             goto fail;
     }
 
