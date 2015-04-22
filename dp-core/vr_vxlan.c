@@ -254,7 +254,7 @@ vr_vxlan_init(struct vrouter *router)
 {
     /* Create an index table with two strides of 12 bits each */
     if (!router->vr_vxlan_table) {
-        router->vr_vxlan_table = vr_itable_create(24, 2, 12, 12);
+        router->vr_vxlan_table = vr_itable_create("Vxlan", 24, 2, 12, 12);
         if (!router->vr_vxlan_table) {
             vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
             return -ENOMEM;

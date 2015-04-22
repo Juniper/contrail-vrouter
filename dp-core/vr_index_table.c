@@ -11,6 +11,7 @@
 #endif
 
 struct vr_itbl {
+    char itbl_name[15];
     unsigned int stride_cnt;
     unsigned int index_len;
     unsigned int *stride_len;
@@ -251,6 +252,13 @@ vr_itable_del(vr_itable_t t, unsigned int index)
         return NULL;
     }
 
+    if (index & (~(((0x1 << (table->index_len - 1)) - 1) |
+                            (0x1 << (table->index_len - 1 ))))) {
+        vr_printf("Indextable :%s Del Index %x has more bits"
+                " than %d Ignoring MSB\n", table->itbl_name, index,
+                table->index_len);
+    }
+
     __vr_itable_del(table, index, table->data, 0, &old);
 
     /* Return the deleted value */
@@ -267,6 +275,13 @@ vr_itable_get(vr_itable_t t, unsigned int index)
 
     if (!table) {
         return NULL;
+    }
+
+    if (index & (~(((0x1 << (table->index_len - 1)) - 1) |
+                            (0x1 << (table->index_len - 1 ))))) {
+        vr_printf("Indextable :%s Get Index %x has more bits"
+                " than %d Ignoring MSB\n", table->itbl_name, index,
+                table->index_len);
     }
 
     /* Go till last stride as long as data exists */
@@ -298,9 +313,10 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
     }
 
     if (index & (~(((0x1 << (table->index_len - 1)) - 1) |
-        (0x1 << (table->index_len - 1 ))))) {
-        vr_printf("Index %x has more bits than %d Ignoring MSB\n",
-                index, table->index_len);
+                            (0x1 << (table->index_len - 1 ))))) {
+        vr_printf("Indextable :%s Set Index %x has more bits"
+                " than %d Ignoring MSB\n", table->itbl_name, index,
+                table->index_len);
     }
 
     if (!table->data) {
@@ -347,6 +363,7 @@ vr_itable_delete(vr_itable_t t, vr_itable_del_cb_t func)
         return;
     }
 
+
     /* Delete all entries and strides */
     __vr_itable_exit(table, func, table->data, 0, 0);
 
@@ -367,7 +384,7 @@ vr_itable_delete(vr_itable_t t, vr_itable_del_cb_t func)
  */
 
 vr_itable_t
-vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...)
+vr_itable_create(char *name, unsigned int index_len, unsigned int stride_cnt, ...)
 {
     va_list vargs;
     struct vr_itbl *table;
@@ -389,6 +406,10 @@ vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...)
     table = vr_zalloc(sizeof(struct vr_itbl));
     if (!table) {
         goto fail;
+    }
+
+    if (name) {
+        strncpy(table->itbl_name, name, 15);
     }
 
     table->index_len = index_len;

@@ -10,7 +10,7 @@ typedef void (*vr_itable_del_cb_t)(unsigned int index, void *data);
 
 #define VR_ITABLE_ERR_PTR ((void *)-1)
 
-vr_itable_t vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...);
+vr_itable_t vr_itable_create(char *, unsigned int , unsigned int , ...);
 void vr_itable_delete(vr_itable_t t, vr_itable_del_cb_t func);
 
 void *vr_itable_get(vr_itable_t t, unsigned int index);

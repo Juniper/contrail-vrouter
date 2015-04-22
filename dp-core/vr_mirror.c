@@ -515,7 +515,7 @@ vr_mirror_init(struct vrouter *router)
     }
 
     if (!router->vr_mirror_md) {
-        router->vr_mirror_md = vr_itable_create(32, 4, 8, 8, 8, 8);
+        router->vr_mirror_md = vr_itable_create("Mirror", 32, 4, 8, 8, 8, 8);
         if (!router->vr_mirror_md && (ret = -ENOMEM)) {
             vr_module_error(ret, __FUNCTION__, __LINE__, 0);
             goto cleanup;
