@@ -107,7 +107,7 @@ buffer sandesh vr_route_req {
 
 buffer sandesh vr_mpls_req {
     1: sandesh_op   h_op;
-    2: i16          mr_label;
+    2: i32          mr_label;
     3: i16          mr_rid;
     4: i32          mr_nhid;
     5: i32          mr_marker;
