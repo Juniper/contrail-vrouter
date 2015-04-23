@@ -223,20 +223,25 @@ vr_route_req_process(void *s_req)
         if (rt->rtr_label_flags & VR_BE_FLOOD_DHCP_FLAG)
             strcat(flags, "Df");
 
-        printf("%5d", rt->rtr_index);
-        for (i = 0; i < 5; i++)
+        ret = printf("%-8d", rt->rtr_index);
+        for (i = ret; i < 12; i++)
             printf(" ");
 
         ret = printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
         for (i = ret; i < 20; i++)
             printf(" ");
 
-        printf(" %16s", flags);
+        ret = printf(" %8s", flags);
+        for (i = ret; i < 10; i++)
+            printf(" ");
 
         if (rt->rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
             ret = printf(" %16d", rt->rtr_label);
         else
             ret = printf(" %16c", '-');
+
+        for (i = ret; i < 20; i++)
+            printf(" ");
 
         printf(" %10d\n", rt->rtr_nh_id);
     }
@@ -461,7 +466,7 @@ vr_route_op(void)
         } else {
             printf("Kernel L2 Bridge table %d/%d\n\n", req->rtr_rid, cmd_vrf_id);
             dump_legend(cmd_family_id);
-            printf("Index     DestMac                          Flags       Label/VNID      Nexthop\n");
+            printf("Index       DestMac                  Flags           Label/VNID      Nexthop\n");
         }
     }
 
