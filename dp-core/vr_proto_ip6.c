@@ -154,9 +154,14 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
             sport = 0;
             dport = icmph->icmp_type;
         }
-    } else {
+    } else if ((ip6->ip6_nxt == VR_IP_PROTO_TCP) ||
+            (ip6->ip6_nxt == VR_IP_PROTO_UDP) ||
+            (ip6->ip6_nxt == VR_IP_PROTO_SCTP)) {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
+    } else {
+        sport = 0;
+        dport = 0;
     }
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
