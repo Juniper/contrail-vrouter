@@ -159,6 +159,9 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
         case NH_FLAG_VNID:
             strcat(ptr, "Vxlan, ");
             break;
+        case NH_FLAG_UNKNOWN_UC_FLOOD:
+            strcat(ptr, "Unicast Flood, ");
+            break;
         }
     }
     return ptr;
@@ -432,7 +435,8 @@ cmd_usage()
            "                    [--tor composit tor ]\n"
            "                        [--lbl <lbl> label for composit fabric ]\n"
            "                [VRF Translate options]\n"
-           "                    [--vxlan Vxlan VRF Translation]\n");
+           "                    [--vxlan Vxlan VRF Translation]\n"
+           "                    [--uucf Unknown Unicast Flood]\n");
 
     exit(-EINVAL);
 }
@@ -473,6 +477,7 @@ enum opt_index {
     CEVPN_OPT_IND,
     TOR_OPT_IND,
     LBL_OPT_IND,
+    UUCF_OPT_IND,
     LST_OPT_IND,
     GET_OPT_IND,
     CRT_OPT_IND,
@@ -515,8 +520,9 @@ static struct option long_options[] = {
     [EL2_OPT_IND]       = {"el2",   no_argument,        &opt[EL2_OPT_IND],      1},
     [CEN_OPT_IND]       = {"cen",   no_argument,        &opt[CEN_OPT_IND],      1},
     [CEVPN_OPT_IND]     = {"cevpn", no_argument,        &opt[CEVPN_OPT_IND],    1},
-    [TOR_OPT_IND]       = {"tor",   no_argument,        &opt[TOR_OPT_IND],    1},
+    [TOR_OPT_IND]       = {"tor",   no_argument,        &opt[TOR_OPT_IND],      1},
     [LBL_OPT_IND]       = {"lbl",   required_argument,  &opt[LBL_OPT_IND],      1},
+    [UUCF_OPT_IND]      = {"uucf",  no_argument,        &opt[UUCF_OPT_IND],     1},
     [LST_OPT_IND]       = {"list",  no_argument,        &opt[LST_OPT_IND],      1},
     [GET_OPT_IND]       = {"get",   required_argument,  &opt[GET_OPT_IND],      1},
     [CRT_OPT_IND]       = {"create", required_argument, &opt[CRT_OPT_IND],      1},
@@ -705,6 +711,8 @@ validate_options()
             } else if (type == NH_VRF_TRANSLATE) {
                 if (opt_set(VXLAN_OPT_IND))
                     flags |= NH_FLAG_VNID;
+                if (opt_set(UUCF_OPT_IND))
+                    flags |= NH_FLAG_UNKNOWN_UC_FLOOD;
             } else {
                 cmd_usage();
             }

@@ -40,7 +40,7 @@ buffer sandesh vr_nexthop_req {
     13: i16         nhr_tun_dport;
     14: i32         nhr_ref_cnt;
     15: i32         nhr_marker;
-    16: i16         nhr_flags;
+    16: u32         nhr_flags;
     17: list<byte>  nhr_encap;
     18: list<i32>   nhr_nh_list;
     19: i32         nhr_label;
@@ -199,6 +199,7 @@ buffer sandesh vr_vrf_stats_req {
    28:  i64                 vsr_arp_tor_proxy;
    29:  i64                 vsr_arp_physical_flood;
    30:  i64                 vsr_l2_receives;
+   31:  i64                 vsr_uuc_floods;
 }
 
 buffer sandesh vr_response {
