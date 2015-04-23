@@ -127,6 +127,7 @@ vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
     flow_p->flow6_sport = sport;
     flow_p->flow6_dport = dport;
     flow_p->flow6_family = AF_INET6;
+    flow_p->flow6_unused = 0;
 
     flow_p->flow_key_len = VR_FLOW_IPV6_HASH_SIZE;
 

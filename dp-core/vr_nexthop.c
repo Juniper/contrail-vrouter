@@ -9,9 +9,11 @@
 #include <vr_interface.h>
 #include <vr_nexthop.h>
 #include <vr_vxlan.h>
+
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_bridge.h"
+#include "vr_btable.h"
 #include "vr_datapath.h"
 #include "vr_route.h"
 #include "vr_hash.h"
@@ -30,13 +32,15 @@ extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
 struct vr_nexthop *ip4_default_nh;
 struct vr_nexthop *ip6_default_nh;
 
+unsigned int vr_nexthops = VR_DEF_NEXTHOPS;
+
 struct vr_nexthop *
 __vrouter_get_nexthop(struct vrouter *router, unsigned int index)
 {
     if (!router || index >= router->vr_max_nexthops)
         return NULL;
 
-    return router->vr_nexthops[index];
+    return *(struct vr_nexthop **)vr_btable_get(router->vr_nexthops, index);
 }
 
 struct vr_nexthop *
@@ -51,6 +55,21 @@ vrouter_get_nexthop(unsigned int rid, unsigned int index)
         nh->nh_users++;
 
     return nh;
+}
+
+static int
+__vrouter_set_nexthop(struct vrouter *router, unsigned int index,
+        struct vr_nexthop *nh)
+{
+    struct vr_nexthop **nh_p;
+
+    nh_p = (struct vr_nexthop **)vr_btable_get(router->vr_nexthops, index);
+    if (!nh_p)
+        return -EINVAL;
+
+    *nh_p = nh;
+
+    return 0;
 }
 
 void
@@ -91,7 +110,7 @@ vrouter_add_nexthop(struct vr_nexthop *nh)
 {
     struct vrouter *router = vrouter_get(nh->nh_rid);
 
-    if (!router || nh->nh_id > router->vr_max_nexthops)
+    if (!router || nh->nh_id >= router->vr_max_nexthops)
         return -EINVAL;
 
     /*
@@ -99,12 +118,11 @@ vrouter_add_nexthop(struct vr_nexthop *nh)
      * over to nexthop, incase of change
      * just return
      */
-    if (router->vr_nexthops[nh->nh_id])
+    if (__vrouter_get_nexthop(router, nh->nh_id))
         return 0;
 
     nh->nh_users++;
-    router->vr_nexthops[nh->nh_id] = nh;
-    return 0;
+    return __vrouter_set_nexthop(router, nh->nh_id, nh);
 }
 
 static void
@@ -112,12 +130,10 @@ nh_del(struct vr_nexthop *nh)
 {
     struct vrouter *router = vrouter_get(nh->nh_rid);
 
-    if (!router || nh->nh_id > router->vr_max_nexthops)
+    if (!router || nh->nh_id >= router->vr_max_nexthops)
         return;
 
-    if (router->vr_nexthops[nh->nh_id]) {
-        router->vr_nexthops[nh->nh_id] = NULL;
-    }
+    __vrouter_set_nexthop(router, nh->nh_id, NULL);
     vrouter_put_nexthop(nh);
 
     return;
@@ -2483,7 +2499,7 @@ vr_nexthop_dump(vr_nexthop_req *r)
 
     for (i = (unsigned int)(r->nhr_marker + 1);
             i < router->vr_max_nexthops; i++) {
-        nh = router->vr_nexthops[i];
+        nh = __vrouter_get_nexthop(router, i);
         if (nh) {
             resp = vr_nexthop_req_get();
             if (!resp && (ret = -ENOMEM))
@@ -2544,28 +2560,23 @@ static void
 nh_table_exit(struct vrouter *router, bool soft_reset)
 {
     unsigned int i;
-    struct vr_nexthop **vnt;
-
-    vnt = router->vr_nexthops;
-    if (!vnt)
-        return;
+    struct vr_nexthop *nh;
 
     for (i = 0; i < router->vr_max_nexthops; i++) {
-        if (vnt[i]) {
-            if (soft_reset && i == NH_DISCARD_ID)
-                continue;
-
-            vnt[i]->nh_destructor(vnt[i]);
-        }
+        if (soft_reset && i == NH_DISCARD_ID)
+            continue;
+        nh = __vrouter_get_nexthop(router, i);
+        if (nh)
+            nh->nh_destructor(nh);
     }
 
 
     if (soft_reset == false) {
-        router->vr_nexthops = NULL;
         /* Make the default nh point to NULL */
         ip4_default_nh = NULL;
-        vr_free(vnt);
+        vr_btable_free(router->vr_nexthops);
         router->vr_max_nexthops = 0;
+        router->vr_nexthops = NULL;
     }
 
     return;
@@ -2596,9 +2607,10 @@ nh_table_init(struct vrouter *router)
     unsigned int table_memory;
 
     if (!router->vr_max_nexthops) {
-        router->vr_max_nexthops = NH_TABLE_ENTRIES;
+        router->vr_max_nexthops = vr_nexthops;
         table_memory = router->vr_max_nexthops * sizeof(struct vr_nexthop *);
-        router->vr_nexthops = vr_zalloc(table_memory);
+        router->vr_nexthops = vr_btable_alloc(router->vr_max_nexthops,
+                sizeof(struct vr_nexthop *));
         if (!router->vr_nexthops)
             return vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, table_memory);
@@ -2606,22 +2618,11 @@ nh_table_init(struct vrouter *router)
 
     if (!ip4_default_nh) {
         ret = nh_allocate_discard();
-        if (ret) {
-            vr_module_error(ret, __FUNCTION__, __LINE__, 0);
-            goto init_fail;
-        }
+        if (ret)
+            return vr_module_error(ret, __FUNCTION__, __LINE__, 0);
     }
 
     return 0;
-
-init_fail:
-    if (router->vr_nexthops)
-        vr_free(router->vr_nexthops);
-
-    router->vr_max_nexthops = 0;
-    router->vr_nexthops = NULL;
-
-    return ret;
 }
 
 void

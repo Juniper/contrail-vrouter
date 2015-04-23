@@ -164,6 +164,14 @@ nh_flags(uint16_t flags, uint8_t type, char *ptr)
     return ptr;
 }
 
+static void
+nh_print_newline_header(void)
+{
+    printf("\n%14c", ' ');
+
+    return;
+}
+
 void
 vr_nexthop_req_process(void *s_req)
 {
@@ -183,29 +191,30 @@ vr_nexthop_req_process(void *s_req)
     else
         strcpy(fam, "N/A");
 
-    printf("Id:%03d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d Vrf:%d\n",
+    printf("Id:%-9d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d Vrf:%d",
                 req->nhr_id, nh_type(req->nhr_type), fam,
                 nh_flags(req->nhr_flags, req->nhr_type, flags_mem),
                 req->nhr_rid, req->nhr_ref_cnt, req->nhr_vrf);
 
-    if (req->nhr_type == NH_RCV)
-        printf("\tOif:%d\n", req->nhr_encap_oif_id);
-
-    if (req->nhr_type == NH_ENCAP) {
-        printf("\tEncapFmly:%04x Oif:%d Len:%d Data:", req->nhr_encap_family, req->nhr_encap_oif_id, req->nhr_encap_size);
+    if (req->nhr_type == NH_RCV) {
+        nh_print_newline_header();
+        printf("Oif:%d\n", req->nhr_encap_oif_id);
+    } else if (req->nhr_type == NH_ENCAP) {
+        nh_print_newline_header();
+        printf("EncapFmly:%04x Oif:%d Len:%d Data:", req->nhr_encap_family, req->nhr_encap_oif_id, req->nhr_encap_size);
         for (i = 0; i< req->nhr_encap_size; i++) {
             printf("%02x ", (unsigned char)req->nhr_encap[i]);
         }
         printf("\n");
-    }
-
-    if (req->nhr_type == NH_TUNNEL) {
-        printf("\tOif:%d Len:%d Flags %s Data:", req->nhr_encap_oif_id,
+    } else if (req->nhr_type == NH_TUNNEL) {
+        nh_print_newline_header();
+        printf("Oif:%d Len:%d Flags %s Data:", req->nhr_encap_oif_id,
                 req->nhr_encap_size, nh_flags(req->nhr_flags, req->nhr_type, flags_mem));
         for (i = 0; i< req->nhr_encap_size; i++) {
             printf("%02x ", (unsigned char)req->nhr_encap[i]);
         }
-        printf("\n\tVrf:%d", req->nhr_vrf);
+        nh_print_newline_header();
+        printf("Vrf:%d", req->nhr_vrf);
         a.s_addr = req->nhr_tun_sip;
         printf("  Sip:%s", inet_ntoa(a));
         a.s_addr = req->nhr_tun_dip;
@@ -215,14 +224,12 @@ vr_nexthop_req_process(void *s_req)
             printf("        Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport),
                                                   ntohs(req->nhr_tun_dport));
         }
-    }
-
-    if (req->nhr_type == NH_VRF_TRANSLATE) {
-        printf("\tVrf:%d\n", req->nhr_vrf);
-    }
-
-    if (req->nhr_type == NH_COMPOSITE) {
-        printf("\tSub NH(label):");
+    } else if (req->nhr_type == NH_VRF_TRANSLATE) {
+        nh_print_newline_header();
+        printf("Vrf:%d\n", req->nhr_vrf);
+    } else if (req->nhr_type == NH_COMPOSITE) {
+        nh_print_newline_header();
+        printf("Sub NH(label):");
         for (i = 0; i < req->nhr_nh_list_size; i++) {
             printf(" %d", req->nhr_nh_list[i]);
             if (req->nhr_label_list[i] >= 0)

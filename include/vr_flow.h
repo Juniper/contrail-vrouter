@@ -62,12 +62,6 @@ typedef enum {
 #define VR_FLOW_DR_REVERSE_SG           0x11
 #define VR_FLOW_DR_REVERSE_OUT_SG       0x12
 
-#define VR_FLOW_IPV6_HASH_SIZE           40
-#define VR_FLOW_IPV4_HASH_SIZE           16
-#define VR_FLOW_HASH_SIZE(type) \
-        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_HASH_SIZE \
-                               : VR_FLOW_IPV4_HASH_SIZE)
-
 #define VR_IP6_ADDRESS_LEN               16
 
 #define VR_FLOW_FAMILY(type) \
@@ -78,9 +72,10 @@ struct vr_forwarding_md;
 struct vr_common_flow{
     unsigned char  ip_family;
     unsigned char  ip_proto;
-    unsigned short ip_nh_id;
+    unsigned short ip_unused;
     unsigned short ip_sport;
     unsigned short ip_dport;
+    unsigned int   ip_nh_id;
     unsigned char  ip_addr[2 * VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
@@ -88,9 +83,10 @@ struct vr_common_flow{
 struct vr_inet_flow {
     unsigned char  ip4_family;
     unsigned char  ip4_proto;
-    unsigned short ip4_nh_id;
+    unsigned short ip4_unused;
     unsigned short ip4_sport;
     unsigned short ip4_dport;
+    unsigned int   ip4_nh_id;
     unsigned int   ip4_sip;
     unsigned int   ip4_dip;
 } __attribute__((packed));
@@ -98,9 +94,10 @@ struct vr_inet_flow {
 struct vr_inet6_flow {
     unsigned char  ip6_family;
     unsigned char  ip6_proto;
-    unsigned short ip6_nh_id;
+    unsigned short ip6_unused;
     unsigned short ip6_sport;
     unsigned short ip6_dport;
+    unsigned int   ip6_nh_id;
     unsigned char  ip6_sip[VR_IP6_ADDRESS_LEN];
     unsigned char  ip6_dip[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
@@ -128,6 +125,7 @@ struct vr_flow {
 #define flow4_dport    key_u.ip4_key.ip4_dport
 #define flow4_nh_id    key_u.ip4_key.ip4_nh_id
 #define flow4_proto    key_u.ip4_key.ip4_proto
+#define flow4_unused   key_u.ip4_key.ip4_unused
 #define flow6_family   key_u.ip6_key.ip6_family
 #define flow6_sip      key_u.ip6_key.ip6_sip
 #define flow6_dip      key_u.ip6_key.ip6_sip
@@ -135,6 +133,13 @@ struct vr_flow {
 #define flow6_dport    key_u.ip6_key.ip6_dport
 #define flow6_nh_id    key_u.ip6_key.ip6_nh_id
 #define flow6_proto    key_u.ip6_key.ip6_proto
+#define flow6_unused   key_u.ip6_key.ip6_unused
+
+#define VR_FLOW_IPV6_HASH_SIZE           sizeof(struct vr_inet6_flow)
+#define VR_FLOW_IPV4_HASH_SIZE           sizeof(struct vr_inet_flow)
+#define VR_FLOW_HASH_SIZE(type) \
+        ((type == VP_TYPE_IP6) ? VR_FLOW_IPV6_HASH_SIZE \
+                               : VR_FLOW_IPV4_HASH_SIZE)
 
 /*
  * Limit the number of outstanding flows in hold state. The flow rate can
@@ -208,9 +213,12 @@ struct vr_flow_queue {
     struct vr_packet_node vfq_pnodes[VR_MAX_FLOW_QUEUE_ENTRIES];
 };
 
+/* align to 8 byte boundary */
+#define VR_FLOW_KEY_PAD ((8 - (sizeof(struct vr_flow) % 8)) % 8)
+
 struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
-    uint8_t vr_flow_key_padding[7];
+    uint8_t vr_flow_key_padding[VR_FLOW_KEY_PAD];
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -232,7 +240,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow fe_key;
-    uint8_t vr_flow_key_padding[7];
+    uint8_t vr_flow_key_padding[VR_FLOW_KEY_PAD];
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;

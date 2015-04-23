@@ -145,9 +145,9 @@ buffer sandesh vr_flow_req {
    19: i16          fr_mir_sport;
    20: list<byte>   fr_pcap_meta_data;
    21: i16          fr_mir_vrf;
-   22: i16          fr_ecmp_nh_index;
+   22: i32          fr_ecmp_nh_index;
    23: i32          fr_src_nh_index;
-   24: i16          fr_flow_nh_id;
+   24: i32          fr_flow_nh_id;
    25: i16          fr_drop_reason;
    26: string       fr_file_path;
    27: i64          fr_processed;
@@ -165,7 +165,7 @@ buffer sandesh vr_vrf_assign_req {
     4:  i16                 var_vif_vrf;
     5:  i16                 var_vlan_id;
     6:  i16                 var_marker;
-    7:  i16                 var_nh_id;
+    7:  i32                 var_nh_id;
 }
 
 buffer sandesh vr_vrf_stats_req {
