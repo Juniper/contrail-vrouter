@@ -35,7 +35,8 @@ env.Append(LINKCOM =
 dpdk_dir ='#third_party/dpdk/'
 make_dir = Dir(dpdk_dir).srcnode().abspath
 
-make_cmd = 'make config T=x86_64-native-linuxapp-gcc; make'
+cd_cmd = 'cd ' + make_dir + ' && '
+make_cmd = cd_cmd + 'make config T=x86_64-native-linuxapp-gcc && make'
 dpdk_lib = env.Command('dpdk_lib', None, make_cmd, chdir=make_dir)
 env.AlwaysBuild(dpdk_lib)
 env.Default(dpdk_lib)
