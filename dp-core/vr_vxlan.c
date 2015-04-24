@@ -127,11 +127,12 @@ vr_vxlan_get(vr_vxlan_req *req)
     struct vr_nexthop *nh = NULL;
     struct vrouter *router;
 
-   router = vrouter_get(req->vxlanr_rid);
+    router = vrouter_get(req->vxlanr_rid);
     if (!router) {
         ret = -ENODEV;
     } else {
-        nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, req->vxlanr_vnid);
+        nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table,
+                req->vxlanr_vnid);
         if (!nh)
             ret = -ENOENT;
     }
@@ -210,23 +211,25 @@ vr_vxlan_req_process(void *s_req)
     switch(req->h_op) {
     case SANDESH_OP_ADD:
         vr_vxlan_add(req);
-       break;
+        break;
 
     case SANDESH_OP_GET:
         vr_vxlan_get(req);
-       break;
+        break;
 
     case SANDESH_OP_DUMP:
         vr_vxlan_dump(req);
-       break;
+        break;
 
     case SANDESH_OP_DELETE:
         vr_vxlan_del(req);
-       break;
+        break;
 
     default:
-       break;
+        break;
     }
+
+    return;
 }
 
 static void

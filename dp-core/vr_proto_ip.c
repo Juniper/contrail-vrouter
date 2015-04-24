@@ -796,6 +796,7 @@ vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
     flow_p->flow4_sport = sport;
     flow_p->flow4_dport = dport;
     flow_p->flow4_family = AF_INET;
+    flow_p->flow4_unused = 0;
 
     flow_p->flow_key_len = VR_FLOW_IPV4_HASH_SIZE;
 

@@ -14,6 +14,8 @@
 #include "vr_datapath.h"
 #include "vr_btable.h"
 
+unsigned int vr_mpls_labels = VR_DEF_LABELS;
+
 struct vr_nexthop *
 __vrouter_get_label(struct vrouter *router, unsigned int label)
 {
@@ -432,7 +434,7 @@ vr_mpls_init(struct vrouter *router)
     int ilm_memory;
 
     if (!router->vr_ilm) {
-        router->vr_max_labels = VR_MAX_LABELS;
+        router->vr_max_labels = vr_mpls_labels;
         ilm_memory = sizeof(struct vr_nexthop *) * router->vr_max_labels;
         router->vr_ilm = vr_btable_alloc(router->vr_max_labels,
                 sizeof(struct vr_nexthop *));
