@@ -22,6 +22,9 @@
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
+#include <rte_byteorder.h>
+
+extern unsigned int dpdk_vlan_tag;
 
 /*
  * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the
@@ -371,6 +374,8 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
     struct vr_dpdk_lcore * lcore;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    struct ether_hdr *eh;
+    uint16_t vlan_tci;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -398,6 +403,30 @@ dpdk_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_MAX_BURST_SZ
 
     for (i = 0; i < nb_pkts; i++) {
         mbuf = pkts[i];
+
+        /* Strip VLAN tag if present.
+         *
+         * If vRouter works in VLAN, we check if the packet received on physical
+         * interface belongs to our VLAN. If it does, the tag should be stripped.
+         * If not (untagged or another tag), it should be forwarded to the kernel.
+         * If vRouter does not work in VLAN, it should ignore tagged packets.
+         */
+        if (dpdk_vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) {
+            eh = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
+            vlan_tci = ((struct vlan_hdr *)(eh + 1))->vlan_tci;
+
+            if (eh->ether_type == rte_cpu_to_be_16(ETHER_TYPE_VLAN) &&
+                            vlan_tci == dpdk_vlan_tag) {
+                memmove(rte_pktmbuf_adj(mbuf, sizeof(struct vlan_hdr)),
+                            eh, 2 * ETHER_ADDR_LEN);
+            } else {
+                /* TODO: packet should be forwarded to kernel */
+                RTE_LOG(DEBUG, VROUTER,"%s: Packet not tagged or tag mismatch. "
+                    "Dropping.\n", __func__);
+                vr_dpdk_pfree(mbuf, VP_DROP_INVALID_PACKET);
+            }
+        }
+
 #ifdef VR_DPDK_RX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
         if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))

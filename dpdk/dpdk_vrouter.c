@@ -23,6 +23,7 @@
 
 #include <rte_timer.h>
 #include <rte_errno.h>
+#include <rte_byteorder.h>
 
 #include "vr_dpdk.h"
 #include "vr_uvhost.h"
@@ -31,6 +32,7 @@
 
 static int no_daemon_set;
 extern char *ContrailBuildInfo;
+unsigned int dpdk_vlan_tag = 0xFFFF;
 
 /* Global vRouter/DPDK structure */
 struct vr_dpdk_global vr_dpdk;
@@ -436,12 +438,15 @@ dpdk_threads_create(void)
 
 enum vr_opt_index {
     DAEMON_OPT_INDEX,
+    VLAN_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
     [DAEMON_OPT_INDEX]              =   {"no-daemon",           no_argument,
                                                     &no_daemon_set,         1},
+    [VLAN_OPT_INDEX]              =   {"vlan",           required_argument,
+                                                    NULL,         'v'},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -474,6 +479,14 @@ main(int argc, char *argv[])
         switch (opt) {
         case 0:
             break;
+
+        /* If VLAN tag is set, vRouter will expect tagged packets. The tag
+         * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
+         */
+        case 'v':
+            dpdk_vlan_tag = rte_cpu_to_be_16((unsigned int)atoi(optarg));
+            break;
+
 
         case '?':
         default:
