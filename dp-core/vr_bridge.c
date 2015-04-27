@@ -49,6 +49,7 @@ int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
 void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
 struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
+extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 
 
 static bool
@@ -61,6 +62,23 @@ bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry,
 
     if (be->be_flags & VR_BE_VALID_FLAG)
         return true;
+
+    return false;
+}
+
+
+bool
+vr_unknown_uc_flood(struct vr_interface *ingress_vif,
+                               struct vr_nexthop *ingress_nh)
+{
+    if (!ingress_vif)
+        return false;
+
+    if (vif_is_virtual(ingress_vif))
+        return (ingress_vif->vif_flags & VIF_FLAG_UNKNOWN_UC_FLOOD);
+
+    if (vif_is_fabric(ingress_vif) && ingress_nh)
+        return (ingress_nh->nh_flags & NH_FLAG_UNKNOWN_UC_FLOOD);
 
     return false;
 }
@@ -420,6 +438,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     struct vr_nexthop *nh = NULL;
     unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
     int reason, handled;
+    struct vr_vrf_stats *stats;
 
     /* Do the bridge lookup for the packets not meant for "me" */
     if (!fmd->fmd_to_me) {
@@ -434,8 +453,26 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
         nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
         if (!nh) {
-            vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-            return 0;
+
+            /* If Flooding of unknown unicast not allowed, drop the packet */
+            if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
+                                 IS_MAC_BMCAST(rt.rtr_req.rtr_mac)) {
+                vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
+                return 0;
+            }
+
+            rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
+            nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
+            if (!nh) {
+                vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
+                return 0;
+            }
+            stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+            if (stats)
+                stats->vrf_uuc_floods++;
+
+            /* Treat this unknown unicast packet as multicast */
+            pkt->vp_flags |= VP_FLAG_MULTICAST;
         }
 
         if (nh->nh_type != NH_L2_RCV)
