@@ -144,7 +144,7 @@ dump_legend(void)
 static void
 dump_table(struct flow_table *ft)
 {
-    unsigned int i, j, fi, need_flag_print = 0;
+    unsigned int i, j, k, fi, need_flag_print = 0, printed;
     struct vr_flow_entry *fe;
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
@@ -165,9 +165,16 @@ dump_table(struct flow_table *ft)
 
     dump_legend();
 
-    printf(" Index              Source:Port           Destination:Port    \tProto(V)\n");
+    printf("    Index            ");
+    /* inter field gap */
+    printf("%4c", ' ');
+    /* 40 byte address field - middled header */
+    printf("Source:Port/Destination:Port                  ");
+    /* inter field gap */
+    printf("%4c", ' ');
+    printf("Proto(V)\n");
     printf("-----------------------------------------------------------------");
-    printf("--------\n");
+    printf("------------------\n");
     for (i = 0; i < ft->ft_num_entries; i++) {
         bzero(flag_string, sizeof(flag_string));
         need_flag_print = 0;
@@ -182,22 +189,38 @@ dump_table(struct flow_table *ft)
                       in_dest, sizeof(in_dest));
             }
 
-            printf("%6d", i);
+            printf("%9d", i);
             if (fe->fe_rflow >= 0)
-                printf("<=>%-6d", fe->fe_rflow);
+                printf("<=>%-9d", fe->fe_rflow);
             else
-                printf("         ");
+                printf("%12c", ' ');
 
-            if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
-                printf("   %40s:%-5d    ", in_src, ntohs(fe->fe_key.flow_sport));
-                printf("%40s:%-5d    %d (%d", in_dest, ntohs(fe->fe_key.flow_dport),
-                        fe->fe_key.flow_proto, fe->fe_vrf);
+            printf("%4c", ' ');
+            if (fe->fe_type == VP_TYPE_IP) {
+                printed = printf("%s:%-5d", in_src, ntohs(fe->fe_key.flow_sport));
+                for (k = printed; k < 46; k++)
+                    printf(" ");
+                printf("%4c", ' ');
+                printf("%3d (%d", fe->fe_key.flow_proto, fe->fe_vrf);
+                if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
+                    printf("->%d", fe->fe_dvrf);
+                printf(")\n");
+                printf("%25c", ' ');
+                printf("%s:%-5d", in_dest, ntohs(fe->fe_key.flow_dport));
+            } else if (fe->fe_type == VP_TYPE_IP6) {
+                printed = printf("%s:%-5d    ", in_src, ntohs(fe->fe_key.flow_sport));
+                for (k = printed; k < 46; k++)
+                    printf(" ");
+                printf("%4c", ' ');
+                printf("%3d (%d", fe->fe_key.flow_proto, fe->fe_vrf);
+                if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
+                    printf("->%d", fe->fe_dvrf);
+                printf(")\n");
+                printf("%25c", ' ');
+                printf("%s:%-5d    ", in_dest, ntohs(fe->fe_key.flow_dport));
             }
 
-            if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
-                printf("->%d", fe->fe_dvrf);
-
-            printf(")\n");
+            printf("\n");
 
             switch (fe->fe_action) {
             case VR_FLOW_ACTION_HOLD:
