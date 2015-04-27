@@ -154,13 +154,13 @@ struct host_os {
 #define vr_gro_process                  vrouter_host->hos_gro_process
 
 struct vrouter {
-    unsigned int vr_num_if;
     unsigned char vr_vrrp_mac[VR_ETHER_ALEN];
     unsigned char vr_mac[VR_ETHER_ALEN];
     unsigned int vr_ip;
 
-    unsigned int vr_max_interfaces;
     struct vr_interface **vr_interfaces;
+    unsigned int vr_max_interfaces;
+
     unsigned int vr_max_nexthops;
     struct vr_btable *vr_nexthops;
     struct vr_rtable *vr_inet_rtable;

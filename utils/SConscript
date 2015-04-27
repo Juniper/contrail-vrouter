@@ -62,8 +62,11 @@ dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
 vxlan_sources = ['vxlan.c']
 vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 
+vrouter_sources = ['vrouter.c']
+vrouter = env.Program(target = 'vrouter', source = vrouter_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
-binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan]
+binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan, vrouter]
 scripts  = ['vifdump']
 env.Default(binaries)
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))
