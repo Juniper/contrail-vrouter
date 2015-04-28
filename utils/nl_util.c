@@ -35,7 +35,7 @@
 
 extern struct nl_response *nl_parse_gen(struct nl_client *);
 
-extern void vr_ops_process (void *a) __attribute__((weak));
+extern void vrouter_ops_process (void *a) __attribute__((weak));
 extern void vr_flow_req_process(void *s_req) __attribute__((weak));
 extern void vr_route_req_process(void *s_req) __attribute__((weak));
 extern void vr_interface_req_process(void *s_req) __attribute__((weak));

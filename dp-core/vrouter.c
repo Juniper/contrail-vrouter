@@ -11,6 +11,7 @@
 #endif
 #include "vr_types.h"
 #include "vr_sandesh.h"
+#include "vr_message.h"
 #include <vr_packet.h>
 #include <vr_interface.h>
 #include <vr_nexthop.h>
@@ -28,6 +29,13 @@ struct host_os *vrouter_host;
 extern struct host_os *vrouter_get_host(void);
 extern int vr_stats_init(struct vrouter *);
 extern void vr_stats_exit(struct vrouter *, bool);
+
+extern unsigned int vr_flow_entries;
+extern unsigned int vr_oflow_entries;
+extern unsigned int vr_bridge_entries;
+extern unsigned int vr_bridge_oentries;
+extern const char *ContrailBuildInfo;
+
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
@@ -237,6 +245,89 @@ vrouter_get(unsigned int vr_id)
     return &router;
 }
 
+static void
+vrouter_ops_destroy(vrouter_ops *req)
+{
+    if (!req)
+        return;
+
+    if (req->vo_build_info) {
+        vr_free(req->vo_build_info);
+        req->vo_build_info = NULL;
+    }
+
+    vr_free(req->vo_build_info);
+
+    return;
+}
+
+static vrouter_ops *
+vrouter_ops_get(void)
+{
+    vrouter_ops *req;
+
+    req = vr_malloc(sizeof(*req));
+    if (!req)
+        return NULL;
+
+    req->vo_build_info = vr_zalloc(strlen(ContrailBuildInfo));
+    if (!req->vo_build_info) {
+        vr_free(req);
+        return NULL;
+    }
+
+    return req;
+}
+
+void
+vrouter_ops_get_process(void *s_req)
+{
+    int ret = 0;
+    struct vrouter *router;
+    vrouter_ops *req = (vrouter_ops *)s_req;
+    vrouter_ops *resp = NULL;
+
+    if (req->h_op != SANDESH_OP_GET) {
+        ret = -EOPNOTSUPP;
+        goto generate_response;
+    }
+
+    router = vrouter_get(req->vo_rid);
+    if (!router) {
+        ret = -EINVAL;
+        goto generate_response;
+    }
+
+    resp = vrouter_ops_get();
+    if (!resp) {
+        ret = -ENOMEM;
+        goto generate_response;
+    }
+
+    resp->vo_interfaces = router->vr_max_interfaces;
+    resp->vo_vrfs = VR_MAX_VRFS;
+    resp->vo_mpls_labels = router->vr_max_labels;
+    resp->vo_nexthops = router->vr_max_nexthops;
+    resp->vo_bridge_entries = vr_bridge_entries;
+    resp->vo_oflow_bridge_entries = vr_bridge_oentries;
+    resp->vo_flow_entries = vr_flow_entries;
+    resp->vo_oflow_entries = vr_oflow_entries;
+    resp->vo_mirror_entries = router->vr_max_mirror_indices;
+    strncpy(resp->vo_build_info, ContrailBuildInfo,
+            strlen(ContrailBuildInfo));
+
+    req = resp;
+generate_response:
+    if (ret)
+        req = NULL;
+
+    vr_message_response(VR_VROUTER_OPS_OBJECT_ID, req, ret);
+    if (resp)
+        vrouter_ops_destroy(resp);
+
+    return;
+}
+
 void
 vrouter_exit(bool soft_reset)
 {
@@ -305,6 +396,11 @@ vrouter_ops_process(void *s_req)
         ret = vrouter_soft_reset();
         vr_printf("vrouter soft reset done (%d)\n", ret);
         break;
+
+    case SANDESH_OP_GET:
+        vrouter_ops_get_process(s_req);
+        return;
+
     default:
         ret = -EOPNOTSUPP;
     }
