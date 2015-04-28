@@ -613,8 +613,11 @@ op_retry:
         break;
     }
 
-    if ((op == SANDESH_OP_DUMP) || (op == SANDESH_OP_GET))
+    /* only want to print the first time */
+    if (((op == SANDESH_OP_DUMP) && !(dump_pending))
+            || (op == SANDESH_OP_GET)) {
         vr_interface_print_header();
+    }
 
     ret = vr_intf_send_msg(&intf_req, "vr_interface_req");
     if (ret < 0)
