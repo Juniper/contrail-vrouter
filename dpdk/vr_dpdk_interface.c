@@ -519,7 +519,7 @@ dpdk_agent_if_add(struct vr_interface *vif)
     vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
 
     /* schedule packet device with no hardware queues */
-    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk.packet_lcore_id, 0, NULL, 0, NULL);
+    return vr_dpdk_lcore_if_schedule(vif, VR_DPDK_PACKET_LCORE_ID, 0, NULL, 0, NULL);
 }
 
 /* Delete agent interface */
@@ -626,12 +626,12 @@ dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
      * and proper l2/l3 lens to be set.
      */
     iph->ip_csum = 0;
-    m->pkt.vlan_macip.f.l2_len = offset - rte_pktmbuf_headroom(m);
-    m->pkt.vlan_macip.f.l3_len = iph_len;
+    m->outer_l3_len = iph_len;
+    m->outer_l2_len = offset - rte_pktmbuf_headroom(m);
 
-    RTE_LOG(DEBUG, VROUTER, "%s: Inner offset: l2_len = %d, l3_len = %d\n", __func__,
-        (int)m->pkt.vlan_macip.f.l2_len,
-        (int)m->pkt.vlan_macip.f.l3_len);
+    RTE_LOG(DEBUG, VROUTER, "%s: Outer packet: l2_len = %d, l3_len = %d\n", __func__,
+        (int)m->outer_l2_len,
+        (int)m->outer_l3_len);
 
     /* calculate TCP/UDP checksum */
     if (likely(iph->ip_proto == VR_IP_PROTO_UDP)) {
@@ -727,10 +727,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         vif->vif_name);
 
     /* reset mbuf data pointer and length */
-    m->pkt.data = pkt_data(pkt);
-    m->pkt.data_len = pkt_head_len(pkt);
-    /* TODO: use pkt_len instead? */
-    m->pkt.pkt_len = pkt_head_len(pkt);
+    m->data_off = pkt_head_space(pkt);
+    m->data_len = pkt_head_len(pkt);
+    /* TODO: we do not support mbuf chains */
+    m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
@@ -802,7 +802,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
-        if (lcore_id == vr_dpdk.packet_lcore_id)
+        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
             tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
@@ -829,10 +829,10 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         vif->vif_name);
 
     /* reset mbuf data pointer and length */
-    m->pkt.data = pkt_data(pkt);
-    m->pkt.data_len = pkt_head_len(pkt);
-    /* TODO: use pkt_len instead? */
-    m->pkt.pkt_len = pkt_head_len(pkt);
+    m->data_off = pkt_head_space(pkt);
+    m->data_len = pkt_head_len(pkt);
+    /* TODO: we do not support mbuf chains */
+    m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];

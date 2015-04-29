@@ -35,7 +35,7 @@ vr_dpdk_ring_allocate(unsigned host_lcore_id, char *ring_name,
         return NULL;
 
     ring = (struct rte_ring *)rte_malloc_socket(ring_name, ring_size,
-        CACHE_LINE_SIZE,  rte_lcore_to_socket_id(host_lcore_id));
+        RTE_CACHE_LINE_SIZE,  rte_lcore_to_socket_id(host_lcore_id));
     if (ring == NULL)
         return NULL;
 

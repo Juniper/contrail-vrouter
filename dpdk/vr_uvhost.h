@@ -13,6 +13,12 @@ typedef void (*vr_uvh_exit_callback_t)(void);
 #define VR_NL_UVH_SOCK VR_SOCKET_DIR"/vr_nl_uvh"
 
 int vr_uvhost_init(pthread_t *th, vr_uvh_exit_callback_t exit_fn);
+void *vr_uvhost_start(void *arg);
+void vr_uvhost_wakeup(void);
+
+/* Global variables */
+extern vr_uvh_exit_callback_t vr_uvhost_exit_fn;
+
 
 #endif /* __VR_UVHOST_H__ */
 

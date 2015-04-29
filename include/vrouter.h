@@ -21,6 +21,7 @@ extern "C" {
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
+#define VR_MAX_CPUS         64
 
 #define VR_CPU_MASK     0xff
 extern unsigned int vr_num_cpus;

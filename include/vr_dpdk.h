@@ -52,10 +52,6 @@
 
 /* Default lcore mask. Used only when sched_getaffinity() is failed */
 #define VR_DPDK_DEF_LCORE_MASK      0xf
-/* Number of service lcores: NetLink (master) and packet */
-#define VR_DPDK_NB_SERVICE_LCORES   2
-/* Minimum number of lcores */
-#define VR_DPDK_MIN_LCORES          (VR_DPDK_NB_SERVICE_LCORES + 1)
 /* Memory to allocate at startup in MB */
 #define VR_DPDK_MAX_MEM             "512"
 /* Number of memory channels to use */
@@ -74,6 +70,9 @@
 #define VR_DPDK_MAX_NB_TX_QUEUES    5
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_RSS_QUEUES   4
+/* Maximum RETA table size */
+#define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_128
+#define VR_DPDK_MAX_RETA_ENTRIES    (VR_DPDK_MAX_RETA_SIZE/RTE_RETA_GROUP_SIZE)
 /* Number of hardware RX ring descriptors */
 #define VR_DPDK_NB_RXD              256
 /* Number of hardware TX ring descriptors */
@@ -82,7 +81,7 @@
 #define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
                                     + sizeof(struct vr_ip)      \
                                     + sizeof(struct vr_udp))/2)
-/* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*RTE_MAX_LCORE) */
+/* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*VR_MAX_CPUS) */
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
 /* Max size of a single packet */
 #define VR_DPDK_MAX_PACKET_SZ       2048
@@ -110,7 +109,7 @@
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_MAX_BURST_SZ*8)
 /* Number of VM mempools */
-#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES*2 - VR_DPDK_MIN_LCORES)
+#define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES*2)
 /* Number of mbufs in VM mempool */
 #define VR_DPDK_VM_MEMPOOL_SZ       1024
 /* How many objects (mbufs) to keep in per-lcore VM mempool cache */
@@ -137,6 +136,22 @@
 #define VR_DPDK_INVALID_QUEUE_ID    0xFFFF
 /* Socket connection retry timeout in seconds (use power of 2) */
 #define VR_DPDK_RETRY_CONNECT_SECS  64
+/* Maximum number of KNI devices (vhost0 + monitoring) */
+#define VR_DPDK_MAX_KNI_INTERFACES  5
+
+/*
+ * DPDK LCore IDs
+ */
+enum {
+    VR_DPDK_NETLINK_LCORE_ID,
+    VR_DPDK_KNI_LCORE_ID,
+    VR_DPDK_TIMER_LCORE_ID,
+    VR_DPDK_UVHOST_LCORE_ID,
+    /* packet lcore has TX queues, so it should be at the end of the list */
+    VR_DPDK_PACKET_LCORE_ID,
+    /* the actual number of forwarding lcores depends on affinity mask */
+    VR_DPDK_FWD_LCORE_ID
+};
 
 /*
  * VRouter/DPDK Data Structures
@@ -228,6 +243,10 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES];
     /* Event socket */
     void *lcore_event_sock;
+    /* Event FD to wake up UVHost
+     * TODO: refactor to use either event_sock or event FD
+     */
+    int lcore_event_fd;
     /* Lcore command param */
     rte_atomic32_t lcore_cmd_param;
     /* Lcore command */
@@ -258,6 +277,9 @@ struct vr_dpdk_ethdev {
     uint16_t ethdev_nb_tx_queues;
     /* Number of HW RX queues used for RSS (limited by the nb of lcores) */
     uint16_t ethdev_nb_rss_queues;
+    /* Actual size of ethdev RETA */
+    uint16_t ethdev_reta_size;
+    /* DPDK port ID */
     uint8_t ethdev_port_id;
     /* Hardware RX queue states */
     uint8_t ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
@@ -277,7 +299,7 @@ struct vr_dpdk_global {
     /* Number of forwarding lcores */
     unsigned nb_fwd_lcores;
     /* Table of pointers to forwarding lcore */
-    struct vr_dpdk_lcore *lcores[RTE_MAX_LCORE];
+    struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
     /* Global stop flag */
     rte_atomic16_t stop_flag;
     /* NetLink socket handler */
@@ -286,7 +308,6 @@ struct vr_dpdk_global {
     /* Packet socket */
     struct rte_ring *packet_ring;
     void *packet_transport;
-    unsigned packet_lcore_id;
     /* KNI thread ID */
     pthread_t kni_thread;
     /* Timer thread ID */
@@ -315,19 +336,19 @@ extern struct vr_dpdk_global vr_dpdk;
  * We use the tailroom to store vr_packet structure:
  *     struct rte_mbuf + headroom + data + tailroom + struct vr_packet
  *
- * rte_mbuf: *buf_addr(buf_len) + headroom + *pkt.data(data_len) + tailroom
+ * rte_mbuf: *buf_addr(buf_len) + headroom + data_off(data_len) + tailroom
  *
  * rte_mbuf->buf_addr = rte_mbuf + sizeof(rte_mbuf)
  * rte_mbuf->buf_len = elt_size - sizeof(rte_mbuf) - sizeof(vr_packet)
- * rte_mbuf->pkt.data = rte_mbuf->buf_addr + RTE_PKTMBUF_HEADROOM
+ * rte_mbuf->data_off = RTE_PKTMBUF_HEADROOM
  *
  *
  * vr_packet: *vp_head + headroom + vp_data(vp_len) + vp_tail + tailroom
  *                + vp_end
  *
  * vr_packet->vp_head = rte_mbuf->buf_addr (set in mbuf constructor)
- * vr_packet->vp_data = rte_mbuf->pkt.data - rte_mbuf->buf_addr
- * vr_packet->vp_len  = rte_mbuf->pkt.data_len
+ * vr_packet->vp_data = rte_mbuf->data_off
+ * vr_packet->vp_len  = rte_mbuf->data_len
  * vr_packet->vp_tail = vr_packet->vp_data + vr_packet->vp_len
  * vr_packet->vp_end  = rte_mbuf->buf_len (set in mbuf constructor)
  */
@@ -354,7 +375,7 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
 
     pkt->vp_head = mbuf->buf_addr;
-    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->pkt.data_len;
+    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->data_len;
     pkt->vp_end = mbuf->buf_len;
     pkt->vp_len = pkt->vp_tail - pkt->vp_data;
 
@@ -368,6 +389,8 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
 void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i);
 /* Check if the stop flag is set */
 int vr_dpdk_is_stop_flag_set(void);
+/* Called by user space vhost server at exit */
+void vr_dpdk_exit_trigger(void);
 
 /*
  * vr_dpdk_ethdev.c
@@ -482,7 +505,7 @@ void vr_dpdk_lcore_if_unschedule(struct vr_interface *vif);
 /* Schedule an MPLS label queue */
 int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned mpls_label);
-/* Returns the least used lcore or RTE_MAX_LCORE */
+/* Returns the least used lcore or VR_MAX_CPUS */
 unsigned vr_dpdk_lcore_least_used_get(void);
 /* Returns the least used lcore among the ones that handle physical intf TX */
 unsigned int vr_dpdk_phys_lcore_least_used_get(void);

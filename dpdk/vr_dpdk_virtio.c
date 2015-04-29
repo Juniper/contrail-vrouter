@@ -19,8 +19,8 @@
 #include <rte_malloc.h>
 
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
-vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
-vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][RTE_MAX_LCORE];
+vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
+vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
 
 static int dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts,
                                   uint32_t max_pkts);
@@ -129,8 +129,8 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
         vr_dpdk_phys_lcore_least_used_get();
-    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id ==
-        RTE_MAX_LCORE)
+    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id
+            == VR_MAX_CPUS)
         goto error;
 
     dpdk_ring_to_push_add(
@@ -355,10 +355,10 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             if (!mbuf)
                 break;
 
-            mbuf->pkt.data_len = pkt_len;
-            mbuf->pkt.pkt_len = pkt_len;
+            mbuf->data_len = pkt_len;
+            mbuf->pkt_len = pkt_len;
 
-            rte_memcpy(mbuf->pkt.data, pkt_addr, pkt_len);
+            rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
 
             /* gather mbuf from several vring buffers (fixes FreeBSD) */
             while (desc->flags & VRING_DESC_F_NEXT) {
@@ -505,7 +505,7 @@ dpdk_virtio_to_vm_flush(void *arg)
                             rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
         }
 
-        rte_memcpy(buf_addr, vq->vdv_tx_mbuf[i]->pkt.data,
+        rte_memcpy(buf_addr, rte_pktmbuf_mtod(vq->vdv_tx_mbuf[i], void *),
                    rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]));
 
         vq->vdv_used->ring[next_avail_idx].len =
@@ -559,7 +559,7 @@ vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
         return -1;
     }
 
@@ -590,7 +590,7 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
         return -1;
     }
 
@@ -633,7 +633,7 @@ vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
         return -1;
     }
 
@@ -673,7 +673,7 @@ vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
         return -1;
     }
 
@@ -703,7 +703,7 @@ vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
         return -1;
     }
 
@@ -738,7 +738,7 @@ vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * RTE_MAX_LCORE))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
         return -1;
     }
 
