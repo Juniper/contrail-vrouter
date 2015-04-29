@@ -57,6 +57,7 @@ struct vr_vrf_stats {
     uint64_t vrf_arp_physical_stitch;
     uint64_t vrf_arp_tor_proxy;
     uint64_t vrf_arp_physical_flood;
+    uint64_t vrf_uuc_floods;
 };
 
 struct vr_route {
