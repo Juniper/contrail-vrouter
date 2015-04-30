@@ -76,6 +76,7 @@
  * so we copy all the packets to another interface
  */
 #define VIF_FLAG_MONITORED          0x8000
+#define VIF_FLAG_UNKNOWN_UC_FLOOD   0x10000
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)

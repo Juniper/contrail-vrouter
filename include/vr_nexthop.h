@@ -54,6 +54,7 @@ enum nexthop_type {
 #define NH_FLAG_COMPOSITE_TOR               0x04000
 #define NH_FLAG_VNID                        0x08000
 #define NH_FLAG_ROUTE_LOOKUP                0x10000
+#define NH_FLAG_UNKNOWN_UC_FLOOD            0x20000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
