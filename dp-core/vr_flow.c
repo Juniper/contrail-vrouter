@@ -1366,8 +1366,8 @@ vr_flow_req_process(void *s_req)
         resp->fr_hold_oflows = router->vr_flow_table_info->vfti_oflows;
         resp->fr_added = router->vr_flow_table_info->vfti_added;
         resp->fr_cpus = vr_num_cpus;
-        /* we only have space for 64 stats block max when encoding */
-        for (i = 0; ((i < vr_num_cpus) && (i < 64)); i++) {
+        /* we only have space for VR_MAX_CPUS stats block max when encoding */
+        for (i = 0; ((i < vr_num_cpus) && (i < VR_MAX_CPUS)); i++) {
             resp->fr_hold_stat[i] =
                 router->vr_flow_table_info->vfti_hold_count[i];
             hold_count += resp->fr_hold_stat[i];

@@ -63,9 +63,12 @@ static struct rte_eth_conf ethdev_conf = {
 #endif
         .pballoc = RTE_FDIR_PBALLOC_64K,        /* Space for FDIR filters. */
         /* Offset of flexbytes field in RX packets (in 16-bit word units). */
-        .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
+        /* TODO: flow director API has changed since DPDK 1.7 */
+//        .flexbytes_offset = VR_DPDK_MPLS_OFFSET,
         /* RX queue of packets matching a "drop" filter in perfect mode. */
         .drop_queue = 0,
+        .flex_conf = {
+        },
     },
 };
 
@@ -81,7 +84,8 @@ static const struct rte_eth_rxconf rx_queue_conf = {
         .hthresh = 8,   /* Ring host threshold */
         .wthresh = 4,   /* Ring writeback threshold */
     },
-    .rx_free_thresh = 0,    /* Immediately free RX descriptors */
+    /* Do not immediately free RX descriptors */
+    .rx_free_thresh = VR_DPDK_ETH_RX_BURST_SZ,
 };
 
 /*
@@ -307,6 +311,8 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
         vr_dpdk.nb_fwd_lcores + 1), VR_DPDK_MAX_NB_TX_QUEUES);
     ethdev->ethdev_nb_rss_queues = RTE_MIN(RTE_MIN(ethdev->ethdev_nb_rx_queues,
         vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_RSS_QUEUES);
+    ethdev->ethdev_reta_size = RTE_MIN(dev_info.reta_size,
+        VR_DPDK_MAX_RETA_SIZE);
 
     RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u "
             "max_rx_queues=%"PRIu16 "max_tx_queues=%"PRIu16
@@ -390,21 +396,28 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
 int
 vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
 {
-    int ret, i, j;
+    int ret, i, j, entry;
     uint8_t port_id = ethdev->ethdev_port_id;
-    struct rte_eth_rss_reta reta_conf;
+    int nb_entries = ethdev->ethdev_reta_size/RTE_RETA_GROUP_SIZE;
+    struct rte_eth_rss_reta_entry64 reta_entries[VR_DPDK_MAX_RETA_ENTRIES];
+    struct rte_eth_rss_reta_entry64 *reta;
 
-    /* create new RSS redirection table */
-    memset(&reta_conf, 0, sizeof(reta_conf));
-    for (i = j = 0; i < ETH_RSS_RETA_NUM_ENTRIES; i++) {
-        reta_conf.reta[i] = j++;
-        if (ethdev->ethdev_queue_states[j] != VR_DPDK_QUEUE_RSS_STATE)
-            j = 0;
+    for (entry = 0; entry < nb_entries; entry++) {
+        reta = &reta_entries[entry];
+
+        /* create new RSS redirection table */
+        memset(reta, 0, sizeof(*reta));
+        reta->mask = 0xffffffffffffffffULL;
+        for (i = j = 0; i < RTE_RETA_GROUP_SIZE; i++) {
+            reta->reta[i] = j++;
+            if (ethdev->ethdev_queue_states[j] != VR_DPDK_QUEUE_RSS_STATE)
+                j = 0;
+        }
     }
 
     /* update RSS redirection table */
-    reta_conf.mask_lo = reta_conf.mask_hi = 0xffffffffffffffffULL;
-    ret = rte_eth_dev_rss_reta_update(port_id, &reta_conf);
+    ret = rte_eth_dev_rss_reta_update(port_id, reta_entries,
+                ethdev->ethdev_reta_size);
 
     /* no error if the device does not support RETA configuration */
     if (ret == -ENOTSUP)

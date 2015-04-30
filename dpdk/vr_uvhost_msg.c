@@ -373,8 +373,9 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     }
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
-        vr_uvhost_log("%s: calling handler for message %d\n",
-                                    vru_cl->vruc_path, msg->request);
+        vr_uvhost_log("Client %s: calling handler for message %d\n",
+            /* strip socket prefix */
+            vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX), msg->request);
         if (vru_cl->vruc_num_fds_sent > 0) {
             for (i = 0; i < vru_cl->vruc_num_fds_sent; i++) {
                 vr_uvhost_log("\tmessage %d sent FD: %d\n",
@@ -383,8 +384,9 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
         }
         return vr_uvhost_cl_msg_handlers[msg->request](vru_cl);
     } else {
-        vr_uvhost_log("%s: no handler defined for message %d\n",
-                                vru_cl->vruc_path, msg->request);
+        vr_uvhost_log("Client %s: no handler defined for message %d\n",
+            /* strip socket prefix */
+            vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX), msg->request);
     }
 
     return 0;
