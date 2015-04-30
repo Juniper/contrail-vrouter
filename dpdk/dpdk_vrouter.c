@@ -39,7 +39,8 @@ struct vr_dpdk_global vr_dpdk;
 static char *dpdk_argv[] = {
     "dpdk",
     "-m", VR_DPDK_MAX_MEM,
-    "-c", "",
+    /* the argument will be updated in dpdk_init() */
+    "--lcores", NULL,
     "-n", VR_DPDK_MAX_MEMCHANNELS
 };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
@@ -101,7 +102,7 @@ dpdk_mempools_create(void)
     for (i = 0; i < VR_DPDK_MAX_VM_MEMPOOLS; i++) {
         ret = snprintf(mempool_name, sizeof(mempool_name), "vr_mempool_%d", i);
         if (ret >= sizeof(mempool_name)) {
-            RTE_LOG(INFO, VROUTER, "Error creating mempool %d name\n", i);
+            RTE_LOG(INFO, VROUTER, "Error creating VM mempool %d name\n", i);
             return -ENOMEM;
         }
         vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
@@ -110,13 +111,13 @@ dpdk_mempools_create(void)
                 rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                 rte_socket_id(), 0);
         if (vr_dpdk.free_mempools[i] == NULL) {
-            RTE_LOG(CRIT, VROUTER, "Error creating mempool %d: %s (%d)\n",
+            RTE_LOG(CRIT, VROUTER, "Error creating VM mempool %d: %s (%d)\n",
                 i, rte_strerror(rte_errno), rte_errno);
             return -rte_errno;
         }
         vr_dpdk.nb_free_mempools++;
     }
-    RTE_LOG(INFO, VROUTER, "Allocated %" PRIu16 " mempool(s)\n",
+    RTE_LOG(INFO, VROUTER, "Allocated %" PRIu16 " VM mempool(s)\n",
         vr_dpdk.nb_free_mempools);
 
     return 0;
@@ -132,7 +133,8 @@ dpdk_mempools_create(void)
  *      0 if the system does not have enough cores
  */
 static uint64_t
-dpdk_core_mask_get(void) {
+dpdk_core_mask_get(void)
+{
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
@@ -159,11 +161,11 @@ dpdk_core_mask_get(void) {
 
     /*
      * Do not allow to run vRouter on all the cores available, as some have
-     * to be left for virtual machines.
+     * to be spared for virtual machines.
      */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
     if (system_cpus_count == -1)
-        return VR_DPDK_DEF_LCORE_MASK;
+        return cpu_core_mask;
 
     core_mask_count
         = __builtin_popcountll((unsigned long long)cpu_core_mask);
@@ -171,25 +173,76 @@ dpdk_core_mask_get(void) {
     if (core_mask_count == system_cpus_count)
         return VR_DPDK_DEF_LCORE_MASK;
 
-    if (core_mask_count < VR_DPDK_MIN_LCORES)
-        return 0;
-
     return cpu_core_mask;
+}
+
+/* Stringify core mask, i.e. 0xf -> 5@0,6@1,7@2,8@3 */
+static char *
+dpdk_core_mask_stringify(uint64_t core_mask)
+{
+    int ret, lcore_id = 0, core_id = 0;
+    static char core_mask_string[256];
+    char *p = core_mask_string;
+    bool first_lcore = true;
+
+    while (core_mask) {
+        if (core_mask & 1) {
+            if (first_lcore)
+                first_lcore = false;
+            else
+                *p++ = ',';
+
+            ret = snprintf(p,
+            sizeof(core_mask_string) - (p - core_mask_string),
+                    "%d@%d", lcore_id + VR_DPDK_FWD_LCORE_ID, core_id);
+            p += ret;
+
+            if (p - core_mask_string >= sizeof(core_mask_string))
+                return NULL;
+            lcore_id++;
+        }
+        core_mask >>= 1;
+        core_id++;
+    }
+    *p = '\0';
+    return core_mask_string;
 }
 
 /* Updates parameters of EAL initialization in dpdk_argv[]. */
 static int
-dpdk_argv_update(void) {
-    static char core_mask_string[19];
-    uint64_t core_mask = dpdk_core_mask_get();
+dpdk_argv_update(void)
+{
+    long int system_cpus_count;
+    int i;
+    char *core_mask_str;
+    static char lcores_string[512];
 
-    if (core_mask == 0) {
+    /* get number of available CPUs */
+    system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
+    if (system_cpus_count == -1) {
+        system_cpus_count = __builtin_popcountll(
+                (unsigned long long)VR_DPDK_DEF_LCORE_MASK);
+    }
+
+    core_mask_str = dpdk_core_mask_stringify(dpdk_core_mask_get());
+
+    /* sanity check */
+    if (core_mask_str == NULL || system_cpus_count == 0)
+        return -1;
+
+    if (snprintf(lcores_string, sizeof(lcores_string), "(0-%d)@(0-%ld),%s",
+        VR_DPDK_FWD_LCORE_ID - 1, system_cpus_count - 1, core_mask_str)
+            == sizeof(lcores_string)) {
         return -1;
     }
 
-    snprintf(core_mask_string, sizeof(core_mask_string), "0x%" PRIx64,
-                core_mask);
-    dpdk_argv[4] = core_mask_string;
+    /* find and update the argument */
+    for (i = 0; i < dpdk_argc; i++) {
+        if (dpdk_argv[i] == NULL)
+            dpdk_argv[i] = lcores_string;
+    }
+
+    printf("LCores configuration: %s\n", lcores_string);
 
     return 0;
 }
@@ -208,8 +261,7 @@ dpdk_init(void)
     }
 
     if (dpdk_argv_update() == -1) {
-        fprintf(stderr, "vRouter/DPDK needs at least %u cores to start\n",
-                VR_DPDK_MIN_LCORES);
+        fprintf(stderr, "Error updating lcores arguments\n");
         return -1;
     }
 
@@ -219,30 +271,22 @@ dpdk_init(void)
         return ret;
     }
 
-    /* TODO: for DPDK 1.8+ */
-    /* rte_kni_init(max_kni_ifaces); */
+    rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
 
     ret = dpdk_mempools_create();
     if (ret < 0)
         return ret;
-
-    /* Scan PCI bus for recognised devices */
-    ret = rte_eal_pci_probe();
-    if (ret < 0) {
-        RTE_LOG(CRIT, VROUTER, "Error probing PCI: %s (%d)\n", rte_strerror(-ret), -ret);
-        return ret;
-    }
 
     /* Get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count();
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
     vr_dpdk.nb_fwd_lcores = rte_lcore_count();
-    vr_dpdk.nb_fwd_lcores -= VR_DPDK_NB_SERVICE_LCORES;
+    vr_dpdk.nb_fwd_lcores -= VR_DPDK_FWD_LCORE_ID;
     RTE_LOG(INFO, VROUTER, "Using %d forwarding lcore(s)\n",
                             vr_dpdk.nb_fwd_lcores);
     RTE_LOG(INFO, VROUTER, "Using %d service lcore(s)\n",
-                            VR_DPDK_NB_SERVICE_LCORES);
+                            VR_DPDK_FWD_LCORE_ID);
 
     /* init timer subsystem */
     rte_timer_subsystem_init();
@@ -284,38 +328,6 @@ dpdk_exit(void)
     }
 }
 
-/* Timer handling loop */
-static void *
-dpdk_timer_loop(__attribute__((unused)) void *dummy)
-{
-    while (1) {
-        rte_timer_manage();
-
-        /* check for the global stop flag */
-        if (unlikely(vr_dpdk_is_stop_flag_set()))
-            break;
-
-        usleep(VR_DPDK_SLEEP_TIMER_US);
-    };
-    return NULL;
-}
-
-/* KNI handling loop */
-static void *
-dpdk_kni_loop(__attribute__((unused)) void *dummy)
-{
-    while (1) {
-        vr_dpdk_knidev_all_handle();
-
-        /* check for the global stop flag */
-        if (unlikely(vr_dpdk_is_stop_flag_set()))
-            break;
-
-        usleep(VR_DPDK_SLEEP_KNI_US);
-    };
-    return NULL;
-}
-
 /* Set stop flag for all lcores */
 static void
 dpdk_stop_flag_set(void)
@@ -325,8 +337,10 @@ dpdk_stop_flag_set(void)
         return;
 
     vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0);
-
     rte_atomic16_inc(&vr_dpdk.stop_flag);
+
+    /* wakeup UVHost server to shutdown */
+    vr_uvhost_wakeup();
 }
 
 /* Check if the stop flag is set */
@@ -369,66 +383,12 @@ dpdk_signals_init(void)
         return -1;
     }
 
-    /* ignore sigpipes emanating from sockets that are closed */
-    act.sa_handler = SIG_IGN;
-    if (sigaction(SIGPIPE, &act, NULL) != 0) {
-        RTE_LOG(CRIT, VROUTER, "Error ignoring SIGPIPE\n");
-        return -1;
-    }
-
+    /* block (ignore) sigpipes for this and all the child threads */
     sigemptyset(&set);
     sigaddset(&set, SIGPIPE);
     if (pthread_sigmask(SIG_BLOCK, &set, NULL) != 0) {
-        RTE_LOG(CRIT, VROUTER, "Error setting sinal mask\n");
+        RTE_LOG(CRIT, VROUTER, "Error setting signal mask\n");
         return -1;
-    }
-
-    return 0;
-}
-
-/* Cancel all threads */
-static void
-dpdk_threads_cancel(void)
-{
-    if (vr_dpdk.kni_thread)
-        pthread_cancel(vr_dpdk.kni_thread);
-    if (vr_dpdk.timer_thread)
-        pthread_cancel(vr_dpdk.timer_thread);
-}
-
-/* Wait for other threads to join */
-static void
-dpdk_threads_join(void)
-{
-    if (vr_dpdk.kni_thread)
-        pthread_join(vr_dpdk.kni_thread, NULL);
-    if (vr_dpdk.timer_thread)
-        pthread_join(vr_dpdk.timer_thread, NULL);
-}
-
-
-/* Create threads to handle KNI, timers, NetLink etc */
-static int
-dpdk_threads_create(void)
-{
-    int ret;
-
-    /* thread to handle KNI requests */
-    ret = pthread_create(&vr_dpdk.kni_thread, NULL,
-            &dpdk_kni_loop, NULL);
-    if (ret != 0) {
-        RTE_LOG(CRIT, VROUTER, "Error creating KNI thread: %s (%d)\n",
-            rte_strerror(ret), ret);
-        return ret;
-    }
-    /* thread to handle timers */
-    ret = pthread_create(&vr_dpdk.timer_thread, NULL,
-            &dpdk_timer_loop, NULL);
-    if (ret != 0) {
-        RTE_LOG(CRIT, VROUTER, "Error creating timer thread: %s (%d)\n",
-            rte_strerror(ret), ret);
-
-        return ret;
     }
 
     return 0;
@@ -452,7 +412,7 @@ static struct option long_options[] = {
  *
  * Returns nothing.
  */
-static void
+void
 vr_dpdk_exit_trigger(void)
 {
     dpdk_stop_flag_set();
@@ -496,11 +456,6 @@ main(int argc, char *argv[])
         return ret;
     }
 
-    /* Create user space vhost thread */
-    if ((ret = vr_uvhost_init(&vr_dpdk.uvh_thread, vr_dpdk_exit_trigger))) {
-        return ret;
-    }
-
     /* associate signal hanlder with signals */
     ret = dpdk_signals_init();
     if (ret != 0) {
@@ -515,30 +470,10 @@ main(int argc, char *argv[])
         return ret;
     }
 
-    /* init the communication socket with agent */
-    ret = dpdk_netlink_init();
-    if (ret != 0) {
-        vr_dpdk_host_exit();
-        dpdk_exit();
-        return ret;
-    }
-
-    /* create threads to handle KNI, timers, NetLink etc */
-    ret = dpdk_threads_create();
-    if (ret != 0) {
-        dpdk_threads_cancel();
-        dpdk_threads_join();
-        vr_dpdk_host_exit();
-        dpdk_exit();
-        return ret;
-    }
-
-    /* run loops on all forwarding lcores */
+    /* run all the lcores */
     ret = rte_eal_mp_remote_launch(vr_dpdk_lcore_launch, NULL, CALL_MASTER);
 
     rte_eal_mp_wait_lcore();
-    dpdk_threads_cancel();
-    dpdk_threads_join();
     dpdk_netlink_exit();
     vr_dpdk_host_exit();
     dpdk_exit();

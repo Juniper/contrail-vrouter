@@ -12,7 +12,7 @@
 /*
  * VR_UVH_MAX_CLIENTS needs to be the same as VR_MAX_INTERFACES.
  */
-#define VR_UVH_MAX_CLIENTS (256 + 4096)
+#define VR_UVH_MAX_CLIENTS VR_MAX_INTERFACES
 
 typedef struct vr_uvh_client_mem_region {
     uint64_t vrucmr_phys_addr;
