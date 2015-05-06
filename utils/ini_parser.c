@@ -30,7 +30,7 @@ copy_line(char *buffer, const char *line, uint32_t *index)
         return;
     }
 
-    while(line[i]) {
+    while (line[i]) {
         if (isspace(line[i])) {
             i++;
             continue;

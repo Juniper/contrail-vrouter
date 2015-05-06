@@ -37,8 +37,9 @@
 #include "vr_hash.h"
 #include "vr_fragment.h"
 
-/* Max number of CPU */
-unsigned int vr_num_cpus = RTE_MAX_LCORE;
+/* Max number of CPUs. We adjust it later in vr_dpdk_host_init() */
+unsigned int vr_num_cpus = VR_MAX_CPUS;
+
 /* Global init flag */
 static bool vr_host_inited = false;
 
@@ -181,23 +182,26 @@ dpdk_preset(struct vr_packet *pkt)
  */
 
 static inline void
-dpdk_pktmbuf_copy_data(struct rte_mbuf *dst, struct rte_mbuf *src)
+dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
 {
+    dst->data_off = src->data_off;
+    dst->port = src->port;
     dst->ol_flags = src->ol_flags;
+    dst->packet_type = src->packet_type;
+    dst->data_len = src->data_len;
+    dst->pkt_len = src->pkt_len;
+    dst->vlan_tci = src->vlan_tci;
+    dst->hash = src->hash;
+    dst->seqn = src->seqn;
+    dst->userdata = src->userdata;
+    dst->tx_offload = src->tx_offload;
 
-    dst->pkt.next = NULL;
-    dst->pkt.data_len = src->pkt.data_len;
-    dst->pkt.nb_segs = 1;
-    dst->pkt.in_port = src->pkt.in_port;
-    dst->pkt.pkt_len = src->pkt.data_len;
-    dst->pkt.vlan_macip = src->pkt.vlan_macip;
-    dst->pkt.hash = src->pkt.hash;
-
-    __rte_mbuf_sanity_check(dst, RTE_MBUF_PKT, 1);
-    __rte_mbuf_sanity_check(src, RTE_MBUF_PKT, 0);
+    __rte_mbuf_sanity_check(dst, 1);
+    __rte_mbuf_sanity_check(src, 0);
 
     /* copy data */
-    rte_memcpy(dst->pkt.data, src->pkt.data, src->pkt.data_len);
+    rte_memcpy(rte_pktmbuf_mtod(dst, void *),
+            rte_pktmbuf_mtod(src, void *), src->data_len);
 }
 
 /**
@@ -229,21 +233,21 @@ dpdk_pktmbuf_copy(struct rte_mbuf *md,
         return (NULL);
 
     mi = mc;
-    prev = &mi->pkt.next;
-    pktlen = md->pkt.pkt_len;
+    prev = &mi->next;
+    pktlen = md->pkt_len;
     nseg = 0;
 
     do {
         nseg++;
-        dpdk_pktmbuf_copy_data(mi, md);
+        dpdk_pktmbuf_data_copy(mi, md);
         *prev = mi;
-        prev = &mi->pkt.next;
-    } while ((md = md->pkt.next) != NULL &&
+        prev = &mi->next;
+    } while ((md = md->next) != NULL &&
         (mi = rte_pktmbuf_alloc(mp)) != NULL);
 
     *prev = NULL;
-    mc->pkt.nb_segs = nseg;
-    mc->pkt.pkt_len = pktlen;
+    mc->nb_segs = nseg;
+    mc->pkt_len = pktlen;
 
     /* Allocation of new indirect segment failed */
     if (unlikely (mi == NULL)) {
@@ -251,7 +255,7 @@ dpdk_pktmbuf_copy(struct rte_mbuf *md,
         return (NULL);
     }
 
-    __rte_mbuf_sanity_check(mc, RTE_MBUF_PKT, 1);
+    __rte_mbuf_sanity_check(mc, 1);
     return (mc);
 }
 
@@ -330,7 +334,7 @@ dpdk_pktmbuf_copy_bits(const struct rte_mbuf *mbuf, int offset,
         /* get next mbuf */
         to += copy;
         len -= copy;
-        mbuf = mbuf->pkt.next;
+        mbuf = mbuf->next;
     } while (unlikely(len > 0 && NULL != mbuf));
 
     if (likely(0 == len))
@@ -383,7 +387,8 @@ dpdk_pset_data(struct vr_packet *pkt, unsigned short offset)
     struct rte_mbuf *m;
 
     m = vr_dpdk_pkt_to_mbuf(pkt);
-    m->pkt.data = pkt->vp_head + offset;
+    m->buf_addr = pkt->vp_head;
+    m->data_off = offset;
 
     return;
 }
@@ -516,9 +521,9 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
     rte_timer_init(timer);
 
     RTE_LOG(DEBUG, VROUTER, "%s[%u]: reset timer %p REINJECTING: lcore_id %u\n",
-            __func__, rte_lcore_id(), timer, vr_dpdk.packet_lcore_id);
+            __func__, rte_lcore_id(), timer, VR_DPDK_PACKET_LCORE_ID);
     /* schedule task to pkt0 lcore */
-    if (rte_timer_reset(timer, 0, SINGLE, vr_dpdk.packet_lcore_id,
+    if (rte_timer_reset(timer, 0, SINGLE, VR_DPDK_PACKET_LCORE_ID,
         dpdk_work_timer, vtimer) == -1) {
         RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
         rte_free(timer);
@@ -658,7 +663,7 @@ dpdk_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 
         /* iterate thru buffers chain */
         while (hdr_len) {
-            m = m->pkt.next;
+            m = m->next;
             if (!m)
                 return (NULL);
             if (hdr_len > rte_pktmbuf_data_len(m))
@@ -681,11 +686,6 @@ static int
 dpdk_pcow(struct vr_packet *pkt, unsigned short head_room)
 {
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
-
-    /* Store the right values to mbuf */
-    mbuf->pkt.data = pkt_data(pkt);
-    mbuf->pkt.pkt_len = pkt_len(pkt);
-    mbuf->pkt.data_len = pkt_head_len(pkt);
 
     if (head_room > rte_pktmbuf_headroom(mbuf)) {
         return -ENOMEM;
@@ -1138,9 +1138,20 @@ int
 vr_dpdk_host_init(void)
 {
     int ret;
+    unsigned lcore_id;
 
     if (vr_host_inited)
         return 0;
+
+    /*
+     * Set number of CPUs. Note it is not just number of lcores, so we
+     * cannot just use rte_lcore_count() here.
+     */
+    vr_num_cpus = 0;
+    RTE_LCORE_FOREACH(lcore_id) {
+        vr_num_cpus = RTE_MAX(vr_num_cpus, lcore_id);
+    }
+    vr_num_cpus++;
 
     if (!vrouter_host) {
         vrouter_host = vrouter_get_host();

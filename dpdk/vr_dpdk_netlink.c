@@ -221,7 +221,7 @@ vr_nl_uvhost_connect(void)
 
     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror connecting to uvhost: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "\terror creating uvhost socket: %s (%d)\n",
                         strerror(errno), errno);
         goto error;
     }
@@ -269,8 +269,9 @@ error:
     return ret;
 }
 
+/* Init NetLink and UVHost sockets */
 int
-dpdk_netlink_init(void)
+vr_dpdk_netlink_init(void)
 {
     int ret;
 

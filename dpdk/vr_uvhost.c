@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/eventfd.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -22,13 +23,8 @@
 #include "vr_uvhost_client.h"
 #include "vr_dpdk_usocket.h"
 
-/*
- * Prototypes
- */
-static void *vr_uvhost_start(void *arg);
-
 /* Global variables */
-static vr_uvh_exit_callback_t vr_uvhost_exit_fn;
+vr_uvh_exit_callback_t vr_uvhost_exit_fn;
 
 /*
  * vr_uvhost_init - initializes the user space vhost server and waits
@@ -66,21 +62,40 @@ vr_uvhost_exit(void)
     return;
 }
 
+void
+vr_uvhost_wakeup(void)
+{
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[VR_DPDK_UVHOST_LCORE_ID];
+
+    if (likely(lcore->lcore_event_fd > 0)) {
+        eventfd_write(lcore->lcore_event_fd, 1);
+    }
+}
+
 /*
  * vr_uvhost_start - starts the user space vhost server
  *
  * Returns NULL if an error occurs. Otherwise, it runs forever.
  */
-static void *
+void *
 vr_uvhost_start(void *arg)
 {
     int s = 0, ret, err;
     struct sockaddr_un sun;
     fd_set *rfdset, *wfdset;
+    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
     vr_uvhost_client_init();
 
     vr_uvhost_log("Starting uvhost server...\n");
+    lcore->lcore_event_fd = eventfd(0, 0);
+    if (lcore->lcore_event_fd == -1) {
+        vr_uvhost_log("\terror creating event FD: %s (%d)\n",
+                        strerror(errno), errno);
+        goto error;
+    }
+    vr_uvhost_log("\tserver event FD is %d\n", lcore->lcore_event_fd);
+
     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s == -1) {
         vr_uvhost_log("\terror creating server socket: %s (%d)\n",
@@ -110,6 +125,10 @@ vr_uvhost_start(void *arg)
 
     vr_uvhost_fdset_init();
 
+    if (vr_uvhost_add_fd(lcore->lcore_event_fd, UVH_FD_READ, NULL, NULL)) {
+        vr_uvhost_log("\terror adding server event FD %d\n", lcore->lcore_event_fd);
+        goto error;
+    }
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_listen_handler)) {
         vr_uvhost_log("\terror adding server socket FD %d\n", s);
         goto error;
@@ -126,6 +145,9 @@ vr_uvhost_start(void *arg)
             goto error;
         }
 
+        if (vr_dpdk_is_stop_flag_set())
+            break;
+
         if (vr_uvh_call_fd_handlers()) {
             vr_uvhost_log("\terror calling socket handlers\n");
             goto error;
@@ -138,6 +160,10 @@ error:
     if (s) {
         close(s);
         unlink(sun.sun_path);
+    }
+    if (lcore->lcore_event_fd > 0) {
+        close(lcore->lcore_event_fd);
+        lcore->lcore_event_fd = 0;
     }
 
     vr_uvhost_exit();

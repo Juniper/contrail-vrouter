@@ -35,7 +35,7 @@ vr_dpdk_ring_allocate(unsigned host_lcore_id, char *ring_name,
         return NULL;
 
     ring = (struct rte_ring *)rte_malloc_socket(ring_name, ring_size,
-        CACHE_LINE_SIZE,  rte_lcore_to_socket_id(host_lcore_id));
+        RTE_CACHE_LINE_SIZE,  rte_lcore_to_socket_id(host_lcore_id));
     if (ring == NULL)
         return NULL;
 
@@ -65,6 +65,9 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     rtp->rtp_tx_queue = tx_queue;
     rte_wmb();
     lcore->lcore_nb_rings_to_push++;
+    RTE_LOG(INFO, VROUTER, "\tlcore %u now has %"PRIu16
+        " ring(s) to push/route\n",
+        lcore_id, lcore->lcore_nb_rings_to_push);
     RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_DPDK_MAX_RINGS);
 }
 

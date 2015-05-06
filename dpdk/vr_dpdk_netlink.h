@@ -10,5 +10,6 @@
 int vr_netlink_uvhost_vif_add(unsigned char *vif_name, unsigned int vif_idx,
                               unsigned int vif_nrxqs, unsigned int vif_ntxqs);
 int vr_netlink_uvhost_vif_del(unsigned int vif_idx);
+int vr_dpdk_netlink_init(void);
 
 #endif /* __VR_DPDK_NETLINK_H__ */

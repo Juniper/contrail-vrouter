@@ -7,6 +7,7 @@
 #include "vr_types.h"
 #include "vr_message.h"
 #include "vr_sandesh.h"
+#include "vrouter.h"
 
 struct sandesh_object_md sandesh_md[] = {
     [VR_NULL_OBJECT_ID]         =   {
@@ -35,7 +36,7 @@ struct sandesh_object_md sandesh_md[] = {
     },
     [VR_FLOW_OBJECT_ID]         =   {
         .obj_len                =       ((4 * sizeof(vr_flow_req)) +
-                    (64 * sizeof(unsigned int))),
+                    (VR_MAX_CPUS * sizeof(unsigned int))),
         .obj_type_string        =       "vr_flow_req",
     },
     [VR_VRF_ASSIGN_OBJECT_ID]     =   {
