@@ -2254,6 +2254,12 @@ linux_if_notifier(struct notifier_block * __unused,
 
     agent_if = router->vr_agent_if;
 
+#ifdef CONFIG_NET_NS
+    if (dev->nd_net != &init_net) {
+        return NOTIFY_DONE;
+    }
+#endif
+
     if (event == NETDEV_UNREGISTER) {
         if (agent_if) {
             if (dev == (struct net_device *)agent_if->vif_os) {
@@ -2278,7 +2284,6 @@ linux_if_notifier(struct notifier_block * __unused,
         /* quite possible that there was no vif */
         vhost_attach_phys(dev);
     }
-
 
     return NOTIFY_DONE;
 }
