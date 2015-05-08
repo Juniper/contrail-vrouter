@@ -2249,6 +2249,12 @@ linux_if_notifier(struct notifier_block * __unused,
     dev = (struct net_device *)arg;
 #endif
 
+#ifdef CONFIG_NET_NS
+    if (dev->nd_net != &init_net) {
+        return NOTIFY_DONE;
+    }
+#endif
+
     if (!router)
         return NOTIFY_DONE;
 
@@ -2278,7 +2284,6 @@ linux_if_notifier(struct notifier_block * __unused,
         /* quite possible that there was no vif */
         vhost_attach_phys(dev);
     }
-
 
     return NOTIFY_DONE;
 }
