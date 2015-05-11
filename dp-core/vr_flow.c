@@ -1080,14 +1080,6 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
             return -EINVAL;
     }
 
-    /*
-     * for delete, we need not validate nh_index from incoming request
-     */
-    if (req->fr_flags & VR_FLOW_FLAG_ACTIVE) {
-        if (!__vrouter_get_nexthop(router, req->fr_src_nh_index))
-            return -EINVAL;
-    }
-
     return 0;
 }
 
