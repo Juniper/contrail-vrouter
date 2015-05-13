@@ -445,6 +445,8 @@ main(int argc, char *argv[])
          */
         case 'v':
             vr_dpdk.vlan_tag = (uint16_t)atoi(optarg);
+            if (!vr_dpdk.vlan_tag)
+                vr_dpdk.vlan_tag = VLAN_ID_INVALID;
             break;
 
 

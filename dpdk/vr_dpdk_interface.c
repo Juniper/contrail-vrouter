@@ -809,7 +809,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         m->vlan_tci = vr_dpdk.vlan_tag;
         if (rte_vlan_insert(&m)) {
             RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
-            vr_dpdk_pfree(m, VP_DROP_INVALID_PACKET);
+            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
             return -1;
         }
     }
