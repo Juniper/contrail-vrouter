@@ -2089,7 +2089,7 @@ vif_vrf_table_get(struct vr_interface *vif, vr_vrf_assign_req *req)
  */
 int
 vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
-        short vrf, unsigned short nh_id)
+        int vrf, unsigned int nh_id)
 {
     int ret = 0;
 

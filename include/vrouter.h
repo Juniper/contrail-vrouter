@@ -177,6 +177,7 @@ struct vrouter {
     unsigned int vr_max_labels;
     struct vr_btable *vr_ilm;
 
+    unsigned int vr_max_vrfs;
     unsigned int vr_max_mirror_indices;
     struct vr_mirror_entry **vr_mirrors;
     vr_itable_t vr_mirror_md;

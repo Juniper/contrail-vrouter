@@ -11,7 +11,8 @@ extern "C" {
 #endif
 
 #define VR_NUM_ROUTES_PER_DUMP  20
-#define VR_MAX_VRFS             4096
+#define VR_DEF_VRFS             4096
+#define VR_MAX_VRFS             65536
 
 #define METADATA_IP_SUBNET      0xA9FE0000 /* link local subnet (169.254.0.0/16) */
 #define METADATA_IP_MASK        (0xFFFF << 16)
