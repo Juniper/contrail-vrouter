@@ -1,0 +1,50 @@
+#
+# Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+#
+import os
+Import('VRutilsEnv')
+env = VRutilsEnv.Clone()
+VTestEnv = env;
+
+src_root = Dir('#').srcnode().abspath
+build_root = Dir(env['TOP']).abspath
+sandesh_file = src_root + '/vrouter/sandesh/vr.sandesh'
+build_dir = build_root + '/vrouter/utils/vtest/'
+
+system_header_path = GetOption('system-header-path')
+if system_header_path:
+    env.Append(CPPPATH = system_header_path + '/include/')
+
+env.Append(CPPPATH = ['./include', build_dir, '/usr/include/libxml2'])
+xml_cpppath = os.popen('xml2-config --cflags | sed \'s/\-I//g\'').read()
+#env.Append(CPPPATH = xml_cpppath)
+
+# CFLAGS
+env.Append(CCFLAGS = '-g')
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['.', '../../sandesh'])
+env.Replace(LIBS = ['sandesh-c', 'dp_sandesh_c', 'xml2'])
+
+sandesh_gen = env.Program('sandesh_gen.c')
+
+sandesh_gen_cmd = build_root + '/vrouter/utils/vtest/sandesh_gen' + ' ' + sandesh_file
+sandesh_gen_output = env.Command('sandesh_gen_output', None,
+        sandesh_gen_cmd, chdir=build_dir)
+
+vtest_src = [
+                'vt_main.c',
+                'vt_message.c',
+                'vt_gen_lib.c',
+                'vt_gen_message_modules.c',
+                'vt_gen_sandesh.c',
+                'vt_gen_sandesh_expect.c',
+            ]
+
+
+vtest = env.Program('vtest', vtest_src)
+env.Requires(vtest, sandesh_gen_output)
+
+# Local Variables:
+# mode: python
+# End:
