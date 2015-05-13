@@ -1055,7 +1055,7 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
     }
 
     if (req->fr_flags & VR_FLOW_FLAG_VRFT) {
-        if ((unsigned short)req->fr_flow_dvrf >= VR_MAX_VRFS)
+        if ((unsigned short)req->fr_flow_dvrf >= router->vr_max_vrfs)
             return -EINVAL;
     }
 

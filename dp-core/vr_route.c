@@ -10,6 +10,8 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 
+unsigned int vr_vrfs = VR_DEF_VRFS;
+
 static struct rtable_fspec rtable_families[];
 extern int mtrie_algo_init(struct vr_rtable *, struct rtable_fspec *);
 extern void mtrie_algo_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
@@ -19,8 +21,10 @@ extern void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool)
 int vr_route_delete(vr_route_req *);
 int vr_route_get(vr_route_req *);
 int vr_route_dump(vr_route_req *);
+
 int inet_route_add(struct rtable_fspec *, struct vr_route_req *);
 int inet_route_del(struct rtable_fspec *, struct vr_route_req *);
+
 int bridge_entry_add(struct rtable_fspec *, struct vr_route_req *);
 int bridge_entry_del(struct rtable_fspec *, struct vr_route_req *);
 
@@ -361,7 +365,7 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
 
     rtable = router->vr_inet_rtable;
     if (!rtable ||
-            ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
+            ((unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) ||
             ((unsigned int)(req->rtr_req.rtr_prefix_len) > 
                             (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)))
         return -EINVAL;
@@ -402,7 +406,7 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
 
     if (((unsigned int)(req->rtr_req.rtr_prefix_len) > 
                             (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)) ||
-            (unsigned int)(req->rtr_req.rtr_vrf_id) >= VR_MAX_VRFS)
+            (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs)
         return -EINVAL;
 
     router = vrouter_get(req->rtr_req.rtr_rid);
@@ -410,7 +414,8 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
         return -EINVAL;
 
     rtable = router->vr_inet_rtable;
-    if (!rtable || req->rtr_req.rtr_vrf_id >= (int)fs->rtb_max_vrfs)
+    if (!rtable ||
+            (unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs)
         return -EINVAL;
 
     return rtable->algo_del(rtable, req);
@@ -420,11 +425,12 @@ static void
 inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
                                                         bool soft_reset)
 {
-
     if (router->vr_inet_rtable) {
         fs->algo_deinit(router->vr_inet_rtable, fs, soft_reset);
-        vr_free(router->vr_inet_rtable);
-        router->vr_inet_rtable = NULL;
+        if (!soft_reset) {
+            vr_free(router->vr_inet_rtable);
+            router->vr_inet_rtable = NULL;
+        }
     }
 
     return;
@@ -438,12 +444,11 @@ inet_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
     if (!fs->algo_init)
         return 1;
 
-    if (router->vr_inet_rtable)
-        return 0;
-
-    router->vr_inet_rtable = vr_zalloc(sizeof(struct vr_rtable));
-    if (!router->vr_inet_rtable)
-        return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
+    if (!router->vr_inet_rtable) {
+        router->vr_inet_rtable = vr_zalloc(sizeof(struct vr_rtable));
+        if (!router->vr_inet_rtable)
+            return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
+    }
 
     ret = fs->algo_init(router->vr_inet_rtable, fs);
     if (ret)
@@ -462,7 +467,7 @@ bridge_entry_add(struct rtable_fspec *fs, struct vr_route_req *req)
         return -EINVAL;
 
     if (!router->vr_bridge_rtable ||
-            ((unsigned int)req->rtr_req.rtr_vrf_id > fs->rtb_max_vrfs) ||
+            ((unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) ||
             ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN))
         return -EINVAL;
 
@@ -475,14 +480,15 @@ bridge_entry_del(struct rtable_fspec *fs, struct vr_route_req *req)
     struct vrouter *router;
 
     if ((unsigned int)(req->rtr_req.rtr_mac_size) > 6 ||
-            (unsigned int)(req->rtr_req.rtr_vrf_id) >= VR_MAX_VRFS)
+            (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs)
         return -EINVAL;
 
     router = vrouter_get(req->rtr_req.rtr_rid);
     if (!router)
         return -EINVAL;
 
-    if (!router->vr_bridge_rtable || req->rtr_req.rtr_vrf_id >= (int)fs->rtb_max_vrfs)
+    if (!router->vr_bridge_rtable ||
+            (unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs)
         return -EINVAL;
 
     return router->vr_bridge_rtable->algo_del(router->vr_bridge_rtable, req);
@@ -513,9 +519,8 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
 
 static void
 bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
-                                                            bool soft_reset)
+        bool soft_reset)
 {
-
     if (!router->vr_bridge_rtable) {
         return;
     }
@@ -532,7 +537,6 @@ bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
 static struct rtable_fspec rtable_families[] = {
     {
         .rtb_family                     =   AF_INET,
-        .rtb_max_vrfs                   =   VR_MAX_VRFS,
         .rtb_family_init                =   inet_rtb_family_init,
         .rtb_family_deinit              =   inet_rtb_family_deinit,
         .route_add                      =   inet_route_add,
@@ -542,7 +546,6 @@ static struct rtable_fspec rtable_families[] = {
     },
     {
         .rtb_family                     =   AF_BRIDGE,
-        .rtb_max_vrfs                   =   VR_MAX_VRFS,
         .rtb_family_init                =   bridge_rtb_family_init,
         .rtb_family_deinit              =   bridge_rtb_family_deinit,
         .route_add                      =   bridge_entry_add,
@@ -552,7 +555,6 @@ static struct rtable_fspec rtable_families[] = {
     },
     {
         .rtb_family                     =   AF_INET6,
-        .rtb_max_vrfs                   =   VR_MAX_VRFS,
         .rtb_family_init                =   inet_rtb_family_init,
         .rtb_family_deinit              =   inet_rtb_family_deinit,
         .route_add                      =   inet_route_add,
@@ -579,14 +581,19 @@ vr_fib_exit(struct vrouter *router, bool soft_reset)
 int
 vr_fib_init(struct vrouter *router)
 {
-    int i;
-    int ret;
-    int size;
+    int i = 0, ret, size;
     struct rtable_fspec *fs;
+
+    if (vr_vrfs > VR_MAX_VRFS) {
+        return vr_module_error(-EINVAL, __FUNCTION__, __LINE__, vr_vrfs);
+    }
+
+    router->vr_max_vrfs = vr_vrfs;
 
     size = (int)ARRAYSIZE(rtable_families);
     for (i = 0; i < size; i++) {
         fs = &rtable_families[i];
+        fs->rtb_max_vrfs = router->vr_max_vrfs;
         ret = fs->rtb_family_init(fs, router);
         if (ret) {
             vr_module_error(ret, __FUNCTION__, __LINE__, 0);

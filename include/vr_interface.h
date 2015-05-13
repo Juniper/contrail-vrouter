@@ -137,8 +137,8 @@ struct vr_interface_driver {
 };
 
 struct vr_vrf_assign {
-    short va_vrf;
-    unsigned short va_nh_id;
+    int va_vrf;
+    unsigned int va_nh_id;
 };
 
 struct vr_interface {
@@ -249,7 +249,7 @@ extern void vif_drop_pkt(struct vr_interface *, struct vr_packet *, bool);
 extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
-        short, unsigned short);
+        int, unsigned int);
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
