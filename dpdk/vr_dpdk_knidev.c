@@ -397,34 +397,11 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 
 /* Init KNI */
 int
-vr_dpdk_knidev_init(struct vr_interface *vif)
+vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 {
-    uint8_t port_id;
-    struct vr_dpdk_ethdev *ethdev;
     struct rte_eth_dev_info dev_info;
     struct rte_kni_conf kni_conf;
     struct rte_kni *kni;
-
-    if (vif->vif_type == VIF_TYPE_HOST) {
-        ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
-        /* TODO: in test scripts ethdev is null here */
-        if (ethdev)
-            port_id = ethdev->ethdev_port_id;
-        else
-            /* ...so we use os_idx instead */
-            port_id = vif->vif_os_idx;
-    } else if (vif->vif_type == VIF_TYPE_MONITORING) {
-            /*
-             * DPDK numerates all the detected Ethernet devices starting from 0.
-             * So we might get into an issue if we have no eth devices at all
-             * or we have few eth ports and don't what to use the first one.
-             */
-            port_id = 0; /* TODO: we always use DPDK port 0 */
-    } else {
-        RTE_LOG(ERR, VROUTER, "\tunknown KNI interface addition"
-                "type %d os index %d\n", vif->vif_type, vif->vif_os_idx);
-        return -EINVAL;
-    }
 
     /* get eth device info */
     memset(&dev_info, 0, sizeof(dev_info));

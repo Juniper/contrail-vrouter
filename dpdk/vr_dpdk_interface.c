@@ -201,12 +201,13 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         }
     }
 
-    /* Please don't remove since we need it to debug. Thanks! */
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
-    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " PCI %d:%d.%d"
+
+    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " PCI "PCI_PRI_FMT
         " MAC " MAC_FORMAT "\n",
-        vif->vif_idx, port_id, pci_address.bus, pci_address.devid, pci_address.function,
+        vif->vif_idx, port_id, pci_address.domain, pci_address.bus,
+        pci_address.devid, pci_address.function,
         MAC_VALUE(mac_addr.addr_bytes));
 
     ethdev = &vr_dpdk.ethdevs[port_id];
@@ -284,10 +285,11 @@ dpdk_fabric_if_del(struct vr_interface *vif)
 static int
 dpdk_vhost_if_add(struct vr_interface *vif)
 {
-    uint8_t port_id;
+    uint8_t port_id, slave_port_id = VR_DPDK_INVALID_PORT_ID;
     int ret;
     struct ether_addr mac_addr;
     struct rte_pci_addr pci_address;
+    struct vr_dpdk_ethdev *ethdev;
 
     if (vif->vif_flags & VIF_FLAG_PMD) {
         port_id = vif->vif_os_idx;
@@ -296,6 +298,13 @@ dpdk_vhost_if_add(struct vr_interface *vif)
         memset(&pci_address, 0, sizeof(pci_address));
         dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
         port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
+        /*
+         * KNI does not support bond interfaces and generate random MACs,
+         * so we try to get a bond member istead.
+         */
+        ethdev = &vr_dpdk.ethdevs[port_id];
+        if (ethdev->ethdev_nb_slaves > 0)
+            slave_port_id = ethdev->ethdev_slaves[0];
     }
 
     /* get interface MAC address */
@@ -306,6 +315,16 @@ dpdk_vhost_if_add(struct vr_interface *vif)
                 " MAC " MAC_FORMAT "\n",
                 vif->vif_idx, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
+    if (slave_port_id != VR_DPDK_INVALID_PORT_ID) {
+        port_id = slave_port_id;
+
+        memset(&mac_addr, 0, sizeof(mac_addr));
+        rte_eth_macaddr_get(port_id, &mac_addr);
+        RTE_LOG(INFO, VROUTER, "\tusing bond slave eth device %" PRIu8
+                " MAC " MAC_FORMAT "\n",
+                port_id, MAC_VALUE(mac_addr.addr_bytes));
+    }
+
     /* check if KNI is already added */
     if (vr_dpdk.knis[vif->vif_idx] != NULL) {
         RTE_LOG(ERR, VROUTER, "\terror adding KNI device %s: already exist\n",
@@ -314,7 +333,7 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     }
 
     /* init KNI */
-    ret = vr_dpdk_knidev_init(vif);
+    ret = vr_dpdk_knidev_init(port_id, vif);
     if (ret != 0)
         return ret;
 
@@ -433,8 +452,13 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
         return -EEXIST;
     }
 
-    /* init KNI */
-    ret = vr_dpdk_knidev_init(vif);
+    /*
+     * TODO: we always use DPDK port 0 for monitoring KNI
+     * DPDK numerates all the detected Ethernet devices starting from 0.
+     * So we might only get into an issue if we have no eth devices at all
+     * or we have few eth ports and don't what to use the first one.
+     */
+    ret = vr_dpdk_knidev_init(0, vif);
     if (ret != 0)
         return ret;
 

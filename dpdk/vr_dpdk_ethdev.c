@@ -19,6 +19,7 @@
 #include "vr_dpdk.h"
 
 #include <rte_port_ethdev.h>
+#include <rte_eth_bond.h>
 #include <rte_errno.h>
 #include <rte_byteorder.h>
 
@@ -293,6 +294,8 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* store queue params */
     tx_queue_params->qp_release_op = &dpdk_ethdev_tx_queue_release;
+    tx_queue_params->qp_ethdev.queue_id = tx_queue_id;
+    tx_queue_params->qp_ethdev.port_id = port_id;
 
     return tx_queue;
 }
@@ -314,8 +317,8 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
     ethdev->ethdev_reta_size = RTE_MIN(dev_info.reta_size,
         VR_DPDK_MAX_RETA_SIZE);
 
-    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u "
-            "max_rx_queues=%"PRIu16 "max_tx_queues=%"PRIu16
+    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u"
+            " max_rx_queues=%"PRIu16 " max_tx_queues=%"PRIu16
             " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
             " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
             dev_info.driver_name, dev_info.if_index,
@@ -326,6 +329,10 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
 #if !VR_DPDK_USE_HW_FILTERING
     /* use RSS queues only */
     ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
+#else
+    /* use RSS queues only if device does not support RETA */
+    if (ethdev->ethdev_reta_size == 0)
+        ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #endif
 
     return;
@@ -401,6 +408,10 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
     int nb_entries = ethdev->ethdev_reta_size/RTE_RETA_GROUP_SIZE;
     struct rte_eth_rss_reta_entry64 reta_entries[VR_DPDK_MAX_RETA_ENTRIES];
     struct rte_eth_rss_reta_entry64 *reta;
+
+    /* check if device support RETA */
+    if (ethdev->ethdev_reta_size == 0)
+        return 0;
 
     for (entry = 0; entry < nb_entries; entry++) {
         reta = &reta_entries[entry];
@@ -488,6 +499,63 @@ vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
     return ret;
 }
 
+/* Update device bond info */
+static void
+dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
+{
+    int i, slave_port_id;
+    int port_id = ethdev->ethdev_port_id;
+    struct rte_pci_addr *pci_addr;
+    struct ether_addr bond_mac, mac_addr;
+    struct ether_addr lacp_mac = { .addr_bytes = {0x01, 0x80, 0xc2, 0, 0, 0x02} };
+
+    if (rte_eth_bond_mode_get(port_id) == -1) {
+        ethdev->ethdev_nb_slaves = -1;
+    } else {
+        ethdev->ethdev_nb_slaves = rte_eth_bond_slaves_get(port_id,
+            ethdev->ethdev_slaves, sizeof(ethdev->ethdev_slaves));
+
+        memset(&mac_addr, 0, sizeof(bond_mac));
+        rte_eth_macaddr_get(port_id, &bond_mac);
+        RTE_LOG(INFO, VROUTER, "\tbond eth device %" PRIu8
+            " configured MAC " MAC_FORMAT "\n",
+            port_id, MAC_VALUE(bond_mac.addr_bytes));
+        /* log out and configure bond members */
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+            slave_port_id = ethdev->ethdev_slaves[i];
+            memset(&mac_addr, 0, sizeof(mac_addr));
+            rte_eth_macaddr_get(slave_port_id, &mac_addr);
+            pci_addr = &rte_eth_devices[slave_port_id].pci_dev->addr;
+            RTE_LOG(INFO, VROUTER, "\tbond member eth device %" PRIu8
+                " PCI "PCI_PRI_FMT
+                " MAC " MAC_FORMAT "\n",
+                slave_port_id, pci_addr->domain, pci_addr->bus,
+                pci_addr->devid, pci_addr->function,
+                MAC_VALUE(mac_addr.addr_bytes));
+
+            /* try to add bond mac and LACP multicast MACs */
+            if (rte_eth_dev_mac_addr_add(slave_port_id, &bond_mac, 0) == 0
+                && rte_eth_dev_mac_addr_add(slave_port_id, &lacp_mac, 0) == 0) {
+                /* disable the promisc mode enabled by default */
+                rte_eth_promiscuous_disable(ethdev->ethdev_port_id);
+                RTE_LOG(INFO, VROUTER, "\tbond member eth device %"PRIu8
+                    " promisc mode disabled\n", slave_port_id);
+            } else {
+                RTE_LOG(INFO, VROUTER, "\tbond member eth device %"PRIu8
+                    ": unable to add MAC addresses\n", slave_port_id);
+            }
+        }
+        /* In LACP mode all the bond members are in the promisc mode
+         * by default (see bond_mode_8023ad_activate_slave()
+         * But we need also to put the bond interface in promisc to get
+         * the broadcasts. Seems to be a bug in bond_ethdev_rx_burst_8023ad()?
+         */
+        rte_eth_promiscuous_enable(port_id);
+    }
+}
+
+
+
 /* Init ethernet device */
 int
 vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
@@ -508,6 +576,9 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
             port_id, rte_strerror(-ret), -ret);
         return ret;
     }
+
+    /* update device bond information after the device has been configured */
+    dpdk_ethdev_bond_info_update(ethdev);
 
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)

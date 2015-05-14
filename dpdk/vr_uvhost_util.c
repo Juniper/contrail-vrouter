@@ -34,15 +34,18 @@ static int uvh_max_fd = 0;
 void
 vr_uvhost_log(const char *format, ...)
 {
-    va_list ap;
-    FILE *f = stderr; /* TODO _ change to a different file */
+    va_list args;
 
-    fprintf(f, "UVHOST: ");
-    va_start(ap, format);
-    vfprintf(f, format, ap);
-    fflush(f);
+    if (RTE_LOGTYPE_UVHOST & rte_logs.type) {
+        char buf[256] = "UVHOST: ";
 
-    return;
+        strncat(buf, format, sizeof(buf) - strlen(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+
+        va_start(args, format);
+        rte_vlog(RTE_LOG_INFO, RTE_LOGTYPE_UVHOST, buf, args);
+        va_end(args);
+    }
 }
 
 /*

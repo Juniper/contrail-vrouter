@@ -327,7 +327,7 @@ vr_build_route_request(unsigned int op, int family, uint8_t *prefix,
         } else {
             rt_req.rtr_prefix = NULL;
         }
-            
+
         rt_req.rtr_prefix_len = p_len;
         rt_req.rtr_label_flags = 0;
         rt_req.rtr_replace_plen = replace_plen;
@@ -635,7 +635,7 @@ main(int argc, char *argv[])
     cmd_family_id = AF_INET;
 
     while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:F",
-                    long_options, &option_index)) >= 0) { 
+                    long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':
                 if (cmd_op >= 0) {
@@ -667,7 +667,7 @@ main(int argc, char *argv[])
                 break;
 
             case 'p':
-                /* 
+                /*
                  * Try parsing for AF_INET first, if not try AF_INET6
                  */
                 if (!inet_pton(AF_INET, optarg, cmd_prefix))
@@ -688,7 +688,7 @@ main(int argc, char *argv[])
                 break;
 
             case 's':
-                /* 
+                /*
                  * Try parsing for AF_INET first, if not try AF_INET6
                  */
                 if (!inet_pton(AF_INET, optarg, cmd_src))

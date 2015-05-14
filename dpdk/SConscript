@@ -1,69 +1,117 @@
 #
-# Copyright (c) 2014 Semihalf. All rights reserved.
+# Copyright (c) 2014, 2015 Semihalf. All rights reserved.
 #
 import os
 
 Import('VRouterEnv')
-
 env = VRouterEnv.Clone()
 
-# Include paths
+# DPDK build configuration
+DPDK_TARGET  = 'x86_64-native-linuxapp-gcc'
+DPDK_SRC_DIR = '#third_party/dpdk/'
+DPDK_DST_DIR = env['TOP'] + '/vrouter/dpdk/' + DPDK_TARGET
+DPDK_INC_DIR = DPDK_DST_DIR + '/include'
+DPDK_LIB_DIR = DPDK_DST_DIR + '/lib'
+# Pass -g and -O flags if present to DPDK
+DPDK_FLAGS   =  ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
 
-# CFLAGS
+#
+# DPDK libraries need to be linked as a whole archive, otherwise some
+# callbacks and constructors will not be linked in. Also some of the
+# libraries need to be linked as a group for the cross-reference resolving.
+#
+# That is why we pass DPDK libraries as flags to the linker.
+#
+# Order is important: from higher level to lower level
+# The list is from the rte.app.mk file
+DPDK_LIBS = [
+    '-Wl,--whole-archive',
+#    '-lrte_distributor',
+#    '-lrte_reorder',
+    '-lrte_kni',
+#    '-lrte_ivshmem',
+#    '-lrte_pipeline',
+#    '-lrte_table',
+    '-lrte_port',
+    '-lrte_timer',
+    '-lrte_hash',
+#    '-lrte_jobstats',
+#    '-lrte_lpm',
+#    '-lrte_power',
+#    '-lrte_acl',
+#    '-lrte_meter',
+    '-lrte_sched',
+    '-lm',
+    '-lrt',
+#    '-lrte_vhost',
+    '-lpcap',
+#    '-lfuse',
+#    '-libverbs',
+    '-Wl,--start-group',
+    '-lrte_kvargs',
+    '-lrte_mbuf',
+    '-lrte_ip_frag',
+    '-lethdev',
+    '-lrte_malloc',
+    '-lrte_mempool',
+    '-lrte_ring',
+    '-lrte_eal',
+    '-lrte_cmdline',
+#    '-lrte_cfgfile',
+    '-lrte_pmd_bond',
+#    '-lrte_pmd_xenvirt',
+#    '-lxenstore',
+#    '-lrte_pmd_vmxnet3_uio',
+#    '-lrte_pmd_virtio_uio',
+#    '-lrte_pmd_enic',
+    '-lrte_pmd_i40e',
+#    '-lrte_pmd_fm10k',
+    '-lrte_pmd_ixgbe',
+    '-lrte_pmd_e1000',
+#    '-lrte_pmd_mlx4',
+#    '-lrte_pmd_ring',
+#    '-lrte_pmd_pcap',
+#    '-lrte_pmd_af_packet',
+    '-Wl,--end-group',
+    '-Wl,--no-whole-archive'
+]
+
+# Flags
 env.Append(CCFLAGS = '-Werror -Wall')
 env.Append(CCFLAGS = '-D__DPDK__')
 env.Append(CCFLAGS = '-msse4.2')
 
+# Include/lLib paths
+env.Append(CPPPATH = DPDK_INC_DIR);
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Append(LIBPATH = ['#third_party/dpdk/build/lib'])
+env.Append(LIBPATH = DPDK_LIB_DIR)
 
+# Libraries
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
+env.Append(LIBS = ['rt', 'dl', 'pthread', 'urcu-qsbr'])
+env.Append(LINKFLAGS = DPDK_LIBS)
 
-# Add all dpdk libraries
-env.Append(LIBS = ['rte_kvargs', 'rte_pmd_ixgbe', 'rte_kni',
-    'rte_hash', 'rte_mempool', 'rte_ring', 'rte_mbuf', 'rte_eal', 'rte_malloc',
-    'rte_port', 'rte_timer', 'ethdev'])
+# Make DPDK
+dpdk_src_dir = Dir(DPDK_SRC_DIR).abspath
+dpdk_dst_dir = Dir(DPDK_DST_DIR).abspath
 
-# Add libraries required by dpdk
-env.Append(LIBS = ['rt', 'dl', 'pthread'])
-env.Append(LIBS = ['urcu-qsbr'])
+make_cmd = 'make -C ' + dpdk_src_dir \
+    + ' EXTRA_CFLAGS="' + DPDK_FLAGS + '"' \
+    + ' O=' + dpdk_dst_dir \
+    + ' '
+dpdk_lib = env.Command('dpdk_lib', None,
+    make_cmd + 'config T=' + DPDK_TARGET
+    + ' && ' + make_cmd)
 
-env.Append(LINKCOM =
-    ' -Wl,--whole-archive -lrte_pmd_e1000 -lrte_pmd_ixgbe -Wl,--no-whole-archive')
-
-dpdk_dir ='#third_party/dpdk/'
-make_dir = Dir(dpdk_dir).srcnode().abspath
-
-cd_cmd = 'cd ' + make_dir + ' && '
-make_cmd = cd_cmd + 'make config T=x86_64-native-linuxapp-gcc && make'
-dpdk_lib = env.Command('dpdk_lib', None, make_cmd, chdir=make_dir)
 env.AlwaysBuild(dpdk_lib)
 env.Default(dpdk_lib)
 
-dpdk_vrouter_src = [ 'dpdk_vrouter.c',
-                     'vr_dpdk_ethdev.c',
-                     'vr_dpdk_flow_mem.c',
-                     'vr_dpdk_host.c',
-                     'vr_dpdk_interface.c',
-                     'vr_dpdk_knidev.c',
-                     'vr_dpdk_lcore.c',
-                     'vr_dpdk_netlink.c',
-                     'vr_dpdk_packet.c',
-                     'vr_dpdk_ringdev.c',
-                     'vr_dpdk_usocket.c',
-                     'vr_dpdk_virtio.c',
-                     'vr_uvhost.c',
-                     'vr_uvhost_util.c',
-                     'vr_uvhost_msg.c',
-                     'vr_uvhost_client.c'
-                   ]
-
-dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_vrouter_src)
+dpdk_vrouter = env.Program('contrail-vrouter-dpdk', Glob('*.c'))
 env.Requires(dpdk_vrouter, dpdk_lib)
 
 if GetOption('clean'):
-    os.system('cd ' + make_dir + ';' + make_cmd + ' clean')
+    os.system(make_cmd + 'clean')
 # to make sure that all are built when you do 'scons' @ the top level
 env.Default(dpdk_vrouter)
 
