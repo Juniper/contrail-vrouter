@@ -26,7 +26,8 @@
 #include "vr_dpdk_netlink.h"
 
 #include <rte_timer.h>
-#include <rte_ether.h>
+#include <rte_cycles.h>
+#include <rte_port_ethdev.h>
 
 /*
  * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the
@@ -700,6 +701,26 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     return ret;
 }
 
+/* TX bond queues */
+static void
+dpdk_lcore_bond_tx(struct vr_dpdk_lcore *lcore)
+{
+    struct vr_dpdk_queue *tx_queue;
+    struct vr_dpdk_queue_params *tx_queue_params;
+    unsigned int vif_idx;
+
+    SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
+        /* if TX queue is an ethdev */
+        if (tx_queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
+            vif_idx = tx_queue->q_vif->vif_idx;
+            tx_queue_params = &lcore->lcore_tx_queue_params[vif_idx];
+            /* TX any pending LACP packets */
+            rte_eth_tx_burst(tx_queue_params->qp_ethdev.port_id,
+                tx_queue_params->qp_ethdev.queue_id, NULL, 0);
+        }
+    }
+}
+
 /* Forwarding lcore main loop */
 int
 dpdk_lcore_fwd_loop(void)
@@ -708,8 +729,13 @@ dpdk_lcore_fwd_loop(void)
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     /* cycles counters */
     uint64_t cur_cycles = 0;
+    uint64_t cur_bond_cycles = 0;
     uint64_t diff_cycles;
     uint64_t last_tx_cycles = 0;
+    uint64_t last_bond_tx_cycles = 0;
+    /* always calculate bond TX timeout in CPU cycles */
+    const uint64_t bond_tx_cycles = (rte_get_timer_hz() + MS_PER_S - 1)
+        * VR_DPDK_BOND_TX_MS / MS_PER_S;
 #if VR_DPDK_USE_TIMER
     /* calculate timeouts in CPU cycles */
     const uint64_t tx_flush_cycles = (rte_get_timer_hz() + US_PER_S - 1)
@@ -741,6 +767,20 @@ dpdk_lcore_fwd_loop(void)
 
             /* flush all TX queues */
             vr_dpdk_lcore_flush(lcore);
+
+            /* check if we need to TX bond queues */
+#if VR_DPDK_USE_TIMER
+            /* we already got the CPU cycles */
+            cur_bond_cycles = cur_cycles;
+#else
+            cur_bond_cycles = rte_get_timer_cycles();
+#endif
+            diff_cycles = cur_bond_cycles - last_bond_tx_cycles;
+            if (unlikely(bond_tx_cycles < diff_cycles)) {
+                last_bond_tx_cycles = cur_bond_cycles;
+
+                dpdk_lcore_bond_tx(lcore);
+            }
 
             if (unlikely(lcore->lcore_nb_rx_queues == 0)) {
                 /* no queues to poll -> sleep a bit */

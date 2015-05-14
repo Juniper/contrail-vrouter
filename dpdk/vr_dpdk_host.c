@@ -67,10 +67,16 @@ dpdk_printf(const char *format, ...)
 {
     va_list args;
 
-    rte_log(RTE_LOG_INFO, RTE_LOGTYPE_VROUTER, "DPCORE: ");
-    va_start(args, format);
-    rte_vlog(RTE_LOG_INFO, RTE_LOGTYPE_VROUTER, format, args);
-    va_end(args);
+    if (RTE_LOGTYPE_DPCORE & rte_logs.type) {
+        char buf[256] = "DPCORE: ";
+
+        strncat(buf, format, sizeof(buf) - strlen(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+
+        va_start(args, format);
+        rte_vlog(RTE_LOG_INFO, RTE_LOGTYPE_DPCORE, buf, args);
+        va_end(args);
+    }
 
     return 0;
 }
