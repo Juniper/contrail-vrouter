@@ -31,16 +31,29 @@
 #include <rte_ethdev.h>
 #include <rte_port.h>
 
+/*
+ * Use RTE_LOG_DEBUG to enable debug logs.
+ * See more debug options below.
+ */
+#undef RTE_LOG_LEVEL
+#define RTE_LOG_LEVEL               RTE_LOG_INFO
+
+/*
+ * By default all the logtypes are enabled.
+ * Use VR_DPDK_LOGTYPE_DISABLE option below to disable some of the types.
+ */
 #define RTE_LOGTYPE_VROUTER         RTE_LOGTYPE_USER1
 #define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
-#undef RTE_LOG_LEVEL
-#define RTE_LOG_LEVEL               RTE_LOG_INFO
+#define RTE_LOGTYPE_DPCORE          RTE_LOGTYPE_USER4
+//#define VR_DPDK_LOGTYPE_DISABLE     (0)
+#define VR_DPDK_LOGTYPE_DISABLE     (RTE_LOGTYPE_USOCK | RTE_LOGTYPE_UVHOST)
 
 /*
  * Debug options:
  *
 #define RTE_LOG_LEVEL               RTE_LOG_DEBUG
+#define VR_DPDK_LOGTYPE_DISABLE     (RTE_LOGTYPE_USOCK | RTE_LOGTYPE_UVHOST)
 #define VR_DPDK_NETLINK_DEBUG
 #define VR_DPDK_NETLINK_PKT_DUMP
 #define VR_DPDK_USOCK_DUMP
@@ -119,6 +132,13 @@
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
 #define VR_DPDK_TX_FLUSH_LOOPS      5
 #define VR_DPDK_TX_FLUSH_US         100
+/*
+ * Bond TX timeout (in ms)
+ * Receive and transmit functions must be invoked on bonded
+ * interface at least 10 times per second or LACP will not
+ * work correctly
+ */
+#define VR_DPDK_BOND_TX_MS          90
 /* Sleep time in US if there are no queues to poll */
 #define VR_DPDK_SLEEP_NO_QUEUES_US  10000
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
@@ -200,6 +220,10 @@ struct vr_dpdk_queue_params {
             struct rte_ring *ring_p;
             unsigned host_lcore_id;
         } qp_ring;
+        struct {
+            uint8_t port_id;
+            uint16_t queue_id;
+        } qp_ethdev;
     };
 };
 
@@ -283,6 +307,10 @@ struct vr_dpdk_ethdev {
     uint8_t ethdev_port_id;
     /* Hardware RX queue states */
     uint8_t ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
+    /* List of slaves ports */
+    uint8_t ethdev_slaves[RTE_MAX_ETHPORTS];
+    /* The device is a bond if the number of slaves is > 0 */
+    int ethdev_nb_slaves;
     /* Pointers to memory pools */
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
 };
@@ -439,14 +467,7 @@ int vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
 /* Generates unique log message */
 int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
                     const char *format, ...);
-#define DPDK_ULOG(l, t, h, ...)                         \
-    (void)(((RTE_LOG_ ## l <= RTE_LOG_LEVEL) &&         \
-    (RTE_LOG_ ## l <= rte_logs.level) &&                \
-    (RTE_LOGTYPE_ ## t & rte_logs.type)) ?              \
-    vr_dpdk_ulog(RTE_LOG_ ## l,                         \
-        RTE_LOGTYPE_ ## t, h, # t ": " __VA_ARGS__) : 0)
-
-#if RTE_LOG_LEVEL == RTE_LOG_DEBUG
+#if (RTE_LOG_LEVEL == RTE_LOG_DEBUG)
 #define DPDK_DEBUG_VAR(v) v
 #define DPDK_UDEBUG(t, h, ...)                          \
     (void)(((RTE_LOGTYPE_ ## t & rte_logs.type)) ?      \
@@ -471,7 +492,7 @@ static inline int vr_dpdk_if_unlock()
  * vr_dpdk_knidev.c
  */
 /* Init KNI */
-int vr_dpdk_knidev_init(struct vr_interface *vif);
+int vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif);
 /* Release KNI */
 int vr_dpdk_knidev_release(struct vr_interface *vif);
 /* Init KNI RX queue */

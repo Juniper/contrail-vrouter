@@ -40,11 +40,17 @@ struct vr_dpdk_global vr_dpdk;
 static char *dpdk_argv[] = {
     "dpdk",
     "-m", VR_DPDK_MAX_MEM,
+    "-n", VR_DPDK_MAX_MEMCHANNELS,
     /* the argument will be updated in dpdk_init() */
     "--lcores", NULL,
-    "-n", VR_DPDK_MAX_MEMCHANNELS
+    /* up to five optional arguments */
+    NULL, NULL,
+    NULL, NULL,
+    NULL, NULL,
+    NULL, NULL,
+    NULL, NULL
 };
-static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv);
+static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 5*2;
 
 /* Pktmbuf constructor with vr_packet support */
 void
@@ -141,8 +147,10 @@ dpdk_core_mask_get(void)
     int i;
     long system_cpus_count, core_mask_count;
 
-    if (sched_getaffinity(0, sizeof(cs), &cs) < 0)
+    if (sched_getaffinity(0, sizeof(cs), &cs) < 0) {
+        printf("Error getting affinity. Falling back do the default core mask.\n");
         return VR_DPDK_DEF_LCORE_MASK;
+    }
 
     /*
      * Go through all the CPUs in the cpu_set_t structure to check
@@ -157,22 +165,28 @@ dpdk_core_mask_get(void)
             cpu_core_mask |= (uint64_t)1 << i;
     }
 
-    if (!cpu_core_mask)
+    if (!cpu_core_mask) {
+        printf("Error: core mask is zero. Falling back do the default core mask.\n");
         return VR_DPDK_DEF_LCORE_MASK;
+    }
 
     /*
      * Do not allow to run vRouter on all the cores available, as some have
      * to be spared for virtual machines.
      */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
-    if (system_cpus_count == -1)
+    if (system_cpus_count == -1) {
+        printf("Error getting number of processors. Falling back do the default core mask.\n");
         return cpu_core_mask;
+    }
 
     core_mask_count
         = __builtin_popcountll((unsigned long long)cpu_core_mask);
 
-    if (core_mask_count == system_cpus_count)
+    if (core_mask_count == system_cpus_count) {
+        printf("Using default core mask.\n");
         return VR_DPDK_DEF_LCORE_MASK;
+    }
 
     return cpu_core_mask;
 }
@@ -239,11 +253,18 @@ dpdk_argv_update(void)
 
     /* find and update the argument */
     for (i = 0; i < dpdk_argc; i++) {
-        if (dpdk_argv[i] == NULL)
+        if (dpdk_argv[i] == NULL) {
             dpdk_argv[i] = lcores_string;
+            break;
+        }
     }
 
-    printf("LCores configuration: %s\n", lcores_string);
+    /* print out configuration */
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID)
+        printf("Using VLAN TCI: %"PRIu16"\n", vr_dpdk.vlan_tag);
+    printf("EAL arguments:\n");
+    for (i = 1; i < dpdk_argc - 1; i += 2)
+        printf("\t%s \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
 
     return 0;
 }
@@ -271,6 +292,8 @@ dpdk_init(void)
         fprintf(stderr, "Error initializing EAL\n");
         return ret;
     }
+    /* disable unwanted logtypes for debug purposes */
+    rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
 
     rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
 
@@ -395,21 +418,6 @@ dpdk_signals_init(void)
     return 0;
 }
 
-enum vr_opt_index {
-    DAEMON_OPT_INDEX,
-    VLAN_OPT_INDEX,
-    MAX_OPT_INDEX
-};
-
-static struct option long_options[] = {
-    [DAEMON_OPT_INDEX]              =   {"no-daemon",           no_argument,
-                                                    &no_daemon_set,         1},
-    [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
-                                                    NULL,                 'v'},
-    [MAX_OPT_INDEX]                 =   {NULL,                  0,
-                                                    NULL,                   0},
-};
-
 /*
  * vr_dpdk_exit_trigger - function that is called by user space vhost server
  * to cause all DPDK threads to exit.
@@ -424,46 +432,130 @@ vr_dpdk_exit_trigger(void)
     return;
 }
 
+enum vr_opt_index {
+    NO_DAEMON_OPT_INDEX,
+    HELP_OPT_INDEX,
+    VERSION_OPT_INDEX,
+    VLAN_OPT_INDEX,
+    VDEV_OPT_INDEX,
+    MAX_OPT_INDEX
+};
+
+static struct option long_options[] = {
+    [NO_DAEMON_OPT_INDEX]           =   {"no-daemon",           no_argument,
+                                                    &no_daemon_set,         1},
+    [HELP_OPT_INDEX]                =   {"help",                no_argument,
+                                                    NULL,                   0},
+    [VERSION_OPT_INDEX]             =   {"version",             no_argument,
+                                                    NULL,                   0},
+    [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
+                                                    NULL,                   0},
+    [VDEV_OPT_INDEX]                =   {"vdev",                required_argument,
+                                                    NULL,                   0},
+    [MAX_OPT_INDEX]                 =   {NULL,                  0,
+                                                    NULL,                   0},
+};
+
+static void
+Usage(void)
+{
+    printf("Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n");
+    printf("             [--vlan <tci>] [--vdev <config>]\n");
+    printf("\n");
+    printf("--no-daemon  Do not demonize the vRouter\n");
+    printf("--help       Prints this help message\n");
+    printf("--version    Prints build information\n");
+    printf("\n");
+    printf("--vlan <tci>     VLAN tag control information\n");
+    printf("--vdev <config>  Virtual device configuration\n");
+
+    exit(1);
+}
+
+static void
+version_print(void)
+{
+    printf("Build information: %s\n", ContrailBuildInfo);
+}
+
+static void
+parse_long_opts(int opt_flow_index, char *opt_arg)
+{
+    int i;
+
+    errno = 0;
+    switch (opt_flow_index) {
+    case NO_DAEMON_OPT_INDEX:
+        break;
+
+    case VERSION_OPT_INDEX:
+        version_print();
+        exit(0);
+        break;
+
+    /* If VLAN tag is set, vRouter will expect tagged packets. The tag
+     * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
+     */
+    case VLAN_OPT_INDEX:
+        vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
+        if (!vr_dpdk.vlan_tag) {
+            vr_dpdk.vlan_tag = VLAN_ID_INVALID;
+        }
+        break;
+
+
+    case VDEV_OPT_INDEX:
+        /* find a pair of free arguments */
+        for (i = 0; i < sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 1; i++) {
+            if (dpdk_argv[i] == NULL && dpdk_argv[i + 1] == NULL) {
+                dpdk_argv[i] = "--vdev";
+                dpdk_argv[i + 1] = opt_arg;
+                dpdk_argc += 2;
+                break;
+            }
+        }
+        break;
+
+    case HELP_OPT_INDEX:
+    default:
+        Usage();
+    }
+}
+
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
 
-    fprintf(stdout, "Starting vRouter/DPDK...\nBuild information: %s\n",
-                ContrailBuildInfo);
-    fflush(stdout);
-
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {
         switch (opt) {
         case 0:
+            parse_long_opts(option_index, optarg);
             break;
-
-        /* If VLAN tag is set, vRouter will expect tagged packets. The tag
-         * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
-         */
-        case 'v':
-            vr_dpdk.vlan_tag = (uint16_t)atoi(optarg);
-            if (!vr_dpdk.vlan_tag)
-                vr_dpdk.vlan_tag = VLAN_ID_INVALID;
-            break;
-
 
         case '?':
         default:
             fprintf(stderr, "Invalid option %s\n", argv[optind - 1]);
-            exit(-EINVAL);
+            Usage();
             break;
         }
     }
-    /* for other getopts in dpdk */
+    /* for other getopts in DPDK */
     optind = 0;
 
     if (!no_daemon_set) {
-        if (daemon(0, 0) < 0)
-            return -1;
+        if (daemon(0, 0) < 0) {
+            fprintf(stderr, "Error daemonizing vRouter: %s (%d)\n",
+                strerror(errno), errno);
+            return 1;
+        }
     }
+
+    printf("Starting vRouter/DPDK...\n");
+    version_print();
+    fflush(stdout);
 
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();
