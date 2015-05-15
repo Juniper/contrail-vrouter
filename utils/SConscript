@@ -18,7 +18,7 @@ env.Append(CCFLAGS = '-g')
 if 'install' in COMMAND_LINE_TARGETS:
     VRutilsEnv.Append(SRC_INSTALL_TARGET = '/utils/')
 
-subdirs = ['dkms']
+subdirs = ['dkms', 'vtest']
 for sdir in  subdirs:
     env.SConscript(sdir + '/SConscript',
                     exports='VRutilsEnv',
