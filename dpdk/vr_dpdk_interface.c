@@ -642,113 +642,174 @@ static inline void
 dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    struct vr_ip *iph = (struct vr_ip *)(pkt->vp_head + offset);
-    unsigned iph_len = iph->ip_hl * 4;
+    struct vr_ip *iph = NULL;
+    struct vr_ip6 *ip6h = NULL;
+    unsigned char iph_len, iph_proto;
     struct vr_tcp *tcph;
     struct vr_udp *udph;
 
     RTE_VERIFY(0 < offset);
 
-    /* calculate IP checksum */
-    m->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IPOIP) {
+        iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+        iph_len = iph->ip_hl * 4;
+        iph_proto = iph->ip_proto;
+        m->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+        iph->ip_csum = 0;
+    } else if (pkt->vp_type == VP_TYPE_IP6 || pkt->vp_type == VP_TYPE_IP6OIP) {
+        ip6h = (struct vr_ip6 *)pkt_data_at_offset(pkt, offset);
+        iph_len = sizeof(struct vr_ip6);
+        iph_proto = ip6h->ip6_nxt;
+        m->ol_flags |= PKT_TX_IPV6;
+    }
+
     /* Note: Intel NICs need the checksum set to zero
      * and proper l2/l3 lens to be set.
      */
-    iph->ip_csum = 0;
     m->l3_len = iph_len;
     m->l2_len = offset - rte_pktmbuf_headroom(m);
 
-    RTE_LOG(DEBUG, VROUTER, "%s: Outer packet: l2_len = %d, l3_len = %d\n", __func__,
-        (int)m->outer_l2_len,
-        (int)m->outer_l3_len);
-
     /* calculate TCP/UDP checksum */
-    if (likely(iph->ip_proto == VR_IP_PROTO_UDP)) {
+    if (likely(iph_proto == VR_IP_PROTO_UDP)) {
         m->ol_flags |= PKT_TX_UDP_CKSUM;
-        udph = (struct vr_udp *)((char *)iph + iph_len);
+        udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
         udph->udp_csum = 0;
-        udph->udp_csum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, m->ol_flags);
-    } else if (likely(iph->ip_proto == VR_IP_PROTO_TCP)) {
+        if (iph)
+            udph->udp_csum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, m->ol_flags);
+        else if (ip6h)
+            udph->udp_csum = rte_ipv6_phdr_cksum((struct ipv6_hdr *)ip6h, m->ol_flags);
+    } else if (likely(iph_proto == VR_IP_PROTO_TCP)) {
         m->ol_flags |= PKT_TX_TCP_CKSUM;
-        tcph = (struct vr_tcp *)((char *)iph + iph_len);
+        tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
         tcph->tcp_csum = 0;
-        tcph->tcp_csum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, m->ol_flags);
+        if (iph)
+            tcph->tcp_csum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, m->ol_flags);
+        else if (ip6h)
+            tcph->tcp_csum = rte_ipv6_phdr_cksum((struct ipv6_hdr *)ip6h, m->ol_flags);
     }
 }
 
 static inline void
-dpdk_sw_ip_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
+dpdk_ipv4_sw_iphdr_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
-    struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+    struct vr_ip *iph;
 
     RTE_VERIFY(0 < offset);
 
+    iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
     iph->ip_csum = vr_ip_csum(iph);
 }
 
 static inline void
-dpdk_sw_udptcp_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
+dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
-    struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
-    unsigned iph_len = iph->ip_hl * 4;
+    struct vr_ip *iph = NULL;
+    struct vr_ip6 *ip6h = NULL;
+    unsigned char iph_len, iph_proto;
     struct vr_udp *udph;
     struct vr_tcp *tcph;
 
     RTE_VERIFY(0 < offset);
 
-    if (iph->ip_proto == VR_IP_PROTO_UDP) {
+    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IPOIP) {
+        iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+        iph->ip_csum = vr_ip_csum(iph);
+        iph_len = iph->ip_hl * 4;
+        iph_proto = iph->ip_proto;
+    } else if (pkt->vp_type == VP_TYPE_IP6 || pkt->vp_type == VP_TYPE_IP6OIP) {
+        ip6h = (struct vr_ip6 *)pkt_data_at_offset(pkt, offset);
+        iph_len = sizeof(struct vr_ip6);
+        iph_proto = ip6h->ip6_nxt;
+    }
+
+    if (iph_proto == VR_IP_PROTO_UDP) {
         udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
         udph->udp_csum = 0;
-        udph->udp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, udph);
-    } else if (iph->ip_proto == VR_IP_PROTO_TCP) {
+        if (iph)
+            udph->udp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, udph);
+        else if (ip6h)
+            udph->udp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, udph);
+    } else if (iph_proto == VR_IP_PROTO_TCP) {
         tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
         tcph->tcp_csum = 0;
-        tcph->tcp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, tcph);
+        if (iph)
+            tcph->tcp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, tcph);
+        else if (ip6h)
+            tcph->tcp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, tcph);
     }
+}
+
+static inline void
+dpdk_ipv4_outer_tunnel_hw_checksum(struct vr_packet *pkt)
+{
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
+    unsigned offset = pkt->vp_data + sizeof(struct ether_hdr);
+    struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+    unsigned iph_len = iph->ip_hl * 4;
+    struct vr_udp *udph;
+
+    m->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+    iph->ip_csum = 0;
+    m->l3_len = iph_len;
+    m->l2_len = offset - rte_pktmbuf_headroom(m);
+
+    if (iph->ip_proto == VR_IP_PROTO_UDP) {
+        udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
+        udph->udp_length = htons(pkt_len(pkt));
+        udph->udp_csum = 0;
+    }
+}
+
+static inline void
+dpdk_ipv4_outer_tunnel_sw_checksum(struct vr_packet *pkt)
+{
+    unsigned offset = pkt->vp_data + sizeof(struct ether_hdr);
+    struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+    unsigned iph_len = iph->ip_hl * 4;
+    struct vr_udp *udph;
+
+    if (iph->ip_proto == VR_IP_PROTO_UDP) {
+        udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
+        udph->udp_length = htons(pkt_len(pkt));
+        udph->udp_csum = 0;
+    }
+
+    iph->ip_csum = vr_ip_csum(iph);
 }
 
 static inline void
 dpdk_hw_checksum(struct vr_packet *pkt)
 {
     /* if a tunnel */
-    if (VP_TYPE_IPOIP == pkt->vp_type) {
+    if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum in soft */
         /* TODO: vlan support */
-        dpdk_sw_ip_checksum_at_offset(pkt,
+        dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum in hardware */
-        dpdk_hw_checksum_at_offset(pkt,
-               pkt_get_inner_network_header_off(pkt));
-    } else {
-        /* normal IP packet */
+        dpdk_hw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
+    } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
+        /* normal IPv4 or IPv6 packet */
         /* TODO: vlan support */
-        dpdk_hw_checksum_at_offset(pkt,
-            pkt->vp_data + sizeof(struct ether_hdr));
+        dpdk_hw_checksum_at_offset(pkt, pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
-
 
 static inline void
 dpdk_sw_checksum(struct vr_packet *pkt)
 {
     /* if a tunnel */
-    if (VP_TYPE_IPOIP == pkt->vp_type) {
+    if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum */
         /* TODO: vlan support */
-        dpdk_sw_ip_checksum_at_offset(pkt,
+        dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum */
-        dpdk_sw_ip_checksum_at_offset(pkt,
-            pkt_get_inner_network_header_off(pkt));
-        dpdk_sw_udptcp_checksum_at_offset(pkt,
-            pkt_get_inner_network_header_off(pkt));
-    } else {
-        /* normal IP packet */
+        dpdk_sw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
+    } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
+        /* normal IPv4 or IPv6 packet */
         /* TODO: vlan support */
-        dpdk_sw_ip_checksum_at_offset(pkt,
-            pkt->vp_data + sizeof(struct ether_hdr));
-        dpdk_sw_udptcp_checksum_at_offset(pkt,
-            pkt->vp_data + sizeof(struct ether_hdr));
+        dpdk_sw_checksum_at_offset(pkt, pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
 
@@ -819,17 +880,17 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             dpdk_hw_checksum(pkt);
         else
             dpdk_sw_checksum(pkt);
-    } else if (likely(VP_TYPE_IPOIP == pkt->vp_type)) {
-        /* always calculate outer checksum for tunnels */
-        /* if NIC supports checksum offload */
+    } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
+        /* If NIC supports checksum offload.
+         * Inner checksum is already done. Compute outer IPv4 checksum,
+         * set UDP length, and zero UDP checksum.
+         */
         if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
             /* TODO: vlan support */
-            dpdk_hw_checksum_at_offset(pkt,
-                pkt->vp_data + sizeof(struct ether_hdr));
+            dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
         } else {
             /* TODO: vlan support */
-            dpdk_sw_ip_checksum_at_offset(pkt,
-                pkt->vp_data + sizeof(struct ether_hdr));
+            dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
         }
     }
 
