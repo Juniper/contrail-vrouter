@@ -818,7 +818,8 @@ error:
 }
 
 static void
-dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m, unsigned short overlay_len)
+dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m,
+                    unsigned short overlay_len, unsigned char iph_len)
 {
     int opt_off = sizeof(struct tcphdr);
     u_int8_t *opt_ptr = (u_int8_t *) tcph;
@@ -857,8 +858,7 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m, unsigned short over
                     ethdev_port_id);
             rte_eth_dev_get_mtu(port_id, &mtu);
 
-            max_mss = mtu - (overlay_len + sizeof(struct vr_ip) +
-                sizeof(struct tcphdr));
+            max_mss = mtu - (overlay_len + iph_len + sizeof(struct tcphdr));
 
             if (pkt_mss > max_mss) {
                 opt_ptr[opt_off+2] = (max_mss & 0xff00) >> 8;
@@ -897,38 +897,48 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, struct rte_mbuf *m, unsigned short over
 static int
 dpdk_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 {
-    struct rte_mbuf *m;
-    struct vr_ip *iph;
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
+    struct vr_ip *ip4h = NULL;
+    struct vr_ip6 *ip6h = NULL;
     struct tcphdr *tcph;
     int offset;
-
-    m = vr_dpdk_pkt_to_mbuf(pkt);
+    unsigned char iph_len = 0, iph_proto = 0;
 
     /* check if whole ip header is in the packet */
-    offset = sizeof(struct vr_ip);
-    if (pkt->vp_data + offset < pkt->vp_end)
-        iph = (struct vr_ip *) ((uintptr_t)m->buf_addr + pkt->vp_data);
-    else
-        rte_panic("%s: ip header not in first buffer\n", __func__);
+    if (pkt->vp_type == VP_TYPE_IP) {
+        offset = sizeof(struct vr_ip);
+        if (pkt->vp_data + offset < pkt->vp_end)
+            ip4h = (struct vr_ip *) ((uintptr_t)m->buf_addr + pkt->vp_data);
+        else
+            rte_panic("%s: ip header not in first buffer\n", __func__);
+        iph_proto = ip4h->ip_proto;
+        iph_len = ip4h->ip_hl * 4;
 
-    if (iph->ip_proto != VR_IP_PROTO_TCP)
+        /*
+         * If this is a fragment and not the first one, it can be ignored
+         */
+        if (ip4h->ip_frag_off & htons(IP_OFFMASK))
+            goto out;
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        iph_len = offset = sizeof(struct vr_ip6);
+        if (pkt->vp_data + offset < pkt->vp_end)
+            ip6h = (struct vr_ip6 *) ((uintptr_t)m->buf_addr + pkt->vp_data);
+        else
+            rte_panic("%s: ip header not in first buffer\n", __func__);
+        iph_proto = ip6h->ip6_nxt;
+    }
+
+    if (iph_proto != VR_IP_PROTO_TCP)
         goto out;
-
-    /*
-     * If this is a fragment and not the first one, it can be ignored
-     */
-    if (iph->ip_frag_off & htons(IP_OFFMASK))
-        goto out;
-
 
     /*
      * Now we know exact ip header length,
      * check if whole tcp header is also in the packet
      */
-    offset = (iph->ip_hl * 4) + sizeof(struct tcphdr);
+    offset = iph_len + sizeof(struct tcphdr);
 
     if (pkt->vp_data + offset < pkt->vp_end)
-        tcph = (struct tcphdr *) ((char *) iph + (iph->ip_hl * 4));
+        tcph = (struct tcphdr *)pkt_data_at_offset(pkt, pkt->vp_data + iph_len);
     else
         rte_panic("%s: tcp header not in first buffer\n", __func__);
 
@@ -943,7 +953,7 @@ dpdk_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         rte_panic("%s: tcp header outside first buffer\n", __func__);
 
 
-    dpdk_adjust_tcp_mss(tcph, m, overlay_len);
+    dpdk_adjust_tcp_mss(tcph, m, overlay_len, iph_len);
 
 out:
     return 0;
@@ -1117,7 +1127,7 @@ vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif)
     pkt->vp_network_h = pkt->vp_inner_network_h = 0;
     pkt->vp_nh = NULL;
     pkt->vp_flags = 0;
-    if (likely(m->ol_flags & PKT_TX_IP_CKSUM))
+    if (likely(m->ol_flags & PKT_RX_IP_CKSUM_BAD))
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
     pkt->vp_ttl = 64;
