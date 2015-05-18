@@ -6,17 +6,15 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
-#include <stdint.h>
-#include <linux/vhost.h>
+#include "vr_dpdk.h"
+#include "vr_dpdk_virtio.h"
+#include "vr_uvhost_client.h"
+
 #include <linux/virtio_net.h>
 #include <sys/eventfd.h>
 
-#include "vr_dpdk.h"
-#include "vr_dpdk_virtio.h"
-#include "qemu_uvhost.h"
-#include "vr_uvhost_client.h"
-
 #include <rte_malloc.h>
+#include <rte_memcpy.h>
 
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
@@ -105,12 +103,12 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
-    char ring_name[64];
+    char ring_name[RTE_RING_NAMESIZE];
     struct vr_dpdk_queue_params *rx_queue_params =
         &lcore->lcore_rx_queue_params[vif_idx];
     int ret;
 
-    RTE_LOG(INFO, VROUTER, "\tcreating lcore %u RX ring for queue %u vif %u\n",
+    RTE_LOG(INFO, VROUTER, "    creating lcore %u RX ring for queue %u vif %u\n",
         lcore_id, queue_id, vif_idx);
 
     if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
@@ -160,7 +158,7 @@ error:
         rte_free(vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring);
         vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring = NULL;
     }
-    RTE_LOG(ERR, VROUTER, "\terror creating lcore %u RX ring for queue %u vif %u\n",
+    RTE_LOG(ERR, VROUTER, "    error creating lcore %u RX ring for queue %u vif %u\n",
         lcore_id, queue_id, vif_idx);
     return NULL;
 }

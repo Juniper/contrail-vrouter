@@ -13,12 +13,12 @@
  * vr_dpdk_knidev.c -- DPDK KNI device
  *
  */
-#include <stdio.h>
-#include <unistd.h>
-
-#include <rte_malloc.h>
 
 #include "vr_dpdk.h"
+
+#include <rte_ethdev.h>
+#include <rte_kni.h>
+#include <rte_malloc.h>
 
 /*
  * KNI Reader
@@ -211,7 +211,7 @@ dpdk_kni_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 
     /* free the queue */
     if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u KNI device RX queue\n",
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u KNI device RX queue\n",
                     lcore_id);
     }
 
@@ -251,8 +251,8 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
     if (rx_queue->q_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s RX queue at eth device %"
-            PRIu8 "\n", vif->vif_name, port_id);
+        RTE_LOG(ERR, VROUTER, "    error creating KNI device %s RX queue"
+            " at eth device %" PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
     }
 
@@ -276,7 +276,7 @@ dpdk_kni_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u KNI device TX queue\n",
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u KNI device TX queue\n",
                     lcore_id);
     }
 
@@ -298,10 +298,17 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue_params *tx_queue_params
                     = &lcore->lcore_tx_queue_params[vif_idx];
+    struct vr_dpdk_ethdev *ethdev;
 
     if (vif->vif_type == VIF_TYPE_HOST) {
-        port_id = (((struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os))->
-                ethdev_port_id);
+        ethdev = vif->vif_bridge->vif_os;
+        if (ethdev == NULL) {
+            RTE_LOG(ERR, VROUTER, "    error creating KNI device %s TX queue:"
+                " bridge vif %u ethdev is not initialized\n",
+                vif->vif_name, vif->vif_bridge->vif_idx);
+            return NULL;
+        }
+        port_id = ethdev->ethdev_port_id;
     }
 
     /* init queue */
@@ -316,8 +323,8 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating KNI device %s TX queue at eth device %"
-            PRIu8 "\n", vif->vif_name, port_id);
+        RTE_LOG(ERR, VROUTER, "    error creating KNI device %s TX queue"
+            " at eth device %" PRIu8 "\n", vif->vif_name, port_id);
         return NULL;
     }
 
@@ -426,8 +433,8 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     /* allocate KNI device */
     kni = rte_kni_alloc(vr_dpdk.rss_mempool, &kni_conf, &kni_ops);
     if (kni == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror allocation KNI device %s at eth device %"
-                PRIu8 "\n", vif->vif_name, port_id);
+        RTE_LOG(ERR, VROUTER, "    error allocation KNI device %s"
+            " at eth device %" PRIu8 "\n", vif->vif_name, port_id);
         return -ENOMEM;
     }
 

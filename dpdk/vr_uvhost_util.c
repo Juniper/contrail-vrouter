@@ -4,14 +4,8 @@
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
-#include <stdarg.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/select.h>
-#include <pthread.h>
 
 #include "vr_dpdk.h"
-#include "vr_uvhost.h"
 #include "vr_uvhost_util.h"
 
 #define MAX_UVHOST_FDS 1024
@@ -37,7 +31,7 @@ vr_uvhost_log(const char *format, ...)
     va_list args;
 
     if (RTE_LOGTYPE_UVHOST & rte_logs.type) {
-        char buf[256] = "UVHOST: ";
+        char buf[VR_DPDK_STR_BUF_SZ] = "UVHOST: ";
 
         strncat(buf, format, sizeof(buf) - strlen(buf) - 1);
         buf[sizeof(buf) - 1] = '\0';

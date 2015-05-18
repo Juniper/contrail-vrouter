@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
+
 #ifndef __VR_UVHOST_MSG_H__
 #define __VR_UVHOST_MSG_H__
 

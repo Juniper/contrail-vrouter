@@ -9,6 +9,8 @@
 #ifndef __VR_UVHOST_CLIENT_H__
 #define __VR_UVHOST_CLIENT_H__
 
+#include "qemu_uvhost.h"
+
 /*
  * VR_UVH_MAX_CLIENTS needs to be the same as VR_MAX_INTERFACES.
  */

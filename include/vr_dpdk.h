@@ -17,18 +17,13 @@
 #ifndef _VR_DPDK_H_
 #define _VR_DPDK_H_
 
-#include <net/if.h>
+#include "vr_os.h"
+#include "vr_interface.h"
+#include "vr_packet.h"
+
 #include <sys/queue.h>
 
-#include "vr_os.h"
-#include "vr_packet.h"
-#include "vr_interface.h"
-
 #include <rte_config.h>
-#include <rte_pci.h>
-#include <rte_version.h>
-#include <rte_kni.h>
-#include <rte_ethdev.h>
 #include <rte_port.h>
 
 /*
@@ -46,8 +41,7 @@
 #define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #define RTE_LOGTYPE_DPCORE          RTE_LOGTYPE_USER4
-//#define VR_DPDK_LOGTYPE_DISABLE     (0)
-#define VR_DPDK_LOGTYPE_DISABLE     (RTE_LOGTYPE_USOCK | RTE_LOGTYPE_UVHOST)
+#define VR_DPDK_LOGTYPE_DISABLE     (0)
 
 /*
  * Debug options:
@@ -158,6 +152,8 @@
 #define VR_DPDK_RETRY_CONNECT_SECS  64
 /* Maximum number of KNI devices (vhost0 + monitoring) */
 #define VR_DPDK_MAX_KNI_INTERFACES  5
+/* String buffer size (for logs and EAL arguments) */
+#define VR_DPDK_STR_BUF_SZ          512
 
 /*
  * DPDK LCore IDs

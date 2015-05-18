@@ -4,28 +4,21 @@
  *
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
-#include <sys/select.h>
-#include <sys/un.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <errno.h>
-#include <sys/socket.h>
-#include <linux/vhost.h>
-#include <linux/virtio_net.h>
-#include <stdint.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-
 
 #include "vr_dpdk.h"
-#include "vr_uvhost_util.h"
-#include "vr_uvhost_msg.h"
-#include "qemu_uvhost.h"
-#include "vr_uvhost_client.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk_usocket.h"
+#include "vr_uvhost_client.h"
+#include "vr_uvhost_msg.h"
+#include "vr_uvhost_util.h"
 
+#include <fcntl.h>
+#include <linux/virtio_net.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+
+#include <rte_errno.h>
 #include <rte_hexdump.h>
 
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
@@ -122,11 +115,11 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
             vru_cl->vruc_fds_sent[i] = -1;
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
-                vr_uvhost_log("mmap for size 0x%"PRIx64" failed for FD %d"
+                vr_uvhost_log("mmap for size 0x%" PRIx64 " failed for FD %d"
                         " on vhost client %s (%s)\n",
                         size,
                         vru_cl->vruc_fds_sent[i],
-                        vru_cl->vruc_path, strerror(errno));
+                        vru_cl->vruc_path, rte_strerror(errno));
                 return -1;
             }
 
@@ -380,7 +373,7 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
             vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX), msg->request);
         if (vru_cl->vruc_num_fds_sent > 0) {
             for (i = 0; i < vru_cl->vruc_num_fds_sent; i++) {
-                vr_uvhost_log("\tmessage %d sent FD: %d\n",
+                vr_uvhost_log("    message %d sent FD: %d\n",
                     msg->request, vru_cl->vruc_fds_sent[i]);
             }
         }
@@ -553,7 +546,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                     ret + vru_cl->vruc_msg_bytes_read);
         } else if (ret < 0) {
             RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
-                pthread_self(), fd, ret, strerror(errno), errno);
+                pthread_self(), fd, ret, rte_strerror(errno), errno);
         }
 #endif
         if (ret < 0) {
@@ -644,10 +637,10 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
             return 0;
         }
 
-        vr_uvhost_log("\terror accepting client connection FD %d\n", fd);
+        vr_uvhost_log("    error accepting client connection FD %d\n", fd);
         return -1;
     }
-    vr_uvhost_log("\tFD %d accepted new client connection FD %d\n", fd, s);
+    vr_uvhost_log("    FD %d accepted new client connection FD %d\n", fd, s);
 
     /* We still need to listen for the original socket to support VM
      * shut off/restart, since we create the socket at vif --add
@@ -660,7 +653,7 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
      */
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_msg_handler)) {
-        vr_uvhost_log("\terror adding client %s FD %d read handler\n",
+        vr_uvhost_log("    error adding client %s FD %d read handler\n",
                       sun.sun_path, fd);
         goto error;
     }
@@ -736,7 +729,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     mode_t umask_mode;
 
     if (msg == NULL) {
-        vr_uvhost_log("\terror adding vif %u: message is NULL\n",
+        vr_uvhost_log("    error adding vif %u: message is NULL\n",
                         msg->vrnu_vif_idx);
         return -1;
     }
@@ -745,11 +738,11 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
                         msg->vrnu_vif_name);
     s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (s == -1) {
-        vr_uvhost_log("\terror creating vif %u socket: %s (%d)\n",
-                        msg->vrnu_vif_idx, strerror(errno), errno);
+        vr_uvhost_log("    error creating vif %u socket: %s (%d)\n",
+                        msg->vrnu_vif_idx, rte_strerror(errno), errno);
         goto error;
     }
-    vr_uvhost_log("\tvif %u socket %s FD is %d\n",
+    vr_uvhost_log("    vif %u socket %s FD is %d\n",
                             msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
 
     memset(&sun, 0, sizeof(sun));
@@ -770,8 +763,8 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 
     ret = bind(s, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
-        vr_uvhost_log("\terror binding vif %u FD %d to %s: %s (%d)\n",
-            msg->vrnu_vif_idx, s, sun.sun_path, strerror(errno), errno);
+        vr_uvhost_log("    error binding vif %u FD %d to %s: %s (%d)\n",
+            msg->vrnu_vif_idx, s, sun.sun_path, rte_strerror(errno), errno);
         goto error;
     }
 
@@ -785,14 +778,14 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 
     ret = listen(s, 1);
     if (ret == -1) {
-        vr_uvhost_log("\terror listening vif %u socket FD %d: %s (%d)\n",
-                        msg->vrnu_vif_idx, s, strerror(errno), errno);
+        vr_uvhost_log("    error listening vif %u socket FD %d: %s (%d)\n",
+                        msg->vrnu_vif_idx, s, rte_strerror(errno), errno);
         goto error;
     }
 
     vru_cl = vr_uvhost_new_client(s, sun.sun_path, msg->vrnu_vif_idx);
     if (vru_cl == NULL) {
-        vr_uvhost_log("\terror creating vif %u socket %s new vhost client\n",
+        vr_uvhost_log("    error creating vif %u socket %s new vhost client\n",
                       msg->vrnu_vif_idx, sun.sun_path);
         goto error;
     }
@@ -803,7 +796,7 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 
     ret = vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_listen_handler);
     if (ret == -1) {
-        vr_uvhost_log("\terror adding vif %u socket FD %d\n",
+        vr_uvhost_log("    error adding vif %u socket FD %d\n",
                         msg->vrnu_vif_idx, s);
         goto error;
     }
@@ -894,13 +887,13 @@ vr_uvh_nl_listen_handler(int fd, void *arg)
     vr_uvhost_log("Handling connection FD %d...\n", fd);
     s = accept(fd, (struct sockaddr *) &sun, &len);
     if (s < 0) {
-        vr_uvhost_log("\terror accepting NetLink connection FD %d\n", fd);
+        vr_uvhost_log("    error accepting NetLink connection FD %d\n", fd);
         return -1;
     }
-    vr_uvhost_log("\tFD %d accepted new NetLink connection FD %d\n", fd, s);
+    vr_uvhost_log("    FD %d accepted new NetLink connection FD %d\n", fd, s);
 
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_msg_handler)) {
-        vr_uvhost_log("\terror adding socket %s FD %d read handler\n",
+        vr_uvhost_log("    error adding socket %s FD %d read handler\n",
                       sun.sun_path, fd);
         return -1;
     }

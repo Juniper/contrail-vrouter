@@ -13,13 +13,11 @@
  * vr_dpdk_ringdev.c -- DPDK ring device
  *
  */
-#include <stdio.h>
-#include <unistd.h>
 
 #include "vr_dpdk.h"
 
-#include <rte_port_ring.h>
 #include <rte_malloc.h>
+#include <rte_port_ring.h>
 
 /* Allocates a new ring */
 struct rte_ring *
@@ -65,7 +63,7 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     rtp->rtp_tx_queue = tx_queue;
     rte_wmb();
     lcore->lcore_nb_rings_to_push++;
-    RTE_LOG(INFO, VROUTER, "\tlcore %u now has %"PRIu16
+    RTE_LOG(INFO, VROUTER, "    lcore %u now has %" PRIu16
         " ring(s) to push/route\n",
         lcore_id, lcore->lcore_nb_rings_to_push);
     RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_DPDK_MAX_RINGS);
@@ -119,7 +117,7 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u ring\n", lcore_id);
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u ring\n", lcore_id);
     }
 
     /* reset the queue */
@@ -189,7 +187,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 
 error:
-    RTE_LOG(ERR, VROUTER, "\terror initializing ring TX queue for device %"
+    RTE_LOG(ERR, VROUTER, "    error initializing ring TX queue for device %"
         PRIu8 "\n", port_id);
     return NULL;
 }

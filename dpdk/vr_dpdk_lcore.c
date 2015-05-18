@@ -14,20 +14,19 @@
  *
  */
 
-#include <sched.h>
-#include <rte_malloc.h>
-#include <urcu-qsbr.h>
-#include <linux/vhost.h>
-
 #include "vr_dpdk.h"
-#include "vr_uvhost.h"
+#include "vr_dpdk_netlink.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
-#include "vr_dpdk_netlink.h"
+#include "vr_uvhost.h"
 
-#include <rte_timer.h>
+#include <urcu-qsbr.h>
+
 #include <rte_cycles.h>
+#include <rte_ethdev.h>
+#include <rte_malloc.h>
 #include <rte_port_ethdev.h>
+#include <rte_timer.h>
 
 /*
  * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the
@@ -172,7 +171,7 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned least_used_id = vr_dpdk_lcore_least_used_get();
 
     if (least_used_id == VR_MAX_CPUS) {
-        RTE_LOG(ERR, VROUTER, "\terror getting the least used lcore ID\n");
+        RTE_LOG(ERR, VROUTER, "    error getting the least used lcore ID\n");
         return -EFAULT;
     }
 
@@ -186,7 +185,7 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
         return ret;
 
     /* init RX queue */
-    RTE_LOG(INFO, VROUTER, "\tlcore %u RX from filtering queue %" PRIu16
+    RTE_LOG(INFO, VROUTER, "    lcore %u RX from filtering queue %" PRIu16
         " MPLS %u\n", least_used_id, queue_id, mpls_label);
     rx_queue = vr_dpdk_ethdev_rx_queue_init(least_used_id, vif, queue_id);
     if (rx_queue == NULL)
@@ -212,7 +211,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     struct vr_dpdk_lcore *lcore;
 
     if (least_used_id == VR_MAX_CPUS) {
-        RTE_LOG(ERR, VROUTER, "\terror getting the least used lcore ID\n");
+        RTE_LOG(ERR, VROUTER, "    error getting the least used lcore ID\n");
         return -EFAULT;
     }
 
@@ -231,7 +230,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
                     (nb_tx_queues > vr_dpdk.nb_fwd_lcores)) &&
                 (queue_id < nb_tx_queues)) {
                 /* there is a hardware queue available */
-                RTE_LOG(INFO, VROUTER, "\tlcore %u TX to HW queue %" PRIu16 "\n",
+                RTE_LOG(INFO, VROUTER, "    lcore %u TX to HW queue %" PRIu16 "\n",
                     lcore_id, queue_id);
                 tx_queue = (*tx_queue_init_op)(lcore_id, vif, queue_id);
                 if (tx_queue == NULL)
@@ -240,7 +239,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
                 queue_id++;
             } else {
                 /* no more hardware queues left, so we use rings instead */
-                RTE_LOG(INFO, VROUTER, "\tlcore %u TX to SW ring\n", lcore_id);
+                RTE_LOG(INFO, VROUTER, "    lcore %u TX to SW ring\n", lcore_id);
                 tx_queue = vr_dpdk_ring_tx_queue_init(lcore_id, vif, least_used_id);
                 if (tx_queue == NULL)
                     return -EFAULT;
@@ -265,7 +264,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
             /* init hardware queue */
             if (queue_id < nb_rx_queues) {
                 /* there is a hardware queue available */
-                RTE_LOG(INFO, VROUTER, "\tlcore %u RX from HW queue %" PRIu16
+                RTE_LOG(INFO, VROUTER, "    lcore %u RX from HW queue %" PRIu16
                         "\n", lcore_id, queue_id);
                 rx_queue = (*rx_queue_init_op)(lcore_id, vif, queue_id);
                 if (rx_queue == NULL)
@@ -353,13 +352,13 @@ dpdk_lcore_rxtx_release_all(struct vr_interface *vif)
         lcore = vr_dpdk.lcores[lcore_id];
         rx_queue_params = &lcore->lcore_rx_queue_params[vif->vif_idx];
         if (rx_queue_params->qp_release_op) {
-            RTE_LOG(INFO, VROUTER, "\treleasing lcore %u RX queue\n", lcore_id);
+            RTE_LOG(INFO, VROUTER, "    releasing lcore %u RX queue\n", lcore_id);
             rx_queue_params->qp_release_op(lcore_id, vif);
         }
 
         tx_queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx];
         if (tx_queue_params->qp_release_op) {
-            RTE_LOG(INFO, VROUTER, "\treleasing lcore %u TX queue\n", lcore_id);
+            RTE_LOG(INFO, VROUTER, "    releasing lcore %u TX queue\n", lcore_id);
             tx_queue_params->qp_release_op(lcore_id, vif);
         }
     }
@@ -709,6 +708,7 @@ dpdk_lcore_bond_tx(struct vr_dpdk_lcore *lcore)
     struct vr_dpdk_queue_params *tx_queue_params;
     unsigned int vif_idx;
 
+    /* TODO: check it is a bond interface */
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
         /* if TX queue is an ethdev */
         if (tx_queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
