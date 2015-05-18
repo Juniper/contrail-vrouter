@@ -13,22 +13,21 @@
  * dpdk_vrouter.c -- vRouter/DPDK application
  *
  */
+
+/* For sched_getaffinity() */
 #define _GNU_SOURCE
-#include <sched.h>
-#include <unistd.h>
+
+#include "vr_dpdk.h"
+#include "vr_dpdk_virtio.h"
+#include "vr_uvhost.h"
 
 #include <getopt.h>
 #include <signal.h>
-#include <linux/vhost.h>
 
-#include <rte_timer.h>
 #include <rte_errno.h>
-
-#include "vr_dpdk.h"
-#include "vr_uvhost.h"
-#include "vr_packet.h"
-#include "qemu_uvhost.h"
-#include "vr_dpdk_virtio.h"
+#include <rte_ethdev.h>
+#include <rte_kni.h>
+#include <rte_timer.h>
 
 static int no_daemon_set;
 extern char *ContrailBuildInfo;
@@ -36,21 +35,20 @@ extern char *ContrailBuildInfo;
 /* Global vRouter/DPDK structure */
 struct vr_dpdk_global vr_dpdk;
 
-/* TODO: default commandline params */
 static char *dpdk_argv[] = {
     "dpdk",
-    "-m", VR_DPDK_MAX_MEM,
-    "-n", VR_DPDK_MAX_MEMCHANNELS,
     /* the argument will be updated in dpdk_init() */
     "--lcores", NULL,
-    /* up to five optional arguments */
+    "-m", VR_DPDK_MAX_MEM,
+    "-n", VR_DPDK_MAX_MEMCHANNELS,
+    /* up to ten optional arguments (5 pairs of argument + option) */
     NULL, NULL,
     NULL, NULL,
     NULL, NULL,
     NULL, NULL,
     NULL, NULL
 };
-static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 5*2;
+static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 10;
 
 /* Pktmbuf constructor with vr_packet support */
 void
@@ -148,7 +146,9 @@ dpdk_core_mask_get(void)
     long system_cpus_count, core_mask_count;
 
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0) {
-        printf("Error getting affinity. Falling back do the default core mask.\n");
+        RTE_LOG(ERR, VROUTER, "Error getting affinity."
+            " Falling back do the default core mask 0x%" PRIx64 "\n",
+                (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
         return VR_DPDK_DEF_LCORE_MASK;
     }
 
@@ -166,7 +166,9 @@ dpdk_core_mask_get(void)
     }
 
     if (!cpu_core_mask) {
-        printf("Error: core mask is zero. Falling back do the default core mask.\n");
+        RTE_LOG(ERR, VROUTER, "Error: core mask is zero."
+            " Falling back do the default core mask 0x%" PRIx64 "\n",
+                (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
         return VR_DPDK_DEF_LCORE_MASK;
     }
 
@@ -176,7 +178,9 @@ dpdk_core_mask_get(void)
      */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
     if (system_cpus_count == -1) {
-        printf("Error getting number of processors. Falling back do the default core mask.\n");
+        RTE_LOG(ERR, VROUTER, "Error getting number of processors."
+            " Falling back do the default core mask 0x%" PRIx64 "\n",
+                (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
         return cpu_core_mask;
     }
 
@@ -184,7 +188,9 @@ dpdk_core_mask_get(void)
         = __builtin_popcountll((unsigned long long)cpu_core_mask);
 
     if (core_mask_count == system_cpus_count) {
-        printf("Using default core mask.\n");
+        RTE_LOG(NOTICE, VROUTER, "Use taskset(1) to set the core mask."
+            " Falling back do the default core mask 0x%" PRIx64 "\n",
+                (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
         return VR_DPDK_DEF_LCORE_MASK;
     }
 
@@ -196,7 +202,7 @@ static char *
 dpdk_core_mask_stringify(uint64_t core_mask)
 {
     int ret, lcore_id = 0, core_id = 0;
-    static char core_mask_string[256];
+    static char core_mask_string[VR_DPDK_STR_BUF_SZ];
     char *p = core_mask_string;
     bool first_lcore = true;
 
@@ -230,7 +236,7 @@ dpdk_argv_update(void)
     long int system_cpus_count;
     int i;
     char *core_mask_str;
-    static char lcores_string[512];
+    static char lcores_string[VR_DPDK_STR_BUF_SZ];
 
     /* get number of available CPUs */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
@@ -260,11 +266,13 @@ dpdk_argv_update(void)
     }
 
     /* print out configuration */
-    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID)
-        printf("Using VLAN TCI: %"PRIu16"\n", vr_dpdk.vlan_tag);
-    printf("EAL arguments:\n");
-    for (i = 1; i < dpdk_argc - 1; i += 2)
-        printf("\t%s \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+        RTE_LOG(INFO, VROUTER, "Using VLAN TCI: %" PRIu16 "\n", vr_dpdk.vlan_tag);
+    }
+    RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
+    for (i = 1; i < dpdk_argc - 1; i += 2) {
+        RTE_LOG(INFO, VROUTER, "    %9s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
+    }
 
     return 0;
 }
@@ -277,19 +285,19 @@ dpdk_init(void)
 
     ret = vr_dpdk_flow_mem_init();
     if (ret < 0) {
-        fprintf(stderr, "Error initializing flow table: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "Error initializing flow table: %s (%d)\n",
             rte_strerror(-ret), -ret);
         return ret;
     }
 
     if (dpdk_argv_update() == -1) {
-        fprintf(stderr, "Error updating lcores arguments\n");
+        RTE_LOG(ERR, VROUTER, "Error updating lcores arguments\n");
         return -1;
     }
 
     ret = rte_eal_init(dpdk_argc, dpdk_argv);
     if (ret < 0) {
-        fprintf(stderr, "Error initializing EAL\n");
+        RTE_LOG(ERR, VROUTER, "Error initializing EAL\n");
         return ret;
     }
     /* disable unwanted logtypes for debug purposes */
@@ -459,15 +467,17 @@ static struct option long_options[] = {
 static void
 Usage(void)
 {
-    printf("Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n");
-    printf("             [--vlan <tci>] [--vdev <config>]\n");
-    printf("\n");
-    printf("--no-daemon  Do not demonize the vRouter\n");
-    printf("--help       Prints this help message\n");
-    printf("--version    Prints build information\n");
-    printf("\n");
-    printf("--vlan <tci>     VLAN tag control information\n");
-    printf("--vdev <config>  Virtual device configuration\n");
+    RTE_LOG(INFO, VROUTER,
+        "Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n"
+        "             [--vlan <tci>] [--vdev <config>]\n"
+        "\n"
+        "--no-daemon  Do not demonize the vRouter\n"
+        "--help       Prints this help message\n"
+        "--version    Prints build information\n"
+        "\n"
+        "--vlan <tci>     VLAN tag control information\n"
+        "--vdev <config>  Virtual device configuration\n"
+        );
 
     exit(1);
 }
@@ -475,7 +485,7 @@ Usage(void)
 static void
 version_print(void)
 {
-    printf("Build information: %s\n", ContrailBuildInfo);
+    RTE_LOG(INFO, VROUTER, "Build information: %s\n", ContrailBuildInfo);
 }
 
 static void
@@ -528,6 +538,9 @@ main(int argc, char *argv[])
     int ret, opt, option_index;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
 
+    /* early init the log */
+    rte_openlog_stream(stdout);
+
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {
         switch (opt) {
@@ -537,7 +550,7 @@ main(int argc, char *argv[])
 
         case '?':
         default:
-            fprintf(stderr, "Invalid option %s\n", argv[optind - 1]);
+            RTE_LOG(ERR, VROUTER, "Invalid option %s\n", argv[optind - 1]);
             Usage();
             break;
         }
@@ -547,15 +560,14 @@ main(int argc, char *argv[])
 
     if (!no_daemon_set) {
         if (daemon(0, 0) < 0) {
-            fprintf(stderr, "Error daemonizing vRouter: %s (%d)\n",
-                strerror(errno), errno);
+            RTE_LOG(ERR, VROUTER, "Error daemonizing vRouter: %s (%d)\n",
+                rte_strerror(errno), errno);
             return 1;
         }
     }
 
-    printf("Starting vRouter/DPDK...\n");
+    RTE_LOG(INFO, VROUTER, "Starting vRouter/DPDK...\n");
     version_print();
-    fflush(stdout);
 
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();

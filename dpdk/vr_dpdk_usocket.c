@@ -5,29 +5,21 @@
  * Copyright(c) 2014, Juniper Networks Inc.
  * All rights reserved
  */
-#include <stdio.h>
-#include <unistd.h>
+
+#include "vr_dpdk.h"
+#include "vr_dpdk_usocket.h"
+#include "vr_message.h"
+
 #include <fcntl.h>
 #include <poll.h>
-#include <stdbool.h>
-
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
+#include <linux/netlink.h>
 #include <sys/eventfd.h>
+#include <sys/stat.h>
+#include <sys/un.h>
 
 #include <urcu-qsbr.h>
 
-#include <netinet/in.h>
-
-#include <linux/netlink.h>
-
-#include "vr_queue.h"
-#include "vr_dpdk_usocket.h"
-#include "vr_message.h"
-#include "vr_dpdk.h"
-
+#include <rte_errno.h>
 #include <rte_hexdump.h>
 #include <rte_timer.h>
 
@@ -614,7 +606,7 @@ retry_read:
         rte_hexdump(stdout, "usock buffer dump:", buf + offset, ret);
     } else if (ret < 0) {
         RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
-            pthread_self(), usockp->usock_fd, ret, strerror(errno), errno);
+            pthread_self(), usockp->usock_fd, ret, rte_strerror(errno), errno);
     }
 #endif
     if (ret <= 0) {
@@ -629,7 +621,7 @@ retry_read:
             return 0;
 
         RTE_LOG(ERR, USOCK, "Error reading FD %d: %s (%d)\n",
-                usockp->usock_fd, strerror(errno), errno);
+                usockp->usock_fd, rte_strerror(errno), errno);
         return ret;
     }
 

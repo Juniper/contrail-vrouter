@@ -4,20 +4,15 @@
  * Copyright(c) 2014, Juniper Networks Inc.,
  * All rights reserved
  */
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <rte_errno.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
 
 #include "vr_dpdk.h"
-
 #include "vr_btable.h"
+
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
+#include <rte_errno.h>
 
 #define MAX_LINE_SIZE   128
 #define HPI_MAX         16
@@ -150,7 +145,7 @@ vr_dpdk_flow_mem_init(void)
 
     ret = vr_hugepage_info_init();
     if (ret < 0) {
-        fprintf(stderr, "Error initializing hugepage info: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "Error initializing hugepage info: %s (%d)\n",
             rte_strerror(-ret), -ret);
         return ret;
     }
@@ -181,7 +176,7 @@ vr_dpdk_flow_mem_init(void)
     if (touse_file_name) {
         fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         if (fd == -1) {
-            fprintf(stderr, "Error opening file %s: %s (%d)\n",
+            RTE_LOG(ERR, VROUTER, "Error opening file %s: %s (%d)\n",
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }
@@ -190,7 +185,7 @@ vr_dpdk_flow_mem_init(void)
         /* the file descriptor is no longer needed */
         close(fd);
         if (vr_dpdk.flow_table == MAP_FAILED) {
-            fprintf(stderr, "Error mmapping file %s: %s (%d)\n",
+            RTE_LOG(ERR, VROUTER, "Error mmapping file %s: %s (%d)\n",
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }

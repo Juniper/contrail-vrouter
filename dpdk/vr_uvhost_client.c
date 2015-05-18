@@ -5,16 +5,8 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
-#include <sys/socket.h>
-#include <linux/vhost.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "vr_dpdk.h"
-#include "qemu_uvhost.h"
 #include "vr_uvhost_client.h"
-
-#include <stddef.h>
 
 static vr_uvh_client_t vr_uvh_clients[VR_UVH_MAX_CLIENTS];
 

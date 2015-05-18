@@ -4,22 +4,19 @@
  * Copyright (c) 2014, Juniper Networks Private Inc.,
  * All rights reserved
  */
-#include <stdio.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <sys/un.h>
-#include <sys/stat.h>
 
-#include <linux/netlink.h>
-#include <linux/genetlink.h>
-
-#include "vr_queue.h"
+#include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_message.h"
-#include "vr_dpdk.h"
 #include "vr_genetlink.h"
 #include "vr_uvhost.h"
 #include "vr_uvhost_msg.h"
+
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <linux/genetlink.h>
+
+#include <rte_errno.h>
 
 #define HDR_LEN (NLMSG_HDRLEN + GENL_HDRLEN + sizeof(struct nlattr))
 
@@ -157,8 +154,8 @@ vr_netlink_uvhost_vif_del(unsigned int vif_idx)
      */
     if (send(vr_nl_uvh_sock, (void *) &msg, sizeof(msg), 0) !=
              sizeof(msg)) {
-        RTE_LOG(ERR, VROUTER, "\terror deleting vif %u from user space vhost:"
-            " %s (%d)\n", vif_idx, strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error deleting vif %u from user space vhost:"
+            " %s (%d)\n", vif_idx, rte_strerror(errno), errno);
         return -1;
     }
 
@@ -190,8 +187,8 @@ vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
      */
     if (send(vr_nl_uvh_sock, (void *) &msg, sizeof(msg), 0) !=
              sizeof(msg)) {
-        RTE_LOG(ERR, VROUTER, "\terror adding vif %u to user space vhost:"
-            " %s (%d)\n", vif_idx, strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error adding vif %u to user space vhost:"
+            " %s (%d)\n", vif_idx, rte_strerror(errno), errno);
         return -1;
     }
 
@@ -221,11 +218,11 @@ vr_nl_uvhost_connect(void)
 
     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror creating uvhost socket: %s (%d)\n",
-                        strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error creating uvhost socket: %s (%d)\n",
+                        rte_strerror(errno), errno);
         goto error;
     }
-    RTE_LOG(INFO, VROUTER, "\tuvhost Unix socket FD is %d\n", s);
+    RTE_LOG(INFO, VROUTER, "    uvhost Unix socket FD is %d\n", s);
 
     memset(&nl_sun, 0, sizeof(nl_sun));
     nl_sun.sun_family = AF_UNIX;
@@ -235,8 +232,8 @@ vr_nl_uvhost_connect(void)
     unlink(nl_sun.sun_path);
     ret = bind(s, (struct sockaddr *) &nl_sun, sizeof(nl_sun));
     if (ret == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror binding uvhost FD %d to %s: %s (%d)\n",
-                        s, nl_sun.sun_path, strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error binding uvhost FD %d to %s: %s (%d)\n",
+                        s, nl_sun.sun_path, rte_strerror(errno), errno);
         goto error;
     }
 
@@ -249,8 +246,8 @@ vr_nl_uvhost_connect(void)
     strncpy(uvh_sun.sun_path, VR_UVH_NL_SOCK, sizeof(uvh_sun.sun_path) - 1);
     ret = vr_dpdk_retry_connect(s, (struct sockaddr *) &uvh_sun, sizeof(uvh_sun));
     if (ret == -1) {
-        RTE_LOG(ERR, VROUTER, "\terror connecting uvhost socket FD %d to %s: %s (%d)\n",
-                        s, uvh_sun.sun_path, strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error connecting uvhost socket FD %d to %s:"
+            " %s (%d)\n", s, uvh_sun.sun_path, rte_strerror(errno), errno);
         goto error;
     }
 
@@ -282,11 +279,11 @@ vr_dpdk_netlink_init(void)
 
     vr_dpdk.netlink_sock = vr_usocket(NETLINK, TCP);
     if (!vr_dpdk.netlink_sock) {
-        RTE_LOG(ERR, VROUTER, "\terror creating NetLink server socket: %s (%d)\n",
-                strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error creating NetLink server socket:"
+            " %s (%d)\n", rte_strerror(errno), errno);
         return -1;
     }
-    RTE_LOG(INFO, VROUTER, "\tNetLink TCP socket FD is %d\n",
+    RTE_LOG(INFO, VROUTER, "    NetLink TCP socket FD is %d\n",
             ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
 
     ret = vr_nl_uvhost_connect();
@@ -294,7 +291,7 @@ vr_dpdk_netlink_init(void)
         vr_message_transport_unregister(&dpdk_nl_transport);
         vr_usocket_close(vr_dpdk.netlink_sock);
 
-        RTE_LOG(ERR, VROUTER, "\terror creating uvhost connection\n");
+        RTE_LOG(ERR, VROUTER, "    error creating uvhost connection\n");
         return -1;
     }
 

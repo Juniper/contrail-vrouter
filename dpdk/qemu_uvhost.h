@@ -8,6 +8,8 @@
 #ifndef __QEMU_UVHOST_H__
 #define __QEMU_UVHOST_H__
 
+#include <linux/vhost.h>
+
 #define VHOST_MEMORY_MAX_NREGIONS    8
 #define VHOST_CLIENT_MAX_VRINGS      2
 

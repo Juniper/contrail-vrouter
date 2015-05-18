@@ -14,28 +14,25 @@
  *
  */
 
-#include <stdarg.h>
-#include <sys/user.h>
-#include <linux/if_ether.h>
+#include "vr_dpdk.h"
+#include "vr_fragment.h"
+#include "vr_hash.h"
+#include "vr_proto.h"
+#include "vr_sandesh.h"
 
+#include <linux/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <sys/user.h>
 
 #include <urcu-qsbr.h>
 
-#include <rte_config.h>
-#include <rte_malloc.h>
-#include <rte_jhash.h>
-#include <rte_timer.h>
 #include <rte_cycles.h>
 #include <rte_errno.h>
+#include <rte_ethdev.h>
 #include <rte_jhash.h>
-
-#include "vr_dpdk.h"
-#include "vr_sandesh.h"
-#include "vr_proto.h"
-#include "vr_hash.h"
-#include "vr_fragment.h"
+#include <rte_malloc.h>
+#include <rte_timer.h>
 
 /* Max number of CPUs. We adjust it later in vr_dpdk_host_init() */
 unsigned int vr_num_cpus = VR_MAX_CPUS;
@@ -68,7 +65,7 @@ dpdk_printf(const char *format, ...)
     va_list args;
 
     if (RTE_LOGTYPE_DPCORE & rte_logs.type) {
-        char buf[256] = "DPCORE: ";
+        char buf[VR_DPDK_STR_BUF_SZ] = "DPCORE: ";
 
         strncat(buf, format, sizeof(buf) - strlen(buf) - 1);
         buf[sizeof(buf) - 1] = '\0';
@@ -126,7 +123,7 @@ static struct vr_packet *
 dpdk_palloc_head(struct vr_packet *pkt, unsigned int size)
 {
     /* TODO: not implemented */
-    fprintf(stderr, "%s: not implemented\n", __func__);
+    RTE_LOG(ERR, VROUTER, "%s: not implemented\n", __func__);
     return NULL;
 }
 
@@ -972,13 +969,13 @@ dpdk_add_mpls(struct vrouter *router, unsigned mpls_label)
             RTE_LOG(INFO, VROUTER, "Enabling hardware acceleration on vif %u for MPLS %u\n",
                 (unsigned)eth_vif->vif_idx, mpls_label);
             if (!eth_vif->vif_ip) {
-                RTE_LOG(ERR, VROUTER, "\terror accelerating MPLS %u: no IP address set\n",
+                RTE_LOG(ERR, VROUTER, "    error accelerating MPLS %u: no IP address set\n",
                     mpls_label);
                 continue;
             }
             ret = vr_dpdk_lcore_mpls_schedule(eth_vif, eth_vif->vif_ip, mpls_label);
             if (ret != 0)
-                RTE_LOG(INFO, VROUTER, "\terror accelerating MPLS %u: %s (%d)\n",
+                RTE_LOG(INFO, VROUTER, "    error accelerating MPLS %u: %s (%d)\n",
                     mpls_label, rte_strerror(-ret), -ret);
         }
     }
@@ -1244,7 +1241,7 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
     va_list ap;
     int ret = 0;
     uint32_t hash;
-    char buf[256];
+    char buf[VR_DPDK_STR_BUF_SZ];
 
     /* fallback to rte_log */
     if (last_hash == NULL) {

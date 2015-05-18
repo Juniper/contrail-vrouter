@@ -13,15 +13,13 @@
  * vr_dpdk_ethdev.c -- DPDK ethernet device
  *
  */
-#include <stdio.h>
-#include <unistd.h>
 
 #include "vr_dpdk.h"
 
-#include <rte_port_ethdev.h>
 #include <rte_eth_bond.h>
 #include <rte_errno.h>
-#include <rte_byteorder.h>
+#include <rte_ethdev.h>
+#include <rte_port_ethdev.h>
 
 static struct rte_eth_conf ethdev_conf = {
     .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
@@ -139,7 +137,7 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
         (unsigned)dst_ip, (unsigned)VR_MPLS_OVER_UDP_DST_PORT, (unsigned)mpls_label);
 
     if (queue_id >= 0xFF) {
-        RTE_LOG(ERR, VROUTER, "\terror adding perfect filter for eth device %"
+        RTE_LOG(ERR, VROUTER, "    error adding perfect filter for eth device %"
                 PRIu8 ": queue ID %" PRIu16 " is out of range\n",
                  port_id, queue_id);
         return -EINVAL;
@@ -178,7 +176,7 @@ dpdk_ethdev_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 
     /* free the queue */
     if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u eth device RX queue\n",
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u eth device RX queue\n",
                     lcore_id);
     }
 
@@ -220,7 +218,7 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
     if (rx_queue->q_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
+        RTE_LOG(ERR, VROUTER, "    error creating eth device %" PRIu8
                 " RX queue %" PRIu16 "\n", port_id, rx_queue_id);
         return NULL;
     }
@@ -245,7 +243,7 @@ dpdk_ethdev_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 
     /* flush and free the queue */
     if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
-        RTE_LOG(ERR, VROUTER, "\terror freeing lcore %u eth device TX queue\n",
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u eth device TX queue\n",
                     lcore_id);
     }
 
@@ -287,7 +285,7 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror creating eth device %" PRIu8
+        RTE_LOG(ERR, VROUTER, "    error creating eth device %" PRIu8
                 " TX queue %" PRIu16 "\n", port_id, tx_queue_id);
         return NULL;
     }
@@ -318,9 +316,9 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
         VR_DPDK_MAX_RETA_SIZE);
 
     RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u"
-            " max_rx_queues=%"PRIu16 " max_tx_queues=%"PRIu16
-            " max_vfs=%"PRIu16" max_vmdq_pools=%"PRIu16
-            " rx_offload_capa=%"PRIx32" tx_offload_capa=%"PRIx32"\n",
+            " max_rx_queues=%" PRIu16 " max_tx_queues=%" PRIu16
+            " max_vfs=%" PRIu16 " max_vmdq_pools=%" PRIu16
+            " rx_offload_capa=%" PRIx32 " tx_offload_capa=%" PRIx32 "\n",
             dev_info.driver_name, dev_info.if_index,
             dev_info.max_rx_queues, dev_info.max_tx_queues,
             dev_info.max_vfs, dev_info.max_vmdq_pools,
@@ -330,7 +328,7 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
     /* use RSS queues only */
     ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #else
-    /* use RSS queues only if device does not support RETA */
+    /* we use just RSS queues if the device does not support RETA */
     if (ethdev->ethdev_reta_size == 0)
         ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #endif
@@ -357,7 +355,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
             ethdev->ethdev_queue_states[i] = VR_DPDK_QUEUE_RSS_STATE;
         } else if (i < ethdev->ethdev_nb_rx_queues) {
             if (vr_dpdk.nb_free_mempools == 0) {
-                RTE_LOG(ERR, VROUTER, "\terror assigning mempool to eth device %"
+                RTE_LOG(ERR, VROUTER, "    error assigning mempool to eth device %"
                     PRIu8 " RX queue %d\n", port_id, i);
                 return -ENOMEM;
             }
@@ -375,7 +373,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
             /* return mempool to the list */
             if (mempool != vr_dpdk.rss_mempool)
                 vr_dpdk.nb_free_mempools++;
-            RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " RX queue %d"
+            RTE_LOG(ERR, VROUTER, "    error setting up eth device %" PRIu8 " RX queue %d"
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
@@ -383,7 +381,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
         ethdev->ethdev_mempools[i] = mempool;
     }
     i = ethdev->ethdev_nb_rx_queues - ethdev->ethdev_nb_rss_queues;
-    RTE_LOG(INFO, VROUTER, "\tsetup %d RSS queue(s) and %d filtering queue(s)\n",
+    RTE_LOG(INFO, VROUTER, "    setup %d RSS queue(s) and %d filtering queue(s)\n",
         (int)ethdev->ethdev_nb_rss_queues, i);
 
     /* configure TX queues */
@@ -391,7 +389,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
         ret = rte_eth_tx_queue_setup(port_id, i, VR_DPDK_NB_TXD,
             rte_eth_dev_socket_id(port_id), &tx_queue_conf);
         if (ret < 0) {
-            RTE_LOG(ERR, VROUTER, "\terror setting up eth device %" PRIu8 " TX queue %d"
+            RTE_LOG(ERR, VROUTER, "    error setting up eth device %" PRIu8 " TX queue %d"
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
@@ -409,7 +407,10 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
     struct rte_eth_rss_reta_entry64 reta_entries[VR_DPDK_MAX_RETA_ENTRIES];
     struct rte_eth_rss_reta_entry64 *reta;
 
-    /* check if device support RETA */
+    /* There is nothing to configure if the device does not support RETA.
+     * If the device reported few RX queues earlier, we assume those
+     * queues are preconfigured for RSS by default.
+     */
     if (ethdev->ethdev_reta_size == 0)
         return 0;
 
@@ -435,7 +436,7 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
         return 0;
 
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror initializing ethdev %" PRIu8 " RSS: %s (%d)\n",
+        RTE_LOG(ERR, VROUTER, "    error initializing ethdev %" PRIu8 " RSS: %s (%d)\n",
             port_id, rte_strerror(-ret), -ret);
     }
 
@@ -474,7 +475,7 @@ vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
     ret = rte_eth_dev_fdir_get_infos(port_id, &fdir_info);
     if (ret == 0) {
         /* enable hardware filtering */
-        RTE_LOG(INFO, VROUTER, "\tenable hardware filtering for ethdev %"
+        RTE_LOG(INFO, VROUTER, "    enable hardware filtering for ethdev %"
             PRIu8 "\n", port_id);
         vif->vif_flags |= VIF_FLAG_FILTERING_OFFLOAD;
     } else {
@@ -492,7 +493,7 @@ vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
 
     ret = rte_eth_dev_fdir_set_masks(port_id, &masks);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror setting ethdev %" PRIu8
+        RTE_LOG(ERR, VROUTER, "    error setting ethdev %" PRIu8
             " Flow Director masks: %s (%d)\n", port_id, rte_strerror(-ret), -ret);
     }
 
@@ -517,7 +518,7 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
 
         memset(&mac_addr, 0, sizeof(bond_mac));
         rte_eth_macaddr_get(port_id, &bond_mac);
-        RTE_LOG(INFO, VROUTER, "\tbond eth device %" PRIu8
+        RTE_LOG(INFO, VROUTER, "    bond eth device %" PRIu8
             " configured MAC " MAC_FORMAT "\n",
             port_id, MAC_VALUE(bond_mac.addr_bytes));
         /* log out and configure bond members */
@@ -526,9 +527,8 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
             memset(&mac_addr, 0, sizeof(mac_addr));
             rte_eth_macaddr_get(slave_port_id, &mac_addr);
             pci_addr = &rte_eth_devices[slave_port_id].pci_dev->addr;
-            RTE_LOG(INFO, VROUTER, "\tbond member eth device %" PRIu8
-                " PCI "PCI_PRI_FMT
-                " MAC " MAC_FORMAT "\n",
+            RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
+                " PCI " PCI_PRI_FMT " MAC " MAC_FORMAT "\n",
                 slave_port_id, pci_addr->domain, pci_addr->bus,
                 pci_addr->devid, pci_addr->function,
                 MAC_VALUE(mac_addr.addr_bytes));
@@ -538,10 +538,10 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
                 && rte_eth_dev_mac_addr_add(slave_port_id, &lacp_mac, 0) == 0) {
                 /* disable the promisc mode enabled by default */
                 rte_eth_promiscuous_disable(ethdev->ethdev_port_id);
-                RTE_LOG(INFO, VROUTER, "\tbond member eth device %"PRIu8
+                RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
                     " promisc mode disabled\n", slave_port_id);
             } else {
-                RTE_LOG(INFO, VROUTER, "\tbond member eth device %"PRIu8
+                RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
                     ": unable to add MAC addresses\n", slave_port_id);
             }
         }
@@ -571,7 +571,7 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
     ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
         ethdev->ethdev_nb_tx_queues, &ethdev_conf);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror configuring eth dev %" PRIu8
+        RTE_LOG(ERR, VROUTER, "    error configuring eth dev %" PRIu8
                 ": %s (%d)\n",
             port_id, rte_strerror(-ret), -ret);
         return ret;

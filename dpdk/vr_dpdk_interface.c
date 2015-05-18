@@ -14,20 +14,13 @@
  *
  */
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <net/if.h>
-#include <linux/vhost.h>
-
-#include "vr_queue.h"
 #include "vr_dpdk.h"
+#include "vr_dpdk_netlink.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
-#include "vr_dpdk_netlink.h"
 
 #include <rte_errno.h>
-#include <rte_ether.h>
+#include <rte_ethdev.h>
 #include <rte_ip.h>
 
 /*
@@ -195,7 +188,9 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
         port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
         if (port_id == VR_DPDK_INVALID_PORT_ID) {
-            RTE_LOG(ERR, VROUTER, "Invalid PCI address %d:%d:%d:%d\n",
+            RTE_LOG(ERR, VROUTER, "Error adding vif %u eth device %s:"
+                " no port ID found for PCI " PCI_PRI_FMT "\n",
+                    vif->vif_idx, vif->vif_name,
                     pci_address.domain, pci_address.bus,
                     pci_address.devid, pci_address.function);
             return -ENOENT;
@@ -205,7 +200,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " PCI "PCI_PRI_FMT
+    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " PCI " PCI_PRI_FMT
         " MAC " MAC_FORMAT "\n",
         vif->vif_idx, port_id, pci_address.domain, pci_address.bus,
         pci_address.devid, pci_address.function,
@@ -213,7 +208,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding eth dev %s: already added\n",
+        RTE_LOG(ERR, VROUTER, "    error adding eth dev %s: already added\n",
                 vif->vif_name);
         return -EEXIST;
     }
@@ -230,7 +225,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror starting eth device %" PRIu8
+        RTE_LOG(ERR, VROUTER, "    error starting eth device %" PRIu8
                 ": %s (%d)\n", port_id, rte_strerror(-ret), -ret);
         return ret;
     }
@@ -266,7 +261,7 @@ dpdk_fabric_if_del(struct vr_interface *vif)
      * then vif->vif_os will be NULL.
      */
     if (vif->vif_os == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror deleting eth dev %s: already removed\n",
+        RTE_LOG(ERR, VROUTER, "    error deleting eth dev %s: already removed\n",
                 vif->vif_name);
         return -EEXIST;
     }
@@ -299,9 +294,17 @@ dpdk_vhost_if_add(struct vr_interface *vif)
         memset(&pci_address, 0, sizeof(pci_address));
         dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
         port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
+        if (port_id == VR_DPDK_INVALID_PORT_ID) {
+            RTE_LOG(ERR, VROUTER, "Error adding vif %u KNI device %s:"
+                " no port ID found for PCI " PCI_PRI_FMT "\n",
+                    vif->vif_idx, vif->vif_name,
+                    pci_address.domain, pci_address.bus,
+                    pci_address.devid, pci_address.function);
+            return -ENOENT;
+        }
         /*
          * KNI does not support bond interfaces and generate random MACs,
-         * so we try to get a bond member istead.
+         * so we try to get a bond member instead.
          */
         ethdev = &vr_dpdk.ethdevs[port_id];
         if (ethdev->ethdev_nb_slaves > 0)
@@ -321,14 +324,14 @@ dpdk_vhost_if_add(struct vr_interface *vif)
 
         memset(&mac_addr, 0, sizeof(mac_addr));
         rte_eth_macaddr_get(port_id, &mac_addr);
-        RTE_LOG(INFO, VROUTER, "\tusing bond slave eth device %" PRIu8
+        RTE_LOG(INFO, VROUTER, "    using bond slave eth device %" PRIu8
                 " MAC " MAC_FORMAT "\n",
                 port_id, MAC_VALUE(mac_addr.addr_bytes));
     }
 
     /* check if KNI is already added */
     if (vr_dpdk.knis[vif->vif_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding KNI device %s: already exist\n",
+        RTE_LOG(ERR, VROUTER, "    error adding KNI device %s: already exist\n",
                 vif->vif_name);
         return -EEXIST;
     }
@@ -358,7 +361,7 @@ dpdk_vhost_if_del(struct vr_interface *vif)
 
     /* check if KNI exists */
     if (vr_dpdk.knis[vif->vif_idx] == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror deleting KNI device %u: "
+        RTE_LOG(ERR, VROUTER, "    error deleting KNI device %u: "
                     "device does not exist\n", vif->vif_idx);
         return -EEXIST;
     }
@@ -440,15 +443,15 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
      */
     monitored_vif = __vrouter_get_interface(router, monitored_vif_id);
     if (!monitored_vif) {
-        RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",
-                monitored_vif_id);
+        RTE_LOG(ERR, VROUTER, "    error getting vif to monitor:"
+            " vif %u does not exist\n", monitored_vif_id);
         return -EINVAL;
     }
 
     /* check if KNI is already added */
     if (vr_dpdk.knis[vif->vif_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding monitoring device %s: "
-                "vif %d KNI device already exist\n",
+        RTE_LOG(ERR, VROUTER, "    error adding monitoring device %s:"
+                " vif %d KNI device already exist\n",
                 vif->vif_name, vif->vif_idx);
         return -EEXIST;
     }
@@ -457,7 +460,7 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
      * TODO: we always use DPDK port 0 for monitoring KNI
      * DPDK numerates all the detected Ethernet devices starting from 0.
      * So we might only get into an issue if we have no eth devices at all
-     * or we have few eth ports and don't what to use the first one.
+     * or we have few eth ports and don't want to use the first one.
      */
     ret = vr_dpdk_knidev_init(0, vif);
     if (ret != 0)
@@ -494,8 +497,8 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
     monitored_vif = __vrouter_get_interface(vrouter_get(vif->vif_rid),
                                                     monitored_vif_id);
     if (!monitored_vif) {
-        RTE_LOG(ERR, VROUTER, "\terror getting vif to monitor: vif %u does not exist\n",
-                monitored_vif_id);
+        RTE_LOG(ERR, VROUTER, "    error getting vif to monitor:"
+            " vif %u does not exist\n", monitored_vif_id);
     } else {
         /* stop monitoring */
         dpdk_monitoring_stop(monitored_vif, vif);
@@ -505,8 +508,8 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
 
     /* check if KNI is added */
     if (vr_dpdk.knis[vif->vif_idx] == NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror deleting monitoring device: "
-                "vif %d KNI device does not exist\n",
+        RTE_LOG(ERR, VROUTER, "    error deleting monitoring device:"
+                " vif %d KNI device does not exist\n",
                 vif->vif_idx);
         return -EEXIST;
     }
@@ -529,7 +532,7 @@ dpdk_agent_if_add(struct vr_interface *vif)
 
     /* check if packet device is already added */
     if (vr_dpdk.packet_ring != NULL) {
-        RTE_LOG(ERR, VROUTER, "\terror adding packet device %s: already exist\n",
+        RTE_LOG(ERR, VROUTER, "    error adding packet device %s: already exist\n",
             vif->vif_name);
         return -EEXIST;
     }
@@ -537,8 +540,8 @@ dpdk_agent_if_add(struct vr_interface *vif)
     /* init packet device */
     ret = dpdk_packet_socket_init();
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "\terror initializing packet socket: %s (%d)\n",
-            strerror(errno), errno);
+        RTE_LOG(ERR, VROUTER, "    error initializing packet socket: %s (%d)\n",
+            rte_strerror(errno), errno);
         return ret;
     }
 

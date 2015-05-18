@@ -4,13 +4,14 @@
  * Copyright (c) 2014, Juniper Networks, Inc.
  * All rights reserved
  */
+
+#include "vr_dpdk.h"
+#include "vr_queue.h"
+#include "vr_dpdk_usocket.h"
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdbool.h>
-
-#include "vr_queue.h"
-#include "vr_dpdk.h"
-#include "vr_dpdk_usocket.h"
 
 int dpdk_packet_core_id = -1;
 
@@ -94,7 +95,7 @@ dpdk_packet_socket_init(void)
             vr_dpdk.packet_ring = rte_ring_create("pkt0_tx", VR_DPDK_TX_RING_SZ,
                     SOCKET_ID_ANY, RING_F_SC_DEQ);
             if (!vr_dpdk.packet_ring) {
-                RTE_LOG(ERR, VROUTER, "\terror creating pkt0 ring\n");
+                RTE_LOG(ERR, VROUTER, "    error creating pkt0 ring\n");
                 goto error;
             }
         }
