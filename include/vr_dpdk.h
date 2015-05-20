@@ -90,6 +90,8 @@
                                     + sizeof(struct vr_udp))/2)
 /* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*VR_MAX_CPUS) */
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
+/* Maximum number of bond interfaces per lcore */
+#define VR_DPDK_MAX_BONDS           2
 /* Max size of a single packet */
 #define VR_DPDK_MAX_PACKET_SZ       2048
 /* Number of bytes needed for each mbuf */
@@ -132,7 +134,7 @@
  * interface at least 10 times per second or LACP will not
  * work correctly
  */
-#define VR_DPDK_BOND_TX_MS          90
+#define VR_DPDK_BOND_TX_MS          100
 /* Sleep time in US if there are no queues to poll */
 #define VR_DPDK_SLEEP_NO_QUEUES_US  10000
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
@@ -257,6 +259,10 @@ struct vr_dpdk_lcore {
     volatile uint16_t lcore_nb_rings_to_push;
     /* List of rings to push */
     struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS];
+    /* Number of bond queues to TX */
+    volatile uint16_t lcore_nb_bonds_to_tx;
+    /* List of bond queue params to TX LACP packets periodically */
+    struct vr_dpdk_queue_params *lcore_bonds_to_tx[VR_DPDK_MAX_BONDS];
     /* Table of RX queue params */
     struct vr_dpdk_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES];
     /* Table of TX queue params */

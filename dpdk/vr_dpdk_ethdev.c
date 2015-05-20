@@ -233,10 +233,23 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 static void
 dpdk_ethdev_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 {
+    int i;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
+
+    /* remove queue params from the list of bonds to TX */
+    for (i = 0; i < lcore->lcore_nb_bonds_to_tx; i++) {
+        if (likely(lcore->lcore_bonds_to_tx[i] == tx_queue_params)) {
+            lcore->lcore_bonds_to_tx[i] = NULL;
+            lcore->lcore_nb_bonds_to_tx--;
+            RTE_VERIFY(lcore->lcore_nb_bonds_to_tx <= VR_DPDK_MAX_BONDS);
+            /* copy the last element to the empty spot */
+            lcore->lcore_bonds_to_tx[i] = lcore->lcore_bonds_to_tx[lcore->lcore_nb_bonds_to_tx];
+            break;
+        }
+    }
 
     tx_queue->txq_ops.f_tx = NULL;
     rte_wmb();
@@ -294,6 +307,14 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     tx_queue_params->qp_release_op = &dpdk_ethdev_tx_queue_release;
     tx_queue_params->qp_ethdev.queue_id = tx_queue_id;
     tx_queue_params->qp_ethdev.port_id = port_id;
+
+    /* add queue params to the list of bonds to TX */
+    if (ethdev->ethdev_nb_slaves > 0) {
+        /* make sure queue params has been stored */
+        rte_wmb();
+        lcore->lcore_bonds_to_tx[lcore->lcore_nb_bonds_to_tx++] = tx_queue_params;
+        RTE_VERIFY(lcore->lcore_nb_bonds_to_tx <= VR_DPDK_MAX_BONDS);
+    }
 
     return tx_queue;
 }

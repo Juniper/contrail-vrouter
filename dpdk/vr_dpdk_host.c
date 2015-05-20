@@ -111,7 +111,7 @@ dpdk_palloc(unsigned int size)
     struct rte_mbuf *m;
 
     /* in DPDK we have fixed-sized mbufs only */
-    RTE_VERIFY(size < VR_DPDK_MAX_PACKET_SZ);
+    RTE_VERIFY(size <= VR_DPDK_MAX_PACKET_SZ);
     m = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
     if (!m)
         return (NULL);

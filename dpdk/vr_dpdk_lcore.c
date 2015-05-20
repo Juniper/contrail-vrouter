@@ -157,7 +157,7 @@ dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
 
     /* decrease the number of RX queues */
     lcore->lcore_nb_rx_queues--;
-    RTE_VERIFY(lcore->lcore_nb_rx_queues < VR_MAX_INTERFACES);
+    RTE_VERIFY(lcore->lcore_nb_rx_queues <= VR_MAX_INTERFACES);
 }
 
 /* Schedule an MPLS label queue */
@@ -704,20 +704,14 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
 static void
 dpdk_lcore_bond_tx(struct vr_dpdk_lcore *lcore)
 {
-    struct vr_dpdk_queue *tx_queue;
+    int i;
     struct vr_dpdk_queue_params *tx_queue_params;
-    unsigned int vif_idx;
 
-    /* TODO: check it is a bond interface */
-    SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
-        /* if TX queue is an ethdev */
-        if (tx_queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
-            vif_idx = tx_queue->q_vif->vif_idx;
-            tx_queue_params = &lcore->lcore_tx_queue_params[vif_idx];
-            /* TX any pending LACP packets */
-            rte_eth_tx_burst(tx_queue_params->qp_ethdev.port_id,
-                tx_queue_params->qp_ethdev.queue_id, NULL, 0);
-        }
+    for (i = 0; i < lcore->lcore_nb_bonds_to_tx; i++) {
+        tx_queue_params = lcore->lcore_bonds_to_tx[i];
+        /* TX any pending LACP packets */
+        rte_eth_tx_burst(tx_queue_params->qp_ethdev.port_id,
+            tx_queue_params->qp_ethdev.queue_id, NULL, 0);
     }
 }
 
