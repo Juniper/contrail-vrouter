@@ -495,6 +495,18 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         return 0;
     }
 
+    /*
+     * we really do not allow any broadcast packets from interfaces
+     * that are part of transparent service chain, since transparent
+     * service chain bridges packets across vrf (and hence loops can
+     * happen)
+     */
+    if ((pkt->vp_flags & VP_FLAG_MULTICAST) &&
+            (vif_is_service(vif))) {
+        vif_drop_pkt(vif, pkt, 1);
+        return 0;
+    }
+
     if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, &fmd))
         return 0;
 
