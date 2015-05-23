@@ -2566,6 +2566,9 @@ nh_table_exit(struct vrouter *router, bool soft_reset)
     unsigned int i;
     struct vr_nexthop *nh;
 
+    if (!router->vr_nexthops)
+        return;
+
     for (i = 0; i < router->vr_max_nexthops; i++) {
         if (soft_reset && i == NH_DISCARD_ID)
             continue;
