@@ -321,7 +321,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         mbuf_flags = 0;
         pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
         if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
-            mbuf_flags |= PKT_TX_IP_CKSUM;
+            mbuf_flags |= PKT_RX_IP_CKSUM_BAD;
 
         /*
          * Ignore virtio header in first descriptor as we don't support
