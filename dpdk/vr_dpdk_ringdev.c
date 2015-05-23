@@ -66,7 +66,7 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     RTE_LOG(INFO, VROUTER, "    lcore %u now has %" PRIu16
         " ring(s) to push/route\n",
         lcore_id, lcore->lcore_nb_rings_to_push);
-    RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_DPDK_MAX_RINGS);
+    RTE_VERIFY(lcore->lcore_nb_rings_to_push <= VR_DPDK_MAX_RINGS);
 }
 
 /* Remove the ring from the list of rings to push
@@ -84,7 +84,7 @@ dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring)
 
     rtp->rtp_tx_ring = NULL;
     lcore->lcore_nb_rings_to_push--;
-    RTE_VERIFY(lcore->lcore_nb_rings_to_push < VR_DPDK_MAX_RINGS);
+    RTE_VERIFY(lcore->lcore_nb_rings_to_push <= VR_DPDK_MAX_RINGS);
     rte_wmb();
     /* copy the last element to the empty spot */
     last_rtp = &lcore->lcore_rings_to_push[lcore->lcore_nb_rings_to_push];
