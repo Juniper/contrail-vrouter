@@ -305,7 +305,7 @@ vrouter_ops_get_process(void *s_req)
     }
 
     resp->vo_interfaces = router->vr_max_interfaces;
-    resp->vo_vrfs = VR_MAX_VRFS;
+    resp->vo_vrfs = router->vr_max_vrfs;
     resp->vo_mpls_labels = router->vr_max_labels;
     resp->vo_nexthops = router->vr_max_nexthops;
     resp->vo_bridge_entries = vr_bridge_entries;

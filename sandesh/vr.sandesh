@@ -162,7 +162,7 @@ buffer sandesh vr_vrf_assign_req {
     1:  sandesh_op          h_op;
     2:  i16                 var_rid;
     3:  i16                 var_vif_index;
-    4:  i16                 var_vif_vrf;
+    4:  i32                 var_vif_vrf;
     5:  i16                 var_vlan_id;
     6:  i16                 var_marker;
     7:  i32                 var_nh_id;
@@ -173,7 +173,7 @@ buffer sandesh vr_vrf_stats_req {
     2:  i16                 vsr_rid;
     3:  i16                 vsr_family;
     4:  i16                 vsr_type;
-    5:  i16                 vsr_vrf;
+    5:  i32                 vsr_vrf;
     6:  i64                 vsr_discards;
     7:  i64                 vsr_resolves;
     8:  i64                 vsr_receives;
