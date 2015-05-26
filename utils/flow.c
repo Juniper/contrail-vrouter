@@ -66,7 +66,8 @@ struct flow_table {
     unsigned int ft_flags;
     unsigned int ft_cpus;
     unsigned int ft_hold_oflows;
-    u_int32_t ft_hold_stat[64];
+    unsigned int ft_hold_stat_count;
+    u_int32_t ft_hold_stat[128];
     char flow_table_path[256];
 } main_table;
 
@@ -156,9 +157,9 @@ dump_table(struct flow_table *ft)
     printf("Entries: Created %lu Added %lu Processed %lu\n",
             ft->ft_created, ft->ft_added, ft->ft_processed);
     printf("(Created Flows/CPU: ");
-    for (i = 0; i < ft->ft_cpus; i++) {
+    for (i = 0; i < ft->ft_hold_stat_count; i++) {
         printf("%u", ft->ft_hold_stat[i]);
-        if (i != (ft->ft_cpus - 1))
+        if (i != (ft->ft_hold_stat_count - 1))
             printf(" ");
     }
     printf(")(oflows %u)\n\n", ft->ft_hold_oflows);
@@ -543,9 +544,19 @@ flow_table_map(vr_flow_req *req)
     ft->ft_cpus = req->fr_cpus;
 
     if (req->fr_hold_stat && req->fr_hold_stat_size) {
-        for (i = 0; i < ft->ft_cpus; i++) {
+        ft->ft_hold_stat_count = req->fr_hold_stat_size;
+        for (i = 0; i < req->fr_hold_stat_size; i++) {
+            if (i ==
+                    (sizeof(ft->ft_hold_stat) / sizeof(ft->ft_hold_stat[0]))) {
+                ft->ft_hold_stat_count = i;
+                break;
+            }
+
             ft->ft_hold_stat[i] = req->fr_hold_stat[i];
         }
+    } else {
+        ft->ft_hold_stat_count = 0;
+        memset(ft->ft_hold_stat, 0, sizeof(ft->ft_hold_stat));
     }
 
     return ft->ft_num_entries;
