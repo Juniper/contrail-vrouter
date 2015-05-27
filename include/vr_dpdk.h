@@ -156,6 +156,8 @@
 #define VR_DPDK_MAX_KNI_INTERFACES  5
 /* String buffer size (for logs and EAL arguments) */
 #define VR_DPDK_STR_BUF_SZ          512
+/* Log timestamp format */
+#define VR_DPDK_TIMESTAMP           "%F %T"
 
 /*
  * DPDK LCore IDs

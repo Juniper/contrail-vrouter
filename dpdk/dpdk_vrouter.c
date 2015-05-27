@@ -23,6 +23,7 @@
 
 #include <getopt.h>
 #include <signal.h>
+#include <sys/time.h>
 
 #include <rte_errno.h>
 #include <rte_ethdev.h>
@@ -35,6 +36,7 @@ extern char *ContrailBuildInfo;
 /* Global vRouter/DPDK structure */
 struct vr_dpdk_global vr_dpdk;
 
+/* Arguments for EAL init */
 static char *dpdk_argv[] = {
     "dpdk",
     /* the argument will be updated in dpdk_init() */
@@ -49,6 +51,9 @@ static char *dpdk_argv[] = {
     NULL, NULL
 };
 static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 10;
+
+/* Timestamp logger */
+static FILE *timestamp_log_stream;
 
 /* Pktmbuf constructor with vr_packet support */
 void
@@ -300,6 +305,9 @@ dpdk_init(void)
         RTE_LOG(ERR, VROUTER, "Error initializing EAL\n");
         return ret;
     }
+    /* EAL resets the log stream */
+    rte_openlog_stream(timestamp_log_stream);
+
     /* disable unwanted logtypes for debug purposes */
     rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
 
@@ -467,7 +475,7 @@ static struct option long_options[] = {
 static void
 Usage(void)
 {
-    RTE_LOG(INFO, VROUTER,
+    printf(
         "Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n"
         "             [--vlan <tci>] [--vdev <config>]\n"
         "\n"
@@ -532,14 +540,52 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     }
 }
 
+static ssize_t
+timestamp_log_write(__attribute__((unused)) void *c, const char *buf, size_t size)
+{
+    ssize_t ret;
+    struct timeval tv;
+    struct tm *tm;
+    char outbuf[VR_DPDK_STR_BUF_SZ];
+    size_t len = 0;
+
+    gettimeofday(&tv, NULL);
+    if ((tm = localtime(&tv.tv_sec)) != NULL) {
+        len += strftime(outbuf, sizeof(outbuf) - len, VR_DPDK_TIMESTAMP, tm);
+        len += snprintf(outbuf + len, sizeof(outbuf) - len, ",%03lu ", tv.tv_usec/1000);
+    }
+
+    strncpy(outbuf + len, buf, sizeof(outbuf) - len);
+    if (sizeof(outbuf) - len > size)
+        len += size;
+    else
+        len = sizeof(outbuf);
+
+    ret = fwrite(outbuf, len, 1, stdout);
+    fflush(stdout);
+
+    if (ret == 0)
+        return -1;
+
+    return ret;
+}
+static cookie_io_functions_t timestamp_log_func = {
+    .write = timestamp_log_write,
+};
+
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
 
-    /* early init the log */
-    rte_openlog_stream(stdout);
+    /* init the timestamp log */
+    timestamp_log_stream = fopencookie(NULL, "w+", timestamp_log_func);
+    if (timestamp_log_stream == NULL) {
+        printf("Error configuring log stream. Falling back to stdout.\n");
+        timestamp_log_stream = stdout;
+    }
+    rte_openlog_stream(timestamp_log_stream);
 
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {
