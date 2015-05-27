@@ -61,7 +61,8 @@ vr_vxlan_req_process(void *s_req)
 
    dump_marker = req->vxlanr_vnid;
 
-   response_pending = false;
+   if (vxlan_op != SANDESH_OP_DUMP)
+       response_pending = false;
 
    return;
 }
@@ -151,6 +152,8 @@ op_retry:
             if (resp->nl_op == SANDESH_REQUEST) {
                 sandesh_decode(resp->nl_data, resp->nl_len,
                                vr_find_sandesh_info, &ret);
+            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
+                response_pending = false;
             }
         }
 
