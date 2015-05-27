@@ -241,7 +241,9 @@ vr_route_req_process(void *s_req)
         printf(" %10d\n", rt->rtr_nh_id);
     }
 
-    response_pending = false;
+    if (cmd_op != SANDESH_OP_DUMP)
+        response_pending = false;
+
     return;
 }
 
@@ -406,9 +408,12 @@ vr_send_one_message(void)
     while (response_pending) {
         if ((ret = nl_recvmsg(cl)) > 0) {
             resp = nl_parse_reply(cl);
-            if (resp->nl_op == SANDESH_REQUEST)
+            if (resp->nl_op == SANDESH_REQUEST) {
                 sandesh_decode(resp->nl_data, resp->nl_len,
                                vr_find_sandesh_info, &ret);
+            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
+                response_pending = false;
+            }
         }
     }
     return resp_code;

@@ -249,7 +249,8 @@ vr_nexthop_req_process(void *s_req)
         dump_marker = req->nhr_id;
     }
 
-    response_pending = false;
+    if (command != 3)
+        response_pending = false;
     printf("\n");
 }
 
@@ -386,6 +387,8 @@ op_retry:
             resp = nl_parse_reply(cl);
             if (resp->nl_op == SANDESH_REQUEST) {
                 sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
+                response_pending = false;
             }
         }
 
