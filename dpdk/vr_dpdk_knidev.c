@@ -23,7 +23,23 @@
 /*
  * KNI Reader
  */
+#if DPDK_KNIDEV_READER_STATS_COLLECT == 1
+
+#define DPDK_KNIDEV_READER_STATS_PKTS_IN_ADD(port, val) \
+    port->stats.n_pkts_in += val
+#define DPDK_KNIDEV_READER_STATS_PKTS_DROP_ADD(port, val) \
+    port->stats.n_pkts_drop += val
+
+#else
+
+#define DPDK_KNIDEV_READER_STATS_PKTS_IN_ADD(port, val)
+#define DPDK_KNIDEV_READER_STATS_PKTS_DROP_ADD(port, val)
+
+#endif
+
 struct dpdk_knidev_reader {
+    struct rte_port_in_stats stats;
+
     struct rte_kni *kni;
 };
 
@@ -64,8 +80,12 @@ dpdk_knidev_reader_rx(void *port, struct rte_mbuf **pkts, uint32_t n_pkts)
 {
     struct dpdk_knidev_reader *p =
         (struct dpdk_knidev_reader *) port;
+    uint32_t nb_rx;
 
-    return rte_kni_rx_burst(p->kni, pkts, n_pkts);
+    nb_rx = rte_kni_rx_burst(p->kni, pkts, n_pkts);
+    DPDK_KNIDEV_READER_STATS_PKTS_IN_ADD(p, nb_rx);
+
+    return nb_rx;
 }
 
 static int
@@ -81,10 +101,42 @@ dpdk_knidev_reader_free(void *port)
     return 0;
 }
 
+static int
+dpdk_knidev_reader_stats_read(void *port,
+    struct rte_port_in_stats *stats, int clear)
+{
+    struct dpdk_knidev_reader *p =
+        (struct dpdk_knidev_reader *) port;
+
+    if (stats != NULL)
+        memcpy(stats, &p->stats, sizeof(p->stats));
+
+    if (clear)
+        memset(&p->stats, 0, sizeof(p->stats));
+
+    return 0;
+}
+
 /*
  * KNI Writer
  */
+#if DPDK_KNIDEV_WRITER_STATS_COLLECT == 1
+
+#define DPDK_KNIDEV_WRITER_STATS_PKTS_IN_ADD(port, val) \
+    port->stats.n_pkts_in += val
+#define DPDK_KNIDEV_WRITER_STATS_PKTS_DROP_ADD(port, val) \
+    port->stats.n_pkts_drop += val
+
+#else
+
+#define DPDK_KNIDEV_WRITER_STATS_PKTS_IN_ADD(port, val)
+#define DPDK_KNIDEV_WRITER_STATS_PKTS_DROP_ADD(port, val)
+
+#endif
+
 struct dpdk_knidev_writer {
+    struct rte_port_out_stats stats;
+
     struct rte_mbuf *tx_buf[2 * RTE_PORT_IN_BURST_SIZE_MAX];
     uint32_t tx_burst_sz;
     uint16_t tx_buf_count;
@@ -139,6 +191,7 @@ send_burst(struct dpdk_knidev_writer *p)
 
     nb_tx = rte_kni_tx_burst(p->kni, p->tx_buf, p->tx_buf_count);
 
+    DPDK_KNIDEV_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
     for ( ; nb_tx < p->tx_buf_count; nb_tx++)
         /* TODO: a separate counter for this drop */
         vr_dpdk_pfree(p->tx_buf[nb_tx], VP_DROP_INTERFACE_DROP);
@@ -152,6 +205,7 @@ dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
     struct dpdk_knidev_writer *p = (struct dpdk_knidev_writer *) port;
 
     p->tx_buf[p->tx_buf_count++] = pkt;
+    DPDK_KNIDEV_WRITER_STATS_PKTS_IN_ADD(p, 1);
     if (p->tx_buf_count >= p->tx_burst_sz)
         send_burst(p);
 
@@ -183,6 +237,22 @@ dpdk_knidev_writer_free(void *port)
     return 0;
 }
 
+static int
+dpdk_knidev_writer_stats_read(void *port,
+    struct rte_port_out_stats *stats, int clear)
+{
+    struct dpdk_knidev_writer *p =
+        (struct dpdk_knidev_writer *) port;
+
+    if (stats != NULL)
+        memcpy(stats, &p->stats, sizeof(p->stats));
+
+    if (clear)
+        memset(&p->stats, 0, sizeof(p->stats));
+
+    return 0;
+}
+
 /*
  * Summary of KNI operations
  */
@@ -190,6 +260,7 @@ struct rte_port_in_ops dpdk_knidev_reader_ops = {
     .f_create = dpdk_knidev_reader_create,
     .f_free = dpdk_knidev_reader_free,
     .f_rx = dpdk_knidev_reader_rx,
+    .f_stats = dpdk_knidev_reader_stats_read,
 };
 
 struct rte_port_out_ops dpdk_knidev_writer_ops = {
@@ -198,6 +269,7 @@ struct rte_port_out_ops dpdk_knidev_writer_ops = {
     .f_tx = dpdk_knidev_writer_tx,
     .f_tx_bulk = NULL, /* TODO: not implemented */
     .f_flush = dpdk_knidev_writer_flush,
+    .f_stats = dpdk_knidev_writer_stats_read,
 };
 
 /* Release KNI RX queue */
