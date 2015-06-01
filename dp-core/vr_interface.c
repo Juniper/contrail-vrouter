@@ -1806,12 +1806,14 @@ generate_resp:
 }
 
 static void
-vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
+vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf, short core)
 {
     unsigned int i;
     struct vr_interface_stats *stats;
     struct vr_interface_settings settings;
+    short real_core;
 
+    req->vifr_core = core;
     req->vifr_type = intf->vif_type;
     req->vifr_flags = intf->vif_flags;
     req->vifr_vrf = intf->vif_vrf;
@@ -1860,15 +1862,50 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
     req->vifr_obytes = 0;
     req->vifr_opackets = 0;
     req->vifr_oerrors = 0;
+    req->vifr_ifenqpackets = 0;
+    req->vifr_ifenqdrops = 0;
+    req->vifr_ifdeqpackets = 0;
+    req->vifr_ifdeqdrops = 0;
+    req->vifr_rngenqpackets = 0;
+    req->vifr_rngenqdrops = 0;
+    req->vifr_rngdeqpackets = 0;
+    req->vifr_rngdeqdrops = 0;
 
-    for (i = 0; i < vr_num_cpus; i++) {
-        stats = vif_get_stats(intf, i);
-        req->vifr_ibytes += stats->vis_ibytes;
-        req->vifr_ipackets += stats->vis_ipackets;
-        req->vifr_ierrors += stats->vis_ierrors;
-        req->vifr_obytes += stats->vis_obytes;
-        req->vifr_opackets += stats->vis_opackets;
-        req->vifr_oerrors += stats->vis_oerrors;
+    if (req->vifr_core == 0) {
+        for (i = 0; i < vr_num_cpus; i++) {
+            stats = vif_get_stats(intf, i);
+            req->vifr_ibytes += stats->vis_ibytes;
+            req->vifr_ipackets += stats->vis_ipackets;
+            req->vifr_ierrors += stats->vis_ierrors;
+            req->vifr_obytes += stats->vis_obytes;
+            req->vifr_opackets += stats->vis_opackets;
+            req->vifr_oerrors += stats->vis_oerrors;
+            req->vifr_ifenqpackets += stats->vis_ifenqpackets;
+            req->vifr_ifenqdrops += stats->vis_ifenqdrops;
+            req->vifr_ifdeqpackets += stats->vis_ifdeqpackets;
+            req->vifr_ifdeqdrops += stats->vis_ifdeqdrops;
+            req->vifr_rngenqpackets += stats->vis_rngenqpackets;
+            req->vifr_rngenqdrops += stats->vis_rngenqdrops;
+            req->vifr_rngdeqpackets += stats->vis_rngdeqpackets;
+            req->vifr_rngdeqdrops += stats->vis_rngdeqdrops;
+        }
+    } else if (req->vifr_core > 0) {
+            real_core = req->vifr_core - 1;
+            stats = vif_get_stats(intf, real_core);
+            req->vifr_ibytes = stats->vis_ibytes;
+            req->vifr_ipackets = stats->vis_ipackets;
+            req->vifr_ierrors = stats->vis_ierrors;
+            req->vifr_obytes = stats->vis_obytes;
+            req->vifr_opackets = stats->vis_opackets;
+            req->vifr_oerrors = stats->vis_oerrors;
+            req->vifr_ifenqpackets += stats->vis_ifenqpackets;
+            req->vifr_ifenqdrops += stats->vis_ifenqdrops;
+            req->vifr_ifdeqpackets += stats->vis_ifdeqpackets;
+            req->vifr_ifdeqdrops += stats->vis_ifdeqdrops;
+            req->vifr_rngenqpackets += stats->vis_rngenqpackets;
+            req->vifr_rngenqdrops += stats->vis_rngenqdrops;
+            req->vifr_rngdeqpackets += stats->vis_rngdeqpackets;
+            req->vifr_rngdeqdrops += stats->vis_rngdeqdrops;
     }
 
     req->vifr_speed = -1;
@@ -1935,6 +1972,13 @@ vr_interface_get(vr_interface_req *req)
     struct vr_interface *vif = NULL;
     struct vrouter *router;
     vr_interface_req *resp = NULL;
+    short core;
+
+    if (req->vifr_core <= vr_num_cpus)
+        core = req->vifr_core;
+    else
+        core = 0;
+
 
     router = vrouter_get(req->vifr_rid);
     if (!router) {
@@ -1954,7 +1998,7 @@ vr_interface_get(vr_interface_req *req)
             goto generate_response;
         }
 
-        vr_interface_make_req(resp, vif);
+        vr_interface_make_req(resp, vif, core);
     } else
         ret = -ENOENT;
 
@@ -1974,7 +2018,11 @@ vr_interface_dump(vr_interface_req *r)
     vr_interface_req *resp = NULL;
     struct vr_interface *vif;
     struct vrouter *router = vrouter_get(r->vifr_vrf);
+    short core = r->vifr_core;
     struct vr_message_dumper *dumper = NULL;
+
+    if ((unsigned int)core > vr_num_cpus)
+        goto generate_response;
 
     if (!router && (ret = -ENODEV))
         goto generate_response;
@@ -1998,7 +2046,7 @@ vr_interface_dump(vr_interface_req *r)
             i < router->vr_max_interfaces; i++) {
         vif = router->vr_interfaces[i];
         if (vif) {
-            vr_interface_make_req(resp, vif);
+            vr_interface_make_req(resp, vif, core);
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;

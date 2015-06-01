@@ -509,6 +509,10 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned host_lcore_id);
 /* Handle all KNIs attached */
 void vr_dpdk_knidev_all_handle(void);
+/* Enable sent/received/dropped packets statistics */
+#define DPDK_KNIDEV_WRITER_STATS_COLLECT    1
+#define DPDK_KNIDEV_READER_STATS_COLLECT    1
+
 
 /*
  * vr_dpdk_packet.c
@@ -585,5 +589,8 @@ void dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
 
 void
 dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring);
+
+#define DPDK_VIRTIO_WRITER_STATS_COLLECT    1
+#define DPDK_VIRTIO_READER_STATS_COLLECT    1
 
 #endif /*_VR_DPDK_H_ */

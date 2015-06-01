@@ -108,6 +108,14 @@ struct vr_interface_stats {
     uint64_t vis_obytes;
     uint64_t vis_opackets;
     uint64_t vis_oerrors;
+    uint64_t vis_ifenqpackets;
+    uint64_t vis_ifenqdrops;
+    uint64_t vis_ifdeqpackets;
+    uint64_t vis_ifdeqdrops;
+    uint64_t vis_rngenqpackets;
+    uint64_t vis_rngenqdrops;
+    uint64_t vis_rngdeqpackets;
+    uint64_t vis_rngdeqdrops;
 };
 
 struct vr_packet;

@@ -29,6 +29,8 @@ extern void dpdk_burst_rx(unsigned int, struct rte_mbuf *[],
                 struct vr_interface *, const char *, unsigned int);
 extern struct nlmsghdr *dpdk_nl_message_hdr(struct vr_message *);
 extern unsigned int dpdk_nl_message_len(struct vr_message *);
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
+        unsigned short);
 
 static int vr_usocket_accept(struct vr_usocket *);
 static int vr_usocket_connect(struct vr_usocket *);
@@ -457,9 +459,11 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
     struct vr_packet *pkt;
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_interface_stats *vr_stats;
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
+    vr_stats = vif_get_stats(usockp->usock_vif, lcore_id);
     if (usockp->usock_vif) {
         /* buf_addr and data_off do not change */
         usockp->usock_mbuf->data_len = usockp->usock_read_len;
@@ -472,9 +476,11 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         vr_dpdk_lcore_flush(lcore);
 
         rcu_quiescent_state();
+        vr_stats->vis_ifdeqpackets++;
     } else {
         RTE_LOG(ERR, VROUTER, "Error receiving from packet socket: no vif attached\n");
         vr_dpdk_pfree(usockp->usock_mbuf, VP_DROP_INTERFACE_DROP);
+        vr_stats->vis_ifdeqdrops++;
     }
 
     usockp->usock_mbuf = NULL;
@@ -490,14 +496,24 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     int i;
     unsigned nb_pkts;
     struct rte_mbuf *mbuf_arr[VR_DPDK_RING_RX_BURST_SZ];
+    const unsigned lcore_id = rte_lcore_id();
+    struct vr_interface_stats *vr_stats;
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining pkt0 ring...\n", __func__,
             pthread_self());
+    vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
             (void **)&mbuf_arr, VR_DPDK_RING_RX_BURST_SZ);
+        vr_stats->vis_rngdeqpackets += nb_pkts;
         for (i = 0; i < nb_pkts; i++) {
-            usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]);
+            if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) > 0)
+                vr_stats->vis_ifenqpackets++;
+            else {
+                vr_stats->vis_rngdeqdrops++;
+                vr_stats->vis_ifenqdrops++;
+            }
+
             rte_pktmbuf_free(mbuf_arr[i]);
         }
     } while (nb_pkts > 0);

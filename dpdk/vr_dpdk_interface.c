@@ -23,6 +23,9 @@
 #include <rte_ethdev.h>
 #include <rte_ip.h>
 
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
+        unsigned short);
+
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
  * Returns 0 on success, < 0 otherwise.
@@ -830,6 +833,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    struct rte_port_out_stats port_stats;
+    struct vr_interface_stats *vr_stats;
     int ret;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
@@ -854,10 +859,14 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     if (unlikely(vif->vif_type == VIF_TYPE_AGENT)) {
         ret = rte_ring_mp_enqueue(vr_dpdk.packet_ring, m);
+        vr_stats = vif_get_stats(vif, lcore_id);
         if (ret != 0) {
             /* TODO: a separate counter for this drop */
             vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
+            vr_stats->vis_rngenqdrops++;
             return -1;
+        } else {
+            vr_stats->vis_rngenqpackets++;
         }
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
@@ -938,6 +947,14 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         return -1;
     }
 
+    /* Update counters for sent and dropped packets */
+    if (likely(tx_queue->txq_ops.f_stats != NULL)) {
+        tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
+        vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
+        vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
+        vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+    }
+
     return 0;
 }
 
@@ -951,6 +968,8 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    struct rte_port_out_stats port_stats;
+    struct vr_interface_stats *vr_stats;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -986,6 +1005,14 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
                 __func__, vif->vif_name, lcore_id);
         vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
         return -1;
+    }
+
+    /* Update counters for sent and dropped packets */
+    if (likely(tx_queue->txq_ops.f_stats != NULL)) {
+        tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
+        vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
+        vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
+        vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
     }
 
     return 0;

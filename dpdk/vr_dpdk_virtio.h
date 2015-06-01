@@ -28,6 +28,9 @@ typedef enum vq_ready_state {
 } vq_ready_state_t;
 
 typedef struct vr_dpdk_virtioq {
+    struct rte_port_out_stats out_stats;
+    struct rte_port_in_stats in_stats;
+
     struct vring_desc   *vdv_desc;      /**< Virtqueue descriptor ring. */
     struct vring_avail  *vdv_avail;     /**< Virtqueue available ring. */
     struct vring_used   *vdv_used;      /**< Virtqueue used ring. */
