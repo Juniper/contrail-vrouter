@@ -42,15 +42,15 @@
 #include "ini_parser.h"
 
 
-#define VHOST_TYPE_STRING       "vhost"
-#define AGENT_TYPE_STRING       "agent"
-#define PHYSICAL_TYPE_STRING    "physical"
-#define VIRTUAL_TYPE_STRING     "virtual"
-#define XEN_LL_TYPE_STRING      "xenll"
-#define GATEWAY_TYPE_STRING     "gateway"
+#define VHOST_TYPE_STRING           "vhost"
+#define AGENT_TYPE_STRING           "agent"
+#define PHYSICAL_TYPE_STRING        "physical"
+#define VIRTUAL_TYPE_STRING         "virtual"
+#define XEN_LL_TYPE_STRING          "xenll"
+#define GATEWAY_TYPE_STRING         "gateway"
 #define VIRTUAL_VLAN_TYPE_STRING    "virtual-vlan"
-#define STATS_TYPE_STRING       "stats"
-#define MONITORING_TYPE_STRING  "monitoring"
+#define STATS_TYPE_STRING           "stats"
+#define MONITORING_TYPE_STRING      "monitoring"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
@@ -62,11 +62,12 @@ static int if_xconnect_kindex = -1;
 static int if_vif_index = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
+static short core = -1;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vif_set, vhost_phys_set;
+static int xconnect_set, vif_set, vhost_phys_set, core_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -188,6 +189,13 @@ vr_interface_print_header(void)
     array_size = sizeof(flag_metadata) / sizeof(flag_metadata[0]);
 
     printf("Vrouter Interface Table\n\n");
+
+    if (core_set && --core > -1)
+        printf("Statistics for core %d\n\n", core);
+
+    if (core_set)
+        return;
+
     printf("Flags: ");
 
     for (i = 0; i < array_size; i++) {
@@ -324,6 +332,7 @@ vr_interface_req_process(void *s)
     printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
             req->vifr_mtu, req->vifr_ref_cnt);
+
     vr_interface_print_head_space();
     printf("RX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_ipackets,
@@ -332,6 +341,29 @@ vr_interface_req_process(void *s)
     printf("TX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors);
+
+    /* Additional DPDK-specific statistics */
+    if (platform == DPDK_PLATFORM) {
+        vr_interface_print_head_space();
+        printf("Packets sent to vif: %" PRId64"  Drops:%" PRId64 "  \n",
+            req->vifr_ifenqpkts, req->vifr_ifenqdrops);
+        vr_interface_print_head_space();
+        printf("Packets enqueued on TX ring: %" PRId64"  Drops:%" PRId64 "  \n",
+            req->vifr_iftxrngenqpkts, req->vifr_iftxrngenqdrops);
+        vr_interface_print_head_space();
+        printf("Packets received on vif: %" PRId64"  Drops:%" PRId64 "  \n",
+            req->vifr_ifdeqpkts, req->vifr_ifdeqdrops);
+        /**
+         * TODO: when we hash MPLSoGRE packets to different lcores, it should
+         * apply to virtual as well as physical interfaces.
+         */
+        if (req->vifr_type == VIF_TYPE_VIRTUAL
+                                /* || req->vifr_type == VIF_TYPE_PHYSICAL */) {
+            vr_interface_print_head_space();
+            printf("Packets enqueued on RX ring: %" PRId64"  Drops:%" PRId64 "  \n",
+                req->vifr_ifrxrngenqpkts, req->vifr_ifrxrngenqdrops);
+        }
+    }
     printf("\n");
 
     if (list_set)
@@ -599,6 +631,25 @@ op_retry:
         break;
 
     case SANDESH_OP_GET:
+        /**
+         * Implementation of getting per-core vif statistics is based on this
+         * little trick to avoid making changes in how agent makes requests for
+         * statistics. From vRouter's and agent's point of view, request for
+         * stats for 0th core means a request for stats summed up for all the
+         * cores. So cores are enumerated starting with 1.
+         * Meanwhile, from user's point of view they are enumerated starting
+         * with 0 (e.g. vif --list --core 0 means 'vif statistics for the very
+         * first (0th) core'). This is how Linux enumerates CPUs, so it should
+         * be more intuitive for the user.
+         *
+         * Agent is not aware of possibility of asking for per-core stats. Its
+         * requests have vifr_core implicitly set to 0. So we need to make a
+         * conversion between those enumerating systems. The vif utility
+         * increments by 1 the core number user asked for. Then it is
+         * decremented back in vRouter.
+         */
+        intf_req.vifr_core = ++core;
+
         /*
          * this logic is slightly complicated. if --kernel option is set
          * for get or when if_kindex is set for add doing a get, we should
@@ -615,6 +666,7 @@ op_retry:
         break;
 
     case SANDESH_OP_DUMP:
+        intf_req.vifr_core = ++core;
         break;
     }
 
@@ -651,9 +703,9 @@ Usage()
     printf("\t   \t--vif <vif ID>]\n");
     printf( "[--id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
-    printf("\t   [--get <intf_id>][--kernel]\n");
+    printf("\t   [--get <intf_id>][--kernel][--core <core number>]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
-    printf("\t   [--list]\n");
+    printf("\t   [--list][--core <core number>]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -681,6 +733,7 @@ enum if_opt_index {
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
     VINDEX_OPT_INDEX,
+    CORE_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -704,7 +757,8 @@ static struct option long_options[] = {
     [VIF_OPT_INDEX]         =   {"vif",         required_argument,  &vif_set,           1},
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
-    [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,      1},
+    [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,        1},
+    [CORE_OPT_INDEX]        =   {"core",        required_argument,  &core_set,          1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -771,6 +825,12 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case LIST_OPT_INDEX:
         vr_op = SANDESH_OP_DUMP;
+        break;
+
+    case CORE_OPT_INDEX:
+        core = (short)strtoul(opt_arg, NULL, 0);
+        if (core < 0)
+            core = 0;
         break;
 
     case TYPE_OPT_INDEX:
@@ -859,14 +919,25 @@ validate_options(void)
     }
 
     if (get_set) {
-        if ((sum_opt > 1) && (sum_opt != 2 || !kindex_set))
+        if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set))
             Usage();
         return;
     }
 
-    if ((delete_set || list_set)) {
+    if (delete_set) {
         if (sum_opt > 1)
             Usage();
+        return;
+    }
+
+    if (list_set) {
+        if (!core_set) {
+            if (sum_opt > 1)
+                Usage();
+        } else {
+            if (sum_opt != 2)
+                Usage();
+        }
         return;
     }
 
@@ -888,6 +959,15 @@ validate_options(void)
         return;
     }
 
+    /**
+     * Statistics per CPU core could be requested as an additional parameter
+     * to --list or --get.
+     */
+    if (core_set) {
+        if (!list_set || !get_set)
+            Usage();
+    }
+
     return;
 }
 
@@ -901,7 +981,7 @@ main(int argc, char *argv[])
      */
     unsigned int sock_proto = NETLINK_GENERIC;
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:DPi:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:C:DPi:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'a':
@@ -968,6 +1048,11 @@ main(int argc, char *argv[])
             case 'i':
                 vindex_set = 1;
                 parse_long_opts(VINDEX_OPT_INDEX, NULL);
+                break;
+
+            case 'C':
+                core_set = 1;
+                parse_long_opts(CORE_OPT_INDEX, optarg);
                 break;
 
             case 0:

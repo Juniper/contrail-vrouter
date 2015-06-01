@@ -25,6 +25,10 @@
 
 #include <rte_config.h>
 #include <rte_port.h>
+#include <rte_port_ring.h>
+
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
+        unsigned short);
 
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.
@@ -364,6 +368,79 @@ struct vr_dpdk_global {
 
 extern struct vr_dpdk_global vr_dpdk;
 
+/**
+ *  Enable sent/received/dropped packets statistics
+ */
+#define DPDK_KNIDEV_WRITER_STATS_COLLECT    1
+#define DPDK_KNIDEV_READER_STATS_COLLECT    1
+#define DPDK_VIRTIO_WRITER_STATS_COLLECT    1
+#define DPDK_VIRTIO_READER_STATS_COLLECT    1
+
+/**
+ * dpdk_port_out_stats_update
+ *
+ * Updates counters for:
+ *  - packets enqueued to the interface successfully.
+ *  - packets which have been dropped during .f_tx() or .f_flush().
+ *  If we write to ring instead of NIC's queue, count it as a ring enqueue.
+ *
+ * port_stats is updated by .f_tx() and .f_flush().
+ * vr_stats is returned by vif_get_stats().
+ */
+static inline void
+dpdk_port_out_stats_update(struct vr_dpdk_queue *txq,
+                            struct rte_port_out_stats *port_stats,
+                            struct vr_interface_stats *vr_stats)
+{
+    if (!port_stats || !vr_stats)
+        return;
+
+    if (likely(txq->txq_ops.f_stats != NULL)) {
+        txq->txq_ops.f_stats(txq->q_queue_h, port_stats, 0);
+
+        /**
+         * It does not matter if we check equality of .f_tx of .f_flush here,
+         * equality of .f_txs implies equality of .f_flushes.
+         */
+        if (txq->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
+            vr_stats->vis_iftxrngenqpkts = port_stats->n_pkts_in;
+            vr_stats->vis_iftxrngenqdrops = port_stats->n_pkts_drop;
+        } else {
+            vr_stats->vis_ifenqpkts = port_stats->n_pkts_in;
+            vr_stats->vis_ifenqdrops = port_stats->n_pkts_drop;
+        }
+    }
+}
+
+/**
+ * dpdk_port_in_stats_update
+ *
+ * Updates counters for:
+ *  - packets dequeued from the interface successfully.
+ *  - packets which have been dropped during .f_rx().
+ *
+ * port_stats is updated by .f_rx().
+ * vr_stats is returned by vif_get_stats().
+ */
+static inline void
+dpdk_port_in_stats_update(struct vr_dpdk_queue *rxq,
+                            struct rte_port_in_stats *port_stats,
+                            struct vr_interface_stats *vr_stats)
+{
+    if (!port_stats || !vr_stats)
+        return;
+
+    if (likely(rxq->rxq_ops.f_stats != NULL)) {
+        rxq->rxq_ops.f_stats(rxq->q_queue_h, port_stats, 0);
+
+        /**
+         * We don't use .f_rx for rings, so no need to check.
+         */
+        vr_stats->vis_ifdeqpkts = port_stats->n_pkts_in;
+        vr_stats->vis_ifdeqdrops = port_stats->n_pkts_drop;
+    }
+}
+
 /*
  * rte_mbuf <=> vr_packet conversion
  *
@@ -541,8 +618,20 @@ static inline void
 vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
 {
     struct vr_dpdk_queue *tx_queue;
+    const unsigned lcore_id = rte_lcore_id();
+    struct rte_port_out_stats port_stats;
+    struct vr_interface_stats *vr_stats;
+
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
         tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+        /**
+         * Don't update stats if we write to agent interface, as it does
+         * not use rte_port_out_stats structure.
+         */
+        if (tx_queue->q_vif->vif_type != VIF_TYPE_AGENT) {
+            vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
+            dpdk_port_out_stats_update(tx_queue, &port_stats, vr_stats);
+        }
     }
 }
 /* Send a burst of vr_packets to vRouter */
