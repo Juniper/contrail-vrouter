@@ -16,6 +16,9 @@
 #include <rte_malloc.h>
 #include <rte_memcpy.h>
 
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
+        unsigned short);
+
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
 vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
@@ -24,11 +27,18 @@ static int dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts,
                                   uint32_t max_pkts);
 static int dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *pkt);
 static int dpdk_virtio_to_vm_flush(void *arg);
+static int dpdk_virtio_writer_stats_read(void *arg,
+                                            struct rte_port_out_stats *stats,
+                                            int clear);
+static int dpdk_virtio_reader_stats_read(void *arg,
+                                            struct rte_port_in_stats *stats,
+                                            int clear);
 
 struct rte_port_in_ops dpdk_virtio_reader_ops = {
     .f_create = NULL,
     .f_free = NULL,
     .f_rx = dpdk_virtio_from_vm_rx,
+    .f_stats = dpdk_virtio_reader_stats_read
 };
 
 struct rte_port_out_ops dpdk_virtio_writer_ops = {
@@ -37,6 +47,7 @@ struct rte_port_out_ops dpdk_virtio_writer_ops = {
     .f_tx = dpdk_virtio_to_vm_tx,
     .f_tx_bulk = NULL, /* TODO: not implemented */
     .f_flush = dpdk_virtio_to_vm_flush,
+    .f_stats = dpdk_virtio_writer_stats_read
 };
 
 /*
@@ -268,6 +279,20 @@ vr_dpdk_virtio_get_mempool(void)
     return vr_dpdk.virtio_mempool;
 }
 
+#if DPDK_VIRTIO_READER_STATS_COLLECT == 1
+
+#define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val) \
+	port->vdv_in_stats.n_pkts_in += val
+#define DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(port, val) \
+	port->vdv_in_stats.n_pkts_drop += val
+
+#else
+
+#define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val)
+#define DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(port, val)
+
+#endif
+
 /*
  * dpdk_virtio_from_vm_rx - receive packets from a virtio client so that
  * the packets can be handed to vrouter for forwarding. the virtio client is
@@ -363,6 +388,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             mbuf->pkt_len = pkt_len;
             mbuf->ol_flags = mbuf_flags;
 
+            DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(vq, 1);
             rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
 
             /* gather mbuf from several vring buffers (fixes FreeBSD) */
@@ -395,6 +421,19 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     return pkts_sent;
 }
 
+#if DPDK_VIRTIO_WRITER_STATS_COLLECT == 1
+
+#define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val) \
+	port->vdv_out_stats.n_pkts_in += val
+#define DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(port, val) \
+	port->vdv_out_stats.n_pkts_drop += val
+
+#else
+
+#define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val)
+#define DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(port, val)
+
+#endif
 
 /*
  * dpdk_virtio_to_vm_tx - sends a packet from vrouter to a virtio client. The
@@ -408,11 +447,13 @@ dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *mbuf)
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
 
     if (vq->vdv_ready_state == VQ_NOT_READY) {
+        DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
         vr_dpdk_pfree(mbuf, VP_DROP_INTERFACE_DROP);
         return -1;
     }
 
     vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = mbuf;
+    DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(vq, 1);
     if (vq->vdv_tx_mbuf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ) {
         dpdk_virtio_to_vm_flush(vq);
     }
@@ -475,6 +516,7 @@ dpdk_virtio_to_vm_flush(void *arg)
         desc = &vq->vdv_desc[next_desc_idx];
         buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
         if (buf_addr == NULL) {
+            DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
             vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
             continue;
         }
@@ -496,6 +538,7 @@ dpdk_virtio_to_vm_flush(void *arg)
 
             buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
             if (buf_addr == NULL) {
+                DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
                 vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
                 continue;
             }
@@ -520,9 +563,9 @@ dpdk_virtio_to_vm_flush(void *arg)
      * Free any packets that could not be sent to the VM because it didn't
      * post receive buffers soon enough.
      */
-    for (; i < vq->vdv_tx_mbuf_count; i++) {
+    DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, vq->vdv_tx_mbuf_count - i);
+    for (; i < vq->vdv_tx_mbuf_count; i++)
         vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
-    }
 
     vq->vdv_tx_mbuf_count = 0;
 
@@ -807,6 +850,8 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
     vr_dpdk_virtioq_t *vq;
     struct rte_ring *vq_pring;
     int nb_enq;
+    struct vr_interface_stats *vr_stats;
+    const unsigned lcore_id = rte_lcore_id();
 
     vq = (vr_dpdk_virtioq_t *) rx_queue->q_queue_h;
     vq_pring = vq->vdv_pring;
@@ -814,8 +859,53 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
     RTE_LOG(DEBUG, VROUTER, "%s: enqueue %u pakets to ring %p\n",
                 __func__, npkts, vq_pring);
     nb_enq = rte_ring_sp_enqueue_burst(vq_pring, (void **) pkt_arr, npkts);
+
+    /**
+     * Packets received from VM are enqueued to the ring here. Increment
+     * a counter for RX'd-and-enqueued packets by the number of successfully
+     * enqueued packets.
+     */
+    vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
+    if (nb_enq > 0)
+        vr_stats->vis_ifrxrngenqpkts += nb_enq;
+
+    /**
+     * Increment a counter for RX'd-but-not-enqueued packets by the difference
+     * of packets we wish to enqueue and packets really enqueued.
+     */
+    vr_stats->vis_ifrxrngenqdrops += npkts - nb_enq;
     for ( ; nb_enq < npkts; nb_enq++)
         vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
 
     return;
+}
+
+static int
+dpdk_virtio_reader_stats_read(void *arg,
+    struct rte_port_in_stats *stats, int clear)
+{
+    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+
+    if (stats != NULL)
+        memcpy(stats, &vq->vdv_in_stats, sizeof(vq->vdv_in_stats));
+
+    if (clear)
+        memset(&vq->vdv_in_stats, 0, sizeof(vq->vdv_in_stats));
+
+    return 0;
+}
+
+static int
+dpdk_virtio_writer_stats_read(void *arg,
+    struct rte_port_out_stats *stats, int clear)
+{
+    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+
+    if (stats != NULL)
+        memcpy(stats, &vq->vdv_out_stats, sizeof(vq->vdv_out_stats));
+
+    if (clear)
+        memset(&vq->vdv_out_stats, 0, sizeof(vq->vdv_out_stats));
+
+    return 0;
 }

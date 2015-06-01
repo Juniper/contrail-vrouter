@@ -28,6 +28,9 @@
 #include <rte_port_ethdev.h>
 #include <rte_timer.h>
 
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
+        unsigned short);
+
 /*
  * vr_dpdk_phys_lcore_least_used_get - returns the least used lcore among the
  * ones that handle TX for physical interfaces.
@@ -512,6 +515,9 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
     uint32_t nb_pkts;
     struct vr_packet *pkt_arr[VR_DPDK_MAX_BURST_SZ];
     int pkti;
+    const unsigned lcore_id = rte_lcore_id();
+    struct rte_port_in_stats port_stats;
+    struct vr_interface_stats *vr_stats;
 
     /* for all RX queues */
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
@@ -528,9 +534,16 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
                 }
                 vr_dpdk_virtio_enq_pkts_to_phys_lcore(rx_queue,
                                                       pkt_arr, nb_pkts);
+            /**
+             * TODO: When we hash MPLSoGRE packets to different lcores, we will
+             * need to increment vis_ifrxrngenqpkts for physical interface here.
+             */
             } else {
                 dpdk_vroute(rx_queue->q_vif, pkts, nb_pkts);
             }
+
+            vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
+            dpdk_port_in_stats_update(rx_queue, &port_stats, vr_stats);
         }
     }
     return total_pkts;
@@ -547,6 +560,9 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     struct vr_dpdk_ring_to_push *rtp;
     uint16_t nb_rtp;
     struct rte_ring *ring;
+    const unsigned lcore_id = rte_lcore_id();
+    struct rte_port_out_stats port_stats;
+    struct vr_interface_stats *vr_stats;
 
     /* TODO: skip RX queues with no packets to read
      * RX operation for KNIs is quite expensive. We used rx_queue_mask to
@@ -571,9 +587,9 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
             VR_DPDK_MAX_BURST_SZ-1);
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
-
             if (likely(rtp->rtp_tx_queue != NULL)) {
                 /* check if TX queue is available */
+                vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
                 if (likely(rtp->rtp_tx_queue->txq_ops.f_tx != NULL)) {
                     /* push packets to the TX queue */
                     /* TODO: use f_tx_bulk instead */
@@ -581,8 +597,12 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
                         rtp->rtp_tx_queue->txq_ops.f_tx(
                             rtp->rtp_tx_queue->q_queue_h, pkts[i]);
                     }
+
+                    dpdk_port_out_stats_update(rtp->rtp_tx_queue, &port_stats,
+                                                vr_stats);
                 } else {
                     /* TX queue has been deleted, so just drop the packets */
+                    vr_stats->vis_ifenqdrops += nb_pkts;
                     for (i = 0; i < nb_pkts; i++)
                         /* TODO: a separate counter for this drop */
                         vr_dpdk_pfree(pkts[i], VP_DROP_INTERFACE_DROP);
