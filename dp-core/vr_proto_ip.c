@@ -859,8 +859,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
             dport = icmph->icmp_type;
         }
     } else if ((ip->ip_proto == VR_IP_PROTO_TCP) ||
-            (ip->ip_proto == VR_IP_PROTO_UDP) ||
-            (ip->ip_proto == VR_IP_PROTO_SCTP)) {
+            (ip->ip_proto == VR_IP_PROTO_UDP)) {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
     } else {
