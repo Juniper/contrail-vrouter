@@ -137,6 +137,7 @@ dump_legend(void)
     printf("L=Link Local Port)\n");
 
     printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
+    printf("   TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established\n");
     printf("\n");
 
     return;
@@ -247,7 +248,7 @@ dump_table(struct flow_table *ft)
                 action = 'U';
             }
 
-            printf("\t(");
+            printf("    (");
             if (fe->fe_type == VP_TYPE_IP)
                 printf("K(nh):%u, ", fe->fe_key.flow4_nh_id);
 
@@ -262,6 +263,30 @@ dump_table(struct flow_table *ft)
             }
 
             printf(", ");
+            if (fe->fe_key.flow4_proto == VR_IP_PROTO_TCP) {
+                printf("TCP:");
+
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_SYN)
+                    printf("S");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_SYN_R)
+                    printf("Sr");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED)
+                    printf("E");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED_R)
+                    printf("Er");
+
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_FIN)
+                    printf("F");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_FIN_R)
+                    printf("Fr");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_RST)
+                    printf("R");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_HALF_CLOSE)
+                    printf("C");
+
+                printf(", ");
+            }
+
             if (fe->fe_ecmp_nh_index >= 0)
                 printf("E:%d, ", fe->fe_ecmp_nh_index);
 
