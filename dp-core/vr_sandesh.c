@@ -34,8 +34,7 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_type_string        =       "vr_mirror_req",
     },
     [VR_FLOW_OBJECT_ID]         =   {
-        .obj_len                =       ((4 * sizeof(vr_flow_req)) +
-                    (64 * sizeof(unsigned int))),
+        .obj_len                =       4 * sizeof(vr_flow_req),
         .obj_type_string        =       "vr_flow_req",
     },
     [VR_VRF_ASSIGN_OBJECT_ID]     =   {
@@ -57,6 +56,11 @@ struct sandesh_object_md sandesh_md[] = {
     [VR_VXLAN_OBJECT_ID]     =   {
         .obj_len                =       4 * sizeof(vr_vxlan_req),
         .obj_type_string        =       "vr_vxlan_req",
+    },
+    [VR_FLOW_INFO_OBJECT_ID]         =   {
+        .obj_len                =       ((4 * sizeof(vr_flow_req)) +
+                    (VR_FLOW_MAX_CPUS * sizeof(unsigned int))),
+        .obj_type_string        =       "vr_flow_req",
     },
 };
 
