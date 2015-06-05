@@ -213,12 +213,22 @@ struct vr_flow_queue {
     struct vr_packet_node vfq_pnodes[VR_MAX_FLOW_QUEUE_ENTRIES];
 };
 
+#define VR_FLOW_TCP_FIN             0x0001
+#define VR_FLOW_TCP_HALF_CLOSE      0x0002
+#define VR_FLOW_TCP_FIN_R           0x0004
+#define VR_FLOW_TCP_SYN             0x0008
+#define VR_FLOW_TCP_SYN_R           0x0010
+#define VR_FLOW_TCP_ESTABLISHED     0x0020
+#define VR_FLOW_TCP_ESTABLISHED_R   0x0040
+#define VR_FLOW_TCP_RST             0x0080
+
 /* align to 8 byte boundary */
 #define VR_FLOW_KEY_PAD ((8 - (sizeof(struct vr_flow) % 8)) % 8)
 
 struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
-    uint8_t vr_flow_key_padding[VR_FLOW_KEY_PAD];
+    uint16_t fe_tcp_flags;
+    unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -231,8 +241,8 @@ struct vr_dummy_flow_entry {
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
-    unsigned short fe_udp_src_port;
     uint8_t fe_type;
+    unsigned short fe_udp_src_port;
 } __attribute__((packed));
 
 #define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
@@ -240,7 +250,8 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow fe_key;
-    uint8_t vr_flow_key_padding[VR_FLOW_KEY_PAD];
+    uint16_t fe_tcp_flags;
+    unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
     unsigned short fe_action;
     unsigned short fe_flags;
@@ -253,8 +264,8 @@ struct vr_flow_entry {
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
-    unsigned short fe_udp_src_port;
     uint8_t fe_type;
+    unsigned short fe_udp_src_port;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 

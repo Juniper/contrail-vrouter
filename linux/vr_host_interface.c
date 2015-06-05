@@ -995,14 +995,19 @@ linux_pull_outer_headers(struct sk_buff *skb)
     }
 
     if (thdr && pull && (iph || ip6h)) {
-        /*
-         * this covers both regular port number offsets that come in
-         * the first 4 bytes and the icmp header
-         */
-        offset += sizeof(struct vr_icmp);
-        if (!pskb_may_pull(skb, offset))
-            goto pull_fail;
-
+        if (ip_proto == VR_IP_PROTO_TCP) {
+            offset += sizeof(struct vr_tcp);
+            if (!pskb_may_pull(skb, offset))
+                goto pull_fail;
+        } else {
+            /*
+             * this covers both regular port number offsets that come in
+             * the first 4 bytes and the icmp header
+             */
+            offset += sizeof(struct vr_icmp);
+            if (!pskb_may_pull(skb, offset))
+                goto pull_fail;
+        }
 
         if (iph)
             iph = ip_hdr(skb);

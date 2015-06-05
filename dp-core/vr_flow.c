@@ -57,6 +57,8 @@ static void vr_flush_entry(struct vrouter *, struct vr_flow_entry *,
         struct vr_flow_md *, struct vr_forwarding_md *);
 static void vr_flush_flow_queue(struct vrouter *, struct vr_flow_entry *,
         struct vr_forwarding_md *, struct vr_flow_queue *);
+static void vr_flow_set_forwarding_md(struct vrouter *, struct vr_flow_entry *,
+        unsigned int, struct vr_forwarding_md *);
 
 struct vr_flow_entry *vr_find_flow(struct vrouter *, struct vr_flow *,
         uint8_t, unsigned int *);
@@ -213,6 +215,7 @@ vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
     fe->fe_action = VR_FLOW_ACTION_DROP;
     fe->fe_flags = 0;
     fe->fe_udp_src_port = 0;
+    fe->fe_tcp_flags = 0;
 
     return;
 }
@@ -305,7 +308,10 @@ vr_flow_queue_free(struct vrouter *router, void *arg)
 
     vfq = (struct vr_flow_queue *)defer->vdd_data;
     fe = vr_get_flow_entry(router, vfq->vfq_index);
-    vr_flush_flow_queue(router, fe, &fmd, vfq);
+    if (fe) {
+        vr_flow_set_forwarding_md(router, fe, vfq->vfq_index, &fmd);
+        vr_flush_flow_queue(router, fe, &fmd, vfq);
+    }
     vr_free(vfq);
     return;
 }
@@ -550,8 +556,6 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
      * for now, we will not use dvrf if VRFT is set, because the RPF
      * check needs to happen in the source vrf
      */
-
-    vr_flow_set_forwarding_md(router, fe, index, fmd);
     src_nh = __vrouter_get_nexthop(router, fe->fe_src_nh_index);
     if (!src_nh) {
         vr_pfree(pkt, VP_DROP_INVALID_NH);
@@ -728,6 +732,180 @@ vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry *flow_e)
     return;
 }
 
+static void
+vr_flow_init_close(struct vrouter *router, struct vr_flow_entry *flow_e,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    unsigned int flow_index;
+    unsigned int head_room = sizeof(struct agent_hdr) + sizeof(struct vr_eth);
+
+    struct vr_packet *pkt_c;
+
+    pkt_c = vr_pclone(pkt);
+    if (!pkt_c)
+        return;
+
+    vr_preset(pkt_c);
+    if (vr_pcow(pkt_c, head_room)) {
+        vr_pfree(pkt_c, VP_DROP_PCOW_FAIL);
+        return;
+    }
+
+    flow_index = fmd->fmd_flow_index;
+    vr_trap(pkt_c, fmd->fmd_dvrf, AGENT_TRAP_SESSION_CLOSE,
+            (void *)&flow_index);
+
+    return;
+}
+
+static void
+vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    uint16_t tcp_offset_flags;
+    unsigned int length;
+
+    struct vr_ip *iph;
+    struct vr_ip6 *ip6h;
+    struct vr_tcp *tcph = NULL;
+    struct vr_flow_entry *rflow_e = NULL;
+
+    iph = (struct vr_ip *)pkt_network_header(pkt);
+    if (!vr_ip_transport_header_valid(iph))
+        return;
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        if (iph->ip_proto != VR_IP_PROTO_TCP)
+            return;
+
+        length = ntohs(iph->ip_len) - (iph->ip_hl * 4);
+        tcph = (struct vr_tcp *)((unsigned char *)iph + (iph->ip_hl * 4));
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        ip6h = (struct vr_ip6 *)iph;
+        if (ip6h->ip6_nxt != VR_IP_PROTO_TCP)
+            return;
+
+        length = ntohs(ip6h->ip6_plen);
+        tcph = (struct vr_tcp *)((unsigned char *)iph + sizeof(struct vr_ip6));
+    }
+
+    if (tcph) {
+        /*
+         * there are some optimizations here that makes the code slightly
+         * not so frugal. For e.g.: the *_R flags are used to make sure that
+         * for a packet that contains ACK, we will not need to fetch the
+         * reverse flow if we are not interested, thus saving some execution
+         * time.
+         */
+        tcp_offset_flags = ntohs(tcph->tcp_offset_r_flags);
+        /* if we get a reset, session has to be closed */
+        if (tcp_offset_flags & VR_TCP_FLAG_RST) {
+            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags,
+                    VR_FLOW_TCP_RST);
+            if (flow_e->fe_flags & VR_RFLOW_VALID) {
+                rflow_e = vr_get_flow_entry(router, flow_e->fe_rflow);
+                if (rflow_e) {
+                    (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                            VR_FLOW_TCP_RST);
+                }
+            }
+            vr_flow_init_close(router, flow_e, pkt, fmd);
+            return;
+        } else if (tcp_offset_flags & VR_TCP_FLAG_SYN) {
+            /* if only a SYN... */
+            flow_e->fe_tcp_seq = ntohl(tcph->tcp_seq);
+            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags, VR_FLOW_TCP_SYN);
+            if (flow_e->fe_flags & VR_RFLOW_VALID) {
+                rflow_e = vr_get_flow_entry(router, flow_e->fe_rflow);
+                if (rflow_e) {
+                    (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                            VR_FLOW_TCP_SYN_R);
+                    if ((flow_e->fe_tcp_flags & VR_FLOW_TCP_SYN_R) &&
+                            (tcp_offset_flags & VR_TCP_FLAG_ACK)) {
+                        if (ntohl(tcph->tcp_ack) == (rflow_e->fe_tcp_seq + 1)) {
+                            (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                                    VR_FLOW_TCP_ESTABLISHED);
+                            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags,
+                                     VR_FLOW_TCP_ESTABLISHED_R);
+                        }
+                    }
+                }
+            }
+        } else if (tcp_offset_flags & VR_TCP_FLAG_FIN) {
+            /*
+             * when a FIN is received, update the sequence of the FIN and set
+             * the flow FIN flag. It is possible that the FIN packet came with
+             * some data, in which case the sequence number of the FIN is one
+             * more than the last data byte in the sequence
+             */
+            length -= (((tcp_offset_flags) >> 12) * 4);
+            flow_e->fe_tcp_seq = ntohl(tcph->tcp_seq) + length;
+            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags, VR_FLOW_TCP_FIN);
+            /*
+             * when an ack for a FIN is sent, we need to take some actions
+             * on the reverse flow (since FIN came in the reverse flow). to
+             * avoid looking up the reverse flow for all acks, we mark the
+             * reverse flow's reverse flow with a flag (FIN_R). we will
+             * lookup the reverse flow only if this flag is set and the
+             * tcp header has an ack bit set
+             */
+            if (flow_e->fe_flags & VR_RFLOW_VALID) {
+                rflow_e = vr_get_flow_entry(router, flow_e->fe_rflow);
+                if (rflow_e) {
+                    (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                            VR_FLOW_TCP_FIN_R);
+                }
+            }
+        }
+
+        /*
+         * if FIN_R is set in the flow and if the ACK bit is set in the
+         * tcp header, then we need to mark the reverse flow as dead.
+         *
+         * OR
+         *
+         * if the SYN_R is set and ESTABLISHED_R is not set and if this
+         * is an ack packet, if this ack completes the connection, we
+         * need to set ESTABLISHED
+         */
+        if (((flow_e->fe_tcp_flags & VR_FLOW_TCP_FIN_R) ||
+                (!(flow_e->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED_R) &&
+                 (flow_e->fe_tcp_flags & VR_FLOW_TCP_SYN_R))) &&
+                (tcp_offset_flags & VR_TCP_FLAG_ACK)) {
+            if (flow_e->fe_flags & VR_RFLOW_VALID) {
+                if (!rflow_e) {
+                    rflow_e = vr_get_flow_entry(router, flow_e->fe_rflow);
+                }
+
+                if (rflow_e) {
+                    if ((ntohl(tcph->tcp_ack) == (rflow_e->fe_tcp_seq + 1)) &&
+                            (flow_e->fe_tcp_flags & VR_FLOW_TCP_FIN_R)) {
+                        (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                                VR_FLOW_TCP_HALF_CLOSE);
+                        /*
+                         * both the forward and the reverse flows are
+                         * now dead
+                         */
+                        if (flow_e->fe_tcp_flags & VR_FLOW_TCP_HALF_CLOSE) {
+                            vr_flow_init_close(router, flow_e, pkt, fmd);
+                        }
+                    } else if (ntohl(tcph->tcp_ack) != rflow_e->fe_tcp_seq) {
+                        if (!(flow_e->fe_tcp_flags &
+                                    VR_FLOW_TCP_ESTABLISHED_R)) {
+                            (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                                    VR_FLOW_TCP_ESTABLISHED);
+                            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags,
+                                     VR_FLOW_TCP_ESTABLISHED_R);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return;
+}
+
 flow_result_t
 vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
                struct vr_packet *pkt, struct vr_forwarding_md *fmd)
@@ -761,6 +939,9 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
         /* mark as hold */
         vr_flow_entry_set_hold(router, flow_e);
     }
+
+    vr_flow_set_forwarding_md(router, flow_e, fe_index, fmd);
+    vr_flow_tcp_digest(router, flow_e, pkt, fmd);
 
     return vr_do_flow_action(router, flow_e, fe_index, pkt, fmd);
 }
@@ -837,7 +1018,6 @@ vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
     for (i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
         pnode = &vfq->vfq_pnodes[i];
         if (fmd) {
-            memset(fmd, 0, sizeof(*fmd));
             fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
             fmd->fmd_label = pnode->pl_label;
             if (pnode->pl_flags & PN_FLAG_TO_ME)
@@ -1163,8 +1343,9 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
 {
     int ret;
     unsigned int fe_index;
+    bool new_flow = false;
 
-    struct vr_flow_entry *fe = NULL;
+    struct vr_flow_entry *fe = NULL, *rfe = NULL;
     struct vr_flow_table_info *infop = router->vr_flow_table_info;
 
     router = vrouter_get(req->fr_rid);
@@ -1200,6 +1381,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         if (!fe)
             return -ENOSPC;
 
+        new_flow = true;
         infop->vfti_added++;
     } else {
         if ((req->fr_action == VR_FLOW_ACTION_HOLD) &&
@@ -1253,6 +1435,16 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
 
     fe->fe_flags = req->fr_flags; 
+    if (new_flow && (fe->fe_flags & VR_RFLOW_VALID)) {
+        rfe = vr_get_flow_entry(router, fe->fe_rflow);
+        if (rfe) {
+            if (rfe->fe_tcp_flags & VR_FLOW_TCP_SYN) {
+                (void)__sync_fetch_and_or(&fe->fe_tcp_flags,
+                        VR_FLOW_TCP_SYN_R);
+            }
+        }
+    }
+
     vr_flow_udp_src_port(router, fe);
 
     return vr_flow_schedule_transition(router, req, fe);

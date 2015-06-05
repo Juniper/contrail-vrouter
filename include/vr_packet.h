@@ -559,14 +559,24 @@ vr_incremental_diff(unsigned int oldval, unsigned int newval,
     return;
 }
 
+#define VR_TCP_FLAG_FIN         0x0001
+#define VR_TCP_FLAG_SYN         0x0002
+#define VR_TCP_FLAG_RST         0x0004
+#define VR_TCP_FLAG_PSH         0x0008
+#define VR_TCP_FLAG_ACK         0x0010
+#define VR_TCP_FLAG_URG         0x0020
+#define VR_TCP_FLAG_ECN         0x0040
+#define VR_TCP_FLAG_CWR         0x0080
+
+#define VR_TCP_OFFSET(field)    ((ntohs(field) & 0xF000) >> 12)
+#define VR_TCP_FLAGS(field)     (ntohs(field) & 0x01FF)
+
 struct vr_tcp {
     unsigned short tcp_sport;
     unsigned short tcp_dport;
     unsigned int tcp_seq;
     unsigned int tcp_ack;
-    unsigned short tcp_offset:4,
-                tcp_reserved:6,
-                tcp_flags:6;
+    uint16_t tcp_offset_r_flags;
     unsigned short tcp_win;
     unsigned short tcp_csum;
     unsigned short tcp_urg;

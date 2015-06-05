@@ -1057,7 +1057,7 @@ vr_has_to_fragment(struct vr_interface *vif, struct vr_packet *pkt,
 
         if (ip->ip_proto == VR_IP_PROTO_TCP) {
             tcp = (struct vr_tcp *)((unsigned char *)ip + (ip->ip_hl * 4));
-            len += (tcp->tcp_offset * 4);
+            len += (VR_TCP_OFFSET(tcp->tcp_offset_r_flags) * 4);
         }
 
         len += (pkt_get_network_header_off(pkt) - pkt->vp_data);
