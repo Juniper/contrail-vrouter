@@ -944,6 +944,7 @@ static int
 linux_pull_outer_headers(struct sk_buff *skb)
 {
     struct vlan_hdr *vhdr;
+    bool thdr = false, pull = false;
     uint16_t proto, offset, ip_proto = 0;
     struct iphdr *iph = NULL;
     struct ipv6hdr *ip6h = NULL;
@@ -972,8 +973,9 @@ linux_pull_outer_headers(struct sk_buff *skb)
         if (!pskb_may_pull(skb, offset))
             goto pull_fail;
         iph = ip_hdr(skb);
-        if (linux_ip_proto_pull(iph) &&
-            vr_ip_transport_header_valid((struct vr_ip *)iph)) {
+        thdr = vr_ip_transport_header_valid((struct vr_ip *)iph);
+        pull = linux_ip_proto_pull(iph);
+        if (pull && thdr) {
             ip_proto = iph->protocol;
         }
     } else if (proto == htons(ETH_P_IPV6)) {
@@ -984,8 +986,9 @@ linux_pull_outer_headers(struct sk_buff *skb)
             goto pull_fail;
 
         ip6h = ipv6_hdr(skb);
-
-        if (linux_ipv6_proto_pull(ip6h)) {
+        thdr = true;
+        pull = linux_ipv6_proto_pull(ip6h);
+        if (pull) {
             ip_proto = ip6h->nexthdr;
         }
     } else if (proto == htons(ETH_P_ARP)) {
@@ -994,7 +997,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
             goto pull_fail;
     }
 
-    if (iph || ip6h) {
+    if (thdr && pull && (iph || ip6h)) {
         /*
          * this covers both regular port number offsets that come in
          * the first 4 bytes and the icmp header
