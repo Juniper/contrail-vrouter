@@ -599,6 +599,16 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
                         rtp->rtp_tx_queue->txq_ops.f_tx(
                             rtp->rtp_tx_queue->q_queue_h, pkts[i]);
                     }
+
+                    /* Update counters for sent and dropped packets */
+                    if (likely(rtp->rtp_tx_queue->txq_ops.f_stats != NULL)) {
+                        rtp->rtp_tx_queue->txq_ops.f_stats(
+                                rtp->rtp_tx_queue->q_queue_h, &port_stats, 0);
+                        vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif,
+                                                                    lcore_id);
+                        vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
+                        vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+                    }
                 } else {
                     /* TX queue has been deleted, so just drop the packets */
                     vr_stats->vis_rngdeqdrops += nb_pkts;
@@ -606,16 +616,6 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
                         /* TODO: a separate counter for this drop */
                         vr_dpdk_pfree(pkts[i], VP_DROP_INTERFACE_DROP);
                 }
-
-                /* Update counters for sent and dropped packets */
-                if (likely(rtp->rtp_tx_queue->txq_ops.f_stats != NULL)) {
-                    rtp->rtp_tx_queue->txq_ops.f_stats(rtp->rtp_tx_queue->q_queue_h,
-                                                        &port_stats, 0);
-                    vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
-                    vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
-                    vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
-                }
-
             } else {
                 /*
                  * If there is no TX queue, we are in the second leg

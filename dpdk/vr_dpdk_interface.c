@@ -936,23 +936,24 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
+    vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
         if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
             tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+
+        /* Update counters for sent and dropped packets */
+        if (likely(tx_queue->txq_ops.f_stats != NULL)) {
+            tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
+            vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
+            vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+        }
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
+        vr_stats->vis_rngdeqdrops++;
         vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
         return -1;
-    }
-
-    /* Update counters for sent and dropped packets */
-    if (likely(tx_queue->txq_ops.f_stats != NULL)) {
-        tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
-        vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
-        vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
-        vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
     }
 
     return 0;
@@ -998,21 +999,22 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
+    vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
+
+        /* Update counters for sent and dropped packets */
+        if (likely(tx_queue->txq_ops.f_stats != NULL)) {
+            tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
+            vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
+            vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+        }
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
+        vr_stats->vis_rngdeqdrops++;
         vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
         return -1;
-    }
-
-    /* Update counters for sent and dropped packets */
-    if (likely(tx_queue->txq_ops.f_stats != NULL)) {
-        tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
-        vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
-        vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
-        vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
     }
 
     return 0;

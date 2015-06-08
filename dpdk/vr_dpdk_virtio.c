@@ -563,10 +563,9 @@ dpdk_virtio_to_vm_flush(void *arg)
      * Free any packets that could not be sent to the VM because it didn't
      * post receive buffers soon enough.
      */
-    for (; i < vq->vdv_tx_mbuf_count; i++) {
-        DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
+    DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, vq->vdv_tx_mbuf_count - i);
+    for (; i < vq->vdv_tx_mbuf_count; i++)
         vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
-    }
 
     vq->vdv_tx_mbuf_count = 0;
 
@@ -865,10 +864,9 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
     if (nb_enq > 0)
         vr_stats->vis_rngenqpackets += nb_enq;
 
-    for ( ; nb_enq < npkts; nb_enq++) {
+    vr_stats->vis_rngenqdrops += npkts - nb_enq;
+    for ( ; nb_enq < npkts; nb_enq++)
         vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
-        vr_stats->vis_rngenqdrops++;
-    }
 
     return;
 }
