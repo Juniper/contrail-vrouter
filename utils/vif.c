@@ -348,17 +348,23 @@ vr_interface_req_process(void *s)
     /* Additional DPDK-specific statistics */
     if (platform == DPDK_PLATFORM) {
         vr_interface_print_head_space();
-        printf("Packets enq'd to   vif: %" PRId64"\tDrops on enq'ing:%" PRId64 "  \n",
-            req->vifr_ifenqpackets, req->vifr_ifenqdrops);
+        printf("Packets sent to vif: %" PRId64"  Drops:%" PRId64 "  \n",
+            req->vifr_ifenqpkts, req->vifr_ifenqdrops);
         vr_interface_print_head_space();
-        printf("Packets deq'd from vif: %" PRId64"\tDrops on deq'ing:%" PRId64 "  \n",
-            req->vifr_ifdeqpackets, req->vifr_ifdeqdrops);
+        printf("Packets enqueued on TX ring: %" PRId64"  Drops:%" PRId64 "  \n",
+            req->vifr_iftxrngenqpkts, req->vifr_iftxrngenqdrops);
         vr_interface_print_head_space();
-        printf("Packets enq'd to   ring:%" PRId64"\tDrops on enq'ing:%" PRId64 "  \n",
-            req->vifr_rngenqpackets, req->vifr_rngenqdrops);
-        vr_interface_print_head_space();
-        printf("Packets deq'd from ring:%" PRId64"\tDrops on deq'ing:%" PRId64 "  \n",
-            req->vifr_rngdeqpackets, req->vifr_rngdeqdrops);
+        printf("Packets received on vif: %" PRId64"  Drops:%" PRId64 "  \n",
+            req->vifr_ifdeqpkts, req->vifr_ifdeqdrops);
+        /**
+         * TODO: when we hash MPLSoGRE packets to different lcores, it should
+         * apply to virtual as well as physical interfaces.
+         */
+        if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+            vr_interface_print_head_space();
+            printf("Packets enqueued on RX ring: %" PRId64"  Drops:%" PRId64 "  \n",
+                req->vifr_ifrxenqpkts, req->vifr_ifrxenqdrops);
+        }
     }
     printf("\n");
 

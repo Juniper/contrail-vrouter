@@ -145,6 +145,10 @@ dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
     SLIST_REMOVE(&lcore->lcore_tx_head, tx_queue, vr_dpdk_queue,
         q_next);
     tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    /**
+     * TODO: should we increment stats here? Probably not, because it is done
+     * while we remove vif, but I'm not 100% sure.
+     */
 }
 
 /* Remove RX queue from a lcore
@@ -534,14 +538,24 @@ dpdk_lcore_fwd_rx(struct vr_dpdk_lcore *lcore)
                 }
                 vr_dpdk_virtio_enq_pkts_to_phys_lcore(rx_queue,
                                                       pkt_arr, nb_pkts);
+            /**
+             * TODO: When we hash MPLSoGRE packets to different lcores, we will
+             * need to increment vis_ifrxenqpkts for physical interface here.
+             */
             } else {
                 dpdk_vroute(rx_queue->q_vif, pkts, nb_pkts);
             }
 
+            /**
+             * Update counters for:
+             *  - packets dequeued from the interface successfully.
+             *  - packets which have been dropped when .f_rx() could not
+             *  receive.
+             */
             if (likely(rx_queue->rxq_ops.f_stats != NULL)) {
                 rx_queue->rxq_ops.f_stats(rx_queue->q_queue_h, &port_stats, 0);
                 vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
-                vr_stats->vis_ifdeqpackets = port_stats.n_pkts_in;
+                vr_stats->vis_ifdeqpkts = port_stats.n_pkts_in;
                 vr_stats->vis_ifdeqdrops = port_stats.n_pkts_drop;
             }
         }
@@ -587,11 +601,9 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
             VR_DPDK_MAX_BURST_SZ-1);
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
-
             if (likely(rtp->rtp_tx_queue != NULL)) {
-                vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
-                vr_stats->vis_rngdeqpackets += nb_pkts;
                 /* check if TX queue is available */
+                vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
                 if (likely(rtp->rtp_tx_queue->txq_ops.f_tx != NULL)) {
                     /* push packets to the TX queue */
                     /* TODO: use f_tx_bulk instead */
@@ -600,18 +612,26 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
                             rtp->rtp_tx_queue->q_queue_h, pkts[i]);
                     }
 
-                    /* Update counters for sent and dropped packets */
+                    /**
+                     * Update counters for:
+                     *  - packets enqueued to the interface successfully.
+                     *  - packets which have been dropped when .f_tx() could
+                     *  not send.
+                     *  We'll always be writing to NIC's queue, not a DPDK
+                     *  ring, so no need to distinguish, like we do in
+                     *  dpdk_if_tx() and dpdk_if_rx().
+                     */
                     if (likely(rtp->rtp_tx_queue->txq_ops.f_stats != NULL)) {
                         rtp->rtp_tx_queue->txq_ops.f_stats(
                                 rtp->rtp_tx_queue->q_queue_h, &port_stats, 0);
                         vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif,
                                                                     lcore_id);
-                        vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
+                        vr_stats->vis_ifenqpkts = port_stats.n_pkts_in;
                         vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
                     }
                 } else {
                     /* TX queue has been deleted, so just drop the packets */
-                    vr_stats->vis_rngdeqdrops += nb_pkts;
+                    vr_stats->vis_ifenqdrops += nb_pkts;
                     for (i = 0; i < nb_pkts; i++)
                         /* TODO: a separate counter for this drop */
                         vr_dpdk_pfree(pkts[i], VP_DROP_INTERFACE_DROP);

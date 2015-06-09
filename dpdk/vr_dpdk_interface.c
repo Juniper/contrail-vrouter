@@ -22,6 +22,7 @@
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_ip.h>
+#include <rte_port_ring.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
@@ -863,10 +864,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         if (ret != 0) {
             /* TODO: a separate counter for this drop */
             vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
-            vr_stats->vis_rngenqdrops++;
+            vr_stats->vis_iftxrngenqdrops++;
             return -1;
         } else {
-            vr_stats->vis_rngenqpackets++;
+            vr_stats->vis_iftxrngenqpkts++;
         }
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
@@ -942,16 +943,28 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
             tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 
-        /* Update counters for sent and dropped packets */
+        /**
+         * Update counters for:
+         *  - packets enqueued to the interface successfully.
+         *  - packets which have been dropped when .f_tx() could not send.
+         *  If we write to ring instead of NIC's queue, count it as a ring
+         *  enqueue.
+         */
         if (likely(tx_queue->txq_ops.f_stats != NULL)) {
             tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
-            vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
-            vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+
+            if (tx_queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
+                vr_stats->vis_iftxrngenqpkts = port_stats.n_pkts_in;
+                vr_stats->vis_iftxrngenqdrops = port_stats.n_pkts_drop;
+            } else {
+                vr_stats->vis_ifenqpkts = port_stats.n_pkts_in;
+                vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+            }
         }
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
-        vr_stats->vis_rngdeqdrops++;
+        vr_stats->vis_ifenqdrops++;
         vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
         return -1;
     }
@@ -1003,16 +1016,26 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
 
-        /* Update counters for sent and dropped packets */
+        /**
+         * Update counters for:
+         *  - packets enqueued to the interface successfully.
+         *  - packets which have been dropped when .f_tx() could not send.
+         */
         if (likely(tx_queue->txq_ops.f_stats != NULL)) {
             tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
-            vr_stats->vis_ifenqpackets = port_stats.n_pkts_in;
-            vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+
+            if (tx_queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
+                vr_stats->vis_iftxrngenqpkts = port_stats.n_pkts_in;
+                vr_stats->vis_iftxrngenqdrops = port_stats.n_pkts_drop;
+            } else {
+                vr_stats->vis_ifenqpkts = port_stats.n_pkts_in;
+                vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+            }
         }
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
-        vr_stats->vis_rngdeqdrops++;
+        vr_stats->vis_ifenqdrops++;
         vif_drop_pkt(vif, vr_dpdk_mbuf_to_pkt(m), 0);
         return -1;
     }

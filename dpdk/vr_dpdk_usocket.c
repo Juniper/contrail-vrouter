@@ -463,6 +463,10 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
+    /**
+     * Packets is read from the agent's socket here. On success, a counter for
+     * packets dequeued from the interface is incremented.
+     */
     vr_stats = vif_get_stats(usockp->usock_vif, lcore_id);
     if (usockp->usock_vif) {
         /* buf_addr and data_off do not change */
@@ -476,8 +480,12 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         vr_dpdk_lcore_flush(lcore);
 
         rcu_quiescent_state();
-        vr_stats->vis_ifdeqpackets++;
+        vr_stats->vis_ifdeqpkts++;
     } else {
+        /**
+         * If reading from socket failed, increment counter for interface
+         * dequeue drops.
+         */
         RTE_LOG(ERR, VROUTER, "Error receiving from packet socket: no vif attached\n");
         vr_dpdk_pfree(usockp->usock_mbuf, VP_DROP_INTERFACE_DROP);
         vr_stats->vis_ifdeqdrops++;
@@ -505,12 +513,18 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
             (void **)&mbuf_arr, VR_DPDK_RING_RX_BURST_SZ);
-        vr_stats->vis_rngdeqpackets += nb_pkts;
         for (i = 0; i < nb_pkts; i++) {
+            /**
+             * Packets is written to the agent's socket here. On success,
+             * a counter for packets enqueued to the interface is incremented.
+             */
             if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) > 0)
-                vr_stats->vis_ifenqpackets++;
+                vr_stats->vis_ifenqpkts++;
             else {
-                vr_stats->vis_rngdeqdrops++;
+                /**
+                 * If writing to socket failed, increment counter for interface
+                 * enqueue drops.
+                 */
                 vr_stats->vis_ifenqdrops++;
             }
 

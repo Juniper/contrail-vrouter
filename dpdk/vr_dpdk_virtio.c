@@ -860,11 +860,20 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
                 __func__, npkts, vq_pring);
     nb_enq = rte_ring_sp_enqueue_burst(vq_pring, (void **) pkt_arr, npkts);
 
+    /**
+     * Packets received from VM are enqueued to the ring here. Increment
+     * a counter for RX'd-and-enqueued packets by the number of successfully
+     * enqueued packets.
+     */
     vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
     if (nb_enq > 0)
-        vr_stats->vis_rngenqpackets += nb_enq;
+        vr_stats->vis_ifrxenqpkts += nb_enq;
 
-    vr_stats->vis_rngenqdrops += npkts - nb_enq;
+    /**
+     * Increment a counter for RX'd-but-not-enqueued packets by the difference
+     * of packets we wish to enqueue and packets really enqueued.
+     */
+    vr_stats->vis_ifrxenqdrops += npkts - nb_enq;
     for ( ; nb_enq < npkts; nb_enq++)
         vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
 

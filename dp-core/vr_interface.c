@@ -1862,14 +1862,14 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf, short co
     req->vifr_obytes = 0;
     req->vifr_opackets = 0;
     req->vifr_oerrors = 0;
-    req->vifr_ifenqpackets = 0;
+    req->vifr_ifenqpkts = 0;
     req->vifr_ifenqdrops = 0;
-    req->vifr_ifdeqpackets = 0;
+    req->vifr_iftxrngenqpkts = 0;
+    req->vifr_iftxrngenqdrops = 0;
+    req->vifr_ifdeqpkts = 0;
     req->vifr_ifdeqdrops = 0;
-    req->vifr_rngenqpackets = 0;
-    req->vifr_rngenqdrops = 0;
-    req->vifr_rngdeqpackets = 0;
-    req->vifr_rngdeqdrops = 0;
+    req->vifr_ifrxenqpkts = 0;
+    req->vifr_ifrxenqdrops = 0;
 
     if (req->vifr_core == 0) {
         for (i = 0; i < vr_num_cpus; i++) {
@@ -1880,14 +1880,14 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf, short co
             req->vifr_obytes += stats->vis_obytes;
             req->vifr_opackets += stats->vis_opackets;
             req->vifr_oerrors += stats->vis_oerrors;
-            req->vifr_ifenqpackets += stats->vis_ifenqpackets;
+            req->vifr_ifenqpkts += stats->vis_ifenqpkts;
             req->vifr_ifenqdrops += stats->vis_ifenqdrops;
-            req->vifr_ifdeqpackets += stats->vis_ifdeqpackets;
+            req->vifr_iftxrngenqpkts += stats->vis_iftxrngenqpkts;
+            req->vifr_iftxrngenqdrops += stats->vis_iftxrngenqdrops;
+            req->vifr_ifdeqpkts += stats->vis_ifdeqpkts;
             req->vifr_ifdeqdrops += stats->vis_ifdeqdrops;
-            req->vifr_rngenqpackets += stats->vis_rngenqpackets;
-            req->vifr_rngenqdrops += stats->vis_rngenqdrops;
-            req->vifr_rngdeqpackets += stats->vis_rngdeqpackets;
-            req->vifr_rngdeqdrops += stats->vis_rngdeqdrops;
+            req->vifr_ifrxenqpkts += stats->vis_ifrxenqpkts;
+            req->vifr_ifrxenqdrops += stats->vis_ifrxenqdrops;
         }
     } else if (req->vifr_core > 0) {
             real_core = req->vifr_core - 1;
@@ -1898,14 +1898,14 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf, short co
             req->vifr_obytes = stats->vis_obytes;
             req->vifr_opackets = stats->vis_opackets;
             req->vifr_oerrors = stats->vis_oerrors;
-            req->vifr_ifenqpackets += stats->vis_ifenqpackets;
+            req->vifr_ifenqpkts += stats->vis_ifenqpkts;
             req->vifr_ifenqdrops += stats->vis_ifenqdrops;
-            req->vifr_ifdeqpackets += stats->vis_ifdeqpackets;
+            req->vifr_iftxrngenqpkts += stats->vis_iftxrngenqpkts;
+            req->vifr_iftxrngenqdrops += stats->vis_iftxrngenqdrops;
+            req->vifr_ifdeqpkts += stats->vis_ifdeqpkts;
             req->vifr_ifdeqdrops += stats->vis_ifdeqdrops;
-            req->vifr_rngenqpackets += stats->vis_rngenqpackets;
-            req->vifr_rngenqdrops += stats->vis_rngenqdrops;
-            req->vifr_rngdeqpackets += stats->vis_rngdeqpackets;
-            req->vifr_rngdeqdrops += stats->vis_rngdeqdrops;
+            req->vifr_ifrxenqpkts += stats->vis_ifrxenqpkts;
+            req->vifr_ifrxenqdrops += stats->vis_ifrxenqdrops;
     }
 
     req->vifr_speed = -1;

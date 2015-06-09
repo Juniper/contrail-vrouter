@@ -26,6 +26,9 @@
 #include <rte_config.h>
 #include <rte_port.h>
 
+extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
+        unsigned short);
+
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.
  * See more debug options below.
@@ -545,8 +548,24 @@ static inline void
 vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
 {
     struct vr_dpdk_queue *tx_queue;
+    const unsigned lcore_id = rte_lcore_id();
+    struct rte_port_out_stats port_stats;
+    struct vr_interface_stats *vr_stats;
+
     SLIST_FOREACH(tx_queue, &lcore->lcore_tx_head, q_next) {
         tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+
+        /**
+         * Update counters for:
+         *  - packets enqueued to the interface successfully.
+         *  - packets which have been dropped when .f_tx() could not send.
+         */
+        vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
+        if (likely(tx_queue->txq_ops.f_stats != NULL)) {
+            tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
+            vr_stats->vis_ifenqpkts = port_stats.n_pkts_in;
+            vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
+        }
     }
 }
 /* Send a burst of vr_packets to vRouter */
