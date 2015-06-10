@@ -360,7 +360,7 @@ vr_interface_req_process(void *s)
          * TODO: when we hash MPLSoGRE packets to different lcores, it should
          * apply to virtual as well as physical interfaces.
          */
-        if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+        if (req->vifr_type == VIF_TYPE_VIRTUAL) {
             vr_interface_print_head_space();
             printf("Packets enqueued on RX ring: %" PRId64"  Drops:%" PRId64 "  \n",
                 req->vifr_ifrxenqpkts, req->vifr_ifrxenqdrops);
