@@ -161,6 +161,9 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
     struct vr_arp *arp;
     struct vr_forwarding_md fmd_new;
     struct vr_interface *vif = pkt->vp_if;
+    struct vr_route_req rt;
+    bool vif_tx = false;
+    struct vr_nexthop *nh;
 
     eth = (struct vr_eth *)pkt_push(pkt, sizeof(*eth));
     if (!eth) {
@@ -192,13 +195,35 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
      * doing vr_bridge_input, we check for the flag NO_ARP_PROXY and
      * and if set, directly send out on that interface
      */
+
+
     if (vif_is_vhost(vif) ||
             (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)) {
-        vif->vif_tx(vif, pkt, fmd);
+        vif_tx = true;
     } else {
-        vr_bridge_input(vif->vif_router, pkt, &fmd_new);
+
+        rt.rtr_req.rtr_label_flags = 0;
+        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+        rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        rt.rtr_req.rtr_mac =(int8_t *) arp->arp_dha;
+        rt.rtr_req.rtr_vrf_id = fmd_new.fmd_dvrf;
+        nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
+        if (!nh || !(nh->nh_flags & NH_FLAG_VALID)) {
+            vr_pfree(pkt, VP_DROP_INVALID_NH);
+            return;
+        }
+        if (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
+            fmd_new.fmd_label = rt.rtr_req.rtr_label;
+
+        if (vif_is_virtual(vif) && (nh->nh_dev != vif)) {
+            vif_tx = true;
+        }
     }
 
+    if (vif_tx)
+        vif->vif_tx(vif, pkt, &fmd_new);
+    else
+        nh_output(pkt, nh, &fmd_new);
     return;
 }
 
