@@ -42,15 +42,15 @@
 #include "ini_parser.h"
 
 
-#define VHOST_TYPE_STRING       "vhost"
-#define AGENT_TYPE_STRING       "agent"
-#define PHYSICAL_TYPE_STRING    "physical"
-#define VIRTUAL_TYPE_STRING     "virtual"
-#define XEN_LL_TYPE_STRING      "xenll"
-#define GATEWAY_TYPE_STRING     "gateway"
+#define VHOST_TYPE_STRING           "vhost"
+#define AGENT_TYPE_STRING           "agent"
+#define PHYSICAL_TYPE_STRING        "physical"
+#define VIRTUAL_TYPE_STRING         "virtual"
+#define XEN_LL_TYPE_STRING          "xenll"
+#define GATEWAY_TYPE_STRING         "gateway"
 #define VIRTUAL_VLAN_TYPE_STRING    "virtual-vlan"
-#define STATS_TYPE_STRING       "stats"
-#define MONITORING_TYPE_STRING  "monitoring"
+#define STATS_TYPE_STRING           "stats"
+#define MONITORING_TYPE_STRING      "monitoring"
 
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
@@ -190,7 +190,7 @@ vr_interface_print_header(void)
 
     printf("Vrouter Interface Table\n\n");
 
-    if (stats_set && --core != -1)
+    if (stats_set && --core > -1)
         printf("Statistics for core %d\n\n", core);
 
     if (stats_set)
@@ -360,10 +360,11 @@ vr_interface_req_process(void *s)
          * TODO: when we hash MPLSoGRE packets to different lcores, it should
          * apply to virtual as well as physical interfaces.
          */
-        if (req->vifr_type == VIF_TYPE_VIRTUAL) {
+        if (req->vifr_type == VIF_TYPE_VIRTUAL
+                                /* || req->vifr_type == VIF_TYPE_PHYSICAL */) {
             vr_interface_print_head_space();
             printf("Packets enqueued on RX ring: %" PRId64"  Drops:%" PRId64 "  \n",
-                req->vifr_ifrxenqpkts, req->vifr_ifrxenqdrops);
+                req->vifr_ifrxrngenqpkts, req->vifr_ifrxrngenqdrops);
         }
     }
     printf("\n");
@@ -582,6 +583,23 @@ vr_intf_op(unsigned int op)
 op_retry:
     memset(&intf_req, 0 , sizeof(intf_req));
 
+    /**
+     * Implementation of getting per-core vif statistics is based on this
+     * little trick to avoid making changes in how agent makes requests for
+     * statistics. From vRouter's and agent's point of view, request for stats
+     * for 0th core means a request for stats summed up for all the cores.
+     * So cores are enumerated starting with 1.
+     * Meanwhile, from user's point of view they are enumerated starting with 0
+     * (e.g. vif --stats 0 means 'vif stats for the very first (0th) core').
+     * This is how Linux enumerates CPUs, so it should be more intuitive for
+     * the user.
+     *
+     * Agent is not aware of possibility of asking for per-core stats. Its
+     * requests have vifr_core implicitly set to 0. So we need to make a
+     * conversion between those enumerating systems. The vif utility increments
+     * by 1 the core number user asked for. Then it's decremented back in
+     * vRouter.
+     */
     intf_req.vifr_core = ++core;
 
     if (set_set)
@@ -739,7 +757,7 @@ static struct option long_options[] = {
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
     [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,        1},
-    [STATS_OPT_INDEX]        =  {"stats",       required_argument,  &stats_set,         1},
+    [STATS_OPT_INDEX]       =   {"stats",       required_argument,  &stats_set,         1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -810,6 +828,8 @@ parse_long_opts(int option_index, char *opt_arg)
 
     case STATS_OPT_INDEX:
         core = (short)strtoul(opt_arg, NULL, 0);
+        if (core < 0)
+            core = 0;
         vr_op = SANDESH_OP_DUMP;
         break;
 

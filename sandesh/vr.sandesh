@@ -66,12 +66,12 @@ buffer sandesh vr_interface_req {
    16: i64          vifr_oerrors;
    17: i64          vifr_ifenqpkts;
    18: i64          vifr_ifenqdrops;
-   19: i64          vifr_iftxrngenqpkts;
-   20: i64          vifr_iftxrngenqdrops;
-   21: i64          vifr_ifdeqpkts;
-   22: i64          vifr_ifdeqdrops;
-   23: i64          vifr_ifrxenqpkts;
-   24: i64          vifr_ifrxenqdrops;
+   19: i64          vifr_ifdeqpkts;
+   20: i64          vifr_ifdeqdrops;
+   21: i64          vifr_iftxrngenqpkts;
+   22: i64          vifr_iftxrngenqdrops;
+   23: i64          vifr_ifrxrngenqpkts;
+   24: i64          vifr_ifrxrngenqdrops;
    25:  i32         vifr_ref_cnt;
    26: i32          vifr_marker;
    27:  list<byte>  vifr_mac;

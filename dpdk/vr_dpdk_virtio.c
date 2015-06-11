@@ -282,9 +282,9 @@ vr_dpdk_virtio_get_mempool(void)
 #if DPDK_VIRTIO_READER_STATS_COLLECT == 1
 
 #define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val) \
-	port->in_stats.n_pkts_in += val
+	port->vdv_in_stats.n_pkts_in += val
 #define DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(port, val) \
-	port->in_stats.n_pkts_drop += val
+	port->vdv_in_stats.n_pkts_drop += val
 
 #else
 
@@ -424,9 +424,9 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
 #if DPDK_VIRTIO_WRITER_STATS_COLLECT == 1
 
 #define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val) \
-	port->out_stats.n_pkts_in += val
+	port->vdv_out_stats.n_pkts_in += val
 #define DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(port, val) \
-	port->out_stats.n_pkts_drop += val
+	port->vdv_out_stats.n_pkts_drop += val
 
 #else
 
@@ -453,6 +453,7 @@ dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *mbuf)
     }
 
     vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = mbuf;
+    DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(vq, 1);
     if (vq->vdv_tx_mbuf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ) {
         dpdk_virtio_to_vm_flush(vq);
     }
@@ -548,7 +549,6 @@ dpdk_virtio_to_vm_flush(void *arg)
                             rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
         }
 
-        DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(vq, 1);
         rte_memcpy(buf_addr, rte_pktmbuf_mtod(vq->vdv_tx_mbuf[i], void *),
                    rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]));
 
@@ -867,13 +867,13 @@ vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
      */
     vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
     if (nb_enq > 0)
-        vr_stats->vis_ifrxenqpkts += nb_enq;
+        vr_stats->vis_ifrxrngenqpkts += nb_enq;
 
     /**
      * Increment a counter for RX'd-but-not-enqueued packets by the difference
      * of packets we wish to enqueue and packets really enqueued.
      */
-    vr_stats->vis_ifrxenqdrops += npkts - nb_enq;
+    vr_stats->vis_ifrxrngenqdrops += npkts - nb_enq;
     for ( ; nb_enq < npkts; nb_enq++)
         vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
 
@@ -887,10 +887,10 @@ dpdk_virtio_reader_stats_read(void *arg,
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
 
     if (stats != NULL)
-        memcpy(stats, &vq->in_stats, sizeof(vq->in_stats));
+        memcpy(stats, &vq->vdv_in_stats, sizeof(vq->vdv_in_stats));
 
     if (clear)
-        memset(&vq->in_stats, 0, sizeof(vq->in_stats));
+        memset(&vq->vdv_in_stats, 0, sizeof(vq->vdv_in_stats));
 
     return 0;
 }
@@ -902,10 +902,10 @@ dpdk_virtio_writer_stats_read(void *arg,
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
 
     if (stats != NULL)
-        memcpy(stats, &vq->out_stats, sizeof(vq->out_stats));
+        memcpy(stats, &vq->vdv_out_stats, sizeof(vq->vdv_out_stats));
 
     if (clear)
-        memset(&vq->out_stats, 0, sizeof(vq->out_stats));
+        memset(&vq->vdv_out_stats, 0, sizeof(vq->vdv_out_stats));
 
     return 0;
 }

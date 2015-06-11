@@ -110,12 +110,12 @@ struct vr_interface_stats {
     uint64_t vis_oerrors;
     uint64_t vis_ifenqpkts;
     uint64_t vis_ifenqdrops;
-    uint64_t vis_iftxrngenqpkts;
-    uint64_t vis_iftxrngenqdrops;
     uint64_t vis_ifdeqpkts;
     uint64_t vis_ifdeqdrops;
-    uint64_t vis_ifrxenqpkts;
-    uint64_t vis_ifrxenqdrops;
+    uint64_t vis_iftxrngenqpkts;
+    uint64_t vis_iftxrngenqdrops;
+    uint64_t vis_ifrxrngenqpkts;
+    uint64_t vis_ifrxrngenqdrops;
 };
 
 struct vr_packet;

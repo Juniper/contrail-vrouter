@@ -22,7 +22,6 @@
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_ip.h>
-#include <rte_port_ring.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
@@ -943,24 +942,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
             tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 
-        /**
-         * Update counters for:
-         *  - packets enqueued to the interface successfully.
-         *  - packets which have been dropped when .f_tx() could not send.
-         *  If we write to ring instead of NIC's queue, count it as a ring
-         *  enqueue.
-         */
-        if (likely(tx_queue->txq_ops.f_stats != NULL)) {
-            tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
-
-            if (tx_queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
-                vr_stats->vis_iftxrngenqpkts = port_stats.n_pkts_in;
-                vr_stats->vis_iftxrngenqdrops = port_stats.n_pkts_drop;
-            } else {
-                vr_stats->vis_ifenqpkts = port_stats.n_pkts_in;
-                vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
-            }
-        }
+        dpdk_port_out_stats_update(tx_queue, &port_stats, vr_stats);
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
@@ -1016,22 +998,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
 
-        /**
-         * Update counters for:
-         *  - packets enqueued to the interface successfully.
-         *  - packets which have been dropped when .f_tx() could not send.
-         */
-        if (likely(tx_queue->txq_ops.f_stats != NULL)) {
-            tx_queue->txq_ops.f_stats(tx_queue->q_queue_h, &port_stats, 0);
-
-            if (tx_queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
-                vr_stats->vis_iftxrngenqpkts = port_stats.n_pkts_in;
-                vr_stats->vis_iftxrngenqdrops = port_stats.n_pkts_drop;
-            } else {
-                vr_stats->vis_ifenqpkts = port_stats.n_pkts_in;
-                vr_stats->vis_ifenqdrops = port_stats.n_pkts_drop;
-            }
-        }
+        dpdk_port_out_stats_update(tx_queue, &port_stats, vr_stats);
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
