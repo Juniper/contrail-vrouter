@@ -1,0 +1,8 @@
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Approved+1: Ashish Ranjan <aranjan@juniper.net>
+Code-Review+2: Anand H. Krishnan <anandhk@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Sun, 14 Jun 2015 10:48:58 -0700
+Reviewed-on: https://review.opencontrail.org/11506
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/R2.20
