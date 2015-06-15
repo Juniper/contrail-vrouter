@@ -1243,7 +1243,10 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
                     pull_len += 24;
+                } else if (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL) {
+                    pull_len += 8;
                 }
+
                 if (frag_size < pull_len)
                     goto slow_path;
 
@@ -1681,7 +1684,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
                     pull_len += 24;
+                } else if (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL) {
+                    pull_len += 8;
                 }
+
                 if (frag_size < pull_len)
                     goto slow_path;
 
@@ -1895,9 +1901,8 @@ lh_pull_inner_headers(struct vr_packet *pkt,
      * is what pskb_may_pull() expects.
      */
     pull_len += (pkt->vp_data - (skb->data - skb->head));
-    if (!pskb_may_pull(skb, pull_len)) {
+    if (!pskb_may_pull(skb, pull_len))
         goto error;
-    }
 
     vrouter_overlay_len = VROUTER_L2_OVERLAY_LEN;
     outer_cksum_validate = false;
@@ -2006,6 +2011,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             pull_len += sizeof(struct ipv6hdr);
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
+
             ip6h = (struct vr_ip6 *) (skb->head + hoff);
             iph = NULL;
         } else if (ntohs(eth_proto) == VR_ETH_PROTO_ARP) {
@@ -2094,9 +2100,8 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                     if (skb->len < pull_len)
                         pull_len = skb->len;
 
-                    if (!pskb_may_pull(skb, pull_len)) {
+                    if (!pskb_may_pull(skb, pull_len))
                         goto error;
-                    }
 
                     pull_len -= sizeof(struct vr_icmp);
                     if (icmp_pl_ip_proto == VR_IP_PROTO_TCP)
@@ -2137,10 +2142,13 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
                     pull_len += 24;
+                } else if (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL) {
+                    pull_len += 8;
                 }
-                if (!pskb_may_pull(skb, pull_len)) {
+
+                if (!pskb_may_pull(skb, pull_len))
                     goto error;
-                }
+
                 ip6h = (struct vr_ip6 *) (skb->head + hoff);
                 iph = (struct vr_ip*) ip6h;
             }

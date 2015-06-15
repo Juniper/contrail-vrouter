@@ -702,14 +702,12 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
                 l4_type = vr_ip6_well_known_packet(pkt);
                 if (l4_type != L4_TYPE_UNKNOWN) {
-                    if (!pkt_src) {
-                        trap = true;
-                    }
 
+                    /* Trap well known V6 packets */
+                    trap = true;
+
+                    /* If DHCP, and we are not DHCP server, dont Trap */
                     if (l4_type == L4_TYPE_DHCP_REQUEST) {
-                        if (pkt_src)
-                            trap = true;
-
                         rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
                                 eth->eth_smac);
                         if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
