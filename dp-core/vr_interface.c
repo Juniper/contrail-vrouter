@@ -1879,9 +1879,9 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
      * for 0th core means a request for stats summed up for all the cores.
      * So cores are enumerated starting with 1.
      * Meanwhile, from user's point of view they are enumerated starting with 0
-     * (e.g. vif --stats 0 means 'vif stats for the very first (0th) core').
-     * This is how Linux enumerates CPUs, so it should be more intuitive for
-     * the user.
+     * (e.g. vif --list --core 0 means 'vif stats for the very first (0th)
+     * core'). This is how Linux enumerates CPUs, so it should be more
+     * intuitive for the user.
      *
      * Agent is not aware of possibility of asking for per-core stats. Its
      * requests have vifr_core implicitly set to 0. So we need to make a

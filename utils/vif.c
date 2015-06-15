@@ -67,7 +67,7 @@ static short core = -1;
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vif_set, vhost_phys_set, stats_set;
+static int xconnect_set, vif_set, vhost_phys_set, core_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -190,10 +190,10 @@ vr_interface_print_header(void)
 
     printf("Vrouter Interface Table\n\n");
 
-    if (stats_set && --core > -1)
+    if (core_set && --core > -1)
         printf("Statistics for core %d\n\n", core);
 
-    if (stats_set)
+    if (core_set)
         return;
 
     printf("Flags: ");
@@ -271,7 +271,7 @@ vr_interface_req_process(void *s)
     if (add_set)
         vr_ifindex = req->vifr_idx;
 
-    if (!get_set && !list_set && !stats_set)
+    if (!get_set && !list_set)
         return;
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
@@ -305,36 +305,33 @@ vr_interface_req_process(void *s)
                 if_indextoname(req->vifr_os_idx, name): "NULL");
     }
 
-     if (!stats_set) {
-        if (req->vifr_type == VIF_TYPE_PHYSICAL) {
-            if (req->vifr_speed >= 0) {
-                printf(" (Speed %d,", req->vifr_speed);
-                if (req->vifr_duplex >= 0)
-                    printf(" Duplex %d", req->vifr_duplex);
-                printf(")");
-            }
-        } else if (req->vifr_type == VIF_TYPE_VIRTUAL_VLAN) {
-            printf(" Vlan(o/i)(,S): %d/%d", req->vifr_ovlan_id, req->vifr_vlan_id);
-            if (req->vifr_src_mac_size && req->vifr_src_mac)
-                printf(", "MAC_FORMAT, MAC_VALUE((uint8_t *)req->vifr_src_mac));
-            printf(" Bridge Index: %d", req->vifr_bridge_idx);
+    if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+        if (req->vifr_speed >= 0) {
+            printf(" (Speed %d,", req->vifr_speed);
+            if (req->vifr_duplex >= 0)
+                printf(" Duplex %d", req->vifr_duplex);
+            printf(")");
         }
+    } else if (req->vifr_type == VIF_TYPE_VIRTUAL_VLAN) {
+        printf(" Vlan(o/i)(,S): %d/%d", req->vifr_ovlan_id, req->vifr_vlan_id);
+        if (req->vifr_src_mac_size && req->vifr_src_mac)
+            printf(", "MAC_FORMAT, MAC_VALUE((uint8_t *)req->vifr_src_mac));
+        printf(" Bridge Index: %d", req->vifr_bridge_idx);
+    }
 
-        if (req->vifr_parent_vif_idx >= 0)
-            printf(" Parent:vif0/%d", req->vifr_parent_vif_idx);
+    if (req->vifr_parent_vif_idx >= 0)
+        printf(" Parent:vif0/%d", req->vifr_parent_vif_idx);
 
-        printf("\n");
+    printf("\n");
 
-        vr_interface_print_head_space();
-        printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
-                vr_get_if_type_string(req->vifr_type),
-                MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
-        vr_interface_print_head_space();
-        printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
-                req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
-                req->vifr_mtu, req->vifr_ref_cnt);
-    } else
-        printf("\n");
+    vr_interface_print_head_space();
+    printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
+            vr_get_if_type_string(req->vifr_type),
+            MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
+    vr_interface_print_head_space();
+    printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
+            req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
+            req->vifr_mtu, req->vifr_ref_cnt);
 
     vr_interface_print_head_space();
     printf("RX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
@@ -369,7 +366,7 @@ vr_interface_req_process(void *s)
     }
     printf("\n");
 
-    if (list_set || stats_set)
+    if (list_set)
         dump_marker = req->vifr_idx;
 
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
@@ -583,25 +580,6 @@ vr_intf_op(unsigned int op)
 op_retry:
     memset(&intf_req, 0 , sizeof(intf_req));
 
-    /**
-     * Implementation of getting per-core vif statistics is based on this
-     * little trick to avoid making changes in how agent makes requests for
-     * statistics. From vRouter's and agent's point of view, request for stats
-     * for 0th core means a request for stats summed up for all the cores.
-     * So cores are enumerated starting with 1.
-     * Meanwhile, from user's point of view they are enumerated starting with 0
-     * (e.g. vif --stats 0 means 'vif stats for the very first (0th) core').
-     * This is how Linux enumerates CPUs, so it should be more intuitive for
-     * the user.
-     *
-     * Agent is not aware of possibility of asking for per-core stats. Its
-     * requests have vifr_core implicitly set to 0. So we need to make a
-     * conversion between those enumerating systems. The vif utility increments
-     * by 1 the core number user asked for. Then it's decremented back in
-     * vRouter.
-     */
-    intf_req.vifr_core = ++core;
-
     if (set_set)
         intf_req.vifr_vrf = -1;
     else
@@ -649,6 +627,25 @@ op_retry:
         break;
 
     case SANDESH_OP_GET:
+        /**
+         * Implementation of getting per-core vif statistics is based on this
+         * little trick to avoid making changes in how agent makes requests for
+         * statistics. From vRouter's and agent's point of view, request for
+         * stats for 0th core means a request for stats summed up for all the
+         * cores. So cores are enumerated starting with 1.
+         * Meanwhile, from user's point of view they are enumerated starting
+         * with 0 (e.g. vif --list --core 0 means 'vif statistics for the very
+         * first (0th) core'). This is how Linux enumerates CPUs, so it should
+         * be more intuitive for the user.
+         *
+         * Agent is not aware of possibility of asking for per-core stats. Its
+         * requests have vifr_core implicitly set to 0. So we need to make a
+         * conversion between those enumerating systems. The vif utility
+         * increments by 1 the core number user asked for. Then it is
+         * decremented back in vRouter.
+         */
+        intf_req.vifr_core = ++core;
+
         /*
          * this logic is slightly complicated. if --kernel option is set
          * for get or when if_kindex is set for add doing a get, we should
@@ -665,6 +662,7 @@ op_retry:
         break;
 
     case SANDESH_OP_DUMP:
+        intf_req.vifr_core = ++core;
         break;
     }
 
@@ -701,10 +699,9 @@ Usage()
     printf("\t   \t--vif <vif ID>]\n");
     printf( "[--id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
-    printf("\t   [--get <intf_id>][--kernel]\n");
+    printf("\t   [--get <intf_id>][--kernel][--core <core number>]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
-    printf("\t   [--list]\n");
-    printf("\t   [--stats <core number>]\n");
+    printf("\t   [--list][--core <core number>]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -732,7 +729,7 @@ enum if_opt_index {
     VHOST_PHYS_OPT_INDEX,
     HELP_OPT_INDEX,
     VINDEX_OPT_INDEX,
-    STATS_OPT_INDEX,
+    CORE_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -757,7 +754,7 @@ static struct option long_options[] = {
     [DHCP_OPT_INDEX]        =   {"dhcp-enable", no_argument,        &dhcp_set,          1},
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
     [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,        1},
-    [STATS_OPT_INDEX]       =   {"stats",       required_argument,  &stats_set,         1},
+    [CORE_OPT_INDEX]        =   {"core",        required_argument,  &core_set,          1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -826,11 +823,10 @@ parse_long_opts(int option_index, char *opt_arg)
         vr_op = SANDESH_OP_DUMP;
         break;
 
-    case STATS_OPT_INDEX:
+    case CORE_OPT_INDEX:
         core = (short)strtoul(opt_arg, NULL, 0);
         if (core < 0)
             core = 0;
-        vr_op = SANDESH_OP_DUMP;
         break;
 
     case TYPE_OPT_INDEX:
@@ -919,14 +915,25 @@ validate_options(void)
     }
 
     if (get_set) {
-        if ((sum_opt > 1) && (sum_opt != 2 || !kindex_set))
+        if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set))
             Usage();
         return;
     }
 
-    if ((delete_set || list_set)) {
+    if (delete_set) {
         if (sum_opt > 1)
             Usage();
+        return;
+    }
+
+    if (list_set) {
+        if (!core_set) {
+            if (sum_opt > 1)
+                Usage();
+        } else {
+            if (sum_opt != 2)
+                Usage();
+        }
         return;
     }
 
@@ -948,6 +955,15 @@ validate_options(void)
         return;
     }
 
+    /**
+     * Statistics per CPU core could be requested as an additional parameter
+     * to --list or --get.
+     */
+    if (core_set) {
+        if (!list_set || !get_set)
+            Usage();
+    }
+
     return;
 }
 
@@ -961,7 +977,7 @@ main(int argc, char *argv[])
      */
     unsigned int sock_proto = NETLINK_GENERIC;
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:s:DPi:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:C:DPi:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'a':
@@ -1030,9 +1046,9 @@ main(int argc, char *argv[])
                 parse_long_opts(VINDEX_OPT_INDEX, NULL);
                 break;
 
-            case 's':
-                stats_set = 1;
-                parse_long_opts(STATS_OPT_INDEX, optarg);
+            case 'C':
+                core_set = 1;
+                parse_long_opts(CORE_OPT_INDEX, optarg);
                 break;
 
             case 0:
