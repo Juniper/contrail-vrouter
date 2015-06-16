@@ -96,7 +96,7 @@ vr_get_hentry_by_index(vr_htable_t htable, unsigned int index)
     if (index < table->hentries)
         return vr_btable_get(table->htable, index);
 
-    if (index < table->oentries)
+    if (index < (table->oentries + table->hentries))
         return vr_btable_get(table->otable, (index - table->hentries));
 
     return NULL;
