@@ -109,10 +109,10 @@ dpdk_knidev_reader_stats_read(void *port,
         (struct dpdk_knidev_reader *) port;
 
     if (stats != NULL)
-    memcpy(stats, &p->stats, sizeof(p->stats));
+        memcpy(stats, &p->stats, sizeof(p->stats));
 
     if (clear)
-    memset(&p->stats, 0, sizeof(p->stats));
+        memset(&p->stats, 0, sizeof(p->stats));
 
     return 0;
 }
@@ -242,13 +242,13 @@ dpdk_knidev_writer_stats_read(void *port,
     struct rte_port_out_stats *stats, int clear)
 {
     struct dpdk_knidev_writer *p =
-    (struct dpdk_knidev_writer *) port;
+        (struct dpdk_knidev_writer *) port;
 
     if (stats != NULL)
-    memcpy(stats, &p->stats, sizeof(p->stats));
+        memcpy(stats, &p->stats, sizeof(p->stats));
 
     if (clear)
-    memset(&p->stats, 0, sizeof(p->stats));
+        memset(&p->stats, 0, sizeof(p->stats));
 
     return 0;
 }

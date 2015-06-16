@@ -936,7 +936,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
+    vr_stats = vif_get_stats(vif, lcore_id);
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
         if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
@@ -994,7 +994,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    vr_stats = vif_get_stats(tx_queue->q_vif, lcore_id);
+    vr_stats = vif_get_stats(vif, lcore_id);
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
 

@@ -388,7 +388,6 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             mbuf->pkt_len = pkt_len;
             mbuf->ol_flags = mbuf_flags;
 
-            DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(vq, 1);
             rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
 
             /* gather mbuf from several vring buffers (fixes FreeBSD) */
@@ -418,6 +417,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkts_sent %u\n",
             __func__, vq, pkts_sent);
 
+    DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(vq, pkts_sent);
     return pkts_sent;
 }
 

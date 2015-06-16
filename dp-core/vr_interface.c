@@ -1807,12 +1807,12 @@ generate_resp:
 
 static void
 vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
-                        short core)
+                        unsigned int core)
 {
     unsigned int i;
     struct vr_interface_stats *stats;
     struct vr_interface_settings settings;
-    short real_core;
+    int real_core;
 
     req->vifr_core = core;
     req->vifr_type = intf->vif_type;
@@ -1918,7 +1918,8 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
              * TODO: This would be much simplier if agent could explicitly ask
              * for stats for 'minus 1st' core, meaning 'all the cores'.
              */
-            real_core = req->vifr_core - 1;
+            real_core = req->vifr_core;
+            real_core--;
             stats = vif_get_stats(intf, real_core);
 
             req->vifr_ibytes = stats->vis_ibytes;
@@ -2001,7 +2002,7 @@ vr_interface_get(vr_interface_req *req)
     struct vr_interface *vif = NULL;
     struct vrouter *router;
     vr_interface_req *resp = NULL;
-    short core;
+    unsigned int core;
 
     /**
      * Check if requested core number is sane. If not, let's assume the
@@ -2052,14 +2053,14 @@ vr_interface_dump(vr_interface_req *r)
     vr_interface_req *resp = NULL;
     struct vr_interface *vif;
     struct vrouter *router = vrouter_get(r->vifr_vrf);
-    short core;
+    unsigned int core;
     struct vr_message_dumper *dumper = NULL;
 
     /**
      * Check if requested core number is sane. If not, let's assume the
      * request was made for summed up stats for all the cores.
      */
-    if (r->vifr_core > 0 && r->vifr_core <= (int)vr_num_cpus) {
+    if (r->vifr_core > 0 && r->vifr_core <= vr_num_cpus) {
         core = r->vifr_core;
     } else {
         core = 0;

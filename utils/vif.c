@@ -62,7 +62,7 @@ static int if_xconnect_kindex = -1;
 static int if_vif_index = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
-static short core = -1;
+static int core = -1;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
@@ -190,7 +190,7 @@ vr_interface_print_header(void)
 
     printf("Vrouter Interface Table\n\n");
 
-    if (core_set && --core > -1)
+    if (core_set && core > -1)
         printf("Statistics for core %d\n\n", core);
 
     if (core_set)
@@ -644,7 +644,7 @@ op_retry:
          * increments by 1 the core number user asked for. Then it is
          * decremented back in vRouter.
          */
-        intf_req.vifr_core = ++core;
+        intf_req.vifr_core = (unsigned int)(core + 1);
 
         /*
          * this logic is slightly complicated. if --kernel option is set
@@ -662,7 +662,7 @@ op_retry:
         break;
 
     case SANDESH_OP_DUMP:
-        intf_req.vifr_core = ++core;
+        intf_req.vifr_core = (unsigned int)(core + 1);
         break;
     }
 
@@ -824,7 +824,7 @@ parse_long_opts(int option_index, char *opt_arg)
         break;
 
     case CORE_OPT_INDEX:
-        core = (short)strtoul(opt_arg, NULL, 0);
+        core = (int)strtol(opt_arg, NULL, 0);
         if (core < 0)
             core = 0;
         break;
