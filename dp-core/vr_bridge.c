@@ -452,7 +452,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
 
         nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
-        if (!nh) {
+        if (!nh || nh->nh_type == NH_DISCARD) {
 
             /* If Flooding of unknown unicast not allowed, drop the packet */
             if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
@@ -462,6 +462,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
 
             rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
+            rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
             nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
             if (!nh) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
