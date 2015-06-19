@@ -41,8 +41,8 @@ static struct nl_client *cl;
 static bool dump_pending = false;
 unsigned int dump_marker= 0;
 
-static int vxlan_vnid = 99999;
-static int vxlan_nh = 99999;
+static int vxlan_vnid;
+static int vxlan_nh;
 
 static int create_set, delete_set, dump_set;
 static int get_set, nh_set, vnid_set;
@@ -54,8 +54,8 @@ vr_vxlan_req_process(void *s_req)
 {
    vr_vxlan_req *req = (vr_vxlan_req *)s_req;
 
-   printf("%5d    %7d\n", (req->vxlanr_vnid & 0xFFFF),
-           (req->vxlanr_nhid & 0xFFFF));
+   printf("%7d    %d\n", req->vxlanr_vnid,
+           req->vxlanr_nhid);
 
    dump_marker = req->vxlanr_vnid;
 
