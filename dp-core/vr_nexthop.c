@@ -1635,7 +1635,8 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          * flow lookup now or not. There are two cases:
          *
          * 1. when policy flag is set in the nexthop, and
-         * 2. when the source is an ECMP.
+         * 2. when the source is an ECMP (For bridged packets this ECMP
+         *      is avoided)
          *
          * When the source is an ECMP, we would like the packet to reach the
          * same place from where it came from, and hence a flow has to be setup
@@ -1646,7 +1647,8 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
              if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
                  need_flow_lookup = true;
-             } else {
+             } else if ((nh->nh_family == AF_INET) &&
+                     (!(nh->nh_flags & NH_FLAG_VNID))) {
                  src_nh = vr_inet_src_lookup(fmd->fmd_dvrf, pkt);
                  if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
                             src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
