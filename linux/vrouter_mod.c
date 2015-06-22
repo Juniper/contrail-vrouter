@@ -2532,6 +2532,13 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+        .procname       = "vxlan_ecmp_no_rpf",
+        .data           = &vr_vxlan_ecmp_no_rpf,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 

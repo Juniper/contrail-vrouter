@@ -33,6 +33,7 @@ struct vr_nexthop *ip4_default_nh;
 struct vr_nexthop *ip6_default_nh;
 
 unsigned int vr_nexthops = VR_DEF_NEXTHOPS;
+unsigned int vr_vxlan_ecmp_no_rpf = 1;
 
 struct vr_nexthop *
 __vrouter_get_nexthop(struct vrouter *router, unsigned int index)
@@ -1650,11 +1651,12 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
              if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
                  need_flow_lookup = true;
-             } else {
+             } else if ((!(nh->nh_flags & NH_FLAG_VNID)) ||
+                     (!vr_vxlan_ecmp_no_rpf)) {
                  src_nh = vr_inet_src_lookup(fmd->fmd_dvrf, pkt);
                  if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
                             src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
-                     need_flow_lookup = true;
+                    need_flow_lookup = true;
                  }
              }
 
