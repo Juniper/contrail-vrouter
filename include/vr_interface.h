@@ -77,6 +77,7 @@
  */
 #define VIF_FLAG_MONITORED          0x8000
 #define VIF_FLAG_UNKNOWN_UC_FLOOD   0x10000
+#define VIF_FLAG_VLAN_OFFLOAD       0x20000
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
@@ -151,36 +152,23 @@ struct vr_vrf_assign {
 
 struct vr_interface {
     unsigned short vif_type;
-    unsigned short vif_vrf;
     unsigned short vif_rid;
-    unsigned short vif_mtu;
-
     unsigned int vif_flags;
-    unsigned int vif_idx;
-    unsigned int vif_users;
-    unsigned int vif_os_idx;
-
-    struct vrouter *vif_router;
-    struct vr_interface *vif_parent;
-    struct vr_interface *vif_bridge;
-    struct vr_interface_stats *vif_stats;
-
-    unsigned short vif_vlan_id;
-    unsigned short vif_ovlan_id;
-    unsigned short vif_nh_id;
-    unsigned short vif_vrf_table_users;
-    uint8_t vif_transport;
     /*
      * unsigned short does not cut it, because initial value for
      * each entry in the table is -1. negative value of table
      * entries is also vital for table_users calculation.
      */
-    struct vr_vrf_assign *vif_vrf_table;
+    unsigned short vif_nh_id;
+    unsigned short vif_idx;
+    unsigned short vif_vrf;
+    unsigned short vif_mtu;
+
+    struct vrouter *vif_router;
+    struct vr_interface_stats *vif_stats;
+
 
     void *vif_os;
-    int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
-    unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
-            struct vr_forwarding_md *, unsigned char *, unsigned short);
     int (*vif_tx)(struct vr_interface *, struct vr_packet *,
             struct vr_forwarding_md *);
     /*
@@ -191,18 +179,10 @@ struct vr_interface {
      * for sure...
      */
     int (*vif_rx)(struct vr_interface *, struct vr_packet *, unsigned short);
-    mac_response_t (*vif_mac_request)(struct vr_interface *,
-            struct vr_packet *, struct vr_forwarding_md *, unsigned char *);
 
-    struct vr_interface **vif_sub_interfaces;
-    struct vr_interface_driver *vif_driver;
-    unsigned char *vif_src_mac;
-    vr_htable_t vif_btable;
-
-    unsigned char vif_rewrite[VR_ETHER_HLEN];
+    unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
+            struct vr_forwarding_md *, unsigned char *, unsigned short);
     unsigned char vif_mac[VR_ETHER_ALEN];
-    unsigned char vif_name[VR_INTERFACE_NAME_LEN];
-    unsigned int  vif_ip;
 #ifdef __KERNEL__
 #if defined(__linux__)
     struct napi_struct vr_napi;
@@ -215,6 +195,27 @@ struct vr_interface {
 #endif
 #endif
     uint8_t vif_mirror_id; /* best placed here for now - less space wasted */
+    /* Big and less frequently used fileds */
+    struct vr_interface *vif_parent;
+    struct vr_interface *vif_bridge;
+    unsigned int vif_users;
+    unsigned int vif_os_idx;
+    unsigned short vif_vlan_id;
+    unsigned short vif_ovlan_id;
+    unsigned short vif_vrf_table_users;
+    uint8_t vif_transport;
+
+    struct vr_vrf_assign *vif_vrf_table;
+    int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
+    mac_response_t (*vif_mac_request)(struct vr_interface *,
+            struct vr_packet *, struct vr_forwarding_md *, unsigned char *);
+    struct vr_interface **vif_sub_interfaces;
+    struct vr_interface_driver *vif_driver;
+    unsigned char *vif_src_mac;
+    vr_htable_t vif_btable;
+    unsigned char vif_rewrite[VR_ETHER_HLEN];
+    unsigned char vif_name[VR_INTERFACE_NAME_LEN];
+    unsigned int  vif_ip;
 };
 
 struct vr_interface_settings {

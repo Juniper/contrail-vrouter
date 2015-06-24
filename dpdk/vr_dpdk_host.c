@@ -138,12 +138,18 @@ static void
 dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     struct vrouter *router = vrouter_get(0);
+    unsigned lcore_id;
 
     if (!pkt)
         rte_panic("Null packet");
 
-    if (router)
-        ((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
+    if (router) {
+        lcore_id = rte_lcore_id();
+        /* RCU thread check */
+        if (lcore_id == LCORE_ID_ANY)
+            lcore_id = 0;
+        ((uint64_t *)(router->vr_pdrop_stats[lcore_id]))[reason]++;
+    }
 
     rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
 
@@ -1072,10 +1078,11 @@ vhost_remove_xconnect(void)
 {
     int i;
     struct vr_interface *vif;
+    struct vrouter *router = vrouter_get(0);
 
-    for (i = 0; i < VR_MAX_INTERFACES; i++) {
-        vif = vr_dpdk.vhosts[i];
-        if (vif != NULL) {
+    for (i = 0; i < router->vr_max_interfaces; i++) {
+        vif = __vrouter_get_interface(router, i);
+        if (vif && (vif_is_vhost(vif))) {
             vif_remove_xconnect(vif);
             if (vif->vif_bridge != NULL)
                 vif_remove_xconnect(vif->vif_bridge);
@@ -1115,7 +1122,7 @@ struct vr_packet *
 vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif)
 {
     struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(m);
-    pkt->vp_cpu = vr_get_cpu();
+    pkt->vp_cpu = rte_lcore_id();
     /* vp_head is set in vr_dpdk_pktmbuf_init() */
 
     pkt->vp_tail = rte_pktmbuf_headroom(m) + rte_pktmbuf_data_len(m);

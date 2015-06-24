@@ -19,6 +19,8 @@
 #include <rte_eth_bond.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
+#include <rte_hash_crc.h>
+#include <rte_ip.h>
 #include <rte_port_ethdev.h>
 
 static struct rte_eth_conf ethdev_conf = {
@@ -31,7 +33,7 @@ static struct rte_eth_conf ethdev_conf = {
         .header_split       = 0, /* Disable Header Split */
         .hw_ip_checksum     = 1, /* Enable IP/UDP/TCP checksum offload */
         .hw_vlan_filter     = 0, /* Disabel VLAN filter */
-        .hw_vlan_strip      = 0, /* Disable VLAN strip */
+        .hw_vlan_strip      = 0, /* Disable VLAN strip (might be enabled with --vlan argument) */
         .hw_vlan_extend     = 0, /* Disable Extended VLAN */
         .jumbo_frame        = 0, /* Disable Jumbo Frame Receipt */
         .hw_strip_crc       = 0, /* Disable CRC stripping by hardware */
@@ -41,7 +43,8 @@ static struct rte_eth_conf ethdev_conf = {
         .rss_conf = { /* Port RSS configuration */
             .rss_key            = NULL, /* If not NULL, 40-byte hash key */
             .rss_key_len        = 0,    /* Hash key length in bytes */
-            .rss_hf             = ETH_RSS_UDP, /* Hash functions to apply */
+            /* Hash functions to apply */
+            .rss_hf             = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP,
         },
     },
     .txmode = { /* Port TX configuration. */
@@ -84,7 +87,7 @@ static const struct rte_eth_rxconf rx_queue_conf = {
         .wthresh = 4,   /* Ring writeback threshold */
     },
     /* Do not immediately free RX descriptors */
-    .rx_free_thresh = VR_DPDK_ETH_RX_BURST_SZ,
+    .rx_free_thresh = VR_DPDK_RX_BURST_SZ,
 };
 
 /*
@@ -208,7 +211,6 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* init queue */
     rx_queue->rxq_ops = rte_port_ethdev_reader_ops;
     rx_queue->q_queue_h = NULL;
-    rx_queue->rxq_burst_size = VR_DPDK_ETH_RX_BURST_SZ;
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
@@ -294,7 +296,7 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     struct rte_port_ethdev_writer_params writer_params = {
         .port_id = port_id,
         .queue_id = tx_queue_id,
-        .tx_burst_sz = VR_DPDK_ETH_TX_BURST_SZ,
+        .tx_burst_sz = VR_DPDK_TX_BURST_SZ,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
@@ -308,9 +310,9 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     tx_queue_params->qp_ethdev.queue_id = tx_queue_id;
     tx_queue_params->qp_ethdev.port_id = port_id;
 
-    /* add queue params to the list of bonds to TX */
-    if (ethdev->ethdev_nb_slaves > 0) {
-        /* make sure queue params has been stored */
+    /* for the queue 0 add queue params to the list of bonds to TX */
+    if (ethdev->ethdev_nb_slaves > 0 && tx_queue_id == 0) {
+        /* make sure queue params have been stored */
         rte_wmb();
         lcore->lcore_bonds_to_tx[lcore->lcore_nb_bonds_to_tx++] = tx_queue_params;
         RTE_VERIFY(lcore->lcore_nb_bonds_to_tx <= VR_DPDK_MAX_BONDS);
@@ -589,6 +591,10 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
 
     dpdk_ethdev_info_update(ethdev);
 
+    /* enable hardware vlan stripping */
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+        ethdev_conf.rxmode.hw_vlan_strip = 1;
+    }
     ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
         ethdev->ethdev_nb_tx_queues, &ethdev_conf);
     if (ret < 0) {
@@ -625,4 +631,97 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
     dpdk_ethdev_mempools_free(ethdev);
 
     return 0;
+}
+
+/* Emulate smart NIC RSS hash
+ * TODO: add MPLSoGRE case
+ * Returns:
+ *     0  if the mbuf has been hashed by NIC
+ *     1  otherwise
+ */
+static inline int
+dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
+{
+    struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
+    struct ipv4_hdr *ipv4_hdr;
+    uint32_t *l4_ptr;
+    uint32_t hash = 0;
+    uint8_t iph_len;
+
+    if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
+        RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
+                __func__, mbuf->hash.rss);
+        return 0;
+    }
+
+    /* TODO: IPv6 support */
+    if (likely(eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+        mbuf->ol_flags |= PKT_RX_IPV4_HDR;
+        /* we assume the VLAN has been stripped */
+        ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr +
+                                    sizeof(struct ether_hdr));
+
+        /* We use SSE4.3 CRC hash. No need to support Toeplitz hash,
+         * since there is no need to match NIC's hash */
+        hash = rte_hash_crc_4byte(ipv4_hdr->src_addr, hash);
+        hash = rte_hash_crc_4byte(ipv4_hdr->dst_addr, hash);
+
+        iph_len = (ipv4_hdr->version_ihl & IPV4_HDR_IHL_MASK) *
+                    IPV4_IHL_MULTIPLIER;
+        switch (ipv4_hdr->next_proto_id) {
+        case IPPROTO_TCP:
+        case IPPROTO_UDP:
+            mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
+            l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
+
+            hash = rte_hash_crc_4byte(*l4_ptr, hash);
+            break;
+        }
+        mbuf->ol_flags |= PKT_RX_RSS_HASH;
+        mbuf->hash.rss = hash;
+        RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n",
+                __func__, mbuf->hash.rss);
+    }
+
+    return 1;
+}
+
+/* Emulate smart NIC RX for a burst of mbufs
+ * Returns:
+ *     0  if at least one mbuf has been hashed by NIC, so there is
+ *        no need to emulate RSS
+ *     1  if the RSS need to be emulated
+ */
+int
+vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
+    uint32_t nb_pkts)
+{
+    unsigned i;
+
+    /* prefetch the mbufs */
+    for (i = 0; i < nb_pkts; i++) {
+        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
+        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *) + RTE_CACHE_LINE_SIZE);
+    }
+
+    /* emulate VLAN stripping if needed */
+    if (unlikely (vr_dpdk.vlan_tag != VLAN_ID_INVALID
+            && ((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0))) {
+        for (i = 0; i < nb_pkts; i++) {
+            rte_vlan_strip(pkts[i]);
+        }
+    }
+
+    /* no RSS needed for just one lcore */
+    if (unlikely(vr_dpdk.nb_fwd_lcores == 1))
+        return 0;
+
+    /* emulate RSS hash */
+    for (i = 0; i < nb_pkts; i++) {
+        if (likely(dpdk_mbuf_rss_hash(pkts[i]) == 0)) {
+            return 0;
+        }
+    }
+
+    return 1;
 }

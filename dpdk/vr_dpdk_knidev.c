@@ -137,7 +137,7 @@ dpdk_knidev_reader_stats_read(void *port,
 struct dpdk_knidev_writer {
     struct rte_port_out_stats stats;
 
-    struct rte_mbuf *tx_buf[2 * RTE_PORT_IN_BURST_SIZE_MAX];
+    struct rte_mbuf *tx_buf[2 * VR_DPDK_TX_BURST_SZ];
     uint32_t tx_burst_sz;
     uint16_t tx_buf_count;
     uint64_t bsz_mask;
@@ -161,7 +161,7 @@ dpdk_knidev_writer_create(void *params, int socket_id)
     /* Check input parameters */
     if ((conf == NULL) ||
         (conf->tx_burst_sz == 0) ||
-        (conf->tx_burst_sz > RTE_PORT_IN_BURST_SIZE_MAX) ||
+        (conf->tx_burst_sz > VR_DPDK_TX_BURST_SZ) ||
         (!rte_is_power_of_2(conf->tx_burst_sz))) {
         RTE_LOG(ERR, PORT, "%s: Invalid input parameters\n", __func__);
         return NULL;
@@ -314,7 +314,6 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* init queue */
     rx_queue->rxq_ops = dpdk_knidev_reader_ops;
     rx_queue->q_queue_h = NULL;
-    rx_queue->rxq_burst_size = VR_DPDK_KNI_RX_BURST_SZ;
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* create the queue */
@@ -391,7 +390,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* create the queue */
     struct dpdk_knidev_writer_params writer_params = {
         .kni = vif->vif_os,
-        .tx_burst_sz = VR_DPDK_KNI_TX_BURST_SZ,
+        .tx_burst_sz = VR_DPDK_TX_BURST_SZ,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
@@ -478,6 +477,7 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 int
 vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 {
+    int i;
     struct rte_eth_dev_info dev_info;
     struct rte_kni_conf kni_conf;
     struct rte_kni *kni;
@@ -513,6 +513,14 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     /* store pointer to KNI for further use */
     vif->vif_os = kni;
 
+    /* add interface to the table of KNIs */
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] == NULL) {
+            vr_dpdk.knis[i] = vif->vif_os;
+            break;
+        }
+    }
+
     return 0;
 }
 
@@ -520,10 +528,20 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 int
 vr_dpdk_knidev_release(struct vr_interface *vif)
 {
+    int i;
     struct rte_kni *kni = vif->vif_os;
 
     vif->vif_os = NULL;
+
+    /* delete the interface from the table of KNIs */
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] == kni) {
+            vr_dpdk.knis[i] = NULL;
+            break;
+        }
+    }
     rte_wmb();
+
     return rte_kni_release(kni);
 }
 
@@ -531,12 +549,11 @@ vr_dpdk_knidev_release(struct vr_interface *vif)
 void
 vr_dpdk_knidev_all_handle(void)
 {
-    struct vrouter *router = vrouter_get(0);
     int i;
 
     vr_dpdk_if_lock();
-    for (i = 0; i < router->vr_max_interfaces; i++) {
-        if (vr_dpdk.knis[i])
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
+        if (vr_dpdk.knis[i] != NULL)
             rte_kni_handle_request(vr_dpdk.knis[i]);
     }
     vr_dpdk_if_unlock();

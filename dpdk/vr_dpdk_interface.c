@@ -144,10 +144,19 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     vif->vif_os = (void *)ethdev;
 
     rte_eth_dev_info_get(ethdev->ethdev_port_id, &dev_info);
-    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) {
+    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM
+        && dev_info.tx_offload_capa & DEV_TX_OFFLOAD_UDP_CKSUM
+        && dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM) {
         vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
+    }
+
+    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_VLAN_INSERT
+        && dev_info.rx_offload_capa & DEV_RX_OFFLOAD_VLAN_STRIP) {
+        vif->vif_flags |= VIF_FLAG_VLAN_OFFLOAD;
+    } else {
+        vif->vif_flags &= ~VIF_FLAG_VLAN_OFFLOAD;
     }
 
     memset(&mac_addr, 0, sizeof(mac_addr));
@@ -332,23 +341,10 @@ dpdk_vhost_if_add(struct vr_interface *vif)
                 port_id, MAC_VALUE(mac_addr.addr_bytes));
     }
 
-    /* check if KNI is already added */
-    if (vr_dpdk.knis[vif->vif_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "    error adding KNI device %s: already exist\n",
-                vif->vif_name);
-        return -EEXIST;
-    }
-
     /* init KNI */
     ret = vr_dpdk_knidev_init(port_id, vif);
     if (ret != 0)
         return ret;
-
-    /* add interface to the table of KNIs */
-    vr_dpdk.knis[vif->vif_idx] = vif->vif_os;
-
-    /* add interface to the table of vHosts */
-    vr_dpdk.vhosts[vif->vif_idx] = vrouter_get_interface(vif->vif_rid, vif->vif_idx);
 
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
             1, &vr_dpdk_kni_rx_queue_init,
@@ -362,20 +358,7 @@ dpdk_vhost_if_del(struct vr_interface *vif)
     RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device %s\n",
                 vif->vif_idx, vif->vif_name);
 
-    /* check if KNI exists */
-    if (vr_dpdk.knis[vif->vif_idx] == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error deleting KNI device %u: "
-                    "device does not exist\n", vif->vif_idx);
-        return -EEXIST;
-    }
-
     vr_dpdk_lcore_if_unschedule(vif);
-
-    /* del the interface from the table of vHosts */
-    vr_dpdk.vhosts[vif->vif_idx] = NULL;
-
-    /* del the interface from the table of KNIs */
-    vr_dpdk.knis[vif->vif_idx] = NULL;
 
     /* release KNI */
     return vr_dpdk_knidev_release(vif);
@@ -451,14 +434,6 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
         return -EINVAL;
     }
 
-    /* check if KNI is already added */
-    if (vr_dpdk.knis[vif->vif_idx] != NULL) {
-        RTE_LOG(ERR, VROUTER, "    error adding monitoring device %s:"
-                " vif %d KNI device already exist\n",
-                vif->vif_name, vif->vif_idx);
-        return -EEXIST;
-    }
-
     /*
      * TODO: we always use DPDK port 0 for monitoring KNI
      * DPDK numerates all the detected Ethernet devices starting from 0.
@@ -468,9 +443,6 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     ret = vr_dpdk_knidev_init(0, vif);
     if (ret != 0)
         return ret;
-
-    /* add interface to the table of KNIs */
-    vr_dpdk.knis[vif->vif_idx] = vif->vif_os;
 
     /* write-only interface */
     ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
@@ -509,17 +481,6 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
 
     vr_dpdk_lcore_if_unschedule(vif);
 
-    /* check if KNI is added */
-    if (vr_dpdk.knis[vif->vif_idx] == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error deleting monitoring device:"
-                " vif %d KNI device does not exist\n",
-                vif->vif_idx);
-        return -EEXIST;
-    }
-
-    /* del the interface from the table of KNIs */
-    vr_dpdk.knis[vif->vif_idx] = NULL;
-
     /* release KNI */
     return vr_dpdk_knidev_release(vif);
 }
@@ -550,8 +511,10 @@ dpdk_agent_if_add(struct vr_interface *vif)
 
     vr_usocket_attach_vif(vr_dpdk.packet_transport, vif);
 
-    /* schedule packet device with no hardware queues */
-    return vr_dpdk_lcore_if_schedule(vif, VR_DPDK_PACKET_LCORE_ID, 0, NULL, 0, NULL);
+    /* No need to schedule the pkt0 at the moment, since we RX from the
+     * socket and TX to the global packet_ring.
+     */
+    return 0;
 }
 
 /* Delete agent interface */

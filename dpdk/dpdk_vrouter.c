@@ -50,7 +50,7 @@ static char *dpdk_argv[] = {
     NULL, NULL,
     NULL, NULL
 };
-static int dpdk_argc = sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 10;
+static int dpdk_argc = RTE_DIM(dpdk_argv) - 10;
 
 /* Timestamp logger */
 static FILE *timestamp_log_stream;
@@ -66,6 +66,10 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
     /* decrease rte packet size to fit vr_packet struct */
     m->buf_len -= sizeof(struct vr_packet);
     RTE_VERIFY(0 < m->buf_len);
+
+    /* start of buffer is just after vr_packet structure */
+    m->buf_addr += sizeof(struct vr_packet);
+    m->buf_physaddr += sizeof(struct vr_packet);
 
     /* basic vr_packet initialization */
     pkt = vr_dpdk_mbuf_to_pkt(m);
@@ -311,6 +315,10 @@ dpdk_init(void)
     /* disable unwanted logtypes for debug purposes */
     rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
 
+    /* TODO: If the host does not support KNIs (i.e. RedHat), we'll get
+     * a panic here.
+     * So the initialization should be moved to vr_dpdk_knidev_init()
+     */
     rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
 
     ret = dpdk_mempools_create();
@@ -345,7 +353,7 @@ dpdk_exit(void)
 
     vr_dpdk_if_lock();
     RTE_LOG(INFO, VROUTER, "Releasing KNI devices...\n");
-    for (i = 0; i < VR_MAX_INTERFACES; i++) {
+    for (i = 0; i < VR_DPDK_MAX_KNI_INTERFACES; i++) {
         if (vr_dpdk.knis[i] != NULL) {
             rte_kni_release(vr_dpdk.knis[i]);
             vr_dpdk.knis[i] = NULL;
@@ -512,11 +520,13 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         break;
 
     /* If VLAN tag is set, vRouter will expect tagged packets. The tag
-     * will be stripped in dpdk_vroute() and injected in dpdk_if_tx().
+     * will be stripped by NIC or in vr_dpdk_ethdev_rx_emulate() and
+     * injected in dpdk_if_tx().
      */
     case VLAN_OPT_INDEX:
+        errno = 0;
         vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
-        if (!vr_dpdk.vlan_tag) {
+        if (errno != 0) {
             vr_dpdk.vlan_tag = VLAN_ID_INVALID;
         }
         break;
@@ -524,7 +534,7 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
 
     case VDEV_OPT_INDEX:
         /* find a pair of free arguments */
-        for (i = 0; i < sizeof(dpdk_argv)/sizeof(*dpdk_argv) - 1; i++) {
+        for (i = 0; i < RTE_DIM(dpdk_argv) - 1; i++) {
             if (dpdk_argv[i] == NULL && dpdk_argv[i + 1] == NULL) {
                 dpdk_argv[i] = "--vdev";
                 dpdk_argv[i + 1] = opt_arg;

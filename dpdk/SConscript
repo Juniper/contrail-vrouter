@@ -44,7 +44,7 @@ DPDK_LIBS = [
     '-lm',
     '-lrt',
 #    '-lrte_vhost',
-    '-lpcap',
+#    '-lpcap',
 #    '-lfuse',
 #    '-libverbs',
     '-Wl,--start-group',
