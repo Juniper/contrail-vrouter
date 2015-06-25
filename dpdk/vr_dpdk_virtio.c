@@ -89,9 +89,6 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     if (fd > 0) {
         close(fd);
     }
-    /* remove the ring from the list of rings to push */
-    dpdk_ring_to_push_remove(rx_queue_params->qp_ring.host_lcore_id,
-            rx_queue_params->qp_ring.ring_p);
 
     rte_free(rx_queue_params->qp_ring.ring_p);
 
@@ -114,10 +111,8 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
-    char ring_name[RTE_RING_NAMESIZE];
     struct vr_dpdk_queue_params *rx_queue_params =
         &lcore->lcore_rx_queue_params[vif_idx];
-    int ret;
 
     RTE_LOG(INFO, VROUTER, "    creating lcore %u RX ring for queue %u vif %u\n",
         lcore_id, queue_id, vif_idx);
@@ -126,52 +121,19 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
         return NULL;
     }
 
-    ret = snprintf(ring_name, sizeof(ring_name), "vif_%d_%" PRIu16 "_ring",
-        vif_idx, queue_id);
-    if (ret >= sizeof(ring_name))
-        goto error;
-
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring =
-        vr_dpdk_ring_allocate(lcore_id, ring_name, VR_DPDK_VIRTIO_TX_RING_SZ);
-    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring == NULL)
-        goto error;
-
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id =
-        vr_dpdk_phys_lcore_least_used_get();
-    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id
-            == VR_MAX_CPUS)
-        goto error;
-
-    dpdk_ring_to_push_add(
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id,
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring, NULL);
-
     rx_queue->rxq_ops = dpdk_virtio_reader_ops;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_zero_copy = 0;
+    /* TODO: not used
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_zero_copy = 0; */
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     rx_queue->q_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
-    rx_queue->rxq_burst_size = VR_DPDK_VIRTIO_RX_BURST_SZ;
     rx_queue->q_vif = vif;
 
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_virtio_rx_queue_release;
-    rx_queue_params->qp_ring.ring_p =
-                vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring;
-    rx_queue_params->qp_ring.host_lcore_id =
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring_dst_lcore_id;
 
     return rx_queue;
-
-error:
-    if (vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring) {
-        rte_free(vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring);
-        vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_pring = NULL;
-    }
-    RTE_LOG(ERR, VROUTER, "    error creating lcore %u RX ring for queue %u vif %u\n",
-        lcore_id, queue_id, vif_idx);
-    return NULL;
 }
 
 /*
@@ -224,7 +186,8 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     tx_queue->txq_ops = dpdk_virtio_writer_ops;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_zero_copy = 0;
+    /* TODO: not used
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_zero_copy = 0; */
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx = 0;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
@@ -270,13 +233,19 @@ vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
 }
 
 /*
- * vr_dpdk_virtio_get_mempool - get the mempool to use for receiving
+ * dpdk_virtio_mempool_get - get the mempool to use for receiving
  * packets from VMs.
  */
 static struct rte_mempool *
-vr_dpdk_virtio_get_mempool(void)
+dpdk_virtio_mempool_get(void)
 {
-    return vr_dpdk.virtio_mempool;
+//    return vr_dpdk.virtio_mempool;
+    if (rte_lcore_id() == 7) {
+        RTE_LOG(DEBUG, VROUTER, "%s: RSS mempool status: count %d free %d\n",
+            __func__, rte_mempool_count(vr_dpdk.rss_mempool),
+            rte_mempool_free_count(vr_dpdk.rss_mempool));
+    }
+    return vr_dpdk.rss_mempool;
 }
 
 #if DPDK_VIRTIO_READER_STATS_COLLECT == 1
@@ -305,6 +274,7 @@ static int
 dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
 {
     vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+    rte_prefetch0(vq->vdv_avail);
     uint16_t vq_hard_avail_idx, i;
     uint16_t num_pkts, next_desc_idx, next_avail_idx, pkts_sent = 0;
     struct vring_desc *desc;
@@ -378,7 +348,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         if (pkt_addr) {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
                 __func__, vq, i, pkt_addr);
-            mbuf = rte_pktmbuf_alloc(vr_dpdk_virtio_get_mempool());
+            mbuf = rte_pktmbuf_alloc(dpdk_virtio_mempool_get());
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
                 __func__, vq, i, mbuf);
             if (!mbuf)
@@ -832,52 +802,6 @@ vr_dpdk_virtio_get_vif_client(unsigned int idx)
     }
 
     return vr_dpdk_vif_clients[idx];
-}
-
-/*
- * vr_dpdk_virtio_enq_pkts_to_phys_lcore - enqueue packets received on a
- * virtio interface queue onto a ring that will be handled by the lcore
- * assigned to that queue. This lcore will then transmit the packet out the
- * wire if required.
- *
- * Returns nothing.
- */
-void
-vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
-                                      struct vr_packet **pkt_arr,
-                                      uint32_t npkts)
-{
-    vr_dpdk_virtioq_t *vq;
-    struct rte_ring *vq_pring;
-    int nb_enq;
-    struct vr_interface_stats *vr_stats;
-    const unsigned lcore_id = rte_lcore_id();
-
-    vq = (vr_dpdk_virtioq_t *) rx_queue->q_queue_h;
-    vq_pring = vq->vdv_pring;
-
-    RTE_LOG(DEBUG, VROUTER, "%s: enqueue %u pakets to ring %p\n",
-                __func__, npkts, vq_pring);
-    nb_enq = rte_ring_sp_enqueue_burst(vq_pring, (void **) pkt_arr, npkts);
-
-    /**
-     * Packets received from VM are enqueued to the ring here. Increment
-     * a counter for RX'd-and-enqueued packets by the number of successfully
-     * enqueued packets.
-     */
-    vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
-    if (nb_enq > 0)
-        vr_stats->vis_ifrxrngenqpkts += nb_enq;
-
-    /**
-     * Increment a counter for RX'd-but-not-enqueued packets by the difference
-     * of packets we wish to enqueue and packets really enqueued.
-     */
-    vr_stats->vis_ifrxrngenqdrops += npkts - nb_enq;
-    for ( ; nb_enq < npkts; nb_enq++)
-        vr_pfree(pkt_arr[nb_enq], VP_DROP_INTERFACE_DROP);
-
-    return;
 }
 
 static int

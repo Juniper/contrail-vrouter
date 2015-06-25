@@ -22,7 +22,7 @@
 /* Allocates a new ring */
 struct rte_ring *
 vr_dpdk_ring_allocate(unsigned host_lcore_id, char *ring_name,
-    unsigned vr_dpdk_tx_ring_sz)
+    unsigned vr_dpdk_tx_ring_sz, unsigned flags)
 {
     int ret;
     ssize_t ring_size;
@@ -37,9 +37,7 @@ vr_dpdk_ring_allocate(unsigned host_lcore_id, char *ring_name,
     if (ring == NULL)
         return NULL;
 
-    /* create single-producer single-consumer ring */
-    ret = rte_ring_init(ring, ring_name, vr_dpdk_tx_ring_sz,
-        RING_F_SP_ENQ | RING_F_SC_DEQ);
+    ret = rte_ring_init(ring, ring_name, vr_dpdk_tx_ring_sz, flags);
     if (ret < 0) {
         rte_free(ring);
         return NULL;
@@ -64,7 +62,7 @@ dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     rte_wmb();
     lcore->lcore_nb_rings_to_push++;
     RTE_LOG(INFO, VROUTER, "    lcore %u now has %" PRIu16
-        " ring(s) to push/route\n",
+        " ring(s) to push\n",
         lcore_id, lcore->lcore_nb_rings_to_push);
     RTE_VERIFY(lcore->lcore_nb_rings_to_push <= VR_DPDK_MAX_RINGS);
 }
@@ -161,8 +159,9 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     if (ret >= sizeof(ring_name))
         goto error;
 
-    /* allocate a ring on the host lcore */
-    tx_ring = vr_dpdk_ring_allocate(host_lcore_id, ring_name, VR_DPDK_TX_RING_SZ);
+    /* allocate a ring on the host lcore (single-producer single-consumer) */
+    tx_ring = vr_dpdk_ring_allocate(host_lcore_id, ring_name,
+            VR_DPDK_TX_RING_SZ, RING_F_SP_ENQ | RING_F_SC_DEQ);
     if (tx_ring == NULL)
         goto error;
 
@@ -172,7 +171,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* create the queue */
     struct rte_port_ring_writer_params writer_params = {
         .ring = tx_ring,
-        .tx_burst_sz = VR_DPDK_RING_TX_BURST_SZ,
+        .tx_burst_sz = VR_DPDK_TX_BURST_SZ,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params,
                                                         socket_id);

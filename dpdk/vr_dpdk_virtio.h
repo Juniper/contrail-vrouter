@@ -11,11 +11,11 @@
 /*
  * Burst size for packets from a VM
  */
-#define VR_DPDK_VIRTIO_RX_BURST_SZ VR_DPDK_RING_RX_BURST_SZ
+#define VR_DPDK_VIRTIO_RX_BURST_SZ VR_DPDK_RX_BURST_SZ
 /*
  * Burst size for packets to a VM
  */
-#define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_RING_TX_BURST_SZ
+#define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_TX_BURST_SZ
 
 /*
  * Size of ring to send packets from virtio RX queue to lcore for forwarding
@@ -28,25 +28,27 @@ typedef enum vq_ready_state {
 } vq_ready_state_t;
 
 typedef struct vr_dpdk_virtioq {
-    struct rte_port_out_stats vdv_out_stats;
-    struct rte_port_in_stats vdv_in_stats;
-
     struct vring_desc   *vdv_desc;      /**< Virtqueue descriptor ring. */
     struct vring_avail  *vdv_avail;     /**< Virtqueue available ring. */
     struct vring_used   *vdv_used;      /**< Virtqueue used ring. */
     uint32_t            vdv_size;       /**< Size of descriptor ring. */
+    uint32_t vdv_tx_mbuf_count;
 
     volatile vq_ready_state_t vdv_ready_state;
-    int vdv_enabled_state;
     unsigned int vdv_vif_idx;
-    int vdv_zero_copy;
-    unsigned int vdv_base_idx;
-    uint16_t vdv_last_used_idx;
-    struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
-    uint32_t vdv_tx_mbuf_count;
     struct rte_ring *vdv_pring;
-    unsigned vdv_pring_dst_lcore_id;
     int vdv_callfd;
+    uint16_t vdv_last_used_idx;
+
+    /* Big and less frequently used fields */
+    struct rte_port_in_stats vdv_in_stats;
+    struct rte_port_out_stats vdv_out_stats;
+    unsigned int vdv_base_idx;
+    struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
+    /* TODO: not used
+    int vdv_enabled_state;
+    int vdv_zero_copy;
+     */
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
 } vr_dpdk_virtioq_t;
 
@@ -74,7 +76,4 @@ int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
                             vq_ready_state_t ready);
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);
 void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
-void vr_dpdk_virtio_enq_pkts_to_phys_lcore(struct vr_dpdk_queue *rx_queue,
-                                           struct vr_packet **pkt_arr,
-                                           uint32_t npkts);
 #endif /* __VR_DPDK_VIRTIO_H__ */

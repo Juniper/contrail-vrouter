@@ -456,7 +456,6 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
 static void
 vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 {
-    struct vr_packet *pkt;
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_interface_stats *vr_stats;
@@ -473,9 +472,9 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         usockp->usock_mbuf->data_len = usockp->usock_read_len;
         usockp->usock_mbuf->pkt_len = usockp->usock_read_len;
         /* convert mbuf to vr_packet */
-        pkt = vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
-        /* send the packet to vRouter */
-        vr_dpdk_packets_vroute(usockp->usock_vif, &pkt, 1);
+        vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
+        /* send the mbuf to vRouter */
+        vr_dpdk_lcore_vroute(usockp->usock_vif, &usockp->usock_mbuf, 1);
         /* flush pkt0 TX queues immediately */
         vr_dpdk_lcore_flush(lcore);
 
@@ -503,7 +502,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
 {
     int i;
     unsigned nb_pkts;
-    struct rte_mbuf *mbuf_arr[VR_DPDK_RING_RX_BURST_SZ];
+    struct rte_mbuf *mbuf_arr[VR_DPDK_RX_BURST_SZ];
     const unsigned lcore_id = rte_lcore_id();
     struct vr_interface_stats *vr_stats;
 
@@ -512,7 +511,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
-            (void **)&mbuf_arr, VR_DPDK_RING_RX_BURST_SZ);
+            (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ);
         for (i = 0; i < nb_pkts; i++) {
             /**
              * Packets is written to the agent's socket here. On success,
