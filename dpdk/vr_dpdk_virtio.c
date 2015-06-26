@@ -232,22 +232,6 @@ vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
     return NULL;
 }
 
-/*
- * dpdk_virtio_mempool_get - get the mempool to use for receiving
- * packets from VMs.
- */
-static struct rte_mempool *
-dpdk_virtio_mempool_get(void)
-{
-//    return vr_dpdk.virtio_mempool;
-    if (rte_lcore_id() == 7) {
-        RTE_LOG(DEBUG, VROUTER, "%s: RSS mempool status: count %d free %d\n",
-            __func__, rte_mempool_count(vr_dpdk.rss_mempool),
-            rte_mempool_free_count(vr_dpdk.rss_mempool));
-    }
-    return vr_dpdk.rss_mempool;
-}
-
 #if DPDK_VIRTIO_READER_STATS_COLLECT == 1
 
 #define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val) \
@@ -348,7 +332,9 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         if (pkt_addr) {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
                 __func__, vq, i, pkt_addr);
-            mbuf = rte_pktmbuf_alloc(dpdk_virtio_mempool_get());
+            /* No need to use a dedicated mempool at the moment, since there is
+             * no dedicated lcore to poll virtio interfaces */
+            mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
                 __func__, vq, i, mbuf);
             if (!mbuf)

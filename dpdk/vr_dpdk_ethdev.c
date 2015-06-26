@@ -22,6 +22,7 @@
 #include <rte_hash_crc.h>
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
+#include <rte_udp.h>
 
 static struct rte_eth_conf ethdev_conf = {
     .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
@@ -104,12 +105,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
     },
     .tx_free_thresh = 0,    /* Use PMD default values */
     .tx_rs_thresh = 0,      /* Use PMD default values */
-    .txq_flags =            /* Set flags for the Tx queue */
-        ETH_TXQ_FLAGS_NOMULTSEGS
-        | ETH_TXQ_FLAGS_NOREFCOUNT
-        | ETH_TXQ_FLAGS_NOVLANOFFL
-        | ETH_TXQ_FLAGS_NOXSUMSCTP
-        | ETH_TXQ_FLAGS_NOXSUMTCP
+    .txq_flags = 0          /* Set flags for the Tx queue */
 };
 
 /* Add hardware filter */
@@ -644,6 +640,7 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
 {
     struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
     struct ipv4_hdr *ipv4_hdr;
+    uint64_t *ipv4_addr_ptr;
     uint32_t *l4_ptr;
     uint32_t hash = 0;
     uint8_t iph_len;
@@ -655,27 +652,33 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
     }
 
     /* TODO: IPv6 support */
+    /* TODO: VLAN support */
     if (likely(eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
         mbuf->ol_flags |= PKT_RX_IPV4_HDR;
-        /* we assume the VLAN has been stripped */
-        ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr +
-                                    sizeof(struct ether_hdr));
+        ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr
+                                    + sizeof(struct ether_hdr));
+        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr
+                                    + offsetof(struct ipv4_hdr, src_addr));
 
-        /* We use SSE4.3 CRC hash. No need to support Toeplitz hash,
-         * since there is no need to match NIC's hash */
-        hash = rte_hash_crc_4byte(ipv4_hdr->src_addr, hash);
-        hash = rte_hash_crc_4byte(ipv4_hdr->dst_addr, hash);
+        /* We use SSE4.2 CRC hash. No need to match NIC's Toeplitz hash ATM. */
+        /* Hash src and dst address at a time */
+        hash = rte_hash_crc_8byte(*ipv4_addr_ptr, hash);
 
         iph_len = (ipv4_hdr->version_ihl & IPV4_HDR_IHL_MASK) *
                     IPV4_IHL_MULTIPLIER;
-        switch (ipv4_hdr->next_proto_id) {
-        case IPPROTO_TCP:
-        case IPPROTO_UDP:
-            mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
-            l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
 
-            hash = rte_hash_crc_4byte(*l4_ptr, hash);
-            break;
+        if (likely(rte_pktmbuf_data_len(mbuf) > sizeof(struct ether_hdr)
+                    + iph_len
+                    + sizeof(struct udp_hdr))) {
+            switch (ipv4_hdr->next_proto_id) {
+            case IPPROTO_TCP:
+            case IPPROTO_UDP:
+                mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
+                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
+
+                hash = rte_hash_crc_4byte(*l4_ptr, hash);
+                break;
+            }
         }
         mbuf->ol_flags |= PKT_RX_RSS_HASH;
         mbuf->hash.rss = hash;
@@ -701,11 +704,12 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPD
     /* prefetch the mbufs */
     for (i = 0; i < nb_pkts; i++) {
         rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
-        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *) + RTE_CACHE_LINE_SIZE);
+        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], uint8_t *) + RTE_CACHE_LINE_SIZE);
     }
 
     /* emulate VLAN stripping if needed */
     if (unlikely (vr_dpdk.vlan_tag != VLAN_ID_INVALID
+            && vif_is_fabric(vif)
             && ((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0))) {
         for (i = 0; i < nb_pkts; i++) {
             rte_vlan_strip(pkts[i]);

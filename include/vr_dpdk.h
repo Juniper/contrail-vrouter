@@ -335,8 +335,6 @@ struct vr_dpdk_global {
     /* Frequently used fields */
     /* Pointer to main (RSS) memory pool */
     struct rte_mempool *rss_mempool;
-    /* Pointer to virtio memory pool */
-    struct rte_mempool *virtio_mempool;
     /* Packet socket ring */
     struct rte_ring *packet_ring;
     /* Global stop flag */

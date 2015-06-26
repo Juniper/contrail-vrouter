@@ -81,21 +81,6 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
 static int
 dpdk_mempools_create(void)
 {
-    /* Create the mbuf pool used for receiving from VM virtio interfaces */
-    vr_dpdk.virtio_mempool = rte_mempool_create("virtio_mempool",
-                                 VR_DPDK_VIRTIO_MEMPOOL_SZ,
-                                 VR_DPDK_MBUF_SZ,
-                                 VR_DPDK_VIRTIO_MEMPOOL_CACHE_SZ,
-                                 sizeof(struct rte_pktmbuf_pool_private),
-                                 rte_pktmbuf_pool_init, NULL,
-                                 vr_dpdk_pktmbuf_init, NULL,
-                                 rte_socket_id(), 0);
-    if (vr_dpdk.virtio_mempool == NULL) {
-        RTE_LOG(CRIT, VROUTER, "Error creating virtio mempool: %s (%d)\n",
-            rte_strerror(rte_errno), rte_errno);
-        return -rte_errno;
-    }
-
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool", VR_DPDK_RSS_MEMPOOL_SZ,
             VR_DPDK_MBUF_SZ, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,

@@ -418,18 +418,14 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
                     vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring,
                     (void **)&lcore_pkts[i][0],
                     chunk_nb_pkts);
-            if (i + VR_DPDK_FWD_LCORE_ID == 7)
-                RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RX equeueing: count %d free %d nb %d\n",
-                     __func__, i + VR_DPDK_FWD_LCORE_ID,
-                     rte_ring_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
-                     rte_ring_free_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
-                     lcore_nb_pkts);
             if (unlikely(ret == -ENOBUFS)) {
+                /* never happens, because the size of the ring is greater than mempool */
                 RTE_LOG(INFO, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
                      __func__, i + VR_DPDK_FWD_LCORE_ID, lcore_nb_pkts,
                      rte_ring_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
                      rte_ring_free_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring));
                 /* ring is full, drop the packets */
+                /* TODO: increment per-ring counters */
                 for (j = 1; j < lcore_nb_pkts; j++) {
                     vr_dpdk_pfree(lcore_pkts[i][j], VP_DROP_INTERFACE_DROP);
                 }
