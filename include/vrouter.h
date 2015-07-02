@@ -112,6 +112,8 @@ struct host_os {
     int (*hos_gro_process)(struct vr_packet *, struct vr_interface *, bool);
     void (*hos_add_mpls)(struct vrouter *, unsigned);
     void (*hos_del_mpls)(struct vrouter *, unsigned);
+    int (*hos_enqueue_to_assembler)(struct vrouter *, unsigned int,
+            struct vr_packet *, struct vr_forwarding_md *);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -153,6 +155,7 @@ struct host_os {
 #define vr_pkt_from_vm_tcp_mss_adj      vrouter_host->hos_pkt_from_vm_tcp_mss_adj
 #define vr_pkt_may_pull                 vrouter_host->hos_pkt_may_pull
 #define vr_gro_process                  vrouter_host->hos_gro_process
+#define vr_enqueue_to_assembler         vrouter_host->hos_enqueue_to_assembler
 
 struct vrouter {
     unsigned char vr_vrrp_mac[VR_ETHER_ALEN];

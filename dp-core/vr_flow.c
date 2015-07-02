@@ -496,6 +496,8 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
         if (fmd->fmd_to_me)
             pnode->pl_flags |= PN_FLAG_TO_ME;
     }
+    pnode->pl_vrf = fmd->fmd_dvrf;
+    pnode->pl_vlan = fmd->fmd_vlan;
 
     __sync_synchronize();
     pnode->pl_packet = pkt;

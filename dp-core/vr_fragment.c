@@ -6,6 +6,7 @@
  */
 #include <vr_os.h>
 #include <vr_packet.h>
+#include "vr_interface.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
 #include "vr_hash.h"
@@ -40,6 +41,8 @@ fragment_entry_set(struct vr_fragment *fe, unsigned short vrf, struct vr_ip *iph
     fe->f_dport = dport;
     vr_get_mono_time(&sec, &nsec);
     fe->f_time = sec;
+    fe->f_expected = 0;
+    fe->f_received = 0;
 
     return;
 }
@@ -61,6 +64,295 @@ fragment_entry_alloc(struct vr_fragment *fe)
 {
     return __sync_bool_compare_and_swap(&fe->f_dip, 0, 1);
 }
+
+static void
+vr_fragment_queue_element_free(struct vr_fragment_queue_element *vfqe)
+{
+    if (vfqe->fqe_pnode.pl_packet) {
+        vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_CLONED_ORIGINAL);
+    }
+
+    vr_free(vfqe);
+    return;
+}
+
+static void
+fragment_free_frag(struct vr_fragment *frag)
+{
+    struct vr_fragment_queue_element *fqe;
+
+    while ((fqe = frag->f_qe)) {
+        frag->f_qe = fqe->fqe_next;
+        vr_fragment_queue_element_free(fqe);
+    }
+
+    vr_free(frag);
+    return;
+}
+
+static void
+fragment_unlink_frag(struct vr_fragment **prev, struct vr_fragment *frag)
+{
+    *prev = frag->f_next;
+    return;
+}
+
+unsigned int
+vr_assembler_table_scan(struct vr_fragment **head)
+{
+    unsigned int scanned = 0;
+    unsigned int sec, nsec, dest;
+    struct vr_fragment *frag = *head, *next, **prev;
+
+    prev = head;
+    while (frag) {
+        next = frag->f_next;
+
+        vr_get_mono_time(&sec, &nsec);
+        dest = frag->f_time + VR_ASSEMBLER_TIMEOUT_TIME;
+        if (dest < frag->f_time) {
+            if ((sec < frag->f_time) && (dest < sec)) {
+                fragment_unlink_frag(prev, frag);
+                fragment_free_frag(frag);
+            } else {
+                prev = &frag->f_next;
+            }
+        } else {
+            if ((sec > dest) || (sec < frag->f_time)) {
+                fragment_unlink_frag(prev, frag);
+                fragment_free_frag(frag);
+            } else {
+                prev = &frag->f_next;
+            }
+        }
+        scanned++;
+        frag = next;
+    }
+
+    return scanned;
+}
+
+int
+vr_fragment_assembler(struct vr_fragment **head_p,
+        struct vr_fragment_queue_element *vfqe)
+{
+    int ret;
+    unsigned int sec, nsec;
+    bool found = false, forward = false;
+
+    struct vrouter *router;
+    struct vr_ip *ip;
+    struct vr_flow flow;
+    struct vr_packet *pkt;
+    struct vr_packet_node *pnode;
+    struct vr_fragment *frag, **prev = NULL;
+    struct vr_fragment_queue_element *fqe;
+    struct vr_fragment_key vfk;
+    struct vr_interface *vif;
+    struct vr_forwarding_md fmd;
+
+
+    router = vfqe->fqe_router;
+    pkt = vfqe->fqe_pnode.pl_packet;
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    fragment_key(&vfk, vfqe->fqe_pnode.pl_vrf, ip);
+
+    frag = *head_p;
+    prev = head_p;
+    while (frag) {
+        if (!memcmp(&frag->f_key, &vfk, sizeof(vfk))) {
+            found = true;
+            break;
+        }
+
+        prev = &frag->f_next;
+        frag = frag->f_next;
+    }
+
+    if (!found) {
+        if (vfqe->fqe_action == VR_ASSEMBLER_ACTION_DATA) {
+            vr_fragment_queue_element_free(vfqe);
+            return 0;
+        }
+
+        frag = vr_zalloc(sizeof(*frag));
+        if (!frag)
+            return -ENOMEM;
+        memcpy(&frag->f_key, &vfk, sizeof(vfk));
+        frag->f_port_info_valid = false;
+    }
+
+    if (vr_ip_fragment_tail(ip)) {
+        frag->f_expected = ((ntohs(ip->ip_frag_off) && 0x1FFF) * 8) +
+            ntohs(ip->ip_len) - (ip->ip_hl * 4) ;
+    }
+    frag->f_received += (ntohs(ip->ip_len) - (ip->ip_hl * 4));
+
+    vr_get_mono_time(&sec, &nsec);
+    frag->f_time = sec;
+    if (!found) {
+        prev = head_p;
+        frag->f_next = *head_p;
+        *head_p = frag;
+    }
+
+    if (vr_ip_transport_header_valid(ip)) {
+        ret = vr_inet_form_flow(router, vfqe->fqe_pnode.pl_vrf,
+                vfqe->fqe_pnode.pl_packet, vfqe->fqe_pnode.pl_vlan, &flow);
+
+        if (ret) {
+            fragment_free_frag(frag);
+            return 0;
+        }
+
+        frag->f_sport = flow.flow4_sport;
+        frag->f_dport = flow.flow4_dport;
+        frag->f_port_info_valid = true;
+
+    }
+
+    if (vfqe->fqe_action == VR_ASSEMBLER_ACTION_ENQUEUE) {
+        vfqe->fqe_next = NULL;
+        fqe = frag->f_qe;
+        if (!fqe) {
+            frag->f_qe = vfqe;
+        } else {
+            while (fqe) {
+                if (fqe->fqe_next) {
+                    fqe = fqe->fqe_next;
+                } else {
+                    break;
+                }
+            }
+
+            fqe->fqe_next = vfqe;
+        }
+    } else if (vfqe->fqe_action == VR_ASSEMBLER_ACTION_DATA) {
+        vr_fragment_queue_element_free(vfqe);
+    }
+
+
+    if (frag->f_port_info_valid) {
+        while ((fqe = frag->f_qe)) {
+            pnode = &fqe->fqe_pnode;
+            pkt = pnode->pl_packet;
+            if (pkt) {
+                memset(&fmd, 0, sizeof(fmd));
+                fmd.fmd_outer_src_ip = pnode->pl_outer_src_ip;
+                fmd.fmd_label = pnode->pl_label;
+                if (pnode->pl_flags & PN_FLAG_TO_ME)
+                    fmd.fmd_to_me = 1;
+                fmd.fmd_dvrf = pnode->pl_vrf;
+                fmd.fmd_vlan = pnode->pl_vlan;
+
+                vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
+                if (!vif || (pkt->vp_if != vif)) {
+                    vr_pfree(pkt, VP_DROP_INVALID_IF);
+                    continue;
+                }
+
+                if (!pkt->vp_nh) {
+                    if (vif_is_fabric(pkt->vp_if) && (fmd.fmd_label >= 0)) {
+                        if (!(pnode->pl_flags & PN_FLAG_LABEL_IS_VNID))
+                            pkt->vp_nh = __vrouter_get_label(router, fmd.fmd_label);
+                    }
+                }
+
+                forward = vr_flow_forward(router, pkt, &fmd);
+                if (forward)
+                    vr_reinject_packet(pkt, &fmd);
+                fqe->fqe_pnode.pl_packet = NULL;
+            }
+            frag->f_qe = fqe->fqe_next;
+            vr_fragment_queue_element_free(fqe);
+        }
+
+        if (frag->f_received == frag->f_expected) {
+            fragment_unlink_frag(prev, frag);
+            fragment_free_frag(frag);
+        }
+
+    }
+
+    return 0;
+}
+
+uint32_t
+vr_fragment_get_hash(unsigned int vrf, struct vr_packet *pkt)
+{
+    struct vr_ip *ip;
+    struct vr_fragment_key vfk;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    fragment_key(&vfk, vrf, ip);
+
+    return vr_hash(&vfk, sizeof(vfk), 0);
+}
+
+int
+vr_fragment_enqueue(struct vrouter *router,
+        struct vr_fragment_queue_element **tailp, unsigned int action,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    bool swapped = false;
+    unsigned int i;
+
+    struct vr_packet_node *pnode;
+    struct vr_fragment_queue_element *fq = NULL, *tail;
+
+    fq = vr_malloc(sizeof(*fq));
+    if (!fq) {
+        goto fail;
+    }
+    fq->fqe_router = router;
+    fq->fqe_action = action;
+    fq->fqe_next = NULL;
+
+    pkt->vp_flags &= ~VP_FLAG_FLOW_SET;
+
+    pnode = &fq->fqe_pnode;
+    if (pkt->vp_nh &&
+            (pkt->vp_nh->nh_type == NH_VRF_TRANSLATE) &&
+            (pkt->vp_nh->nh_flags & NH_FLAG_VNID))
+        pnode->pl_flags |= PN_FLAG_LABEL_IS_VNID;
+
+    pkt->vp_nh = NULL;
+    pnode->pl_vif_idx = pkt->vp_if->vif_idx;
+    pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
+    pnode->pl_label = fmd->fmd_label;
+    if (fmd->fmd_to_me)
+        pnode->pl_flags |= PN_FLAG_TO_ME;
+    pnode->pl_vrf = fmd->fmd_dvrf;
+    pnode->pl_vlan = fmd->fmd_vlan;
+    pnode->pl_packet = pkt;
+
+    /*
+     * we are actually competing with an existing assembler work that must
+     * be in the process of dequeueing the list from the per-cpu queue.
+     * we try thrice to enqueue our element. It is unlikely that it will
+     * fail more than once
+     */
+    for (i = 0; i < VR_FRAG_ENQUEUE_ATTEMPTS; i++) {
+        tail = *tailp;
+        fq->fqe_next = tail;
+        swapped = __sync_bool_compare_and_swap(tailp, tail, fq);
+        if (swapped) {
+            break;
+        } else if (i == (VR_FRAG_ENQUEUE_ATTEMPTS - 1)) {
+            goto fail;
+        }
+    }
+
+    return 0;
+
+fail:
+    if (fq)
+        vr_free(fq);
+
+    vr_pfree(pkt, VP_DROP_FRAGMENTS);
+    return -1;
+}
+
 
 void
 vr_fragment_del(struct vr_fragment *fe)
@@ -107,6 +399,8 @@ vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
     if (!fe)
         return -ENOMEM;
 
+    fe->f_received += (ntohs(iph->ip_len) - (iph->ip_hl * 4));
+
     return 0;
 }
 
@@ -146,7 +440,7 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
         fe->f_time = sec;
     }
 
-    return fe;;
+    return fe;
 }
 
 #define ENTRIES_PER_SCAN    64

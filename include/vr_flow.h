@@ -205,6 +205,8 @@ struct vr_packet_node {
     uint32_t pl_label;
     uint32_t pl_vif_idx;
     uint32_t pl_flags;
+    uint32_t pl_vrf;
+    int32_t pl_vlan;
 };
 
 struct vr_flow_queue {
@@ -337,5 +339,7 @@ extern unsigned int vr_reinject_packet(struct vr_packet *,
         struct vr_forwarding_md *);
 
 bool vr_valid_link_local_port(struct vrouter *, int, int, int);
+int vr_inet_form_flow(struct vrouter *, unsigned short,
+                struct vr_packet *, uint16_t, struct vr_flow *);
 
 #endif /* __VR_FLOW_H__ */
