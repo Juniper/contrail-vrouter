@@ -63,7 +63,7 @@ usock_deinit_poll(struct vr_usocket *usockp)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
     if (usockp->usock_pfds) {
-        vr_free(usockp->usock_pfds);
+        vr_free(usockp->usock_pfds, VR_USOCK_POLL_OBJECT);
         usockp->usock_pfds = NULL;
     }
 
@@ -103,7 +103,7 @@ usock_init_poll(struct vr_usocket *usockp)
 
     if (!usockp->usock_pfds) {
         usockp->usock_pfds = vr_zalloc(sizeof(struct pollfd) *
-                usockp->usock_max_cfds + 1);
+                usockp->usock_max_cfds + 1, VR_USOCK_POLL_OBJECT);
         if (!usockp->usock_pfds) {
             usock_set_error(usockp, -ENOMEM);
             goto error_return;
@@ -161,7 +161,7 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
 
     if (!parent->usock_children) {
         parent->usock_children = vr_zalloc(sizeof(struct vr_usocket *) *
-                USOCK_MAX_CHILD_FDS + 1);
+                USOCK_MAX_CHILD_FDS + 1, VR_USOCK_OBJECT);
         if (!parent->usock_children) {
             usock_set_error(parent, -ENOMEM);
             return -ENOMEM;
@@ -209,13 +209,13 @@ usock_clone(struct vr_usocket *parent, int cfd)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: parent FD %d cfd %d\n", __func__,
             pthread_self(), parent->usock_fd, cfd);
-    child = vr_zalloc(sizeof(struct vr_usocket));
+    child = vr_zalloc(sizeof(struct vr_usocket), VR_USOCK_OBJECT);
     if (!child) {
         usock_set_error(parent, -ENOMEM);
         goto error_return;
     }
 
-    child->usock_rx_buf = vr_malloc(USOCK_RX_BUF_LEN);
+    child->usock_rx_buf = vr_malloc(USOCK_RX_BUF_LEN, VR_USOCK_BUF_OBJECT);
     if (!child->usock_rx_buf) {
         usock_set_error(parent, -ENOMEM);
         goto error_return;
@@ -234,8 +234,8 @@ usock_clone(struct vr_usocket *parent, int cfd)
 error_return:
     if (child) {
         if (child->usock_rx_buf)
-            vr_free(child->usock_rx_buf);
-        vr_free(child);
+            vr_free(child->usock_rx_buf, VR_USOCK_BUF_OBJECT);
+        vr_free(child, VR_USOCK_OBJECT);
     }
 
     return parent->usock_error;
@@ -291,12 +291,12 @@ usock_close(struct vr_usocket *usockp)
     close(usockp->usock_fd);
 
     if (!usockp->usock_mbuf_pool && usockp->usock_rx_buf) {
-        vr_free(usockp->usock_rx_buf);
+        vr_free(usockp->usock_rx_buf, VR_USOCK_BUF_OBJECT);
         usockp->usock_rx_buf = NULL;
     }
 
     if (usockp->usock_iovec) {
-        vr_free(usockp->usock_iovec);
+        vr_free(usockp->usock_iovec, VR_USOCK_IOVEC_OBJECT);
         usockp->usock_iovec = NULL;
     }
 
@@ -312,7 +312,7 @@ usock_close(struct vr_usocket *usockp)
 
     usockp->usock_io_in_progress = 0;
 
-    vr_free(usockp);
+    vr_free(usockp, VR_USOCK_OBJECT);
 
     return;
 }
@@ -667,7 +667,8 @@ retry_read:
         }
 
         if (usockp->usock_buf_len < usockp->usock_read_len) {
-            usockp->usock_rx_buf = vr_malloc(usockp->usock_read_len);
+            usockp->usock_rx_buf = vr_malloc(usockp->usock_read_len,
+                    VR_USOCK_BUF_OBJECT);
             if (!usockp->usock_rx_buf) {
                 /* bad, but let's recover */
                 usockp->usock_rx_buf = buf;
@@ -676,7 +677,7 @@ retry_read:
                 usockp->usock_state = READING_FAULTY_DATA;
             } else {
                 memcpy(usockp->usock_rx_buf, buf, usockp->usock_read_offset);
-                vr_free(buf);
+                vr_free(buf, VR_USOCK_BUF_OBJECT);
                 usockp->usock_buf_len = usockp->usock_read_len;
                 buf = usockp->usock_rx_buf;
             }
@@ -736,7 +737,7 @@ usock_alloc(unsigned short proto, unsigned short type)
             return NULL;
     }
 
-    usockp = vr_zalloc(sizeof(*usockp));
+    usockp = vr_zalloc(sizeof(*usockp), VR_USOCK_OBJECT);
     if (!usockp)
         goto error_exit;
 
@@ -779,7 +780,7 @@ usock_alloc(unsigned short proto, unsigned short type)
     }
 
     if (buf_len) {
-        usockp->usock_rx_buf = vr_zalloc(buf_len);
+        usockp->usock_rx_buf = vr_zalloc(buf_len, VR_USOCK_BUF_OBJECT);
         if (!usockp->usock_rx_buf)
             goto error_exit;
 
@@ -800,7 +801,7 @@ usock_alloc(unsigned short proto, unsigned short type)
         }
 
         usockp->usock_iovec = vr_zalloc(sizeof(struct iovec) *
-                PKT0_MAX_IOV_LEN);
+                PKT0_MAX_IOV_LEN, VR_USOCK_IOVEC_OBJECT);
         if (!usockp->usock_iovec)
             goto error_exit;
 

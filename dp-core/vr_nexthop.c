@@ -94,12 +94,12 @@ vrouter_put_nexthop(struct vr_nexthop *nh)
                     vrouter_put_nexthop(nh->nh_component_nh[i].cnh);
             }
 
-            vr_free(nh->nh_component_nh);
+            vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
         }
         if (nh->nh_dev) {
             vrouter_put_interface(nh->nh_dev);
         }
-        vr_free(nh);
+        vr_free(nh, VR_NEXTHOP_OBJECT);
     }
 
     return;
@@ -1943,7 +1943,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
             if (nh->nh_component_nh[i].cnh)
                 vrouter_put_nexthop(nh->nh_component_nh[i].cnh);
         }
-        vr_free(nh->nh_component_nh);
+        vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
         nh->nh_component_nh = NULL;
         nh->nh_component_cnt = 0;
     }
@@ -1956,7 +1956,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         return 0;
 
     nh->nh_component_nh = vr_zalloc(req->nhr_nh_list_size *
-            sizeof(struct vr_component_nh));
+            sizeof(struct vr_component_nh), VR_NEXTHOP_COMPONENT_OBJECT);
     if (!nh->nh_component_nh) {
         return -ENOMEM;
     }
@@ -1998,7 +1998,7 @@ error:
                 vrouter_put_nexthop(tmp_nh);
         }
 
-        vr_free(nh->nh_component_nh);
+        vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
         nh->nh_component_nh = NULL;
         nh->nh_component_cnt = 0;
     }
@@ -2176,7 +2176,7 @@ vr_nexthop_add(vr_nexthop_req *req)
             goto generate_resp;
 
         len = ret;
-        nh = vr_zalloc(len);
+        nh = vr_zalloc(len, VR_NEXTHOP_OBJECT);
         if (!nh) {
             ret = -ENOMEM;
             goto generate_resp;
@@ -2330,12 +2330,16 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
     case NH_COMPOSITE:
         req->nhr_nh_list_size = nh->nh_component_cnt;
         if (nh->nh_component_cnt) {
-            req->nhr_nh_list = vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int));
+            req->nhr_nh_list =
+                vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int),
+                        VR_NEXTHOP_REQ_LIST_OBJECT);
             if (!req->nhr_nh_list)
                 return -ENOMEM;
 
             req->nhr_label_list_size = nh->nh_component_cnt;
-            req->nhr_label_list = vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int));
+            req->nhr_label_list =
+                vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int),
+                        VR_NEXTHOP_REQ_LIST_OBJECT);
             /* don't bother about freeing. we will free it in req_destroy */
             if (!req->nhr_label_list)
                 return -ENOMEM;
@@ -2394,7 +2398,8 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
     }
 
     if (req->nhr_encap_size) {
-        req->nhr_encap = vr_zalloc(req->nhr_encap_size);
+        req->nhr_encap = vr_zalloc(req->nhr_encap_size,
+                VR_NEXTHOP_REQ_ENCAP_OBJECT);
         if (req->nhr_encap) {
             memcpy(req->nhr_encap, encap,
                     req->nhr_encap_size);
@@ -2410,7 +2415,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
 static vr_nexthop_req *
 vr_nexthop_req_get(void)
 {
-    return vr_zalloc(sizeof(vr_nexthop_req));
+    return vr_zalloc(sizeof(vr_nexthop_req), VR_NEXTHOP_REQ_OBJECT);
 }
 
 static void
@@ -2420,24 +2425,24 @@ vr_nexthop_req_destroy(vr_nexthop_req *req)
         return;
 
     if (req->nhr_encap_size && req->nhr_encap) {
-        vr_free(req->nhr_encap);
+        vr_free(req->nhr_encap, VR_NEXTHOP_REQ_ENCAP_OBJECT);
         req->nhr_encap_size = 0;
         req->nhr_encap = NULL;
     }
 
     if (req->nhr_nh_list_size && req->nhr_nh_list) {
-        vr_free(req->nhr_nh_list);
+        vr_free(req->nhr_nh_list, VR_NEXTHOP_REQ_LIST_OBJECT);
         req->nhr_nh_list_size = 0;
         req->nhr_nh_list = NULL;
     }
 
     if (req->nhr_label_list_size && req->nhr_label_list) {
-        vr_free(req->nhr_label_list);
+        vr_free(req->nhr_label_list, VR_NEXTHOP_REQ_LIST_OBJECT);
         req->nhr_label_list = NULL;
         req->nhr_label_list_size = 0;
     }
 
-    vr_free(req);
+    vr_free(req, VR_NEXTHOP_REQ_OBJECT);
     return;
 }
 
@@ -2584,7 +2589,7 @@ nh_table_exit(struct vrouter *router, bool soft_reset)
 static int
 nh_allocate_discard(void)
 {
-    ip4_default_nh = vr_zalloc(sizeof(struct vr_nexthop));
+    ip4_default_nh = vr_zalloc(sizeof(struct vr_nexthop), VR_NEXTHOP_OBJECT);
     if (!ip4_default_nh)
         return -ENOMEM;
 

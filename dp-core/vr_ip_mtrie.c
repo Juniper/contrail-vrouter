@@ -189,7 +189,8 @@ mtrie_alloc_bucket(struct mtrie_bkt_info *ip_bkt_info, unsigned char level, stru
 
     bkt_size = ip_bkt_info[level].bi_size;
     bkt = vr_zalloc(sizeof(struct ip_bucket) 
-                    + sizeof(struct ip_bucket_entry) * bkt_size);
+                    + sizeof(struct ip_bucket_entry) * bkt_size,
+                    VR_MTRIE_BUCKET_OBJECT);
     if (!bkt)
         return NULL;
 
@@ -264,7 +265,7 @@ mtrie_free_entry(struct ip_bucket_entry *entry, unsigned int level)
         }
 
     entry->entry_bkt_p = NULL;
-    vr_free(bkt);
+    vr_free(bkt, VR_MTRIE_BUCKET_OBJECT);
 
     return;
 }
@@ -414,7 +415,7 @@ ip_bucket_sched_for_free(struct ip_bucket *bkt, int level)
             vrouter_put_nexthop(tmp_ent->entry_nh_p);
         }
     }
-    vr_free(bkt);
+    vr_free(bkt, VR_MTRIE_BUCKET_OBJECT);
 }
 
 static void
@@ -530,7 +531,7 @@ mtrie_dumper_make_response(struct vr_message_dumper *dumper, vr_route_req *resp,
     resp->rtr_nh_id = ent->entry_nh_p->nh_id;
     resp->rtr_index = ent->entry_bridge_index;
     if (resp->rtr_index != VR_BE_INVALID_INDEX) {
-        resp->rtr_mac = vr_zalloc(VR_ETHER_ALEN);
+        resp->rtr_mac = vr_zalloc(VR_ETHER_ALEN, VR_ROUTE_REQ_MAC_OBJECT);
         resp->rtr_mac_size = VR_ETHER_ALEN;
         lreq.rtr_req.rtr_mac = resp->rtr_mac;
         lreq.rtr_req.rtr_index = resp->rtr_index;
@@ -608,7 +609,7 @@ mtrie_dump_entry(struct vr_message_dumper *dumper, struct ip_bucket_entry *ent,
 
         ret = mtrie_dumper_route_encode(dumper, &dump_resp);
         if (dump_resp.rtr_mac_size) {
-            vr_free(dump_resp.rtr_mac);
+            vr_free(dump_resp.rtr_mac, VR_ROUTE_REQ_MAC_OBJECT);
             dump_resp.rtr_mac_size = 0;
             dump_resp.rtr_mac = NULL;
         }
@@ -980,7 +981,7 @@ mtrie_alloc_vrf(unsigned int vrf_id, unsigned int family)
     if (family == AF_INET6)
         index = 1;
 
-    mtrie = vr_zalloc(sizeof(struct ip_mtrie));
+    mtrie = vr_zalloc(sizeof(struct ip_mtrie), VR_MTRIE_OBJECT);
     if (mtrie) {
         mtrie->root.entry_nh_p = vrouter_get_nexthop(0, NH_DISCARD_ID);
         mtrie->root.entry_bridge_index =  VR_BE_INVALID_INDEX;
@@ -1007,7 +1008,7 @@ mtrie_free_vrf(struct vr_rtable *rtable, unsigned int vrf_id)
     
         mtrie_free_entry(&mtrie->root, 0);
         vrf_tables[vrf_id] = NULL;
-        vr_free(mtrie);
+        vr_free(mtrie, VR_MTRIE_OBJECT);
     }
 
     return;
@@ -1027,18 +1028,18 @@ mtrie_stats_cleanup(struct vr_rtable *rtable, bool soft_reset)
             if (soft_reset) {
                 memset(mtrie_vrf_stats[i], 0, stats_memory_size);
             } else {
-                vr_free(mtrie_vrf_stats[i]);
+                vr_free(mtrie_vrf_stats[i], VR_MTRIE_STATS_OBJECT);
                 mtrie_vrf_stats[i] = NULL;
             }
         }
     }
 
     if (!soft_reset) {
-        vr_free(mtrie_vrf_stats);
+        vr_free(mtrie_vrf_stats, VR_MTRIE_STATS_OBJECT);
         rtable->vrf_stats = mtrie_vrf_stats = NULL;
 
         if (invalid_vrf_stats) {
-            vr_free(invalid_vrf_stats);
+            vr_free(invalid_vrf_stats, VR_MTRIE_STATS_OBJECT);
             invalid_vrf_stats = NULL;
         }
     } else {
@@ -1063,7 +1064,7 @@ mtrie_algo_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs,
 
     if (!soft_reset) {
         vn_rtable[0] = vn_rtable[1] = NULL;
-        vr_free(rtable->algo_data);
+        vr_free(rtable->algo_data, VR_MTRIE_TABLE_OBJECT);
         rtable->algo_data = NULL;
     }
 
@@ -1081,13 +1082,14 @@ mtrie_stats_init(struct vr_rtable *rtable)
 
     if (!mtrie_vrf_stats) {
         stats_memory = sizeof(void *) * rtable->algo_max_vrfs;
-        mtrie_vrf_stats = vr_zalloc(stats_memory);
+        mtrie_vrf_stats = vr_zalloc(stats_memory, VR_MTRIE_STATS_OBJECT);
         if (!mtrie_vrf_stats)
             return vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, stats_memory);
         for (i = 0; i < rtable->algo_max_vrfs; i++) {
             stats_memory = sizeof(struct vr_vrf_stats) * vr_num_cpus;
-            mtrie_vrf_stats[i] = vr_zalloc(stats_memory);
+            mtrie_vrf_stats[i] = vr_zalloc(stats_memory,
+                    VR_MTRIE_STATS_OBJECT);
             if (!mtrie_vrf_stats[i] && (ret = -ENOMEM)) {
                 vr_module_error(ret, __FUNCTION__, __LINE__, i);
                 goto cleanup;
@@ -1099,7 +1101,7 @@ mtrie_stats_init(struct vr_rtable *rtable)
 
     if (!invalid_vrf_stats) {
         invalid_vrf_stats = vr_zalloc(sizeof(struct vr_vrf_stats) *
-                vr_num_cpus);
+                vr_num_cpus, VR_MTRIE_STATS_OBJECT);
         if (!invalid_vrf_stats && (ret = -ENOMEM)) {
             vr_module_error(ret, __FUNCTION__, __LINE__, -1);
             goto cleanup;
@@ -1115,18 +1117,18 @@ cleanup:
 
     for (--i; i >= 0; i--) {
         if (mtrie_vrf_stats[i]) {
-            vr_free(mtrie_vrf_stats[i]);
+            vr_free(mtrie_vrf_stats[i], VR_MTRIE_STATS_OBJECT);
             mtrie_vrf_stats[i] = NULL;
         }
     }
 
     if (mtrie_vrf_stats) {
-        vr_free(mtrie_vrf_stats);
+        vr_free(mtrie_vrf_stats, VR_MTRIE_STATS_OBJECT);
         mtrie_vrf_stats = NULL;
     }
 
     if (invalid_vrf_stats) {
-        vr_free(invalid_vrf_stats);
+        vr_free(invalid_vrf_stats, VR_MTRIE_STATS_OBJECT);
         invalid_vrf_stats = NULL;
     }
 
@@ -1144,7 +1146,7 @@ mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 
     if (!rtable->algo_data) {
         table_memory = 2 * sizeof(void *) * fs->rtb_max_vrfs;
-        rtable->algo_data = vr_zalloc(table_memory);
+        rtable->algo_data = vr_zalloc(table_memory, VR_MTRIE_TABLE_OBJECT);
         if (!rtable->algo_data)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, table_memory);
     }
@@ -1180,7 +1182,7 @@ mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 
 init_fail:
     if (rtable->algo_data) {
-        vr_free(rtable->algo_data);
+        vr_free(rtable->algo_data, VR_MTRIE_TABLE_OBJECT);
         rtable->algo_data = NULL;
     }
 

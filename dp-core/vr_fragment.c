@@ -151,7 +151,7 @@ vr_fragment_queue_element_free(struct vr_fragment_queue_element *vfqe,
         vr_pfree(vfqe->fqe_pnode.pl_packet, drop_reason);
     }
 
-    vr_free(vfqe);
+    vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
     return;
 }
 
@@ -165,7 +165,7 @@ fragment_free_frag(struct vr_fragment *frag)
         vr_fragment_queue_element_free(fqe, VP_DROP_FRAGMENTS);
     }
 
-    vr_free(frag);
+    vr_free(frag, VR_FRAGMENT_OBJECT);
     return;
 }
 
@@ -217,7 +217,7 @@ vr_assembler_table_scan_exit(void)
 {
     if (vr_assembler_table_scan_timer) {
         vr_delete_timer(vr_assembler_table_scan_timer);
-        vr_free(vr_assembler_table_scan_timer);
+        vr_free(vr_assembler_table_scan_timer, VR_TIMER_OBJECT);
         vr_assembler_table_scan_timer = NULL;
     }
 
@@ -229,7 +229,7 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
 {
     struct vr_timer *vtimer;
 
-    vr_assembler_table_scan_timer = vr_zalloc(sizeof(*vtimer));
+    vr_assembler_table_scan_timer = vr_zalloc(sizeof(*vtimer), VR_TIMER_OBJECT);
     if (!vr_assembler_table_scan_timer)
         return -ENOMEM;
 
@@ -239,7 +239,7 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
     vtimer->vt_msecs =
         (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_LINUX_ASSEMBLER_BUCKETS;
     if (vr_create_timer(vtimer)) {
-        vr_free(vtimer);
+        vr_free(vtimer, VR_TIMER_OBJECT);
         vr_assembler_table_scan_timer = NULL;
     }
 
@@ -288,7 +288,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
                 (list_length > VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE))
             goto exit_assembly;
 
-        frag = vr_zalloc(sizeof(*frag));
+        frag = vr_zalloc(sizeof(*frag), VR_FRAGMENT_OBJECT);
         if (!frag) {
             ret = -ENOMEM;
             goto exit_assembly;
@@ -398,7 +398,7 @@ vr_fragment_enqueue(struct vrouter *router,
             goto fail;
     }
 
-    fqe = vr_malloc(sizeof(*fqe));
+    fqe = vr_malloc(sizeof(*fqe), VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
     if (!fqe) {
         goto fail;
     }
@@ -439,7 +439,7 @@ vr_fragment_enqueue(struct vrouter *router,
 
 fail:
     if (fqe)
-        vr_free(fqe);
+        vr_free(fqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
 
     vr_pfree(pkt, VP_DROP_FRAGMENTS);
     return -1;
@@ -592,7 +592,7 @@ fragment_table_scanner_init(struct vrouter *router, struct vr_btable *table)
 
     num_entries = vr_btable_entries(table);
 
-    scanner = vr_zalloc(sizeof(*scanner));
+    scanner = vr_zalloc(sizeof(*scanner), VR_FRAGMENT_SCANNER_OBJECT);
     if (!scanner) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, num_entries);
         return NULL;
@@ -603,7 +603,7 @@ fragment_table_scanner_init(struct vrouter *router, struct vr_btable *table)
     scanner->sp_num_entries = num_entries;
     scanner->sp_last_scanned_entry = -1;
 
-    vtimer = vr_malloc(sizeof(*vtimer));
+    vtimer = vr_malloc(sizeof(*vtimer), VR_TIMER_OBJECT);
     if (!vtimer) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, num_entries);
         goto fail_init;
@@ -622,7 +622,7 @@ fragment_table_scanner_init(struct vrouter *router, struct vr_btable *table)
 
 fail_init:
     if (scanner)
-        vr_free(scanner);
+        vr_free(scanner, VR_FRAGMENT_SCANNER_OBJECT);
 
     return NULL;
 }
@@ -632,15 +632,17 @@ vr_fragment_table_scanner_exit(struct vrouter *router)
 {
     if (router->vr_fragment_table_scanner) {
         vr_delete_timer(router->vr_fragment_table_scanner);
-        vr_free(router->vr_fragment_table_scanner->vt_vr_arg);
-        vr_free(router->vr_fragment_table_scanner);
+        vr_free(router->vr_fragment_table_scanner->vt_vr_arg,
+                VR_FRAGMENT_SCANNER_OBJECT);
+        vr_free(router->vr_fragment_table_scanner, VR_TIMER_OBJECT);
         router->vr_fragment_table_scanner = NULL;
     }
 
     if (router->vr_fragment_otable_scanner) {
         vr_delete_timer(router->vr_fragment_otable_scanner);
-        vr_free(router->vr_fragment_otable_scanner->vt_vr_arg);
-        vr_free(router->vr_fragment_otable_scanner);
+        vr_free(router->vr_fragment_otable_scanner->vt_vr_arg,
+                VR_FRAGMENT_SCANNER_OBJECT);
+        vr_free(router->vr_fragment_otable_scanner, VR_TIMER_OBJECT);
         router->vr_fragment_otable_scanner = NULL;
     }
 

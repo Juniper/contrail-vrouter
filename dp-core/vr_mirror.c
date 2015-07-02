@@ -55,7 +55,7 @@ vrouter_put_mirror(struct vrouter *router, unsigned int index)
             vr_delay_op();
 
         vrouter_put_nexthop(mirror->mir_nh);
-        vr_free(mirror);
+        vr_free(mirror, VR_MIRROR_OBJECT);
     }
 
     return 0;
@@ -146,7 +146,7 @@ vr_mirror_add(vr_mirror_req *req)
     if (mirror) {
         vr_mirror_change(mirror, req, nh);
     } else {
-        mirror = vr_zalloc(sizeof(*mirror));
+        mirror = vr_zalloc(sizeof(*mirror), VR_MIRROR_OBJECT);
         mirror->mir_users++;
         mirror->mir_nh = nh;
         mirror->mir_rid = req->mirr_rid;
@@ -275,9 +275,9 @@ vr_mirror_meta_destroy(struct vr_mirror_meta_entry *me)
         return;
 
     if (me->mirror_md)
-        vr_free(me->mirror_md);
+        vr_free(me->mirror_md, VR_MIRROR_META_OBJECT);
 
-    vr_free(me);
+    vr_free(me, VR_MIRROR_META_OBJECT);
     return;
 }
 
@@ -327,13 +327,13 @@ vr_mirror_meta_entry_set(struct vrouter *router, unsigned int index,
     char *buf;
     struct vr_mirror_meta_entry *me, *me_old;
 
-    me = vr_malloc(sizeof(*me));
+    me = vr_malloc(sizeof(*me), VR_MIRROR_META_OBJECT);
     if (!me)
         return -ENOMEM;
 
-    buf = vr_malloc(meta_data_len);
+    buf = vr_malloc(meta_data_len, VR_MIRROR_META_OBJECT);
     if (!buf) {
-        vr_free(me);
+        vr_free(me, VR_MIRROR_META_OBJECT);
         return -ENOMEM;
     }
 
@@ -492,7 +492,7 @@ vr_mirror_exit(struct vrouter *router, bool soft_reset)
     }
 
     if (!soft_reset) {
-        vr_free(router->vr_mirrors);
+        vr_free(router->vr_mirrors, VR_MIRROR_TABLE_OBJECT);
         router->vr_mirrors = NULL;
         router->vr_max_mirror_indices = 0;
     }
@@ -509,7 +509,7 @@ vr_mirror_init(struct vrouter *router)
     if (!router->vr_mirrors) {
         router->vr_max_mirror_indices = VR_MAX_MIRROR_INDICES;
         size = sizeof(struct vr_mirror_entry *) * router->vr_max_mirror_indices;
-        router->vr_mirrors = vr_zalloc(size);
+        router->vr_mirrors = vr_zalloc(size, VR_MIRROR_TABLE_OBJECT);
         if (!router->vr_mirrors)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, size);
     }
@@ -526,7 +526,7 @@ vr_mirror_init(struct vrouter *router)
 
 cleanup:
     if (router->vr_mirrors) {
-        vr_free(router->vr_mirrors);
+        vr_free(router->vr_mirrors, VR_MIRROR_TABLE_OBJECT);
         router->vr_mirrors = NULL;
     }
 

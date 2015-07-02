@@ -29,7 +29,7 @@ vr_lib_create_timer(struct vr_timer *vtimer)
 {
     struct dummy_timer_list *timer;
 
-    timer = vr_zalloc(sizeof(*timer));
+    timer = vr_zalloc(sizeof(*timer), VR_TIMER_OBJECT);
     if (!timer)
         return -1;
     init_timer(timer);
@@ -46,7 +46,7 @@ vr_lib_create_timer(struct vr_timer *vtimer)
 static void
 vr_lib_delete_timer(struct vr_timer *vtimer)
 {
-    vr_free(vtimer->vt_os_arg);
+    vr_free(vtimer->vt_os_arg, VR_TIMER_OBJECT);
 }
 
 static void *
@@ -82,19 +82,19 @@ vr_lib_printf(const char *format, ...)
 }
 
 static void *
-vr_lib_malloc(unsigned int size)
+vr_lib_malloc(unsigned int size, unsigned int object)
 {
     return malloc(size);
 }
 
 static void *
-vr_lib_zalloc(unsigned int size)
+vr_lib_zalloc(unsigned int size, unsigned int object)
 {
     return calloc(size, 1);
 }
 
 static void
-vr_lib_free(void *mem)
+vr_lib_free(void *mem, unsigned int object)
 {
     if (mem)
         free(mem);

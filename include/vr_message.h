@@ -29,6 +29,7 @@
 #define VR_VXLAN_OBJECT_ID              11
 #define VR_VROUTER_OPS_OBJECT_ID        12
 #define VR_FLOW_INFO_OBJECT_ID          13
+#define VR_MEM_STATS_OBJECT_ID          14
 
 #define VR_MESSAGE_PAGE_SIZE            (4096 - 128)
 

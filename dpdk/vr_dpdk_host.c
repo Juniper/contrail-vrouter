@@ -47,6 +47,9 @@ struct rcu_cb_data {
     unsigned char rcd_user_data[0];
 };
 
+extern void vr_malloc_stats(unsigned int, unsigned int);
+extern void vr_free_stats(unsigned int);
+
 static void *
 dpdk_page_alloc(unsigned int size)
 {
@@ -79,21 +82,28 @@ dpdk_printf(const char *format, ...)
 }
 
 static void *
-dpdk_malloc(unsigned int size)
+dpdk_malloc(unsigned int size, unsigned int object)
 {
+    vr_malloc_stats(size, object);
     return rte_malloc(NULL, size, 0);
 }
 
 static void *
-dpdk_zalloc(unsigned int size)
+dpdk_zalloc(unsigned int size, unsigned int object)
 {
+    vr_malloc_stats(size, object);
     return rte_calloc(NULL, size, 1, 0);
 }
 
 static void
-dpdk_free(void *mem)
+dpdk_free(void *mem, unsigned int object)
 {
-    rte_free(mem);
+    if (mem) {
+        vr_free_stats(object);
+        rte_free(mem);
+    }
+
+    return;
 }
 
 static uint64_t
@@ -499,7 +509,7 @@ dpdk_work_timer(struct rte_timer *timer, void *arg)
     dpdk_timer(timer, arg);
 
     dpdk_delete_timer(vtimer);
-    dpdk_free(vtimer);
+    dpdk_free(vtimer, VR_TIMER_OBJECT);
 
     return;
 }
@@ -510,15 +520,15 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
     struct rte_timer *timer;
     struct vr_timer *vtimer;
 
-    timer = dpdk_malloc(sizeof(struct rte_timer));
+    timer = dpdk_malloc(sizeof(struct rte_timer), VR_TIMER_OBJECT);
     if (!timer) {
         RTE_LOG(ERR, VROUTER, "Error allocating RTE timer\n");
         return;
     }
 
-    vtimer = dpdk_malloc(sizeof(*vtimer));
+    vtimer = dpdk_malloc(sizeof(*vtimer), VR_TIMER_OBJECT);
     if (!vtimer) {
-        dpdk_free(timer);
+        dpdk_free(timer, VR_TIMER_OBJECT);
         RTE_LOG(ERR, VROUTER, "Error allocating VR timer for work\n");
         return;
     }
@@ -561,7 +571,7 @@ rcu_cb(struct rcu_head *rh)
 
     /* Call the user call back */
     cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
-    dpdk_free(cb_data);
+    dpdk_free(cb_data, VR_DEFER_OBJECT);
 
     return;
 }
@@ -587,7 +597,7 @@ dpdk_get_defer_data(unsigned int len)
     if (!len)
         return NULL;
 
-    cb_data = dpdk_malloc(sizeof(*cb_data) + len);
+    cb_data = dpdk_malloc(sizeof(*cb_data) + len, VR_DEFER_OBJECT);
     if (!cb_data) {
         return NULL;
     }
@@ -604,7 +614,7 @@ dpdk_put_defer_data(void *data)
         return;
 
     cb_data = CONTAINER_OF(rcd_user_data, struct rcu_cb_data, data);
-    dpdk_free(cb_data);
+    dpdk_free(cb_data, VR_DEFER_OBJECT);
 
     return;
 }

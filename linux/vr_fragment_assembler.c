@@ -42,7 +42,7 @@ vr_linux_fragment_queue_free(struct vr_linux_fragment_queue *vlfq)
         if (vfqe->fqe_pnode.pl_packet)
             vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
         vfqe->fqe_pnode.pl_packet = NULL;
-        vr_free(vfqe);
+        vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
         vfqe = next;
     }
 
@@ -153,7 +153,7 @@ vr_linux_assembler_table_exit(void)
     vr_assembler_table_scan_exit();
 
     if (vr_linux_assembler_table) {
-        vr_free(vr_linux_assembler_table);
+        vr_free(vr_linux_assembler_table, VR_ASSEMBLER_TABLE_OBJECT);
         vr_linux_assembler_table = NULL;
     }
 
@@ -166,7 +166,7 @@ vr_linux_assembler_table_init(void)
     unsigned int i, size;
 
     size = sizeof(struct vr_linux_fragment_bucket) * VR_LINUX_ASSEMBLER_BUCKETS;
-    vr_linux_assembler_table = vr_zalloc(size);
+    vr_linux_assembler_table = vr_zalloc(size, VR_ASSEMBLER_TABLE_OBJECT);
     if (!vr_linux_assembler_table) {
         printk("%s:%d Allocation for %u failed\n",
                 __FUNCTION__, __LINE__, size);
@@ -200,7 +200,7 @@ vr_linux_fragment_queue_exit(void)
         for (i = 0; i < vr_num_cpus; i++)
             vr_linux_fragment_queue_free(&vr_lfq_pcpu_queues[i]);
 
-        vr_free(vr_lfq_pcpu_queues);
+        vr_free(vr_lfq_pcpu_queues, VR_FRAGMENT_QUEUE_OBJECT);
         vr_lfq_pcpu_queues = NULL;
     }
 
@@ -213,7 +213,7 @@ vr_linux_fragment_queue_init(void)
     unsigned int i, size;
 
     size = sizeof(struct vr_linux_fragment_queue) * vr_num_cpus;
-    vr_lfq_pcpu_queues = vr_zalloc(size);
+    vr_lfq_pcpu_queues = vr_zalloc(size, VR_FRAGMENT_QUEUE_OBJECT);
     if (!vr_lfq_pcpu_queues) {
         printk("%s:%d Allocation for %u failed\n",
                 __FUNCTION__, __LINE__, size);

@@ -26,6 +26,64 @@ extern "C" {
 #define VR_CPU_MASK     0xff
 extern unsigned int vr_num_cpus;
 
+enum vr_malloc_objects_t {
+    VR_ASSEMBLER_TABLE_OBJECT,
+    VR_BRIDGE_MAC_OBJECT,
+    VR_BTABLE_OBJECT,
+    VR_BUILD_INFO_OBJECT,
+    VR_DEFER_OBJECT,
+    VR_DROP_STATS_OBJECT,
+    VR_DROP_STATS_REQ_OBJECT,
+    VR_FLOW_QUEUE_OBJECT,
+    VR_FLOW_REQ_OBJECT,
+    VR_FLOW_REQ_PATH_OBJECT,
+    VR_FLOW_HOLD_STAT_OBJECT,
+    VR_FLOW_LINK_LOCAL_OBJECT,
+    VR_FLOW_METADATA_OBJECT,
+    VR_FLOW_TABLE_INFO_OBJECT,
+    VR_FRAGMENT_OBJECT,
+    VR_FRAGMENT_QUEUE_OBJECT,
+    VR_FRAGMENT_QUEUE_ELEMENT_OBJECT,
+    VR_FRAGMENT_SCANNER_OBJECT,
+    VR_HPACKET_POOL_OBJECT,
+    VR_HTABLE_OBJECT,
+    VR_INTERFACE_OBJECT,
+    VR_INTERFACE_MAC_OBJECT,
+    VR_INTERFACE_REQ_OBJECT,
+    VR_INTERFACE_REQ_MAC_OBJECT,
+    VR_INTERFACE_REQ_NAME_OBJECT,
+    VR_INTERFACE_STATS_OBJECT,
+    VR_INTERFACE_TABLE_OBJECT,
+    VR_INTERFACE_VRF_TABLE_OBJECT,
+    VR_ITABLE_OBJECT,
+    VR_MALLOC_OBJECT,
+    VR_MESSAGE_OBJECT,
+    VR_MESSAGE_RESPONSE_OBJECT,
+    VR_MESSAGE_DUMP_OBJECT,
+    VR_MEM_STATS_REQ_OBJECT,
+    VR_MIRROR_OBJECT,
+    VR_MIRROR_TABLE_OBJECT,
+    VR_MIRROR_META_OBJECT,
+    VR_MTRIE_OBJECT,
+    VR_MTRIE_BUCKET_OBJECT,
+    VR_MTRIE_STATS_OBJECT,
+    VR_MTRIE_TABLE_OBJECT,
+    VR_NEXTHOP_OBJECT,
+    VR_NEXTHOP_COMPONENT_OBJECT,
+    VR_NEXTHOP_REQ_LIST_OBJECT,
+    VR_NEXTHOP_REQ_ENCAP_OBJECT,
+    VR_NEXTHOP_REQ_OBJECT,
+    VR_ROUTE_TABLE_OBJECT,
+    VR_ROUTE_REQ_MAC_OBJECT,
+    VR_TIMER_OBJECT,
+    VR_USOCK_OBJECT,
+    VR_USOCK_POLL_OBJECT,
+    VR_USOCK_BUF_OBJECT,
+    VR_USOCK_IOVEC_OBJECT,
+    VR_VROUTER_REQ_OBJECT,
+    VR_VROUTER_MAX_OBJECT,
+};
+
 extern int vr_perfr;
 extern int vr_mudp;
 extern int vr_perfs;
@@ -58,9 +116,9 @@ struct vr_timer {
 
 struct host_os {
     int (*hos_printf)(const char *, ...);
-    void *(*hos_malloc)(unsigned int);
-    void *(*hos_zalloc)(unsigned int);
-    void (*hos_free)(void *);
+    void *(*hos_malloc)(unsigned int, unsigned int);
+    void *(*hos_zalloc)(unsigned int, unsigned int);
+    void (*hos_free)(void *, unsigned int);
     uint64_t (*hos_vtop)(void *);
     void *(*hos_page_alloc)(unsigned int);
     void (*hos_page_free)(void *, unsigned int);
@@ -157,6 +215,12 @@ struct host_os {
 #define vr_gro_process                  vrouter_host->hos_gro_process
 #define vr_enqueue_to_assembler         vrouter_host->hos_enqueue_to_assembler
 
+struct vr_malloc_stats {
+    int64_t ms_size;
+    int64_t ms_alloc;
+    int64_t ms_free;
+};
+
 struct vrouter {
     unsigned char vr_vrrp_mac[VR_ETHER_ALEN];
     unsigned char vr_mac[VR_ETHER_ALEN];
@@ -192,6 +256,7 @@ struct vrouter {
     struct vr_timer *vr_fragment_otable_scanner;
 
     uint64_t **vr_pdrop_stats;
+    struct vr_malloc_stats **vr_malloc_stats;
 
     uint16_t vr_link_local_ports_size;
     unsigned char *vr_link_local_ports;
