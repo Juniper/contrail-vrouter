@@ -175,7 +175,7 @@ vr_hpacket_pool_destroy(struct vr_hpacket_pool *pool)
         vr_hpacket_free(hpkt);
         hpkt = n_hpkt;
     }
-    vr_free(pool);
+    vr_free(pool, VR_HPACKET_POOL_OBJECT);
 
     return;
 }
@@ -190,7 +190,7 @@ vr_hpacket_pool_create(unsigned int pool_size, unsigned int psize)
     if (!pool_size)
         return NULL;
 
-    pool = vr_zalloc(sizeof(*pool));
+    pool = vr_zalloc(sizeof(*pool), VR_HPACKET_POOL_OBJECT);
     if (!pool)
         goto cleanup;
 

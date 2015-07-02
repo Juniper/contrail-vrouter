@@ -231,6 +231,63 @@ buffer sandesh vrouter_ops {
    12: string       vo_build_info;
 }
 
+buffer sandesh vr_mem_stats_req {
+    1:  sandesh_op      h_op;
+    2:  i16             vms_rid;
+    3:  i64             vms_alloced;
+    4:  i64             vms_freed;
+    5:  i64             vms_bridge_mac_object;
+    6:  i64             vms_btable_object;
+    7:  i64             vms_build_info_object;
+    8:  i64             vms_defer_object;
+    9:  i64             vms_drop_stats_object;
+   10:  i64             vms_drop_stats_req_object;
+   11:  i64             vms_flow_queue_object;
+   12:  i64             vms_flow_req_object;
+   13:  i64             vms_flow_req_path_object;
+   14:  i64             vms_flow_hold_stat_object;
+   15:  i64             vms_flow_link_local_object;
+   16:  i64             vms_flow_metadata_object;
+   17:  i64             vms_flow_table_info_object;
+   18:  i64             vms_fragment_scanner_object;
+   19:  i64             vms_hpacket_pool_object;
+   20:  i64             vms_htable_object;
+   21:  i64             vms_interface_object;
+   22:  i64             vms_interface_mac_object;
+   23:  i64             vms_interface_req_object;
+   24:  i64             vms_interface_req_mac_object;
+   25:  i64             vms_interface_req_name_object;
+   26:  i64             vms_interface_stats_object;
+   27:  i64             vms_interface_table_object;
+   28:  i64             vms_interface_vrf_table_object;
+   29:  i64             vms_itable_object;
+   30:  i64             vms_malloc_object;
+   31:  i64             vms_message_object;
+   32:  i64             vms_message_response_object;
+   33:  i64             vms_message_dump_object;
+   34:  i64             vms_mem_stats_req_object;
+   35:  i64             vms_mirror_object;
+   36:  i64             vms_mirror_table_object;
+   37:  i64             vms_mirror_meta_object;
+   38:  i64             vms_mtrie_object;
+   39:  i64             vms_mtrie_bucket_object;
+   40:  i64             vms_mtrie_stats_object;
+   41:  i64             vms_mtrie_table_object;
+   42:  i64             vms_nexthop_object;
+   43:  i64             vms_nexthop_component_object;
+   44:  i64             vms_nexthop_req_list_object;
+   45:  i64             vms_nexthop_req_encap_object;
+   46:  i64             vms_nexthop_req_object;
+   47:  i64             vms_route_table_object;
+   48:  i64             vms_route_req_mac_object;
+   49:  i64             vms_timer_object;
+   50:  i64             vms_usock_object;
+   51:  i64             vms_usock_poll_object;
+   52:  i64             vms_usock_buf_object;
+   53:  i64             vms_usock_iovec_object;
+   54:  i64             vms_vrouter_req_object;
+}
+
 buffer sandesh vr_drop_stats_req {
     1:  sandesh_op      h_op;
     2:  u32             vds_core;

@@ -74,7 +74,7 @@ __vr_itable_del(struct vr_itbl *table, unsigned int index,
         if (*old) {
             ptr[id] = NULL;
             if (vr_stride_empty(ptr, table->stride_len[cnt]) == 1) {
-                vr_free(ptr);
+                vr_free(ptr, VR_ITABLE_OBJECT);
                 return 1;
             }
         }
@@ -92,7 +92,7 @@ __vr_itable_del(struct vr_itbl *table, unsigned int index,
              */
             ptr[id] = NULL;
             if (vr_stride_empty(ptr, table->stride_len[cnt]) == 1) {
-                vr_free(ptr);
+                vr_free(ptr, VR_ITABLE_OBJECT);
 
                 /* If the stride deleted is first, mark the head null */
                 if (cnt == 0) {
@@ -178,7 +178,7 @@ __vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
         }
 
         /* All stride entries are delete invoked. Delete the stride now */
-        vr_free(ptr);
+        vr_free(ptr, VR_ITABLE_OBJECT);
         return;
     }
 
@@ -189,13 +189,13 @@ __vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
 
             /* Upper strides are deleted. Delete the current */
             ptr[i] = NULL;
-            vr_free(ptr[i]);
+            vr_free(ptr[i], VR_ITABLE_OBJECT);
         }
     }
 
     /* Destruct the head as well*/
     if (cnt == 0) {
-        vr_free(table->data);
+        vr_free(table->data, VR_ITABLE_OBJECT);
         table->data = NULL;
     }
 
@@ -304,7 +304,8 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
     }
 
     if (!table->data) {
-        table->data = vr_zalloc(table->stride_len[0] * sizeof(void *));
+        table->data = vr_zalloc(table->stride_len[0] * sizeof(void *),
+                VR_ITABLE_OBJECT);
         if (!table->data) {
             return VR_ITABLE_ERR_PTR;
         }
@@ -315,7 +316,8 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
         id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
 
         if (!ptr[id]) {
-            ptr[id] = vr_zalloc(table->stride_len[i + 1] * sizeof(void *));
+            ptr[id] = vr_zalloc(table->stride_len[i + 1] * sizeof(void *),
+                    VR_ITABLE_OBJECT);
             /* To fix: We might return with some empty strides */
             if (!ptr[id]) {
                 return VR_ITABLE_ERR_PTR;
@@ -351,9 +353,9 @@ vr_itable_delete(vr_itable_t t, vr_itable_del_cb_t func)
     __vr_itable_exit(table, func, table->data, 0, 0);
 
     /* Free the table itself */
-    vr_free(table->stride_len);
-    vr_free(table->stride_shift);
-    vr_free(table);
+    vr_free(table->stride_len, VR_ITABLE_OBJECT);
+    vr_free(table->stride_shift, VR_ITABLE_OBJECT);
+    vr_free(table, VR_ITABLE_OBJECT);
 
     return;
 }
@@ -386,7 +388,7 @@ vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...)
         goto fail;
     }
 
-    table = vr_zalloc(sizeof(struct vr_itbl));
+    table = vr_zalloc(sizeof(struct vr_itbl), VR_ITABLE_OBJECT);
     if (!table) {
         goto fail;
     }
@@ -394,12 +396,14 @@ vr_itable_create(unsigned int index_len, unsigned int stride_cnt, ...)
     table->index_len = index_len;
     table->stride_cnt = stride_cnt;
 
-    table->stride_shift = vr_zalloc(table->stride_cnt * sizeof(unsigned int));
+    table->stride_shift = vr_zalloc(table->stride_cnt * sizeof(unsigned int),
+            VR_ITABLE_OBJECT);
     if (!table->stride_shift) {
         goto fail;
     }
 
-    table->stride_len = vr_zalloc(table->stride_cnt * sizeof(unsigned int));
+    table->stride_len = vr_zalloc(table->stride_cnt * sizeof(unsigned int),
+            VR_ITABLE_OBJECT);
     if (!table->stride_len) {
         goto fail;
     }
@@ -435,14 +439,14 @@ fail:
 
     if (table) {
         if (table->stride_shift) {
-            vr_free(table->stride_shift);
+            vr_free(table->stride_shift, VR_ITABLE_OBJECT);
         }
 
         if (table->stride_len) {
-            vr_free(table->stride_len);
+            vr_free(table->stride_len, VR_ITABLE_OBJECT);
         }
 
-        vr_free(table);
+        vr_free(table, VR_ITABLE_OBJECT);
     }
 
     return NULL;

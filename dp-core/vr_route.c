@@ -428,7 +428,7 @@ inet_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
     if (router->vr_inet_rtable) {
         fs->algo_deinit(router->vr_inet_rtable, fs, soft_reset);
         if (!soft_reset) {
-            vr_free(router->vr_inet_rtable);
+            vr_free(router->vr_inet_rtable, VR_ROUTE_TABLE_OBJECT);
             router->vr_inet_rtable = NULL;
         }
     }
@@ -445,7 +445,8 @@ inet_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
         return 1;
 
     if (!router->vr_inet_rtable) {
-        router->vr_inet_rtable = vr_zalloc(sizeof(struct vr_rtable));
+        router->vr_inet_rtable = vr_zalloc(sizeof(struct vr_rtable),
+                VR_ROUTE_TABLE_OBJECT);
         if (!router->vr_inet_rtable)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
     }
@@ -504,7 +505,7 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
         return 0;
 
     if (fs->algo_init) {
-        table = vr_zalloc(sizeof(struct vr_rtable));
+        table = vr_zalloc(sizeof(struct vr_rtable), VR_ROUTE_TABLE_OBJECT);
         if (!table)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
 
@@ -528,7 +529,7 @@ bridge_rtb_family_deinit(struct rtable_fspec *fs, struct vrouter *router,
     fs->algo_deinit(router->vr_bridge_rtable, fs, soft_reset);
 
     if (!soft_reset) {
-        vr_free(router->vr_bridge_rtable);
+        vr_free(router->vr_bridge_rtable, VR_ROUTE_TABLE_OBJECT);
         router->vr_bridge_rtable = NULL;
     }
 }

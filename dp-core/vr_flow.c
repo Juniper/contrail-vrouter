@@ -312,7 +312,7 @@ vr_flow_queue_free(struct vrouter *router, void *arg)
         vr_flow_set_forwarding_md(router, fe, vfq->vfq_index, &fmd);
         vr_flush_flow_queue(router, fe, &fmd, vfq);
     }
-    vr_free(vfq);
+    vr_free(vfq, VR_FLOW_QUEUE_OBJECT);
     return;
 }
 
@@ -322,7 +322,7 @@ vr_flow_queue_free_defer(struct vr_flow_md *flmd, struct vr_flow_queue *vfq)
     struct vr_defer_data *vdd = flmd->flmd_defer_data;
 
     if (!vdd) {
-        vr_free(vfq);
+        vr_free(vfq, VR_FLOW_QUEUE_OBJECT);
         return;
     }
 
@@ -377,7 +377,8 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
     if (fe) {
         *fe_index += index;
         if (need_hold) {
-            fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue));
+            fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue),
+                    VR_FLOW_QUEUE_OBJECT);
             if (!fe->fe_hold_list) {
                 vr_reset_flow_entry(router, fe, *fe_index);
                 fe = NULL;
@@ -1126,7 +1127,7 @@ vr_flow_flush(void *arg)
     }
 
 exit_flush:
-    vr_free(flmd);
+    vr_free(flmd, VR_FLOW_METADATA_OBJECT);
 
     return;
 }
@@ -1292,7 +1293,8 @@ vr_flow_schedule_transition(struct vrouter *router, vr_flow_req *req,
     struct vr_flow_md *flmd;
     struct vr_defer_data *defer = NULL;
 
-    flmd = (struct vr_flow_md *)vr_malloc(sizeof(*flmd));
+    flmd = (struct vr_flow_md *)vr_malloc(sizeof(*flmd),
+            VR_FLOW_METADATA_OBJECT);
     if (!flmd)
         return -ENOMEM;
 
@@ -1302,7 +1304,7 @@ vr_flow_schedule_transition(struct vrouter *router, vr_flow_req *req,
     if (fe->fe_hold_list) {
         defer = vr_get_defer_data(sizeof(*defer));
         if (!defer) {
-            vr_free(flmd);
+            vr_free(flmd, VR_FLOW_METADATA_OBJECT);
             return -ENOMEM;
         }
     }
@@ -1409,7 +1411,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         if ((req->fr_action == VR_FLOW_ACTION_HOLD) &&
                 (fe->fe_action != req->fr_action)) {
             if (!fe->fe_hold_list) {
-                fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue));
+                fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue),
+                        VR_FLOW_QUEUE_OBJECT);
                 if (!fe->fe_hold_list)
                     return -ENOMEM;
             }
@@ -1479,17 +1482,17 @@ vr_flow_req_destroy(vr_flow_req *req)
         return;
 
     if (req->fr_file_path) {
-        vr_free(req->fr_file_path);
+        vr_free(req->fr_file_path, VR_FLOW_REQ_PATH_OBJECT);
         req->fr_file_path = NULL;
     }
 
     if (req->fr_hold_stat && req->fr_hold_stat_size) {
-        vr_free(req->fr_hold_stat);
+        vr_free(req->fr_hold_stat, VR_FLOW_HOLD_STAT_OBJECT);
         req->fr_hold_stat = NULL;
         req->fr_hold_stat_size = 0;
     }
 
-    vr_free(req);
+    vr_free(req, VR_FLOW_REQ_OBJECT);
 
     return;
 }
@@ -1499,7 +1502,7 @@ vr_flow_req_get(vr_flow_req *ref_req)
 {
     unsigned int hold_stat_size;
     unsigned int num_cpus = vr_num_cpus;
-    vr_flow_req *req = vr_zalloc(sizeof(*req));
+    vr_flow_req *req = vr_zalloc(sizeof(*req), VR_FLOW_REQ_OBJECT);
 
     if (!req)
         return NULL;
@@ -1512,9 +1515,10 @@ vr_flow_req_get(vr_flow_req *ref_req)
     }
 
     if (vr_flow_path) {
-        req->fr_file_path = vr_zalloc(VR_UNIX_PATH_MAX);
+        req->fr_file_path = vr_zalloc(VR_UNIX_PATH_MAX,
+                VR_FLOW_REQ_PATH_OBJECT);
         if (!req->fr_file_path) {
-            vr_free(req);
+            vr_free(req, VR_FLOW_REQ_OBJECT);
             return NULL;
         }
     }
@@ -1523,14 +1527,14 @@ vr_flow_req_get(vr_flow_req *ref_req)
         num_cpus = VR_FLOW_MAX_CPUS;
 
     hold_stat_size = num_cpus * sizeof(uint32_t);
-    req->fr_hold_stat = vr_zalloc(hold_stat_size);
+    req->fr_hold_stat = vr_zalloc(hold_stat_size, VR_FLOW_HOLD_STAT_OBJECT);
     if (!req->fr_hold_stat) {
         if (vr_flow_path && req->fr_file_path) {
-            vr_free(req->fr_file_path);
+            vr_free(req->fr_file_path, VR_FLOW_REQ_PATH_OBJECT);
             req->fr_file_path = NULL;
         }
 
-        vr_free(req);
+        vr_free(req, VR_FLOW_REQ_OBJECT);
         return NULL;
     }
     req->fr_hold_stat_size = num_cpus;
@@ -1613,7 +1617,7 @@ vr_flow_table_info_destroy(struct vrouter *router)
     if (!router->vr_flow_table_info)
         return;
 
-    vr_free(router->vr_flow_table_info);
+    vr_free(router->vr_flow_table_info, VR_FLOW_TABLE_INFO_OBJECT);
     router->vr_flow_table_info = NULL;
     router->vr_flow_table_info_size = 0;
 
@@ -1640,7 +1644,8 @@ vr_flow_table_info_init(struct vrouter *router)
         return 0;
 
     size = sizeof(struct vr_flow_table_info) + sizeof(uint32_t) * vr_num_cpus;
-    infop = (struct vr_flow_table_info *)vr_zalloc(size);
+    infop = (struct vr_flow_table_info *)vr_zalloc(size,
+            VR_FLOW_TABLE_INFO_OBJECT);
     if (!infop)
         return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, size);
 
@@ -1758,7 +1763,7 @@ static void
 vr_link_local_ports_exit(struct vrouter *router)
 {
     if (router->vr_link_local_ports) {
-        vr_free(router->vr_link_local_ports);
+        vr_free(router->vr_link_local_ports, VR_FLOW_LINK_LOCAL_OBJECT);
         router->vr_link_local_ports = NULL;
         router->vr_link_local_ports_size = 0;
     }
@@ -1779,7 +1784,7 @@ vr_link_local_ports_init(struct vrouter *router)
     /* Bits to Bytes */
     bytes /= 8;
 
-    router->vr_link_local_ports = vr_zalloc(bytes);
+    router->vr_link_local_ports = vr_zalloc(bytes, VR_FLOW_LINK_LOCAL_OBJECT);
     if (!router->vr_link_local_ports)
         return -1;
     router->vr_link_local_ports_size = bytes;

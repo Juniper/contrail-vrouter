@@ -113,7 +113,7 @@ static void
 dpdk_nl_trans_free(char *buf)
 {
     buf -= HDR_LEN;
-    vr_free(buf);
+    vr_free(buf, VR_MESSAGE_OBJECT);
 
     return;
 }
@@ -123,7 +123,7 @@ dpdk_nl_trans_alloc(unsigned int size)
 {
     char *buf;
 
-    buf = vr_malloc(size + HDR_LEN);
+    buf = vr_malloc(size + HDR_LEN, VR_MESSAGE_OBJECT);
     if (!buf)
         return NULL;
 

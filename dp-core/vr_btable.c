@@ -82,7 +82,7 @@ vr_btable_free(struct vr_btable *table)
         }
     }
 
-    vr_free(table);
+    vr_free(table, VR_BTABLE_OBJECT);
 
     return;
 }
@@ -126,7 +126,7 @@ vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
     alloc_size = sizeof(*table) + (total_parts * (sizeof(void *))) +
         (total_parts * sizeof(struct vr_btable_partition));
 
-    table = vr_zalloc(alloc_size);
+    table = vr_zalloc(alloc_size, VR_BTABLE_OBJECT);
     if (!table)
         return NULL;
 
@@ -186,7 +186,7 @@ vr_btable_attach(struct iovec *iov, unsigned int iov_len,
     alloc_size += (sizeof(struct vr_btable_partition) * iov_len);
 
 
-    table = (struct vr_btable *)vr_zalloc(alloc_size);
+    table = (struct vr_btable *)vr_zalloc(alloc_size, VR_BTABLE_OBJECT);
     if (!table)
         return NULL;
 
