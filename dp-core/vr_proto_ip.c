@@ -818,9 +818,15 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
         return -1;
     }
 
+    frag->f_received += (ntohs(ip->ip_len) - (ip->ip_hl * 4));
+    if (vr_ip_fragment_tail(ip)) {
+        frag->f_expected = ((ntohs(ip->ip_frag_off) && 0x1FFF) * 8) +
+            ntohs(ip->ip_len) - (ip->ip_hl * 4) ;
+    }
+
     sport = frag->f_sport;
     dport = frag->f_dport;
-    if (vr_ip_fragment_tail(ip))
+    if (frag->f_received == frag->f_expected)
         vr_fragment_del(frag);
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
@@ -874,7 +880,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
     return 0;
 }
 
-static int
+int
 vr_inet_form_flow(struct vrouter *router, unsigned short vrf, 
         struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p)
 {
@@ -885,8 +891,6 @@ vr_inet_form_flow(struct vrouter *router, unsigned short vrf,
         ret = vr_inet_proto_flow(router, vrf, pkt, vlan, ip, flow_p);
     } else {
         ret = vr_inet_fragment_flow(router, vrf, pkt, vlan, flow_p);
-        if (ret < 0)
-            vr_pfree(pkt, VP_DROP_FRAGMENTS);
     }
 
     return ret;
@@ -923,6 +927,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     bool lookup = false;
     struct vr_flow flow, *flow_p = &flow;
     struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
+    struct vr_packet *pkt_c;
 
     /*
      * if the packet has already done one round of flow lookup, there
@@ -953,13 +958,28 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     }
 
     ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow_p);
-    if (ret < 0)
+    if (ret < 0) {
+        if (!vr_ip_transport_header_valid(ip) && vr_enqueue_to_assembler) {
+            vr_enqueue_to_assembler(router, VR_ASSEMBLER_ACTION_ENQUEUE,
+                    pkt, fmd);
+        } else {
+            /* unlikely to be hit. you can safely discount misc drops here */
+            vr_pfree(pkt, VP_DROP_FRAGMENTS);
+        }
         return FLOW_CONSUMED;
+    }
 
 
     if (vr_ip_fragment_head(ip)) {
         vr_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
                 flow_p->flow4_dport);
+        if (vr_enqueue_to_assembler) {
+            pkt_c = vr_pclone(pkt);
+            if (pkt_c) {
+                vr_enqueue_to_assembler(router, VR_ASSEMBLER_ACTION_DATA,
+                        pkt_c, fmd);
+            }
+        }
     }
 
     return vr_flow_lookup(router, flow_p, pkt, fmd);
