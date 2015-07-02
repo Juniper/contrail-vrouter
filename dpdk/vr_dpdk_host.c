@@ -1045,6 +1045,7 @@ struct host_os dpdk_host = {
 
     .hos_add_mpls                   =    dpdk_add_mpls,
     .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
+    /* TODO: support .hos_enqueue_to_assembler */
 };
 
 struct host_os *

@@ -6,13 +6,92 @@
  */
 #include <vr_os.h>
 #include <vr_packet.h>
+#include "vr_interface.h"
 #include "vr_btable.h"
 #include "vr_fragment.h"
 #include "vr_hash.h"
 
+/*
+ * Handling out of order fragment arrival:
+ *
+ * Every fragment that does not have a corresponding entry in the fragment
+ * metadata table (which is the primary table that the datapath will rely on),
+ * will be enqueued to the assembler. The head of an ip fragment is a special
+ * case. It will be both forwarded to the destination and enqueued to the
+ * assembler. The assembler just extracts the required data from the packet
+ * and will not forward the packet . The assembler will use the head of the
+ * fragment to search and then to forward the other fragments of the packet,
+ * while not forwarding the head itself.
+
+ * Enqueue to per-cpu queue
+ * ------------------------
+
+ * Its important that locks are avoided as far as possible in datapath. To avoid
+ * contention between multiple threads running datapath, we will have a per-cpu
+ * queue to the assembler. Since both the assembler and the datapath will be
+ * dequeueing from and enqueueing to the queue and frees will be involved, its
+ * much easier and safer to enqueue the packet to the head of the queue (which
+ * is a memory that is never freed and involves only updating the next pointer,
+ * which can be a stale memory, but a safe operation nevertheless) rather than
+ * at the tail (which is an element whose life cycle is not easy to determine).
+
+ * Dequeue from the per-cpu queue
+ * ------------------------------
+
+ * The assembler will do an atomic read and update of head to NULL. There is a
+ * small consistency issue to be taken care of while updating the head. The
+ * enqueuer will first update the next pointer of the queued element and then
+ * update the head. Updation of the head will be atomic read and update. Post
+ * update, if the old head is not the same as the next, next will be updated to
+ * NULL.
+
+ * The Assembler
+ * -------------
+
+ * The assembler will be (a) kernel thread(s) which will wakeup when there is
+ * work to do and go to sleep when there is nothing to do. The infrastructure to
+ * wake up a thread when there is work to do is highly OS specific. Hence, to
+ * accommodate that need, we will introduce a new host os entry point called
+ * 'enqueue_to_assembler'. This entry point will enqueue to the per-cpu queue
+ * as discussed above and will wakeup the kthread that does the assembly. The
+ * enqueue code can be in platform independent part, so that all platforms can
+ * reuse the code, with the infrastructure to wakeup the assembler being in
+ * tail of the 'enqueue_to_assembler'.
+
+ * For Linux kernel, we will use the workqueue infrastructure. We will create
+ * a new workqueue for assembling the packets. The workqueue will have a dedicated
+ * thread for each processor in the system(kernel infrastructure). So, once you
+ * queue work to the queue, the thread for that processor will wakeup and do the
+ * work of dequeuing it from the percpu queue and enqueuing it to the assembler
+ * table.
+
+ * When the assembler is woken up, it goes through the per-cpu queue and
+ * dequeues all packets that have been enqueued and inserts them into the hash
+ * list. The work area of the assembler is the hash table, where each bucket will
+ * be a pointer to list of fragment metadata. Each such bucket will be protected
+ * by a spinlock. The spinlock is mainly meant for exclusion between the aging
+ * timer and the assembler.
+
+ * Since a spinlock/mutex structure is needed and such structures are OS specific,
+ * the assembler's origin will be in the OS specific part. The assembler will
+ * define the hash buckets (that has the spinlock), with the individual and list
+ * definitions coming from the OS independent part. While going through each
+ * bucket, assembler will hold the bucket lock and pass control to the os
+ * independent part.
+
+ * For the linux kernel implementation, we will use spinlock rather than a mutex,
+ * since the aging timer is invoked in an atomic context and hence can't block.
+
+ * The assembler will dequeue packets from per-cpu queue and queue it in the
+ * hash list. When the head of the fragment arrives, every fragment is dequeued
+ * and flushed out of that entry, while still maintaining the metadata.
+ */
+
 #define FRAG_TABLE_ENTRIES  1024
 #define FRAG_TABLE_BUCKETS  4
 #define FRAG_OTABLE_ENTRIES 512
+
+struct vr_timer *vr_assembler_table_scan_timer;
 
 static inline void
 fragment_key(struct vr_fragment_key *key, unsigned short vrf,
@@ -40,6 +119,8 @@ fragment_entry_set(struct vr_fragment *fe, unsigned short vrf, struct vr_ip *iph
     fe->f_dport = dport;
     vr_get_mono_time(&sec, &nsec);
     fe->f_time = sec;
+    fe->f_expected = 0;
+    fe->f_received = 0;
 
     return;
 }
@@ -61,6 +142,309 @@ fragment_entry_alloc(struct vr_fragment *fe)
 {
     return __sync_bool_compare_and_swap(&fe->f_dip, 0, 1);
 }
+
+static void
+vr_fragment_queue_element_free(struct vr_fragment_queue_element *vfqe,
+        unsigned int drop_reason)
+{
+    if (vfqe->fqe_pnode.pl_packet) {
+        vr_pfree(vfqe->fqe_pnode.pl_packet, drop_reason);
+    }
+
+    vr_free(vfqe);
+    return;
+}
+
+static void
+fragment_free_frag(struct vr_fragment *frag)
+{
+    struct vr_fragment_queue_element *fqe;
+
+    while ((fqe = frag->f_qe)) {
+        frag->f_qe = fqe->fqe_next;
+        vr_fragment_queue_element_free(fqe, VP_DROP_FRAGMENTS);
+    }
+
+    vr_free(frag);
+    return;
+}
+
+static void
+fragment_unlink_frag(struct vr_fragment **prev, struct vr_fragment *frag)
+{
+    *prev = frag->f_next;
+    return;
+}
+
+unsigned int
+vr_assembler_table_scan(struct vr_fragment **head)
+{
+    unsigned int scanned = 0;
+    unsigned int sec, nsec, dest;
+    struct vr_fragment *frag = *head, *next, **prev;
+
+    prev = head;
+    while (frag) {
+        next = frag->f_next;
+
+        vr_get_mono_time(&sec, &nsec);
+        dest = frag->f_time + VR_ASSEMBLER_TIMEOUT_TIME;
+        if (dest < frag->f_time) {
+            if ((sec < frag->f_time) && (dest < sec)) {
+                fragment_unlink_frag(prev, frag);
+                fragment_free_frag(frag);
+            } else {
+                prev = &frag->f_next;
+            }
+        } else {
+            if ((sec > dest) || (sec < frag->f_time)) {
+                fragment_unlink_frag(prev, frag);
+                fragment_free_frag(frag);
+            } else {
+                prev = &frag->f_next;
+            }
+        }
+        scanned++;
+        frag = next;
+    }
+
+    return scanned;
+}
+
+
+void
+vr_assembler_table_scan_exit(void)
+{
+    if (vr_assembler_table_scan_timer) {
+        vr_delete_timer(vr_assembler_table_scan_timer);
+        vr_free(vr_assembler_table_scan_timer);
+        vr_assembler_table_scan_timer = NULL;
+    }
+
+    return;
+}
+
+int
+vr_assembler_table_scan_init(void (*scanner)(void *))
+{
+    struct vr_timer *vtimer;
+
+    vr_assembler_table_scan_timer = vr_zalloc(sizeof(*vtimer));
+    if (!vr_assembler_table_scan_timer)
+        return -ENOMEM;
+
+    vtimer = vr_assembler_table_scan_timer;
+    vtimer->vt_timer = scanner;
+    vtimer->vt_vr_arg = NULL;
+    vtimer->vt_msecs =
+        (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_LINUX_ASSEMBLER_BUCKETS;
+    if (vr_create_timer(vtimer)) {
+        vr_free(vtimer);
+        vr_assembler_table_scan_timer = NULL;
+    }
+
+    return 0;
+}
+
+int
+vr_fragment_assembler(struct vr_fragment **head_p,
+        struct vr_fragment_queue_element *vfqe)
+{
+    int ret = 0;
+    unsigned int sec, nsec, list_length = 0, drop_reason = VP_DROP_FRAGMENTS;
+    bool found = false;
+
+    struct vrouter *router;
+    struct vr_ip *ip;
+    struct vr_flow flow;
+    struct vr_packet *pkt;
+    struct vr_packet_node *pnode;
+    struct vr_fragment *frag, **prev = NULL;
+    struct vr_fragment_queue_element *fqe;
+    struct vr_fragment_key vfk;
+    struct vr_forwarding_md fmd;
+
+
+    router = vfqe->fqe_router;
+    pkt = vfqe->fqe_pnode.pl_packet;
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    fragment_key(&vfk, vfqe->fqe_pnode.pl_vrf, ip);
+
+    frag = *head_p;
+    prev = head_p;
+    while (frag) {
+        list_length++;
+        if (!memcmp(&frag->f_key, &vfk, sizeof(vfk))) {
+            found = true;
+            break;
+        }
+
+        prev = &frag->f_next;
+        frag = frag->f_next;
+    }
+
+    if (!found) {
+        if (vr_ip_fragment_head(ip) ||
+                (list_length > VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE))
+            goto exit_assembly;
+
+        frag = vr_zalloc(sizeof(*frag));
+        if (!frag) {
+            ret = -ENOMEM;
+            goto exit_assembly;
+        }
+
+        memcpy(&frag->f_key, &vfk, sizeof(vfk));
+        frag->f_port_info_valid = false;
+    }
+
+    if (vr_ip_fragment_tail(ip)) {
+        frag->f_expected = ((ntohs(ip->ip_frag_off) && 0x1FFF) * 8) +
+            ntohs(ip->ip_len) - (ip->ip_hl * 4) ;
+    }
+    frag->f_received += (ntohs(ip->ip_len) - (ip->ip_hl * 4));
+
+    vr_get_mono_time(&sec, &nsec);
+    frag->f_time = sec;
+    if (!found) {
+        prev = head_p;
+        frag->f_next = *head_p;
+        *head_p = frag;
+    }
+
+    if (vr_ip_transport_header_valid(ip)) {
+        ret = vr_inet_form_flow(router, vfqe->fqe_pnode.pl_vrf,
+                vfqe->fqe_pnode.pl_packet, vfqe->fqe_pnode.pl_vlan, &flow);
+
+        if (ret) {
+            fragment_free_frag(frag);
+            goto exit_assembly;
+        }
+
+        frag->f_sport = flow.flow4_sport;
+        frag->f_dport = flow.flow4_dport;
+        frag->f_port_info_valid = true;
+    }
+
+    if (!vr_ip_fragment_head(ip)) {
+        vfqe->fqe_next = NULL;
+        fqe = frag->f_qe;
+        if (!fqe) {
+            frag->f_qe = vfqe;
+        } else {
+            while (fqe) {
+                if (fqe->fqe_next) {
+                    fqe = fqe->fqe_next;
+                } else {
+                    break;
+                }
+            }
+
+            fqe->fqe_next = vfqe;
+        }
+    } else {
+        vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
+    }
+
+
+    if (frag->f_port_info_valid) {
+        while ((fqe = frag->f_qe)) {
+            memset(&fmd, 0, sizeof(fmd));
+            pnode = &fqe->fqe_pnode;
+            vr_flow_flush_pnode(router, pnode, NULL, &fmd);
+            frag->f_qe = fqe->fqe_next;
+            vr_fragment_queue_element_free(fqe, VP_DROP_CLONED_ORIGINAL);
+        }
+
+        fragment_unlink_frag(prev, frag);
+        fragment_free_frag(frag);
+    }
+
+    return 0;
+
+exit_assembly:
+    vr_fragment_queue_element_free(vfqe, drop_reason);
+    return ret;
+}
+
+uint32_t
+vr_fragment_get_hash(unsigned int vrf, struct vr_packet *pkt)
+{
+    struct vr_ip *ip;
+    struct vr_fragment_key vfk;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    fragment_key(&vfk, vrf, ip);
+
+    return vr_hash(&vfk, sizeof(vfk), 0);
+}
+
+int
+vr_fragment_enqueue(struct vrouter *router,
+        struct vr_fragment_queue *vfq,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    bool swapped = false;
+    unsigned int i;
+
+    struct vr_packet_node *pnode;
+    struct vr_fragment_queue_element *fqe = NULL, *tail, **tailp;
+
+    tailp = &vfq->vfq_tail;
+    if (*tailp == NULL) {
+        vfq->vfq_length = 0;
+    } else {
+        if ((vfq->vfq_length + 1) > VR_MAX_FRAGMENTS_PER_CPU_QUEUE)
+            goto fail;
+    }
+
+    fqe = vr_malloc(sizeof(*fqe));
+    if (!fqe) {
+        goto fail;
+    }
+    fqe->fqe_router = router;
+    fqe->fqe_next = NULL;
+
+    pkt->vp_flags &= ~VP_FLAG_FLOW_SET;
+
+    pnode = &fqe->fqe_pnode;
+    vr_flow_fill_pnode(pnode, pkt, fmd);
+    /*
+     * we are actually competing with an existing assembler work that must
+     * be in the process of dequeueing the list from the per-cpu queue.
+     * we try thrice to enqueue our element. It is unlikely that it will
+     * fail more than once
+     *
+     * calculation of vfq_length could be erroneous. But, we will err by
+     * maximum 1, which is fine.
+     */
+    for (i = 0; i < VR_FRAG_ENQUEUE_ATTEMPTS; i++) {
+        tail = *tailp;
+        fqe->fqe_next = tail;
+        vfq->vfq_length++;
+        swapped = __sync_bool_compare_and_swap(tailp, tail, fqe);
+        if (swapped) {
+            if (tail == NULL)
+                vfq->vfq_length = 1;
+            break;
+        } else {
+            if (i == (VR_FRAG_ENQUEUE_ATTEMPTS - 1)) {
+                goto fail;
+            }
+            vfq->vfq_length--;
+        }
+    }
+
+    return 0;
+
+fail:
+    if (fqe)
+        vr_free(fqe);
+
+    vr_pfree(pkt, VP_DROP_FRAGMENTS);
+    return -1;
+}
+
 
 void
 vr_fragment_del(struct vr_fragment *fe)
@@ -107,6 +491,8 @@ vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
     if (!fe)
         return -ENOMEM;
 
+    fe->f_received += (ntohs(iph->ip_len) - (iph->ip_hl * 4));
+
     return 0;
 }
 
@@ -146,7 +532,7 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
         fe->f_time = sec;
     }
 
-    return fe;;
+    return fe;
 }
 
 #define ENTRIES_PER_SCAN    64

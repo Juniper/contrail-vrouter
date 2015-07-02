@@ -47,6 +47,10 @@ extern struct vr_packet *linux_get_packet(struct sk_buff *,
         struct vr_interface *);
 
 extern bool linux_ip_proto_pull(struct iphdr *);
+extern int lh_enqueue_to_assembler(struct vrouter *, struct vr_packet *,
+        struct vr_forwarding_md *);
+extern int vr_assembler_init(void);
+extern void vr_assembler_exit(void);
 
 struct work_arg {
     struct work_struct wa_work;
@@ -2379,6 +2383,7 @@ struct host_os linux_host = {
     .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj,
     .hos_pkt_may_pull               =       lh_pkt_may_pull,
     .hos_gro_process                =       lh_gro_process,
+    .hos_enqueue_to_assembler       =       lh_enqueue_to_assembler,
 };
     
 struct host_os *
@@ -2573,6 +2578,7 @@ vrouter_linux_exit(void)
 {
     vr_sysctl_exit();
     vr_message_exit();
+    vr_assembler_exit();
     vr_mem_exit();
     vrouter_exit(false);
     flush_scheduled_work();
@@ -2600,6 +2606,10 @@ vrouter_linux_init(void)
         return ret;
 
     ret = vr_mem_init();
+    if (ret)
+        goto init_fail;
+
+    ret = vr_assembler_init();
     if (ret)
         goto init_fail;
 
