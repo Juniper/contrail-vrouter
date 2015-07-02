@@ -719,18 +719,11 @@ dpdk_ipv4_outer_tunnel_hw_checksum(struct vr_packet *pkt)
     unsigned offset = pkt->vp_data + sizeof(struct ether_hdr);
     struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
     unsigned iph_len = iph->ip_hl * 4;
-    struct vr_udp *udph;
 
     m->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
     iph->ip_csum = 0;
     m->l3_len = iph_len;
     m->l2_len = offset - rte_pktmbuf_headroom(m);
-
-    if (iph->ip_proto == VR_IP_PROTO_UDP) {
-        udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
-        udph->udp_length = htons(pkt_len(pkt));
-        udph->udp_csum = 0;
-    }
 }
 
 static inline void
@@ -738,14 +731,6 @@ dpdk_ipv4_outer_tunnel_sw_checksum(struct vr_packet *pkt)
 {
     unsigned offset = pkt->vp_data + sizeof(struct ether_hdr);
     struct vr_ip *iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
-    unsigned iph_len = iph->ip_hl * 4;
-    struct vr_udp *udph;
-
-    if (iph->ip_proto == VR_IP_PROTO_UDP) {
-        udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
-        udph->udp_length = htons(pkt_len(pkt));
-        udph->udp_csum = 0;
-    }
 
     iph->ip_csum = vr_ip_csum(iph);
 }
