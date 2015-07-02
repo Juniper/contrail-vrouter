@@ -203,7 +203,7 @@ vr_htable_delete(vr_htable_t htable)
     if (table->otable)
         vr_btable_free(table->otable);
 
-    vr_free(table);
+    vr_free(table, VR_HTABLE_OBJECT);
 }
 
 vr_htable_t
@@ -222,7 +222,7 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
         return NULL;
     }
 
-    table = vr_zalloc(sizeof(struct vr_htable));
+    table = vr_zalloc(sizeof(struct vr_htable), VR_HTABLE_OBJECT);
     if (!table) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
                                        sizeof(struct vr_htable));

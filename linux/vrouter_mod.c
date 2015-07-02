@@ -67,6 +67,8 @@ extern int vr_genetlink_init(void);
 extern void vr_genetlink_exit(void);
 extern int vr_mem_init(void);
 extern void vr_mem_exit(void);
+extern void vr_malloc_stats(unsigned int, unsigned int);
+extern void vr_free_stats(unsigned int);
 
 extern void vhost_exit(void);
 extern int lh_gro_process(struct vr_packet *, struct vr_interface *, bool);
@@ -87,22 +89,26 @@ lh_printk(const char *format, ...)
 }
 
 static void *
-lh_malloc(unsigned int size)
+lh_malloc(unsigned int size, unsigned int object)
 {
+    vr_malloc_stats(size, object);
     return kmalloc(size, GFP_ATOMIC);
 }
 
 static void *
-lh_zalloc(unsigned int size)
+lh_zalloc(unsigned int size, unsigned int object)
 {
+    vr_malloc_stats(size, object);
     return kzalloc(size, GFP_ATOMIC);
 }
 
 static void
-lh_free(void *mem)
+lh_free(void *mem, unsigned int object)
 {
-    if (mem)
+    if (mem) {
+        vr_free_stats(object);
         kfree(mem);
+    }
 
     return;
 }
@@ -461,7 +467,7 @@ rcu_cb(struct rcu_head *rh)
 
     /* Call the user call back */
     cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
-    lh_free(cb_data);
+    lh_free(cb_data, VR_DEFER_OBJECT);
 
     return;
 }
@@ -487,7 +493,7 @@ lh_get_defer_data(unsigned int len)
     if (!len)
         return NULL;
 
-    cb_data = lh_malloc(sizeof(*cb_data) + len);
+    cb_data = lh_malloc(sizeof(*cb_data) + len, VR_DEFER_OBJECT);
     if (!cb_data) {
         return NULL;
     }
@@ -504,7 +510,7 @@ lh_put_defer_data(void *data)
         return;
 
     cb_data = container_of(data, struct rcu_cb_data, rcd_user_data);
-    lh_free(cb_data);
+    lh_free(cb_data, VR_DEFER_OBJECT);
 
     return;
 }
@@ -2327,7 +2333,7 @@ lh_delete_timer(struct vr_timer *vtimer)
 
     if (timer) {
         del_timer_sync(timer);
-        vr_free(vtimer->vt_os_arg);
+        vr_free(vtimer->vt_os_arg, VR_TIMER_OBJECT);
         vtimer->vt_os_arg = NULL;
     }
 
@@ -2339,7 +2345,7 @@ lh_create_timer(struct vr_timer *vtimer)
 {
     struct timer_list *timer;
 
-    timer = vr_zalloc(sizeof(*timer));
+    timer = vr_zalloc(sizeof(*timer), VR_TIMER_OBJECT);
     if (!timer)
         return -ENOMEM;
     init_timer(timer);

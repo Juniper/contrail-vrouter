@@ -252,11 +252,9 @@ vrouter_ops_destroy(vrouter_ops *req)
         return;
 
     if (req->vo_build_info) {
-        vr_free(req->vo_build_info);
+        vr_free(req->vo_build_info, VR_BUILD_INFO_OBJECT);
         req->vo_build_info = NULL;
     }
-
-    vr_free(req->vo_build_info);
 
     return;
 }
@@ -266,13 +264,14 @@ vrouter_ops_get(void)
 {
     vrouter_ops *req;
 
-    req = vr_malloc(sizeof(*req));
+    req = vr_malloc(sizeof(*req), VR_VROUTER_REQ_OBJECT);
     if (!req)
         return NULL;
 
-    req->vo_build_info = vr_zalloc(strlen(ContrailBuildInfo));
+    req->vo_build_info = vr_zalloc(strlen(ContrailBuildInfo),
+            VR_BUILD_INFO_OBJECT);
     if (!req->vo_build_info) {
-        vr_free(req);
+        vr_free(req, VR_VROUTER_REQ_OBJECT);
         return NULL;
     }
 

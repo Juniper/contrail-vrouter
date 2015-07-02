@@ -79,19 +79,19 @@ dpdk_printf(const char *format, ...)
 }
 
 static void *
-dpdk_malloc(unsigned int size)
+dpdk_malloc(unsigned int size, unsigned int object)
 {
     return rte_malloc(NULL, size, 0);
 }
 
 static void *
-dpdk_zalloc(unsigned int size)
+dpdk_zalloc(unsigned int size, unsigned int object)
 {
     return rte_calloc(NULL, size, 1, 0);
 }
 
 static void
-dpdk_free(void *mem)
+dpdk_free(void *mem, unsigned int object)
 {
     rte_free(mem);
 }

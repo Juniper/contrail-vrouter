@@ -122,7 +122,7 @@ vr_interface_service_enable(struct vr_interface *vif)
      */
     if (!vif->vif_vrf_table) {
         vif->vif_vrf_table = vr_malloc(sizeof(struct vr_vrf_assign) *
-                VIF_VRF_TABLE_ENTRIES);
+                VIF_VRF_TABLE_ENTRIES, VR_INTERFACE_VRF_TABLE_OBJECT);
         if (!vif->vif_vrf_table)
             return -ENOMEM;
 
@@ -165,7 +165,7 @@ vr_interface_service_disable(struct vr_interface *vif)
      * takes care of freeing the memory
      */
     if (vif->vif_vrf_table && !vif->vif_vrf_table_users) {
-        vr_free(vif->vif_vrf_table);
+        vr_free(vif->vif_vrf_table, VR_INTERFACE_VRF_TABLE_OBJECT);
         vif->vif_vrf_table = NULL;
     }
 
@@ -808,7 +808,7 @@ vlan_drv_add(struct vr_interface *vif, vr_interface_req *vifr)
         if (vifr->vifr_src_mac_size != VR_ETHER_ALEN)
             return -EINVAL;
 
-        vif->vif_src_mac = vr_malloc(VR_ETHER_ALEN);
+        vif->vif_src_mac = vr_malloc(VR_ETHER_ALEN, VR_INTERFACE_MAC_OBJECT);
         if (!vif->vif_src_mac)
             return -ENOMEM;
 
@@ -1152,7 +1152,7 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
     } else {
         if(!pvif->vif_sub_interfaces) {
             pvif->vif_sub_interfaces = vr_zalloc(VLAN_ID_MAX *
-                sizeof(struct vr_interface *));
+                sizeof(struct vr_interface *), VR_INTERFACE_OBJECT);
             if (!pvif->vif_sub_interfaces)
                 return -ENOMEM;
             /*
@@ -1290,15 +1290,15 @@ vif_free(struct vr_interface *vif)
         return;
 
     if (vif->vif_stats)
-        vr_free(vif->vif_stats);
+        vr_free(vif->vif_stats, VR_INTERFACE_STATS_OBJECT);
 
     if (vif->vif_vrf_table) {
-        vr_free(vif->vif_vrf_table);
+        vr_free(vif->vif_vrf_table, VR_INTERFACE_VRF_TABLE_OBJECT);
         vif->vif_vrf_table = NULL;
     }
 
     if (vif->vif_sub_interfaces) {
-        vr_free(vif->vif_sub_interfaces);
+        vr_free(vif->vif_sub_interfaces, VR_INTERFACE_OBJECT);
         vif->vif_sub_interfaces = NULL;
     }
 
@@ -1306,7 +1306,7 @@ vif_free(struct vr_interface *vif)
         vif_bridge_deinit(vif);
     }
 
-    vr_free(vif);
+    vr_free(vif, VR_INTERFACE_OBJECT);
 
     return;
 }
@@ -1725,14 +1725,14 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         goto generate_resp;
     }
 
-    vif = vr_zalloc(sizeof(*vif));
+    vif = vr_zalloc(sizeof(*vif), VR_INTERFACE_OBJECT);
     if (!vif) {
         ret = -ENOMEM;
         goto generate_resp;
     }
 
     vif->vif_stats = vr_zalloc(vr_num_cpus *
-            sizeof(struct vr_interface_stats));
+            sizeof(struct vr_interface_stats), VR_INTERFACE_STATS_OBJECT);
     if (!vif->vif_stats) {
         ret = -ENOMEM;
         goto generate_resp;
@@ -1956,18 +1956,19 @@ vr_interface_req_get(void)
 {
     vr_interface_req *req;
 
-    req = vr_zalloc(sizeof(*req));
+    req = vr_zalloc(sizeof(*req), VR_INTERFACE_REQ_OBJECT);
     if (!req)
         return req;
 
-    req->vifr_mac = vr_zalloc(VR_ETHER_ALEN);
+    req->vifr_mac = vr_zalloc(VR_ETHER_ALEN, VR_INTERFACE_REQ_MAC_OBJECT);
     if (req->vifr_mac)
         req->vifr_mac_size = VR_ETHER_ALEN;
 
-    req->vifr_src_mac = vr_zalloc(VR_ETHER_ALEN);
+    req->vifr_src_mac = vr_zalloc(VR_ETHER_ALEN, VR_INTERFACE_REQ_MAC_OBJECT);
     if (req->vifr_src_mac)
         req->vifr_src_mac_size = 0;
-    req->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN);
+    req->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN,
+            VR_INTERFACE_REQ_NAME_OBJECT);
 
     return req;
 }
@@ -1980,19 +1981,19 @@ vr_interface_req_destroy(vr_interface_req *req)
         return;
 
     if (req->vifr_mac) {
-        vr_free(req->vifr_mac);
+        vr_free(req->vifr_mac, VR_INTERFACE_REQ_MAC_OBJECT);
         req->vifr_mac_size = 0;
     }
 
     if (req->vifr_src_mac) {
-        vr_free(req->vifr_src_mac);
+        vr_free(req->vifr_src_mac, VR_INTERFACE_REQ_MAC_OBJECT);
         req->vifr_src_mac_size = 0;
     }
 
     if (req->vifr_name)
-        vr_free(req->vifr_name);
+        vr_free(req->vifr_name, VR_INTERFACE_REQ_NAME_OBJECT);
 
-    vr_free(req);
+    vr_free(req, VR_INTERFACE_REQ_OBJECT);
     return;
 }
 
@@ -2229,7 +2230,7 @@ vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
      */
     if (!(vif->vif_flags & VIF_FLAG_SERVICE_IF) &&
             !vif->vif_vrf_table_users) {
-        vr_free(vif->vif_vrf_table);
+        vr_free(vif->vif_vrf_table, VR_INTERFACE_VRF_TABLE_OBJECT);
         vif->vif_vrf_table = NULL;
     }
 
@@ -2317,7 +2318,7 @@ vr_interface_exit(struct vrouter *router, bool soft_reset)
     }
 
     if (!soft_reset && router->vr_interfaces) {
-        vr_free(router->vr_interfaces);
+        vr_free(router->vr_interfaces, VR_INTERFACE_TABLE_OBJECT);
         router->vr_interfaces = NULL;
         router->vr_max_interfaces = 0;
     }
@@ -2335,7 +2336,8 @@ vr_interface_init(struct vrouter *router)
         router->vr_max_interfaces = VR_MAX_INTERFACES;
         table_memory = router->vr_max_interfaces *
             sizeof(struct vr_interface *);
-        router->vr_interfaces = vr_zalloc(table_memory);
+        router->vr_interfaces = vr_zalloc(table_memory,
+                VR_INTERFACE_TABLE_OBJECT);
         if (!router->vr_interfaces && (ret = -ENOMEM))
             return vr_module_error(ret, __FUNCTION__,
                     __LINE__, table_memory);
@@ -2355,7 +2357,7 @@ vr_interface_init(struct vrouter *router)
 
 cleanup:
     if (router->vr_interfaces) {
-        vr_free(router->vr_interfaces);
+        vr_free(router->vr_interfaces, VR_INTERFACE_TABLE_OBJECT);
         router->vr_interfaces = NULL;
         router->vr_max_interfaces = 0;
     }

@@ -11,14 +11,14 @@
 static char *
 vr_message_default_malloc(unsigned int size)
 {
-    return vr_malloc(size);
+    return vr_malloc(size, VR_MESSAGE_OBJECT);
 }
 
 static void
 vr_message_default_free(char *buf)
 {
     if (buf)
-        vr_free(buf);
+        vr_free(buf, VR_MESSAGE_OBJECT);
     return;
 }
 
@@ -76,7 +76,7 @@ vr_message_queue_response(char *buf, int len)
 {
     struct vr_message *response;
 
-    response = vr_zalloc(sizeof(*response));
+    response = vr_zalloc(sizeof(*response), VR_MESSAGE_RESPONSE_OBJECT);
     if (!response)
         return -ENOMEM;
 
@@ -112,7 +112,7 @@ vr_message_free(struct vr_message *message)
     if (message) {
         if (message->vr_message_buf)
             vr_mtrans_free(message->vr_message_buf);
-        vr_free(message);
+        vr_free(message, VR_MESSAGE_RESPONSE_OBJECT);
     }
 
     return;
@@ -271,7 +271,7 @@ vr_message_dump_exit(void *context, int ret)
             vr_message_queue_response(dumper->dump_buffer,
                     dumper->dump_offset);
 
-        vr_free(dumper);
+        vr_free(dumper, VR_MESSAGE_DUMP_OBJECT);
     }
 
     return;
@@ -290,13 +290,13 @@ vr_message_dump_init(void *req)
     if (!proto || !trans)
         return NULL;
 
-    dumper = vr_zalloc(sizeof(*dumper));
+    dumper = vr_zalloc(sizeof(*dumper), VR_MESSAGE_DUMP_OBJECT);
     if (!dumper)
         return NULL;
 
     buf = trans->mtrans_alloc(VR_MESSAGE_PAGE_SIZE);
     if (!buf) {
-        vr_free(dumper);
+        vr_free(dumper, VR_MESSAGE_DUMP_OBJECT);
         return NULL;
     }
 

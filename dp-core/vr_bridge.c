@@ -297,7 +297,7 @@ bridge_entry_make_req(struct vr_route_req *resp, struct vr_bridge_entry *ent)
 {
     memset(resp, 0, sizeof(struct vr_route_req));
     resp->rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-    resp->rtr_req.rtr_mac = vr_zalloc(VR_ETHER_ALEN);
+    resp->rtr_req.rtr_mac = vr_zalloc(VR_ETHER_ALEN, VR_BRIDGE_MAC_OBJECT);
     if (!resp->rtr_req.rtr_mac)
         return -ENOMEM;
     VR_MAC_COPY(resp->rtr_req.rtr_mac, ent->be_key.be_mac);
@@ -316,7 +316,7 @@ static void
 bridge_entry_req_destroy(struct vr_route_req *resp)
 {
     if (resp->rtr_req.rtr_mac)
-        vr_free(resp->rtr_req.rtr_mac);
+        vr_free(resp->rtr_req.rtr_mac, VR_ROUTE_REQ_MAC_OBJECT);
 }
 
 static int

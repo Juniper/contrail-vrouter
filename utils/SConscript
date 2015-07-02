@@ -65,6 +65,9 @@ vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 vrouter_sources = ['vrouter.c']
 vrouter = env.Program(target = 'vrouter', source = vrouter_sources)
 
+memstats_sources = ['memstats.c']
+memstats = env.Program(target = 'memstats', source = memstats_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats, vxlan, vrouter]
 scripts  = ['vifdump']

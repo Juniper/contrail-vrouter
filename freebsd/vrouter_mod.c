@@ -412,7 +412,7 @@ fh_delete_timer(struct vr_timer *vtimer)
 	vr_log(VR_DEBUG, "stop timer %p\n", callout);
 	if (callout) {
 		callout_drain(callout);
-		vr_free(vtimer->vt_os_arg);
+		vr_free(vtimer->vt_os_arg, VR_TIMER_OBJECT);
 		vtimer->vt_os_arg = NULL;
 	}
 
@@ -424,7 +424,7 @@ fh_create_timer(struct vr_timer *vtimer)
 {
 	struct callout *callout;
 
-	callout = vr_zalloc(sizeof(*callout));
+	callout = vr_zalloc(sizeof(*callout), VR_TIMER_OBJECT);
 	if (!callout) {
 		vr_log(VR_ERR, "Failed to alloc callout\n");
 		return (-1);
