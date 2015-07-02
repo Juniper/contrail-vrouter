@@ -105,6 +105,15 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
                                     + sizeof(struct rte_mbuf)   \
                                     + RTE_PKTMBUF_HEADROOM      \
                                     + sizeof(struct vr_packet))
+/* Size of direc mbuf used for fragmentation. It needs a headroom as it holds
+ * the IP headers of the fragments and we have to prepend an outer (tunnel)
+ * header. */
+#define VR_DPDK_FRAG_DIRECT_MBUF_SZ     (sizeof(struct rte_mbuf)    \
+                                         + RTE_PKTMBUF_HEADROOM)
+/* Size of indirect mbufs used for fragmentation. These mbufs holds only a
+ * pointer to the data in other mbufs, thus they don't need any additional
+ * buffer size. */
+#define VR_DPDK_FRAG_INDIRECT_MBUF_SZ   (sizeof(struct rte_mbuf))
 /* How many packets to read/write from/to queue in one go */
 #define VR_DPDK_RX_BURST_SZ         32
 #define VR_DPDK_TX_BURST_SZ         32
@@ -116,6 +125,14 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 #define VR_DPDK_RSS_MEMPOOL_SZ      16384
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
+/* Number of mbufs in FRAG_DIRECT mempool */
+#define VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ     4096
+/* How many objects (mbufs) to keep in per-lcore FRAG_DIRECT mempool cache */
+#define VR_DPDK_FRAG_DIRECT_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
+/* Number of mbufs in FRAG_INDIRECT mempool */
+#define VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ     4096
+/* How many objects (mbufs) to keep in per-lcore FRAG_INDIRECT mempool cache */
+#define VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
 /* Number of VM mempools */
 #define VR_DPDK_MAX_VM_MEMPOOLS     (VR_DPDK_MAX_NB_RX_QUEUES*2)
 /* Number of mbufs in VM mempool */
@@ -164,6 +181,10 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 #define VR_DPDK_STR_BUF_SZ          512
 /* Log timestamp format */
 #define VR_DPDK_TIMESTAMP           "%F %T"
+/* Maximum number of fragments allowed after IP fragmentation. Set to 7 to
+ * allow for standard jumbo frame size (9000 / 1500 = 6) + 1 additional segment
+ * for outer headers. */
+#define VR_DPDK_FRAG_MAX_IP_FRAGS   7
 
 /*
  * DPDK LCore IDs
@@ -360,6 +381,10 @@ struct vr_dpdk_global {
      * ATM we use it just to synchronize access between the NetLink interface
      * and kernel KNI events. The datapath is not affected. */
     pthread_mutex_t if_lock;
+    /* Pointer to IP fragmentation memory pool (direct) */
+    struct rte_mempool *frag_direct_mempool;
+    /* Pointer to IP fragmentation memory pool (indirect) */
+    struct rte_mempool *frag_indirect_mempool;
     /* List of free memory pools */
     struct rte_mempool *free_mempools[VR_DPDK_MAX_VM_MEMPOOLS] __rte_cache_aligned;
     /* List of KNI interfaces to handle KNI requests */
