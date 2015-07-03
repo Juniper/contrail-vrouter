@@ -311,8 +311,7 @@ op_retry:
         nh_req.nhr_tun_sport = htons(sport);
         nh_req.nhr_tun_dport = htons(dport);
         nh_req.nhr_nh_list_size = 0;
-        if ((mode == NH_TUNNEL) ||
-                ((mode == NH_ENCAP) && !(flags & NH_FLAG_ENCAP_L2))) {
+        if ((mode == NH_TUNNEL) || ((mode == NH_ENCAP))) {
             nh_req.nhr_encap_size = 14;
             buf = calloc(1, nh_req.nhr_encap_size);
             memcpy(buf, dst, 6);
@@ -347,7 +346,8 @@ op_retry:
     nh_req.nhr_id = nh_id;
     nh_req.nhr_rid = 0;
 
-    if ((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2))
+    if (((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2)) ||
+                    ((mode == NH_COMPOSITE) && (flags & NH_FLAG_COMPOSITE_L2)))
         nh_req.nhr_family = AF_BRIDGE;
     else
         nh_req.nhr_family = AF_INET;
@@ -676,11 +676,11 @@ validate_options()
                 if (!opt_set(EL2_OPT_IND)) {
                     if (!opt_set(SMAC_OPT_IND) || !opt_set(DMAC_OPT_IND))
                         cmd_usage();
+
+                    if (memcmp(opt, zero_opt, sizeof(opt)))
+                        cmd_usage();
                 } else
                     flags |= NH_FLAG_ENCAP_L2;
-
-                if (memcmp(opt, zero_opt, sizeof(opt)))
-                    cmd_usage();
 
             } else if (type == NH_TUNNEL) {
                 if (!opt_set(OIF_OPT_IND) || !opt_set(SMAC_OPT_IND) ||
