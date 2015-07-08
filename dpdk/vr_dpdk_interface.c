@@ -754,14 +754,15 @@ dpdk_hw_checksum(struct vr_packet *pkt)
 }
 
 static inline void
-dpdk_sw_checksum(struct vr_packet *pkt)
+dpdk_sw_checksum(struct vr_packet *pkt, bool will_fragment)
 {
     /* if a tunnel */
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum */
         /* TODO: vlan support */
-        dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
-            pkt->vp_data + sizeof(struct ether_hdr));
+        if (!will_fragment)
+            dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
+                pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum */
         dpdk_sw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
     } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
@@ -903,6 +904,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *mbufs_out[VR_DPDK_FRAG_MAX_IP_FRAGS];
     int num_of_frags = 1;
     int i;
+    bool do_outer_ip_csum_for_fragment;
+    bool will_fragment;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -945,6 +948,20 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         return 0;
     }
 
+    /* Set a flag indicating that the packet being processed is going to be
+     * fragmented as after prepending outer header it exceeds the MTU size of
+     * an interface. */
+    will_fragment = (vr_pkt_type_is_overlay(pkt->vp_type) &&
+            vif->vif_mtu < m->pkt_len);
+
+    /* Set a flag indicating if the outer IP header checksum should be
+     * calculated in software after fragmentation. In general it should, except
+     * the case when outer IP header checksum is calculated in the hardware. In
+     * this case, even though fragmentation changes the IP length, ID, etc. the
+     * hardware calculates the checksum afterwards giving correct result on the
+     * wire. */
+    do_outer_ip_csum_for_fragment = true;
+
     /*
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
      * i.e. there is no direct equivalent of skb->ip_summed field.
@@ -958,10 +975,13 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      */
     if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
         /* if NIC supports checksum offload */
-        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD))
+        if (likely((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) &&
+                   !will_fragment))
+            /* Can not do hardware checksumming for fragmented packets */
             dpdk_hw_checksum(pkt);
         else
-            dpdk_sw_checksum(pkt);
+            dpdk_sw_checksum(pkt, will_fragment);
+
     } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
         /* If NIC supports checksum offload.
          * Inner checksum is already done. Compute outer IPv4 checksum,
@@ -970,7 +990,13 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
             /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
-        } else if (m->pkt_len <= vif->vif_mtu) { /* if wont fragment it later */
+
+            /* We do not have to calculate outer IP header checksum in this
+             * case as it will be calculated in the hardware on sending. */
+            do_outer_ip_csum_for_fragment = false;
+
+        } else if (likely(!will_fragment)) {
+            /* if wont fragment it later */
             /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
         }
@@ -1005,10 +1031,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     vr_stats = vif_get_stats(vif, lcore_id);
 
-    if (vr_pkt_type_is_overlay(pkt->vp_type) && vif->vif_mtu < m->pkt_len) {
+    if (unlikely(will_fragment)) {
         num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out,
                 VR_DPDK_FRAG_MAX_IP_FRAGS, vif->vif_mtu,
-                !(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD), lcore_id);
+                do_outer_ip_csum_for_fragment, lcore_id);
         if (num_of_frags < 0) {
             RTE_LOG(DEBUG, VROUTER, "%s: error %d during fragmentation of an "
                     "IP packet for interface %s on lcore %u\n", __func__,
@@ -1024,7 +1050,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * have no vr_packet structure attached at all so it can not be used (see
      * description for the dpdk_fragment_packet() function. */
 
-    if (num_of_frags > 1) {
+    if (unlikely(num_of_frags > 1)) {
         unsigned mask = (1 << num_of_frags) - 1;
 
         if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
