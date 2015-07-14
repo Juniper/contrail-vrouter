@@ -667,9 +667,10 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
         iph_len = (ipv4_hdr->version_ihl & IPV4_HDR_IHL_MASK) *
                     IPV4_IHL_MULTIPLIER;
 
-        if (likely(rte_pktmbuf_data_len(mbuf) > sizeof(struct ether_hdr)
+        if (likely((rte_pktmbuf_data_len(mbuf) > sizeof(struct ether_hdr)
                     + iph_len
-                    + sizeof(struct udp_hdr))) {
+                    + sizeof(struct udp_hdr)) &&
+                    !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
             switch (ipv4_hdr->next_proto_id) {
             case IPPROTO_TCP:
             case IPPROTO_UDP:
