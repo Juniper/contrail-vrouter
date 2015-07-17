@@ -1018,6 +1018,9 @@ mtrie_stats_cleanup(struct vr_rtable *rtable, bool soft_reset)
 {
     unsigned int i, stats_memory_size;
 
+    if (!mtrie_vrf_stats)
+        return;
+
     stats_memory_size = sizeof(struct vr_vrf_stats) * vr_num_cpus;
     for (i = 0; i < rtable->algo_max_vrfs; i++) {
         if (mtrie_vrf_stats[i]) {
