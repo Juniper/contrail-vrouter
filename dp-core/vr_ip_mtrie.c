@@ -947,6 +947,9 @@ mtrie_stats_cleanup(struct vr_rtable *rtable)
 {
     unsigned int i;
 
+    if (!mtrie_vrf_stats)
+        return;
+
     for (i = 0; i < rtable->algo_max_vrfs; i++) {
         if (mtrie_vrf_stats[i]) {
             vr_free(mtrie_vrf_stats[i]);
