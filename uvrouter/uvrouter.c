@@ -191,3 +191,11 @@ main(int argc, const char *argv[])
 
     return 0;
 }
+
+/* This is required in order to successfully link the uvrouter. The real
+ * implementation of this function is used only in DPDK vRouter and is defined
+ * in dpdk/dpdk_vrouter.c */
+void vr_ctl_req_process(void *s_req)
+{
+}
+

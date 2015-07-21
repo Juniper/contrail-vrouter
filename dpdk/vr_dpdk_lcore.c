@@ -356,7 +356,7 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
 {
     struct rte_mbuf *mbuf;
     int i, j, ret;
-    unsigned dst_lcore_id;
+    unsigned dst_lcore_id = 0; /* Initialize to avoid warning */
     uint32_t lcore_nb_pkts, chunk_nb_pkts;
     const unsigned nb_fwd_lcores = vr_dpdk.nb_fwd_lcores;
     const unsigned this_lcore_id = rte_lcore_id() - VR_DPDK_FWD_LCORE_ID;

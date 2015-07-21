@@ -17,6 +17,14 @@ env = DefaultEnvironment().Clone()
 VRouterEnv = env
 dpdk_exists = os.path.isdir('../third_party/dpdk')
 
+# DPDK build configuration
+dpdk_conf = {}
+DPDK_TARGET = 'x86_64-native-linuxapp-gcc'
+DPDK_SRC_DIR = '#third_party/dpdk/'
+DPDK_DST_DIR = env['TOP'] + '/vrouter/dpdk/' + DPDK_TARGET
+DPDK_INC_DIR = DPDK_DST_DIR + '/include'
+DPDK_LIB_DIR = DPDK_DST_DIR + '/lib'
+
 # Include paths
 env.Replace(CPPPATH = '#vrouter/include')
 env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
@@ -69,10 +77,92 @@ if sys.platform != 'darwin':
                         'utils', 'uvrouter', 'test']
     if dpdk_exists:
         subdirs.append('dpdk')
+        #
+        # DPDK libraries need to be linked as a whole archive, otherwise some
+        # callbacks and constructors will not be linked in. Also some of the
+        # libraries need to be linked as a group for the cross-reference resolving.
+        #
+        # That is why we pass DPDK libraries as flags to the linker.
+        #
+        # Order is important: from higher level to lower level
+        # The list is from the rte.app.mk file
+        DPDK_LIBS = [
+            '-Wl,--whole-archive',
+        #    '-lrte_distributor',
+        #    '-lrte_reorder',
+            '-lrte_kni',
+        #    '-lrte_ivshmem',
+        #    '-lrte_pipeline',
+        #    '-lrte_table',
+            '-lrte_port',
+            '-lrte_timer',
+            '-lrte_hash',
+        #    '-lrte_jobstats',
+        #    '-lrte_lpm',
+        #    '-lrte_power',
+        #    '-lrte_acl',
+        #    '-lrte_meter',
+            '-lrte_sched',
+            '-lm',
+            '-lrt',
+        #    '-lrte_vhost',
+        #    '-lpcap',
+        #    '-lfuse',
+        #    '-libverbs',
+            '-Wl,--start-group',
+            '-lrte_kvargs',
+            '-lrte_mbuf',
+            '-lrte_ip_frag',
+            '-lethdev',
+            '-lrte_malloc',
+            '-lrte_mempool',
+            '-lrte_ring',
+            '-lrte_eal',
+            '-lrte_cmdline',
+        #    '-lrte_cfgfile',
+            '-lrte_pmd_bond',
+        #    '-lrte_pmd_xenvirt',
+        #    '-lxenstore',
+        #    '-lrte_pmd_vmxnet3_uio',
+        #    '-lrte_pmd_virtio_uio',
+        #    '-lrte_pmd_enic',
+            '-lrte_pmd_i40e',
+        #    '-lrte_pmd_fm10k',
+            '-lrte_pmd_ixgbe',
+            '-lrte_pmd_e1000',
+        #    '-lrte_pmd_mlx4',
+        #    '-lrte_pmd_ring',
+        #    '-lrte_pmd_pcap',
+        #    '-lrte_pmd_af_packet',
+            '-Wl,--end-group',
+            '-Wl,--no-whole-archive'
+        ]
+
+        # Pass -g and -O flags if present to DPDK
+        DPDK_FLAGS = ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
+
+        # Make DPDK
+        dpdk_src_dir = Dir(DPDK_SRC_DIR).abspath
+        dpdk_dst_dir = Dir(DPDK_DST_DIR).abspath
+
+        make_cmd = 'make -C ' + dpdk_src_dir \
+            + ' EXTRA_CFLAGS="' + DPDK_FLAGS + '"' \
+            + ' O=' + dpdk_dst_dir \
+            + ' '
+        dpdk_lib = env.Command('dpdk_lib', None,
+            make_cmd + 'config T=' + DPDK_TARGET
+            + ' && ' + make_cmd)
+
+        env.Append(CPPPATH = DPDK_INC_DIR);
+        env.Append(LIBPATH = DPDK_LIB_DIR)
+        env.Append(DPDK_LINKFLAGS = DPDK_LIBS)
+
+        if GetOption('clean'):
+            os.system(make_cmd + 'clean')
 
     for sdir in subdirs:
         env.SConscript(sdir + '/SConscript',
-                       exports='VRouterEnv',
+                       exports='VRouterEnv dpdk_lib',
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
