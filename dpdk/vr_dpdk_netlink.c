@@ -55,8 +55,6 @@ dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
             multi_flag = 0;
         }
 
-        resp->vr_message_len = RTE_ALIGN(resp->vr_message_len, 4);
-
         /* Update Netlink headers */
         resp_nlh = dpdk_nl_message_hdr(resp);
         resp_nlh->nlmsg_len = dpdk_nl_message_len(resp);
