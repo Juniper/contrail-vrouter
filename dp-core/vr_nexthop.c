@@ -72,10 +72,59 @@ __vrouter_set_nexthop(struct vrouter *router, unsigned int index,
     return 0;
 }
 
+static void
+vrouter_free_nexthop(struct vr_nexthop *nh)
+{
+    if (nh->nh_type == NH_COMPOSITE) {
+        if (nh->nh_component_nh) {
+            vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
+            nh->nh_component_nh = NULL;
+        }
+    }
+
+    if (nh->nh_dev) {
+        vrouter_put_interface(nh->nh_dev);
+    }
+
+    vr_free(nh, VR_NEXTHOP_OBJECT);
+    return;
+}
+
+static void
+vrouter_free_nexthop_cb(struct vrouter *router, void *data)
+{
+    struct vr_defer_data *vdd = (struct vr_defer_data *)data;
+
+    if (!vdd)
+        return;
+
+    vrouter_free_nexthop((struct vr_nexthop *)vdd->vdd_data);
+    return;
+}
+
+static int
+vrouter_free_nexthop_defer(struct vr_nexthop *nh)
+{
+    struct vr_defer_data *defer;
+
+    defer = vr_get_defer_data(sizeof(*defer));
+    if (!defer)
+        return -ENOMEM;
+
+    defer->vdd_data = nh;
+    vr_defer(nh->nh_router, vrouter_free_nexthop_cb, (void *)defer);
+
+    return 0;
+}
+
 void
 vrouter_put_nexthop(struct vr_nexthop *nh)
 {
-    int i;
+    int i, component_cnt;
+    struct vr_nexthop *cnh;
+
+    if (!nh)
+        return;
 
     /* This function might get invoked with zero ref_cnt */
     if (nh->nh_users) {
@@ -83,23 +132,30 @@ vrouter_put_nexthop(struct vr_nexthop *nh)
     }
 
     if (!nh->nh_users ) {
-
         if (!vr_not_ready)
             vr_delay_op();
 
         /* If composite de-ref the internal nexthops */
         if (nh->nh_type == NH_COMPOSITE) {
-            for (i = 0; i < nh->nh_component_cnt; i++) {
-                if (nh->nh_component_nh[i].cnh)
-                    vrouter_put_nexthop(nh->nh_component_nh[i].cnh);
+            component_cnt = nh->nh_component_cnt;
+            nh->nh_component_cnt = 0;
+            for (i = 0; i < component_cnt; i++) {
+                if (nh->nh_component_nh[i].cnh) {
+                    cnh = nh->nh_component_nh[i].cnh;
+                    nh->nh_component_nh[i].cnh = NULL;
+                    vrouter_put_nexthop(cnh);
+                }
             }
+        }
 
-            vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
+        if (vr_not_ready) {
+            vrouter_free_nexthop(nh);
+        } else {
+            if (vrouter_free_nexthop_defer(nh)) {
+                vr_delay_op();
+                vrouter_free_nexthop(nh);
+            }
         }
-        if (nh->nh_dev) {
-            vrouter_put_interface(nh->nh_dev);
-        }
-        vr_free(nh, VR_NEXTHOP_OBJECT);
     }
 
     return;
