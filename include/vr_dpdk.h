@@ -35,7 +35,11 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
  * See more debug options below.
  */
 #undef RTE_LOG_LEVEL
+#ifdef COMPILE_DEBUG_LOGS
+#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
+#else
 #define RTE_LOG_LEVEL               RTE_LOG_INFO
+#endif
 
 /*
  * By default all the logtypes are enabled.
