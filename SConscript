@@ -17,6 +17,14 @@ env = DefaultEnvironment().Clone()
 VRouterEnv = env
 dpdk_exists = os.path.isdir('../third_party/dpdk')
 
+# DPDK build configuration
+dpdk_conf = {}
+dpdk_conf['DPDK_TARGET'] = 'x86_64-native-linuxapp-gcc'
+dpdk_conf['DPDK_SRC_DIR'] = '#third_party/dpdk/'
+dpdk_conf['DPDK_DST_DIR'] = env['TOP'] + '/vrouter/dpdk/' + dpdk_conf['DPDK_TARGET']
+dpdk_conf['DPDK_INC_DIR'] = dpdk_conf['DPDK_DST_DIR'] + '/include'
+dpdk_conf['DPDK_LIB_DIR'] = dpdk_conf['DPDK_DST_DIR'] + '/lib'
+
 # Include paths
 env.Replace(CPPPATH = '#vrouter/include')
 env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
@@ -72,7 +80,7 @@ if sys.platform != 'darwin':
 
     for sdir in subdirs:
         env.SConscript(sdir + '/SConscript',
-                       exports='VRouterEnv',
+                       exports='VRouterEnv dpdk_conf',
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 

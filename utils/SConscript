@@ -3,6 +3,7 @@
 #
 
 Import('VRouterEnv')
+Import('dpdk_conf')
 env = VRouterEnv.Clone()
 VRutilsEnv = env;
 
@@ -33,6 +34,7 @@ env.StaticLibrary(libvrutil, libvrutil_objs)
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
+env.Append(CPPPATH = dpdk_conf['DPDK_INC_DIR'])
 
 # Build individual utils
 vif_sources = ['vif.c']
@@ -68,9 +70,13 @@ vrouter = env.Program(target = 'vrouter', source = vrouter_sources)
 vrmemstats_sources = ['vrmemstats.c']
 vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
 
+vrctl_sources = ['vrctl.c']
+vrctl = env.Program(target = 'vrctl', source = vrctl_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats,
-          vxlan, vrouter, vrmemstats]
+             vxlan, vrouter, vrmemstats, vrctl]
+
 scripts  = ['vifdump']
 env.Default(binaries)
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))

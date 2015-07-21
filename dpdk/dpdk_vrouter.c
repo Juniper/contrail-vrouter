@@ -464,6 +464,36 @@ vr_dpdk_exit_trigger(void)
     return;
 }
 
+/**
+ * A handler for control messages.
+ *
+ * Currently only logging control is supported.
+ *
+ * @param s_req Received request to be processed.
+ */
+void
+vr_ctl_req_process(void *s_req)
+{
+    int i;
+
+    vr_ctl_req *req = (vr_ctl_req *)s_req;
+
+    if (req->ctl_log_level)
+        rte_set_log_level(req->ctl_log_level);
+
+    if (req->ctl_log_type_enable_size)
+        for (i = 0; i < req->ctl_log_type_enable_size; ++i)
+            rte_set_log_type(req->ctl_log_type_enable[i], 1);
+
+    if (req->ctl_log_type_disable_size)
+        for (i = 0; i < req->ctl_log_type_disable_size; ++i)
+            rte_set_log_type(req->ctl_log_type_disable[i], 0);
+
+    /* Neither of currently called functions signals an error. Just send OK
+     * response here for now. */
+    vr_send_response(0);
+}
+
 enum vr_opt_index {
     NO_DAEMON_OPT_INDEX,
     HELP_OPT_INDEX,

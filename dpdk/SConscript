@@ -4,14 +4,10 @@
 import os
 
 Import('VRouterEnv')
+Import('dpdk_conf')
+
 env = VRouterEnv.Clone()
 
-# DPDK build configuration
-DPDK_TARGET  = 'x86_64-native-linuxapp-gcc'
-DPDK_SRC_DIR = '#third_party/dpdk/'
-DPDK_DST_DIR = env['TOP'] + '/vrouter/dpdk/' + DPDK_TARGET
-DPDK_INC_DIR = DPDK_DST_DIR + '/include'
-DPDK_LIB_DIR = DPDK_DST_DIR + '/lib'
 # Pass -g and -O flags if present to DPDK
 DPDK_FLAGS   =  ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
 
@@ -79,12 +75,14 @@ DPDK_LIBS = [
 # Flags
 env.Append(CCFLAGS = '-Werror -Wall')
 env.Append(CCFLAGS = '-msse4.2')
+if env['OPT'] == 'debug':
+    env.Append(CCFLAGS = '-DCOMPILE_DEBUG_LOGS')
 
 # Include/lLib paths
-env.Append(CPPPATH = DPDK_INC_DIR);
+env.Append(CPPPATH = dpdk_conf['DPDK_INC_DIR']);
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Append(LIBPATH = DPDK_LIB_DIR)
+env.Append(LIBPATH = dpdk_conf['DPDK_LIB_DIR'])
 
 # Libraries
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
@@ -92,15 +90,15 @@ env.Append(LIBS = ['rt', 'dl', 'pthread', 'urcu-qsbr'])
 env.Append(LINKFLAGS = DPDK_LIBS)
 
 # Make DPDK
-dpdk_src_dir = Dir(DPDK_SRC_DIR).abspath
-dpdk_dst_dir = Dir(DPDK_DST_DIR).abspath
+dpdk_src_dir = Dir(dpdk_conf['DPDK_SRC_DIR']).abspath
+dpdk_dst_dir = Dir(dpdk_conf['DPDK_DST_DIR']).abspath
 
 make_cmd = 'make -C ' + dpdk_src_dir \
     + ' EXTRA_CFLAGS="' + DPDK_FLAGS + '"' \
     + ' O=' + dpdk_dst_dir \
     + ' '
 dpdk_lib = env.Command('dpdk_lib', None,
-    make_cmd + 'config T=' + DPDK_TARGET
+    make_cmd + 'config T=' + dpdk_conf['DPDK_TARGET']
     + ' && ' + make_cmd)
 
 env.AlwaysBuild(dpdk_lib)

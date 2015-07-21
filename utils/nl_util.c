@@ -48,6 +48,7 @@ extern void vr_vrf_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_drop_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_vxlan_req_process(void *s_req) __attribute__((weak));
 extern void vr_mem_stats_req_process(void *s_req) __attribute__((weak));
+extern void vr_ctl_req_process(void *s_req) __attribute__((weak));
 
 void
 vrouter_ops_process(void *s_req)
@@ -125,6 +126,12 @@ vr_vxlan_req_process(void *s_req)
 
 void
 vr_mem_stats_req_process(void *s_req)
+{
+    return;
+}
+
+void
+vr_ctl_req_process(void *s_req)
 {
     return;
 }
