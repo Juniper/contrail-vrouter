@@ -2,11 +2,15 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
+import os
+
 Import('VRouterEnv')
+
 env = VRouterEnv.Clone()
 VRutilsEnv = env;
 
 vr_root = '../'
+dpdk_exists = os.path.isdir('../../../../third_party/dpdk/')
 
 system_header_path = GetOption('system-header-path')
 if system_header_path:
@@ -70,7 +74,15 @@ vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats,
-          vxlan, vrouter, vrmemstats]
+             vxlan, vrouter, vrmemstats]
+
+if dpdk_exists:
+    Import('dpdk_lib')
+    vrctl_sources = ['vrctl.c']
+    vrctl = env.Program(target = 'vrctl', source = vrctl_sources)
+    env.Requires(vrctl, dpdk_lib)
+    binaries.append(vrctl)
+
 scripts  = ['vifdump']
 env.Default(binaries)
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))
