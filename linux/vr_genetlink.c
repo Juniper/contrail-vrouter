@@ -81,6 +81,7 @@ static int
 netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
 {
     char *buf;
+    int ret;
     unsigned int len;
     uint32_t multi_flag;
     struct nlmsghdr *rep, *nlh = info->nlhdr;
@@ -97,7 +98,9 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
     request.vr_message_buf = nla_data(nla);
     request.vr_message_len = nla_len(nla);
 
-    vr_message_request(&request);
+    ret = vr_message_request(&request);
+    if (ret < 0)
+        return ret;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0))
     netlink_id =  NETLINK_CB(in_skb).pid;
