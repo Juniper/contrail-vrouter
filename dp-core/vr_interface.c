@@ -1887,6 +1887,8 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_iftxrngenqdrops = 0;
     req->vifr_ifrxrngenqpkts = 0;
     req->vifr_ifrxrngenqdrops = 0;
+    req->vifr_dpdk_ipackets = 0;
+    req->vifr_dpdk_ierrors = 0;
 
     /**
      * Implementation of getting per-core vif statistics is based on this
@@ -1952,6 +1954,16 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
             req->vifr_iftxrngenqdrops = stats->vis_iftxrngenqdrops;
             req->vifr_ifrxrngenqpkts = stats->vis_ifrxrngenqpkts;
             req->vifr_ifrxrngenqdrops = stats->vis_ifrxrngenqdrops;
+    }
+
+    /**
+     * DPDK-specific statistics below are written to the physical interface's
+     * stats structure in vr_dpdk_nicstats_req_process().
+     */
+    if (intf->vif_type == VIF_TYPE_PHYSICAL) {
+        stats = vif_get_stats(intf, 0);
+        req->vifr_dpdk_ipackets = stats->vis_dpdk_ipackets;
+        req->vifr_dpdk_ierrors = stats->vis_dpdk_ierrors;
     }
 
     req->vifr_speed = -1;
@@ -2030,7 +2042,6 @@ vr_interface_get(vr_interface_req *req)
     } else {
         core = 0;
     }
-
 
     router = vrouter_get(req->vifr_rid);
     if (!router) {

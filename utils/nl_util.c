@@ -129,6 +129,12 @@ vr_mem_stats_req_process(void *s_req)
     return;
 }
 
+void
+vr_dpdk_nicstats_req_process(void *s_req)
+{
+    return;
+}
+
 struct nl_response *
 nl_parse_gen_ctrl(struct nl_client *cl)
 {

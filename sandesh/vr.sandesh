@@ -88,6 +88,13 @@ buffer sandesh vr_interface_req {
     38: i32         vifr_bridge_idx;
     39: i16         vifr_ovlan_id;
     40: byte        vifr_transport;
+    41: i64         vifr_dpdk_ipackets;
+    42: i64         vifr_dpdk_ierrors;
+}
+
+buffer sandesh vr_dpdk_nicstats_req {
+    1: u32        nicsr_rid;
+    2: u32        nicsr_port;
 }
 
 buffer sandesh vr_vxlan_req {

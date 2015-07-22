@@ -260,6 +260,7 @@ vr_if_transport_string(vr_interface_req *req)
 
     return "Unknown";
 }
+
 void
 vr_interface_req_process(void *s)
 {
@@ -363,6 +364,15 @@ vr_interface_req_process(void *s)
             printf("Packets enqueued on RX ring: %" PRId64"  Drops:%" PRId64 "  \n",
                 req->vifr_ifrxrngenqpkts, req->vifr_ifrxrngenqdrops);
         }
+
+        if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+            vr_interface_print_head_space();
+            printf("Total successfully RX packets: %" PRId64" \n",
+                req->vifr_dpdk_ipackets);
+            vr_interface_print_head_space();
+            printf("Total erroneous RX packets: %" PRId64" \n",
+                req->vifr_dpdk_ierrors);
+        }
     }
     printf("\n");
 
@@ -380,7 +390,6 @@ vr_interface_req_process(void *s)
 
     return;
 }
-
 
 void
 vr_response_process(void *s)
@@ -578,6 +587,7 @@ vr_intf_op(unsigned int op)
 {
     int ret;
     vr_interface_req intf_req;
+    vr_dpdk_nicstats_req nicstats_req;
     int platform = get_platform();
     if (create_set)
         return vhost_create();
@@ -674,6 +684,20 @@ op_retry:
     if (((op == SANDESH_OP_DUMP) && !(dump_pending))
             || (op == SANDESH_OP_GET)) {
         vr_interface_print_header();
+
+        /**
+         * If we do DUMP or GET and we're DPDK, we need to ask for
+         * some DPDK-specific statistics. After this request, they'll
+         * be written into vr_interface_stats and will be received
+         * with other statistics.
+         */
+        if (platform == DPDK_PLATFORM) {
+            nicstats_req.nicsr_rid = 0;
+            nicstats_req.nicsr_port = 0;
+            ret = vr_intf_send_msg(&nicstats_req, "vr_dpdk_nicstats_req");
+            if (ret < 0)
+                return ret;
+        }
     }
 
     ret = vr_intf_send_msg(&intf_req, "vr_interface_req");

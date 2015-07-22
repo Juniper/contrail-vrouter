@@ -27,6 +27,55 @@
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 
+/**
+ * A handler for DPDK NIC statistics.
+ *
+ * @param s_req Received request to be processed.
+ */
+void vr_dpdk_nicstats_req_process(void *s_req) {
+    struct vrouter *router;
+    struct vr_interface *vif;
+    struct vr_interface_stats *stats;
+    struct rte_eth_stats eth_stats;
+    int ret;
+
+    vr_dpdk_nicstats_req *req = (vr_dpdk_nicstats_req *)s_req;
+
+    router = vrouter_get(req->nicsr_rid);
+    if (!router) {
+        ret = -ENODEV;
+        goto send_response;
+    }
+
+    vif = __vrouter_get_interface(router, req->nicsr_port);
+    if (!vif) {
+        ret = -ENOENT;
+        goto send_response;
+    }
+
+    stats = vif_get_stats(vif, 0);
+    if(!stats) {
+        ret = -ENOENT;
+        goto send_response;
+    }
+
+    ret = rte_eth_stats_get(req->nicsr_port, &eth_stats);
+    if (ret != 0) {
+        goto send_response;
+    }
+
+    /**
+     * rte_eth_stats structure provides a lot more data than we use here.
+     * Please see: dpdk.org/doc/api/structrte__eth__stats.html
+     */
+    stats->vis_dpdk_ipackets = eth_stats.ipackets;
+    stats->vis_dpdk_ierrors = eth_stats.ierrors;
+
+send_response:
+    vr_send_response(ret);
+    return;
+}
+
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
  * Returns 0 on success, < 0 otherwise.
