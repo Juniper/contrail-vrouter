@@ -84,11 +84,15 @@ int
 dpdk_netlink_receive(void *usockp, char *nl_buf,
         unsigned int nl_len)
 {
+    int ret;
     struct vr_message request;
 
     request.vr_message_buf = nl_buf + HDR_LEN;
     request.vr_message_len = nl_len - HDR_LEN;
-    vr_message_request(&request);
+
+    ret = vr_message_request(&request);
+    if (ret < 0)
+        vr_send_response(ret);
 
     dpdk_nl_process_response(usockp, (struct nlmsghdr *)nl_buf);
 
