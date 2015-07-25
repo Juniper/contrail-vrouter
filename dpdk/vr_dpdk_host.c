@@ -25,8 +25,6 @@
 #include <netinet/tcp.h>
 #include <sys/user.h>
 
-#include <urcu-qsbr.h>
-
 #include <rte_cycles.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
@@ -39,13 +37,6 @@ unsigned int vr_num_cpus = VR_MAX_CPUS;
 
 /* Global init flag */
 static bool vr_host_inited = false;
-
-struct rcu_cb_data {
-    struct rcu_head rcd_rcu;
-    vr_defer_cb rcd_user_cb;
-    struct vrouter *rcd_router;
-    unsigned char rcd_user_data[0];
-};
 
 extern void vr_malloc_stats(unsigned int, unsigned int);
 extern void vr_free_stats(unsigned int);
@@ -148,22 +139,10 @@ static void
 dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     struct vrouter *router = vrouter_get(0);
-    unsigned lcore_id;
 
-    if (!pkt)
-        rte_panic("Null packet");
-
-    if (router) {
-        lcore_id = rte_lcore_id();
-        /* RCU thread check */
-        if (lcore_id == LCORE_ID_ANY)
-            lcore_id = 0;
-        ((uint64_t *)(router->vr_pdrop_stats[lcore_id]))[reason]++;
-    }
+    router->vr_pdrop_stats[rte_lcore_id()][reason]++;
 
     rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
-
-    return;
 }
 
 void
@@ -424,6 +403,7 @@ dpdk_timer(struct rte_timer *tim, void *arg)
 {
     struct vr_timer *vtimer = (struct vr_timer*)arg;
 
+    RTE_LOG(DEBUG, VROUTER, "%s: calling timer function %p\n", __func__, vtimer->vt_timer);
     vtimer->vt_timer(vtimer->vt_vr_arg);
 }
 
@@ -447,7 +427,7 @@ dpdk_create_timer(struct vr_timer *vtimer)
     /* reset timer */
     hz = rte_get_timer_hz();
     ticks = hz * vtimer->vt_msecs / 1000;
-    if (rte_timer_reset(timer, ticks, PERIODICAL, rte_get_master_lcore(),
+    if (rte_timer_reset(timer, ticks, PERIODICAL, VR_DPDK_TIMER_LCORE_ID,
         dpdk_timer, vtimer) == -1) {
         RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
         rte_free(timer);
@@ -501,59 +481,16 @@ dpdk_get_mono_time(unsigned int *sec, unsigned int *nsec)
     return;
 }
 
-static void
-dpdk_work_timer(struct rte_timer *timer, void *arg)
-{
-    struct vr_timer *vtimer = (struct vr_timer *)arg;
-
-    dpdk_timer(timer, arg);
-
-    dpdk_delete_timer(vtimer);
-    dpdk_free(vtimer, VR_TIMER_OBJECT);
-
-    return;
-}
-
+/* Work callback called on NetLink lcore */
 static void
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    struct rte_timer *timer;
-    struct vr_timer *vtimer;
-
-    timer = dpdk_malloc(sizeof(struct rte_timer), VR_TIMER_OBJECT);
-    if (!timer) {
-        RTE_LOG(ERR, VROUTER, "Error allocating RTE timer\n");
-        return;
-    }
-
-    vtimer = dpdk_malloc(sizeof(*vtimer), VR_TIMER_OBJECT);
-    if (!vtimer) {
-        dpdk_free(timer, VR_TIMER_OBJECT);
-        RTE_LOG(ERR, VROUTER, "Error allocating VR timer for work\n");
-        return;
-    }
-    vtimer->vt_timer = fn;
-    vtimer->vt_vr_arg = arg;
-    vtimer->vt_os_arg = timer;
-    vtimer->vt_msecs = 1;
-
-    rte_timer_init(timer);
-
-    RTE_LOG(DEBUG, VROUTER, "%s[%u]: reset timer %p REINJECTING: lcore_id %u\n",
-            __func__, rte_lcore_id(), timer, VR_DPDK_PACKET_LCORE_ID);
-    /* schedule task to pkt0 lcore */
-    if (rte_timer_reset(timer, 0, SINGLE, VR_DPDK_PACKET_LCORE_ID,
-        dpdk_work_timer, vtimer) == -1) {
-        RTE_LOG(ERR, VROUTER, "Error resetting timer\n");
-        rte_free(timer);
-        rte_free(vtimer);
-
-        return;
-    }
-
-    /* wake up pkt0 lcore */
-    vr_dpdk_packet_wakeup();
-    return;
+    /* pass the work to packet lcore */
+    RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing work %p to lcore %u\n",
+            __func__, rte_lcore_id(), fn, VR_DPDK_PACKET_LCORE_ID);
+    vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
+                            VR_DPDK_LCORE_WORK_CMD, (uintptr_t)fn, (uintptr_t)arg);
+    /* no need to wait for the work to finish */
 }
 
 static void
@@ -564,35 +501,33 @@ dpdk_delay_op(void)
     return;
 }
 
+/* RCU callback called on RCU thread */
 static void
-rcu_cb(struct rcu_head *rh)
+dpdk_rcu_cb(struct rcu_head *rh)
 {
-    struct rcu_cb_data *cb_data = (struct rcu_cb_data *)rh;
-
-    /* Call the user call back */
-    cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
-    dpdk_free(cb_data, VR_DEFER_OBJECT);
-
-    return;
+    /* pass the callback to packet lcore */
+    RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing RCU callback to lcore %u\n",
+            __func__, rte_lcore_id(), VR_DPDK_PACKET_LCORE_ID);
+    vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
+                            VR_DPDK_LCORE_RCU_CMD, (uintptr_t)rh, 0);
+    vr_dpdk_lcore_cmd_wait(VR_DPDK_PACKET_LCORE_ID);
 }
 
 static void
 dpdk_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
 {
-    struct rcu_cb_data *cb_data;
+    struct vr_dpdk_rcu_cb_data *cb_data;
 
-    cb_data = CONTAINER_OF(rcd_user_data, struct rcu_cb_data, data);
+    cb_data = CONTAINER_OF(rcd_user_data, struct vr_dpdk_rcu_cb_data, data);
     cb_data->rcd_user_cb = user_cb;
     cb_data->rcd_router = router;
-    call_rcu(&cb_data->rcd_rcu, rcu_cb);
-
-    return;
+    call_rcu(&cb_data->rcd_rcu, dpdk_rcu_cb);
 }
 
 static void *
 dpdk_get_defer_data(unsigned int len)
 {
-    struct rcu_cb_data *cb_data;
+    struct vr_dpdk_rcu_cb_data *cb_data;
 
     if (!len)
         return NULL;
@@ -608,12 +543,12 @@ dpdk_get_defer_data(unsigned int len)
 static void
 dpdk_put_defer_data(void *data)
 {
-    struct rcu_cb_data *cb_data;
+    struct vr_dpdk_rcu_cb_data *cb_data;
 
     if (!data)
         return;
 
-    cb_data = CONTAINER_OF(rcd_user_data, struct rcu_cb_data, data);
+    cb_data = CONTAINER_OF(rcd_user_data, struct vr_dpdk_rcu_cb_data, data);
     dpdk_free(cb_data, VR_DEFER_OBJECT);
 
     return;
@@ -1051,9 +986,9 @@ struct host_os dpdk_host = {
     .hos_get_cpu                    =    dpdk_get_cpu,
     .hos_schedule_work              =    dpdk_schedule_work,
     .hos_delay_op                   =    dpdk_delay_op, /* do nothing */
-    .hos_defer                      =    dpdk_defer, /* for mirroring? */
-    .hos_get_defer_data             =    dpdk_get_defer_data, /* for mirroring? */
-    .hos_put_defer_data             =    dpdk_put_defer_data, /* for mirroring? */
+    .hos_defer                      =    dpdk_defer,
+    .hos_get_defer_data             =    dpdk_get_defer_data,
+    .hos_put_defer_data             =    dpdk_put_defer_data,
     .hos_get_time                   =    dpdk_get_time,
     .hos_get_mono_time              =    dpdk_get_mono_time,
     .hos_create_timer               =    dpdk_create_timer,
@@ -1160,6 +1095,7 @@ vr_dpdk_host_exit(void)
 {
     vr_sandesh_exit();
     vrouter_exit(false);
+    /* no rcu_barrier() in urcu-qsbr */
 
     return;
 }

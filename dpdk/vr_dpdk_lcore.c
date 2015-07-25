@@ -20,8 +20,6 @@
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
 
-#include <urcu-qsbr.h>
-
 #include <rte_cycles.h>
 #include <rte_ethdev.h>
 #include <rte_malloc.h>
@@ -256,48 +254,70 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     return 0;
 }
 
+/* Busy wait for a command to complete on a specific lcore */
+void
+vr_dpdk_lcore_cmd_wait(unsigned lcore_id)
+{
+    struct vr_dpdk_lcore *lcore;
+
+    /* only packet and forwarding lcores handle commands */
+    if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
+        return;
+
+    lcore = vr_dpdk.lcores[lcore_id];
+
+    while (lcore->lcore_cmd != VR_DPDK_LCORE_NO_CMD);
+}
+
 /* Wait for a command to complete */
 static void
 dpdk_lcore_cmd_wait_all(void)
 {
     unsigned lcore_id;
-    struct vr_dpdk_lcore *lcore;
 
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-        /* only packet and forwarding lcores handle commands */
-        if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
-            continue;
-
-        lcore = vr_dpdk.lcores[lcore_id];
-
-        while (rte_atomic16_read(&lcore->lcore_cmd)
-                            != VR_DPDK_LCORE_NO_CMD);
+        vr_dpdk_lcore_cmd_wait(lcore_id);
     }
 }
 
-/* Post an lcore command */
+/* Post an lcore command to a specific lcore */
 void
-vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint32_t cmd_param)
+vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg1,
+    uint64_t cmd_arg2)
 {
-    unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
 
+    /* only packet and forwarding lcores handle commands */
+    if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
+        return;
+
+    lcore = vr_dpdk.lcores[lcore_id];
     /* wait for previous command to complete */
-    /* TODO: rte_atomic16_cmpset() to make it thread safe */
-    dpdk_lcore_cmd_wait_all();
+    vr_dpdk_lcore_cmd_wait(lcore_id);
+
+    /* the command is being published */
+    while (rte_atomic16_cmpset(&lcore->lcore_cmd,
+                VR_DPDK_LCORE_NO_CMD, VR_DPDK_LCORE_IN_PROGRESS_CMD) == 0);
+    lcore->lcore_cmd_arg1 = cmd_arg1;
+    lcore->lcore_cmd_arg2 = cmd_arg2;
+    /* publish the command */
+    while (rte_atomic16_cmpset(&lcore->lcore_cmd,
+                VR_DPDK_LCORE_IN_PROGRESS_CMD, cmd) == 0);
+
+    /* we need to wake up the packet lcore so it could handle the command */
+    if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
+        vr_dpdk_packet_wakeup();
+}
+
+/* Post an lcore command to all the lcores */
+void
+vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg1, uint64_t cmd_arg2)
+{
+    unsigned lcore_id;
 
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-        /* only packet and forwarding lcores handle commands */
-        if (lcore_id < VR_DPDK_PACKET_LCORE_ID)
-            continue;
-
-        lcore = vr_dpdk.lcores[lcore_id];
-
-        rte_atomic32_set(&lcore->lcore_cmd_param, cmd_param);
-        rte_atomic16_set(&lcore->lcore_cmd, cmd);
+        vr_dpdk_lcore_cmd_post(lcore_id, cmd, cmd_arg1, cmd_arg2);
     }
-    /* we need to wake up the pkt0 thread so it could handle the command */
-    vr_dpdk_packet_wakeup();
 }
 
 /* Release all RX and TX queues for a given vif
@@ -339,10 +359,10 @@ vr_dpdk_lcore_if_unschedule(struct vr_interface *vif)
 {
     /* Remove RX queues first */
     vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_RX_RM_CMD,
-                        (uint32_t)vif->vif_idx);
+                        (uint32_t)vif->vif_idx, 0);
     /* Flush and remove TX queues */
     vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_TX_RM_CMD,
-                        (uint32_t)vif->vif_idx);
+                        (uint32_t)vif->vif_idx, 0);
     dpdk_lcore_cmd_wait_all();
 
     /* release RX and TX queues */
@@ -668,18 +688,20 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     /* push TX rings */
     total_pkts += dpdk_lcore_rings_push(lcore);
 
-    rcu_quiescent_state();
-
 #if VR_DPDK_SLEEP_NO_PACKETS_US > 0
     /* sleep if no single packet received */
     if (unlikely(total_pkts == 0)) {
+        rcu_thread_offline();
         usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
+        rcu_thread_online();
     }
 #endif
 #if VR_DPDK_YIELD_NO_PACKETS > 0
     /* yield if no single packet received */
     if (unlikely(total_pkts == 0)) {
+        rcu_thread_offline();
         sched_yield();
+        rcu_thread_online();
     }
 #endif
 }
@@ -712,7 +734,6 @@ dpdk_lcore_init(unsigned lcore_id)
     vr_dpdk.lcores[lcore_id] = lcore;
 
     rcu_register_thread();
-    rcu_thread_offline();
 
     return 0;
 }
@@ -740,34 +761,45 @@ dpdk_lcore_exit(unsigned lcore_id)
 int
 vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
 {
-    uint16_t cmd = (uint16_t)rte_atomic16_read(&lcore->lcore_cmd);
-    uint32_t cmd_param = (uint32_t)rte_atomic32_read(&lcore->lcore_cmd_param);
+    uint16_t cmd = lcore->lcore_cmd;
+    uint64_t cmd_arg1 = lcore->lcore_cmd_arg1;
+    uint64_t cmd_arg2 = lcore->lcore_cmd_arg2;
     int ret = 0;
     unsigned vif_idx;
     struct vr_dpdk_queue *rx_queue;
     struct vr_dpdk_queue *tx_queue;
 
-    if (likely(cmd == VR_DPDK_LCORE_NO_CMD))
+    if (likely(cmd == VR_DPDK_LCORE_NO_CMD
+        || cmd == VR_DPDK_LCORE_IN_PROGRESS_CMD))
         return 0;
 
     switch (cmd) {
     case VR_DPDK_LCORE_RX_RM_CMD:
-        vif_idx = cmd_param;
+        vif_idx = (unsigned)cmd_arg1;
         rx_queue = &lcore->lcore_rx_queues[vif_idx];
         if (rx_queue->q_queue_h) {
             /* remove the queue from the lcore */
             dpdk_lcore_rx_queue_remove(lcore, rx_queue);
         }
-        rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     case VR_DPDK_LCORE_TX_RM_CMD:
-        vif_idx = cmd_param;
+        vif_idx = (unsigned)cmd_arg1;
         tx_queue = &lcore->lcore_tx_queues[vif_idx];
         if (tx_queue->q_queue_h) {
             /* remove the queue from the lcore */
             dpdk_lcore_tx_queue_remove(lcore, tx_queue);
         }
-        rte_atomic16_set(&lcore->lcore_cmd, VR_DPDK_LCORE_NO_CMD);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
+        break;
+    case VR_DPDK_LCORE_RCU_CMD:
+        vr_dpdk_packet_rcu_cb((struct rcu_head *)cmd_arg1);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
+        break;
+    case VR_DPDK_LCORE_WORK_CMD:
+        /* do the work */
+        vr_dpdk_packet_work_cb((void (*)(void *))cmd_arg1, (void *)cmd_arg2);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     case VR_DPDK_LCORE_STOP_CMD:
         ret = -1;
@@ -856,9 +888,12 @@ dpdk_lcore_fwd_loop(void)
                 }
             }
 
+            rcu_quiescent_state();
             if (unlikely(lcore->lcore_nb_rx_queues == 0)) {
                 /* no queues to poll -> sleep a bit */
+                rcu_thread_offline();
                 usleep(VR_DPDK_SLEEP_NO_QUEUES_US);
+                rcu_thread_online();
             }
 
             /* handle an IPC command */
@@ -922,6 +957,8 @@ dpdk_lcore_kni_loop(void)
     unsigned lcore_id = rte_lcore_id();
     RTE_LOG(DEBUG, VROUTER, "Hello from KNI lcore %u\n", lcore_id);
 
+    rcu_thread_offline();
+
     while (1) {
         vr_dpdk_knidev_all_handle();
 
@@ -942,6 +979,8 @@ dpdk_lcore_timer_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
     RTE_LOG(DEBUG, VROUTER, "Hello from timer lcore %u\n", lcore_id);
+
+    rcu_thread_offline();
 
     while (1) {
         rte_timer_manage();

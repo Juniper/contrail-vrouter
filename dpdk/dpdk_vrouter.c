@@ -294,11 +294,19 @@ dpdk_argv_update(void)
     return 0;
 }
 
+static void
+version_print(void)
+{
+    RTE_LOG(INFO, VROUTER, "vRouter/DPDK version: %s\n", ContrailBuildInfo);
+}
+
 /* Init DPDK EAL */
 static int
 dpdk_init(void)
 {
     int ret, nb_sys_ports;
+
+    version_print();
 
     ret = vr_dpdk_flow_mem_init();
     if (ret < 0) {
@@ -392,7 +400,7 @@ dpdk_stop_flag_set(void)
     if (unlikely(vr_dpdk_is_stop_flag_set()))
         return;
 
-    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0);
+    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0, 0);
     rte_atomic16_inc(&vr_dpdk.stop_flag);
 
     /* wakeup UVHost server to shutdown */
@@ -504,12 +512,6 @@ Usage(void)
         );
 
     exit(1);
-}
-
-static void
-version_print(void)
-{
-    RTE_LOG(INFO, VROUTER, "Build information: %s\n", ContrailBuildInfo);
 }
 
 static void
@@ -629,9 +631,6 @@ main(int argc, char *argv[])
             return 1;
         }
     }
-
-    RTE_LOG(INFO, VROUTER, "Starting vRouter/DPDK...\n");
-    version_print();
 
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();

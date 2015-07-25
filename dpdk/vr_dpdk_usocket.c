@@ -17,8 +17,6 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
-#include <urcu-qsbr.h>
-
 #include <rte_errno.h>
 #include <rte_hexdump.h>
 #include <rte_timer.h>
@@ -75,7 +73,7 @@ usock_deinit_poll(struct vr_usocket *usockp)
  * of netlink, the poll in on tcp sockets to accept a connection (from agent,
  * utilities etc.:). for packet socket, the poll is on unix socket to receive
  * packets from agent and to be passed to vrouter. packet sockets also will
- * have an event usocket to dequeue packets from the pkt0_mbuf_ring, where
+ * have an event usocket to dequeue packets from the packet_mbuf_ring, where
  * packets to be trapped will be enqueued.
  *
  * alloc the poll array
@@ -454,7 +452,7 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
 }
 
 static void
-vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
+vr_dpdk_packet_receive(struct vr_usocket *usockp)
 {
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
@@ -475,10 +473,9 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
         vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
         /* send the mbuf to vRouter */
         vr_dpdk_lcore_vroute(usockp->usock_vif, &usockp->usock_mbuf, 1);
-        /* flush pkt0 TX queues immediately */
+        /* flush packet TX queues immediately */
         vr_dpdk_lcore_flush(lcore);
 
-        rcu_quiescent_state();
         vr_stats->vis_ifdeqpkts++;
     } else {
         /**
@@ -498,7 +495,7 @@ vr_dpdk_pkt0_receive(struct vr_usocket *usockp)
 }
 
 static void
-vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
+vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
 {
     int i;
     unsigned nb_pkts;
@@ -506,7 +503,7 @@ vr_dpdk_drain_pkt0_ring(struct vr_usocket *usockp)
     const unsigned lcore_id = rte_lcore_id();
     struct vr_interface_stats *vr_stats;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining pkt0 ring...\n", __func__,
+    RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining packet ring...\n", __func__,
             pthread_self());
     vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
@@ -540,11 +537,11 @@ usock_read_done(struct vr_usocket *usockp)
 
     switch (usockp->usock_proto) {
     case PACKET:
-        vr_dpdk_pkt0_receive(usockp);
+        vr_dpdk_packet_receive(usockp);
         break;
 
     case EVENT:
-        vr_dpdk_drain_pkt0_ring(usockp);
+        vr_dpdk_packet_ring_drain(usockp);
         break;
 
     case NETLINK:
@@ -789,9 +786,9 @@ usock_alloc(unsigned short proto, unsigned short type)
     }
 
     if (proto == PACKET) {
-        usockp->usock_mbuf_pool = rte_mempool_lookup("pkt0_mbuf_pool");
+        usockp->usock_mbuf_pool = rte_mempool_lookup("packet_mbuf_pool");
         if (!usockp->usock_mbuf_pool) {
-            usockp->usock_mbuf_pool = rte_mempool_create("pkt0_mbuf_pool",
+            usockp->usock_mbuf_pool = rte_mempool_create("packet_mbuf_pool",
                     PKT0_MBUF_POOL_SIZE, PKT0_MBUF_PACKET_SIZE,
                     PKT0_MBUF_POOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private),
                     rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
@@ -1206,9 +1203,7 @@ vr_usocket_io(void *transport)
             return -1;
         }
 
-        rcu_thread_offline();
-
-        /* Handle an IPC command only for pkt0 thread
+        /* Handle an IPC command only for packet lcore
          * and just check the stop flag for the rest
          */
         if (lcore_id == VR_DPDK_PACKET_LCORE_ID) {
@@ -1219,19 +1214,20 @@ vr_usocket_io(void *transport)
                 break;
         }
 
+        rcu_thread_offline();
         ret = poll(usockp->usock_pfds, usockp->usock_max_cfds,
                 timeout);
-
-        /* manage timers on pkt0 lcore */
-        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-            rte_timer_manage();
-
         if (ret < 0) {
             usock_set_error(usockp, ret);
             /* all other errors are fatal */
             if (errno != EINTR)
                 goto return_from_io;
         }
+
+        rcu_thread_online();
+        /* manage timers on packet lcore */
+        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
+            rte_timer_manage();
 
         processed = 0;
         pfd = usockp->usock_pfds;

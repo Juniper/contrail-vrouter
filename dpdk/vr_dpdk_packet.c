@@ -18,15 +18,35 @@ int dpdk_packet_core_id = -1;
 void
 vr_dpdk_packet_wakeup(void)
 {
-    /* to wake up pkt0 thread we always use current lcore event sock */
-    struct vr_dpdk_lcore *lcorep = vr_dpdk.lcores[rte_lcore_id()];
-
-    if (likely(lcorep->lcore_event_sock != NULL)) {
-        if (vr_usocket_eventfd_write(lcorep->lcore_event_sock) < 0) {
-            vr_usocket_close(lcorep->lcore_event_sock);
-            lcorep->lcore_event_sock = NULL;
+    if (likely(vr_dpdk.packet_event_sock != NULL)) {
+        if (vr_usocket_eventfd_write(vr_dpdk.packet_event_sock) < 0) {
+            vr_usocket_close(vr_dpdk.packet_event_sock);
+            vr_dpdk.packet_event_sock = NULL;
         }
     }
+}
+
+/* Work callback called on packet lcore */
+void
+vr_dpdk_packet_work_cb(void (*fn)(void *), void *arg)
+{
+    rcu_read_lock();
+    fn(arg);
+    rcu_read_unlock();
+    /* nothing to free since we pass two arguments */
+}
+
+/* RCU callback called on packet lcore */
+void
+vr_dpdk_packet_rcu_cb(struct rcu_head *rh)
+{
+    struct vr_dpdk_rcu_cb_data *cb_data;
+
+    cb_data = CONTAINER_OF(rcd_rcu, struct vr_dpdk_rcu_cb_data, rh);
+
+    /* Call the user call back */
+    cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
+    vr_free(cb_data, VR_DEFER_OBJECT);
 }
 
 int
@@ -38,6 +58,8 @@ dpdk_packet_io(void)
 wait_for_connection:
     RTE_LOG(DEBUG, VROUTER, "%s[%lx]: waiting for packet transport\n",
                 __func__, pthread_self());
+
+    rcu_thread_offline();
     while (!vr_dpdk.packet_transport) {
         /* handle an IPC command */
         if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
@@ -67,10 +89,11 @@ dpdk_packet_socket_close(void)
 
     if (!vr_dpdk.packet_transport)
         return;
+
+    /* close and free up the memory both for packet usock and binded event usock */
     usockp = vr_dpdk.packet_transport;
-
     vr_dpdk.packet_transport = NULL;
-
+    vr_dpdk.packet_event_sock = NULL;
     vr_usocket_close(usockp);
 
     return;
@@ -79,8 +102,6 @@ dpdk_packet_socket_close(void)
 int
 dpdk_packet_socket_init(void)
 {
-    unsigned lcore_id;
-    struct vr_dpdk_lcore *lcorep;
     void *event_sock = NULL;
     int err;
 
@@ -89,31 +110,27 @@ dpdk_packet_socket_init(void)
         return -1;
 
     if (!vr_dpdk.packet_ring) {
-        vr_dpdk.packet_ring = rte_ring_lookup("pkt0_tx");
+        vr_dpdk.packet_ring = rte_ring_lookup("packet_tx");
         if (!vr_dpdk.packet_ring) {
             /* multi-producers single-consumer ring */
-            vr_dpdk.packet_ring = rte_ring_create("pkt0_tx", VR_DPDK_TX_RING_SZ,
+            vr_dpdk.packet_ring = rte_ring_create("packet_tx", VR_DPDK_TX_RING_SZ,
                     SOCKET_ID_ANY, RING_F_SC_DEQ);
             if (!vr_dpdk.packet_ring) {
-                RTE_LOG(ERR, VROUTER, "    error creating pkt0 ring\n");
+                RTE_LOG(ERR, VROUTER, "    error creating packet ring\n");
                 goto error;
             }
         }
     }
 
-    /* socket events to wake up the pkt0 lcore */
-    RTE_LCORE_FOREACH(lcore_id) {
-        lcorep = vr_dpdk.lcores[lcore_id];
-        event_sock = (void *)vr_usocket(EVENT, RAW);
-        if (!event_sock) {
-            goto error;
-        }
+    /* create and bind event usock to wake up the packet lcore */
+    event_sock = (void *)vr_usocket(EVENT, RAW);
+    if (!event_sock)
+        goto error;
 
-        if (vr_usocket_bind_usockets(vr_dpdk.packet_transport,
-                    event_sock))
-            goto error;
-        lcorep->lcore_event_sock = event_sock;
-    }
+    if (vr_usocket_bind_usockets(vr_dpdk.packet_transport,
+                event_sock))
+        goto error;
+    vr_dpdk.packet_event_sock = event_sock;
 
     return 0;
 

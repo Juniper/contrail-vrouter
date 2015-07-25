@@ -23,6 +23,8 @@
 
 #include <sys/queue.h>
 
+#include <urcu-qsbr.h>
+
 #include <rte_config.h>
 #include <rte_port.h>
 #include <rte_port_ring.h>
@@ -117,10 +119,6 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 /* How many packets to read/write from/to queue in one go */
 #define VR_DPDK_RX_BURST_SZ         32
 #define VR_DPDK_TX_BURST_SZ         32
-/* Number of mbufs in virtio mempool */
-#define VR_DPDK_VIRTIO_MEMPOOL_SZ   4096
-/* How many objects (mbufs) to keep in per-lcore virtio mempool cache */
-#define VR_DPDK_VIRTIO_MEMPOOL_CACHE_SZ (VR_DPDK_VIRTIO_RX_BURST_SZ*8)
 /* Number of mbufs in RSS mempool */
 #define VR_DPDK_RSS_MEMPOOL_SZ      16384
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
@@ -211,6 +209,13 @@ enum {
  * TODO: update the description
  */
 
+struct vr_dpdk_rcu_cb_data {
+    struct rcu_head rcd_rcu;
+    vr_defer_cb rcd_user_cb;
+    struct vrouter *rcd_router;
+    unsigned char rcd_user_data[0];
+};
+
 /* Init queue operation */
 typedef struct vr_dpdk_queue *
     (*vr_dpdk_queue_init_op)(unsigned lcore_id, struct vr_interface *vif,
@@ -265,12 +270,18 @@ SLIST_HEAD(vr_dpdk_q_slist, vr_dpdk_queue);
 enum vr_dpdk_lcore_cmd {
     /* No command */
     VR_DPDK_LCORE_NO_CMD = 0,
+    /* Command arguments are being published */
+    VR_DPDK_LCORE_IN_PROGRESS_CMD,
     /* Stop and exit the lcore loop */
     VR_DPDK_LCORE_STOP_CMD,
     /* Remove RX queue */
     VR_DPDK_LCORE_RX_RM_CMD,
     /* Remove TX queue */
     VR_DPDK_LCORE_TX_RM_CMD,
+    /* Call RCU callback */
+    VR_DPDK_LCORE_RCU_CMD,
+    /* Call work callback */
+    VR_DPDK_LCORE_WORK_CMD,
 };
 
 struct vr_dpdk_lcore {
@@ -287,15 +298,10 @@ struct vr_dpdk_lcore {
     /* Number of hardware RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
     /* Lcore command */
-    rte_atomic16_t lcore_cmd;
-    /* Lcore command param */
-    rte_atomic32_t lcore_cmd_param;
-    /* Event FD to wake up UVHost
-     * TODO: refactor to use either event_sock or event FD
-     */
-    int lcore_event_fd;
-    /* Event socket */
-    void *lcore_event_sock;
+    volatile uint16_t lcore_cmd;
+    /* Lcore command arguments */
+    volatile uint64_t lcore_cmd_arg1;
+    volatile uint64_t lcore_cmd_arg2;
     /* RX ring */
     struct rte_ring *lcore_rx_ring;
 
@@ -364,6 +370,13 @@ struct vr_dpdk_global {
     uint16_t vlan_tag;
     /* Number of forwarding lcores */
     unsigned nb_fwd_lcores;
+    /* Packet lcore event socket
+     * TODO: refactor to use event FD
+     */
+    void *packet_event_sock;
+    /* Event FD to wake up UVHost */
+    int uvhost_event_fd;
+
     /* Table of pointers to forwarding lcore
      * Must be at the end of the cache line 1 */
     struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
@@ -631,6 +644,10 @@ void vr_dpdk_packet_wakeup(void);
 int dpdk_packet_socket_init(void);
 void dpdk_packet_socket_close(void);
 int dpdk_packet_io(void);
+/* RCU callback called on packet lcore */
+void vr_dpdk_packet_rcu_cb(struct rcu_head *rh);
+/* Work callback called on packet lcore */
+void vr_dpdk_packet_work_cb(void (*fn)(void *), void *arg);
 
 /*
  * vr_dpdk_lcore.c
@@ -678,11 +695,14 @@ void
 vr_dpdk_lcore_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
     uint32_t nb_pkts);
 /* Handle an IPC command */
-int
-vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore);
-/* Post an lcore command */
+int vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore);
+/* Busy wait for a command to complete on a specific lcore */
+void vr_dpdk_lcore_cmd_wait(unsigned lcore_id);
+/* Post an lcore command to a specific lcore */
 void
-vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint32_t cmd_param);
+vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg1, uint64_t cmd_arg2);
+/* Post an lcore command to all the lcores */
+void vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg1, uint64_t cmd_arg2);
 
 
 /*

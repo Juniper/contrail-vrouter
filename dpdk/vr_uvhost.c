@@ -66,10 +66,8 @@ vr_uvhost_exit(void)
 void
 vr_uvhost_wakeup(void)
 {
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[VR_DPDK_UVHOST_LCORE_ID];
-
-    if (likely(lcore->lcore_event_fd > 0)) {
-        eventfd_write(lcore->lcore_event_fd, 1);
+    if (likely(vr_dpdk.uvhost_event_fd > 0)) {
+        eventfd_write(vr_dpdk.uvhost_event_fd, 1);
     }
 }
 
@@ -84,18 +82,17 @@ vr_uvhost_start(void *arg)
     int s = 0, ret, err;
     struct sockaddr_un sun;
     fd_set *rfdset, *wfdset;
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
     vr_uvhost_client_init();
 
     vr_uvhost_log("Starting uvhost server...\n");
-    lcore->lcore_event_fd = eventfd(0, 0);
-    if (lcore->lcore_event_fd == -1) {
+    vr_dpdk.uvhost_event_fd = eventfd(0, 0);
+    if (vr_dpdk.uvhost_event_fd == -1) {
         vr_uvhost_log("    error creating event FD: %s (%d)\n",
                         rte_strerror(errno), errno);
         goto error;
     }
-    vr_uvhost_log("    server event FD is %d\n", lcore->lcore_event_fd);
+    vr_uvhost_log("    server event FD is %d\n", vr_dpdk.uvhost_event_fd);
 
     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (s == -1) {
@@ -126,8 +123,8 @@ vr_uvhost_start(void *arg)
 
     vr_uvhost_fdset_init();
 
-    if (vr_uvhost_add_fd(lcore->lcore_event_fd, UVH_FD_READ, NULL, NULL)) {
-        vr_uvhost_log("    error adding server event FD %d\n", lcore->lcore_event_fd);
+    if (vr_uvhost_add_fd(vr_dpdk.uvhost_event_fd, UVH_FD_READ, NULL, NULL)) {
+        vr_uvhost_log("    error adding server event FD %d\n", vr_dpdk.uvhost_event_fd);
         goto error;
     }
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_listen_handler)) {
@@ -140,6 +137,7 @@ vr_uvhost_start(void *arg)
         rfdset = vr_uvh_rfdset_p();
         wfdset = vr_uvh_wfdset_p();
 
+        rcu_thread_offline();
         if (select(vr_uvh_max_fd()+1, rfdset, wfdset, NULL, NULL) == -1) {
             vr_uvhost_log("    error selecting FDs: %s (%d)\n",
                             rte_strerror(errno), errno);
@@ -149,6 +147,7 @@ vr_uvhost_start(void *arg)
         if (vr_dpdk_is_stop_flag_set())
             break;
 
+        rcu_thread_online();
         if (vr_uvh_call_fd_handlers()) {
             vr_uvhost_log("    error calling socket handlers\n");
             goto error;
@@ -162,9 +161,9 @@ error:
         close(s);
         unlink(sun.sun_path);
     }
-    if (lcore->lcore_event_fd > 0) {
-        close(lcore->lcore_event_fd);
-        lcore->lcore_event_fd = 0;
+    if (vr_dpdk.uvhost_event_fd > 0) {
+        close(vr_dpdk.uvhost_event_fd);
+        vr_dpdk.uvhost_event_fd = 0;
     }
 
     vr_uvhost_exit();
