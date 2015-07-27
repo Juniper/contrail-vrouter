@@ -852,16 +852,22 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 
     /* we do not support any thing other than /32 route lookup */
     if ((rt->rtr_req.rtr_family == AF_INET) && 
-        (rt->rtr_req.rtr_prefix_len != IP4_PREFIX_LEN))
+        (rt->rtr_req.rtr_prefix_len != IP4_PREFIX_LEN)) {
+        rt->rtr_nh = default_nh;
         return default_nh;
+    }
 
     if ((rt->rtr_req.rtr_family == AF_INET6) && 
-        (rt->rtr_req.rtr_prefix_len != IP6_PREFIX_LEN))
+        (rt->rtr_req.rtr_prefix_len != IP6_PREFIX_LEN)) {
+        rt->rtr_nh = default_nh;
         return default_nh;
+    }
 
     table = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
-    if (!table)
+    if (!table) {
+        rt->rtr_nh = default_nh;
         return default_nh;
+    }
 
     ent = &table->root;
 
@@ -882,8 +888,10 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
     }
 
     bkt = PTR_TO_BUCKET(ptr);
-    if (!bkt)
+    if (!bkt) {
+        rt->rtr_nh = default_nh;
         return default_nh;
+    }
 
     for (level = 0; level < ip_bkt_get_max_level(rt->rtr_req.rtr_family); level++) {
         index = rt_to_index(rt, level);
