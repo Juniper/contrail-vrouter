@@ -26,6 +26,17 @@ unsigned int dpdk_nl_message_len(struct vr_message *);
 int vr_usocket_message_write(struct vr_usocket *, struct vr_message *);
 int vr_nl_uvh_sock;
 
+void
+vr_dpdk_netlink_wakeup(void)
+{
+    if (likely(vr_dpdk.netlink_event_sock != NULL)) {
+        if (vr_usocket_eventfd_write(vr_dpdk.netlink_event_sock) < 0) {
+            vr_usocket_close(vr_dpdk.netlink_event_sock);
+            vr_dpdk.netlink_event_sock = NULL;
+        }
+    }
+}
+
 static void
 dpdk_nl_process_response(void *usockp, struct nlmsghdr *nlh)
 {
@@ -202,6 +213,8 @@ dpdk_netlink_exit(void)
 {
     vr_message_transport_unregister(&dpdk_nl_transport);
     vr_usocket_close(vr_dpdk.netlink_sock);
+    vr_dpdk.netlink_sock = NULL;
+    vr_dpdk.netlink_event_sock = NULL;
 
     return;
 }
@@ -272,6 +285,7 @@ error:
 int
 vr_dpdk_netlink_init(void)
 {
+    void *event_sock = NULL;
     int ret;
 
     RTE_LOG(INFO, VROUTER, "Starting NetLink...\n");
@@ -283,19 +297,36 @@ vr_dpdk_netlink_init(void)
     if (!vr_dpdk.netlink_sock) {
         RTE_LOG(ERR, VROUTER, "    error creating NetLink server socket:"
             " %s (%d)\n", rte_strerror(errno), errno);
-        return -1;
+        goto error;
     }
     RTE_LOG(INFO, VROUTER, "    NetLink TCP socket FD is %d\n",
             ((struct vr_usocket *)vr_dpdk.netlink_sock)->usock_fd);
 
     ret = vr_nl_uvhost_connect();
     if (ret != 0) {
-        vr_message_transport_unregister(&dpdk_nl_transport);
-        vr_usocket_close(vr_dpdk.netlink_sock);
-
         RTE_LOG(ERR, VROUTER, "    error creating uvhost connection\n");
-        return -1;
+        goto error;
     }
 
+    /* create and bind event usock to wake up the NetLink lcore */
+    event_sock = (void *)vr_usocket(EVENT, RAW);
+    if (!event_sock) {
+        RTE_LOG(ERR, VROUTER, "    error creating NetLink event\n");
+        goto error;
+    }
+
+    if (vr_usocket_bind_usockets(vr_dpdk.netlink_sock,
+                event_sock)) {
+        RTE_LOG(ERR, VROUTER, "    error binding NetLink event\n");
+        goto error;
+    }
+    vr_dpdk.netlink_event_sock = event_sock;
+
     return 0;
+
+error:
+    vr_message_transport_unregister(&dpdk_nl_transport);
+    vr_usocket_close(vr_dpdk.netlink_sock);
+
+    return -1;
 }

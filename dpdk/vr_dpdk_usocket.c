@@ -505,6 +505,10 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining packet ring...\n", __func__,
             pthread_self());
+
+    if (unlikely(usockp->usock_parent->usock_vif == NULL))
+        return;
+
     vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
@@ -1203,10 +1207,10 @@ vr_usocket_io(void *transport)
             return -1;
         }
 
-        /* Handle an IPC command only for packet lcore
-         * and just check the stop flag for the rest
+        /* Handle an IPC commands for PACKET_LCORE_ID up
+         * and just check the stop flag for the rest.
          */
-        if (lcore_id == VR_DPDK_PACKET_LCORE_ID) {
+        if (lcore_id >= VR_DPDK_PACKET_LCORE_ID) {
             if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
                 break;
         } else {
@@ -1225,9 +1229,6 @@ vr_usocket_io(void *transport)
         }
 
         rcu_thread_online();
-        /* manage timers on packet lcore */
-        if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-            rte_timer_manage();
 
         processed = 0;
         pfd = usockp->usock_pfds;

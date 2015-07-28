@@ -327,8 +327,11 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
 
     ethdev->ethdev_nb_rx_queues = RTE_MIN(dev_info.max_rx_queues,
         VR_DPDK_MAX_NB_RX_QUEUES);
+    /* [PAKCET_ID..FWD_ID) lcores have just TX queues, so we increase
+     * the number of TX queues here */
     ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
-        vr_dpdk.nb_fwd_lcores + 1), VR_DPDK_MAX_NB_TX_QUEUES);
+        vr_dpdk.nb_fwd_lcores + (VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID)),
+        VR_DPDK_MAX_NB_TX_QUEUES);
     ethdev->ethdev_nb_rss_queues = RTE_MIN(RTE_MIN(ethdev->ethdev_nb_rx_queues,
         vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_RSS_QUEUES);
     ethdev->ethdev_reta_size = RTE_MIN(dev_info.reta_size,

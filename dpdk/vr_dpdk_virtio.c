@@ -611,10 +611,10 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
      * This is usually called when qemu shuts down a virtio queue. Set the
      * state to indicate that this queue should not be used any more.
      */
-    synchronize_rcu();
     vq->vdv_ready_state = VQ_NOT_READY;
     vq->vdv_last_used_idx = 0;
     rte_wmb();
+    synchronize_rcu();
 
     return 0;
 }

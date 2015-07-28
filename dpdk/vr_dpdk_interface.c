@@ -1049,7 +1049,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
         if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
             tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_out, mask);
-            if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
+            if (lcore_id < VR_DPDK_FWD_LCORE_ID)
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 
             dpdk_port_out_stats_update(tx_queue, &port_stats, vr_stats);
@@ -1075,7 +1075,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     } else {
         if (likely(tx_queue->txq_ops.f_tx != NULL)) {
             tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
-            if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
+            if (lcore_id < VR_DPDK_FWD_LCORE_ID)
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 
             dpdk_port_out_stats_update(tx_queue, &port_stats, vr_stats);

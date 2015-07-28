@@ -400,7 +400,7 @@ dpdk_stop_flag_set(void)
     if (unlikely(vr_dpdk_is_stop_flag_set()))
         return;
 
-    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0, 0);
+    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_STOP_CMD, 0);
     rte_atomic16_inc(&vr_dpdk.stop_flag);
 
     /* wakeup UVHost server to shutdown */
@@ -419,12 +419,18 @@ vr_dpdk_is_stop_flag_set(void)
 
 /* Custom handling of signals */
 static void
-dpdk_signal_handler(int signum)
+dpdk_signal_handler_stop(int signum)
 {
-    RTE_LOG(DEBUG, VROUTER, "Got signal %d on lcore %u\n",
+    RTE_LOG(INFO, VROUTER, "Got signal %d on lcore %u, stopping...\n",
             signum, rte_lcore_id());
 
     dpdk_stop_flag_set();
+}
+static void
+dpdk_signal_handler_ignore(int signum)
+{
+    RTE_LOG(INFO, VROUTER, "Got signal %d on lcore %u, ignoring...\n",
+            signum, rte_lcore_id());
 }
 
 /* Setup signal handlers */
@@ -435,21 +441,27 @@ dpdk_signals_init(void)
     sigset_t set;
 
     memset(&act, 0 , sizeof(act));
-    act.sa_handler = dpdk_signal_handler;
-
+    act.sa_handler = dpdk_signal_handler_stop;
     if (sigaction(SIGTERM, &act, NULL) != 0) {
         RTE_LOG(CRIT, VROUTER, "Error registering SIGTERM handler\n");
         return -1;
     }
-
     if (sigaction(SIGINT, &act, NULL) != 0) {
         RTE_LOG(CRIT, VROUTER, "Error registering SIGINT handler\n");
         return -1;
     }
 
-    /* block (ignore) sigpipes for this and all the child threads */
-    sigemptyset(&set);
-    sigaddset(&set, SIGPIPE);
+    act.sa_handler = dpdk_signal_handler_ignore;
+    if (sigaction(SIGPIPE, &act, NULL) != 0) {
+        RTE_LOG(CRIT, VROUTER, "Error registering SIGPIPE handler\n");
+        return -1;
+    }
+
+    /* Block (ignore) all the signals for this and all the child threads.
+     * The signals will be unblocked for the master lcore later during
+     * the lcore intialization.
+     */
+    sigfillset(&set);
     if (pthread_sigmask(SIG_BLOCK, &set, NULL) != 0) {
         RTE_LOG(CRIT, VROUTER, "Error setting signal mask\n");
         return -1;

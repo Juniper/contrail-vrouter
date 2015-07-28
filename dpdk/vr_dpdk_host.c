@@ -403,7 +403,6 @@ dpdk_timer(struct rte_timer *tim, void *arg)
 {
     struct vr_timer *vtimer = (struct vr_timer*)arg;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: calling timer function %p\n", __func__, vtimer->vt_timer);
     vtimer->vt_timer(vtimer->vt_vr_arg);
 }
 
@@ -485,12 +484,8 @@ dpdk_get_mono_time(unsigned int *sec, unsigned int *nsec)
 static void
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    /* pass the work to packet lcore */
-    RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing work %p to lcore %u\n",
-            __func__, rte_lcore_id(), fn, VR_DPDK_PACKET_LCORE_ID);
-    vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
-                            VR_DPDK_LCORE_WORK_CMD, (uintptr_t)fn, (uintptr_t)arg);
-    /* no need to wait for the work to finish */
+    /* no RCU reader lock needed, just do the work */
+    fn(arg);
 }
 
 static void
@@ -509,8 +504,7 @@ dpdk_rcu_cb(struct rcu_head *rh)
     RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing RCU callback to lcore %u\n",
             __func__, rte_lcore_id(), VR_DPDK_PACKET_LCORE_ID);
     vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
-                            VR_DPDK_LCORE_RCU_CMD, (uintptr_t)rh, 0);
-    vr_dpdk_lcore_cmd_wait(VR_DPDK_PACKET_LCORE_ID);
+                            VR_DPDK_LCORE_RCU_CMD, (uintptr_t)rh);
 }
 
 static void

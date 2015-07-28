@@ -80,9 +80,9 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
  * (limited by NIC and number of per queue TX/RX descriptors) */
 #define VR_DPDK_MAX_NB_RX_QUEUES    11
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_TX_QUEUES    5
+#define VR_DPDK_MAX_NB_TX_QUEUES    16
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_RSS_QUEUES   4
+#define VR_DPDK_MAX_NB_RSS_QUEUES   16
 /* Maximum number of bond members per ethernet device */
 #define VR_DPDK_BOND_MAX_SLAVES     6
 /* Maximum RETA table size */
@@ -188,12 +188,12 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
  * DPDK LCore IDs
  */
 enum {
-    VR_DPDK_NETLINK_LCORE_ID,
-    VR_DPDK_KNI_LCORE_ID,
+    VR_DPDK_KNI_LCORE_ID = 0,
     VR_DPDK_TIMER_LCORE_ID,
     VR_DPDK_UVHOST_LCORE_ID,
-    /* packet lcore has TX queues, so it should be at the end of the list */
+    /* [PACKET_ID..FWD_ID) lcores have TX queues, but no RX queues */
     VR_DPDK_PACKET_LCORE_ID,
+    VR_DPDK_NETLINK_LCORE_ID,
     /* the actual number of forwarding lcores depends on affinity mask */
     VR_DPDK_FWD_LCORE_ID
 };
@@ -280,8 +280,6 @@ enum vr_dpdk_lcore_cmd {
     VR_DPDK_LCORE_TX_RM_CMD,
     /* Call RCU callback */
     VR_DPDK_LCORE_RCU_CMD,
-    /* Call work callback */
-    VR_DPDK_LCORE_WORK_CMD,
 };
 
 struct vr_dpdk_lcore {
@@ -300,8 +298,7 @@ struct vr_dpdk_lcore {
     /* Lcore command */
     volatile uint16_t lcore_cmd;
     /* Lcore command arguments */
-    volatile uint64_t lcore_cmd_arg1;
-    volatile uint64_t lcore_cmd_arg2;
+    volatile uint64_t lcore_cmd_arg;
     /* RX ring */
     struct rte_ring *lcore_rx_ring;
 
@@ -374,6 +371,8 @@ struct vr_dpdk_global {
      * TODO: refactor to use event FD
      */
     void *packet_event_sock;
+    /* NetLink lcore event socket */
+    void *netlink_event_sock;
     /* Event FD to wake up UVHost */
     int uvhost_event_fd;
 
@@ -700,18 +699,18 @@ int vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore);
 void vr_dpdk_lcore_cmd_wait(unsigned lcore_id);
 /* Post an lcore command to a specific lcore */
 void
-vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg1, uint64_t cmd_arg2);
+vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg);
 /* Post an lcore command to all the lcores */
-void vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg1, uint64_t cmd_arg2);
+void vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg);
 
 
 /*
  * vr_dpdk_netlink.c
  */
+void vr_dpdk_netlink_wakeup(void);
 void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
-int dpdk_netlink_io(void);
 
 /*
  * vr_dpdk_ringdev.c
