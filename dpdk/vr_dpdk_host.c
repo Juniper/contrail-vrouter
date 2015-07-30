@@ -955,6 +955,168 @@ dpdk_pkt_may_pull(struct vr_packet *pkt, unsigned int len)
     return 0;
 }
 
+static void
+dpdk_set_log_level(unsigned int log_level)
+{
+    unsigned int level;
+
+    switch(log_level) {
+    case VR_LOG_EMERG:
+        level = RTE_LOG_EMERG;
+        break;
+
+    case VR_LOG_ALERT:
+        level = RTE_LOG_ALERT;
+        break;
+
+    case VR_LOG_CRIT:
+        level = RTE_LOG_CRIT;
+        break;
+
+    case VR_LOG_ERR:
+        level = RTE_LOG_ERR;
+        break;
+
+    case VR_LOG_WARNING:
+        level = RTE_LOG_WARNING;
+        break;
+
+    case VR_LOG_NOTICE:
+        level = RTE_LOG_NOTICE;
+        break;
+
+    case VR_LOG_INFO:
+        level = RTE_LOG_INFO;
+        break;
+
+    case VR_LOG_DEBUG:
+        level = RTE_LOG_DEBUG;
+        break;
+
+    default:
+        level = 0;
+        break;
+    }
+
+    if (level > 0)
+        rte_set_log_level(level);
+    else
+        RTE_LOG(ERR, VROUTER, "Error: wrong log level (%u) specified\n",
+                level);
+}
+
+static unsigned int
+dpdk_get_log_level(void)
+{
+    unsigned int level = rte_get_log_level();
+
+    switch(level) {
+    case RTE_LOG_EMERG:
+        return VR_LOG_EMERG;
+
+    case RTE_LOG_ALERT:
+        return VR_LOG_ALERT;
+
+    case RTE_LOG_CRIT:
+        return VR_LOG_CRIT;
+
+    case RTE_LOG_ERR:
+        return VR_LOG_ERR;
+
+    case RTE_LOG_WARNING:
+        return VR_LOG_WARNING;
+
+    case RTE_LOG_NOTICE:
+        return VR_LOG_NOTICE;
+
+    case RTE_LOG_INFO:
+        return VR_LOG_INFO;
+
+    case RTE_LOG_DEBUG:
+        return VR_LOG_DEBUG;
+    }
+
+    /* Should never reach here */
+    return 0;
+}
+
+static void
+dpdk_set_log_type(unsigned int log_type, int enable)
+{
+    unsigned int type;
+
+    switch (log_type) {
+    case VR_LOGTYPE_VROUTER:
+        type = RTE_LOGTYPE_VROUTER;
+        break;
+
+    case VR_LOGTYPE_USOCK:
+        type = RTE_LOGTYPE_USOCK;
+        break;
+
+    case VR_LOGTYPE_UVHOST:
+        type = RTE_LOGTYPE_UVHOST;
+        break;
+
+    case VR_LOGTYPE_DPCORE:
+        type = RTE_LOGTYPE_DPCORE;
+        break;
+
+    default:
+        type = 0;
+        break;
+    }
+
+    if (type > 0)
+        rte_set_log_type(type, enable);
+    else
+        RTE_LOG(ERR, VROUTER, "Error: wrong log type (0x%x) specified\n",
+                type);
+}
+
+static unsigned int
+dpdk_log_type_to_vr_type(unsigned int type)
+{
+    switch (type) {
+    case RTE_LOGTYPE_VROUTER:
+        return VR_LOGTYPE_VROUTER;
+
+    case RTE_LOGTYPE_USOCK:
+        return VR_LOGTYPE_USOCK;
+
+    case RTE_LOGTYPE_UVHOST:
+        return VR_LOGTYPE_UVHOST;
+
+    case RTE_LOGTYPE_DPCORE:
+        return VR_LOGTYPE_DPCORE;
+    }
+
+    /* Should never reach here */
+    return 0;
+}
+
+static unsigned int *
+dpdk_get_enabled_log_types(int *size)
+{
+    unsigned int enabled_flags = rte_get_log_type() & ~(RTE_LOGTYPE_USER1 - 1);
+
+    /* Count number of enabled types (set bits in a number) */
+    int num = __builtin_popcount(enabled_flags);
+
+    unsigned int *enabled_array =
+            vr_malloc(sizeof(int) * num, VR_LOG_TYPES_OBJECT);
+    int i;
+    unsigned int shift = 1;
+
+    for (i = 0; i < num; shift <<= 1) {
+        if (enabled_flags & shift) {
+            enabled_array[i++] = dpdk_log_type_to_vr_type(shift);
+        }
+    }
+
+    *size = i;
+    return enabled_array;
+}
 
 struct host_os dpdk_host = {
     .hos_printf                     =    dpdk_printf,
@@ -1004,6 +1166,10 @@ struct host_os dpdk_host = {
     .hos_add_mpls                   =    dpdk_add_mpls,
     .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
     /* TODO: support .hos_enqueue_to_assembler */
+    .hos_set_log_level              =    dpdk_set_log_level,
+    .hos_set_log_type               =    dpdk_set_log_type,
+    .hos_get_log_level              =    dpdk_get_log_level,
+    .hos_get_enabled_log_types      =    dpdk_get_enabled_log_types,
 };
 
 struct host_os *
@@ -1222,3 +1388,4 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 
     return ret;
 }
+

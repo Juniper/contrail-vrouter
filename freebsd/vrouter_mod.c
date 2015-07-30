@@ -645,6 +645,35 @@ out:
 	return (0);
 }
 
+static void
+fh_set_log_level(unsigned int log_level)
+{
+	/* TODO: Implement similarly to the DPDK vRouter */
+}
+
+static void
+fh_set_log_type(unsigned int log_type, int enable)
+{
+	/* TODO: Implement similarly to the DPDK vRouter */
+}
+
+static unsigned int
+fh_get_log_level(void)
+{
+	/* TODO: Implement similarly to the DPDK vRouter */
+
+	return 0;
+}
+
+static unsigned int *
+fh_get_enabled_log_types(int *size)
+{
+	/* TODO: Implement similarly to the DPDK vRouter */
+
+	size = 0;
+	return NULL;
+}
+
 struct host_os freebsd_host = {
 	.hos_malloc			= fh_malloc,
 	.hos_zalloc			= fh_zalloc,
@@ -684,6 +713,10 @@ struct host_os freebsd_host = {
 	.hos_pull_inner_headers_fast	= NULL, /* TODO(md): to implement */
 	.hos_get_udp_src_port		= fh_get_udp_src_port,
 	.hos_pkt_from_vm_tcp_mss_adj	= fh_pkt_from_vm_tcp_mss_adj,
+	.hos_set_log_level              = fh_set_log_level,
+	.hos_set_log_type               = fh_set_log_type,
+	.hos_get_log_level              = fh_get_log_level,
+	.hos_get_enabled_log_types      = fh_get_enabled_log_types,
 };
 
 struct host_os *
