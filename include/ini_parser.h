@@ -31,6 +31,7 @@ extern int get_domain(void);
 extern int get_socket_type(void);
 extern int get_vrouter_ip(void);
 extern int get_platform(void);
+extern const char *get_platform_str(void);
 extern int get_protocol(void);
 
 extern int parse_ini_file(void);

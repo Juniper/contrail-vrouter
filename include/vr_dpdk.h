@@ -37,7 +37,11 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
  * See more debug options below.
  */
 #undef RTE_LOG_LEVEL
+#ifdef COMPILE_DEBUG_LOGS
+#define RTE_LOG_LEVEL               RTE_LOG_DEBUG
+#else
 #define RTE_LOG_LEVEL               RTE_LOG_INFO
+#endif
 
 /*
  * By default all the logtypes are enabled.
@@ -47,7 +51,9 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 #define RTE_LOGTYPE_USOCK           RTE_LOGTYPE_USER2
 #define RTE_LOGTYPE_UVHOST          RTE_LOGTYPE_USER3
 #define RTE_LOGTYPE_DPCORE          RTE_LOGTYPE_USER4
-#define VR_DPDK_LOGTYPE_DISABLE     (0)
+/* Disable the rest (undefined) logtypes */
+#define VR_DPDK_LOGTYPE_DISABLE     (RTE_LOGTYPE_USER5 | RTE_LOGTYPE_USER6 | \
+                                     RTE_LOGTYPE_USER7 | RTE_LOGTYPE_USER8)
 
 /*
  * Debug options:

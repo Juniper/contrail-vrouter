@@ -239,3 +239,8 @@ get_platform(void)
     return LINUX_PLATFORM;
 }
 
+const char *
+get_platform_str(void)
+{
+    return read_string(DEFAULT_SECTION, PLATFORM_KEY);
+}
