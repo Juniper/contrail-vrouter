@@ -26,6 +26,20 @@ extern "C" {
 #define VR_CPU_MASK     0xff
 extern unsigned int vr_num_cpus;
 
+#define VR_LOGTYPE_VROUTER  (1U << 0)
+#define VR_LOGTYPE_USOCK    (1U << 1)
+#define VR_LOGTYPE_UVHOST   (1U << 2)
+#define VR_LOGTYPE_DPCORE   (1U << 3)
+
+#define VR_LOG_EMERG    1U
+#define VR_LOG_ALERT    2U
+#define VR_LOG_CRIT     3U
+#define VR_LOG_ERR      4U
+#define VR_LOG_WARNING  5U
+#define VR_LOG_NOTICE   6U
+#define VR_LOG_INFO     7U
+#define VR_LOG_DEBUG    8U
+
 enum vr_malloc_objects_t {
     VR_ASSEMBLER_TABLE_OBJECT,
     VR_BRIDGE_MAC_OBJECT,
@@ -56,6 +70,7 @@ enum vr_malloc_objects_t {
     VR_INTERFACE_TABLE_OBJECT,
     VR_INTERFACE_VRF_TABLE_OBJECT,
     VR_ITABLE_OBJECT,
+    VR_LOG_TYPES_OBJECT,
     VR_MALLOC_OBJECT,
     VR_MESSAGE_OBJECT,
     VR_MESSAGE_RESPONSE_OBJECT,
@@ -172,6 +187,10 @@ struct host_os {
     void (*hos_del_mpls)(struct vrouter *, unsigned);
     int (*hos_enqueue_to_assembler)(struct vrouter *, struct vr_packet *,
             struct vr_forwarding_md *);
+    void (*hos_set_log_level)(unsigned int vr_log_level);
+    void (*hos_set_log_type)(unsigned int vr_log_type, int enable);
+    unsigned int (*hos_get_log_level)(void);
+    unsigned int *(*hos_get_enabled_log_types)(int *);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -214,6 +233,10 @@ struct host_os {
 #define vr_pkt_may_pull                 vrouter_host->hos_pkt_may_pull
 #define vr_gro_process                  vrouter_host->hos_gro_process
 #define vr_enqueue_to_assembler         vrouter_host->hos_enqueue_to_assembler
+#define vr_set_log_level                vrouter_host->hos_set_log_level
+#define vr_set_log_type                 vrouter_host->hos_set_log_type
+#define vr_get_log_level                vrouter_host->hos_get_log_level
+#define vr_get_enabled_log_types        vrouter_host->hos_get_enabled_log_types
 
 struct vr_malloc_stats {
     int64_t ms_size;

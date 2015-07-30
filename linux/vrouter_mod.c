@@ -2364,6 +2364,35 @@ lh_create_timer(struct vr_timer *vtimer)
     return 0;
 }
 
+static void
+lh_set_log_level(unsigned int log_level)
+{
+   /* TODO: Implement similarly to the DPDK vRouter */
+}
+
+static void
+lh_set_log_type(unsigned int log_type, int enable)
+{
+   /* TODO: Implement similarly to the DPDK vRouter */
+}
+
+static unsigned int
+lh_get_log_level(void)
+{
+   /* TODO: Implement similarly to the DPDK vRouter */
+
+   return 0;
+}
+
+static unsigned int *
+lh_get_enabled_log_types(int *size)
+{
+   /* TODO: Implement similarly to the DPDK vRouter */
+
+   size = 0;
+   return NULL;
+}
+
 struct host_os linux_host = {
     .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
@@ -2408,6 +2437,10 @@ struct host_os linux_host = {
     .hos_pkt_may_pull               =       lh_pkt_may_pull,
     .hos_gro_process                =       lh_gro_process,
     .hos_enqueue_to_assembler       =       lh_enqueue_to_assembler,
+    .hos_set_log_level              =       lh_set_log_level,
+    .hos_set_log_type               =       lh_set_log_type,
+    .hos_get_log_level              =       lh_get_log_level,
+    .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
 };
     
 struct host_os *

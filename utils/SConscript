@@ -3,6 +3,7 @@
 #
 
 Import('VRouterEnv')
+
 env = VRouterEnv.Clone()
 VRutilsEnv = env;
 
@@ -70,7 +71,8 @@ vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats,
-          vxlan, vrouter, vrmemstats]
+             vxlan, vrouter, vrmemstats]
+
 scripts  = ['vifdump']
 env.Default(binaries)
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))

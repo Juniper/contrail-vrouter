@@ -331,6 +331,9 @@ dpdk_init(void)
     /* disable unwanted logtypes for debug purposes */
     rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
 
+    /* set default log level to INFO */
+    rte_set_log_level(RTE_LOG_INFO);
+
     /* TODO: If the host does not support KNIs (i.e. RedHat), we'll get
      * a panic here.
      * So the initialization should be moved to vr_dpdk_knidev_init()
