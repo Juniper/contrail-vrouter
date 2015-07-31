@@ -981,6 +981,13 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
 
     sarp = (struct vr_arp *)pkt_data(pkt);
 
+    /*
+     * Garp coming from other compute nodes can be just flooded without
+     * considering the route information
+     */
+    if (vr_grat_arp(sarp) && vif_is_fabric(pkt->vp_if))
+        return MR_FLOOD;
+
     memset(&rt, 0, sizeof(rt));
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     rt.rtr_req.rtr_family = AF_INET;
@@ -1005,6 +1012,7 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
 
         rt.rtr_nh = NULL;
     }
+
 
     *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_dpa);
     vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
