@@ -37,8 +37,10 @@ typedef struct vr_dpdk_virtioq {
     volatile vq_ready_state_t vdv_ready_state;
     unsigned int vdv_vif_idx;
     struct rte_ring *vdv_pring;
-    int vdv_callfd;
     uint16_t vdv_last_used_idx;
+    int vdv_callfd;
+    uint64_t vdv_nb_syscalls;
+    uint64_t vdv_nb_nombufs;
 
     /* Big and less frequently used fields */
     struct rte_port_in_stats vdv_in_stats;
@@ -76,4 +78,8 @@ int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
                             vq_ready_state_t ready);
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);
 void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
+
+extern struct rte_port_in_ops vr_dpdk_virtio_reader_ops;
+extern struct rte_port_out_ops vr_dpdk_virtio_writer_ops;
+
 #endif /* __VR_DPDK_VIRTIO_H__ */

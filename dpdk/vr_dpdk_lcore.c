@@ -307,7 +307,7 @@ vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg)
         vr_dpdk_lcore_cmd_handle(lcore);
     /* we need to wake up service lcores so they could handle the command */
     else if (lcore_id == VR_DPDK_PACKET_LCORE_ID)
-        vr_dpdk_packet_wakeup();
+        vr_dpdk_packet_wakeup(NULL);
     else if (lcore_id == VR_DPDK_NETLINK_LCORE_ID)
         vr_dpdk_netlink_wakeup();
 }
@@ -391,6 +391,7 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
      */
     /* +chunk size for the round up */
     struct rte_mbuf *lcore_pkts[nb_fwd_lcores][nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ];
+    struct vr_interface_stats *stats;
 
     RTE_LOG(DEBUG, VROUTER, "%s: distributing %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -434,6 +435,7 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
             RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
                  __func__, lcore_nb_pkts, dst_lcore_id + VR_DPDK_FWD_LCORE_ID);
 
+            stats = vif_get_stats(vif, this_lcore_id);
             /* round up the number of packets to the chunk size */
             chunk_nb_pkts = (lcore_nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
                     /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
@@ -442,16 +444,18 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK
                     (void **)&lcore_pkts[i][0],
                     chunk_nb_pkts);
             if (unlikely(ret == -ENOBUFS)) {
+                stats->vis_queue_ierrors += lcore_nb_pkts;
                 /* never happens, because the size of the ring is greater than mempool */
                 RTE_LOG(INFO, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
                      __func__, i + VR_DPDK_FWD_LCORE_ID, lcore_nb_pkts,
                      rte_ring_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
                      rte_ring_free_count(vr_dpdk.lcores[i + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring));
                 /* ring is full, drop the packets */
-                /* TODO: increment per-ring counters */
                 for (j = 1; j < lcore_nb_pkts; j++) {
                     vr_dpdk_pfree(lcore_pkts[i][j], VP_DROP_INTERFACE_DROP);
                 }
+            } else {
+                stats->vis_queue_ipackets += lcore_nb_pkts;
             }
         }
     }
@@ -536,9 +540,6 @@ dpdk_lcore_rx(struct vr_dpdk_lcore *lcore)
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
     struct vr_dpdk_queue *rx_queue;
     uint32_t nb_pkts;
-    const unsigned lcore_id = rte_lcore_id();
-    struct rte_port_in_stats port_stats;
-    struct vr_interface_stats *vr_stats;
 
     /* for all hardware RX queues */
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
@@ -550,10 +551,6 @@ dpdk_lcore_rx(struct vr_dpdk_lcore *lcore)
             rte_prefetch0(rx_queue->q_vif);
 
             total_pkts += nb_pkts;
-            /**
-             * TODO: When we hash MPLSoGRE packets to different lcores, we will
-             * need to increment vis_ifrxrngenqpkts for physical interface here.
-             */
             if (likely(vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts) == 0)) {
                 /* packets have been hashed by NIC, just route them */
                 vr_dpdk_lcore_vroute(rx_queue->q_vif, pkts, nb_pkts);
@@ -561,9 +558,6 @@ dpdk_lcore_rx(struct vr_dpdk_lcore *lcore)
                 /* distribute the packets among forwarding lcores */
                 vr_dpdk_lcore_distribute(rx_queue->q_vif, pkts, nb_pkts);
             }
-
-            vr_stats = vif_get_stats(rx_queue->q_vif, lcore_id);
-            dpdk_port_in_stats_update(rx_queue, &port_stats, vr_stats);
         }
     }
 
@@ -625,12 +619,11 @@ dpdk_lcore_rings_push(struct vr_dpdk_lcore *lcore)
     uint64_t total_pkts = 0;
     struct rte_ring *ring;
     struct vr_dpdk_ring_to_push *rtp;
-    struct vr_interface_stats *vr_stats;
+    struct vr_interface_stats *stats;
     int i;
     uint32_t nb_pkts;
     uint16_t nb_rtp;
     struct rte_mbuf *pkts[VR_DPDK_TX_BURST_SZ];
-    struct rte_port_out_stats port_stats;
     const unsigned lcore_id = rte_lcore_id();
 
     /* for all TX rings to push */
@@ -648,7 +641,6 @@ dpdk_lcore_rings_push(struct vr_dpdk_lcore *lcore)
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
 
-            vr_stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
             /* check if TX queue is available */
             if (likely(rtp->rtp_tx_queue->txq_ops.f_tx != NULL)) {
                 /* push packets to the TX queue */
@@ -657,12 +649,10 @@ dpdk_lcore_rings_push(struct vr_dpdk_lcore *lcore)
                     rtp->rtp_tx_queue->txq_ops.f_tx(
                         rtp->rtp_tx_queue->q_queue_h, pkts[i]);
                 }
-
-                dpdk_port_out_stats_update(rtp->rtp_tx_queue, &port_stats,
-                                            vr_stats);
             } else {
                 /* TX queue has been deleted, so just drop the packets */
-                vr_stats->vis_ifenqdrops += nb_pkts;
+                stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
+                stats->vis_port_oerrors += nb_pkts;
                 for (i = 0; i < nb_pkts; i++)
                     /* TODO: a separate counter for this drop */
                     vr_dpdk_pfree(pkts[i], VP_DROP_INTERFACE_DROP);
@@ -941,6 +931,7 @@ dpdk_lcore_netlink_loop(void)
 
         if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
+        usleep(VR_DPDK_SLEEP_SERVICE_US);
     } /* lcore loop */
 
     RTE_LOG(DEBUG, VROUTER, "Bye-bye from NetLink lcore %u\n", lcore_id);
@@ -962,6 +953,7 @@ dpdk_lcore_packet_loop(void)
 
         if (unlikely(vr_dpdk_is_stop_flag_set()))
             break;
+        usleep(VR_DPDK_SLEEP_SERVICE_US);
     } /* lcore loop */
 
     RTE_LOG(DEBUG, VROUTER, "Bye-bye from packet lcore %u\n", lcore_id);

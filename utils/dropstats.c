@@ -41,15 +41,15 @@ static struct nl_client *cl;
 static int resp_code;
 static vr_drop_stats_req stats_req;
 static int help_set, core_set;
-static int core = -1;
+static unsigned int core = (unsigned)-1;
 
 void
 vr_drop_stats_req_process(void *s_req)
 {
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
 
-   if (core_set && core > -1)
-        printf("Statistics for core %d\n\n", core);
+   if (core != (unsigned)-1)
+        printf("Statistics for core %u\n\n", core);
 
     printf("GARP                          %" PRIu64 "\n",
             stats->vds_garp_from_vm);
@@ -175,25 +175,7 @@ vr_build_drop_stats_request(void)
 {
     stats_req.h_op = SANDESH_OP_GET;
     stats_req.vds_rid = 0;
-
-    /**
-     * Implementation of getting per-core drop statistics is based on this
-     * little trick to avoid making changes in how agent makes requests for
-     * statistics. From vRouter's and agent's point of view, request for
-     * stats for 0th core means a request for stats summed up for all the
-     * cores. So cores are enumerated starting with 1.
-     * Meanwhile, from user's point of view they are enumerated starting
-     * with 0 (e.g. dropstats --core 0 means 'drop statistics for the very
-     * first (0th) core'). This is how Linux enumerates CPUs, so it should
-     * be more intuitive for the user.
-     *
-     * Agent is not aware of possibility of asking for per-core stats. Its
-     * requests have vds_core implicitly set to 0. So we need to make a
-     * conversion between those enumerating systems. The dropstats utility
-     * increments by 1 the core number user asked for. Then it is
-     * decremented back in vRouter.
-     */
-    stats_req.vds_core = (unsigned int)(core + 1);
+    stats_req.vds_core = core;
 
     return &stats_req;
 }
@@ -301,11 +283,12 @@ parse_long_opts(int opt_index, char *opt_arg)
 
     switch (opt_index) {
     case CORE_OPT_INDEX:
-        core = (int)strtol(opt_arg, NULL, 0);
-        if (core < 0)
-            core = 0;
-        if (errno)
+        core = (unsigned)strtol(opt_arg, NULL, 0);
+        if (errno) {
+            printf("Error parsing core %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
             Usage();
+        }
         break;
 
     case HELP_OPT_INDEX:

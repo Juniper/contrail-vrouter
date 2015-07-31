@@ -1822,13 +1822,44 @@ generate_resp:
 }
 
 static void
+vr_interface_add_response(vr_interface_req *req,
+                            struct vr_interface_stats *stats)
+{
+    req->vifr_ibytes += stats->vis_ibytes;
+    req->vifr_ipackets += stats->vis_ipackets;
+    req->vifr_ierrors += stats->vis_ierrors;
+    req->vifr_obytes += stats->vis_obytes;
+    req->vifr_opackets += stats->vis_opackets;
+    req->vifr_oerrors += stats->vis_oerrors;
+
+    req->vifr_queue_ipackets += stats->vis_queue_ipackets;
+    req->vifr_queue_ierrors += stats->vis_queue_ierrors;
+    req->vifr_queue_opackets += stats->vis_queue_opackets;
+    req->vifr_queue_oerrors += stats->vis_queue_oerrors;
+
+    req->vifr_port_ipackets += stats->vis_port_ipackets;
+    req->vifr_port_ierrors += stats->vis_port_ierrors;
+    req->vifr_port_isyscalls += stats->vis_port_isyscalls;
+    req->vifr_port_inombufs += stats->vis_port_inombufs;
+    req->vifr_port_opackets += stats->vis_port_opackets;
+    req->vifr_port_oerrors += stats->vis_port_oerrors;
+    req->vifr_port_osyscalls += stats->vis_port_osyscalls;
+
+    req->vifr_dev_ibytes += stats->vis_dev_ibytes;
+    req->vifr_dev_ipackets += stats->vis_dev_ipackets;
+    req->vifr_dev_ierrors += stats->vis_dev_ierrors;
+    req->vifr_dev_inombufs += stats->vis_dev_inombufs;
+    req->vifr_dev_obytes += stats->vis_dev_obytes;
+    req->vifr_dev_opackets += stats->vis_dev_opackets;
+    req->vifr_dev_oerrors += stats->vis_dev_oerrors;
+}
+
+static void
 vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
                         unsigned int core)
 {
-    unsigned int i;
-    struct vr_interface_stats *stats;
+    unsigned int cpu;
     struct vr_interface_settings settings;
-    int real_core;
 
     req->vifr_core = core;
     req->vifr_type = intf->vif_type;
@@ -1873,86 +1904,50 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         req->vifr_src_mac_size = 0;
     }
 
+    /* vif counters */
     req->vifr_ibytes = 0;
     req->vifr_ipackets = 0;
     req->vifr_ierrors = 0;
     req->vifr_obytes = 0;
     req->vifr_opackets = 0;
     req->vifr_oerrors = 0;
-    req->vifr_ifenqpkts = 0;
-    req->vifr_ifenqdrops = 0;
-    req->vifr_ifdeqpkts = 0;
-    req->vifr_ifdeqdrops = 0;
-    req->vifr_iftxrngenqpkts = 0;
-    req->vifr_iftxrngenqdrops = 0;
-    req->vifr_ifrxrngenqpkts = 0;
-    req->vifr_ifrxrngenqdrops = 0;
+    /* queue counters */
+    req->vifr_queue_ipackets = 0;
+    req->vifr_queue_ierrors = 0;
+    req->vifr_queue_opackets = 0;
+    req->vifr_queue_oerrors = 0;
+    /* port counters */
+    req->vifr_port_ipackets = 0;
+    req->vifr_port_ierrors = 0;
+    req->vifr_port_isyscalls = 0;
+    req->vifr_port_inombufs = 0;
+    req->vifr_port_opackets = 0;
+    req->vifr_port_oerrors = 0;
+    req->vifr_port_osyscalls = 0;
+    /* device counters */
+    req->vifr_dev_ibytes = 0;
+    req->vifr_dev_ipackets = 0;
+    req->vifr_dev_ierrors = 0;
+    req->vifr_dev_inombufs = 0;
+    req->vifr_dev_obytes = 0;
+    req->vifr_dev_opackets = 0;
+    req->vifr_dev_oerrors = 0;
 
-    /**
-     * Implementation of getting per-core vif statistics is based on this
-     * little trick to avoid making changes in how agent makes requests for
-     * statistics. From vRouter's and agent's point of view, request for stats
-     * for 0th core means a request for stats summed up for all the cores.
-     * So cores are enumerated starting with 1.
-     * Meanwhile, from user's point of view they are enumerated starting with 0
-     * (e.g. vif --list --core 0 means 'vif stats for the very first (0th)
-     * core'). This is how Linux enumerates CPUs, so it should be more
-     * intuitive for the user.
-     *
-     * Agent is not aware of possibility of asking for per-core stats. Its
-     * requests have vifr_core implicitly set to 0. So we need to make a
-     * conversion between those enumerating systems. The vif utility increments
-     * by 1 the core number user asked for. Then this modified requests comes
-     * here. See the comment below.
-     */
-    if (req->vifr_core == 0) { /* user or agent wants summed up stats */
-        for (i = 0; i < vr_num_cpus; i++) {
-            stats = vif_get_stats(intf, i);
-            req->vifr_ibytes += stats->vis_ibytes;
-            req->vifr_ipackets += stats->vis_ipackets;
-            req->vifr_ierrors += stats->vis_ierrors;
-            req->vifr_obytes += stats->vis_obytes;
-            req->vifr_opackets += stats->vis_opackets;
-            req->vifr_oerrors += stats->vis_oerrors;
-            req->vifr_ifenqpkts += stats->vis_ifenqpkts;
-            req->vifr_ifdeqpkts += stats->vis_ifdeqpkts;
-            req->vifr_ifdeqdrops += stats->vis_ifdeqdrops;
-            req->vifr_ifenqdrops += stats->vis_ifenqdrops;
-            req->vifr_iftxrngenqpkts += stats->vis_iftxrngenqpkts;
-            req->vifr_iftxrngenqdrops += stats->vis_iftxrngenqdrops;
-            req->vifr_ifrxrngenqpkts += stats->vis_ifrxrngenqpkts;
-            req->vifr_ifrxrngenqdrops += stats->vis_ifrxrngenqdrops;
-        }
-    /* user wants stats for a specific core */
-    } else if (req->vifr_core > 0 && req->vifr_core <= vr_num_cpus) {
-            /**
-             * real_core is what user really asks for.
-             * If a request came for stats for 1st core, it means user
-             * asked for 0th core. If request was made for 2nd, user wanted
-             * the 1st, and so on.
-             *
-             * TODO: This would be much simplier if agent could explicitly ask
-             * for stats for 'minus 1st' core, meaning 'all the cores'.
-             */
-            real_core = req->vifr_core;
-            real_core--;
-            stats = vif_get_stats(intf, real_core);
-
-            req->vifr_ibytes = stats->vis_ibytes;
-            req->vifr_ipackets = stats->vis_ipackets;
-            req->vifr_ierrors = stats->vis_ierrors;
-            req->vifr_obytes = stats->vis_obytes;
-            req->vifr_opackets = stats->vis_opackets;
-            req->vifr_oerrors = stats->vis_oerrors;
-            req->vifr_ifenqpkts = stats->vis_ifenqpkts;
-            req->vifr_ifenqdrops = stats->vis_ifenqdrops;
-            req->vifr_ifdeqpkts = stats->vis_ifdeqpkts;
-            req->vifr_ifdeqdrops = stats->vis_ifdeqdrops;
-            req->vifr_iftxrngenqpkts = stats->vis_iftxrngenqpkts;
-            req->vifr_iftxrngenqdrops = stats->vis_iftxrngenqdrops;
-            req->vifr_ifrxrngenqpkts = stats->vis_ifrxrngenqpkts;
-            req->vifr_ifrxrngenqdrops = stats->vis_ifrxrngenqdrops;
+    /* call host callback if available */
+    if (hif_ops->hif_stats_update) {
+        hif_ops->hif_stats_update(intf, core);
     }
+
+    if (core == (unsigned)-1) {
+        /* summed up stats */
+        for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+            vr_interface_add_response(req, vif_get_stats(intf, cpu));
+        }
+    } else if (core < vr_num_cpus) {
+        /* stats for a specific core */
+        vr_interface_add_response(req, vif_get_stats(intf, core));
+    }
+    /* otherwise the conters will be zeros */
 
     req->vifr_speed = -1;
     req->vifr_duplex = -1;
@@ -2019,18 +2014,6 @@ vr_interface_get(vr_interface_req *req)
     struct vr_interface *vif = NULL;
     struct vrouter *router;
     vr_interface_req *resp = NULL;
-    unsigned int core;
-
-    /**
-     * Check if requested core number is sane. If not, let's assume the
-     * request was made for summed up stats for all the cores.
-     */
-    if (req->vifr_core > 0 && req->vifr_core <= vr_num_cpus) {
-        core = req->vifr_core;
-    } else {
-        core = 0;
-    }
-
 
     router = vrouter_get(req->vifr_rid);
     if (!router) {
@@ -2050,7 +2033,7 @@ vr_interface_get(vr_interface_req *req)
             goto generate_response;
         }
 
-        vr_interface_make_req(resp, vif, core);
+        vr_interface_make_req(resp, vif, req->vifr_core);
     } else
         ret = -ENOENT;
 
@@ -2070,18 +2053,7 @@ vr_interface_dump(vr_interface_req *r)
     vr_interface_req *resp = NULL;
     struct vr_interface *vif;
     struct vrouter *router = vrouter_get(r->vifr_vrf);
-    unsigned int core;
     struct vr_message_dumper *dumper = NULL;
-
-    /**
-     * Check if requested core number is sane. If not, let's assume the
-     * request was made for summed up stats for all the cores.
-     */
-    if (r->vifr_core > 0 && r->vifr_core <= vr_num_cpus) {
-        core = r->vifr_core;
-    } else {
-        core = 0;
-    }
 
     if (!router && (ret = -ENODEV))
         goto generate_response;
@@ -2105,7 +2077,7 @@ vr_interface_dump(vr_interface_req *r)
             i < router->vr_max_interfaces; i++) {
         vif = router->vr_interfaces[i];
         if (vif) {
-            vr_interface_make_req(resp, vif, core);
+            vr_interface_make_req(resp, vif, r->vifr_core);
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;

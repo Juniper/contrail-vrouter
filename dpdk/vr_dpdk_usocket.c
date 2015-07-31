@@ -456,7 +456,7 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
 {
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_interface_stats *vr_stats;
+    struct vr_interface_stats *stats;
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
@@ -464,8 +464,9 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
      * Packets is read from the agent's socket here. On success, a counter for
      * packets dequeued from the interface is incremented.
      */
-    vr_stats = vif_get_stats(usockp->usock_vif, lcore_id);
+    stats = vif_get_stats(usockp->usock_vif, lcore_id);
     if (usockp->usock_vif) {
+        stats->vis_port_ipackets++;
         /* buf_addr and data_off do not change */
         usockp->usock_mbuf->data_len = usockp->usock_read_len;
         usockp->usock_mbuf->pkt_len = usockp->usock_read_len;
@@ -475,8 +476,6 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
         vr_dpdk_lcore_vroute(usockp->usock_vif, &usockp->usock_mbuf, 1);
         /* flush packet TX queues immediately */
         vr_dpdk_lcore_flush(lcore);
-
-        vr_stats->vis_ifdeqpkts++;
     } else {
         /**
          * If reading from socket failed, increment counter for interface
@@ -484,7 +483,7 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
          */
         RTE_LOG(ERR, VROUTER, "Error receiving from packet socket: no vif attached\n");
         vr_dpdk_pfree(usockp->usock_mbuf, VP_DROP_INTERFACE_DROP);
-        vr_stats->vis_ifdeqdrops++;
+        stats->vis_port_ierrors++;
     }
 
     usockp->usock_mbuf = NULL;
@@ -501,7 +500,7 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
     unsigned nb_pkts;
     struct rte_mbuf *mbuf_arr[VR_DPDK_RX_BURST_SZ];
     const unsigned lcore_id = rte_lcore_id();
-    struct vr_interface_stats *vr_stats;
+    struct vr_interface_stats *stats;
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining packet ring...\n", __func__,
             pthread_self());
@@ -509,24 +508,15 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
     if (unlikely(usockp->usock_parent->usock_vif == NULL))
         return;
 
-    vr_stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
+    stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
             (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ);
         for (i = 0; i < nb_pkts; i++) {
-            /**
-             * Packets is written to the agent's socket here. On success,
-             * a counter for packets enqueued to the interface is incremented.
-             */
             if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) > 0)
-                vr_stats->vis_ifenqpkts++;
-            else {
-                /**
-                 * If writing to socket failed, increment counter for interface
-                 * enqueue drops.
-                 */
-                vr_stats->vis_ifenqdrops++;
-            }
+                stats->vis_port_opackets++;
+            else
+                stats->vis_port_oerrors++;
 
             rte_pktmbuf_free(mbuf_arr[i]);
         }
