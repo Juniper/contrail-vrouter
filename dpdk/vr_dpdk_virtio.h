@@ -52,6 +52,22 @@ typedef struct vr_dpdk_virtioq {
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
 } vr_dpdk_virtioq_t;
 
+typedef struct vr_dpdk_uvh_mmap_addr{
+    uint64_t unmap_mmap_addr;                 /**< mmap() returned address */
+    uint64_t unmap_size;                      /**< Size of allocated memory */
+    uint64_t unmap_blksz;                     /**< fd block size */
+} vr_dpdk_uvh_mmap_addr_t;
+
+typedef struct vr_dpdk_uvh_vif_mmap_addr{
+    unsigned int vu_nvrings;
+    uint32_t vu_nregions;
+    struct vr_dpdk_uvh_mmap_addr vu_mmap_data[VR_MAX_INTERFACES];
+
+}vr_dpdk_uvh_vif_mmap_addr_t;
+
+uint64_t vr_dpdk_virtio_uvh_get_blk_size(int fd);
+int vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *vif);
+int vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t *const vif_data_mmap);
 uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
 uint16_t vr_dpdk_virtio_ntxqs(struct vr_interface *vif);
 struct vr_dpdk_queue *
