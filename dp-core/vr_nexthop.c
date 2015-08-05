@@ -77,17 +77,18 @@ void
 vrouter_put_nexthop(struct vr_nexthop *nh)
 {
     int i;
+    unsigned int ref_cnt;
+
+    if (!nh)
+        return;
 
     /* This function might get invoked with zero ref_cnt */
-    if (nh->nh_users) {
-        nh->nh_users--;
+    ref_cnt = nh->nh_users;
+    if (ref_cnt) {
+        ref_cnt = __sync_sub_and_fetch(&nh->nh_users, 1);
     }
 
-    if (!nh->nh_users ) {
-
-        if (!vr_not_ready)
-            vr_delay_op();
-
+    if (!ref_cnt ) {
         /* If composite de-ref the internal nexthops */
         if (nh->nh_type == NH_COMPOSITE) {
             for (i = 0; i < nh->nh_component_cnt; i++) {
