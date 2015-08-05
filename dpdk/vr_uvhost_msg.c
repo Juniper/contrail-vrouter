@@ -21,6 +21,7 @@
 #include <rte_errno.h>
 #include <rte_hexdump.h>
 
+extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
 
 /*
@@ -83,9 +84,9 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
     vr_uvh_client_mem_region_t *region;
     VhostUserMemory *vum_msg;
     uint64_t size;
+    vr_dpdk_uvh_vif_mmap_addr_t *const vif = &(vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx]);
 
     vum_msg = &vru_cl->vruc_msg.memory;
-
     vr_uvhost_log("Number of memory regions: %d\n", vum_msg->nregions);
     for (i = 0; i < vum_msg->nregions; i++) {
         vr_uvhost_log("Region %d: physical address 0x%" PRIx64 ", size 0x%"
@@ -110,9 +111,6 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                                             MAP_SHARED,
                                             vru_cl->vruc_fds_sent[i],
                                             0);
-            /* the file descriptor is no longer needed */
-            close(vru_cl->vruc_fds_sent[i]);
-            vru_cl->vruc_fds_sent[i] = -1;
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
                 vr_uvhost_log("mmap for size 0x%" PRIx64 " failed for FD %d"
@@ -120,14 +118,31 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                         size,
                         vru_cl->vruc_fds_sent[i],
                         vru_cl->vruc_path, rte_strerror(errno));
+                /* the file descriptor is no longer needed */
+                close(vru_cl->vruc_fds_sent[i]);
+                vru_cl->vruc_fds_sent[i] = -1;
                 return -1;
             }
+            /* Set values for munmap(2) function. */
+            vif->vu_mmap_data[i].unmap_blksz = (vr_dpdk_virtio_uvh_get_blk_size
+                                                    (
+                                                     vru_cl->vruc_fds_sent[i]
+                                                     )
+                                       ); 
 
+            vif->vu_mmap_data[i].unmap_mmap_addr = ((uint64_t)region->vrucmr_mmap_addr);
+            vif->vu_mmap_data[i].unmap_size = size;
+
+            /* the file descriptor is no longer needed */
+            close(vru_cl->vruc_fds_sent[i]);
+            vru_cl->vruc_fds_sent[i] = -1;
             region->vrucmr_mmap_addr += vum_msg->regions[i].mmap_offset;
         }
     }
 
+    /* Save the number of regions. */
     vru_cl->vruc_num_mem_regions = vum_msg->nregions;
+    vif->vu_nregions = vum_msg->nregions;
 
     return 0;
 }
@@ -153,7 +168,6 @@ vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
                       vring_idx);
         return -1;
     }
-
     if (vr_dpdk_set_ring_num_desc(vru_cl->vruc_idx, vring_idx,
                                   vum_msg->state.num)) {
         vr_uvhost_log("Could set number of vring descriptors in vhost server"
@@ -163,6 +177,8 @@ vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
+    /* Increments vif's number of vrings. */
+    vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx].vu_nvrings++;
     return 0;
 }
 
@@ -301,7 +317,15 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
                       vring_idx);
         return -1;
     }
+    if (vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx].vu_nvrings == 0) {
+      vr_uvhost_log("Negative nvrings value, vif_idx = %d \n",
+                    vru_cl->vruc_idx);
 
+      return -1;
+    }
+
+    /* Decrements vif's number of vrings. */
+    vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx].vu_nvrings--;
     if (vr_dpdk_virtio_get_vring_base(vru_cl->vruc_idx, vring_idx,
                                      &vum_msg->state.num)) {
         vr_uvhost_log("Couldn't get vring base in vhost server %d %d\n",
