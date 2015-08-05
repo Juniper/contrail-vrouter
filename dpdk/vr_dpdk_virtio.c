@@ -13,9 +13,15 @@
 #include <linux/virtio_net.h>
 #include <sys/eventfd.h>
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <rte_malloc.h>
 #include <rte_memcpy.h>
 
+vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 
@@ -49,6 +55,73 @@ struct rte_port_out_ops dpdk_virtio_writer_ops = {
     .f_flush = dpdk_virtio_to_vm_flush,
     .f_stats = dpdk_virtio_writer_stats_read
 };
+
+/*
+ * vr_dpdk_vrtio_uvh_get_blk_size - returns the block size of fd.
+ */
+uint64_t
+vr_dpdk_virtio_uvh_get_blk_size(int fd)
+{
+    struct stat fd_stat;
+    memset(&fd_stat, 0, sizeof(stat));
+
+    return fstat(fd, &fd_stat) == 0? (uint64_t)fd_stat.st_blksize : 0;
+
+}
+
+
+/*
+ * vr_dpdk_virtio_uvh_vif_munmap - Unmaps every region,
+ * which has been allocated via Qemu's file descriptor.
+ */
+int
+vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *const vif)
+{
+   uint32_t i = 0;
+   int ret = 0;
+   int f_ret;
+   vr_dpdk_uvh_mmap_addr_t *vif_data_mmap = NULL;
+
+   /* Check if nvrings value is zero.*/
+   if (vif->vu_nvrings) {
+      return 1;
+   }
+   for (i = 0; i < vif->vu_nregions; i++) {
+
+        if (vif->vu_mmap_data[i].unmap_mmap_addr) {
+           vif_data_mmap = &(vif->vu_mmap_data[i]);
+           f_ret = vr_dpdk_virtio_uvh_vif_region_munmap(vif_data_mmap);
+           if (!f_ret) {
+                memset(vif_data_mmap, 0, sizeof(vr_dpdk_uvh_mmap_addr_t));
+            } else if(f_ret && !ret) {
+                ret = f_ret;
+            }
+        }
+    }
+   if (!ret) {
+        /* Every vif's region was successfully unmmaped. */
+        memset(vif, 0, sizeof(vr_dpdk_uvh_vif_mmap_addr_t));
+   }
+    return ret;
+}
+
+/*
+ * vr_dpdk_virtio_uvh_vif_region_munmap - deallocates specified region
+ *
+ */
+int
+vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t
+                                     *const vif_data_mmap)
+{
+    uint64_t alignment =  vif_data_mmap->unmap_blksz;
+
+    /* if return value  == -1, munmap(2) failed for a region and set errno,
+     *  still is possible unmap. */
+    return (munmap((void *)(uintptr_t)
+            RTE_ALIGN_FLOOR(vif_data_mmap->unmap_mmap_addr, alignment),
+            RTE_ALIGN_CEIL(vif_data_mmap->unmap_size, alignment))
+           );
+}
 
 /*
  * vr_dpdk_virtio_nrxqs - returns the number of receives queues for a virtio
@@ -616,6 +689,10 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
     rte_wmb();
     synchronize_rcu();
 
+    /*
+     * Unmaps qemu's FDs.
+     */
+    vr_dpdk_virtio_uvh_vif_munmap(&vr_dpdk_virtio_uvh_vif_mmap[vif_idx]);
     return 0;
 }
 
