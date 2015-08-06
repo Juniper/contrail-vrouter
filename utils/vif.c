@@ -98,6 +98,7 @@ static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_FILTERING_OFFLOAD,"Rfl",  "Receive Filtering Offload"},
     {VIF_FLAG_MONITORED,        "Mon",  "Interface is Monitored"},
     {VIF_FLAG_UNKNOWN_UC_FLOOD, "Uuf",  "Unknown Unicast Flood"},
+    {VIF_FLAG_VLAN_OFFLOAD,     "Vof",  "VLAN insert/strip offload"},
 };
 
 static char *

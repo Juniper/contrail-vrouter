@@ -491,7 +491,8 @@ enum vr_opt_index {
     NO_DAEMON_OPT_INDEX,
     HELP_OPT_INDEX,
     VERSION_OPT_INDEX,
-    VLAN_OPT_INDEX,
+    VLAN_TCI_OPT_INDEX,
+    VLAN_NAME_OPT_INDEX,
     VDEV_OPT_INDEX,
     MAX_OPT_INDEX
 };
@@ -503,7 +504,9 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VERSION_OPT_INDEX]             =   {"version",             no_argument,
                                                     NULL,                   0},
-    [VLAN_OPT_INDEX]              =     {"vlan",                required_argument,
+    [VLAN_TCI_OPT_INDEX]            =   {"vlan_tci",            required_argument,
+                                                    NULL,                   0},
+    [VLAN_NAME_OPT_INDEX]           =   {"vlan_name",           required_argument,
                                                     NULL,                   0},
     [VDEV_OPT_INDEX]                =   {"vdev",                required_argument,
                                                     NULL,                   0},
@@ -516,13 +519,14 @@ Usage(void)
 {
     printf(
         "Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n"
-        "             [--vlan <tci>] [--vdev <config>]\n"
+        "             [--vlan_tci <tci>] [--vlan_name <name>] [--vdev <config>]\n"
         "\n"
         "--no-daemon  Do not demonize the vRouter\n"
         "--help       Prints this help message\n"
         "--version    Prints build information\n"
         "\n"
-        "--vlan <tci>     VLAN tag control information\n"
+        "--vlan_tci  <tci>      VLAN tag control information\n"
+        "--vlan_name <name>     VLAN forwarding interface name\n"
         "--vdev <config>  Virtual device configuration\n"
         );
 
@@ -544,16 +548,32 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         exit(0);
         break;
 
-    /* If VLAN tag is set, vRouter will expect tagged packets. The tag
+    /* 
+     * If VLAN tag is set, vRouter will expect tagged packets. The tag
      * will be stripped by NIC or in vr_dpdk_ethdev_rx_emulate() and
      * injected in dpdk_if_tx().
+     *
+     * Received packets with unmatching tag will be forwarded to the VLAN
+     * forwarding interface, that is created in main(). Packets sent on that
+     * interface will be immediately forwarded to the physical interface.
+     *
+     * See following funtions: dpdk_lcore_fwd_io(), vr_dpdk_ethdev_rx_emulate(),
+     * vr_dpdk_lcore_vroute(), dpdk_vlan_forwarding_if_add().
      */
-    case VLAN_OPT_INDEX:
+    case VLAN_TCI_OPT_INDEX:
         errno = 0;
         vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
         if (errno != 0) {
             vr_dpdk.vlan_tag = VLAN_ID_INVALID;
         }
+        break;
+
+    /*
+     * VLAN packets with unmatching tag will be forwarded to the kernel using
+     * an interface with name defined here.
+     */
+    case VLAN_NAME_OPT_INDEX:
+        strncpy(vr_dpdk.vlan_name, opt_arg, sizeof(vr_dpdk.vlan_name) - 1);
         break;
 
 
@@ -608,11 +628,15 @@ static cookie_io_functions_t timestamp_log_func = {
     .write = timestamp_log_write,
 };
 
+extern int dpdk_vlan_forwarding_if_add(void);
+
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
+    strncpy(vr_dpdk.vlan_name, VR_DPDK_VLAN_FWD_DEF_NAME,
+        sizeof(vr_dpdk.vlan_name) - 1);
 
     /* init the timestamp log */
     timestamp_log_stream = fopencookie(NULL, "w+", timestamp_log_func);
@@ -665,6 +689,15 @@ main(int argc, char *argv[])
     if (ret != 0) {
         dpdk_exit();
         return ret;
+    }
+
+    /* create VLAN forwarding interface if needed */
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+        ret = dpdk_vlan_forwarding_if_add();
+        if ( ret != 0) {
+            dpdk_exit();
+            return ret;
+        }
     }
 
     /* run all the lcores */
