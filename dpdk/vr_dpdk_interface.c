@@ -25,9 +25,6 @@
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
 
-extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
-        unsigned short);
-
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
  * Returns 0 on success, < 0 otherwise.
@@ -173,6 +170,39 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     }
 
     return ret;
+}
+
+/* Add VLAN forwarding interface */
+int
+dpdk_vlan_forwarding_if_add(void)
+{
+    int ret;
+    struct vr_interface vlan_fwd_intf;
+
+    strncpy((char *)vlan_fwd_intf.vif_name, vr_dpdk.vlan_name,
+        sizeof(vlan_fwd_intf.vif_name));
+    vlan_fwd_intf.vif_type = VIF_TYPE_VLAN;
+
+    RTE_LOG(INFO, VROUTER, "Adding VLAN forwarding device %s\n",
+        vr_dpdk.vlan_name);
+
+    ret = vr_dpdk_knidev_init(0, &vlan_fwd_intf);
+    if (ret != 0)
+        return ret;
+
+    /* Save KNI handler needed to send packets to the interface. */
+    vr_dpdk.vlan_kni = (struct rte_kni *)vlan_fwd_intf.vif_os;
+
+    /*
+     * Allocate a multi-producer single-consumer ring - a buffer for packets
+     * waiting to be send to the forwarding interface.
+     */
+    vr_dpdk.vlan_ring = vr_dpdk_ring_allocate(VR_DPDK_FWD_LCORE_ID,
+        vr_dpdk.vlan_name, VR_DPDK_TX_RING_SZ, RING_F_SC_DEQ);
+    if (!vr_dpdk.vlan_ring)
+        return -1;
+
+    return 0;
 }
 
 /* Add fabric interface */
@@ -743,14 +773,12 @@ dpdk_hw_checksum(struct vr_packet *pkt)
     /* if a tunnel */
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum in soft */
-        /* TODO: vlan support */
         dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum in hardware */
         dpdk_hw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
     } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
         /* normal IPv4 or IPv6 packet */
-        /* TODO: vlan support */
         dpdk_hw_checksum_at_offset(pkt, pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
@@ -761,7 +789,6 @@ dpdk_sw_checksum(struct vr_packet *pkt, bool will_fragment)
     /* if a tunnel */
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum */
-        /* TODO: vlan support */
         if (!will_fragment)
             dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
                 pkt->vp_data + sizeof(struct ether_hdr));
@@ -769,7 +796,6 @@ dpdk_sw_checksum(struct vr_packet *pkt, bool will_fragment)
         dpdk_sw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
     } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
         /* normal IPv4 or IPv6 packet */
-        /* TODO: vlan support */
         dpdk_sw_checksum_at_offset(pkt, pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
@@ -989,33 +1015,36 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
          * set UDP length, and zero UDP checksum.
          */
         if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
-            /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
 
         } else if (likely(!will_fragment)) {
             /* if wont fragment it later */
-            /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
         }
     }
 
-    /* Inject ethertype and vlan tag.
+    /* Inject ethertype and VLAN tag.
      *
      * Tag only packets that are going to be send to the physical interface,
      * to allow data transfer between compute nodes in the specified VLAN.
      *
-     * VLAN tag is adjustable by user with --vlan parameter: see dpdk_vrouter.c.
-     * If vRouter is not supposed to work in VLAN (parameter was not specified),
-     * packets should not be tagged.
-     *
-     * TODO: Hardware VLAN tag insert.
+     * VLAN tag is adjustable by user with a command line --vlan_tci parameter:
+     * see dpdk_vrouter.c. If vRouter is not supposed to work in VLAN
+     * (parameter was not specified), packets should not be tagged.
      */
     if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif))) {
         m->vlan_tci = vr_dpdk.vlan_tag;
-        if (unlikely(rte_vlan_insert(&m))) {
-            RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
-            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
-            return -1;
+        if (unlikely((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0)) {
+            /* Software VLAN TCI insert. */
+            m->l2_len += sizeof(struct vlan_hdr);
+            if (unlikely(rte_vlan_insert(&m))) {
+                RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
+                vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+                return -1;
+            }
+        } else {
+            /* Hardware VLAN TCI insert. */
+            m->ol_flags |= PKT_TX_VLAN_PKT;
         }
     }
 
