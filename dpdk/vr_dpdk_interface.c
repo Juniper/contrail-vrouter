@@ -174,6 +174,39 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     return ret;
 }
 
+/* Add VLAN forwarding interface */
+int
+dpdk_vlan_forwarding_if_add(void)
+{
+    int ret;
+    struct vr_interface forwarding_if;
+
+    strncpy((char *)forwarding_if.vif_name, vr_dpdk.vlan_name,
+        sizeof(forwarding_if.vif_name));
+    forwarding_if.vif_type = VIF_TYPE_VLAN;
+
+    RTE_LOG(INFO, VROUTER, "Adding VLAN forwarding device %s\n",
+        vr_dpdk.vlan_name);
+
+    ret = vr_dpdk_knidev_init(0, &forwarding_if);
+    if (ret != 0)
+        return ret;
+
+    /* Save KNI handler needed to send packets to the interface. */
+    vr_dpdk.vlan_kni = (struct rte_kni *)forwarding_if.vif_os;
+
+    /*
+     * Allocate a multi-producer single-consumer ring - a buffer for packets
+     * waiting to be send to the forwarding interface.
+     */
+    vr_dpdk.vlan_ring = vr_dpdk_ring_allocate(VR_DPDK_FWD_LCORE_ID,
+        vr_dpdk.vlan_name, VR_DPDK_TX_RING_SZ, RING_F_SC_DEQ);
+    if (!vr_dpdk.vlan_ring)
+        return -1;
+
+    return 0;
+}
+
 /* Add fabric interface */
 static int
 dpdk_fabric_if_add(struct vr_interface *vif)
@@ -742,14 +775,12 @@ dpdk_hw_checksum(struct vr_packet *pkt)
     /* if a tunnel */
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum in soft */
-        /* TODO: vlan support */
         dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
             pkt->vp_data + sizeof(struct ether_hdr));
         /* calculate inner checksum in hardware */
         dpdk_hw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
     } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
         /* normal IPv4 or IPv6 packet */
-        /* TODO: vlan support */
         dpdk_hw_checksum_at_offset(pkt, pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
@@ -760,7 +791,6 @@ dpdk_sw_checksum(struct vr_packet *pkt, bool will_fragment)
     /* if a tunnel */
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         /* calculate outer checksum */
-        /* TODO: vlan support */
         if (!will_fragment)
             dpdk_ipv4_sw_iphdr_checksum_at_offset(pkt,
                 pkt->vp_data + sizeof(struct ether_hdr));
@@ -768,7 +798,6 @@ dpdk_sw_checksum(struct vr_packet *pkt, bool will_fragment)
         dpdk_sw_checksum_at_offset(pkt, pkt_get_inner_network_header_off(pkt));
     } else if (VP_TYPE_IP == pkt->vp_type || VP_TYPE_IP6 == pkt->vp_type) {
         /* normal IPv4 or IPv6 packet */
-        /* TODO: vlan support */
         dpdk_sw_checksum_at_offset(pkt, pkt->vp_data + sizeof(struct ether_hdr));
     }
 }
@@ -988,12 +1017,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
          * set UDP length, and zero UDP checksum.
          */
         if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
-            /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
 
         } else if (likely(!will_fragment)) {
             /* if wont fragment it later */
-            /* TODO: vlan support */
             dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
         }
     }
@@ -1011,6 +1038,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      */
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) {
         m->vlan_tci = vr_dpdk.vlan_tag;
+        m->l2_len += sizeof(struct vlan_hdr);
         if (rte_vlan_insert(&m)) {
             RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
             vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);

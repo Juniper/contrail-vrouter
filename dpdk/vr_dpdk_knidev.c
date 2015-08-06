@@ -480,6 +480,7 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     int i;
     struct rte_eth_dev_info dev_info;
     struct rte_kni_conf kni_conf;
+    struct rte_kni_ops kni_ops;
     struct rte_kni *kni;
 
     /* get eth device info */
@@ -495,12 +496,19 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     kni_conf.group_id = port_id;
     kni_conf.mbuf_size = VR_DPDK_MAX_PACKET_SZ;
 
-    /* KNI options */
-    struct rte_kni_ops kni_ops = {
-        .port_id = port_id,
-        .change_mtu = dpdk_knidev_change_mtu,
-        .config_network_if = dpdk_knidev_config_network_if,
-    };
+    /* KNI options
+     *
+     * Changing state of the KNI interface can change state of the physical
+     * interface. This is useful for the vhost, but not for the VLAN
+     * forwarding interface.
+     */
+    if (vif->vif_type == VIF_TYPE_VLAN) {
+        memset(&kni_ops, 0, sizeof(kni_ops));
+    } else {
+        kni_ops.port_id = port_id;
+        kni_ops.change_mtu = dpdk_knidev_change_mtu;
+        kni_ops.config_network_if = dpdk_knidev_config_network_if;
+    }
 
     /* allocate KNI device */
     kni = rte_kni_alloc(vr_dpdk.rss_mempool, &kni_conf, &kni_ops);

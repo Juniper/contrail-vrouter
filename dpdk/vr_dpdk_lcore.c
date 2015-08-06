@@ -27,6 +27,7 @@
 #include <rte_malloc.h>
 #include <rte_port_ethdev.h>
 #include <rte_timer.h>
+#include <rte_kni.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
@@ -510,15 +511,19 @@ vr_dpdk_lcore_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_
         rte_prefetch0(rte_pktmbuf_mtod(mbuf, char *));
 
         /*
-         * If vRouter works in VLAN, we check if the packet received on physical
-         * interface belongs to our VLAN. If it does, the tag should be stripped.
-         * If not (untagged or another tag), it should be forwarded to the kernel.
+         * If vRouter works in VLAN, we check if the packet received on the
+         * physical interface belongs to our VLAN. If it does, the tag should
+         * be stripped. If not (untagged or another tag), it should be
+         * forwarded to the kernel.
          */
         if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)
-            && mbuf->vlan_tci != vr_dpdk.vlan_tag)) {
-                /* TODO: forward the packet to kernel */
-                vr_dpdk_pfree(mbuf, VP_DROP_INVALID_PACKET);
-                continue;
+                && mbuf->vlan_tci != vr_dpdk.vlan_tag)) {
+            rte_vlan_insert(&mbuf);
+            /* Packets will be dequeued in dpdk_lcore_fwd_io() */
+            if (rte_ring_mp_enqueue(vr_dpdk.vlan_ring, mbuf) != 0)
+                vr_dpdk_pfree(mbuf, VP_DROP_INTERFACE_DROP);
+            /* Nothing to route, take the next packet. */
+            continue;
         }
 
 #ifdef VR_DPDK_RX_PKT_DUMP
@@ -670,7 +675,10 @@ dpdk_lcore_rings_push(struct vr_dpdk_lcore *lcore)
 static inline void
 dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
 {
-    uint64_t total_pkts = 0;
+    uint64_t nb_tx, i, total_pkts = 0;
+    struct vrouter *router;
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_dpdk_queue *tx_queue;
 
     /* TODO: skip RX queues with no packets to read
      * RX operation for KNIs is quite expensive. We used rx_queue_mask to
@@ -700,6 +708,33 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
         rcu_thread_online();
     }
 #endif
+
+    /*
+     * Forward VLAN packets with unmatching tag.
+     * This is done only by the first forwarding lcore.
+     */
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID
+            && lcore == vr_dpdk.lcores[VR_DPDK_FWD_LCORE_ID]) {
+        /*
+         * Receive packets from VLAN interface and send them to the wire.
+         * Those packets will not be seen in vifdump on the physical vif.
+         */
+        router = vrouter_get(0);
+        if (router->vr_eth_if) {
+            total_pkts = rte_kni_rx_burst(vr_dpdk.vlan_kni, pkts,
+                VR_DPDK_RX_BURST_SZ);
+            tx_queue = &lcore->lcore_tx_queues[router->vr_eth_if->vif_idx];
+            for (i = 0; i < total_pkts; i++)
+                tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, pkts[i]);
+        }
+
+        /* Get packets from VLAN ring and forward them to kernel. */
+        total_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.vlan_ring,
+            (void **)&pkts, VR_DPDK_RX_BURST_SZ);
+        nb_tx = rte_kni_tx_burst(vr_dpdk.vlan_kni, pkts, total_pkts);
+        for( ; nb_tx < total_pkts; nb_tx++)
+            vr_dpdk_pfree(pkts[nb_tx], VP_DROP_INTERFACE_DROP);
+    }
 }
 
 /* Setup signal handlers */
