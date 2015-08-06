@@ -47,6 +47,7 @@ void
 vr_drop_stats_req_process(void *s_req)
 {
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
+    int platform = get_platform();
 
    if (core != (unsigned)-1)
         printf("Statistics for core %u\n\n", core);
@@ -150,6 +151,12 @@ vr_drop_stats_req_process(void *s_req)
     printf("No L2 Route                   %" PRIu64 "\n",
             stats->vds_l2_no_route);
     printf("\n");
+    if (platform == DPDK_PLATFORM) {
+        printf("VLAN fwd intf failed TX       %" PRIu64 "\n",
+                stats->vds_vlan_fwd_tx);
+        printf("VLAN fwd intf failed enq      %" PRIu64 "\n",
+                stats->vds_vlan_fwd_enq);
+    }
     return;
 }
 

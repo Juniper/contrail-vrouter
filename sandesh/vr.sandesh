@@ -355,4 +355,6 @@ buffer sandesh vr_drop_stats_req {
     47: i64             vds_arp_no_route;
     48: i64             vds_l2_no_route;
     49: i64             vds_arp_reply_no_route;
+    50: i64             vds_vlan_fwd_tx;
+    51: i64             vds_vlan_fwd_enq;
 }

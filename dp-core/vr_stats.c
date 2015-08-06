@@ -29,8 +29,7 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_flow_queue_limit_exceeded +=
         stats->vds_flow_queue_limit_exceeded;
     response->vds_flow_no_memory += stats->vds_flow_no_memory;
-    response->vds_flow_invalid_protocol +=
-        stats->vds_flow_invalid_protocol;
+    response->vds_flow_invalid_protocol += stats->vds_flow_invalid_protocol;
     response->vds_flow_nat_no_rflow += stats->vds_flow_nat_no_rflow;
     response->vds_flow_action_drop += stats->vds_flow_action_drop;
     response->vds_flow_action_invalid += stats->vds_flow_action_invalid;
@@ -59,14 +58,15 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_cksum_err += stats->vds_cksum_err;
     response->vds_clone_fail += stats->vds_clone_fail;
     response->vds_no_fmd += stats->vds_no_fmd;
-    response->vds_cloned_original +=
-        stats->vds_cloned_original;
+    response->vds_cloned_original += stats->vds_cloned_original;
     response->vds_invalid_vnid += stats->vds_invalid_vnid;
     response->vds_frag_err += stats->vds_frag_err;
     response->vds_invalid_source += stats->vds_invalid_source;
     response->vds_arp_no_route += stats->vds_arp_no_route;
     response->vds_l2_no_route += stats->vds_l2_no_route;
     response->vds_arp_reply_no_route += stats->vds_arp_reply_no_route;
+    response->vds_vlan_fwd_tx += stats->vds_vlan_fwd_tx;
+    response->vds_vlan_fwd_enq += stats->vds_vlan_fwd_enq;
 
     return;
 }
@@ -95,7 +95,7 @@ vr_drop_stats_get(unsigned int core)
         /* stats for a specific core */
         vr_drop_stats_add_response(response, router->vr_pdrop_stats[core]);
     }
-    /* otherwise the conters will be zeros */
+    /* otherwise the counters will be zeros */
 
 exit_get:
     vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : response, ret);

@@ -31,6 +31,7 @@
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
+extern int dpdk_vlan_forwarding_if_add(void);
 
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.
@@ -189,6 +190,7 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
  * allow for standard jumbo frame size (9000 / 1500 = 6) + 1 additional segment
  * for outer headers. */
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
+#define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 
 /*
  * DPDK LCore IDs
@@ -411,6 +413,12 @@ struct vr_dpdk_global {
     uint16_t monitorings[VR_MAX_INTERFACES] __rte_cache_aligned;
     /* Table of ethdevs */
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS] __rte_cache_aligned;
+    /* VLAN forwarding interface name */
+    char vlan_name[VR_INTERFACE_NAME_LEN];
+    /* VLAN forwarding interface ring */
+    struct rte_ring *vlan_ring;
+    /* VLAN forwarding KNI handler */
+    struct rte_kni *vlan_kni;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
