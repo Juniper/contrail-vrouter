@@ -20,7 +20,6 @@
 
 #include <rte_errno.h>
 #include <rte_hexdump.h>
-
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
 
 /*
@@ -80,12 +79,14 @@ static int
 vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
 {
     int i;
+    int ret;
     vr_uvh_client_mem_region_t *region;
     VhostUserMemory *vum_msg;
     uint64_t size;
+    vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs = (
+                             &(vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx]));
 
     vum_msg = &vru_cl->vruc_msg.memory;
-
     vr_uvhost_log("Number of memory regions: %d\n", vum_msg->nregions);
     for (i = 0; i < vum_msg->nregions; i++) {
         vr_uvhost_log("Region %d: physical address 0x%" PRIx64 ", size 0x%"
@@ -110,9 +111,6 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                                             MAP_SHARED,
                                             vru_cl->vruc_fds_sent[i],
                                             0);
-            /* the file descriptor is no longer needed */
-            close(vru_cl->vruc_fds_sent[i]);
-            vru_cl->vruc_fds_sent[i] = -1;
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
                 vr_uvhost_log("mmap for size 0x%" PRIx64 " failed for FD %d"
@@ -120,14 +118,38 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                         size,
                         vru_cl->vruc_fds_sent[i],
                         vru_cl->vruc_path, rte_strerror(errno));
+                /* the file descriptor is no longer needed */
+                close(vru_cl->vruc_fds_sent[i]);
+                vru_cl->vruc_fds_sent[i] = -1;
                 return -1;
             }
+            /* Set values for munmap(2) function. */
+            ret = vr_dpdk_virtio_uvh_get_blk_size(vru_cl->vruc_fds_sent[i],
+                                 &vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
+            if (ret) {
+                vr_uvhost_log("Get block size failed for FD %d on vhost client %s \n",
+                              vru_cl->vruc_fds_sent[i], vru_cl->vruc_path);
+                /* For munmap(2) RTE_* alignment.
+                 * If unmap_blksz == 1; then munmap() can deallocates
+                 * all regions except first.
+                 */
+                vif_mmap_addrs->vu_mmap_data[i].unmap_blksz = 1;
+            }
 
+            vif_mmap_addrs->vu_mmap_data[i].unmap_mmap_addr = ((uint64_t)
+                                                       region->vrucmr_mmap_addr);
+            vif_mmap_addrs->vu_mmap_data[i].unmap_size = size;
+
+            /* the file descriptor is no longer needed */
+            close(vru_cl->vruc_fds_sent[i]);
+            vru_cl->vruc_fds_sent[i] = -1;
             region->vrucmr_mmap_addr += vum_msg->regions[i].mmap_offset;
         }
     }
 
+    /* Save the number of regions. */
     vru_cl->vruc_num_mem_regions = vum_msg->nregions;
+    vif_mmap_addrs->vu_nregions = vum_msg->nregions;
 
     return 0;
 }
@@ -153,7 +175,6 @@ vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
                       vring_idx);
         return -1;
     }
-
     if (vr_dpdk_set_ring_num_desc(vru_cl->vruc_idx, vring_idx,
                                   vum_msg->state.num)) {
         vr_uvhost_log("Could set number of vring descriptors in vhost server"
@@ -604,13 +625,28 @@ cleanup:
         if (vru_cl->vruc_fds_sent[i] > 0)
             close(vru_cl->vruc_fds_sent[i]);
     }
+    if (ret == -1) {
+        /* set VQ_NOT_READY state to vif's queues. */
+        for (i = 0; i < VR_MAX_CPUS; i++) {
+            vr_dpdk_virtio_rxqs[vru_cl->vruc_idx][i].vdv_ready_state = VQ_NOT_READY;
+            vr_dpdk_virtio_txqs[vru_cl->vruc_idx][i].vdv_ready_state = VQ_NOT_READY;
+
+            vr_dpdk_virtio_rxqs[vru_cl->vruc_idx][i].vdv_last_used_idx = 0;
+            vr_dpdk_virtio_txqs[vru_cl->vruc_idx][i].vdv_last_used_idx = 0;
+        }
+        rte_wmb();
+        synchronize_rcu();
+        /*
+        * Unmaps qemu's FDs.
+        */
+        vr_dpdk_virtio_uvh_vif_munmap(&vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx]);
+    }
     /* clear state for next message from this client. */
     vru_cl->vruc_msg_bytes_read = 0;
     memset(&vru_cl->vruc_msg, 0, sizeof(vru_cl->vruc_msg));
     memset(vru_cl->vruc_cmsg, 0, sizeof(vru_cl->vruc_cmsg));
     memset(vru_cl->vruc_fds_sent, 0, sizeof(vru_cl->vruc_fds_sent));
     vru_cl->vruc_num_fds_sent = 0;
-
     errno = err;
     return ret;
 }

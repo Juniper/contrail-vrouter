@@ -8,6 +8,8 @@
 #ifndef __VR_UVHOST_MSG_H__
 #define __VR_UVHOST_MSG_H__
 
+#include "vr_dpdk_virtio.h"
+#include "vr_dpdk.h"
 /*
  * Definitions of messages from the netlink thread that are handled by the
  * user space vhost thread
@@ -40,7 +42,8 @@ typedef struct vrnu_msg {
         vrnu_vif_del_t vrnum_vif_del;
     };
 } vrnu_msg_t;
-
+extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
+extern vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
+extern vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
 int vr_uvh_nl_listen_handler(int fd, void *arg);
-
 #endif /* __VR_UVHOST_MSG_H__ */
