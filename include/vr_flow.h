@@ -21,12 +21,17 @@ typedef enum {
     FLOW_CONSUMED,
 } flow_result_t;
 
-#define VR_FLOW_FLAG_ACTIVE         0x1
+#define VR_FLOW_FLAG_ACTIVE         0x0001
+#define VR_FLOW_FLAG_NEW_FLOW       0x0200
+#define VR_FLOW_FLAG_MODIFIED       0x0400
+#define VR_FLOW_FLAG_KERNEL         0x0800
 #define VR_RFLOW_VALID              0x1000
 #define VR_FLOW_FLAG_MIRROR         0x2000
 #define VR_FLOW_FLAG_VRFT           0x4000
 #define VR_FLOW_FLAG_LINK_LOCAL     0x8000
 
+#define VR_FLOW_FLAG_MASK(flag)     ((flag) & ~(VR_FLOW_FLAG_NEW_FLOW |\
+            VR_FLOW_FLAG_MODIFIED | VR_FLOW_FLAG_KERNEL))
 /* rest of the flags are action specific */
 
 /* for NAT */
@@ -215,6 +220,77 @@ struct vr_flow_queue {
     struct vr_packet_node vfq_pnodes[VR_MAX_FLOW_QUEUE_ENTRIES];
 };
 
+/*
+ * Flow eviction:
+ * 1. Requirement
+ * --------------
+ *
+ * Inactive TCP flows (flows that have already seen the closure cycle - FIN/ACK
+ * or the RESET flags) should additionally be considered as a free flow entry
+ * so that vRouter does not have to wait for agent's aging cycle to accommodate
+ * new flows under severe occupancy and provide better service.
+ *
+ * 2. Problems in datapath initiated flow closure
+ * ----------------------------------------------
+ *
+ * . Simultaneous discovery of the same flow entry by two different CPUs
+ * . Simultaneous closure of an entry by both agent as well as from datapath
+ * . Handling of packets held in the flow entry when the entry moves from hold to
+ *   closed state
+ *
+ * 3. Implementation
+ * -----------------
+ *
+ * 3.1 Marking
+ * -----------
+ *
+ * Once the TCP state machine determines that a flow can be closed, it updates the
+ * tcp flags with a new flag VR_FLOW_TCP_DEAD, since determining whether a tcp flow
+ * has seen its end with only the existing TCP flags is a bit more involved. Even
+ * though we can use this flag itself to determine whether a flow can be evicted,
+ * determining whether a flow can be evicted by the generic allocation function
+ * requires parsing the flow keys to determine whether the flow is TCP. To simplify
+ * the generic allocation routine, we need a simpler mechanism.
+ *
+ * The existing way to determine whether a flow entry is free is based on the
+ * VR_FLOW_FLAG_ACTIVE flag. However, we can't use this flag for flows that will
+ * be evicted by the datapath. This restriction arises from the fact that the
+ * moment datapath sets this flag, which will typically be at the end of the flow
+ * processing of the last packet in that flow, the flow entry can be reused by
+ * another new flow in the system, thus rendering the entry unusable for the last
+ * packet till it exits from vRouter. Hence, we use another flag called
+ * VR_FLOW_FLAG_KERNEL that will be set when the last packet of the TCP flow exits
+ * the flow module. Once this flag is set, the time at which this flag is set is
+ * also noted down in the flow entry. As mentioned before, datapath should be
+ * prevented from reusing the entry till the last packet exits the vRouter. So,
+ * once the flag is set, datapath will reuse the entry only after a timeout, say
+ * 10ms, which is a reasonable time for the packet to exit vRouter.
+ *
+ * 3.2 Allocation/Eviction
+ * -----------------------
+ * Flow entry allocation function, in addition to looking at VR_FLOW_FLAG_ACTIVE,
+ * will also look the VR_FLOW_FLAG_KERNEL flag. If the flag is set and if the
+ * the entry has aged (the 10 ms timeout), datapath will try to unset this flag
+ * and mark the flow as active in an atomic fashion. Failure to set this flag
+ * will make the function to search further.
+ *
+ * It is quite possible that when datapath is trying to allocate this entry, agent
+ * as well could have been trying to modify this entry, since this entry is an
+ * active entry (typically deletion). This can result in unintended side effects
+ * and hence should be prevented. The way we do this is by telling datapath that
+ * agent is changing the flow entry using a flag VR_FLOW_FLAG_MODIFIED. Similarly,
+ * if datapath is in the process of allocating an entry, agent needs to be told
+ * that it cannot modify the entry - again using a flag: VR_FLOW_FLAG_NEW_FLOW.
+ * This flag is also used to indicate that while trapping the packet, stats of the
+ * old entity need to be sent to the agent.
+ *
+ * Since, the VR_FLOW_FLAG_KERNEL will be marked only when packets actually flow
+ * through the entry, such an entry can't be in hold state.
+ */
+
+/* 10 milli second, expressed in nanoseconds */
+#define VR_FLOW_EVICTION_TIME   (10 * 1024 * 1024)
+
 #define VR_FLOW_TCP_FIN             0x0001
 #define VR_FLOW_TCP_HALF_CLOSE      0x0002
 #define VR_FLOW_TCP_FIN_R           0x0004
@@ -223,12 +299,14 @@ struct vr_flow_queue {
 #define VR_FLOW_TCP_ESTABLISHED     0x0020
 #define VR_FLOW_TCP_ESTABLISHED_R   0x0040
 #define VR_FLOW_TCP_RST             0x0080
+#define VR_FLOW_TCP_DEAD            0x8000
 
 /* align to 8 byte boundary */
 #define VR_FLOW_KEY_PAD ((8 - (sizeof(struct vr_flow) % 8)) % 8)
 
 struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
+    uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
     unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
@@ -245,6 +323,8 @@ struct vr_dummy_flow_entry {
     uint8_t fe_drop_reason;
     uint8_t fe_type;
     unsigned short fe_udp_src_port;
+    unsigned int fe_dead_time_second;
+    unsigned int fe_dead_time_nsecond;
 } __attribute__((packed));
 
 #define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
@@ -252,6 +332,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow fe_key;
+    uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
     unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
@@ -268,6 +349,8 @@ struct vr_flow_entry {
     uint8_t fe_drop_reason;
     uint8_t fe_type;
     unsigned short fe_udp_src_port;
+    unsigned int fe_dead_time_second;
+    unsigned int fe_dead_time_nsecond;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 
@@ -301,6 +384,7 @@ struct vr_flow_md {
 struct vr_flow_trap_arg {
     unsigned int vfta_index;
     unsigned int vfta_nh_index;
+    struct vr_flow_stats vfta_stats;
 };
 
 struct vr_packet;
