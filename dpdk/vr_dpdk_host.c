@@ -668,77 +668,81 @@ dpdk_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     uint16_t *l4_hdr;
     struct vr_flow_entry *fentry;
 
-    if (hashrnd_inited == 0) {
-        vr_hashrnd = random();
-        hashrnd_inited = 1;
-    }
-
-    if (pkt->vp_type == VP_TYPE_IP) {
-        /* Ideally the below code is only for VP_TYPE_IP and not
-         * for IP6. But having explicit check for IP only break IP6
-         */
-        pull_len = sizeof(struct iphdr);
-        pull_len += pkt_get_network_header_off(pkt);
-        pull_len -= rte_pktmbuf_headroom(mbuf);
-
-        /* It's safe to assume the ip hdr is within this mbuf, so we skip
-         * all the header checks.
-         */
-
-        iph = (struct vr_ip *)(mbuf->buf_addr + pkt_get_network_header_off(pkt));
-        if (vr_ip_transport_header_valid(iph)) {
-            if ((iph->ip_proto == VR_IP_PROTO_TCP) ||
-                        (iph->ip_proto == VR_IP_PROTO_UDP)) {
-                l4_hdr = (__u16 *) (((char *) iph) + (iph->ip_hl * 4));
-                sport = *l4_hdr;
-                dport = *(l4_hdr+1);
-            }
-        } else {
-            /*
-             * If this fragment required flow lookup, get the source and
-             * dst port from the frag entry. Otherwise, use 0 as the source
-             * dst port (which could result in fragments getting a different
-             * outer UDP source port than non-fragments in the same flow).
-             */
-            frag = vr_fragment_get(router, vrf, iph);
-            if (frag) {
-                sport = frag->f_sport;
-                dport = frag->f_dport;
-            }
-        }
-
-        if (fmd && fmd->fmd_flow_index >= 0) {
-            fentry = vr_get_flow_entry(router, fmd->fmd_flow_index);
-            if (fentry) {
-                vr_dpdk_mbuf_reset(pkt);
-                return fentry->fe_udp_src_port;
-            }
-        }
-
-        ip_src = iph->ip_saddr;
-        ip_dst = iph->ip_daddr;
-
-        hash_key[0] = ip_src;
-        hash_key[1] = ip_dst;
-        hash_key[2] = vrf;
-        hash_key[3] = sport;
-        hash_key[4] = dport;
-
-        hashval = rte_jhash(hash_key, 20, vr_hashrnd);
-        vr_dpdk_mbuf_reset(pkt);
+    if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
+        hashval = mbuf->hash.rss;
     } else {
+        if (unlikely(hashrnd_inited == 0)) {
+            vr_hashrnd = random();
+            hashrnd_inited = 1;
+        }
 
-        /* We treat all non-ip packets as L2 here. For V6 we can extract
-         * the required fieleds explicity and manipulate the src port
-         */
+        if (pkt->vp_type == VP_TYPE_IP) {
+            /* Ideally the below code is only for VP_TYPE_IP and not
+             * for IP6. But having explicit check for IP only break IP6
+             */
+            pull_len = sizeof(struct iphdr);
+            pull_len += pkt_get_network_header_off(pkt);
+            pull_len -= rte_pktmbuf_headroom(mbuf);
 
-        if (pkt_head_len(pkt) < ETH_HLEN)
-            goto error;
+            /* It's safe to assume the ip hdr is within this mbuf, so we skip
+             * all the header checks.
+             */
 
-        hashval = vr_hash(pkt_data(pkt), ETH_HLEN, vr_hashrnd);
-        /* Include the VRF to calculate the hash */
-        hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
-    }
+            iph = (struct vr_ip *)(mbuf->buf_addr + pkt_get_network_header_off(pkt));
+            if (vr_ip_transport_header_valid(iph)) {
+                if ((iph->ip_proto == VR_IP_PROTO_TCP) ||
+                            (iph->ip_proto == VR_IP_PROTO_UDP)) {
+                    l4_hdr = (__u16 *) (((char *) iph) + (iph->ip_hl * 4));
+                    sport = *l4_hdr;
+                    dport = *(l4_hdr+1);
+                }
+            } else {
+                /*
+                 * If this fragment required flow lookup, get the source and
+                 * dst port from the frag entry. Otherwise, use 0 as the source
+                 * dst port (which could result in fragments getting a different
+                 * outer UDP source port than non-fragments in the same flow).
+                 */
+                frag = vr_fragment_get(router, vrf, iph);
+                if (frag) {
+                    sport = frag->f_sport;
+                    dport = frag->f_dport;
+                }
+            }
+
+            if (fmd && fmd->fmd_flow_index >= 0) {
+                fentry = vr_get_flow_entry(router, fmd->fmd_flow_index);
+                if (fentry) {
+                    vr_dpdk_mbuf_reset(pkt);
+                    return fentry->fe_udp_src_port;
+                }
+            }
+
+            ip_src = iph->ip_saddr;
+            ip_dst = iph->ip_daddr;
+
+            hash_key[0] = ip_src;
+            hash_key[1] = ip_dst;
+            hash_key[2] = vrf;
+            hash_key[3] = sport;
+            hash_key[4] = dport;
+
+            hashval = rte_jhash(hash_key, 20, vr_hashrnd);
+            vr_dpdk_mbuf_reset(pkt);
+        } else {
+
+            /* We treat all non-ip packets as L2 here. For V6 we can extract
+             * the required fieleds explicity and manipulate the src port
+             */
+
+            if (pkt_head_len(pkt) < ETH_HLEN)
+                goto error;
+
+            hashval = vr_hash(pkt_data(pkt), ETH_HLEN, vr_hashrnd);
+            /* Include the VRF to calculate the hash */
+            hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
+        }
+    } /* !PKT_RX_RSS_HASH */
 
 
     /*
@@ -748,7 +752,7 @@ dpdk_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
     port = (uint16_t) (((uint64_t) hashval * port_range) >> 32);
 
-    if (port > port_range) {
+    if (unlikely(port > port_range)) {
         /*
          * Shouldn't happen...
          */

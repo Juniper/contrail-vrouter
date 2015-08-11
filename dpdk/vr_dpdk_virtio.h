@@ -16,43 +16,44 @@
  * Burst size for packets to a VM
  */
 #define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_TX_BURST_SZ
-
 /*
  * Size of ring to send packets from virtio RX queue to lcore for forwarding
  */
 #define VR_DPDK_VIRTIO_TX_RING_SZ (64 * VR_DPDK_TX_RING_SZ)
+/*
+ * Maximum number of queues per virtio device
+ */
+#define VR_DPDK_VIRTIO_MAX_QUEUES 1
+
 
 typedef enum vq_ready_state {
-    VQ_NOT_READY = 1,
+    VQ_NOT_READY,
     VQ_READY,
 } vq_ready_state_t;
 
+/* virtio queue */
 typedef struct vr_dpdk_virtioq {
     struct vring_desc   *vdv_desc;      /**< Virtqueue descriptor ring. */
     struct vring_avail  *vdv_avail;     /**< Virtqueue available ring. */
     struct vring_used   *vdv_used;      /**< Virtqueue used ring. */
     uint32_t            vdv_size;       /**< Size of descriptor ring. */
-    uint32_t vdv_tx_mbuf_count;
 
-    volatile vq_ready_state_t vdv_ready_state;
-    unsigned int vdv_vif_idx;
-    struct rte_ring *vdv_pring;
-    uint16_t vdv_last_used_idx;
-    int vdv_callfd;
-    uint64_t vdv_nb_syscalls;
-    uint64_t vdv_nb_nombufs;
+    volatile uint16_t   vdv_last_used_idx;
+    volatile uint16_t   vdv_last_used_idx_res;
+    uint16_t            vdv_ready_state;
+    uint16_t            vdv_vif_idx;
 
     /* Big and less frequently used fields */
-    struct rte_port_in_stats vdv_in_stats;
-    struct rte_port_out_stats vdv_out_stats;
-    unsigned int vdv_base_idx;
-    struct rte_mbuf *vdv_tx_mbuf[2 * VR_DPDK_VIRTIO_TX_BURST_SZ];
+    uint64_t            vdv_nb_syscalls;
+    uint64_t            vdv_nb_nombufs;
+    int                 vdv_callfd; /**< Used to notify the guest (trigger interrupt). */
+    int                 vdv_kickfd; /**< Currently unused as polling mode is enabled. */
     /* TODO: not used
     int vdv_enabled_state;
     int vdv_zero_copy;
      */
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
-} vr_dpdk_virtioq_t;
+} vr_dpdk_virtioq_t __rte_cache_aligned;
 
 typedef struct vr_dpdk_uvh_mmap_addr{
     uint64_t unmap_mmap_addr;                 /**< mmap() returned address */
@@ -95,5 +96,9 @@ void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
 
 extern struct rte_port_in_ops vr_dpdk_virtio_reader_ops;
 extern struct rte_port_out_ops vr_dpdk_virtio_writer_ops;
+
+extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
+extern vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
+extern vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 
 #endif /* __VR_DPDK_VIRTIO_H__ */

@@ -36,17 +36,18 @@ static int
 dpdk_virtual_if_add(struct vr_interface *vif)
 {
     int ret;
-    unsigned int nrxqs, ntxqs;
+    uint16_t nrxqs, ntxqs;
 
     RTE_LOG(INFO, VROUTER, "Adding vif %u virtual device %s\n",
                 vif->vif_idx, vif->vif_name);
 
     nrxqs = vr_dpdk_virtio_nrxqs(vif);
-    ntxqs = vr_dpdk_virtio_ntxqs(vif);
+    /* virtio TX is thread safe, so we assign TX queue to each lcore */
+    ntxqs = (uint16_t)-1;
 
     ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-               nrxqs, &vr_dpdk_virtio_rx_queue_init,
-               ntxqs, &vr_dpdk_virtio_tx_queue_init);
+                nrxqs, &vr_dpdk_virtio_rx_queue_init,
+                ntxqs, &vr_dpdk_virtio_tx_queue_init);
     if (ret) {
         return ret;
     }
@@ -1009,9 +1010,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      *
      * TODO: Hardware VLAN tag insert.
      */
-    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) {
+    if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif))) {
         m->vlan_tci = vr_dpdk.vlan_tag;
-        if (rte_vlan_insert(&m)) {
+        if (unlikely(rte_vlan_insert(&m))) {
             RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
             vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
             return -1;
@@ -1048,7 +1049,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
         if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
             tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_out, mask);
-            if (lcore_id < VR_DPDK_FWD_LCORE_ID)
+            if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 
             /* Free the mbuf of the original packet (the one that has been
@@ -1070,7 +1071,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     } else {
         if (likely(tx_queue->txq_ops.f_tx != NULL)) {
             tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
-            if (lcore_id < VR_DPDK_FWD_LCORE_ID)
+            if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
         } else {
             RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
@@ -1223,7 +1224,7 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
 
         /* update virtio syscalls counters */
         if (queue->rxq_ops.f_rx == vr_dpdk_virtio_reader_ops.f_rx) {
-            vq = (vr_dpdk_virtioq_t *)queue->q_queue_h;
+            vq = &vr_dpdk_virtio_rxqs[vif->vif_idx][0];
             stats->vis_port_isyscalls = vq->vdv_nb_syscalls;
             stats->vis_port_inombufs = vq->vdv_nb_nombufs;
         }
@@ -1248,7 +1249,7 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
 
         /* update virtio syscalls counters */
         if (queue->txq_ops.f_tx == vr_dpdk_virtio_writer_ops.f_tx) {
-            vq = (vr_dpdk_virtioq_t *)queue->q_queue_h;
+            vq = &vr_dpdk_virtio_txqs[vif->vif_idx][0];
             stats->vis_port_osyscalls = vq->vdv_nb_syscalls;
         }
     }
