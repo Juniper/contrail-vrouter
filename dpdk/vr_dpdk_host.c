@@ -40,6 +40,9 @@ static bool vr_host_inited = false;
 
 extern void vr_malloc_stats(unsigned int, unsigned int);
 extern void vr_free_stats(unsigned int);
+/* RCU callback */
+extern void vr_flow_queue_free(struct vrouter *router, void *arg);
+
 
 static void *
 dpdk_page_alloc(unsigned int size)
@@ -394,7 +397,15 @@ dpdk_pset_data(struct vr_packet *pkt, unsigned short offset)
 static unsigned int
 dpdk_get_cpu(void)
 {
-    return rte_lcore_id();
+    unsigned lcore_id = rte_lcore_id();
+
+    /* For the RCU thread we get LCORE_ID_ANY, so memory stats and
+     * other functions get crashed trying to index per-cpu data.
+     */
+    if (lcore_id < vr_num_cpus)
+        return lcore_id;
+    else
+        return 0;
 }
 
 /* DPDK timer callback */
@@ -500,11 +511,35 @@ dpdk_delay_op(void)
 static void
 dpdk_rcu_cb(struct rcu_head *rh)
 {
-    /* pass the callback to packet lcore */
-    RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing RCU callback to lcore %u\n",
-            __func__, rte_lcore_id(), VR_DPDK_PACKET_LCORE_ID);
-    vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
-                            VR_DPDK_LCORE_RCU_CMD, (uintptr_t)rh);
+    int i;
+    struct vr_dpdk_rcu_cb_data *cb_data;
+    struct vr_defer_data *defer;
+    struct vr_flow_queue *vfq;
+    struct vr_packet_node *pnode;
+
+    cb_data = CONTAINER_OF(rcd_rcu, struct vr_dpdk_rcu_cb_data, rh);
+
+    /* check if we need to pass the callback to packet lcore */
+    if (cb_data->rcd_user_cb == vr_flow_queue_free
+            && cb_data->rcd_user_data) {
+        defer = (struct vr_defer_data *)cb_data->rcd_user_data;
+        vfq = (struct vr_flow_queue *)defer->vdd_data;
+        for (i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
+            pnode = &vfq->vfq_pnodes[i];
+            if (pnode->pl_packet) {
+                RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing RCU callback to lcore %u\n",
+                        __func__, rte_lcore_id(), VR_DPDK_PACKET_LCORE_ID);
+                vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
+                                    VR_DPDK_LCORE_RCU_CMD, (uintptr_t)rh);
+                return;
+            }
+        }
+        RTE_LOG(DEBUG, VROUTER, "%s: lcore %u just calling RCU callback\n",
+                __func__, rte_lcore_id());
+    }
+    /* no need to send any packets, so just call the callback */
+    cb_data->rcd_user_cb(cb_data->rcd_router, cb_data->rcd_user_data);
+    vr_free(cb_data, VR_DEFER_OBJECT);
 }
 
 static void

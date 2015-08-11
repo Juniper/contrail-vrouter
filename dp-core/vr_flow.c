@@ -298,7 +298,8 @@ vr_get_flow_entry(struct vrouter *router, int index)
     return (struct vr_flow_entry *)vr_btable_get(table, index);
 }
 
-static void
+/* Non-static due to RCU callback pointer comparison in vRouter/DPDK */
+void
 vr_flow_queue_free(struct vrouter *router, void *arg)
 {
     struct vr_forwarding_md fmd;
