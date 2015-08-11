@@ -109,14 +109,27 @@ struct vr_interface_stats {
     uint64_t vis_obytes;
     uint64_t vis_opackets;
     uint64_t vis_oerrors;
-    uint64_t vis_ifenqpkts;
-    uint64_t vis_ifenqdrops;
-    uint64_t vis_ifdeqpkts;
-    uint64_t vis_ifdeqdrops;
-    uint64_t vis_iftxrngenqpkts;
-    uint64_t vis_iftxrngenqdrops;
-    uint64_t vis_ifrxrngenqpkts;
-    uint64_t vis_ifrxrngenqdrops;
+    /* queue counters */
+    uint64_t vis_queue_ipackets;
+    uint64_t vis_queue_ierrors;
+    uint64_t vis_queue_opackets;
+    uint64_t vis_queue_oerrors;
+    /* port counters */
+    uint64_t vis_port_ipackets;
+    uint64_t vis_port_ierrors;
+    uint64_t vis_port_isyscalls;
+    uint64_t vis_port_inombufs;
+    uint64_t vis_port_opackets;
+    uint64_t vis_port_oerrors;
+    uint64_t vis_port_osyscalls;
+    /* device counters */
+    uint64_t vis_dev_ibytes;
+    uint64_t vis_dev_ipackets;
+    uint64_t vis_dev_ierrors;
+    uint64_t vis_dev_inombufs;
+    uint64_t vis_dev_obytes;
+    uint64_t vis_dev_opackets;
+    uint64_t vis_dev_oerrors;
 };
 
 struct vr_packet;
@@ -236,6 +249,7 @@ struct vr_host_interface_ops {
             struct vr_interface_settings *);
     unsigned int (*hif_get_mtu)(struct vr_interface *);
     unsigned short (*hif_get_encap)(struct vr_interface *);
+    void (*hif_stats_update)(struct vr_interface *, unsigned int);
 };
 
 extern int vr_interface_init(struct vrouter *);

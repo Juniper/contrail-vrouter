@@ -223,6 +223,8 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_ethdev_rx_queue_release;
+    rx_queue_params->qp_ethdev.queue_id = rx_queue_id;
+    rx_queue_params->qp_ethdev.port_id = port_id;
 
     return rx_queue;
 }
@@ -399,6 +401,9 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
+        /* map RX queue to stats counter ignoring any errors */
+        rte_eth_dev_set_rx_queue_stats_mapping(port_id, i, i);
+
         /* save queue mempool pointer */
         ethdev->ethdev_mempools[i] = mempool;
     }
@@ -415,8 +420,44 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
             return ret;
         }
+        /* map TX queue to stats counter ignoring any errors */
+        rte_eth_dev_set_tx_queue_stats_mapping(port_id, i, i);
     }
     return 0;
+}
+
+static void
+dpdk_ethdev_reta_show(uint8_t port_id, uint16_t reta_size)
+{
+    int nb_entries = reta_size/RTE_RETA_GROUP_SIZE;
+    struct rte_eth_rss_reta_entry64 reta_entries[nb_entries];
+    struct rte_eth_rss_reta_entry64 *reta;
+    uint16_t i, idx, shift;
+    int ret, entry;
+
+    for (entry = 0; entry < nb_entries; entry++) {
+        reta = &reta_entries[entry];
+
+        /* reset RSS redirection table */
+        memset(reta, 0, sizeof(*reta));
+        reta->mask = 0xffffffffffffffffULL;
+    }
+
+    ret = rte_eth_dev_rss_reta_query(port_id, reta_entries, reta_size);
+    if (ret != 0) {
+        RTE_LOG(ERR, VROUTER, "Error getting RSS RETA info: %s (%d)\n",
+            rte_strerror(ret), ret);
+        return;
+    }
+
+    for (i = 0; i < reta_size; i++) {
+        idx = i / RTE_RETA_GROUP_SIZE;
+        shift = i % RTE_RETA_GROUP_SIZE;
+        if (!(reta_entries[idx].mask & (1ULL << shift)))
+            continue;
+        RTE_LOG(DEBUG, VROUTER, "        hash index=%u, queue=%u\n",
+                    i, reta_entries[idx].reta[shift]);
+    }
 }
 
 /* Init RSS */
@@ -435,6 +476,9 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
      */
     if (ethdev->ethdev_reta_size == 0)
         return 0;
+
+    RTE_LOG(DEBUG, VROUTER, "%s: RSS RETA BEFORE:\n", __func__);
+    dpdk_ethdev_reta_show(port_id, ethdev->ethdev_reta_size);
 
     for (entry = 0; entry < nb_entries; entry++) {
         reta = &reta_entries[entry];
@@ -461,6 +505,9 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
         RTE_LOG(ERR, VROUTER, "    error initializing ethdev %" PRIu8 " RSS: %s (%d)\n",
             port_id, rte_strerror(-ret), -ret);
     }
+
+    RTE_LOG(DEBUG, VROUTER, "%s: RSS RETA AFTER:\n", __func__);
+    dpdk_ethdev_reta_show(port_id, ethdev->ethdev_reta_size);
 
     return ret;
 }

@@ -16,9 +16,17 @@
 int dpdk_packet_core_id = -1;
 
 void
-vr_dpdk_packet_wakeup(void)
+vr_dpdk_packet_wakeup(struct vr_interface *vif)
 {
+    struct vr_interface_stats *stats;
+
     if (likely(vr_dpdk.packet_event_sock != NULL)) {
+        if (likely(vif != NULL)) {
+            stats = vif_get_stats(vif, rte_lcore_id());
+            stats->vis_port_osyscalls++;
+        } else {
+            /* TODO: update global syscalls counter */
+        }
         if (vr_usocket_eventfd_write(vr_dpdk.packet_event_sock) < 0) {
             vr_usocket_close(vr_dpdk.packet_event_sock);
             vr_dpdk.packet_event_sock = NULL;

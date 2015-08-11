@@ -62,7 +62,7 @@ static int if_xconnect_kindex = -1;
 static int if_vif_index = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
-static int core = -1;
+static unsigned int core = (unsigned)-1;
 
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
@@ -190,12 +190,6 @@ vr_interface_print_header(void)
 
     printf("Vrouter Interface Table\n\n");
 
-    if (core_set && core > -1)
-        printf("Statistics for core %d\n\n", core);
-
-    if (core_set)
-        return;
-
     printf("Flags: ");
 
     for (i = 0; i < array_size; i++) {
@@ -260,6 +254,65 @@ vr_if_transport_string(vr_interface_req *req)
 
     return "Unknown";
 }
+
+static void
+vr_interface_core_print(void)
+{
+    if (core != (unsigned)-1) {
+        printf("Core %u ", core);
+    }
+}
+
+static void
+vr_interface_nombufs_print(uint64_t nombufs)
+{
+    if (nombufs)
+        printf(" no mbufs:%" PRId64, nombufs);
+    printf("\n");
+}
+
+static void
+vr_interface_pbem_counters_print(const char *title, bool print_always,
+            uint64_t packets, uint64_t bytes, uint64_t errors,
+            uint64_t nombufs)
+{
+    if (print_always || packets || bytes || errors) {
+        vr_interface_print_head_space();
+        vr_interface_core_print();
+        printf("%s packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64,
+                title, packets, bytes, errors);
+        vr_interface_nombufs_print(nombufs);
+    }
+}
+
+static void
+vr_interface_pesm_counters_print(const char *title, bool print_always,
+            uint64_t packets, uint64_t errors, uint64_t syscalls,
+            uint64_t nombufs)
+{
+    if (print_always || packets || errors) {
+        vr_interface_print_head_space();
+        vr_interface_core_print();
+        printf("%s packets:%" PRId64 " errors:%" PRId64,
+                title, packets, errors);
+        if (syscalls)
+            printf(" syscalls:%" PRId64, syscalls);
+        vr_interface_nombufs_print(nombufs);
+    }
+}
+
+static void
+vr_interface_pe_counters_print(const char *title, bool print_always,
+            uint64_t packets, uint64_t errors)
+{
+    if (print_always || packets || errors) {
+        vr_interface_print_head_space();
+        vr_interface_core_print();
+        printf("%s packets:%" PRId64 " errors:%" PRId64 "\n",
+                title, packets, errors);
+    }
+}
+
 void
 vr_interface_req_process(void *s)
 {
@@ -333,37 +386,33 @@ vr_interface_req_process(void *s)
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
             req->vifr_mtu, req->vifr_ref_cnt);
 
-    vr_interface_print_head_space();
-    printf("RX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
-            req->vifr_ipackets,
-            req->vifr_ibytes, req->vifr_ierrors);
-    vr_interface_print_head_space();
-    printf("TX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
-            req->vifr_opackets,
-            req->vifr_obytes, req->vifr_oerrors);
-
-    /* Additional DPDK-specific statistics */
     if (platform == DPDK_PLATFORM) {
-        vr_interface_print_head_space();
-        printf("Packets sent to vif: %" PRId64"  Drops:%" PRId64 "  \n",
-            req->vifr_ifenqpkts, req->vifr_ifenqdrops);
-        vr_interface_print_head_space();
-        printf("Packets enqueued on TX ring: %" PRId64"  Drops:%" PRId64 "  \n",
-            req->vifr_iftxrngenqpkts, req->vifr_iftxrngenqdrops);
-        vr_interface_print_head_space();
-        printf("Packets received on vif: %" PRId64"  Drops:%" PRId64 "  \n",
-            req->vifr_ifdeqpkts, req->vifr_ifdeqdrops);
-        /**
-         * TODO: when we hash MPLSoGRE packets to different lcores, it should
-         * apply to virtual as well as physical interfaces.
-         */
-        if (req->vifr_type == VIF_TYPE_VIRTUAL
-                                /* || req->vifr_type == VIF_TYPE_PHYSICAL */) {
-            vr_interface_print_head_space();
-            printf("Packets enqueued on RX ring: %" PRId64"  Drops:%" PRId64 "  \n",
-                req->vifr_ifrxrngenqpkts, req->vifr_ifrxrngenqdrops);
-        }
+        vr_interface_pbem_counters_print("RX device", false,
+                req->vifr_dev_ipackets, req->vifr_dev_ibytes,
+                req->vifr_dev_ierrors, req->vifr_dev_inombufs);
+        vr_interface_pesm_counters_print("RX port  ", false,
+                req->vifr_port_ipackets, req->vifr_port_ierrors,
+                req->vifr_port_isyscalls, req->vifr_port_inombufs);
+        vr_interface_pe_counters_print("RX queue ", false,
+                req->vifr_queue_ipackets, req->vifr_queue_ierrors);
     }
+
+    vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,
+             req->vifr_ibytes, req->vifr_ierrors, 0);
+    vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
+             req->vifr_obytes, req->vifr_oerrors, 0);
+
+    if (platform == DPDK_PLATFORM) {
+        vr_interface_pe_counters_print("TX queue ", false,
+                req->vifr_queue_opackets, req->vifr_queue_oerrors);
+        vr_interface_pesm_counters_print("TX port  ", false,
+                req->vifr_port_opackets, req->vifr_port_oerrors,
+                req->vifr_port_osyscalls, 0);
+        vr_interface_pbem_counters_print("TX device", false,
+                req->vifr_dev_opackets, req->vifr_dev_obytes,
+                req->vifr_dev_oerrors, 0);
+    }
+
     printf("\n");
 
     if (list_set)
@@ -380,7 +429,6 @@ vr_interface_req_process(void *s)
 
     return;
 }
-
 
 void
 vr_response_process(void *s)
@@ -631,24 +679,8 @@ op_retry:
         break;
 
     case SANDESH_OP_GET:
-        /**
-         * Implementation of getting per-core vif statistics is based on this
-         * little trick to avoid making changes in how agent makes requests for
-         * statistics. From vRouter's and agent's point of view, request for
-         * stats for 0th core means a request for stats summed up for all the
-         * cores. So cores are enumerated starting with 1.
-         * Meanwhile, from user's point of view they are enumerated starting
-         * with 0 (e.g. vif --list --core 0 means 'vif statistics for the very
-         * first (0th) core'). This is how Linux enumerates CPUs, so it should
-         * be more intuitive for the user.
-         *
-         * Agent is not aware of possibility of asking for per-core stats. Its
-         * requests have vifr_core implicitly set to 0. So we need to make a
-         * conversion between those enumerating systems. The vif utility
-         * increments by 1 the core number user asked for. Then it is
-         * decremented back in vRouter.
-         */
-        intf_req.vifr_core = (unsigned int)(core + 1);
+        /* zero vifr_core means to sum up all the per-core stats */
+        intf_req.vifr_core = (unsigned)(core + 1);
 
         /*
          * this logic is slightly complicated. if --kernel option is set
@@ -666,7 +698,8 @@ op_retry:
         break;
 
     case SANDESH_OP_DUMP:
-        intf_req.vifr_core = (unsigned int)(core + 1);
+        /* zero vifr_core means to sum up all the per-core stats */
+        intf_req.vifr_core = (unsigned)(core + 1);
         break;
     }
 
@@ -828,9 +861,12 @@ parse_long_opts(int option_index, char *opt_arg)
         break;
 
     case CORE_OPT_INDEX:
-        core = (int)strtol(opt_arg, NULL, 0);
-        if (core < 0)
-            core = 0;
+        core = (unsigned)strtol(opt_arg, NULL, 0);
+        if (errno) {
+            printf("Error parsing core %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
         break;
 
     case TYPE_OPT_INDEX:

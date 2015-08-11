@@ -83,7 +83,7 @@ static void *
 dpdk_zalloc(unsigned int size, unsigned int object)
 {
     vr_malloc_stats(size, object);
-    return rte_calloc(NULL, size, 1, 0);
+    return rte_zmalloc(NULL, size, 0);
 }
 
 static void
