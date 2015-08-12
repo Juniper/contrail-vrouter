@@ -454,28 +454,10 @@ vr_find_flow(struct vrouter *router, struct vr_flow *key,
     return flow_e;
 }
 
-static int
-vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
-        struct vr_packet *pkt, unsigned int index,
+void
+vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    unsigned int i;
-    unsigned short drop_reason = 0;
-    struct vr_flow_queue *vfq = fe->fe_hold_list;
-    struct vr_packet_node *pnode;
-
-    if (!vfq) {
-        drop_reason = VP_DROP_FLOW_UNUSABLE;
-        goto drop;
-    }
-
-    i = __sync_fetch_and_add(&vfq->vfq_entries, 1);
-    if (i >= VR_MAX_FLOW_QUEUE_ENTRIES) {
-        drop_reason = VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED;
-        goto drop;
-    }
-
-    pnode = &vfq->vfq_pnodes[i];
     /*
      * we cannot cache nexthop here. to cache, we need to hold reference
      * to the nexthop. to hold a reference, we will have to hold a lock,
@@ -499,10 +481,38 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
         if (fmd->fmd_to_me)
             pnode->pl_flags |= PN_FLAG_TO_ME;
     }
+    pnode->pl_vrf = fmd->fmd_dvrf;
+    pnode->pl_vlan = fmd->fmd_vlan;
 
     __sync_synchronize();
     pnode->pl_packet = pkt;
 
+    return;
+}
+
+static int
+vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
+        struct vr_packet *pkt, unsigned int index,
+        struct vr_forwarding_md *fmd)
+{
+    unsigned int i;
+    unsigned short drop_reason = 0;
+    struct vr_flow_queue *vfq = fe->fe_hold_list;
+    struct vr_packet_node *pnode;
+
+    if (!vfq) {
+        drop_reason = VP_DROP_FLOW_UNUSABLE;
+        goto drop;
+    }
+
+    i = __sync_fetch_and_add(&vfq->vfq_entries, 1);
+    if (i >= VR_MAX_FLOW_QUEUE_ENTRIES) {
+        drop_reason = VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED;
+        goto drop;
+    }
+
+    pnode = &vfq->vfq_pnodes[i];
+    vr_flow_fill_pnode(pnode, pkt, fmd);
     if (!i)
         vr_trap_flow(router, fe, pkt, index);
 
@@ -818,58 +828,68 @@ vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
     return __vr_flow_forward(result, pkt, fmd);
 }
 
+int
+vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
+        struct vr_flow_entry *fe, struct vr_forwarding_md *fmd)
+{
+    bool forward;
+
+    struct vr_interface *vif;
+    struct vr_packet *pkt;
+    flow_result_t result;
+
+    fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
+    fmd->fmd_label = pnode->pl_label;
+    if (pnode->pl_flags & PN_FLAG_TO_ME)
+        fmd->fmd_to_me = 1;
+
+    pkt = pnode->pl_packet;
+    if (!pkt)
+        return -EINVAL;
+
+    pnode->pl_packet = NULL;
+    /*
+     * this is only a security check and not a catch all check. one note
+     * of caution. please do not access pkt->vp_if till the if block is
+     * succesfully bypassed
+     */
+    vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
+    if (!vif || (pkt->vp_if != vif)) {
+        vr_pfree(pkt, VP_DROP_INVALID_IF);
+        return -ENODEV;
+    }
+
+    if (!pkt->vp_nh) {
+        if (vif_is_fabric(pkt->vp_if) && fmd &&
+                (fmd->fmd_label >= 0)) {
+            if (!(pnode->pl_flags & PN_FLAG_LABEL_IS_VNID))
+                pkt->vp_nh = __vrouter_get_label(router, fmd->fmd_label);
+        }
+    }
+
+    if (fe) {
+        result = vr_flow_action(router, fe, fmd->fmd_flow_index, pkt, fmd);
+        forward = __vr_flow_forward(result, pkt, fmd);
+    } else {
+        forward = vr_flow_forward(router, pkt, fmd);
+    }
+
+    if (forward)
+        vr_reinject_packet(pkt, fmd);
+
+    return 0;
+}
+
 static void
 vr_flush_flow_queue(struct vrouter *router, struct vr_flow_entry *fe,
         struct vr_forwarding_md *fmd, struct vr_flow_queue *vfq)
 {
     unsigned int i;
-    bool forward;
-
-    struct vr_interface *vif;
-    struct vr_packet *pkt;
     struct vr_packet_node *pnode;
-
-    flow_result_t result;
 
     for (i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
         pnode = &vfq->vfq_pnodes[i];
-        if (fmd) {
-            memset(fmd, 0, sizeof(*fmd));
-            fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
-            fmd->fmd_label = pnode->pl_label;
-            if (pnode->pl_flags & PN_FLAG_TO_ME)
-                fmd->fmd_to_me = 1;
-        }
-
-        pkt = pnode->pl_packet;
-        if (!pkt)
-            continue;
-
-        pnode->pl_packet = NULL;
-        /*
-         * this is only a security check and not a catch all check. one note
-         * of caution. please do not access pkt->vp_if till the if block is
-         * succesfully bypassed
-         */
-        vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
-        if (!vif || (pkt->vp_if != vif)) {
-            vr_pfree(pkt, VP_DROP_INVALID_IF);
-            continue;
-        }
-
-        if (!pkt->vp_nh) {
-            if (vif_is_fabric(pkt->vp_if) && fmd &&
-                    (fmd->fmd_label >= 0)) {
-                if (!(pnode->pl_flags & PN_FLAG_LABEL_IS_VNID))
-                    pkt->vp_nh = __vrouter_get_label(router, fmd->fmd_label);
-            }
-        }
-
-        result = vr_flow_action(router, fe, vfq->vfq_index, pkt, fmd);
-        forward = __vr_flow_forward(result, pkt, fmd);
-        if (forward)
-            vr_reinject_packet(pkt, fmd);
-        pnode->pl_packet = NULL;
+        vr_flow_flush_pnode(router, pnode, fe, fmd);
     }
 
     return;
