@@ -116,6 +116,7 @@ dpdk_mempools_create(void)
         return -rte_errno;
     }
 
+#if VR_DPDK_USE_HW_FILTERING
     int ret, i;
     char mempool_name[RTE_MEMPOOL_NAMESIZE];
 
@@ -141,6 +142,7 @@ dpdk_mempools_create(void)
     }
     RTE_LOG(INFO, VROUTER, "Allocated %" PRIu16 " VM mempool(s)\n",
         vr_dpdk.nb_free_mempools);
+#endif
 
     return 0;
 }
@@ -288,7 +290,7 @@ dpdk_argv_update(void)
     }
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < dpdk_argc - 1; i += 2) {
-        RTE_LOG(INFO, VROUTER, "    %9s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
+        RTE_LOG(INFO, VROUTER, " %12s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
     }
 
     return 0;

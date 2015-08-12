@@ -19,13 +19,20 @@ void
 vr_dpdk_packet_wakeup(struct vr_interface *vif)
 {
     struct vr_interface_stats *stats;
+    struct vrouter *router;
+
+    if (unlikely(vif == NULL)) {
+        /* get global agent vif */
+        router = vrouter_get(0);
+        vif = router->vr_agent_if;
+    }
 
     if (likely(vr_dpdk.packet_event_sock != NULL)) {
         if (likely(vif != NULL)) {
             stats = vif_get_stats(vif, rte_lcore_id());
             stats->vis_port_osyscalls++;
         } else {
-            /* TODO: update global syscalls counter */
+            /* no agent interface - no counter */
         }
         if (vr_usocket_eventfd_write(vr_dpdk.packet_event_sock) < 0) {
             vr_usocket_close(vr_dpdk.packet_event_sock);

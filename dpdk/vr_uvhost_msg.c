@@ -627,12 +627,9 @@ cleanup:
     }
     if (ret == -1) {
         /* set VQ_NOT_READY state to vif's queues. */
-        for (i = 0; i < VR_MAX_CPUS; i++) {
+        for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES; i++) {
             vr_dpdk_virtio_rxqs[vru_cl->vruc_idx][i].vdv_ready_state = VQ_NOT_READY;
             vr_dpdk_virtio_txqs[vru_cl->vruc_idx][i].vdv_ready_state = VQ_NOT_READY;
-
-            vr_dpdk_virtio_rxqs[vru_cl->vruc_idx][i].vdv_last_used_idx = 0;
-            vr_dpdk_virtio_txqs[vru_cl->vruc_idx][i].vdv_last_used_idx = 0;
         }
         rte_wmb();
         synchronize_rcu();

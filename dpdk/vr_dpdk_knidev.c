@@ -227,7 +227,7 @@ static int
 dpdk_knidev_writer_free(void *port)
 {
     if (port == NULL) {
-        RTE_LOG(ERR, PORT, "%s: Port is NULL\n", __func__);
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
         return -EINVAL;
     }
 

@@ -26,34 +26,180 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
-vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
-vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_MAX_CPUS];
+vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
+vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 
-static int dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts,
+static int dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts,
                                   uint32_t max_pkts);
-static int dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *pkt);
-static int dpdk_virtio_to_vm_flush(void *arg);
-static int dpdk_virtio_writer_stats_read(void *arg,
+static int dpdk_virtio_to_vm_tx(void *port, struct rte_mbuf *pkt);
+static int dpdk_virtio_to_vm_flush(void *port);
+static int dpdk_virtio_writer_stats_read(void *port,
                                             struct rte_port_out_stats *stats,
                                             int clear);
-static int dpdk_virtio_reader_stats_read(void *arg,
+static int dpdk_virtio_reader_stats_read(void *port,
                                             struct rte_port_in_stats *stats,
                                             int clear);
 
-struct rte_port_in_ops vr_dpdk_virtio_reader_ops = {
-    .f_create = NULL,
-    .f_free = NULL,
-    .f_rx = dpdk_virtio_from_vm_rx,
-    .f_stats = dpdk_virtio_reader_stats_read
+/*
+ * Virtio writer
+ */
+struct dpdk_virtio_writer {
+    struct rte_port_out_stats stats;
+    /* extra statistics */
+    uint64_t nb_syscalls;
+
+    vr_dpdk_virtioq_t *tx_virtioq;
+    struct rte_mbuf *tx_buf[VR_DPDK_VIRTIO_TX_BURST_SZ];
+    uint32_t tx_buf_count;
 };
 
+struct dpdk_virtio_writer_params {
+    /* virtio TX queue pointer */
+    vr_dpdk_virtioq_t *tx_virtioq;
+};
+
+static void *
+dpdk_virtio_writer_create(void *params, int socket_id)
+{
+    struct dpdk_virtio_writer_params *conf =
+            (struct dpdk_virtio_writer_params *) params;
+    struct dpdk_virtio_writer *port;
+
+    /* Check input parameters */
+    if (conf == NULL) {
+        RTE_LOG(ERR, PORT, "%s: Invalid input parameters\n", __func__);
+        return NULL;
+    }
+
+    /* Memory allocation */
+    port = rte_zmalloc_socket("PORT", sizeof(*port),
+            RTE_CACHE_LINE_SIZE, socket_id);
+    if (port == NULL) {
+        RTE_LOG(ERR, PORT, "%s: Failed to allocate port\n", __func__);
+        return NULL;
+    }
+
+    /* Initialization */
+    port->tx_virtioq = conf->tx_virtioq;
+
+    return port;
+}
+
+static int
+dpdk_virtio_writer_free(void *port)
+{
+    vr_dpdk_virtioq_t *tx_virtioq;
+
+    if (port == NULL) {
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
+        return -EINVAL;
+    }
+
+    tx_virtioq = ((struct dpdk_virtio_writer *)port)->tx_virtioq;
+
+    /* close FDs */
+    if (tx_virtioq->vdv_callfd > 0) {
+        close(tx_virtioq->vdv_callfd);
+    }
+    if (tx_virtioq->vdv_kickfd > 0) {
+        close(tx_virtioq->vdv_kickfd);
+    }
+
+    /* reset the virtio */
+    memset(tx_virtioq, 0, sizeof(vr_dpdk_virtioq_t));
+
+    rte_free(port);
+
+    return 0;
+}
+
 struct rte_port_out_ops vr_dpdk_virtio_writer_ops = {
-    .f_create = NULL,
-    .f_free = NULL,
+    .f_create = dpdk_virtio_writer_create,
+    .f_free = dpdk_virtio_writer_free,
     .f_tx = dpdk_virtio_to_vm_tx,
     .f_tx_bulk = NULL, /* TODO: not implemented */
     .f_flush = dpdk_virtio_to_vm_flush,
     .f_stats = dpdk_virtio_writer_stats_read
+};
+
+/*
+ * Virtio reader
+ */
+struct dpdk_virtio_reader {
+    struct rte_port_in_stats stats;
+    /* extra statistics */
+    uint64_t nb_syscalls;
+    uint64_t nb_nombufs;
+
+    vr_dpdk_virtioq_t *rx_virtioq;
+};
+
+struct dpdk_virtio_reader_params {
+    /* virtio RX queue pointer */
+    vr_dpdk_virtioq_t *rx_virtioq;
+};
+
+static void *
+dpdk_virtio_reader_create(void *params, int socket_id)
+{
+    struct dpdk_virtio_reader_params *conf =
+            (struct dpdk_virtio_reader_params *) params;
+    struct dpdk_virtio_reader *port;
+
+    /* Check input parameters */
+    if (conf == NULL) {
+        RTE_LOG(ERR, PORT, "%s: Invalid input parameters\n", __func__);
+        return NULL;
+    }
+
+    /* Memory allocation */
+    port = rte_zmalloc_socket("PORT", sizeof(*port),
+            RTE_CACHE_LINE_SIZE, socket_id);
+    if (port == NULL) {
+        RTE_LOG(ERR, PORT, "%s: Failed to allocate port\n", __func__);
+        return NULL;
+    }
+
+    /* Initialization */
+    port->rx_virtioq = conf->rx_virtioq;
+
+    return port;
+}
+
+static int
+dpdk_virtio_reader_free(void *port)
+{
+    vr_dpdk_virtioq_t *rx_virtioq;
+
+    if (port == NULL) {
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
+        return -EINVAL;
+    }
+
+    rx_virtioq = ((struct dpdk_virtio_reader *)port)->rx_virtioq;
+
+    /* close FDs */
+    if (rx_virtioq->vdv_callfd > 0) {
+        close(rx_virtioq->vdv_callfd);
+    }
+    if (rx_virtioq->vdv_kickfd > 0) {
+        close(rx_virtioq->vdv_kickfd);
+    }
+
+    /* reset the virtio */
+    memset(rx_virtioq, 0, sizeof(vr_dpdk_virtioq_t));
+
+    rte_free(port);
+
+    return 0;
+}
+
+
+struct rte_port_in_ops vr_dpdk_virtio_reader_ops = {
+    .f_create = dpdk_virtio_reader_create,
+    .f_free = dpdk_virtio_reader_free,
+    .f_rx = dpdk_virtio_from_vm_rx,
+    .f_stats = dpdk_virtio_reader_stats_read
 };
 
 /*
@@ -133,7 +279,7 @@ vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t
 uint16_t
 vr_dpdk_virtio_nrxqs(struct vr_interface *vif)
 {
-    return 1;
+    return VR_DPDK_VIRTIO_MAX_QUEUES;
 }
 
 /*
@@ -143,7 +289,7 @@ vr_dpdk_virtio_nrxqs(struct vr_interface *vif)
 uint16_t
 vr_dpdk_virtio_ntxqs(struct vr_interface *vif)
 {
-    return 1;
+    return VR_DPDK_VIRTIO_MAX_QUEUES;
 }
 
 /*
@@ -158,18 +304,14 @@ dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
     struct vr_dpdk_queue_params *rx_queue_params
                         = &lcore->lcore_rx_queue_params[vif->vif_idx];
-    int fd;
-
-    /* close call FD */
-    fd = ((vr_dpdk_virtioq_t *)rx_queue->q_queue_h)->vdv_callfd;
-    if (fd > 0) {
-        close(fd);
+    /* free the queue */
+    if (rx_queue->rxq_ops.f_free(rx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u virtio device RX queue\n",
+                    lcore_id);
     }
 
-    rte_free(rx_queue_params->qp_ring.ring_p);
-
     /* reset the queue */
-    memset(rx_queue->q_queue_h, 0, sizeof(vr_dpdk_virtioq_t));
+    vrouter_put_interface(rx_queue->q_vif);
     memset(rx_queue, 0, sizeof(*rx_queue));
     memset(rx_queue_params, 0, sizeof(*rx_queue_params));
 }
@@ -185,23 +327,39 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 {
     uint16_t queue_id = queue_or_lcore_id;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif_idx];
     struct vr_dpdk_queue_params *rx_queue_params =
         &lcore->lcore_rx_queue_params[vif_idx];
 
+    /* Check input parameters */
     if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
+        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s RX queue%"
+            PRIu16 "\n", vif->vif_name, queue_id);
         return NULL;
     }
 
+    /* init queue */
     rx_queue->rxq_ops = vr_dpdk_virtio_reader_ops;
+    rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+
+    /* init virtio queue */
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
-    /* TODO: not used
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_zero_copy = 0; */
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx = 0;
+    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx_res = 0;
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
-    rx_queue->q_queue_h = (void *) &vr_dpdk_virtio_rxqs[vif_idx][queue_id];
-    rx_queue->q_vif = vif;
+
+    /* create the queue */
+    struct dpdk_virtio_reader_params reader_params = {
+        .rx_virtioq = &vr_dpdk_virtio_rxqs[vif_idx][queue_id],
+    };
+    rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
+    if (rx_queue->q_queue_h == NULL) {
+        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s RX queue%"
+            PRIu16 "\n", vif->vif_name, queue_id);
+        return NULL;
+    }
 
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_virtio_rx_queue_release;
@@ -221,18 +379,18 @@ dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
     struct vr_dpdk_queue_params *tx_queue_params
                         = &lcore->lcore_tx_queue_params[vif->vif_idx];
-    int fd;
 
     tx_queue->txq_ops.f_tx = NULL;
     rte_wmb();
 
-    /* close call FD */
-    fd = ((vr_dpdk_virtioq_t *)tx_queue->q_queue_h)->vdv_callfd;
-    if (fd > 0) {
-        close(fd);
+    /* flush and free the queue */
+    if (tx_queue->txq_ops.f_free(tx_queue->q_queue_h)) {
+        RTE_LOG(ERR, VROUTER, "    error freeing lcore %u virtio device TX queue\n",
+                    lcore_id);
     }
+
     /* reset the queue */
-    memset(tx_queue->q_queue_h, 0, sizeof(vr_dpdk_virtioq_t));
+    vrouter_put_interface(tx_queue->q_vif);
     memset(tx_queue, 0, sizeof(*tx_queue));
     memset(tx_queue_params, 0, sizeof(*tx_queue_params));
 }
@@ -248,24 +406,36 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 {
     uint16_t queue_id = queue_or_lcore_id;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
     unsigned int vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue_params *tx_queue_params
                 = &lcore->lcore_tx_queue_params[vif_idx];
 
-    if (queue_id >= vr_dpdk_virtio_ntxqs(vif)) {
+    /* Check input parameters */
+    /* virtio TX is thread safe, so just use one of the rings */
+    queue_id = queue_id % vr_dpdk_virtio_ntxqs(vif);
+
+    /* init queue */
+    tx_queue->txq_ops = vr_dpdk_virtio_writer_ops;
+    tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
+
+    /* init virtio queue */
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx_res = 0;
+    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
+
+    /* create the queue */
+    struct dpdk_virtio_writer_params writer_params = {
+        .tx_virtioq = &vr_dpdk_virtio_txqs[vif_idx][queue_id],
+    };
+    tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
+    if (tx_queue->q_queue_h == NULL) {
+        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s TX queue%"
+            PRIu16 "\n", vif->vif_name, queue_id);
         return NULL;
     }
-
-    tx_queue->txq_ops = vr_dpdk_virtio_writer_ops;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
-    /* TODO: not used
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_zero_copy = 0; */
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx = 0;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_tx_mbuf_count = 0;
-    tx_queue->q_queue_h = (void *) &vr_dpdk_virtio_txqs[vif_idx][queue_id];
-    tx_queue->q_vif = vif;
 
     /* store queue params */
     tx_queue_params->qp_release_op = &dpdk_virtio_tx_queue_release;
@@ -281,16 +451,10 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
  * Returns address on success, NULL otherwise.
  */
 static char *
-vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
+vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
 {
     int i;
-    vr_uvh_client_t *vru_cl;
     vr_uvh_client_mem_region_t *reg;
-
-    vru_cl = vr_dpdk_virtio_get_vif_client(vq->vdv_vif_idx);
-    if (vru_cl == NULL) {
-        return NULL;
-    }
 
     for (i = 0; i < vru_cl->vruc_num_mem_regions; i++) {
         reg = &vru_cl->vruc_mem_regions[i];
@@ -308,9 +472,9 @@ vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
 #if DPDK_VIRTIO_READER_STATS_COLLECT == 1
 
 #define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val) \
-	port->vdv_in_stats.n_pkts_in += val
+        port->stats.n_pkts_in += val
 #define DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(port, val) \
-	port->vdv_in_stats.n_pkts_drop += val
+        port->stats.n_pkts_drop += val
 
 #else
 
@@ -328,9 +492,10 @@ vr_dpdk_guest_phys_to_host_virt(vr_dpdk_virtioq_t *vq, uint64_t paddr)
  * to do).
  */
 static int
-dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
+dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 {
-    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *)arg;
+    struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
+    vr_dpdk_virtioq_t *vq = p->rx_virtioq;
     rte_prefetch0(vq->vdv_avail);
     uint16_t vq_hard_avail_idx, i;
     uint16_t num_pkts, next_desc_idx, next_avail_idx, pkts_sent = 0;
@@ -339,12 +504,17 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     struct rte_mbuf *mbuf;
     uint32_t pkt_len;
     uint64_t mbuf_flags;
+    vr_uvh_client_t *vru_cl;
 
-    if (vq->vdv_ready_state == VQ_NOT_READY) {
+    if (unlikely(vq->vdv_ready_state == VQ_NOT_READY)) {
         DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p is not ready\n",
                 __func__, vq);
         return 0;
     }
+
+    vru_cl = vr_dpdk_virtio_get_vif_client(vq->vdv_vif_idx);
+    if (unlikely(vru_cl == NULL))
+        return 0;
 
     vq_hard_avail_idx = (*((volatile uint16_t *)&vq->vdv_avail->idx));
 
@@ -352,13 +522,13 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
      * Unsigned subtraction gives the right result even with wrap around.
      */
     num_pkts = vq_hard_avail_idx - vq->vdv_last_used_idx;
-    if (num_pkts == 0) {
+    if (unlikely(num_pkts == 0)) {
         DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p has no packets\n",
                     __func__, vq);
         return 0;
     }
 
-    if (num_pkts > max_pkts) {
+    if (unlikely(num_pkts > max_pkts)) {
         num_pkts = max_pkts;
     }
 
@@ -371,7 +541,7 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
         desc = &vq->vdv_desc[next_desc_idx];
 
         mbuf_flags = 0;
-        pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+        pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
         if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
             mbuf_flags |= PKT_RX_IP_CKSUM_BAD;
 
@@ -383,26 +553,26 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
          */
         vq->vdv_used->ring[next_avail_idx].id = next_desc_idx;
         vq->vdv_used->ring[next_avail_idx].len = 0;
-        if (desc->flags & VRING_DESC_F_NEXT) {
+        if (likely(desc->flags & VRING_DESC_F_NEXT)) {
             /*
              * TODO - make sure desc->next is sane
              */
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u F_NEXT\n",
                 __func__, vq, i);
             desc = &vq->vdv_desc[desc->next];
-            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
             pkt_len = desc->len;
         } else {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
                 __func__, vq, i);
-            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
             if (pkt_addr) {
                 pkt_addr += sizeof(struct virtio_net_hdr);
                 pkt_len = desc->len - sizeof(struct virtio_net_hdr);
             }
         }
 
-        if (pkt_addr) {
+        if (likely(pkt_addr != NULL)) {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
                 __func__, vq, i, pkt_addr);
             /* No need to use a dedicated mempool at the moment, since there is
@@ -410,8 +580,8 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
                 __func__, vq, i, mbuf);
-            if (!mbuf) {
-                vq->vdv_nb_nombufs++;
+            if (unlikely(mbuf == NULL)) {
+                p->nb_nombufs++;
                 break;
             }
 
@@ -422,14 +592,14 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
             rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
 
             /* gather mbuf from several vring buffers (fixes FreeBSD) */
-            while (desc->flags & VRING_DESC_F_NEXT) {
+            while (unlikely(desc->flags & VRING_DESC_F_NEXT)) {
                 desc = &vq->vdv_desc[desc->next];
-                pkt_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
+                pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
                 pkt_len = desc->len;
 
                 tail_addr = rte_pktmbuf_append(mbuf, pkt_len);
-                if (!tail_addr) {
-                    vq->vdv_nb_nombufs++;
+                if (unlikely(tail_addr == NULL)) {
+                    p->nb_nombufs++;
                     break;
                 }
                 rte_memcpy(tail_addr, pkt_addr, pkt_len);
@@ -443,25 +613,25 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
     vq->vdv_last_used_idx += pkts_sent;
     rte_wmb();
     vq->vdv_used->idx += pkts_sent;
-    /* kick guest if required (fixes iperf issue) */
+    /* call guest if required (fixes iperf issue) */
     if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
-        vq->vdv_nb_syscalls++;
+        p->nb_syscalls++;
         eventfd_write(vq->vdv_callfd, 1);
     }
 
     DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkts_sent %u\n",
             __func__, vq, pkts_sent);
 
-    DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(vq, pkts_sent);
+    DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(p, pkts_sent);
     return pkts_sent;
 }
 
 #if DPDK_VIRTIO_WRITER_STATS_COLLECT == 1
 
 #define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val) \
-	port->vdv_out_stats.n_pkts_in += val
+        port->stats.n_pkts_in += val
 #define DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(port, val) \
-	port->vdv_out_stats.n_pkts_drop += val
+        port->stats.n_pkts_drop += val
 
 #else
 
@@ -470,6 +640,170 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
 
 #endif
 
+/**
+ * This function adds buffers to the virtio devices RX virtqueue. Buffers can
+ * be received from the physical port or from another virtio device. A packet
+ * count is returned to indicate the number of packets that are succesfully
+ * added to the RX queue. This function works when mergeable is disabled.
+ *
+ * This is an adaptation of DPDK virtio_dev_rx() function.
+ * Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+ * BSD LICENSE
+ */
+static inline uint32_t __attribute__((always_inline))
+dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
+        vr_dpdk_virtioq_t *vq, struct rte_mbuf **pkts, uint32_t count)
+{
+    struct vring_desc *desc;
+    struct rte_mbuf *buff;
+    /* The virtio_hdr is initialised to 0. */
+    struct virtio_net_hdr_mrg_rxbuf virtio_hdr = {{0, 0, 0, 0, 0, 0}, 0};
+    uint64_t buff_addr = 0;
+    uint64_t buff_hdr_addr = 0;
+    uint32_t head[VR_DPDK_VIRTIO_TX_BURST_SZ], packet_len = 0;
+    uint32_t head_idx, packet_success = 0;
+    uint16_t avail_idx, res_cur_idx;
+    uint16_t res_base_idx, res_end_idx;
+    uint16_t free_entries;
+    uint8_t success = 0;
+    vr_uvh_client_t *vru_cl;
+
+    if (unlikely(vq->vdv_ready_state == VQ_NOT_READY))
+        return 0;
+
+    vru_cl = vr_dpdk_virtio_get_vif_client(vq->vdv_vif_idx);
+    if (unlikely(vru_cl == NULL))
+        return 0;
+
+    /*
+     * As many data cores may want access to available buffers,
+     * they need to be reserved.
+     */
+    do {
+        res_base_idx = vq->vdv_last_used_idx_res;
+        avail_idx = *((volatile uint16_t *)&vq->vdv_avail->idx);
+
+        free_entries = (avail_idx - res_base_idx);
+        /*check that we have enough buffers*/
+        if (unlikely(count > free_entries))
+            count = free_entries;
+
+        if (unlikely(count == 0))
+            return 0;
+
+        res_end_idx = res_base_idx + count;
+        /* vq->vdv_last_used_idx_res is atomically updated. */
+        /* TODO: Allow to disable cmpset if no concurrency in application. */
+        success = rte_atomic16_cmpset(&vq->vdv_last_used_idx_res,
+                res_base_idx, res_end_idx);
+    } while (unlikely(success == 0));
+    res_cur_idx = res_base_idx;
+    RTE_LOG(DEBUG, VROUTER, "%s: Current Index %d| End Index %d\n",
+            __func__, res_cur_idx, res_end_idx);
+
+    /* Prefetch available ring to retrieve indexes. */
+    rte_prefetch0(&vq->vdv_avail->ring[res_cur_idx & (vq->vdv_size - 1)]);
+
+    /* Retrieve all of the head indexes first to avoid caching issues. */
+    for (head_idx = 0; head_idx < count; head_idx++)
+        head[head_idx] = vq->vdv_avail->ring[(res_cur_idx + head_idx) &
+                    (vq->vdv_size - 1)];
+
+    /*Prefetch descriptor index. */
+    rte_prefetch0(&vq->vdv_desc[head[packet_success]]);
+
+    while (res_cur_idx != res_end_idx) {
+        /* Get descriptor from available ring */
+        desc = &vq->vdv_desc[head[packet_success]];
+
+        buff = pkts[packet_success];
+
+        /* Convert from gpa to vva (guest physical addr -> vhost virtual addr) */
+        buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+        /* Prefetch buffer address. */
+        rte_prefetch0((void *)(uintptr_t)buff_addr);
+
+        /* Copy virtio_hdr to packet and increment buffer address */
+        buff_hdr_addr = buff_addr;
+        packet_len = rte_pktmbuf_data_len(buff) + sizeof(struct virtio_net_hdr);
+
+        /*
+         * If the descriptors are chained the header and data are
+         * placed in separate buffers.
+         */
+        if (likely(desc->flags & VRING_DESC_F_NEXT)) {
+            desc->len = sizeof(struct virtio_net_hdr);
+            /*
+             * TODO: verify that desc->next is sane below.
+             */
+            desc = &vq->vdv_desc[desc->next];
+            /* Buffer address translation. */
+            buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+            desc->len = rte_pktmbuf_data_len(buff);
+        } else {
+            buff_addr += sizeof(struct virtio_net_hdr);
+            desc->len = packet_len;
+        }
+
+        /* Update used ring with desc information */
+        vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].id =
+                            head[packet_success];
+        vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].len = packet_len;
+
+        /* Copy mbuf data to buffer */
+        /* FIXME for sg mbuf and the case that desc couldn't hold the mbuf data */
+        rte_memcpy((void *)(uintptr_t)buff_addr,
+            rte_pktmbuf_mtod(buff, const void *),
+            rte_pktmbuf_data_len(buff));
+
+        res_cur_idx++;
+        packet_success++;
+
+        rte_memcpy((void *)(uintptr_t)buff_hdr_addr,
+            (const void *)&virtio_hdr, sizeof(struct virtio_net_hdr));
+
+        if (likely(res_cur_idx < res_end_idx)) {
+            /* Prefetch descriptor index. */
+            rte_prefetch0(&vq->vdv_desc[head[packet_success]]);
+        }
+    }
+
+    rte_compiler_barrier();
+
+    /* Wait until it's our turn to add our buffer to the used ring. */
+    while (unlikely(vq->vdv_last_used_idx != res_base_idx))
+        rte_pause();
+
+    *(volatile uint16_t *)&vq->vdv_used->idx += count;
+    vq->vdv_last_used_idx = res_end_idx;
+
+    /* flush used->idx update before we read avail->flags. */
+    rte_mb();
+
+    /* Kick the guest if necessary. */
+    if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
+        p->nb_syscalls++;
+        eventfd_write(vq->vdv_callfd, 1);
+    }
+    return count;
+}
+
+static inline void
+dpdk_virtio_send_burst(struct dpdk_virtio_writer *p)
+{
+    uint32_t nb_tx;
+
+    nb_tx = dpdk_virtio_dev_to_vm_tx_burst(p, p->tx_virtioq,
+                    p->tx_buf, p->tx_buf_count);
+
+    DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
+    /* dpdk_virtio_dev_to_vm_tx_burst() does not free any mbufs */
+    while (likely(p->tx_buf_count)) {
+        p->tx_buf_count--;
+        rte_pktmbuf_free(p->tx_buf[p->tx_buf_count]);
+    }
+}
+
 /*
  * dpdk_virtio_to_vm_tx - sends a packet from vrouter to a virtio client. The
  * virtio client is usually a VM.
@@ -477,21 +811,15 @@ dpdk_virtio_from_vm_rx(void *arg, struct rte_mbuf **pkts, uint32_t max_pkts)
  * Returns nothing.
  */
 static int
-dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *mbuf)
+dpdk_virtio_to_vm_tx(void *port, struct rte_mbuf *pkt)
 {
-    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+    struct dpdk_virtio_writer *p = (struct dpdk_virtio_writer *)port;
 
-    if (vq->vdv_ready_state == VQ_NOT_READY) {
-        DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
-        vr_dpdk_pfree(mbuf, VP_DROP_INTERFACE_DROP);
-        return -1;
-    }
+    p->tx_buf[p->tx_buf_count++] = pkt;
+    DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(p, 1);
 
-    vq->vdv_tx_mbuf[vq->vdv_tx_mbuf_count++] = mbuf;
-    DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(vq, 1);
-    if (vq->vdv_tx_mbuf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ) {
-        dpdk_virtio_to_vm_flush(vq);
-    }
+    if (unlikely(p->tx_buf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ))
+        dpdk_virtio_send_burst(p);
 
     return 0;
 }
@@ -503,124 +831,12 @@ dpdk_virtio_to_vm_tx(void *arg, struct rte_mbuf *mbuf)
  * Returns nothing.
  */
 static int
-dpdk_virtio_to_vm_flush(void *arg)
+dpdk_virtio_to_vm_flush(void *port)
 {
-    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *)arg;
-    uint16_t i;
-    uint16_t num_buf_posted, vq_hard_avail_idx, vq_hard_used_idx, num_pkts;
-    uint16_t next_desc_idx, next_avail_idx, size;
-    struct vring_desc *desc;
-    char *buf_addr;
-    struct virtio_net_hdr vhdr = {0, 0, 0, 0, 0, 0};
+    struct dpdk_virtio_writer *p = (struct dpdk_virtio_writer *)port;
 
-    if (vq->vdv_ready_state == VQ_NOT_READY) {
-        return 0;
-    }
-
-    if (vq->vdv_tx_mbuf_count == 0) {
-        return 0;
-    }
-
-    vq_hard_avail_idx = (*((volatile uint16_t *)&vq->vdv_avail->idx));
-
-    /*
-     * Unsigned subtraction gives the right result even with wrap around.
-     */
-    num_buf_posted = vq_hard_avail_idx - vq->vdv_last_used_idx;
-    if (num_buf_posted < vq->vdv_tx_mbuf_count) {
-        num_pkts = num_buf_posted;
-    } else {
-        num_pkts = vq->vdv_tx_mbuf_count;
-    }
-
-    for (i = 0; i < num_pkts; i++) {
-        next_avail_idx = (vq->vdv_last_used_idx + i) &
-                             (vq->vdv_size - 1);
-        next_desc_idx = vq->vdv_avail->ring[next_avail_idx];
-
-        /*
-         * Move the descriptor (single or chain of 2) to the used list. The
-         * used index will, however, only be updated at the end of the loop.
-         * This needs to be done even if any failures occur below in the loop.
-         * Set the descriptor length to 0 for now and update it at the end
-         * of the loop if there were no errors.
-         */
-        vq->vdv_used->ring[next_avail_idx].id = next_desc_idx;
-        vq->vdv_used->ring[next_avail_idx].len = 0;
-
-        desc = &vq->vdv_desc[next_desc_idx];
-        buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
-        if (buf_addr == NULL) {
-            DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
-            vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
-            continue;
-        }
-
-        size = sizeof(vhdr);
-        rte_memcpy(buf_addr, &vhdr, size);
-        buf_addr += sizeof(vhdr);
-
-        /*
-         * If the descriptor has VRING_DESC_F_NEXT set, the virtio_net header
-         * and packet data use separate descriptors.
-         */
-        if (desc->flags & VRING_DESC_F_NEXT) {
-            desc->len = sizeof(struct virtio_net_hdr);
-            /*
-             * TODO: verify that desc->next is sane below.
-             */
-            desc = &vq->vdv_desc[desc->next];
-
-            buf_addr = vr_dpdk_guest_phys_to_host_virt(vq, desc->addr);
-            if (buf_addr == NULL) {
-                DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, 1);
-                vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
-                continue;
-            }
-
-            desc->len = rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
-        } else {
-            desc->len = sizeof(struct virtio_net_hdr) +
-                            rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
-        }
-
-        rte_memcpy(buf_addr, rte_pktmbuf_mtod(vq->vdv_tx_mbuf[i], void *),
-                   rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]));
-
-        vq->vdv_used->ring[next_avail_idx].len =
-            sizeof(struct virtio_net_hdr) +
-            rte_pktmbuf_data_len(vq->vdv_tx_mbuf[i]);
-
-        rte_pktmbuf_free(vq->vdv_tx_mbuf[i]);
-    }
-
-    /*
-     * Free any packets that could not be sent to the VM because it didn't
-     * post receive buffers soon enough.
-     */
-    DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(vq, vq->vdv_tx_mbuf_count - i);
-    for (; i < vq->vdv_tx_mbuf_count; i++)
-        vr_dpdk_pfree(vq->vdv_tx_mbuf[i], VP_DROP_INTERFACE_DROP);
-
-    vq->vdv_tx_mbuf_count = 0;
-
-    /*
-     * Now update the used index in the vring.
-     */
-    vq->vdv_last_used_idx += num_pkts;
-    vq_hard_used_idx = (*((volatile uint16_t *)&vq->vdv_used->idx));
-    *((volatile uint16_t *) &vq->vdv_used->idx) = vq_hard_used_idx + num_pkts;
-    rte_wmb();
-
-    /*
-     * If the VM did not want to be interrupted (i.e if it uses DPDK), do
-     * not raise an interrupt. Otherwise, use eventfd to raise an interrupt
-     * in the guest.
-     */
-    if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
-        vq->vdv_nb_syscalls++;
-        eventfd_write(vq->vdv_callfd, 1);
-    }
+    if (p->tx_buf_count > 0)
+        dpdk_virtio_send_burst(p);
 
     return 0;
 }
@@ -637,7 +853,8 @@ vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
         return -1;
     }
 
@@ -652,7 +869,8 @@ vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
-    vq->vdv_base_idx = vring_base;
+    vq->vdv_last_used_idx = vring_base;
+    vq->vdv_last_used_idx_res = vring_base;
     return 0;
 }
 
@@ -668,7 +886,8 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
         return -1;
     }
 
@@ -683,14 +902,13 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
-    *vring_basep = vq->vdv_base_idx;
+    *vring_basep = vq->vdv_last_used_idx;
 
     /*
      * This is usually called when qemu shuts down a virtio queue. Set the
      * state to indicate that this queue should not be used any more.
      */
     vq->vdv_ready_state = VQ_NOT_READY;
-    vq->vdv_last_used_idx = 0;
     rte_wmb();
     synchronize_rcu();
 
@@ -711,7 +929,8 @@ vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
         return -1;
     }
 
@@ -751,7 +970,7 @@ vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx > 2 * VR_DPDK_VIRTIO_MAX_QUEUES)) {
         return -1;
     }
 
@@ -781,7 +1000,8 @@ vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
         return -1;
     }
 
@@ -816,7 +1036,8 @@ vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= (2 * VR_MAX_CPUS))) {
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
         return -1;
     }
 
@@ -869,31 +1090,49 @@ vr_dpdk_virtio_get_vif_client(unsigned int idx)
 }
 
 static int
-dpdk_virtio_reader_stats_read(void *arg,
+dpdk_virtio_reader_stats_read(void *port,
     struct rte_port_in_stats *stats, int clear)
 {
-    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+    struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
 
     if (stats != NULL)
-        memcpy(stats, &vq->vdv_in_stats, sizeof(vq->vdv_in_stats));
+        memcpy(stats, &p->stats, sizeof(p->stats));
 
     if (clear)
-        memset(&vq->vdv_in_stats, 0, sizeof(vq->vdv_in_stats));
+        memset(&p->stats, 0, sizeof(p->stats));
 
     return 0;
 }
 
 static int
-dpdk_virtio_writer_stats_read(void *arg,
+dpdk_virtio_writer_stats_read(void *port,
     struct rte_port_out_stats *stats, int clear)
 {
-    vr_dpdk_virtioq_t *vq = (vr_dpdk_virtioq_t *) arg;
+    struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
 
     if (stats != NULL)
-        memcpy(stats, &vq->vdv_out_stats, sizeof(vq->vdv_out_stats));
+        memcpy(stats, &p->stats, sizeof(p->stats));
 
     if (clear)
-        memset(&vq->vdv_out_stats, 0, sizeof(vq->vdv_out_stats));
+        memset(&p->stats, 0, sizeof(p->stats));
 
     return 0;
+}
+
+/* Update extra statistics for virtio queue */
+void
+vr_dpdk_virtio_xstats_update(struct vr_interface_stats *stats,
+    struct vr_dpdk_queue *queue)
+{
+    struct dpdk_virtio_reader *reader;
+    struct dpdk_virtio_writer *writer;
+
+    if (queue->rxq_ops.f_rx == vr_dpdk_virtio_reader_ops.f_rx) {
+        reader = (struct dpdk_virtio_reader *)queue->q_queue_h;
+        stats->vis_port_isyscalls = reader->nb_syscalls;
+        stats->vis_port_inombufs = reader->nb_nombufs;
+    } else if (queue->txq_ops.f_tx == vr_dpdk_virtio_writer_ops.f_tx) {
+        writer = (struct dpdk_virtio_writer *)queue->q_queue_h;
+        stats->vis_port_osyscalls = writer->nb_syscalls;
+    }
 }

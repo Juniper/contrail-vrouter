@@ -194,7 +194,8 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
              * there are no enough queues for all the forwarding lcores
              */
             if (((lcore_id >= VR_DPDK_FWD_LCORE_ID)
-                    || (nb_tx_queues > vr_dpdk.nb_fwd_lcores))
+                    || (nb_tx_queues >= vr_dpdk.nb_fwd_lcores
+                            + (VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID)))
                 && (queue_id < nb_tx_queues)) {
                 /* there is a hardware queue available */
                 RTE_LOG(INFO, VROUTER, "    lcore %u TX to HW queue %" PRIu16 "\n",
@@ -268,7 +269,8 @@ vr_dpdk_lcore_cmd_wait(unsigned lcore_id)
 
     lcore = vr_dpdk.lcores[lcore_id];
 
-    while (lcore->lcore_cmd != VR_DPDK_LCORE_NO_CMD);
+    while (lcore->lcore_cmd != VR_DPDK_LCORE_NO_CMD)
+        rte_pause();
 }
 
 /* Wait for a command to complete */
@@ -684,22 +686,17 @@ dpdk_lcore_fwd_io(struct vr_dpdk_lcore *lcore)
     /* push TX rings */
     total_pkts += dpdk_lcore_rings_push(lcore);
 
-#if VR_DPDK_SLEEP_NO_PACKETS_US > 0
-    /* sleep if no single packet received */
+    /* make a short pause if no single packet received */
     if (unlikely(total_pkts == 0)) {
         rcu_thread_offline();
+#if VR_DPDK_SLEEP_NO_PACKETS_US > 0
         usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
-        rcu_thread_online();
-    }
 #endif
 #if VR_DPDK_YIELD_NO_PACKETS > 0
-    /* yield if no single packet received */
-    if (unlikely(total_pkts == 0)) {
-        rcu_thread_offline();
         sched_yield();
+#endif
         rcu_thread_online();
     }
-#endif
 }
 
 /* Setup signal handlers */

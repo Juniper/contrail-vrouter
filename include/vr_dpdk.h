@@ -94,9 +94,9 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
 /* Maximum RETA table size */
 #define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_128
 #define VR_DPDK_MAX_RETA_ENTRIES    (VR_DPDK_MAX_RETA_SIZE/RTE_RETA_GROUP_SIZE)
-/* Number of hardware RX ring descriptors */
+/* Number of hardware RX ring descriptors per queue */
 #define VR_DPDK_NB_RXD              256
-/* Number of hardware TX ring descriptors */
+/* Number of hardware TX ring descriptors per queue */
 #define VR_DPDK_NB_TXD              512
 /* Offset to MPLS label for hardware filtering (in 16-bit word units) */
 #define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
