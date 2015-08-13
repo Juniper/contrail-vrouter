@@ -176,6 +176,110 @@ entry_to_bucket(struct ip_bucket_entry *ent)
     return NULL;
 }
 
+static void
+mtrie_free_entry(struct ip_bucket_entry *entry, unsigned int level)
+{
+    unsigned int i;
+    struct ip_bucket *bkt;
+
+    if (ENTRY_IS_NEXTHOP(entry)) {
+        vrouter_put_nexthop(entry->entry_nh_p);
+        entry->entry_nh_p = NULL;
+        return;
+    }
+
+    bkt = entry_to_bucket(entry);
+    if (!bkt)
+        return;
+
+    for (i = 0; i < IPBUCKET_LEVEL_SIZE; i++) {
+        if (ENTRY_IS_BUCKET(&bkt->bkt_data[i])) {
+            mtrie_free_entry(&bkt->bkt_data[i], level + 1);
+        } else {
+            if (bkt->bkt_data[i].entry_nh_p) {
+                vrouter_put_nexthop(bkt->bkt_data[i].entry_nh_p);
+            }
+        }
+    }
+
+    entry->entry_bkt_p = NULL;
+    vr_free(bkt);
+
+    return;
+}
+
+static void
+mtrie_free_bkt(struct ip_bucket *bkt)
+{
+    unsigned int i;
+
+    for (i = 0; i < IPBUCKET_LEVEL_SIZE; i++) {
+        mtrie_free_entry(&bkt->bkt_data[i], 0);
+    }
+
+    vr_free(bkt);
+
+    return;
+}
+
+static void
+mtrie_free_bkt_cb(struct vrouter *router, void *data)
+{
+    struct vr_defer_data *vdd = (struct vr_defer_data *)data;
+
+    if (!vdd)
+        return;
+
+    mtrie_free_bkt((struct ip_bucket *)(vdd->vdd_data));
+
+    return;
+}
+
+static int
+mtrie_free_bkt_defer(struct vrouter *router, struct ip_bucket *bkt)
+{
+
+    struct vr_defer_data *defer;
+
+    defer = vr_get_defer_data(sizeof(*defer));
+    if (!defer)
+        return -ENOMEM;
+
+    defer->vdd_data = bkt;
+    vr_defer(router, mtrie_free_bkt_cb, (void *)defer);
+
+    return 0;
+}
+
+static void
+mtrie_delete_bkt(struct ip_bucket_entry *ent, struct vr_route_req *rt)
+{
+    struct ip_bucket *bkt;
+
+    if (ENTRY_IS_NEXTHOP(ent)) {
+        vrouter_put_nexthop(ent->entry_nh_p);
+        ent->entry_nh_p = NULL;
+        return;
+    }
+
+    bkt = entry_to_bucket(ent);
+    set_entry_to_nh(ent, rt->rtr_nh);
+    ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
+    ent->entry_label = rt->rtr_req.rtr_label;
+    ent->entry_bridge_index = rt->rtr_req.rtr_index;
+
+    if (!vr_not_ready) {
+        if (!mtrie_free_bkt_defer(rt->rtr_nh->nh_router, bkt))
+            return;
+
+        vr_delay_op();
+    }
+    mtrie_free_bkt(bkt);
+
+    return;
+}
+
+
 /*
  * alloc a mtrie bucket
  */
@@ -239,41 +343,12 @@ add_to_tree(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
     return;
 }
 
-static void
-mtrie_free_entry(struct ip_bucket_entry *entry, unsigned int level)
-{
-    unsigned int i;
-    struct ip_bucket *bkt;
-
-    if (ENTRY_IS_NEXTHOP(entry)) {
-        vrouter_put_nexthop(entry->entry_nh_p);
-        return;
-    }
-
-    bkt = entry_to_bucket(entry);
-    if (!bkt)
-        return;
-
-    for (i = 0; i < IPBUCKET_LEVEL_SIZE; i++)
-        if (ENTRY_IS_BUCKET(&bkt->bkt_data[i])) {
-            mtrie_free_entry(&bkt->bkt_data[i], level + 1);
-        } else {
-            if (bkt->bkt_data[i].entry_nh_p) {
-                vrouter_put_nexthop(bkt->bkt_data[i].entry_nh_p);
-            }
-        }
-
-    entry->entry_bkt_p = NULL;
-    vr_free(bkt);
-
-    return;
-}
-
-static void
+void
 mtrie_reset_entry(struct ip_bucket_entry *ent, int level,
                 struct vr_nexthop *nh)
 {
     struct ip_bucket_entry cp_ent;
+    struct ip_bucket *bkt;
 
     memcpy(&cp_ent, ent, sizeof(cp_ent));
 
@@ -281,11 +356,15 @@ mtrie_reset_entry(struct ip_bucket_entry *ent, int level,
     if (nh)
         set_entry_to_nh(ent, nh);
 
-    /* wait for all cores to see it */
-    if (!vr_not_ready)
-        vr_delay_op();
-
     /* ...and then work with the copy */
+    bkt = entry_to_bucket(&cp_ent);
+    if (!bkt)
+        return;
+    if (!vr_not_ready) {
+        if (!mtrie_free_bkt_defer(nh->nh_router, bkt))
+            return;
+        vr_delay_op();
+    }
     mtrie_free_entry(&cp_ent, level);
 
     return;
@@ -398,43 +477,6 @@ exit_ret:
     return ret;
 }
 
-
-static void
-ip_bucket_sched_for_free(struct ip_bucket *bkt, int level)
-{
-    unsigned int i;
-    struct ip_bucket_entry *tmp_ent;
-
-    if (!vr_not_ready)
-        vr_delay_op();
-
-    for (i = 0; i < IPBUCKET_LEVEL_SIZE; i++) {
-        tmp_ent = &bkt->bkt_data[i];
-        if (tmp_ent->entry_nh_p) {
-            vrouter_put_nexthop(tmp_ent->entry_nh_p);
-        }
-    }
-    vr_free(bkt);
-}
-
-static void
-free_bucket(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
-{
-    struct ip_bucket *bkt;
-
-    if (ENTRY_IS_NEXTHOP(ent)) {
-        return;
-    }
-
-    bkt = entry_to_bucket(ent);
-    set_entry_to_nh(ent, rt->rtr_nh);
-    ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
-    ent->entry_label = rt->rtr_req.rtr_label;
-    ent->entry_bridge_index = rt->rtr_req.rtr_index;
-
-    ip_bucket_sched_for_free(bkt, level);
-}
-
 static int
 __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
                 unsigned char level)
@@ -494,7 +536,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
             return 0;
     }
 
-    free_bucket(ent, level, rt);
+    mtrie_delete_bkt(ent, rt);
     return 0;
 }
 
