@@ -53,6 +53,8 @@ vr_mtrans_free(void *buf)
 int
 vr_message_request(struct vr_message *message)
 {
+    int ret;
+
     if (!message_h.vm_proto)
         return 0;
 
@@ -66,8 +68,11 @@ vr_message_request(struct vr_message *message)
         return -EBADFD;
 #endif
 
-    message_h.vm_proto->mproto_decode(message->vr_message_buf,
+    ret = message_h.vm_proto->mproto_decode(message->vr_message_buf,
             message->vr_message_len, NULL, NULL);
+    if (ret < 0)
+        return ret;
+
     return 0;
 }
 
