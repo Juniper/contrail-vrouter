@@ -17,45 +17,30 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#if defined(__linux__)
-#include <asm/types.h>
-
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <linux/if_ether.h>
 
 #include <net/if.h>
-#include <netinet/ether.h>
-#elif defined(__FreeBSD__)
-#include <net/if.h>
-#include <net/ethernet.h>
-#endif
 
 #include "vr_types.h"
-#include "vr_message.h"
 #include "vr_nexthop.h"
-#include "vr_genetlink.h"
 #include "nl_util.h"
 #include "vr_mpls.h"
 #include "vr_defs.h"
-#include "ini_parser.h"
 
 static struct nl_client *cl;
-static int resp_code;
-static vr_vrf_stats_req stats_req;
 static unsigned int stats_op;
+static int marker = -1;
 static int vrf = -1;
+
 static int get_set, dump_set;
 static int help_set;
 static bool dump_pending = false;
-static bool response_pending = true;
 
 void
 vr_vrf_stats_req_process(void *s_req)
 {
     vr_vrf_stats_req *stats = (vr_vrf_stats_req *)s_req;
 
-    stats_req.vsr_marker = stats->vsr_vrf;
+    marker = stats->vsr_vrf;
     printf("Vrf: %d\n", stats->vsr_vrf);
     printf("Discards %" PRIu64 ", Resolves %" PRIu64 ", Receives %"
             PRIu64 ", L2 Receives %" PRIu64 ", Vrf Translates %" PRIu64
@@ -85,156 +70,48 @@ vr_vrf_stats_req_process(void *s_req)
 
     printf("\n");
 
-    response_pending = false;
     return;
 }
 
 void
 vr_response_process(void *s)
 {
-    vr_response *stats_resp;
-
-    stats_resp = (vr_response *)s;
-    resp_code = stats_resp->resp_code;
-
-    response_pending = false;
-    if (stats_resp->resp_code < 0) {
-        printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
-        exit(-1);
-    } else {
-        if (stats_op == SANDESH_OP_DUMP) {
-            if (stats_resp->resp_code > 0)
-                response_pending = true;
-
-            if (resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
-                dump_pending = true;
-                response_pending = true;
-            } else {
-                dump_pending = false;
-            }
-        }
-    }
-
+    vr_response_common_process((vr_response *)s, &dump_pending);
     return;
 }
 
 
-static vr_vrf_stats_req *
-vr_build_vrf_stats_request(void)
+static int
+vr_stats_op(struct nl_client *cl)
 {
-    stats_req.h_op = stats_op;
-    stats_req.vsr_rid = 0;
-    stats_req.vsr_family = AF_INET;
+    int ret;
+    bool dump = false;
 
-    switch (stats_req.h_op) {
+op_retry:
+    switch (stats_op) {
     case SANDESH_OP_GET:
-        stats_req.vsr_vrf = vrf;
+        ret = vr_send_vrf_stats_get(cl, 0, vrf);
         break;
 
     case SANDESH_OP_DUMP:
+        dump = true;
+        ret = vr_send_vrf_stats_dump(cl, 0, marker);
         break;
 
     default:
-        return NULL;
+        ret = -EINVAL;
+        break;
     }
 
-    return &stats_req;
-}
-
-static int
-vr_build_netlink_request(vr_vrf_stats_req *req)
-{
-    int ret, error = 0, attr_len;
-
-    /* nlmsg header */
-    ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
-    if (ret)
-        return ret;
-
-    /* Generic nlmsg header */
-    ret = nl_build_genlh(cl, SANDESH_REQUEST, 0);
-    if (ret)
-        return ret;
-
-    attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_vrf_stats_req", vr_find_sandesh_info,
-                             (nl_get_buf_ptr(cl) + attr_len),
-                             (nl_get_buf_len(cl) - attr_len), &error);
-
-    if ((ret <= 0) || error)
-        return -1;
-
-    /* Add sandesh attribute */
-    nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
-    nl_update_nlh(cl);
-
-    return 0;
-}
-
-static int
-vr_send_one_message(void)
-{
-    int ret;
-    struct nl_response *resp;
-
-    response_pending = true;
-    ret = nl_sendmsg(cl);
-    if (ret <= 0)
-        return 0;
-
-    while (response_pending) {
-        if ((ret = nl_recvmsg(cl)) > 0) {
-            resp = nl_parse_reply(cl);
-            if (resp->nl_op == SANDESH_REQUEST)
-                sandesh_decode(resp->nl_data, resp->nl_len,
-                               vr_find_sandesh_info, &ret);
-        }
-    }
-    return resp_code;
-}
-
-static void
-vr_stats_dump(void)
-{
-    vr_vrf_stats_req *req;
-
-    while (vr_send_one_message() != 0) {
-        if (!dump_pending)
-            return;
-        req = vr_build_vrf_stats_request();
-        if (req)
-            vr_build_netlink_request(req);
-    }
-
-    return;
-}
-
-static void
-vr_do_stats_op(void)
-{
-    if (stats_op == SANDESH_OP_DUMP)
-        vr_stats_dump();
-    else
-        vr_send_one_message();
-
-    return;
-}
-
-static int
-vr_stats_op(void)
-{
-    int ret;
-    vr_vrf_stats_req *req;
-
-    req = vr_build_vrf_stats_request();
-    if (!req)
-        return -errno;
-
-    ret = vr_build_netlink_request(req);
     if (ret < 0)
         return ret;
 
-    vr_do_stats_op();
+    ret = vr_recvmsg(cl, dump);
+    if (ret <= 0)
+        return ret;
+
+    if (dump_pending)
+        goto op_retry;
 
     return 0;
 }
@@ -329,29 +206,12 @@ main(int argc, char *argv[])
 
     validate_options();
 
-    cl = nl_register_client();
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
     if (!cl) {
         exit(1);
     }
 
-    parse_ini_file();
-
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0) {
-        exit(1);
-    }
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0) {
-        exit(1);
-    }
-
-    if (vrouter_get_family_id(cl) <= 0) {
-        return -1;
-    }
-
-    stats_req.vsr_marker = -1;
-    vr_stats_op();
+    vr_stats_op(cl);
 
     return 0;
 }

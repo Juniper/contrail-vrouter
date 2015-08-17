@@ -15,23 +15,10 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#if defined(__linux__)
-#include <asm/types.h>
-
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <linux/if_ether.h>
 
 #include <net/if.h>
-#include <netinet/ether.h>
-#elif defined(__FreeBSD__)
-#include <net/if.h>
-#include <net/ethernet.h>
-#endif
 
 #include "vr_types.h"
-#include "vr_message.h"
-#include "vr_genetlink.h"
 #include "nl_util.h"
 #include "vr_os.h"
 #include "ini_parser.h"
@@ -42,7 +29,7 @@
 #define BUILD_HOST_NAME_STRING  "\"build-hostname\":"
 #define BUILD_TIME_STRING       "\"build-time\":"
 
-enum opt_mpls_index {
+enum opt_vrouter_index {
     INFO_OPT_INDEX,
     HELP_OPT_INDEX,
     GET_LOG_LEVEL_INDEX,
@@ -71,20 +58,20 @@ typedef struct name_id_pair log_level_name_id_t;
 static struct nl_client *cl;
 
 static int opt[MAX_OPT_INDEX];
+
 static int write_options[] = {
     SET_LOG_LEVEL_INDEX,
     LOG_ENABLE_INDEX,
     LOG_DISABLE_INDEX,
     -1
 };
+
 static int read_options[] = {
     INFO_OPT_INDEX,
     GET_LOG_LEVEL_INDEX,
     GET_ENABLED_LOGS_INDEX,
     -1
 };
-
-static bool response_pending = false;
 
 static log_level_name_id_t log_levels[] = {
     {"emergency",   VR_LOG_EMERG},
@@ -112,10 +99,10 @@ static log_types_t log_types_to_enable;
 static log_types_t log_types_to_disable;
 static unsigned int log_level;
 
-static int platform;
+static int platform, vrouter_op = -1;
 
 static bool
-is_read_op_set()
+vrouter_read_op(void)
 {
     int i;
 
@@ -127,7 +114,7 @@ is_read_op_set()
 }
 
 static bool
-is_write_op_set()
+vrouter_write_op(void)
 {
     int i;
 
@@ -263,32 +250,40 @@ close_string:
 }
 
 static void
-print_log_level(unsigned int level)
+print_log_level(vrouter_ops *req)
 {
-    char *str = log_level_id_to_name(level);
+    char *str = log_level_id_to_name(req->vo_log_level);
 
-    printf("Current log level: ");
+    if (platform != DPDK_PLATFORM)
+        return;
+
+    printf("Current log level            ");
     if (str != NULL)
         printf("%s\n", str);
     else
         printf("UNKNOWN\n");
+
+    return;
 }
 
 static void
-print_enabled_log_types(unsigned int types[], int size)
+print_enabled_log_types(vrouter_ops *req)
 {
     int i;
 
-    printf("Enabled log types: ");
+    if (platform != DPDK_PLATFORM)
+        return;
 
-    for (i = 0; i < size; ++i) {
-        printf("%s ", log_type_id_to_name(types[i]));
+    printf("Enabled log types            ");
+    if (!req->vo_log_type_enable_size)
+        printf("none\n");
+
+    for (i = 0; i < req->vo_log_type_enable_size; ++i) {
+        printf("%s ", log_type_id_to_name(req->vo_log_type_enable[i]));
     }
 
-    if (i == 0)
-        printf("none\n");
-    else
-        printf("\n");
+    printf("\n");
+    return;
 }
 
 void
@@ -309,83 +304,51 @@ vrouter_ops_process(void *s_req)
         printf("Flow Table limit             %u\n", req->vo_flow_entries);
         printf("Flow Table overflow limit    %u\n", req->vo_oflow_entries);
         printf("Mirror entries limit         %u\n", req->vo_mirror_entries);
+        print_log_level(req);
+        print_enabled_log_types(req);
+    } else {
+        if (opt[GET_LOG_LEVEL_INDEX])
+            print_log_level(req);
+
+        if (opt[GET_ENABLED_LOGS_INDEX])
+            print_enabled_log_types(req);
     }
 
-    if (opt[GET_LOG_LEVEL_INDEX]) {
-        print_log_level(req->vo_log_level);
-    }
-
-    if (opt[GET_ENABLED_LOGS_INDEX]) {
-        print_enabled_log_types(req->vo_log_type_enable,
-                req->vo_log_type_enable_size);
-    }
-
-    response_pending = false;
     return;
 }
 
 void
 vr_response_process(void *s)
 {
-    vr_response *resp = (vr_response *)s;
-
-    if (resp->resp_code < 0) {
-        printf("Error: %s\n", strerror(-resp->resp_code));
-    }
-
-    response_pending = false;
+    vr_response_common_process((vr_response *)s, NULL);
     return;
 }
 
 static int
-send_request(vrouter_ops *req)
+vr_vrouter_op(struct nl_client *cl)
 {
-    int ret, error, attr_len;
-    struct nl_response *resp;
+    int ret = 0;
 
+    switch (vrouter_op) {
+    case SANDESH_OP_GET:
+        ret = vr_send_vrouter_get(cl, 0);
+        break;
 
-    /* nlmsg header */
-    ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
-    if (ret) {
+    case SANDESH_OP_ADD:
+        ret = vr_send_vrouter_set_logging(cl, 0, log_level,
+                log_types_to_enable.types, log_types_to_enable.size,
+                log_types_to_disable.types, log_types_to_disable.size);
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    if (ret < 0)
         return ret;
-    }
 
-    /* Generic nlmsg header */
-    ret = nl_build_genlh(cl, SANDESH_REQUEST, 0);
-    if (ret) {
-        return ret;
-    }
-
-    attr_len = nl_get_attr_hdr_size();
-
-    error = 0;
-    ret = sandesh_encode(req, "vrouter_ops", vr_find_sandesh_info,
-                         (nl_get_buf_ptr(cl) + attr_len),
-                         (nl_get_buf_len(cl) - attr_len), &error);
-
-    if ((ret <= 0) || error) {
-        return ret;
-    }
-
-    /* Add sandesh attribute */
-    nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
-    nl_update_nlh(cl);
-
-    response_pending = true;
-    /* Send the request to kernel */
-    ret = nl_sendmsg(cl);
-    if (ret <= 0)
-       return ret;
-
-    while ((response_pending) && (ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST) {
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info,
-                    &ret);
-        }
-    }
-
-    return ret;
+    return vr_recvmsg(cl, false);
 }
 
 static struct option long_options[] = {
@@ -414,7 +377,7 @@ static struct option long_options[] = {
 };
 
 static void
-usage(void)
+Usage(void)
 {
     switch (platform) {
     case DPDK_PLATFORM:
@@ -495,29 +458,12 @@ log_types_print(log_types_t *types)
 }
 
 static void
-vrouter_ops_set_log_entries(vrouter_ops *req)
-{
-    if (log_level > 0)
-        req->vo_log_level = log_level;
-
-    if (log_types_to_enable.size) {
-        req->vo_log_type_enable_size = log_types_to_enable.size;
-        req->vo_log_type_enable = log_types_to_enable.types;
-    }
-
-    if (log_types_to_disable.size) {
-        req->vo_log_type_disable_size = log_types_to_disable.size;
-        req->vo_log_type_disable = log_types_to_disable.types;
-    }
-}
-
-static void
 assert_dpdk_platform_for_option(int opt_index)
 {
     if (platform != DPDK_PLATFORM) {
         printf("Error: %s option not supported on %s platform\n",
                 long_options[opt_index].name, get_platform_str());
-        usage();
+        Usage();
     }
 }
 
@@ -529,46 +475,52 @@ parse_long_opts(int opt_index, char *opt_arg)
     errno = 0;
     switch (opt_index) {
     case INFO_OPT_INDEX:
+        vrouter_op = SANDESH_OP_GET;
         break;
 
     case GET_LOG_LEVEL_INDEX:
         assert_dpdk_platform_for_option(opt_index);
+        vrouter_op = SANDESH_OP_GET;
         break;
 
     case SET_LOG_LEVEL_INDEX:
         assert_dpdk_platform_for_option(opt_index);
+        vrouter_op = SANDESH_OP_ADD;
         log_level = log_level_name_to_id(opt_arg);
         if (log_level == 0) {
-            printf("Error: bad log level: '%s'\n\n", opt_arg);
-            usage();
+            printf("vrouter: Invalid log level: '%s'\n\n", opt_arg);
+            Usage();
         }
         break;
 
     case LOG_ENABLE_INDEX:
         assert_dpdk_platform_for_option(opt_index);
+        vrouter_op = SANDESH_OP_ADD;
         ret = log_types_add(&log_types_to_enable, opt_arg);
         if (!ret) {
-            printf("Error: bad log type: '%s'\n\n", opt_arg);
-            usage();
+            printf("vrouter: Invalid log type: '%s'\n\n", opt_arg);
+            Usage();
         }
         break;
 
     case LOG_DISABLE_INDEX:
         assert_dpdk_platform_for_option(opt_index);
+        vrouter_op = SANDESH_OP_ADD;
         ret = log_types_add(&log_types_to_disable, opt_arg);
         if (!ret) {
-            printf("Error: bad log type: '%s'\n\n", opt_arg);
-            usage();
+            printf("vrouter: Invalid log type: '%s'\n\n", opt_arg);
+            Usage();
         }
         break;
 
     case GET_ENABLED_LOGS_INDEX:
+        vrouter_op = SANDESH_OP_GET;
         assert_dpdk_platform_for_option(opt_index);
         break;
 
     case HELP_OPT_INDEX:
     default:
-        usage();
+        Usage();
         break;
     }
 
@@ -576,27 +528,14 @@ parse_long_opts(int opt_index, char *opt_arg)
 }
 
 static void
-prepare_request(vrouter_ops *req)
+validate_options(void)
 {
-    bool read, write;
-    int ret;
-
-    read = is_read_op_set();
-    write = is_write_op_set();
-
-    if (read && write) {
-        printf("Error: only get or set type options can be used at a time\n");
-        usage();
+    if (vrouter_read_op() && vrouter_write_op()) {
+        printf("vrouter: Can not use both get AND set options together\n");
+        Usage();
     }
 
-    memset(req, 0, sizeof(*req));
-
-    if (read) {
-        req->h_op = SANDESH_OP_GET;
-    } else {
-        req->h_op = SANDESH_OP_ADD;
-        vrouter_ops_set_log_entries(req);
-    }
+    return;
 }
 
 int
@@ -609,7 +548,7 @@ main(int argc, char *argv[])
     platform = get_platform();
 
     if (argc == 1) {
-        usage();
+        Usage();
     }
 
     while ((opt = getopt_long(argc, argv, "",
@@ -621,37 +560,20 @@ main(int argc, char *argv[])
 
         case '?':
         default:
-            usage();
+            Usage();
             break;
         }
     }
 
-    cl = nl_register_client();
+
+    validate_options();
+
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
     if (!cl) {
         exit(1);
     }
 
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0) {
-        exit(1);
-    }
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0) {
-        exit(1);
-    }
-
-    if (vrouter_get_family_id(cl) <= 0) {
-        return -1;
-    }
-
-    prepare_request(&req);
-
-    ret = send_request(&req);
-    if (ret < 0) {
-        printf("Error: can not send the request ret=%d\n", ret);
-        exit(1);
-    }
+    vr_vrouter_op(cl);
 
     return 0;
 }

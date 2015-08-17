@@ -369,6 +369,11 @@ bridge_table_dump(struct vr_rtable * __unsued, struct vr_route_req *rt)
     }
 
     mac = (char *)(((vr_route_req *)(dumper->dump_req))->rtr_mac);
+    if (!mac) {
+        ret = -EINVAL;
+        goto generate_response;
+    }
+
     if (IS_MAC_ZERO(mac))
         dumper->dump_been_to_marker = 1;
 

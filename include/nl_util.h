@@ -19,11 +19,13 @@ extern "C" {
 #define NL_MSG_TYPE_GEN_CTRL        2
 #define NL_MSG_TYPE_FMLY            3
 
+#define VR_NETLINK_PROTO_DEFAULT    0xFFFFFFFF
+
 struct nl_response {
+    uint8_t *nl_data;
     unsigned int nl_type;
     unsigned int nl_op;
     unsigned int nl_len;
-    uint8_t  *nl_data;
 };
 
 struct nl_client {
@@ -49,9 +51,9 @@ struct nl_client {
     int cl_socket_domain;
     int cl_socket_type;
     int cl_socket_proto;
+    int (*cl_recvmsg)(struct nl_client *);
     struct sockaddr *cl_sa;
     uint32_t cl_sa_len;
-    int (*cl_recvmsg)(struct nl_client *);
 };
 
 
@@ -102,6 +104,80 @@ extern uint32_t nl_get_buf_len(struct nl_client *cl);
 extern void nl_build_attr(struct nl_client *cl, int len, int attr);
 extern int vrouter_get_family_id(struct nl_client *cl);
 extern int get_vrouter_pid(void);
+
+extern int vr_recvmsg(struct nl_client *cl, bool dump);
+extern int vr_sendmsg(struct nl_client *, void *, char *);
+extern struct nl_client *vr_get_nl_client(unsigned int);
+
+extern int vr_response_common_process(vr_response *, bool *);
+
+extern int vr_send_drop_stats_get(struct nl_client *, unsigned int, int);
+
+extern int vr_send_interface_dump(struct nl_client *, unsigned int, int, int);
+extern int vr_send_interface_get(struct nl_client *, unsigned int,
+                int, int, int);
+extern int vr_send_interface_delete(struct nl_client *, unsigned int,
+        char *, int);
+extern int vr_send_interface_add(struct nl_client *, int, char *, int,
+        int, int, int, unsigned int, unsigned int, int8_t *);
+
+
+extern int vr_send_mem_stats_get(struct nl_client *, unsigned intid);
+
+extern int vr_send_mirror_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_mirror_get(struct nl_client *, unsigned int, unsigned int);
+extern int vr_send_mirror_delete(struct nl_client *,
+        unsigned int, unsigned int);
+extern int vr_send_mirror_add(struct nl_client *, unsigned int,
+        unsigned int, int, unsigned int);
+
+extern int vr_send_mpls_add(struct nl_client *, unsigned int, unsigned int,
+        unsigned int);
+extern int vr_send_mpls_get(struct nl_client *, unsigned int, unsigned int);
+extern int vr_send_mpls_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_mpls_delete(struct nl_client *, unsigned int, unsigned int);
+
+extern int vr_send_nexthop_delete(struct nl_client *, unsigned int,
+        unsigned int);
+extern int vr_send_nexthop_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_nexthop_get(struct nl_client *, unsigned int, unsigned int);
+extern int vr_send_nexthop_composite_add(struct nl_client *, unsigned int,
+        int, unsigned int, int, unsigned int, unsigned int *, unsigned int *);
+extern int vr_send_nexthop_encap_tunnel_add(struct nl_client *, unsigned int,
+        unsigned int, int, unsigned int, int, int, int8_t *, int8_t *,
+        struct in_addr, struct in_addr, int, int);
+extern int vr_send_nexthop_add(struct nl_client *, unsigned int,
+        unsigned int, int, unsigned int, int, int);
+
+extern int vr_send_route_dump(struct nl_client *, unsigned int, unsigned int,
+        unsigned int, uint8_t *, unsigned int);
+extern int vr_send_route_delete(struct nl_client *, unsigned int, unsigned int,
+        unsigned int family, uint8_t *, unsigned int, unsigned int,
+        int, uint8_t *, uint32_t, unsigned ints);
+extern int vr_send_route_add(struct nl_client *, unsigned int, unsigned int,
+        unsigned int family, uint8_t *, unsigned int, unsigned int,
+        int, uint8_t *, uint32_t, unsigned int);
+
+extern int vr_send_vrf_assign_dump(struct nl_client *, unsigned int,
+        unsigned int, int);
+extern int vr_send_vrf_assign_set(struct nl_client *, unsigned int,
+                unsigned int, unsigned int, unsigned int);
+
+extern int vr_send_vrf_stats_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_vrf_stats_get(struct nl_client *, unsigned int, unsigned int);
+
+extern int vr_send_vrouter_get(struct nl_client *, unsigned int);
+extern int vr_send_vrouter_set_logging(struct nl_client *, unsigned int,
+        unsigned int, unsigned int *, unsigned int,
+        unsigned int *, unsigned int);
+
+extern int vr_send_vxlan_add(struct nl_client *, unsigned int,
+        unsigned int, unsigned int);
+extern int vr_send_vxlan_get(struct nl_client *, unsigned int, unsigned int);
+extern int vr_send_vxlan_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_vxlan_delete(struct nl_client *, unsigned int, unsigned int);
+
+
 
 #ifdef __cplusplus
 }
