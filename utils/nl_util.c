@@ -543,7 +543,7 @@ nl_client_stream_recvmsg(struct nl_client *cl) {
     msg.msg_namelen = sizeof(cl->cl_sa_len);
 
     iov.iov_base = (void *)(cl->cl_buf);
-    iov.iov_len = sizeof(struct nlmsghdr);
+    iov.iov_len = NLMSG_HDRLEN;
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
 
@@ -555,10 +555,10 @@ nl_client_stream_recvmsg(struct nl_client *cl) {
         return ret;
     }
     struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf + cl->cl_buf_offset);
-    uint32_t pending_length = nlh->nlmsg_len - sizeof(struct nlmsghdr);
+    uint32_t pending_length = nlh->nlmsg_len - NLMSG_HDRLEN;
 
     /* read sandesh message */
-    iov.iov_base = (void *)(cl->cl_buf + sizeof(struct nlmsghdr));
+    iov.iov_base = (void *)(cl->cl_buf + NLMSG_HDRLEN);
     iov.iov_len = pending_length;
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;

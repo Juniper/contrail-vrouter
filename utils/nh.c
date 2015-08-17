@@ -15,70 +15,68 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#if defined(__linux__)
-#include <asm/types.h>
-
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <linux/if_ether.h>
 
 #include <net/if.h>
+
+#if defined(__linux__)
 #include <netinet/ether.h>
 #elif defined(__FreeBSD__)
-#include <net/if.h>
-#endif
 #include <net/ethernet.h>
+#endif
 
 #include "vr_types.h"
-#include "vr_message.h"
 #include "vr_nexthop.h"
-#include "vr_genetlink.h"
 #include "vr_os.h"
 #include "nl_util.h"
-#include "ini_parser.h"
 
-static int nh_set;
-static struct nl_client *cl;
 static int8_t src_mac[6], dst_mac[6];
-static uint32_t nh_id, if_id, vrf_id ;
-static uint32_t flags;
-static struct in_addr sip, dip;
 static uint16_t sport, dport;
-static int command;
-static int type;
+static uint32_t nh_id, if_id, vrf_id, flags;
+static int nh_set, command, type, dump_marker = -1;
+
 static bool dump_pending = false;
-static bool response_pending = true;
-static int dump_marker = -1;
-static int comp_nh[10];
-static int lbl[10];
-static int comp_nh_ind = 0;
-static int lbl_ind = 0;
+static int comp_nh[10], lbl[10];
+static int comp_nh_ind = 0, lbl_ind = 0;
+
+static struct in_addr sip, dip;
+static struct nl_client *cl;
 
 char *
 nh_type(uint32_t type)
 {
-    switch(type) {
-       case NH_DEAD:
-           return "Dead";
-       case NH_RCV:
-           return "Receive";
-       case NH_L2_RCV:
-           return "L2 Receive";
-       case NH_ENCAP:
-           return "Encap";
-       case NH_TUNNEL:
-           return "Tunnel";
-       case NH_DISCARD:
-           return "Drop";
-       case NH_RESOLVE:
-           return "Resolve";
-       case NH_COMPOSITE:
-           return "Composite";
-       case NH_VRF_TRANSLATE:
-           return "Vrf_Translate";
-       default:
-           return "Invalid";
+    switch (type) {
+    case NH_DEAD:
+        return "Dead";
+
+    case NH_RCV:
+        return "Receive";
+
+    case NH_L2_RCV:
+        return "L2 Receive";
+
+    case NH_ENCAP:
+        return "Encap";
+
+    case NH_TUNNEL:
+        return "Tunnel";
+
+    case NH_DISCARD:
+        return "Drop";
+
+    case NH_RESOLVE:
+        return "Resolve";
+
+    case NH_COMPOSITE:
+        return "Composite";
+
+    case NH_VRF_TRANSLATE:
+        return "Vrf_Translate";
+
+    default:
+        return "Invalid";
     }
+
+    return NULL;
 }
 
 char *
@@ -86,6 +84,7 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
 {
     int i;
     uint32_t mask;
+
     if (!flags) {
         strcpy(ptr, "None");
         return ptr;
@@ -93,7 +92,7 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
 
 
     strcpy(ptr,"");
-    for(i = 0, mask = 1; (i < 32); i++, mask = mask << 1) {
+    for (i = 0, mask = 1; (i < 32); i++, mask = mask << 1) {
         switch(flags & mask) {
         case NH_FLAG_VALID:
             strcat(ptr, "Valid, ");
@@ -163,11 +162,13 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
         case NH_FLAG_VNID:
             strcat(ptr, "Vxlan, ");
             break;
+
         case NH_FLAG_UNKNOWN_UC_FLOOD:
             strcat(ptr, "Unicast Flood, ");
             break;
         }
     }
+
     return ptr;
 }
 
@@ -175,7 +176,6 @@ static void
 nh_print_newline_header(void)
 {
     printf("\n%14c", ' ');
-
     return;
 }
 
@@ -245,165 +245,73 @@ vr_nexthop_req_process(void *s_req)
         printf("\n");
     }
 
-    if (command == 3) {
+    if (command == SANDESH_OP_DUMP) {
         dump_marker = req->nhr_id;
     }
 
-    if (command != 3)
-        response_pending = false;
     printf("\n");
 }
 
 void
 vr_response_process(void *s)
 {
-   vr_response *resp = (vr_response *)s;
-
-   response_pending = false;
-    if (resp->resp_code < 0) {
-        printf("Error %s in kernel operation\n", strerror(-resp->resp_code));
-    } else {
-        if (command == 3) {
-            if (resp->resp_code > 0)
-                response_pending = true;
-
-            if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
-                dump_pending = true;
-                response_pending = true;
-            } else {
-                dump_pending = false;
-            }
-        }
-    }
-
+    vr_response_common_process((vr_response *)s, &dump_pending);
     return;
 }
 
-int
-vr_nh_op(int opt, int mode, uint32_t nh_id, uint32_t if_id, uint32_t vrf_id,
-        int8_t *dst, int8_t  *src, struct in_addr sip, struct in_addr dip,
-        uint32_t flags)
+static int
+vr_nh_op(struct nl_client *cl, int command, int type, uint32_t nh_id,
+        uint32_t if_id, uint32_t vrf_id, int8_t *dst, int8_t  *src,
+        struct in_addr sip, struct in_addr dip, uint32_t flags)
 {
-    vr_nexthop_req nh_req;
-    char *buf;
-    int ret, error, attr_len;
-    struct nl_response *resp;
-    struct nlmsghdr *nlh;
-    int i;
+    int ret;
+    bool dump = false;
 
 op_retry:
-
-    bzero(&nh_req, sizeof(nh_req));
-
-    if (opt == 1) {
-        nh_req.h_op = SANDESH_OP_ADD;
-        nh_req.nhr_flags = flags;
-        nh_req.nhr_encap_oif_id = if_id;
-        nh_req.nhr_encap_size = 0;
-#if defined(__linux__)
-        nh_req.nhr_encap_family = ETH_P_ARP;
-#elif defined(__FreeBSD__)
-    nh_req.nhr_encap_family = ETHERTYPE_ARP;
-#endif
-        nh_req.nhr_vrf = vrf_id;
-        nh_req.nhr_tun_sip = sip.s_addr;
-        nh_req.nhr_tun_dip = dip.s_addr;
-        nh_req.nhr_tun_sport = htons(sport);
-        nh_req.nhr_tun_dport = htons(dport);
-        nh_req.nhr_nh_list_size = 0;
-        if ((mode == NH_TUNNEL) || ((mode == NH_ENCAP))) {
-            nh_req.nhr_encap_size = 14;
-            buf = calloc(1, nh_req.nhr_encap_size);
-            memcpy(buf, dst, 6);
-            memcpy(buf+6, src, 6);
-            buf[12] = 0x08;
-            nh_req.nhr_encap = (int8_t *)buf;
+    switch (command) {
+    case SANDESH_OP_ADD:
+        if ((type == NH_ENCAP) || (type == NH_TUNNEL)) {
+            ret = vr_send_nexthop_encap_tunnel_add(cl, 0, type, nh_id,
+                    flags, vrf_id, if_id, src, dst, sip, dip, sport, dport);
+        } else if (type == NH_COMPOSITE) {
+            ret = vr_send_nexthop_composite_add(cl, 0, nh_id, flags, vrf_id,
+                    comp_nh_ind, comp_nh, lbl);
+        } else {
+            ret = vr_send_nexthop_add(cl, 0, type, nh_id, flags, vrf_id, if_id);
         }
 
-        if (mode == NH_COMPOSITE) {
-            nh_req.nhr_nh_list_size = comp_nh_ind;
-            nh_req.nhr_label_list_size = comp_nh_ind;
-            nh_req.nhr_nh_list = calloc(comp_nh_ind, sizeof(uint32_t));
-            nh_req.nhr_label_list = calloc(comp_nh_ind, sizeof(uint32_t));
-            for (i = 0; i < comp_nh_ind; i++) {
-                nh_req.nhr_nh_list[i] = comp_nh[i];
-                if (i < lbl_ind)
-                    nh_req.nhr_label_list[i] = lbl[i];
-                else
-                    nh_req.nhr_label_list[i] = 0;
-            }
-        }
+        break;
 
-    } else if (opt == 2) {
-        nh_req.h_op = SANDESH_OP_DELETE;
-    } else if (opt == 3) {
-        nh_req.h_op = SANDESH_OP_DUMP;
-        nh_req.nhr_marker = dump_marker;
-    } else if (opt == 4) {
-        nh_req.h_op = SANDESH_OP_GET;
+    case SANDESH_OP_DELETE:
+        ret = vr_send_nexthop_delete(cl, 0, nh_id);
+        break;
+
+    case SANDESH_OP_DUMP:
+        dump = true;
+        ret = vr_send_nexthop_dump(cl, 0, dump_marker);
+        break;
+
+    case SANDESH_OP_GET:
+        ret = vr_send_nexthop_get(cl, 0, nh_id);
+        break;
+
+    default:
+        ret = -EINVAL;
     }
 
-    nh_req.nhr_id = nh_id;
-    nh_req.nhr_rid = 0;
-
-    if (((mode == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2)) ||
-                    ((mode == NH_COMPOSITE) && (flags & NH_FLAG_COMPOSITE_L2)))
-        nh_req.nhr_family = AF_BRIDGE;
-    else
-        nh_req.nhr_family = AF_INET;
-
-    nh_req.nhr_type = mode;
-    /* nlmsg header */
-    ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
-    if (ret) {
+    if (ret < 0)
         return ret;
-    }
 
-    /* Generic nlmsg header */
-    ret = nl_build_genlh(cl, SANDESH_REQUEST, 0);
-    if (ret) {
+    ret = vr_recvmsg(cl, dump);
+    if (ret <= 0)
         return ret;
-    }
-
-    attr_len = nl_get_attr_hdr_size();
-
-    error = 0;
-    ret = sandesh_encode(&nh_req, "vr_nexthop_req", vr_find_sandesh_info,
-                             (nl_get_buf_ptr(cl) + attr_len),
-                             (nl_get_buf_len(cl) - attr_len), &error);
-
-    if ((ret <= 0) || error) {
-        return ret;
-    }
-
-    /* Add sandesh attribute */
-    nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
-    nl_update_nlh(cl);
-
-    response_pending = true;
-    /* Send the request to kernel */
-    ret = nl_sendmsg(cl);
-    while (response_pending) {
-        if ((ret = nl_recvmsg(cl)) > 0) {
-            resp = nl_parse_reply(cl);
-            if (resp->nl_op == SANDESH_REQUEST) {
-                sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
-            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
-                response_pending = false;
-            }
-        }
-
-        nlh = (struct nlmsghdr *)cl->cl_buf;
-        if (!nlh->nlmsg_flags)
-            break;
-    }
 
     if (dump_pending)
         goto op_retry;
 
     return 0;
-
 }
+
 void
 cmd_usage()
 {
@@ -504,17 +412,22 @@ enum opt_index {
     MAX_OPT_IND
 };
 
-int opt[MAX_OPT_IND], zero_opt[MAX_OPT_IND];
-bool opt_set(int ind)
+static int opt[MAX_OPT_IND], zero_opt[MAX_OPT_IND];
+
+static bool
+opt_set(int ind)
 {
     if (ind < 0 || ind >= MAX_OPT_IND)
         return false;
+
     if (opt[ind]) {
         opt[ind] = 0;
         return true;
     }
+
     return false;
 }
+
 static struct option long_options[] = {
     [OIF_OPT_IND]       = {"oif",   required_argument,  &opt[OIF_OPT_IND],      1},
     [SMAC_OPT_IND]      = {"smac",  required_argument,  &opt[SMAC_OPT_IND],     1},
@@ -556,252 +469,265 @@ parse_long_opts(int ind, char *opt_arg)
     struct ether_addr *mac;
 
     errno = 0;
-    switch(ind) {
-        case CMD_OPT_IND:
-            cmd_usage();
-        case HLP_OPT_IND:
+    switch (ind) {
+    case CMD_OPT_IND:
+        cmd_usage();
+        break;
+
+    case HLP_OPT_IND:
+        usage();
+        break;
+
+    case GET_OPT_IND:
+    case CRT_OPT_IND:
+    case DEL_OPT_IND:
+        nh_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
             usage();
-        case GET_OPT_IND:
-        case CRT_OPT_IND:
-        case DEL_OPT_IND:
-            nh_id = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-            nh_set = 1;
-            break;
-        case OIF_OPT_IND:
-            if_id = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-            break;
-        case SMAC_OPT_IND:
-            mac = ether_aton(opt_arg);
-            if (mac)
-                memcpy(src_mac, mac, sizeof(src_mac));
-            else
-                cmd_usage();
-            break;
-        case DMAC_OPT_IND:
-            mac = ether_aton(opt_arg);
-            if (mac)
-                memcpy(dst_mac, mac, sizeof(dst_mac));
-            else
-                cmd_usage();
-            break;
-        case VRF_OPT_IND:
-            vrf_id = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-            break;
-        case TYPE_OPT_IND:
-            type = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-            break;
-        case SIP_OPT_IND:
-            inet_aton(opt_arg, &sip);
-            break;
-        case DIP_OPT_IND:
-            inet_aton(opt_arg, &dip);
-            break;
-        case SPORT_OPT_IND:
-            sport = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-            break;
-        case CNI_OPT_IND:
-            comp_nh[comp_nh_ind++] = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-            break;
-        case LBL_OPT_IND:
-            lbl[lbl_ind++] = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
-        case DPORT_OPT_IND:
-            dport = strtoul(opt_arg, NULL, 0);
-            if (errno)
-                usage();
+        nh_set = 1;
+        break;
+
+    case OIF_OPT_IND:
+        if_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
+
+    case SMAC_OPT_IND:
+        mac = ether_aton(opt_arg);
+        if (mac)
+            memcpy(src_mac, mac, sizeof(src_mac));
+        else
+            cmd_usage();
+        break;
+
+    case DMAC_OPT_IND:
+        mac = ether_aton(opt_arg);
+        if (mac)
+            memcpy(dst_mac, mac, sizeof(dst_mac));
+        else
+            cmd_usage();
+        break;
+
+    case VRF_OPT_IND:
+        vrf_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
+
+    case TYPE_OPT_IND:
+        type = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
+
+    case SIP_OPT_IND:
+        inet_aton(opt_arg, &sip);
+        break;
+
+    case DIP_OPT_IND:
+        inet_aton(opt_arg, &dip);
+        break;
+
+    case SPORT_OPT_IND:
+        sport = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
+
+    case CNI_OPT_IND:
+        comp_nh[comp_nh_ind++] = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
+
+    case LBL_OPT_IND:
+        lbl[lbl_ind++] = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
+
+    case DPORT_OPT_IND:
+        dport = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage();
+        break;
     }
+
+    return;
 }
 
 static void
-validate_options()
+validate_options(void)
 {
-    if (opt_set(CRT_OPT_IND))
-        command = 1;
-    else if (opt_set(DEL_OPT_IND))
-        command = 2;
-    else if (opt_set(GET_OPT_IND))
-        command = 4;
-    else if (opt_set(LST_OPT_IND))
-        command = 3;
-    else
+    if (opt_set(CRT_OPT_IND)) {
+        command = SANDESH_OP_ADD;
+    } else if (opt_set(DEL_OPT_IND)) {
+        command = SANDESH_OP_DELETE;
+    } else if (opt_set(GET_OPT_IND)) {
+        command = SANDESH_OP_GET;
+    } else if (opt_set(LST_OPT_IND)) {
+        command = SANDESH_OP_DUMP;
+    } else {
         usage();
+        return;
+    }
 
 
     switch (command) {
-        case 1:
-            if (!nh_set)
+    case SANDESH_OP_ADD:
+        if (!nh_set)
+            cmd_usage();
+
+        flags |= NH_FLAG_VALID;
+        if (!opt_set(TYPE_OPT_IND) && !opt_set(VRF_OPT_IND))
+            cmd_usage();
+
+        if (opt_set(MC_OPT_IND))
+            flags |= NH_FLAG_MCAST;
+
+        if (opt_set(POL_OPT_IND))
+            flags |= NH_FLAG_POLICY_ENABLED;
+
+        if (opt_set(RPOL_OPT_IND))
+            flags |= NH_FLAG_RELAXED_POLICY;
+
+        if (opt_set(RLKUP_OPT_IND))
+            flags |= NH_FLAG_ROUTE_LOOKUP;
+
+        if (type == NH_RCV) {
+            if (!opt_set(OIF_OPT_IND))
                 cmd_usage();
 
-            flags |= NH_FLAG_VALID;
-            opt_set(TYPE_OPT_IND);
-            opt_set(VRF_OPT_IND);
+            if (memcmp(opt, zero_opt, sizeof(opt)))
+                cmd_usage();
+        } else if (type == NH_L2_RCV) {
+            if (memcmp(opt, zero_opt, sizeof(opt)))
+                cmd_usage();
+        } else if (type == NH_ENCAP) {
+            if (!opt_set(OIF_OPT_IND))
+                cmd_usage();
 
-            if (opt_set(MC_OPT_IND))
-                flags |= NH_FLAG_MCAST;
-
-            if (opt_set(POL_OPT_IND))
-                flags |= NH_FLAG_POLICY_ENABLED;
-
-            if (opt_set(RPOL_OPT_IND))
-                flags |= NH_FLAG_RELAXED_POLICY;
-
-            if (opt_set(RLKUP_OPT_IND))
-                flags |= NH_FLAG_ROUTE_LOOKUP;
-
-            if (type == NH_RCV) {
-                if (!opt_set(OIF_OPT_IND))
+            if (!opt_set(EL2_OPT_IND)) {
+                if (!opt_set(SMAC_OPT_IND) || !opt_set(DMAC_OPT_IND))
                     cmd_usage();
-                if (memcmp(opt, zero_opt, sizeof(opt)))
-                    cmd_usage();
-            } else if (type == NH_L2_RCV) {
-                if (memcmp(opt, zero_opt, sizeof(opt)))
-                    cmd_usage();
-            } else if (type == NH_ENCAP) {
-                if (!opt_set(OIF_OPT_IND))
-                    cmd_usage();
-
-                if (!opt_set(EL2_OPT_IND)) {
-                    if (!opt_set(SMAC_OPT_IND) || !opt_set(DMAC_OPT_IND))
-                        cmd_usage();
-
-                    if (memcmp(opt, zero_opt, sizeof(opt)))
-                        cmd_usage();
-                } else
-                    flags |= NH_FLAG_ENCAP_L2;
-
-            } else if (type == NH_TUNNEL) {
-                if (!opt_set(OIF_OPT_IND) || !opt_set(SMAC_OPT_IND) ||
-                        !opt_set(DMAC_OPT_IND) || !opt_set(SIP_OPT_IND) ||
-                        !opt_set(DIP_OPT_IND)) {
-                    cmd_usage();
-                }
-
-                if (opt_set(UDP_OPT_IND)) {
-                    if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
-                        flags |= NH_FLAG_TUNNEL_UDP_MPLS;
-                    else
-                        flags |= NH_FLAG_TUNNEL_UDP;
-                } else if (opt_set(VXLAN_OPT_IND)) {
-                    flags |= NH_FLAG_TUNNEL_VXLAN;
-                    if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
-                        cmd_usage();
-                } else {
-                    flags |= NH_FLAG_TUNNEL_GRE;
-                }
 
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
-            } else if (type == NH_RESOLVE) {
-                if (memcmp(opt, zero_opt, sizeof(opt)))
-                    cmd_usage();
-            } else if (type == NH_DISCARD) {
-                if (memcmp(opt, zero_opt, sizeof(opt)))
-                    cmd_usage();
-            } else if (type == NH_COMPOSITE) {
-                if (!opt_set(CNI_OPT_IND))
-                    cmd_usage();
-
-                if (opt_set(CL2_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_L2;
-                if (opt_set(CFA_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_FABRIC;
-                if (opt_set(CEN_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_ENCAP;
-                if (opt_set(CEVPN_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_EVPN;
-                if (opt_set(TOR_OPT_IND))
-                    flags |= NH_FLAG_COMPOSITE_TOR;
-                opt_set(LBL_OPT_IND);
-                if (memcmp(opt, zero_opt, sizeof(opt)))
-                    cmd_usage();
-            } else if (type == NH_VRF_TRANSLATE) {
-                if (opt_set(VXLAN_OPT_IND))
-                    flags |= NH_FLAG_VNID;
-                if (opt_set(UUCF_OPT_IND))
-                    flags |= NH_FLAG_UNKNOWN_UC_FLOOD;
             } else {
+                flags |= NH_FLAG_ENCAP_L2;
+            }
+
+        } else if (type == NH_TUNNEL) {
+            if (!opt_set(OIF_OPT_IND) || !opt_set(SMAC_OPT_IND) ||
+                    !opt_set(DMAC_OPT_IND) || !opt_set(SIP_OPT_IND) ||
+                    !opt_set(DIP_OPT_IND)) {
                 cmd_usage();
             }
-            break;
 
-        case 2:
-            if (!nh_set)
-                cmd_usage();
-            if (memcmp(opt, zero_opt, sizeof(opt)))
+            if (opt_set(UDP_OPT_IND)) {
+                if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
+                    flags |= NH_FLAG_TUNNEL_UDP_MPLS;
+                else
+                    flags |= NH_FLAG_TUNNEL_UDP;
+            } else if (opt_set(VXLAN_OPT_IND)) {
+                flags |= NH_FLAG_TUNNEL_VXLAN;
+                if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
                     cmd_usage();
-            break;
+            } else {
+                flags |= NH_FLAG_TUNNEL_GRE;
+            }
 
-        case 3:
             if (memcmp(opt, zero_opt, sizeof(opt)))
-                    usage();
-            break;
-        case 4:
+                cmd_usage();
+        } else if (type == NH_RESOLVE) {
             if (memcmp(opt, zero_opt, sizeof(opt)))
-                    usage();
-            break;
+                cmd_usage();
+        } else if (type == NH_DISCARD) {
+            if (memcmp(opt, zero_opt, sizeof(opt)))
+                cmd_usage();
+        } else if (type == NH_COMPOSITE) {
+            if (!opt_set(CNI_OPT_IND))
+                cmd_usage();
 
+            if (opt_set(CL2_OPT_IND))
+                flags |= NH_FLAG_COMPOSITE_L2;
+
+            if (opt_set(CFA_OPT_IND))
+                flags |= NH_FLAG_COMPOSITE_FABRIC;
+
+            if (opt_set(CEN_OPT_IND))
+                flags |= NH_FLAG_COMPOSITE_ENCAP;
+
+            if (opt_set(CEVPN_OPT_IND))
+                flags |= NH_FLAG_COMPOSITE_EVPN;
+
+            if (opt_set(TOR_OPT_IND))
+                flags |= NH_FLAG_COMPOSITE_TOR;
+
+            if (!opt_set(LBL_OPT_IND))
+                cmd_usage();
+
+            if (memcmp(opt, zero_opt, sizeof(opt)))
+                cmd_usage();
+
+        } else if (type == NH_VRF_TRANSLATE) {
+            if (opt_set(VXLAN_OPT_IND))
+                flags |= NH_FLAG_VNID;
+
+            if (opt_set(UUCF_OPT_IND))
+                flags |= NH_FLAG_UNKNOWN_UC_FLOOD;
+        } else {
+            cmd_usage();
+        }
+
+        break;
+
+    case SANDESH_OP_DELETE:
+        if (!nh_set)
+            cmd_usage();
+
+        if (memcmp(opt, zero_opt, sizeof(opt)))
+            cmd_usage();
+        break;
+
+    case SANDESH_OP_DUMP:
+    case SANDESH_OP_GET:
+        if (memcmp(opt, zero_opt, sizeof(opt)))
+            usage();
+        break;
     }
+
+    return;
 }
 
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
-   int ret;
-    int opt;
-    int ind;
-
-    cl = nl_register_client();
-    if (!cl) {
-        exit(1);
-    }
-
-    parse_ini_file();
-
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0) {
-        exit(1);
-    }
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0) {
-        exit(1);
-    }
-
-    if (vrouter_get_family_id(cl) <= 0) {
-        return 0;
-    }
+    int opt, ind;
 
     while ((opt = getopt_long(argc, argv, "",
-                                        long_options, &ind)) >= 0) {
-        switch(opt) {
-            case 0:
-                parse_long_opts(ind, optarg);
-                break;
+                    long_options, &ind)) >= 0) {
+        switch (opt) {
+        case 0:
+            parse_long_opts(ind, optarg);
+            break;
 
-            default:
-                usage();
+        default:
+            usage();
         }
-
     }
 
     validate_options();
 
-    vr_nh_op(command, type, nh_id, if_id, vrf_id, dst_mac,
-            src_mac, sip, dip, flags);
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (!cl) {
+        exit(1);
+    }
 
+    vr_nh_op(cl, command, type, nh_id, if_id, vrf_id, dst_mac,
+            src_mac, sip, dip, flags);
 
     return 0;
 }
