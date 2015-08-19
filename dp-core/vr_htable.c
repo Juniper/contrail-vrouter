@@ -16,6 +16,7 @@ struct vr_htable {
     struct vr_btable *htable;
     struct vr_btable *otable;
     is_hentry_valid is_valid_entry;
+    vr_bmap_t free_oentries;
 };
 
 void
@@ -23,7 +24,7 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
                                                                 void *data)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
-    vr_hentry_t ent;
+    vr_hentry_t *ent;
     unsigned int i;
 
     if (!table || !cb)
@@ -37,6 +38,7 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
         }
     }
 
+
     marker -= table->hentries;
     if (marker < table->oentries) {
         for (i = marker; i < table->oentries; i++) {
@@ -48,12 +50,36 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
     }
 }
 
-vr_hentry_t
-vr_find_free_hentry(vr_htable_t htable, void *key, unsigned int *index)
+void
+vr_release_hentry(vr_htable_t htable, vr_hentry_t *entry)
+{
+    struct vr_htable *table = (struct vr_htable *)htable;
+    vr_hentry_t *ent, *o_ent, *prev_ent;
+
+    if (entry->hentry_index < table->hentries)
+        return;
+
+    ent = vr_btable_get(table->htable, entry->hentry_bucket_index);
+    prev_ent = ent;
+    for(o_ent = ent->hentry_next; o_ent; o_ent = o_ent->hentry_next) {
+        if (o_ent->hentry_index == entry->hentry_index)
+            break;
+        prev_ent = o_ent;
+    }
+
+    prev_ent->hentry_next = o_ent->hentry_next;
+    o_ent->hentry_bucket_index = (unsigned int) -1;
+    o_ent->hentry_next = NULL;
+    vr_bitmap_bit_clear(table->free_oentries, entry->hentry_index -
+            table->hentries);
+}
+
+vr_hentry_t *
+vr_find_free_hentry(vr_htable_t htable, void *key)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
     unsigned int hash, tmp_hash, i, ind;
-    vr_hentry_t ent;
+    vr_hentry_t *ent, *o_ent;
 
     if (!table || !key)
         return NULL;
@@ -65,27 +91,32 @@ vr_find_free_hentry(vr_htable_t htable, void *key, unsigned int *index)
         ind = tmp_hash + i;
         ent = vr_btable_get(table->htable, ind);
         if (table->is_valid_entry(htable, ent, ind) == false) {
-            if (index)
-                *index = ind;
+            ent->hentry_index = ind;
+            ent->hentry_bucket_index = (unsigned int) -1;
             return ent;
         }
     }
 
-    tmp_hash = hash % table->oentries;
-    for(i = 0; i < table->oentries; i++) {
-        ent = vr_btable_get(table->otable, ((tmp_hash + i) % table->oentries));
-        ind = table->hentries + ((tmp_hash + i) % table->oentries);
-        if (table->is_valid_entry(htable, ent, ind) == false) {
-            if (index)
-                *index = ind;
-            return ent;
-        }
+    ent->hentry_index = ind;
+
+    if (table->oentries) {
+        if (!vr_bitmap_free_bit(table->free_oentries, &ind))
+            return NULL;
+
+        vr_bitmap_bit_set(table->free_oentries, ind);
+
+        o_ent = vr_btable_get(table->otable, ind);
+        o_ent->hentry_next = ent->hentry_next;
+        ent->hentry_next = o_ent;
+        o_ent->hentry_bucket_index = ent->hentry_index;
+        o_ent->hentry_index = ind + table->hentries;
+        return o_ent;
     }
 
     return NULL;
 }
 
-vr_hentry_t
+vr_hentry_t *
 vr_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
@@ -103,10 +134,10 @@ vr_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 }
 
 int
-vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t hentry)
+vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t *hentry)
 {
     unsigned int hash, tmp_hash, ind, i;
-    vr_hentry_t ent;
+    vr_hentry_t *ent;
     struct vr_htable *table = (struct vr_htable *)htable;
 
     if (!table || !hentry)
@@ -122,7 +153,7 @@ vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t hentry)
         ent = vr_btable_get(table->htable, ind);
         if (table->is_valid_entry(htable, ent, ind) == false)
             continue;
-        if ((ent == hentry) || (memcmp(ent, hentry, table->key_size) != 0))
+        if ((ent == hentry) || (memcmp((ent + 1), hentry, table->key_size) != 0))
             continue;
         return ind;
     }
@@ -134,7 +165,7 @@ vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t hentry)
         ent = vr_btable_get(table->otable, ((tmp_hash + i) % table->oentries));
         if (table->is_valid_entry(htable, ent, ind) == false)
             continue;
-        if ((ent == hentry) || (memcmp(ent, hentry, table->key_size) != 0))
+        if ((ent == hentry) || (memcmp((ent + 1), hentry, table->key_size) != 0))
             continue;
 
         return ind;
@@ -144,11 +175,11 @@ vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t hentry)
     return -1;
 }
 
-vr_hentry_t
-vr_find_hentry(vr_htable_t htable, void *key, unsigned int *index)
+vr_hentry_t *
+vr_find_hentry(vr_htable_t htable, void *key)
 {
     unsigned int hash, tmp_hash, ind, i;
-    vr_hentry_t ent;
+    vr_hentry_t *ent, *o_ent;
     struct vr_htable *table = (struct vr_htable *)htable;
 
     if (!table || !key)
@@ -164,25 +195,17 @@ vr_find_hentry(vr_htable_t htable, void *key, unsigned int *index)
         ent = vr_btable_get(table->htable, ind);
         if (table->is_valid_entry(htable, ent, ind) == false)
             continue;
-        if (memcmp(ent, key, table->key_size) == 0) {
-            if (index)
-                *index = ind;
+        if (memcmp((ent + 1), key, table->key_size) == 0) {
             return ent;
         }
     }
 
-    /* Look into the complete over flow table starting from hash*/
-    tmp_hash = hash % table->oentries;
-    for(i = 0; i < table->oentries; i++) {
-        ind = table->hentries + ((tmp_hash + i) % table->oentries);
-        ent = vr_btable_get(table->otable, ((tmp_hash + i) % table->oentries));
-        if (table->is_valid_entry(htable, ent, ind) == false)
+    for(o_ent = ent->hentry_next; o_ent; o_ent = o_ent->hentry_next) {
+        if (table->is_valid_entry(htable, o_ent, o_ent->hentry_index) == false)
             continue;
-        if (memcmp(ent, key, table->key_size) == 0) {
-            if (index)
-                *index = ind;
-            return ent;
-        }
+
+        if (memcmp((o_ent + 1), key, table->key_size) == 0)
+            return o_ent;
     }
 
     /* Entry not found */
@@ -202,6 +225,9 @@ vr_htable_delete(vr_htable_t htable)
 
     if (table->otable)
         vr_btable_free(table->otable);
+
+    if (table->free_oentries)
+        vr_bitmap_delete(table->free_oentries);
 
     vr_free(table);
 }
@@ -226,19 +252,28 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
     if (!table) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
                                        sizeof(struct vr_htable));
-        return NULL;
+        goto exit;
     }
 
     table->htable = vr_btable_alloc(entries, entry_size);
     if (!table->htable) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, entries);
-        return NULL;
+        goto exit;
     }
 
-    table->otable = vr_btable_alloc(oentries, entry_size);
-    if (!table->otable) {
-        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, oentries);
-        return NULL;
+
+    if (oentries) {
+        table->otable = vr_btable_alloc(oentries, entry_size);
+        if (!table->otable) {
+            vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, oentries);
+            goto exit;
+        }
+
+        table->free_oentries = vr_bitmap_create(oentries);
+        if (!table->free_oentries) {
+            vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, oentries);
+            goto exit;
+        }
     }
 
     table->hentries = entries;
@@ -248,4 +283,8 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
     table->key_size = key_size;
     table->is_valid_entry = is_valid_entry;
     return (vr_htable_t)table;
+
+exit:
+    vr_htable_delete((vr_htable_t)table);
+    return NULL;
 }

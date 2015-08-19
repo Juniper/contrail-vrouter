@@ -196,6 +196,134 @@ int vr_perfq3 = 0;   /* CPU to send packets to if vr_perfr3 is 1 */
 /* Should NIC perform checksum offload for outer UDP header? */
 int vr_udp_coff = 0;
 
+struct vr_bmap {
+    unsigned int bmap_bits;
+    unsigned int bmap_size;
+    unsigned char bmap_data[0];
+};
+
+/* Bit map Operations */
+vr_bmap_t
+vr_bitmap_create(unsigned int nbits)
+{
+    unsigned int bytes, bitmap_size;
+    struct vr_bmap *bmap;
+
+    /* Make it 32 bit boundary */
+    bitmap_size = (nbits + 32) & ~32;
+
+    /* Convert to bytes */
+    bitmap_size /= 8;
+    bytes = bitmap_size + sizeof(struct vr_bmap);
+    bmap = vr_zalloc(bytes);
+    if (!bmap)
+        return NULL;
+    bmap->bmap_bits = nbits;
+    bmap->bmap_size = bitmap_size;
+    return (vr_bmap_t)bmap;
+}
+
+bool
+vr_bitmap_valid_bit(vr_bmap_t b, unsigned int bit)
+{
+    struct vr_bmap *bmap = (struct vr_bmap *)b;
+    unsigned char data;
+
+    if (!bmap)
+        return false;
+
+    if (bit >= bmap->bmap_bits)
+        return false;
+
+    data = bmap->bmap_data[(bit / 8)];
+    if (data && (1 << (bit % 8)))
+        return true;
+
+    return false;
+}
+
+bool
+vr_bitmap_bit_set(vr_bmap_t b, unsigned int bit)
+{
+    struct vr_bmap *bmap = (struct vr_bmap *)b;
+    unsigned char *data;
+
+    if (!bmap)
+        return false;
+
+    if (bit >= bmap->bmap_bits)
+        return false;
+
+    data = &bmap->bmap_data[(bit / 8)];
+    *data |= (1 << (bit % 8));
+
+    return true;
+}
+
+bool
+vr_bitmap_free_bit(vr_bmap_t b, unsigned int *bit)
+{
+    struct vr_bmap *bmap = (struct vr_bmap *)b;
+    unsigned char data;
+    int i, cnt = 0;
+
+    if (!bmap)
+        return false;
+
+    for(i = 0; i < bmap->bmap_size; i++) {
+        if (bmap->bmap_data[i] != 0xFF) {
+            data = bmap->bmap_data[i];
+            if ((data & 0xF) == 0xF) {
+                data = data >> 4;
+                cnt = 4;
+            }
+
+            if ((data & 3) == 3) {
+                data = data >> 2;
+                cnt += 2;
+            }
+
+            if (data & 1)
+                cnt += 1;
+
+            *bit = (i * 8) + cnt;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool
+vr_bitmap_bit_clear(vr_bmap_t b, unsigned int bit)
+{
+    struct vr_bmap *bmap = (struct vr_bmap *)b;
+    unsigned char *data;
+
+    if (!bmap)
+        return false;
+
+    if (bit >= bmap->bmap_bits)
+        return false;
+
+    data = &bmap->bmap_data[(bit / 8)];
+    *data &= (~(1 << (bit % 8)));
+
+    return true;
+}
+
+void
+vr_bitmap_delete(vr_bmap_t b)
+{
+    struct vr_bmap *bmap = (struct vr_bmap *)b;
+
+    if (bmap)
+        vr_free(bmap);
+
+    return;
+}
+
+
 int
 vr_module_error(int error, const char *func,
         int line, int mod_specific)

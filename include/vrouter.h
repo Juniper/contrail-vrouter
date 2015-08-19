@@ -206,6 +206,15 @@ struct vr_defer_data {
     void *vdd_data;
 };
 
+typedef struct vr_bmap_opaque  *vr_bmap_t;
+extern vr_bmap_t vr_bitmap_create(unsigned int);
+extern void vr_bitmap_delete(vr_bmap_t);
+extern bool vr_bitmap_valid_bit(vr_bmap_t, unsigned int);
+extern bool vr_bitmap_bit_set(vr_bmap_t, unsigned int);
+extern bool vr_bitmap_bit_clear(vr_bmap_t, unsigned int);
+bool vr_bitmap_free_bit(vr_bmap_t, unsigned int *);
+
+
 extern volatile bool vr_not_ready;
 
 extern struct host_os *vrouter_host;
@@ -214,6 +223,7 @@ extern struct vrouter *vrouter_get(unsigned int);
 extern int vrouter_init(void);
 extern int vr_module_error(int, const char *, int, int);
 extern int vhost_init(void);
+
 
 #ifdef __cplusplus
 }
