@@ -19,10 +19,8 @@
 #include "vr_ip_mtrie.h"
 
 #define VR_NUM_FLOW_TABLES          1
-#define VR_DEF_FLOW_ENTRIES         (512 * 1024)
 
 #define VR_NUM_OFLOW_TABLES         1
-#define VR_DEF_OFLOW_ENTRIES        (8 * 1024)
 
 #define VR_FLOW_ENTRIES_PER_BUCKET  4U
 

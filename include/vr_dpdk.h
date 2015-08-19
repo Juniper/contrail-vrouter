@@ -20,6 +20,7 @@
 #include "vr_os.h"
 #include "vr_interface.h"
 #include "vr_packet.h"
+#include "vr_bridge.h"
 
 #include <sys/queue.h>
 
