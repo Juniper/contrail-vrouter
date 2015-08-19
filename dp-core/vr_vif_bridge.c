@@ -24,12 +24,13 @@ struct vif_bridge_key {
 } __attribute__((packed));
 
 struct vif_bridge_entry {
+    vr_hentry_t vif_bridge_hentry;
     struct vif_bridge_key vbe_key;
     struct vr_interface *vbe_vif;
 } __attribute__((packed));
 
 static bool
-vif_bridge_valid(vr_htable_t htable, vr_hentry_t hentry,
+vif_bridge_valid(vr_htable_t htable, vr_hentry_t *hentry,
         unsigned int index)
 {
     struct vif_bridge_entry *be = (struct vif_bridge_entry *)hentry;
@@ -42,14 +43,14 @@ vif_bridge_valid(vr_htable_t htable, vr_hentry_t hentry,
 
 static struct vif_bridge_entry *
 vif_bridge_get(vr_htable_t htable, unsigned short vlan,
-        unsigned char *mac, int *index)
+        unsigned char *mac)
 {
     struct vif_bridge_key key;
 
     key.vbk_vlan = vlan;
     VR_MAC_COPY(key.vbk_mac, mac);
 
-    return (struct vif_bridge_entry *)vr_find_hentry(htable, &key, index);
+    return (struct vif_bridge_entry *)vr_find_hentry(htable, &key);
 }
 
 struct vr_interface *
@@ -58,7 +59,7 @@ vif_bridge_get_sub_interface(vr_htable_t htable, unsigned short vlan,
 {
     struct vif_bridge_entry *vbe;
 
-    vbe = vif_bridge_get(htable, vlan, mac, NULL);
+    vbe = vif_bridge_get(htable, vlan, mac);
     if (!vbe)
         return NULL;
     return vbe->vbe_vif;
@@ -67,18 +68,20 @@ vif_bridge_get_sub_interface(vr_htable_t htable, unsigned short vlan,
 int
 vif_bridge_get_index(struct vr_interface *pvif, struct vr_interface *vif)
 {
-    int index = -1;
+    struct vif_bridge_entry *be;
 
     if (!pvif || !pvif->vif_btable || !vif)
         return -1;
 
-    (void)vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
-            vif->vif_src_mac, &index);
-    return index;
+    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
+            vif->vif_src_mac);
+    if (!be)
+        return -1;
+    return be->vif_bridge_hentry.hentry_index;
 }
 
 static void
-vif_bridge_free(vr_htable_t htable, vr_hentry_t hentry,
+vif_bridge_free(vr_htable_t htable, vr_hentry_t *hentry,
         unsigned int index __attribute__((unused)),
         void *data __attribute__((unused)))
 {
@@ -90,12 +93,13 @@ vif_bridge_free(vr_htable_t htable, vr_hentry_t hentry,
     memset(&be->vbe_key, 0, sizeof(struct vif_bridge_key));
     be->vbe_vif = NULL;
 
+    vr_release_hentry(htable, hentry);
     return;
 }
 
 struct vif_bridge_entry *
 vif_bridge_alloc(vr_htable_t htable, unsigned short vlan,
-        unsigned char *mac, int *index)
+        unsigned char *mac)
 {
     struct vif_bridge_key key;
     struct vif_bridge_entry *vbe;
@@ -103,7 +107,7 @@ vif_bridge_alloc(vr_htable_t htable, unsigned short vlan,
     key.vbk_vlan = vlan;
     VR_MAC_COPY(key.vbk_mac, mac);
 
-    vbe = vr_find_free_hentry(htable, &key, index);
+    vbe = (struct vif_bridge_entry *)vr_find_free_hentry(htable, &key);
     if (!vbe)
         return NULL;
     memcpy(&vbe->vbe_key, &key, sizeof(key));
@@ -119,11 +123,11 @@ vif_bridge_delete(struct vr_interface *pvif, struct vr_interface *vif)
         return -EINVAL;
 
     be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
-            vif->vif_src_mac, NULL);
+            vif->vif_src_mac);
     if (!be)
         return -ENOENT;
 
-    vif_bridge_free(pvif->vif_btable, (vr_hentry_t)be, 0, NULL);
+    vif_bridge_free(pvif->vif_btable, (vr_hentry_t *)be, 0, NULL);
 
     return 0;
 }
@@ -132,16 +136,15 @@ int
 vif_bridge_add(struct vr_interface *pvif, struct vr_interface *vif)
 {
     struct vif_bridge_entry *be;
-    int index = -1;
 
     if (!pvif->vif_btable)
         return -EINVAL;
 
     be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
-            vif->vif_src_mac, &index);
+            vif->vif_src_mac);
     if (!be) {
         be = vif_bridge_alloc(pvif->vif_btable, vif->vif_vlan_id,
-                vif->vif_src_mac, &index);
+                vif->vif_src_mac);
         if (!be)
             return -ENOMEM;
     }
@@ -149,6 +152,17 @@ vif_bridge_add(struct vr_interface *pvif, struct vr_interface *vif)
     be->vbe_vif = vif;
 
     return 0;
+}
+
+vr_hentry_key
+vif_bridge_get_key(vr_htable_t table, vr_hentry_t *entry)
+{
+    struct vif_bridge_entry *vif_be = (struct vif_bridge_entry *)entry;
+
+    if (!entry)
+        return entry;
+
+    return (vr_hentry_key)(&vif_be->vbe_key);
 }
 
 void
@@ -172,7 +186,8 @@ vif_bridge_init(struct vr_interface *vif)
 
     vif->vif_btable = vr_htable_create(VIF_BRIDGE_ENTRIES,
             VIF_BRIDGE_OENTRIES, sizeof(struct vif_bridge_entry),
-            sizeof(struct vif_bridge_key), vif_bridge_valid);
+            sizeof(struct vif_bridge_key), vif_bridge_valid,
+            vif_bridge_get_key);
     if (!vif->vif_btable)
         return -ENOMEM;
 
