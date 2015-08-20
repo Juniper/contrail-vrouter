@@ -242,6 +242,20 @@ buffer sandesh vrouter_ops {
    13: u32          vo_log_level;
    14: list<u32>    vo_log_type_enable;
    15: list<u32>    vo_log_type_disable;
+   16: i32          vo_perfr;
+   17: i32          vo_perfs;
+   18: i32          vo_from_vm_mss_adj;
+   19: i32          vo_to_vm_mss_adj;
+   20: i32          vo_perfr1;
+   21: i32          vo_perfr2;
+   22: i32          vo_perfr3;
+   23: i32          vo_perfp;
+   24: i32          vo_perfq1;
+   25: i32          vo_perfq2;
+   26: i32          vo_perfq3;
+   27: i32          vo_udp_coff;
+   28: i32          vo_flow_hold_limit;
+   29: i32          vo_mudp;
 }
 
 buffer sandesh vr_mem_stats_req {
