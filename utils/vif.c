@@ -59,7 +59,6 @@ static int if_pmdindex = -1, vif_index = -1;
 static bool need_xconnect_if = false;
 static bool need_vif_id = false;
 static int if_xconnect_kindex = -1;
-static int if_vif_index = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
 static unsigned int core = (unsigned)-1;
@@ -71,7 +70,6 @@ static int xconnect_set, vif_set, vhost_phys_set, core_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
-static bool response_pending = true;
 static bool vr_vrf_assign_dump = false;
 static int dump_marker = -1, var_marker = -1;
 
@@ -421,12 +419,10 @@ vr_interface_req_process(void *s)
 
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
         vr_vrf_assign_dump = true;
+        dump_pending = true;
         printf("VRF table(vlan:vrf):\n");
         vr_ifindex = req->vifr_idx;
     }
-
-    if (vr_op != SANDESH_OP_DUMP)
-        response_pending = false;
 
     return;
 }
@@ -434,28 +430,7 @@ vr_interface_req_process(void *s)
 void
 vr_response_process(void *s)
 {
-    vr_response *resp = (vr_response *)s;
-
-    response_pending = false;
-    if (resp->resp_code < 0 && !ignore_error)
-        printf("%s\n", strerror(-resp->resp_code));
-
-    if (vr_op == SANDESH_OP_DUMP) {
-        if (resp->resp_code > 0)
-            response_pending = true;
-
-        if (resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) {
-            response_pending = true;
-            dump_pending = true;
-        } else {
-            dump_pending = false;
-        }
-    } else if (vr_op == SANDESH_OP_GET && vr_vrf_assign_dump) {
-        if (!(resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE)) {
-            vr_vrf_assign_dump = false;
-        }
-    }
-
+    vr_response_common_process((vr_response *)s, &dump_pending);
     return;
 }
 
@@ -535,193 +510,95 @@ ending:
 }
 
 static int
-vr_intf_send_msg(void *request, char *request_string)
+vr_intf_op(struct nl_client *cl, unsigned int op)
 {
-    int ret, error, attr_len;
-    struct nl_response *resp;
-    struct nlmsghdr *nlh;
+    int ret, vrf;
+    bool dump = false;
 
-    /* nlmsg header */
-    ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
-    if (ret) {
-        return ret;
-    }
-
-    /* Generic nlmsg header */
-    ret = nl_build_genlh(cl, SANDESH_REQUEST, 0);
-    if (ret) {
-        return ret;
-    }
-
-    attr_len = nl_get_attr_hdr_size();
-
-    error = 0;
-    ret = sandesh_encode(request, request_string, vr_find_sandesh_info,
-                             (nl_get_buf_ptr(cl) + attr_len),
-                             (nl_get_buf_len(cl) - attr_len), &error);
-    if (ret <= 0) {
-        return ret;
-    }
-
-    /* Add sandesh attribute */
-    nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
-    nl_update_nlh(cl);
-
-    response_pending = true;
-    /* Send the request to kernel */
-    ret = nl_sendmsg(cl);
-
-    while (response_pending) {
-        if ((ret = nl_recvmsg(cl)) > 0) {
-            resp = nl_parse_reply(cl);
-            if (resp->nl_op == SANDESH_REQUEST) {
-                sandesh_decode(resp->nl_data, resp->nl_len,
-                               vr_find_sandesh_info, &ret);
-            } else if (resp->nl_type == NL_MSG_TYPE_DONE) {
-                response_pending = false;
-            }
-        }
-
-        nlh = (struct nlmsghdr *)cl->cl_buf;
-        if (!nlh->nlmsg_flags)
-            break;
-    }
-
-    return 0;
-}
-
-static int
-vr_intf_set(void)
-{
-    vr_vrf_assign_req va_req;
-
-    va_req.h_op = SANDESH_OP_ADD;
-    va_req.var_rid = 0;
-    va_req.var_vif_index = vr_ifindex;
-    va_req.var_vif_vrf = vrf_id;
-    va_req.var_vlan_id = vlan_id;
-
-    return vr_intf_send_msg(&va_req, "vr_vrf_assign_req");
-}
-
-
-static int
-vr_vrf_assign_dump_request(void)
-{
-    vr_vrf_assign_req va_req;
-
-    va_req.h_op = SANDESH_OP_DUMP;
-    va_req.var_vif_index = vr_ifindex;
-    va_req.var_marker = var_marker;
-
-    while (vr_vrf_assign_dump)
-        vr_intf_send_msg(&va_req, "vr_vrf_assign_req");
-
-    printf("\n");
-
-    return 0;
-}
-
-static int
-vr_intf_op(unsigned int op)
-{
-    int ret;
-    vr_interface_req intf_req;
-    int platform = get_platform();
     if (create_set)
         return vhost_create();
-op_retry:
-    memset(&intf_req, 0 , sizeof(intf_req));
 
-    if (set_set)
-        intf_req.vifr_vrf = -1;
-    else
-        intf_req.vifr_vrf = vrf_id;
-
-    intf_req.h_op = op;
-    intf_req.vifr_mac_size = 6;
-    intf_req.vifr_mac = vr_ifmac;
-    intf_req.vifr_ip = 0;
-    intf_req.vifr_name = if_name;
-    if (op == SANDESH_OP_DUMP)
-        intf_req.vifr_marker = dump_marker;
-
-    switch (op) {
-    case SANDESH_OP_ADD:
-        if (if_kindex < 0)
-            if_kindex = 0;
-        intf_req.vifr_os_idx = if_kindex;
-        if (vr_ifindex < 0)
-            vr_ifindex = if_kindex;
-        if (vindex_set)
-            intf_req.vifr_idx = vif_index;
-        else
-            intf_req.vifr_idx = vr_ifindex;
-        intf_req.vifr_rid = 0;
-        intf_req.vifr_type = vr_if_type;
-        if (vr_if_type == VIF_TYPE_HOST) {
-            intf_req.vifr_cross_connect_idx = if_xconnect_kindex;
-        } else if (vr_if_type == VIF_TYPE_MONITORING) {
-            if (platform == DPDK_PLATFORM) {
-                /* we carry vif index in OS index field */
-                intf_req.vifr_os_idx = if_vif_index;
-            } else {
-                printf("Error adding interface: " MONITORING_TYPE_STRING
-                    " type should be used for vRouter/DPDK only\n");
-                exit(-EINVAL);
-            }
-        }
-        intf_req.vifr_flags = vr_ifflags;
-
-        break;
-
-    case SANDESH_OP_DELETE:
-        intf_req.vifr_idx = vr_ifindex;
-        break;
-
-    case SANDESH_OP_GET:
-        /* zero vifr_core means to sum up all the per-core stats */
-        intf_req.vifr_core = (unsigned)(core + 1);
-
-        /*
-         * this logic is slightly complicated. if --kernel option is set
-         * for get or when if_kindex is set for add doing a get, we should
-         * get true in the first if. else it is a regular get with vr ifindex
-         */
-        if (kindex_set || if_kindex != -1) {
-            intf_req.vifr_idx = -1;
-            if (vr_ifindex >= 0)
-                intf_req.vifr_os_idx = vr_ifindex;
-            else
-                intf_req.vifr_os_idx = if_kindex;
-        } else
-            intf_req.vifr_idx = vr_ifindex;
-        break;
-
-    case SANDESH_OP_DUMP:
-        /* zero vifr_core means to sum up all the per-core stats */
-        intf_req.vifr_core = (unsigned)(core + 1);
-        break;
-    }
-
-    /* only want to print the first time */
-    if (((op == SANDESH_OP_DUMP) && !(dump_pending))
-            || (op == SANDESH_OP_GET)) {
+    if ((op == SANDESH_OP_DUMP) ||
+            ((op == SANDESH_OP_GET) && !(add_set))) {
         vr_interface_print_header();
     }
 
-    ret = vr_intf_send_msg(&intf_req, "vr_interface_req");
+op_retry:
+    switch (op) {
+    case SANDESH_OP_ADD:
+        if (set_set)
+            vrf = -1;
+        else
+            vrf = vrf_id;
+
+        if (if_kindex < 0)
+            if_kindex = 0;
+
+        if (vindex_set)
+            vr_ifindex = vif_index;
+
+        if (vr_ifindex < 0)
+            vr_ifindex = if_kindex;
+
+        ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
+                if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac);
+        break;
+
+    case SANDESH_OP_DELETE:
+        ret = vr_send_interface_delete(cl, 0, if_name, vr_ifindex);
+        break;
+
+    case SANDESH_OP_GET:
+        /**
+         * Implementation of getting per-core vif statistics is based on this
+         * little trick to avoid making changes in how agent makes requests for
+         * statistics. From vRouter's and agent's point of view, request for
+         * stats for 0th core means a request for stats summed up for all the
+         * cores. So cores are enumerated starting with 1.
+         * Meanwhile, from user's point of view they are enumerated starting
+         * with 0 (e.g. vif --list --core 0 means 'vif statistics for the very
+         * first (0th) core'). This is how Linux enumerates CPUs, so it should
+         * be more intuitive for the user.
+         *
+         * Agent is not aware of possibility of asking for per-core stats. Its
+         * requests have vifr_core implicitly set to 0. So we need to make a
+         * conversion between those enumerating systems. The vif utility
+         * increments by 1 the core number user asked for. Then it is
+         * decremented back in vRouter.
+         */
+        if (!vr_vrf_assign_dump) {
+            ret = vr_send_interface_get(cl, 0, vr_ifindex, if_kindex, core + 1);
+        } else {
+            dump = true;
+            ret = vr_send_vrf_assign_dump(cl, 0, vr_ifindex, var_marker);
+        }
+        break;
+
+    case SANDESH_OP_DUMP:
+        dump = true;
+        ret = vr_send_interface_dump(cl, 0, dump_marker, core + 1);
+        break;
+    }
+
     if (ret < 0)
         return ret;
 
-    if (set_set)
-        ret = vr_intf_set();
-    else if (get_set)
-        if (vr_vrf_assign_dump)
-            ret = vr_vrf_assign_dump_request();
 
-    if (dump_pending)
+    ret = vr_recvmsg(cl, dump);
+    if (ret <= 0)
+        return ret;
+
+    if (set_set) {
+        ret = vr_send_vrf_assign_set(cl, 0, vr_ifindex, vlan_id, vrf_id);
+        if (ret < 0)
+            return ret;
+
+        return vr_recvmsg(cl, dump);
+    }
+
+    if (dump_pending) {
         goto op_retry;
+    }
 
     return 0;
 }
@@ -844,6 +721,7 @@ parse_long_opts(int option_index, char *opt_arg)
         break;
 
     case VINDEX_OPT_INDEX:
+    case VIF_OPT_INDEX:
         vif_index = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
@@ -908,11 +786,6 @@ parse_long_opts(int option_index, char *opt_arg)
             Usage();
         }
 
-        break;
-
-    case VIF_OPT_INDEX:
-        if_vif_index = strtol(opt_arg, NULL, 0);
-        vr_ifmac[sizeof(vr_ifmac) - 1] = if_vif_index & 0xFF;
         break;
 
     case DHCP_OPT_INDEX:
@@ -1104,42 +977,17 @@ main(int argc, char *argv[])
 
     validate_options();
 
-    cl = nl_register_client();
+    sock_proto = VR_NETLINK_PROTO_DEFAULT;
+#if defined(__linux__)
+    if (create_set)
+        sock_proto = NETLINK_ROUTE;
+#endif
+    cl = vr_get_nl_client(sock_proto);
     if (!cl) {
         printf("Error registering NetLink client: %s (%d)\n",
                 strerror(errno), errno);
         exit(-ENOMEM);
     }
-
-    parse_ini_file();
-
-#if defined(__linux__)
-    if (create_set)
-        sock_proto = NETLINK_ROUTE;
-    else
-        sock_proto = get_protocol();
-#endif
-
-    ret = nl_socket(cl, get_domain(), get_type(), sock_proto);
-    if (ret <= 0) {
-        printf("Error creating NetLink socket: %s (%d)\n",
-                strerror(errno), errno);
-        exit(1);
-    }
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0) {
-        printf("Error connecting to NetLink socket: %s (%d)\n",
-                strerror(errno), errno);
-        exit(1);
-    }
-
-    if (sock_proto == NETLINK_GENERIC)
-        if (vrouter_get_family_id(cl) <= 0) {
-            printf("Error getting NetLink family: %s (%d)\n",
-                    strerror(errno), errno);
-            return -1;
-        }
 
     if (add_set) {
         /*
@@ -1148,11 +996,11 @@ main(int argc, char *argv[])
          * interface does not exist in vrouter
          */
         ignore_error = true;
-        vr_intf_op(SANDESH_OP_GET);
+        vr_intf_op(cl, SANDESH_OP_GET);
         ignore_error = false;
     }
 
-    vr_intf_op(vr_op);
+    vr_intf_op(cl, vr_op);
 
     return 0;
 }

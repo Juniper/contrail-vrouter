@@ -15,31 +15,15 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#if defined(__linux__)
-#include <asm/types.h>
-
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
-#include <linux/if_ether.h>
 
 #include <net/if.h>
-#include <netinet/ether.h>
-#elif defined(__FreeBSD__)
-#include <net/if.h>
-#include <net/ethernet.h>
-#endif
 
-#include "vr_types.h"
-#include "vr_message.h"
-#include "vr_nexthop.h"
-#include "vr_genetlink.h"
-#include "nl_util.h"
 #include "vr_os.h"
-#include "ini_parser.h"
+#include "vr_types.h"
+#include "vr_nexthop.h"
+#include "nl_util.h"
 
 static struct nl_client *cl;
-static int resp_code;
-static vr_drop_stats_req stats_req;
 static int help_set, core_set;
 static unsigned int core = (unsigned)-1;
 
@@ -160,105 +144,35 @@ vr_drop_stats_req_process(void *s_req)
     return;
 }
 
-void
-vr_response_process(void *s)
-{
-    vr_response *stats_resp;
-
-    stats_resp = (vr_response *)s;
-    resp_code = stats_resp->resp_code;
-
-    if (stats_resp->resp_code < 0) {
-        printf("Error %s in kernel operation\n", strerror(stats_resp->resp_code));
-        exit(-1);
-    }
-
-    return;
-}
-
-
-static vr_drop_stats_req *
-vr_build_drop_stats_request(void)
-{
-    stats_req.h_op = SANDESH_OP_GET;
-    stats_req.vds_rid = 0;
-    /* zero vds_core means to sum up all the per-core stats */
-    stats_req.vds_core = (unsigned)(core + 1);
-
-    return &stats_req;
-}
-
 static int
-vr_build_netlink_request(vr_drop_stats_req *req)
-{
-    int ret, error = 0, attr_len;
-
-    /* nlmsg header */
-    ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
-    if (ret)
-        return ret;
-
-    /* Generic nlmsg header */
-    ret = nl_build_genlh(cl, SANDESH_REQUEST, 0);
-    if (ret)
-        return ret;
-
-    attr_len = nl_get_attr_hdr_size();
-    ret = sandesh_encode(req, "vr_drop_stats_req", vr_find_sandesh_info,
-                             (nl_get_buf_ptr(cl) + attr_len),
-                             (nl_get_buf_len(cl) - attr_len), &error);
-
-    if ((ret <= 0) || error)
-        return -1;
-
-    /* Add sandesh attribute */
-    nl_build_attr(cl, ret, NL_ATTR_VR_MESSAGE_PROTOCOL);
-    nl_update_nlh(cl);
-
-    return 0;
-}
-
-static int
-vr_send_one_message(void)
+vr_get_drop_stats(struct nl_client *cl)
 {
     int ret;
-    struct nl_response *resp;
 
-    ret = nl_sendmsg(cl);
-    if (ret <= 0)
-        return 0;
-
-    if((ret = nl_recvmsg(cl)) > 0) {
-        resp = nl_parse_reply(cl);
-        if (resp->nl_op == SANDESH_REQUEST)
-            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
-    }
-
-    return resp_code;
-}
-
-static void
-vr_drop_stats_op(void)
-{
-    vr_send_one_message();
-    return;
-}
-
-static int
-vr_get_drop_stats(void)
-{
-    int ret;
-    vr_drop_stats_req *req;
-
-    req = vr_build_drop_stats_request();
-    if (!req)
-        return -errno;
-
-    ret = vr_build_netlink_request(req);
+    /*
+     * Implementation of getting per-core drop statistics is based on this
+     * little trick to avoid making changes in how agent makes requests for
+     * statistics. From vRouter's and agent's point of view, request for
+     * stats for 0th core means a request for stats summed up for all the
+     * cores. So cores are enumerated starting with 1.
+     * Meanwhile, from user's point of view they are enumerated starting
+     * with 0 (e.g. dropstats --core 0 means 'drop statistics for the very
+     * first (0th) core'). This is how Linux enumerates CPUs, so it should
+     * be more intuitive for the user.
+     *
+     * Agent is not aware of possibility of asking for per-core stats. Its
+     * requests have vds_core implicitly set to 0. So we need to make a
+     * conversion between those enumerating systems. The dropstats utility
+     * increments by 1 the core number user asked for. Then it is
+     * decremented back in vRouter.
+     */
+    ret = vr_send_drop_stats_get(cl, 0, core + 1);
     if (ret < 0)
         return ret;
 
-    vr_drop_stats_op();
+    ret = vr_recvmsg(cl, false);
+    if (ret <= 0)
+        return ret;
 
     return 0;
 }
@@ -331,28 +245,11 @@ main(int argc, char *argv[])
         }
     }
 
-    cl = nl_register_client();
-    if (!cl) {
-        exit(1);
-    }
-
-    parse_ini_file();
-
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0) {
-       exit(1);
-    }
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0) {
-       exit(1);
-    }
-
-    if (vrouter_get_family_id(cl) <= 0) {
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (!cl)
         return -1;
-    }
 
-    vr_get_drop_stats();
+    vr_get_drop_stats(cl);
 
     return 0;
 }
