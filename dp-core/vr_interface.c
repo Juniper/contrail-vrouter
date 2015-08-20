@@ -377,6 +377,7 @@ agent_trap_may_truncate(int trap_reason)
     case AGENT_TRAP_NEXTHOP:
     case AGENT_TRAP_RESOLVE:
     case AGENT_TRAP_FLOW_MISS:
+    case AGENT_TRAP_FLOW_ACTION_HOLD:
     case AGENT_TRAP_ECMP_RESOLVE:
     case AGENT_TRAP_HANDLE_DF:
     case AGENT_TRAP_ZERO_TTL:
@@ -473,16 +474,20 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
     switch (params->trap_reason) {
     case AGENT_TRAP_FLOW_MISS:
+    case AGENT_TRAP_FLOW_ACTION_HOLD:
         if (params->trap_param) {
             fta = (struct vr_flow_trap_arg *)(params->trap_param);
             hdr->hdr_cmd_param = htonl(fta->vfta_index);
             hdr->hdr_cmd_param_1 = htonl(fta->vfta_nh_index);
+            hdr->hdr_cmd_param_2 = htonl(fta->vfta_stats.flow_bytes);
+            hdr->hdr_cmd_param_3 = htonl(fta->vfta_stats.flow_packets);
+            hdr->hdr_cmd_param_4 = htonl((fta->vfta_stats.flow_bytes_oflow |
+                        (fta->vfta_stats.flow_packets_oflow << 16)));
         }
         break;
 
     case AGENT_TRAP_ECMP_RESOLVE:
     case AGENT_TRAP_SOURCE_MISMATCH:
-    case AGENT_TRAP_SESSION_CLOSE:
         if (params->trap_param)
             hdr->hdr_cmd_param = htonl(*(unsigned int *)(params->trap_param));
         break;
