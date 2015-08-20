@@ -22,6 +22,7 @@
 #include "vr_types.h"
 #include "vr_nexthop.h"
 #include "nl_util.h"
+#include "ini_parser.h"
 
 static struct nl_client *cl;
 static int help_set, core_set;
