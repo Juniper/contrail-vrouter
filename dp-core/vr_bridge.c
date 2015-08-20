@@ -36,9 +36,6 @@ struct vr_bridge_entry {
     unsigned char be_pack[VR_BRIDGE_ENTRY_PACK];
 } __attribute__((packed));
 
-#define VR_DEF_BRIDGE_ENTRIES          (256 * 1024)
-#define VR_DEF_BRIDGE_OENTRIES         (4 * 1024)
-
 unsigned int vr_bridge_entries = VR_DEF_BRIDGE_ENTRIES;
 unsigned int vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
 static vr_htable_t vn_rtable;

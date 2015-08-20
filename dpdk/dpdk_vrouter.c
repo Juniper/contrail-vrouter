@@ -20,6 +20,7 @@
 #include "vr_dpdk.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
+#include "vr_bridge.h"
 
 #include <getopt.h>
 #include <signal.h>
@@ -29,6 +30,13 @@
 #include <rte_ethdev.h>
 #include <rte_kni.h>
 #include <rte_timer.h>
+
+/* dp-core parameters */
+extern unsigned int vr_bridge_entries;
+extern unsigned int vr_bridge_oentries;
+extern unsigned int vr_mpls_labels;
+extern unsigned int vr_nexthops;
+extern unsigned int vr_vrfs;
 
 static int no_daemon_set;
 extern char *ContrailBuildInfo;
@@ -288,6 +296,17 @@ dpdk_argv_update(void)
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
         RTE_LOG(INFO, VROUTER, "Using VLAN TCI: %" PRIu16 "\n", vr_dpdk.vlan_tag);
     }
+    RTE_LOG(INFO, VROUTER,  "Bridge Table limit: %" PRIu32 "\t"
+                            "Bridge Table overflow limit: %" PRIu32 "\n",
+                            vr_bridge_entries, vr_bridge_oentries);
+    RTE_LOG(INFO, VROUTER,  "Flow Table limit: %" PRIu32 "\t"
+                            "Flow Table overflow limit: %" PRIu32 "\n",
+                            vr_flow_entries, vr_oflow_entries);
+    RTE_LOG(INFO, VROUTER,  "MPLS labels limit: %" PRIu32 "\t"
+                            "Nexthops limit: %" PRIu32 "\n",
+                            vr_mpls_labels, vr_nexthops);
+    RTE_LOG(INFO, VROUTER,  "VRF tables limit: %" PRIu32 "\n",
+                            vr_vrfs);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < dpdk_argc - 1; i += 2) {
         RTE_LOG(INFO, VROUTER, " %12s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
@@ -496,6 +515,13 @@ enum vr_opt_index {
     VLAN_TCI_OPT_INDEX,
     VLAN_NAME_OPT_INDEX,
     VDEV_OPT_INDEX,
+    BRIDGE_ENTRIES_OPT_INDEX,
+    BRIDGE_OENTRIES_OPT_INDEX,
+    FLOW_ENTRIES_OPT_INDEX,
+    OFLOW_ENTRIES_OPT_INDEX,
+    MPLS_LABELS_OPT_INDEX,
+    NEXTHOPS_OPT_INDEX,
+    VRFS_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -512,6 +538,20 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VDEV_OPT_INDEX]                =   {"vdev",                required_argument,
                                                     NULL,                   0},
+    [BRIDGE_ENTRIES_OPT_INDEX]      =   {"vr_bridge_entries",   required_argument,
+                                                    NULL,                   0},
+    [BRIDGE_OENTRIES_OPT_INDEX]     =   {"vr_bridge_oentries",  required_argument,
+                                                    NULL,                   0},
+    [FLOW_ENTRIES_OPT_INDEX]        =   {"vr_flow_entries",     required_argument,
+                                                    NULL,                   0},
+    [OFLOW_ENTRIES_OPT_INDEX]       =   {"vr_oflow_entries",    required_argument,
+                                                    NULL,                   0},
+    [MPLS_LABELS_OPT_INDEX]         =   {"vr_mpls_labels",      required_argument,
+                                                    NULL,                   0},
+    [NEXTHOPS_OPT_INDEX]            =   {"vr_nexthops",         required_argument,
+                                                    NULL,                   0},
+    [VRFS_OPT_INDEX]                =   {"vr_vrfs",             required_argument,
+                                                    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -521,15 +561,28 @@ Usage(void)
 {
     printf(
         "Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n"
-        "             [--vlan_tci <tci>] [--vlan_fwd_intf_name <name>] [--vdev <config>]\n"
+        "             [--vdev <config>]\n"
+        "             [--vlan_tci <tci>] [--vlan_fwd_intf_name <name>]\n"
+        "             [--vr_bridge_entries <number>] [--vr_bridge_oentries <number>]\n"
+        "             [--vr_flow_entries <number>] [--vr_oflow_entries <number>]\n"
+        "             [--vr_mpls_labels <number>] [--vr_nexthops <number>]\n"
+        "             [--vr_vrfs <number>]\n"
         "\n"
         "--no-daemon  Do not demonize the vRouter\n"
         "--help       Prints this help message\n"
         "--version    Prints build information\n"
         "\n"
-        "--vlan_tci           <tci>      VLAN tag control information\n"
-        "--vlan_fwd_intf_name <name>     VLAN forwarding interface name\n"
-        "--vdev <config>  Virtual device configuration\n"
+        "--vdev                 <config>    Virtual device configuration\n"
+        "--vlan_tci             <tci>       VLAN tag control information\n"
+        "--vlan_fwd_intf_name   <name>      VLAN forwarding interface name\n"
+        "\n"
+        "--vr_bridge_entries    <number>    Bridge Table limit\n"
+        "--vr_bridge_oentries   <number>    Bridge Table overflow limit\n"
+        "--vr_flow_entries      <number>    Flow Table limit\n"
+        "--vr_oflow_entries     <number>    Flow Table overflow limit\n"
+        "--vr_mpls_labels       <number>    MPLS labels limit\n"
+        "--vr_nexthops          <number>    Nexthop limit\n"
+        "--vr_vrfs              <number>    VRF tables limit\n"
         );
 
     exit(1);
@@ -563,7 +616,6 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
      * vr_dpdk_lcore_vroute(), dpdk_vlan_forwarding_if_add().
      */
     case VLAN_TCI_OPT_INDEX:
-        errno = 0;
         vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
         if (errno != 0) {
             vr_dpdk.vlan_tag = VLAN_ID_INVALID;
@@ -588,6 +640,55 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
                 dpdk_argc += 2;
                 break;
             }
+        }
+        break;
+
+    case BRIDGE_ENTRIES_OPT_INDEX:
+        vr_bridge_entries = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_bridge_entries = VR_DEF_BRIDGE_ENTRIES;
+        }
+        break;
+
+    case BRIDGE_OENTRIES_OPT_INDEX:
+        vr_bridge_oentries = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
+        }
+        break;
+
+    case FLOW_ENTRIES_OPT_INDEX:
+        vr_flow_entries = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_flow_entries = VR_DEF_FLOW_ENTRIES;
+        }
+        break;
+
+    case OFLOW_ENTRIES_OPT_INDEX:
+        vr_oflow_entries = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
+        }
+        break;
+
+    case MPLS_LABELS_OPT_INDEX:
+        vr_mpls_labels = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_mpls_labels = VR_DEF_LABELS;
+        }
+        break;
+
+    case NEXTHOPS_OPT_INDEX:
+        vr_nexthops = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_nexthops = VR_DEF_NEXTHOPS;
+        }
+        break;
+
+    case VRFS_OPT_INDEX:
+        vr_vrfs = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_vrfs = VR_DEF_VRFS;
         }
         break;
 
