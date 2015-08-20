@@ -96,7 +96,7 @@ vr_hentry_defer_delete(struct vrouter *router, void *arg)
     ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
     ent->hentry_flags = 0;
 
-    /* The entry is up for grab */
+    /* The entry is up for grabs */
     vr_bitmap_clear_bit(table->ht_free_oentries,
                          (defer_data->hd_index - table->ht_hentries));
 }

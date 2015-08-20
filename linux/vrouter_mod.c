@@ -399,7 +399,7 @@ lh_work(struct work_struct *work)
 static void
 lh_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    struct work_arg *wa = kzalloc(sizeof(*wa), GFP_KERNEL);
+    struct work_arg *wa = kzalloc(sizeof(*wa), GFP_ATOMIC);
 
     if (!wa)
         return;
