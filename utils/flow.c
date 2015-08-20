@@ -137,7 +137,8 @@ dump_legend(void)
     printf("L=Link Local Port)\n");
 
     printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
-    printf("   TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established\n");
+    printf(" Flags:E=Evicted, Ec=Evict Candidate, N=New Flow, M=Modified\n");
+    printf("TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established, D=Dead\n");
     printf("\n");
 
     return;
@@ -285,6 +286,17 @@ dump_table(struct flow_table *ft)
             }
 
             printf(", ");
+            printf("Flags:");
+            if (fe->fe_flags & VR_FLOW_FLAG_EVICTED)
+                printf("E");
+            if (fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
+                printf("Ec");
+            if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
+                printf("N");
+            if (fe->fe_flags & VR_FLOW_FLAG_MODIFIED)
+                printf("M");
+
+            printf(", ");
             if (fe->fe_key.flow4_proto == VR_IP_PROTO_TCP) {
                 printf("TCP:");
 
@@ -305,6 +317,8 @@ dump_table(struct flow_table *ft)
                     printf("R");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_HALF_CLOSE)
                     printf("C");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
+                    printf("D");
 
                 printf(", ");
             }

@@ -720,7 +720,7 @@ vr_fragment_queue_free(struct vr_fragment_queue *queue)
 
     vfqe = queue->vfq_tail;
     queue->vfq_tail = NULL;
-    while (vfqe) {
+    while (queue) {
         next = vfqe->fqe_next;
         if (vfqe->fqe_pnode.pl_packet)
             vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
