@@ -303,6 +303,7 @@ vrouter_ops_get_process(void *s_req)
         goto generate_response;
     }
 
+    /* Startup command line parameters */
     resp->vo_interfaces = router->vr_max_interfaces;
     resp->vo_vrfs = router->vr_max_vrfs;
     resp->vo_mpls_labels = router->vr_max_labels;
@@ -312,10 +313,28 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_flow_entries = vr_flow_entries;
     resp->vo_oflow_entries = vr_oflow_entries;
     resp->vo_mirror_entries = router->vr_max_mirror_indices;
+
+    /* Runtime parameters adjustable via sysctl or the vrouter utility */
+    resp->vo_perfr = vr_perfr;
+    resp->vo_perfs = vr_perfs;
+    resp->vo_from_vm_mss_adj = vr_from_vm_mss_adj;
+    resp->vo_to_vm_mss_adj = vr_to_vm_mss_adj;
+    resp->vo_perfr1 = vr_perfr1;
+    resp->vo_perfr2 = vr_perfr2;
+    resp->vo_perfr3 = vr_perfr3;
+    resp->vo_perfp = vr_perfp;
+    resp->vo_perfq1 = vr_perfq1;
+    resp->vo_perfq2 = vr_perfq2;
+    resp->vo_perfq3 = vr_perfq3;
+    resp->vo_udp_coff = vr_udp_coff;
+    resp->vo_flow_hold_limit = vr_flow_hold_limit;
+    resp->vo_mudp = vr_mudp;
+
+    /* Build info */
     strncpy(resp->vo_build_info, ContrailBuildInfo,
             strlen(ContrailBuildInfo));
 
-    /* Fill out logging entries */
+    /* Logging entries */
     resp->vo_log_level = vr_get_log_level();
     resp->vo_log_type_enable =
         vr_get_enabled_log_types(&resp->vo_log_type_enable_size);
@@ -335,7 +354,8 @@ generate_response:
 /**
  * A handler for control messages.
  *
- * Currently only logging control is supported.
+ * Currently logging control and runtime parameters are supported.
+ * Setting runtime parameters is also possible via sysctl.
  *
  * @param s_req Received request to be processed.
  */
@@ -346,6 +366,7 @@ vrouter_ops_add_process(void *s_req)
 
     vrouter_ops *req = (vrouter_ops *)s_req;
 
+    /* Log levels */
     if (req->vo_log_level)
         vr_set_log_level(req->vo_log_level);
 
@@ -356,6 +377,36 @@ vrouter_ops_add_process(void *s_req)
     if (req->vo_log_type_disable_size)
         for (i = 0; i < req->vo_log_type_disable_size; ++i)
             vr_set_log_type(req->vo_log_type_disable[i], 0);
+
+    /* Runtime parameters */
+    if (req->vo_perfr != -1)
+        vr_perfr = req->vo_perfr;
+    if (req->vo_perfs != -1)
+        vr_perfs = req->vo_perfs;
+    if (req->vo_from_vm_mss_adj != -1)
+        vr_from_vm_mss_adj = req->vo_from_vm_mss_adj;
+    if (req->vo_to_vm_mss_adj != -1)
+        vr_to_vm_mss_adj = req->vo_to_vm_mss_adj;
+    if (req->vo_perfr1 != -1)
+        vr_perfr1 = req->vo_perfr1;
+    if (req->vo_perfr2 != -1)
+        vr_perfr2 = req->vo_perfr2;
+    if (req->vo_perfr3 != -1)
+        vr_perfr3 = req->vo_perfr3;
+    if (req->vo_perfp != -1)
+        vr_perfp = req->vo_perfp;
+    if (req->vo_perfq1 != -1)
+        vr_perfq1 = req->vo_perfq1;
+    if (req->vo_perfq2 != -1)
+        vr_perfq2 = req->vo_perfq2;
+    if (req->vo_perfq3 != -1)
+        vr_perfq3 = req->vo_perfq3;
+    if (req->vo_udp_coff != -1)
+        vr_udp_coff = req->vo_udp_coff;
+    if (req->vo_flow_hold_limit != -1)
+        vr_flow_hold_limit = (unsigned int)req->vo_flow_hold_limit;
+    if (req->vo_mudp != -1)
+        vr_mudp = req->vo_mudp;
 
     /* Neither of currently called functions signals an error. Just send OK
      * response here for now. */

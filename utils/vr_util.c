@@ -737,6 +737,69 @@ vr_send_vrouter_set_logging(struct nl_client *cl, unsigned int router_id,
         req.vo_log_type_disable = d_log_types;
     }
 
+    /*
+     * We create request to change logging options only. As we do not change
+     * vRouter's runtime parameters here, they need to be set to a meaningless
+     * value. They cannot be left zeroed, because 0 means 'feature turned off'.
+     */
+    req.vo_perfr = -1;
+    req.vo_perfs = -1;
+    req.vo_from_vm_mss_adj = -1;
+    req.vo_to_vm_mss_adj = -1;
+    req.vo_perfr1 = -1;
+    req.vo_perfr2 = -1;
+    req.vo_perfr3 = -1;
+    req.vo_perfp = -1;
+    req.vo_perfq1 = -1;
+    req.vo_perfq2 = -1;
+    req.vo_perfq3 = -1;
+    req.vo_udp_coff = -1;
+    req.vo_flow_hold_limit = -1;
+    req.vo_mudp = -1;
+
+    return vr_sendmsg(cl, &req, "vrouter_ops");
+}
+
+int
+vr_send_vrouter_set_sysctls(struct nl_client *cl, unsigned int router_id,
+        int perfr, int perfs, int from_vm_mss_adj, int to_vm_mss_adj,
+        int perfr1, int perfr2, int perfr3, int perfp, int perfq1,
+        int perfq2, int perfq3, int udp_coff, int flow_hold_limit,
+        int mudp)
+{
+    vrouter_ops req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_ADD;
+
+    /*
+     * vRouter runtime options. Adjustable by sysctl as well.
+     *
+     * No real validation is required, as sysctl does not perform any.
+     * Variables are only tested to be -1 ('do not change'),
+     * 0 ('feature turned off'), or non-zero ('feature turned on').
+     */
+    req.vo_perfr = perfr;
+    req.vo_perfs = perfs;
+    req.vo_from_vm_mss_adj = from_vm_mss_adj;
+    req.vo_to_vm_mss_adj = to_vm_mss_adj;
+    req.vo_perfr1 = perfr1;
+    req.vo_perfr2 = perfr2;
+    req.vo_perfr3 = perfr3;
+    req.vo_perfp = perfp;
+    req.vo_perfq1 = perfq1;
+    req.vo_perfq2 = perfq2;
+    req.vo_perfq3 = perfq3;
+    req.vo_udp_coff = udp_coff;
+    req.vo_flow_hold_limit = flow_hold_limit;
+    req.vo_mudp = mudp;
+
+    /*
+     * We create request to change runtime (sysctl) options only. Log level
+     * fields can be left zeroed, because only non-zero values are meaningful
+     * in this case.
+     */
+
     return vr_sendmsg(cl, &req, "vrouter_ops");
 }
 
