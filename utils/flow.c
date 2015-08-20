@@ -137,8 +137,9 @@ dump_legend(void)
     printf("N=NAT(S=SNAT, D=DNAT, Ps=SPAT, Pd=DPAT, ");
     printf("L=Link Local Port)\n");
 
-    printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
-    printf("   TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established\n");
+    printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop, M=Mirror Index\n");
+    printf(" Flags:E=Evicted, Ec=Evict Candidate, N=New Flow, M=Modified\n");
+    printf("TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established, D=Dead\n");
     printf("\n");
 
     return;
@@ -193,13 +194,15 @@ dump_table(struct flow_table *ft)
             if (fe->fe_type == VP_TYPE_IP) {
                 printf("   %12s:%-5d    ", inet_ntoa(in_src),
                         ntohs(fe->fe_key.flow4_sport));
-                printf("%16s:%-5d    %d (%d",
+                printf("%16s:%-5d    %d",
                         inet_ntoa(in_dest),
                         ntohs(fe->fe_key.flow4_dport),
-                        fe->fe_key.flow4_proto,
-                        fe->fe_vrf);
+                        fe->fe_key.flow4_proto);
+            } else {
+                printf("%52c", ' ');
             }
 
+            printf(" (%d", fe->fe_vrf);
             if (fe->fe_flags & VR_FLOW_FLAG_VRFT)
                 printf("->%d", fe->fe_dvrf);
 
@@ -251,7 +254,7 @@ dump_table(struct flow_table *ft)
                 action = 'U';
             }
 
-            printf("    (");
+            printf("(");
             if (fe->fe_type == VP_TYPE_IP)
                 printf("K(nh):%u, ", fe->fe_key.flow4_nh_id);
 
@@ -266,6 +269,18 @@ dump_table(struct flow_table *ft)
             }
 
             printf(", ");
+            printf("Flags:");
+            if (fe->fe_flags & VR_FLOW_FLAG_EVICTED)
+                printf("E");
+            if (fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
+                printf("Ec");
+            if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
+                printf("N");
+            if (fe->fe_flags & VR_FLOW_FLAG_MODIFIED)
+                printf("M");
+
+            printf(", ");
+
             if (fe->fe_key.flow4_proto == VR_IP_PROTO_TCP) {
                 printf("TCP:");
 
@@ -286,6 +301,8 @@ dump_table(struct flow_table *ft)
                     printf("R");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_HALF_CLOSE)
                     printf("C");
+                if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
+                    printf("D");
 
                 printf(", ");
             }
@@ -294,16 +311,18 @@ dump_table(struct flow_table *ft)
                 printf("E:%d, ", fe->fe_ecmp_nh_index);
 
             printf("S(nh):%u, ", fe->fe_src_nh_index);
-            printf(" Statistics:%u/%u", fe->fe_stats.flow_packets,
+            printf("Stats:%u/%u, ", fe->fe_stats.flow_packets,
                     fe->fe_stats.flow_bytes);
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
-                printf(" Mirror Index :");
+                printf("M:");
                 if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES)
-                    printf(" %d", fe->fe_mirror_id);
+                    printf("%d", fe->fe_mirror_id);
                 if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
                     printf(", %d", fe->fe_sec_mirror_id);
+                printf(", ");
             }
-            printf(" UdpSrcPort %d", fe->fe_udp_src_port);
+            printf("SPort:%d", fe->fe_udp_src_port);
+            printf(")\n");
         }
 
         j = -1;
@@ -312,23 +331,31 @@ dump_table(struct flow_table *ft)
             ofe = (struct vr_flow_entry *)((char *)ft->ft_entries +
                         (next_index * sizeof(*fe)));
             if (j == -1) {
-                if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
-                    printf("%6d", i);
+                if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE)) {
+                    printf("%6d->", i);
+                } else {
+                    printf("%6c->", '|');
+                }
 
-                printf("\n\tOflow entries:\n\t");
+                printf("[");
                 j = 0;
             }
-            j += printf(" %d", ofe->fe_hentry.hentry_index);
+            j += printf("%d", ofe->fe_hentry.hentry_index);
             if (j > 65) {
-                printf("\n\t");
+                printf("\n         ");
                 j = 0;
             }
 
             next_index = ofe->fe_hentry.hentry_next_index;
+            if (j && next_index != VR_INVALID_HENTRY_INDEX)
+                printf(" ");
         }
 
-        if ((fe->fe_flags & VR_FLOW_FLAG_ACTIVE) || (j != -1))
-            printf("\n\n");
+        if (j != -1)
+            printf("]");
+
+        if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE)
+            printf("\n");
     }
 
     return;
