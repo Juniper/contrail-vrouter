@@ -21,12 +21,17 @@ typedef enum {
     FLOW_CONSUMED,
 } flow_result_t;
 
-#define VR_FLOW_FLAG_ACTIVE         0x1
-#define VR_RFLOW_VALID              0x1000
-#define VR_FLOW_FLAG_MIRROR         0x2000
-#define VR_FLOW_FLAG_VRFT           0x4000
-#define VR_FLOW_FLAG_LINK_LOCAL     0x8000
+#define VR_FLOW_FLAG_ACTIVE             0x0001
+#define VR_FLOW_FLAG_NEW_FLOW           0x0200
+#define VR_FLOW_FLAG_EVICT_CANDIDATE    0x0400
+#define VR_FLOW_FLAG_EVICTED            0x0800
+#define VR_RFLOW_VALID                  0x1000
+#define VR_FLOW_FLAG_MIRROR             0x2000
+#define VR_FLOW_FLAG_VRFT               0x4000
+#define VR_FLOW_FLAG_LINK_LOCAL         0x8000
 
+#define VR_FLOW_FLAG_MASK(flag)     ((flag) & ~(VR_FLOW_FLAG_EVICT_CANDIDATE |\
+            VR_FLOW_FLAG_EVICTED | VR_FLOW_FLAG_NEW_FLOW))
 /* rest of the flags are action specific */
 
 /* for NAT */
@@ -68,6 +73,13 @@ typedef enum {
         ((type == VP_TYPE_IP6) ? AF_INET6 \
                                : AF_INET)
 struct vr_forwarding_md;
+
+struct vr_flow_defer_data {
+    struct vr_flow_queue *vfdd_flow_queue;
+    struct vr_flow_entry *vfdd_fe;
+    unsigned int vfdd_fe_index;
+    bool vfdd_delete;
+};
 
 struct vr_common_flow{
     unsigned char  ip_family;
@@ -215,6 +227,46 @@ struct vr_flow_queue {
     struct vr_packet_node vfq_pnodes[VR_MAX_FLOW_QUEUE_ENTRIES];
 };
 
+/*
+ * Flow eviction:
+ * 1. Requirement
+ * --------------
+ *
+ * Inactive TCP flows (flows that have already seen the closure cycle - FIN/ACK
+ * or the RESET flags) should additionally be considered as a free flow entry
+ * so that vRouter does not have to wait for agent's aging cycle to accommodate
+ * new flows under severe occupancy and provide better service.
+ *
+ * 2. Problems in datapath initiated flow closure
+ * ----------------------------------------------
+ *
+ * . Simultaneous discovery of the same flow entry by two different CPUs
+ * . Simultaneous closure of an entry by both agent as well as from datapath
+ * . Handling of packets held in the flow entry when the entry moves from hold to
+ *   closed state
+ *
+ * 3. Implementation
+ * -----------------
+ *
+ * 3.1 Marking
+ * -----------
+ *
+ * Once the TCP state machine determines that a flow can be closed, it updates
+ * the tcp flags with a new flag VR_FLOW_TCP_DEAD, since determining whether a
+ * tcp flow has seen its end with only the existing TCP flags is a bit more
+ * involved. The last packet before exiting the module, marks the flow as a an
+ * eviction candidate (VR_FLOW_FLAG_EVICT_CANDIDATE).
+ *
+ * 3.2 Allocation/Eviction
+ * -----------------------
+ *
+ * Once the last packet exits the flow module, a work is scheduled to mark the
+ * flow as inactive. This work will schedule and RCU call back to mark the entry
+ * as inactive (this is the same flow for deletion of flow from agent). While
+ * deleting the entry, the evicted flow will also be marked as evicted (VR_FLOW_
+ * FLAG_EVICTED).
+ *
+ */
 #define VR_FLOW_TCP_FIN             0x0001
 #define VR_FLOW_TCP_HALF_CLOSE      0x0002
 #define VR_FLOW_TCP_FIN_R           0x0004
@@ -223,12 +275,14 @@ struct vr_flow_queue {
 #define VR_FLOW_TCP_ESTABLISHED     0x0020
 #define VR_FLOW_TCP_ESTABLISHED_R   0x0040
 #define VR_FLOW_TCP_RST             0x0080
+#define VR_FLOW_TCP_DEAD            0x8000
 
 /* align to 8 byte boundary */
 #define VR_FLOW_KEY_PAD ((8 - (sizeof(struct vr_flow) % 8)) % 8)
 
 struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
+    uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
     unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
@@ -252,6 +306,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     struct vr_flow fe_key;
+    uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
     unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
@@ -305,6 +360,7 @@ struct vr_flow_md {
 struct vr_flow_trap_arg {
     unsigned int vfta_index;
     unsigned int vfta_nh_index;
+    struct vr_flow_stats vfta_stats;
 };
 
 struct vr_packet;
