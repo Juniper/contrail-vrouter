@@ -2258,8 +2258,12 @@ linux_if_notifier(struct notifier_block * __unused,
 #endif
 
 #ifdef CONFIG_NET_NS
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0))
+    if (dev_net(dev) != &init_net) {
+#else
     if (dev->nd_net != &init_net) {
-        return NOTIFY_DONE;
+#endif
+	return NOTIFY_DONE;
     }
 #endif
 
