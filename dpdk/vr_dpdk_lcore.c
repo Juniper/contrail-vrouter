@@ -882,12 +882,18 @@ dpdk_lcore_fwd_loop(void)
     /* cycles counters */
     uint64_t cur_cycles = 0;
     uint64_t cur_bond_cycles = 0;
+    uint64_t cur_assembler_cycles = 0;
     uint64_t diff_cycles;
     uint64_t last_tx_cycles = 0;
     uint64_t last_bond_tx_cycles = 0;
+    uint64_t last_assembler_cycles = 0;
     /* always calculate bond TX timeout in CPU cycles */
     const uint64_t bond_tx_cycles = (rte_get_timer_hz() + MS_PER_S - 1)
         * VR_DPDK_BOND_TX_MS / MS_PER_S;
+    /* timeout for IP fragment assembler */
+    const uint64_t assembler_cycles = (rte_get_timer_hz() + MS_PER_S - 1)
+        * (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_LINUX_ASSEMBLER_BUCKETS
+        / MS_PER_S;
 #if VR_DPDK_USE_TIMER
     /* calculate timeouts in CPU cycles */
     const uint64_t tx_flush_cycles = (rte_get_timer_hz() + US_PER_S - 1)
@@ -910,6 +916,19 @@ dpdk_lcore_fwd_loop(void)
 
         /* run forwarding lcore IO */
         dpdk_lcore_fwd_io(lcore);
+
+        /* IP fragment assembler timers */
+#if VR_DPDK_USE_TIMER
+        /* we already got the CPU cycles */
+        cur_assembler_cycles = cur_cycles;
+#else
+        cur_assembler_cycles = rte_get_timer_cycles();
+#endif
+        diff_cycles = cur_assembler_cycles - last_assembler_cycles;
+        if (unlikely(assembler_cycles < diff_cycles)) {
+            last_assembler_cycles = cur_assembler_cycles;
+            dpdk_fragment_assembler_table_scan(NULL);
+        }
 
         /* check if we need to flush TX queues */
         diff_cycles = cur_cycles - last_tx_cycles;
@@ -934,6 +953,11 @@ dpdk_lcore_fwd_loop(void)
 
                     dpdk_lcore_bond_tx(lcore);
                 }
+            }
+
+            if (unlikely(lcore->do_fragment_assembly)) {
+                lcore->do_fragment_assembly = false;
+                lcore->fragment_assembly_func(lcore->fragment_assembly_arg);
             }
 
             rcu_quiescent_state();
@@ -1105,3 +1129,18 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
 
     return 0;
 }
+
+/**
+ * Schedule an assembler work on given lcore.
+ *
+ * This is always called from the same lcore the work is to be scheduled.
+ */
+void
+vr_dpdk_lcore_schedule_assembler_work(struct vr_dpdk_lcore *lcore,
+                                      void (*fun)(void *arg), void *arg)
+{
+    lcore->do_fragment_assembly = true;
+    lcore->fragment_assembly_func = fun;
+    lcore->fragment_assembly_arg = arg;
+}
+

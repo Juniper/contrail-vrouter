@@ -20,6 +20,7 @@
 #include "vr_os.h"
 #include "vr_interface.h"
 #include "vr_packet.h"
+#include "vr_fragment.h"
 
 #include <sys/queue.h>
 
@@ -309,6 +310,8 @@ struct vr_dpdk_lcore {
     volatile uint64_t lcore_cmd_arg;
     /* RX ring */
     struct rte_ring *lcore_rx_ring;
+    /* Flag controlling the assembler work */
+    bool do_fragment_assembly;
 
     /**********************************************************************/
     /* Big and less frequently used fields */
@@ -324,6 +327,8 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
     /* Table of TX queue params */
     struct vr_dpdk_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
+    void (*fragment_assembly_func)(void *arg);
+    void *fragment_assembly_arg;
 };
 
 /* Hardware RX queue state */
@@ -640,7 +645,9 @@ void
 vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg);
 /* Post an lcore command to all the lcores */
 void vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg);
-
+/* Schedule an asslembler work on an lcore */
+void vr_dpdk_lcore_schedule_assembler_work(struct vr_dpdk_lcore *lcore,
+        void (*fun)(void *arg), void *arg);
 
 /*
  * vr_dpdk_netlink.c
@@ -670,5 +677,14 @@ void dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
 
 void
 dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring);
+
+/*
+ * vr_dpdk_fragment_assembler.c
+ */
+int dpdk_fragment_assembler_init(void);
+void dpdk_fragment_assembler_exit(void);
+int dpdk_fragment_assembler_enqueue(struct vrouter *router,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd);
+void dpdk_fragment_assembler_table_scan(void *);
 
 #endif /*_VR_DPDK_H_ */

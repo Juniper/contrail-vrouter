@@ -31,25 +31,6 @@ struct vr_linux_fragment_queue {
 struct vr_linux_fragment_queue *vr_lfq_pcpu_queues;
 
 static void
-vr_linux_fragment_queue_free(struct vr_linux_fragment_queue *vlfq)
-{
-    struct vr_fragment_queue_element *vfqe, *next;
-
-    vfqe = vlfq->vrlfq_queue.vfq_tail;
-    vlfq->vrlfq_queue.vfq_tail = NULL;
-    while (vfqe) {
-        next = vfqe->fqe_next;
-        if (vfqe->fqe_pnode.pl_packet)
-            vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
-        vfqe->fqe_pnode.pl_packet = NULL;
-        vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
-        vfqe = next;
-    }
-
-    return;
-}
-
-static void
 vr_linux_fragment_assembler(struct work_struct *work)
 {
     uint32_t hash, index;
@@ -198,7 +179,7 @@ vr_linux_fragment_queue_exit(void)
         }
 
         for (i = 0; i < vr_num_cpus; i++)
-            vr_linux_fragment_queue_free(&vr_lfq_pcpu_queues[i]);
+            vr_fragment_queue_free(&vr_lfq_pcpu_queues[i].vrlfq_queue);
 
         vr_free(vr_lfq_pcpu_queues, VR_FRAGMENT_QUEUE_OBJECT);
         vr_lfq_pcpu_queues = NULL;

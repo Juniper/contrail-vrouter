@@ -18,6 +18,7 @@
 
 #include <net/if.h>
 
+#include "ini_parser.h"
 #include "vr_os.h"
 #include "vr_types.h"
 #include "vr_nexthop.h"

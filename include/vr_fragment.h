@@ -63,5 +63,6 @@ int vr_fragment_enqueue(struct vrouter *, struct vr_fragment_queue *,
         struct vr_packet *, struct vr_forwarding_md *);
 int vr_assembler_table_scan_init(void (*)(void *));
 void vr_assembler_table_scan_exit(void);
+void vr_fragment_queue_free(struct vr_fragment_queue *queue);
 
 #endif /* __VR_FRAGMENT_H__ */
