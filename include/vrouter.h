@@ -96,6 +96,7 @@ enum vr_malloc_objects_t {
     VR_USOCK_BUF_OBJECT,
     VR_USOCK_IOVEC_OBJECT,
     VR_VROUTER_REQ_OBJECT,
+    VR_BITMAP_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 

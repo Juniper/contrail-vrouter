@@ -17,21 +17,23 @@ struct vr_bridge_entry_key {
     unsigned short be_vrf_id;
 }__attribute__((packed));
 
+struct vr_bridge_entry;
+
 struct vr_dummy_bridge_entry {
+    vr_hentry_t be_hentry;
     struct vr_bridge_entry_key be_key;
     struct vr_nexthop *be_nh;
     uint32_t be_label;
-    uint32_t be_index;
     unsigned short be_flags;
 } __attribute__((packed));
 
-#define VR_BRIDGE_ENTRY_PACK (32 - sizeof(struct vr_dummy_bridge_entry))
+#define VR_BRIDGE_ENTRY_PACK (64 - sizeof(struct vr_dummy_bridge_entry))
 
 struct vr_bridge_entry {
+    vr_hentry_t be_hentry;
     struct vr_bridge_entry_key be_key;
     struct vr_nexthop *be_nh;
     uint32_t be_label;
-    uint32_t be_index;
     unsigned short be_flags;
     unsigned char be_pack[VR_BRIDGE_ENTRY_PACK];
 } __attribute__((packed));
@@ -50,7 +52,7 @@ extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 
 
 static bool
-bridge_entry_valid(vr_htable_t htable, vr_hentry_t hentry,
+bridge_entry_valid(vr_htable_t htable, vr_hentry_t *hentry,
                                               unsigned int index)
 {
     struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
@@ -83,18 +85,15 @@ vr_unknown_uc_flood(struct vr_interface *ingress_vif,
 struct vr_bridge_entry *
 vr_find_bridge_entry(struct vr_bridge_entry_key *key)
 {
-    unsigned int index;
-
     if (!vn_rtable || !key)
         return NULL;
 
-    return vr_find_hentry(vn_rtable, key, &index);
+    return (struct vr_bridge_entry *)vr_find_hentry(vn_rtable, key);
 }
 
 struct vr_bridge_entry *
 vr_find_free_bridge_entry(unsigned int vrf_id, char *mac)
 {
-    unsigned int index;
     struct vr_bridge_entry *be;
     struct vr_bridge_entry_key key;
 
@@ -103,11 +102,7 @@ vr_find_free_bridge_entry(unsigned int vrf_id, char *mac)
 
     key.be_vrf_id = vrf_id;
     VR_MAC_COPY(key.be_mac, mac);
-    be = vr_find_free_hentry(vn_rtable, &key, &index);
-    if (be) {
-        be->be_index = index;
-    }
-
+    be = (struct vr_bridge_entry *)vr_find_free_hentry(vn_rtable, &key);
     return be;
 }
 
@@ -183,7 +178,7 @@ bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
 }
 
 static void
-bridge_table_entry_free(vr_htable_t table, vr_hentry_t hentry,
+bridge_table_entry_free(vr_htable_t table, vr_hentry_t *hentry,
         unsigned int index, void *data)
 {
     struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
@@ -193,10 +188,12 @@ bridge_table_entry_free(vr_htable_t table, vr_hentry_t hentry,
     /* Mark this entry as invalid */
     be->be_flags &= ~VR_BE_VALID_FLAG;
 
-    if (be->be_nh)
+    if (be->be_nh) {
         vrouter_put_nexthop(be->be_nh);
+        be->be_nh = NULL;
+    }
+    vr_release_hentry(table, hentry);
 
-    memset(be, 0, sizeof(struct vr_bridge_entry));
     return;
 }
 
@@ -216,7 +213,7 @@ bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!be)
         return -ENOENT;
 
-    bridge_table_entry_free(vn_rtable, (vr_hentry_t )be, 0, NULL);
+    bridge_table_entry_free(vn_rtable, (vr_hentry_t *)be, 0, NULL);
     return 0;
 }
 
@@ -229,7 +226,8 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
     rt->rtr_req.rtr_label_flags = 0;
 
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
-        be = vr_get_hentry_by_index(vn_rtable, rt->rtr_req.rtr_index);
+        be = (struct vr_bridge_entry *)
+                vr_get_hentry_by_index(vn_rtable, rt->rtr_req.rtr_index);
         if (!be)
             return NULL;
 
@@ -253,7 +251,7 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
         rt->rtr_req.rtr_label_flags = be->be_flags;
         rt->rtr_req.rtr_label = be->be_label;
         rt->rtr_nh = be->be_nh;
-        rt->rtr_req.rtr_index = be->be_index;
+        rt->rtr_req.rtr_index = be->be_hentry.hentry_index;
     }
 
     return rt->rtr_nh;
@@ -304,7 +302,7 @@ bridge_entry_make_req(struct vr_route_req *resp, struct vr_bridge_entry *ent)
     resp->rtr_req.rtr_family = AF_BRIDGE;
     resp->rtr_req.rtr_label = ent->be_label;
     resp->rtr_req.rtr_label_flags = ent->be_flags;
-    resp->rtr_req.rtr_index = ent->be_index;
+    resp->rtr_req.rtr_index = ent->be_hentry.hentry_index;
 
     return 0;
 }
@@ -382,6 +380,17 @@ generate_response:
     return 0;
 }
 
+vr_hentry_key
+bridge_entry_key(vr_htable_t table, vr_hentry_t *entry)
+{
+    struct vr_bridge_entry *be = (struct vr_bridge_entry *)entry;
+
+    if (!entry)
+        return NULL;
+
+    return &be->be_key;
+}
+
 int
 bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
@@ -392,7 +401,8 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 
     rtable->algo_data = vr_htable_create(vr_bridge_entries,
             vr_bridge_oentries, sizeof(struct vr_bridge_entry),
-            sizeof(struct vr_bridge_entry_key), bridge_entry_valid);
+                sizeof(struct vr_bridge_entry_key), bridge_entry_valid,
+                bridge_entry_key);
 
     if (!rtable->algo_data)
         return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
