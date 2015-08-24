@@ -539,45 +539,6 @@ drop:
 }
 
 
-static int
-nh_composite_validate_fabric_src(struct vr_packet *pkt, struct vr_nexthop *nh,
-                                 struct vr_forwarding_md *fmd, void *ret_flags)
-{
-    int j;
-    struct vr_nexthop *tunnel_nh;
-    unsigned int tun_dip;
-
-    if (pkt->vp_if->vif_type != VIF_TYPE_PHYSICAL)
-        return NH_SOURCE_INVALID;
-
-    if (!fmd->fmd_outer_src_ip)
-        return NH_SOURCE_INVALID;
-
-    for(j = 0; j < nh->nh_component_cnt; j++) {
-        tunnel_nh = nh->nh_component_nh[j].cnh;
-
-        if (!tunnel_nh || !(tunnel_nh->nh_flags & NH_FLAG_VALID))
-            continue;
-
-        if (tunnel_nh->nh_type != NH_TUNNEL)
-            continue;
-
-        tun_dip = 0;
-        if (tunnel_nh->nh_flags & NH_FLAG_TUNNEL_GRE)
-            tun_dip = tunnel_nh->nh_gre_tun_dip;
-        else if (tunnel_nh->nh_flags &
-            (NH_FLAG_TUNNEL_UDP_MPLS | NH_FLAG_TUNNEL_VXLAN))
-            tun_dip = tunnel_nh->nh_udp_tun_dip;
-
-        /* If source is in districution tree, it is valid */
-        if (tun_dip && fmd->fmd_outer_src_ip &&
-                    fmd->fmd_outer_src_ip == tun_dip) {
-            return NH_SOURCE_VALID;
-        }
-    }
-    return NH_SOURCE_INVALID;
-}
-
 /*
  * This function validate the source  of the tunnel incase of L2
  * multicast
@@ -648,6 +609,117 @@ nh_composite_mcast_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_SOURCE_INVALID;
 }
 
+static int
+nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+        unsigned int pkt_src, bool *flood_to_vms)
+{
+    int handled = 1;
+    unsigned short trap, rt_flags, drop_reason, pull_len  = 0;
+    l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
+    struct vr_eth *eth;
+    struct vr_arp *sarp;
+    struct vr_nexthop *src_nh;
+    struct vr_ip6 *ip6;
+
+    /*
+     * The vlan tagged packets are meant to be handled only by VM's
+     */
+    if (fmd->fmd_vlan != VLAN_ID_INVALID)
+        return !handled;
+
+    pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+    if (pkt_pull(pkt, pull_len) < 0) {
+        drop_reason = VP_DROP_PULL;
+        goto drop;
+    }
+
+    if (pkt->vp_type == VP_TYPE_ARP) {
+        handled = vr_arp_input(pkt, fmd);
+        if (handled)
+            return handled;
+
+        /*
+         * If not handled, packet needs to be flooded. If the ARP is
+         * from MX, VM's should not see this ARP as VM's always need to
+         * Agentas gateway
+         */
+
+        if (pkt_src) {
+            sarp = (struct vr_arp *)pkt_data(pkt);
+            src_nh = vr_inet_ip_lookup(fmd->fmd_dvrf, sarp->arp_spa);
+            if (vr_gateway_nexthop(src_nh)) {
+                *flood_to_vms = false;
+            }
+        }
+
+        goto unhandled;
+    }
+
+    if ((pkt->vp_type != VP_TYPE_IP) && (pkt->vp_type != VP_TYPE_IP6))
+        goto unhandled;
+
+    /*
+     * V6 Ndisc, router solictation packets are ICMP packets. So we need
+     * to parse to identify the type, unlike V4 ARP
+     */
+    if (pkt->vp_type == VP_TYPE_IP6)
+        l4_type = vr_ip6_well_known_packet(pkt);
+
+    /*
+     * Special control packets need to be handled only if from VM or BMS
+     */
+    if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
+        if (pkt->vp_type == VP_TYPE_IP)
+            l4_type = vr_ip_well_known_packet(pkt);
+
+        /*
+         * If packet is identified as known packet, we always trap
+         * it to Agentm with the exception of DHCP. DHCP can be flooded
+         * depending on the configuration on VMI or L2 route flags
+         */
+        if (l4_type != L4_TYPE_UNKNOWN) {
+
+            trap = true;
+
+            if (l4_type == L4_TYPE_DHCP_REQUEST) {
+                if (!(pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED)) {
+                    eth = (struct vr_eth *)pkt_data(pkt);
+                    rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
+                                eth->eth_smac);
+                    if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
+                        trap = false;
+                }
+            }
+
+            if (trap) {
+                vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+                return handled;
+            }
+        }
+    }
+
+    if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
+        handled = vr_neighbor_input(pkt, fmd);
+        if (handled)
+            return handled;
+
+        if (pkt_src) {
+            ip6 = (struct vr_ip6 *)pkt_data(pkt);
+            src_nh = vr_inet6_ip_lookup(fmd->fmd_dvrf, ip6->ip6_src);
+            if (vr_gateway_nexthop(src_nh))
+                *flood_to_vms = false;
+        }
+    }
+
+unhandled:
+    if (pull_len)
+        pkt_push(pkt, pull_len);
+    return 0;
+
+drop:
+    vr_pfree(pkt, drop_reason);
+    return 1;
+}
 
 static int
 nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
@@ -655,15 +727,12 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 {
 
     int i, clone_size;
-    bool flood_to_vms = true, trap = false;
-    unsigned short drop_reason, pull_len, label, pkt_vrf, rt_flags;
+    bool flood_to_vms = true;
+    unsigned short drop_reason, label, pkt_vrf, pull_len;
     unsigned int tun_src, pkt_src, hashval, port_range, handled;
-    l4_pkt_type_t l4_type;
 
     struct vr_eth *eth = NULL;
-    struct vr_arp *sarp;
-    struct vr_ip6 *ip6;
-    struct vr_nexthop *dir_nh, *src_nh;
+    struct vr_nexthop *dir_nh;
     struct vr_packet *new_pkt;
     struct vr_vrf_stats *stats;
 
@@ -716,83 +785,10 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto drop;
     }
 
-    /* L3 processing only for non-vlan tagged packets */
-    if (fmd->fmd_vlan == VLAN_ID_INVALID) {
+    handled = nh_handle_mcast_control_pkt(pkt, fmd, pkt_src, &flood_to_vms);
+    if (handled)
+        return 0;
 
-        pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-        if (pkt_pull(pkt, pull_len) < 0) {
-            drop_reason = VP_DROP_PULL;
-            goto drop;
-        }
-
-        if (pkt->vp_type == VP_TYPE_ARP) {
-            handled = vr_arp_input(pkt, fmd);
-            if (handled)
-                return 0;
-
-            if (pkt_src) {
-                sarp = (struct vr_arp *)pkt_data(pkt);
-                src_nh = vr_inet_ip_lookup(fmd->fmd_dvrf, sarp->arp_spa);
-                if (vr_gateway_nexthop(src_nh)) {
-                    flood_to_vms = false;
-                }
-            }
-        } else if (pkt->vp_type == VP_TYPE_IP) {
-            if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
-                l4_type = vr_ip_well_known_packet(pkt);
-                if (l4_type != L4_TYPE_UNKNOWN) {
-                    trap = true;
-                    if (l4_type == L4_TYPE_DHCP_REQUEST) {
-                        rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
-                                eth->eth_smac);
-                        if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
-                            trap = false;
-                    }
-
-                    if (trap) {
-                        vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                        return 0;
-                    }
-                }
-            }
-        } else if (pkt->vp_type == VP_TYPE_IP6) {
-            if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
-                l4_type = vr_ip6_well_known_packet(pkt);
-                if (l4_type != L4_TYPE_UNKNOWN) {
-
-                    /* Trap well known V6 packets */
-                    trap = true;
-
-                    /* If DHCP, and we are not DHCP server, dont Trap */
-                    if (l4_type == L4_TYPE_DHCP_REQUEST) {
-                        rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
-                                eth->eth_smac);
-                        if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
-                            trap = false;
-                    }
-
-                    if (trap) {
-                        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_L3_PROTOCOLS, NULL);
-                        return 0;
-                    }
-                }
-            }
-
-            handled = vr_neighbor_input(pkt, fmd);
-            if (handled)
-                return 0;
-
-            if (pkt_src) {
-                ip6 = (struct vr_ip6 *)pkt_data(pkt);
-                src_nh = vr_inet6_ip_lookup(fmd->fmd_dvrf, ip6->ip6_src);
-                if (vr_gateway_nexthop(src_nh)) {
-                    flood_to_vms = false;
-                }
-            }
-        }
-
-        pkt_push(pkt, pull_len);
-    }
 
     /*
      * The packet can come to this nexthp either from Fabric or from VM.
@@ -1101,7 +1097,7 @@ static int
 nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
                     struct vr_forwarding_md *fmd)
 {
-    int i, fabric_src = 0;
+    int i;
     struct vr_vrf_stats *stats;
     struct vr_nexthop *dir_nh;
     unsigned short drop_reason, pkt_vrf;
@@ -1123,9 +1119,6 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
         drop_reason = VP_DROP_INVALID_NH;
         goto drop;
     }
-
-    if (nh->nh_validate_src(pkt, nh, fmd, NULL) == NH_SOURCE_VALID)
-        fabric_src = 1;
 
     /*
      * Packet can be L2 or L3 with or without control information. It is
@@ -1179,7 +1172,8 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
 
         /* If from VM or Tor add vxlan header */
-        if (vif_is_virtual(new_pkt->vp_if) || !fabric_src) {
+        if (vif_is_virtual(new_pkt->vp_if) ||
+                        (fmd->fmd_src == TOR_SOURCE)) {
             /*
              * The L2 multicast bridge entry will have VNID as label. If fmd
              * does not valid label/vnid, skip the processing
@@ -2039,7 +2033,6 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_validate_src = nh_composite_ecmp_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_FABRIC) {
         nh->nh_reach_nh = nh_composite_fabric;
-        nh->nh_validate_src = nh_composite_validate_fabric_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_EVPN) {
         nh->nh_reach_nh = nh_composite_evpn;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ENCAP) {
