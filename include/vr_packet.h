@@ -258,6 +258,7 @@ typedef enum {
     L4_TYPE_UNKNOWN,
     L4_TYPE_DHCP_REQUEST,
     L4_TYPE_ROUTER_SOLICITATION,
+    L4_TYPE_NEIGHBOUR_SOLICITATION,
 } l4_pkt_type_t;
 
 struct vr_eth {
