@@ -37,6 +37,20 @@ enum opt_vrouter_index {
     LOG_ENABLE_INDEX,
     LOG_DISABLE_INDEX,
     GET_ENABLED_LOGS_INDEX,
+    SET_PERFR_INDEX,
+    SET_PERFS_INDEX,
+    SET_FROM_VM_MSS_ADJ_INDEX,
+    SET_TO_VM_MSS_ADJ_INDEX,
+    SET_PERFR1_INDEX,
+    SET_PERFR2_INDEX,
+    SET_PERFR3_INDEX,
+    SET_PERFP_INDEX,
+    SET_PERFQ1_INDEX,
+    SET_PERFQ2_INDEX,
+    SET_PERFQ3_INDEX,
+    SET_UDP_COFF_INDEX,
+    SET_FLOW_HOLD_LIMIT_INDEX,
+    SET_MUDP_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -98,6 +112,12 @@ static log_type_name_id_t log_types[] = {
 static log_types_t log_types_to_enable;
 static log_types_t log_types_to_disable;
 static unsigned int log_level;
+
+/* Runtime parameters */
+static int perfr = -1, perfs = -1, from_vm_mss_adj = -1, to_vm_mss_adj = -1;
+static int perfr1 = -1, perfr2 = -1, perfr3 = -1, perfp = -1, perfq1 = -1;
+static int perfq2 = -1, perfq3 = -1, udp_coff = -1, flow_hold_limit = -1;
+static int mudp = -1;
 
 static int platform, vrouter_op = -1;
 
@@ -197,7 +217,10 @@ print_build_info(char *buildinfo)
 
     end = buildinfo + strlen(buildinfo);
 
-    printf("vRouter module version      ");
+    if (platform != DPDK_PLATFORM)
+        printf("vRouter module version      ");
+    else
+        printf("vRouter/DPDK version        ");
 
     start = strstr(buildinfo, BUILD_VERSION_STRING);
     if (!start)
@@ -245,7 +268,59 @@ print_build_info(char *buildinfo)
     print_field(start, end);
 
 close_string:
-    printf(")\n");
+    printf(")\n\n");
+    return;
+}
+
+static void
+print_vrouter_parameters(vrouter_ops *req)
+{
+    printf("Startup parameters\n"
+        "    Interfaces limit                     %u\n"
+        "    VRF tables limit                     %u\n"
+        "    NextHops limit                       %u\n"
+        "    MPLS Labels limit                    %u\n"
+        "    Bridge Table limit                   %u\n"
+        "    Bridge Table Overflow limit          %u\n"
+        "    Flow Table limit                     %u\n"
+        "    Flow Table overflow limit            %u\n"
+        "    Mirror entries limit                 %u\n"
+        "\n",
+
+        req->vo_interfaces, req->vo_vrfs, req->vo_nexthops,
+        req->vo_mpls_labels, req->vo_bridge_entries,
+        req->vo_oflow_bridge_entries, req->vo_flow_entries,
+        req->vo_oflow_entries, req->vo_mirror_entries
+    );
+
+    printf("Runtime parameters\n"
+        "  Performance tweaks\n"
+        "    GRO                                  %d\n"
+        "    Segmentation in software             %d\n"
+        "  TCP MSS adjust settings\n"
+        "    TCP MSS on packets from VM           %d\n"
+        "    TCP MSS on packet sent to VM         %d\n"
+        "  RPS settings\n"
+        "    RPS after pulling inner hdr (perfr1) %d\n"
+        "    RPS after GRO on pkt1 (perfr2)       %d\n"
+        "    RPS from phys rx handler (perfr3)    %d\n"
+        "    Pull inner header (faster version)   %d\n"
+        "    CPU to send pkts to, if perfr1 set   %d\n"
+        "    CPU to send pkts to, if perfr2 set   %d\n"
+        "    CPU to send pkts to, if perfr3 set   %d\n"
+        "  Other settings\n"
+        "    NIC cksum offload for outer UDP hdr  %d\n"
+        "    Flow hold limit:                     %u\n"
+        "    MPLS over UDP globally               %d\n"
+        "\n",
+
+        req->vo_perfr, req->vo_perfs,
+        req->vo_from_vm_mss_adj, req->vo_to_vm_mss_adj,
+        req->vo_perfr1, req->vo_perfr2, req->vo_perfr3, req->vo_perfp,
+        req->vo_perfq1, req->vo_perfq2, req->vo_perfq3,
+        req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp
+    );
+
     return;
 }
 
@@ -257,7 +332,7 @@ print_log_level(vrouter_ops *req)
     if (platform != DPDK_PLATFORM)
         return;
 
-    printf("Current log level            ");
+    printf("Current log level                        ");
     if (str != NULL)
         printf("%s\n", str);
     else
@@ -274,7 +349,7 @@ print_enabled_log_types(vrouter_ops *req)
     if (platform != DPDK_PLATFORM)
         return;
 
-    printf("Enabled log types            ");
+    printf("Enabled log types                        ");
     if (!req->vo_log_type_enable_size)
         printf("none\n");
 
@@ -295,15 +370,8 @@ vrouter_ops_process(void *s_req)
         if (req->vo_build_info)
             print_build_info(req->vo_build_info);
 
-        printf("Interfaces limit             %u\n", req->vo_interfaces);
-        printf("VRF tables limit             %u\n", req->vo_vrfs);
-        printf("NextHops limit               %u\n", req->vo_nexthops);
-        printf("MPLS Labels limit            %u\n", req->vo_mpls_labels);
-        printf("Bridge Table limit           %u\n", req->vo_bridge_entries);
-        printf("Bridge Table Overflow limit  %u\n", req->vo_oflow_bridge_entries);
-        printf("Flow Table limit             %u\n", req->vo_flow_entries);
-        printf("Flow Table overflow limit    %u\n", req->vo_oflow_entries);
-        printf("Mirror entries limit         %u\n", req->vo_mirror_entries);
+        print_vrouter_parameters(req);
+
         print_log_level(req);
         print_enabled_log_types(req);
     } else {
@@ -335,9 +403,17 @@ vr_vrouter_op(struct nl_client *cl)
         break;
 
     case SANDESH_OP_ADD:
-        ret = vr_send_vrouter_set_logging(cl, 0, log_level,
-                log_types_to_enable.types, log_types_to_enable.size,
-                log_types_to_disable.types, log_types_to_disable.size);
+        if (opt[SET_LOG_LEVEL_INDEX] || opt[LOG_ENABLE_INDEX]) {
+            ret = vr_send_vrouter_set_logging(cl, 0, log_level,
+                    log_types_to_enable.types, log_types_to_enable.size,
+                    log_types_to_disable.types, log_types_to_disable.size);
+        } else {
+            ret = vr_send_vrouter_set_runtime_opts(cl, 0,
+                    perfr, perfs, from_vm_mss_adj, to_vm_mss_adj,
+                    perfr1, perfr2, perfr3, perfp, perfq1,
+                    perfq2, perfq3, udp_coff, flow_hold_limit,
+                    mudp);
+        }
         break;
 
     default:
@@ -373,6 +449,48 @@ static struct option long_options[] = {
     [GET_ENABLED_LOGS_INDEX] = {
         "get-enabled-log-types", no_argument, &opt[GET_ENABLED_LOGS_INDEX], 1
     },
+    [SET_PERFR_INDEX] = {
+        "perfr", required_argument, &opt[SET_PERFR_INDEX], 1
+    },
+    [SET_PERFS_INDEX] = {
+        "perfs", required_argument, &opt[SET_PERFS_INDEX], 1
+    },
+    [SET_FROM_VM_MSS_ADJ_INDEX] = {
+        "from_vm_mss_adj", required_argument, &opt[SET_FROM_VM_MSS_ADJ_INDEX], 1
+    },
+    [SET_TO_VM_MSS_ADJ_INDEX] = {
+        "to_vm_mss_adj", required_argument, &opt[SET_TO_VM_MSS_ADJ_INDEX], 1
+    },
+    [SET_PERFR1_INDEX] = {
+        "perfr1", required_argument, &opt[SET_PERFR1_INDEX], 1
+    },
+    [SET_PERFR2_INDEX] = {
+        "perfr2", required_argument, &opt[SET_PERFR2_INDEX], 1
+    },
+    [SET_PERFR3_INDEX] = {
+        "perfr3", required_argument, &opt[SET_PERFR3_INDEX], 1
+    },
+    [SET_PERFP_INDEX] = {
+        "perfp", required_argument, &opt[SET_PERFP_INDEX], 1
+    },
+    [SET_PERFQ1_INDEX] = {
+        "perfq1", required_argument, &opt[SET_PERFQ1_INDEX], 1
+    },
+    [SET_PERFQ2_INDEX] = {
+        "perfq2", required_argument, &opt[SET_PERFQ2_INDEX], 1
+    },
+    [SET_PERFQ3_INDEX] = {
+        "perfq3", required_argument, &opt[SET_PERFQ3_INDEX], 1
+    },
+    [SET_UDP_COFF_INDEX] = {
+        "udp_coff", required_argument, &opt[SET_UDP_COFF_INDEX], 1
+    },
+    [SET_FLOW_HOLD_LIMIT_INDEX] = {
+        "flow_hold_limit", required_argument, &opt[SET_FLOW_HOLD_LIMIT_INDEX], 1
+    },
+    [SET_MUDP_INDEX] = {
+        "mudp", required_argument, &opt[SET_MUDP_INDEX], 1
+    },
     [MAX_OPT_INDEX] = {NULL, 0, 0, 0}
 };
 
@@ -385,7 +503,9 @@ Usage(void)
                "vrouter ([--info] [--get-log-level] [--get-enabled-log-types]) |"
                " --help\n"
                "vrouter ([--set-log-level <level>] [--enable-log-type <type>]...\n"
-               "         [--disable-log-type <type>]...)\n\n"
+               "         [--disable-log-type <type>]...)\n"
+               "vrouter ([--set-mudp <0|1>] [--from_vm_mss_adj <0|1>]...\n"
+               "         [--flow_hold_limit <0|1>]...)\n\n"
                "Options:\n"
                "--info Dumps information about vrouter\n"
                "--get-log-level Prints current log level\n"
@@ -393,6 +513,9 @@ Usage(void)
                "--set-log-level <level> Sets logging level\n"
                "--enable-log-type <type> Enable given log type\n"
                "--disable-log-type <type> Disable given log type\n"
+               "--from_vm_mss_adj <0|1> Turn on|off TCP MSS on packets from VM\n"
+               "--flow_hold_limit <0|1> Turn on|off flow hold limit\n"
+               "--mudp <0|1> Turn on|off MPLS over UDP globally\n"
                "--help Prints this message\n\n"
                "<type> is one of:\n"
                "    vrouter\n"
@@ -414,8 +537,23 @@ Usage(void)
     default:
         printf("Usage:\n"
                "vrouter --info | --help\n"
-               "\n"
+               "vrouter ([--set-mudp <0|1>] [--from_vm_mss_adj <0|1>]...\n"
+               "         [--flow_hold_limit <0|1>]...)\n\n"
                "--info Dumps information about vrouter\n"
+               "--perfr <0|1> Turn on|off GRO\n"
+               "--perfs <0|1> Turn on|off segmentation in software\n"
+               "--from_vm_mss_adj <0|1> Turn on|off TCP MSS on packets from VM\n"
+               "--to_vm_mss_adj <0|1> Turn on|off TCP MSS on packets to VM\n"
+               "--perfr1 <0|1> RPS after pulling inner hdr\n"
+               "--perfr2 <0|1> RPS after GRO on pkt1\n"
+               "--perfr3 <0|1> RPS from phys rx handler\n"
+               "--perfp <0|1>  Pull inner hdr (faster version)\n"
+               "--perfq1 <cpu> CPU to send pkts to if perfr1 set\n"
+               "--perfq2 <cpu> CPU to send pkts to if perfr2 set\n"
+               "--perfq3 <cpu> CPU to send pkts to if perfr3 set\n"
+               "--udp_coff <0|1> NIC cksum offload for outer UDP hdr\n"
+               "--flow_hold_limit <0|1> Turn on|off flow hold limit\n"
+               "--mudp <0|1> Turn on|off MPLS over UDP globally\n"
                "--help Prints this message\n"
                "\n");
         break;
@@ -458,9 +596,9 @@ log_types_print(log_types_t *types)
 }
 
 static void
-assert_dpdk_platform_for_option(int opt_index)
+assert_platform_for_option(int required_platform, int opt_index)
 {
-    if (platform != DPDK_PLATFORM) {
+    if (platform != required_platform) {
         printf("Error: %s option not supported on %s platform\n",
                 long_options[opt_index].name, get_platform_str());
         Usage();
@@ -479,12 +617,12 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case GET_LOG_LEVEL_INDEX:
-        assert_dpdk_platform_for_option(opt_index);
+        assert_platform_for_option(DPDK_PLATFORM, opt_index);
         vrouter_op = SANDESH_OP_GET;
         break;
 
     case SET_LOG_LEVEL_INDEX:
-        assert_dpdk_platform_for_option(opt_index);
+        assert_platform_for_option(DPDK_PLATFORM, opt_index);
         vrouter_op = SANDESH_OP_ADD;
         log_level = log_level_name_to_id(opt_arg);
         if (log_level == 0) {
@@ -494,7 +632,7 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case LOG_ENABLE_INDEX:
-        assert_dpdk_platform_for_option(opt_index);
+        assert_platform_for_option(DPDK_PLATFORM, opt_index);
         vrouter_op = SANDESH_OP_ADD;
         ret = log_types_add(&log_types_to_enable, opt_arg);
         if (!ret) {
@@ -504,7 +642,7 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case LOG_DISABLE_INDEX:
-        assert_dpdk_platform_for_option(opt_index);
+        assert_platform_for_option(DPDK_PLATFORM, opt_index);
         vrouter_op = SANDESH_OP_ADD;
         ret = log_types_add(&log_types_to_disable, opt_arg);
         if (!ret) {
@@ -514,8 +652,158 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case GET_ENABLED_LOGS_INDEX:
+        assert_platform_for_option(DPDK_PLATFORM, opt_index);
         vrouter_op = SANDESH_OP_GET;
-        assert_dpdk_platform_for_option(opt_index);
+        break;
+
+    case SET_PERFR_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfr = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfr: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFS_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfs = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfs: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_FROM_VM_MSS_ADJ_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        from_vm_mss_adj = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing from_vm_mss_adj: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_TO_VM_MSS_ADJ_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        to_vm_mss_adj = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing to_vm_mss_adj: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFR1_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfr1 = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfr1: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFR2_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfr2 = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfr2: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFR3_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfr3 = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfr3: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFP_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfp = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfp: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFQ1_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfq1 = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfq1: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFQ2_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfq3 = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfq2: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_PERFQ3_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        perfq3 = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing perfq3: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_UDP_COFF_INDEX:
+        assert_platform_for_option(LINUX_PLATFORM, opt_index);
+        vrouter_op = SANDESH_OP_ADD;
+        udp_coff = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing udp_coff: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_FLOW_HOLD_LIMIT_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        flow_hold_limit = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing flow_hold_limit: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_MUDP_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        mudp = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing mudp: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
         break;
 
     case HELP_OPT_INDEX:
