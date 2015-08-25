@@ -73,6 +73,8 @@ static bool ignore_error = false, dump_pending = false;
 static bool vr_vrf_assign_dump = false;
 static int dump_marker = -1, var_marker = -1;
 
+static int platform;
+
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
 
@@ -318,7 +320,6 @@ vr_interface_req_process(void *s)
     char name[50];
     vr_interface_req *req = (vr_interface_req *)s;
     unsigned int printed = 0;
-    int platform = get_platform();
 
     if (add_set)
         vr_ifindex = req->vifr_idx;
@@ -720,8 +721,14 @@ parse_long_opts(int option_index, char *opt_arg)
             Usage();
         break;
 
-    case VINDEX_OPT_INDEX:
     case VIF_OPT_INDEX:
+        /* we carry monitored vif index in OS index field */
+        if_kindex = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+        break;
+
+    case VINDEX_OPT_INDEX:
         vif_index = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
@@ -753,6 +760,9 @@ parse_long_opts(int option_index, char *opt_arg)
         if (vr_if_type == VIF_TYPE_HOST)
             need_xconnect_if = true;
         if (vr_if_type == VIF_TYPE_MONITORING) {
+            if (platform != DPDK_PLATFORM)
+                Usage();
+
             need_vif_id = true;
             /* set default values for mac and vrf */
             vrf_id = 0;
@@ -781,7 +791,7 @@ parse_long_opts(int option_index, char *opt_arg)
         if (isdigit(opt_arg[0])) {
             if_pmdindex = strtol(opt_arg, NULL, 0);
         } else if (!if_xconnect_kindex) {
-            printf("%s does not seem to be a  valid physical interface name\n",
+            printf("%s does not seem to be a valid physical interface name\n",
                     opt_arg);
             Usage();
         }
@@ -890,6 +900,9 @@ main(int argc, char *argv[])
      * interface in linux or doing an operation in vrouter
      */
     unsigned int sock_proto = NETLINK_GENERIC;
+
+    parse_ini_file();
+    platform = get_platform();
 
     while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:C:DPi:",
                     long_options, &option_index)) >= 0) {

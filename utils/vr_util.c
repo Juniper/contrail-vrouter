@@ -249,13 +249,6 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
 
     if (vif_type == VIF_TYPE_HOST) {
         req.vifr_cross_connect_idx = vif_xconnect_index;
-    } else if (vif_type == VIF_TYPE_MONITORING) {
-        if (platform == DPDK_PLATFORM) {
-            /* we carry vif index in OS index field */
-            req.vifr_os_idx = vif_index;
-        } else {
-            return -EINVAL;
-        }
     }
 
     return vr_sendmsg(cl, &req, "vr_interface_req");
