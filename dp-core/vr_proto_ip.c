@@ -1029,6 +1029,8 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
         }
 
         rt.rtr_nh = NULL;
+        rt.rtr_req.rtr_prefix_len = 32;
+        rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
     }
 
 
