@@ -530,6 +530,39 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
 }
 
 /*
+ * Flags to set in mbuf during parsing when certain types of headers
+ * are detected.
+ *
+ * Based on rte_mbuf.h from DPDK 2.1.0.
+ */
+
+/**
+ * IP (Internet Protocol) version 4 packet type.
+ * It is used for outer packet for tunneling cases, and does not contain any
+ * header option.
+ *
+ * Packet format:
+ * <'ether type'=0x0800
+ * | 'version'=4, 'ihl'=5>
+ */
+#define RTE_PTYPE_L3_IPV4            0x00000010
+/**
+ * Added custom header directive - UDP tunneling
+ * We need support for MPLS over UDP.
+ *
+ */
+#define DPDK_PTYPE_TUNNEL_MPLS_UDP   0x00007000
+/**
+ * Added custom header directive - GRE tunneling
+ * We need support for MPLS over GRE.
+ */
+#define DPDK_PTYPE_TUNNEL_MPLS_GRE   0x00008000
+/**
+ * Mask of tunneling packet types.
+ */
+#define RTE_PTYPE_TUNNEL_MASK        0x0000f000
+
+/*
  * dpdk_vrouter.c
  */
 /* A packet mbuf pool constructor with vr_packet support */
@@ -608,7 +641,9 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 #define DPDK_DEBUG_VAR(v)
 #define DPDK_UDEBUG(t, h, ...)
 #endif
-
+/* Helper to adjust TCP MSS */
+void dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
+                            unsigned char iph_len);
 /*
  * vr_dpdk_interface.c
  */
