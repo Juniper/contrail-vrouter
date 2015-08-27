@@ -688,7 +688,7 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
             if (vif_is_fabric(rx_queue->q_vif)) {
                 /* (Re)calculate hashes and strip VLAN tags. */
                 mask_to_distribute = vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif,
-                                                    pkts, nb_pkts);
+                                                    pkts, &nb_pkts);
                 if (likely(mask_to_distribute == 0)) {
                     /* Packets have been hashed by NIC, just route them. */
                     vr_dpdk_lcore_vroute(lcore, rx_queue->q_vif, pkts, nb_pkts);
@@ -714,7 +714,7 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
                 }
             } else {
                 /* For non-fabric interfaces we always distribute the packets. */
-                vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts);
+                vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, &nb_pkts);
                 /* Distribute all the packets. */
                 vr_dpdk_lcore_distribute(lcore, rx_queue->q_vif, pkts, nb_pkts);
             }
@@ -752,7 +752,7 @@ dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore)
             total_pkts += nb_pkts;
 
             /* (Re)calculate hashes and strip VLAN tags. */
-            vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts);
+            vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, &nb_pkts);
             /* Distribute all the packets. */
             vr_dpdk_lcore_distribute(lcore, rx_queue->q_vif, pkts, nb_pkts);
         }

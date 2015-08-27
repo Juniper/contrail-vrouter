@@ -16,6 +16,8 @@
 
 #include "vr_dpdk.h"
 
+#include <vr_mpls.h>
+
 #include <rte_eth_bond.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
@@ -684,65 +686,45 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
  *
  * Returns 0 if the mbuf's hash was OK, 1 if the hash was recalculated.
  *
- * TODO: add MPLSoGRE case
+ * TODO: add inner VLAN and inner IPv6 packet suport.
  */
 static inline int
-dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
+dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
+                                          struct vr_ip6 *ipv6_hdr)
 {
-    struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
-    struct ipv4_hdr *ipv4_hdr;
     uint64_t *ipv4_addr_ptr;
     uint32_t *l4_ptr;
     uint32_t hash = 0;
-    uint8_t iph_len;
+    uint32_t ipv4_len;
 
-    if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
-        RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
-                __func__, mbuf->hash.rss);
-        return 0;
-    }
-
-    /* TODO: IPv6 support */
-    /* TODO: VLAN support */
-    if (likely(eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
-#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
-        mbuf->packet_type |= RTE_PTYPE_L3_IPV4;
-#endif
-        ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr
-                                    + sizeof(struct ether_hdr));
-        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr
-                                    + offsetof(struct ipv4_hdr, src_addr));
+    if (likely(ipv4_hdr != NULL && ipv6_hdr == NULL)) { /* IPv4 */
+        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr +
+            offsetof(struct vr_ip, ip_saddr));
+        ipv4_len = (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER;
 
         /* We use SSE4.2 CRC hash. No need to match NIC's Toeplitz hash ATM. */
         /* Hash src and dst address at a time */
         hash = rte_hash_crc_8byte(*ipv4_addr_ptr, hash);
 
-        iph_len = (ipv4_hdr->version_ihl & IPV4_HDR_IHL_MASK) *
-                    IPV4_IHL_MULTIPLIER;
-
-        if (likely((rte_pktmbuf_data_len(mbuf) > sizeof(struct ether_hdr)
-                    + iph_len
-                    + sizeof(struct udp_hdr)) &&
-                    !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
-            switch (ipv4_hdr->next_proto_id) {
-            case IPPROTO_TCP:
+        switch (ipv4_hdr->ip_proto) {
+        case VR_IP_PROTO_TCP:
 #if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
-                mbuf->packet_type |= RTE_PTYPE_L4_TCP;
+            mbuf->packet_type |= RTE_PTYPE_L4_TCP;
 #endif
-                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
+            l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + ipv4_len);
 
-                hash = rte_hash_crc_4byte(*l4_ptr, hash);
-                break;
-            case IPPROTO_UDP:
+            hash = rte_hash_crc_4byte(*l4_ptr, hash);
+            break;
+        case VR_IP_PROTO_UDP:
 #if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
-                mbuf->packet_type |= RTE_PTYPE_L4_UDP;
+            mbuf->packet_type |= RTE_PTYPE_L4_UDP;
 #endif
-                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
+            l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + ipv4_len);
 
-                hash = rte_hash_crc_4byte(*l4_ptr, hash);
-                break;
-            }
+            hash = rte_hash_crc_4byte(*l4_ptr, hash);
+            break;
         }
+
         mbuf->ol_flags |= PKT_RX_RSS_HASH;
         mbuf->hash.rss = hash;
         RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n",
@@ -750,6 +732,149 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
     }
 
     return 1;
+}
+
+/* dpdk_mbuf_parse_and_hash_packets
+ *
+ * Parse incoming packet. Check L2, L3 headers, encapsulation type, perform
+ * TCP MSS adjust if needed, then call hashing function to.
+ *
+ * TODO: add VLAN, VXLAN and IPv6 support.
+ *
+ * TODO: if we ever need to set L4 lengths or packet type flags, or other info
+ * about received packets, this is a good place to do it.
+ */
+static int
+dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
+{
+    struct vr_eth *eth_hdr = rte_pktmbuf_mtod(mbuf, struct vr_eth *);
+    struct vr_ip *ipv4_hdr = NULL;
+    struct vr_ip *ipv4_inner_hdr = NULL;
+    struct vr_ip6 *ipv6_hdr = NULL;
+    struct vr_ip6 *ipv6_inner_hdr = NULL;
+    struct vr_udp *udp_hdr = NULL;
+    struct vr_gre *gre_hdr = NULL;
+    unsigned int pull_len = VR_ETHER_HLEN, ipv4_len;
+    int encap_type, helper_ret;
+    unsigned short gre_udp_encap = 0, gre_hdr_len = VR_GRE_BASIC_HDR_LEN;
+    uint16_t mbuf_data_len = rte_pktmbuf_data_len(mbuf);
+
+    if (unlikely(mbuf_data_len < pull_len))
+        return -1;
+
+    if (likely(eth_hdr->eth_proto == rte_cpu_to_be_16(VR_ETH_PROTO_IP))) {
+        ipv4_hdr = (struct vr_ip *)((uintptr_t)eth_hdr + VR_ETHER_HLEN);
+        ipv4_len = (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER;
+        pull_len += ipv4_len;
+
+        if (unlikely(mbuf_data_len < pull_len))
+            return -1;
+
+        if (ipv4_hdr->ip_proto == VR_IP_PROTO_GRE) {
+            gre_hdr = (struct vr_gre *)((uintptr_t)ipv4_hdr + ipv4_len);
+
+            if (unlikely(mbuf_data_len < pull_len + VR_GRE_BASIC_HDR_LEN))
+                return -1;
+
+            if (likely(gre_hdr->gre_proto == VR_GRE_PROTO_MPLS_NO)) {
+                /* We are not RFC 1701 compliant receiver. */
+                if (unlikely(gre_hdr->gre_flags & (~(VR_GRE_FLAG_CSUM |
+                                                        VR_GRE_FLAG_KEY))))
+                    return 0;
+
+                if (gre_hdr->gre_flags & VR_GRE_FLAG_CSUM) {
+                    gre_hdr_len += (VR_GRE_CKSUM_HDR_LEN -
+                        VR_GRE_BASIC_HDR_LEN);
+                }
+                if (gre_hdr->gre_flags & VR_GRE_FLAG_KEY) {
+                    gre_hdr_len += (VR_GRE_KEY_HDR_LEN -
+                        VR_GRE_BASIC_HDR_LEN);
+                }
+
+                pull_len += gre_hdr_len;
+                gre_udp_encap = gre_hdr->gre_proto;
+
+                /*
+                 * mbuf->ol_flags & PKT_RX_RSS_HASH is mistakenaly set
+                 * by the NIC driver for MPLS over GRE packets. It is
+                 * removed here and will be set after we perform hashing.
+                 */
+                mbuf->ol_flags &= ~PKT_RX_RSS_HASH;
+            } else {
+                return 0;
+            }
+        } else if (ipv4_hdr->ip_proto == VR_IP_PROTO_UDP) {
+            /* At this point the packet may be:
+             *  IP with inner packet carried in MPLS-over-UDP, or
+             *  IP with inner packet carried in VXLAN, or
+             *  just regular UDP inside IP.
+             */
+            udp_hdr = (struct vr_udp *)((uintptr_t)ipv4_hdr + ipv4_len);
+
+            if (unlikely(udp_hdr == NULL ||
+                    (mbuf_data_len < pull_len + sizeof(struct vr_udp))))
+                return -1;
+
+            pull_len += sizeof(struct vr_udp);
+
+            if (likely(vr_mpls_udp_port(rte_be_to_cpu_16(udp_hdr->udp_dport)))) {
+                /*
+                 * There is a small possibility we still don't have an
+                 * encapsulated MPLS-over-UDP packet here, but a regular UDP
+                 * packet from VM with the destination port set to the value
+                 * of MPLS-over-UDP port.
+                 *
+                 * Hash flag not set == packet from VM, was not hashed by NIC.
+                 */
+                if (unlikely((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0))
+                    return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
+
+                gre_udp_encap = udp_hdr->udp_dport;
+            } else { /* TODO: VXLAN support */
+                return 0;
+            }
+        } else if ((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0) {
+            /* Looks like no tunneling, perhaps a packet from a VM. */
+            return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
+        }
+
+        helper_ret = vr_inner_pkt_parse(rte_pktmbuf_mtod(mbuf, unsigned char *),
+                                        vr_mpls_tunnel_type, &encap_type,
+                                        NULL, &pull_len, mbuf->buf_len,
+                                        &ipv4_inner_hdr, &ipv6_inner_hdr,
+                                        gre_udp_encap, ipv4_hdr->ip_proto);
+        if (helper_ret == PKT_RET_SLOW_PATH)
+            return -1;
+        else if (helper_ret == PKT_RET_UNHANDLED)
+            return 0;
+
+        /* If not inner IPv4 nor IPv6 - nothing to do. */
+        if (unlikely(ipv4_inner_hdr == NULL))
+            return 0; /* IPv6 packets have ipv4_inner_hdr != NULL */
+
+        helper_ret = vr_ip_transport_parse(ipv4_inner_hdr, ipv6_inner_hdr,
+                                           NULL, mbuf->buf_len,
+                                           dpdk_adjust_tcp_mss, NULL, NULL,
+                                           NULL, &pull_len);
+        if (unlikely(helper_ret == PKT_RET_SLOW_PATH))
+            return -1;
+
+        /* Packet may already be hashed by the NIC */
+        if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
+            RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
+                    __func__, mbuf->hash.rss);
+            return 0;
+        } else {
+            /* For GRE packets we need to hash inner packet */
+            /* TODO: internal IPv6 support */
+            if (gre_hdr && ipv4_inner_hdr)
+                ipv4_hdr = ipv4_inner_hdr;
+        }
+    } else {
+        return 0; /* TODO: VLAN tag support */
+    }
+
+    return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
 }
 
 /*
@@ -762,13 +887,15 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
  */
 uint64_t
 vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
-    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts)
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t *nb_pkts)
 {
-    unsigned i;
+    struct rte_mbuf *pkts_ret[VR_DPDK_RX_BURST_SZ];
     uint64_t mask_to_distribute = 0;
+    unsigned i, nb_pkts_ret = 0;
+    int ret;
 
     /* prefetch the mbufs */
-    for (i = 0; i < nb_pkts; i++) {
+    for (i = 0; i < *nb_pkts; i++) {
         rte_prefetch0(rte_pktmbuf_mtod(pkts[i], uint8_t *));
         rte_prefetch0(rte_pktmbuf_mtod_offset(pkts[i], uint8_t *, RTE_CACHE_LINE_SIZE));
     }
@@ -777,7 +904,7 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     if (unlikely (vr_dpdk.vlan_tag != VLAN_ID_INVALID
             && vif_is_fabric(vif)
             && ((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0))) {
-        for (i = 0; i < nb_pkts; i++) {
+        for (i = 0; i < *nb_pkts; i++) {
             rte_vlan_strip(pkts[i]);
         }
     }
@@ -786,12 +913,32 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     if (unlikely(vr_dpdk.nb_fwd_lcores == 1))
         return 0;
 
-    /* emulate RSS hash */
-    for (i = 0; i < nb_pkts; i++) {
-        if (unlikely(dpdk_mbuf_rss_hash(pkts[i]) != 0)) {
-            mask_to_distribute |= 1ULL << i;
+    /* parse packet headers and emulate RSS hash */
+    for (i = 0; i < *nb_pkts; i++) {
+        ret = dpdk_mbuf_parse_and_hash_packets(pkts[i]);
+
+        /*
+         * Return code indicates if packet is too short to be valid. Such
+         * packets are dropped here. Valid packets are put continuously to one
+         * array, to avoid routing/distributing invalid packets. At the end of
+         * the process, caller gets array of valid packets and new number of
+         * packets in the array.
+         */
+        if (likely(ret == 0)) {
+            pkts_ret[nb_pkts_ret++] = pkts[i];
+        } else if (ret == -1) {
+            vr_dpdk_pfree(pkts[i], VP_DROP_PULL);
+        } else if (ret == 1) {
+            mask_to_distribute |= 1ULL << nb_pkts_ret;
+            pkts_ret[nb_pkts_ret++] = pkts[i];
         }
     }
+
+    /* return array without dropped packets */
+    for (i = 0; i < nb_pkts_ret; i++) {
+        pkts[i] = pkts_ret[i];
+    }
+    *nb_pkts = nb_pkts_ret;
 
     return mask_to_distribute;
 }

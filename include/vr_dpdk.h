@@ -574,7 +574,7 @@ int vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev);
  * Returns 0 on no hash changes, otherwise a bitmask of mbufs to distribute.
  */
 uint64_t vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
-    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts);
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t *nb_pkts);
 
 /*
  * vr_dpdk_flow_mem.c
@@ -608,7 +608,9 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 #define DPDK_DEBUG_VAR(v)
 #define DPDK_UDEBUG(t, h, ...)
 #endif
-
+/* Helper to adjust TCP MSS */
+void dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
+                            unsigned char iph_len);
 /*
  * vr_dpdk_interface.c
  */
