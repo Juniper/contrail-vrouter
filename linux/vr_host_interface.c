@@ -909,20 +909,6 @@ linux_to_vr(struct vr_interface *vif, struct sk_buff *skb)
     return 0;
 }
 
-bool
-linux_ip_proto_pull(struct iphdr *iph)
-{
-    __u8 proto = iph->protocol;
-
-    if ((proto == VR_IP_PROTO_TCP) ||
-            (proto == VR_IP_PROTO_UDP) ||
-            (proto == VR_IP_PROTO_ICMP)) {
-        return true;
-    }
-
-    return false;
-}
-
 static bool
 linux_ipv6_proto_pull(struct ipv6hdr *ip6h)
 {
@@ -971,7 +957,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
             goto pull_fail;
         iph = ip_hdr(skb);
         thdr = vr_ip_transport_header_valid((struct vr_ip *)iph);
-        pull = linux_ip_proto_pull(iph);
+        pull = vr_ip_proto_pull((struct vr_ip *)iph);
         if (pull && thdr) {
             ip_proto = iph->protocol;
         }
@@ -1023,7 +1009,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
                     goto pull_fail;
 
                 iph = (struct iphdr *)(skb->data + offset - sizeof(struct iphdr));
-                if (linux_ip_proto_pull(iph)) {
+                if (vr_ip_proto_pull((struct vr_ip *)iph)) {
                     offset += (iph->ihl * 4) - sizeof(struct iphdr) +
                         sizeof(struct vr_icmp);
 
