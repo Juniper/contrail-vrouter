@@ -25,6 +25,10 @@
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
 
+extern void
+dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
+                    unsigned char iph_len);
+
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
  * Returns 0 on success, < 0 otherwise.
@@ -936,6 +940,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     int num_of_frags = 1;
     int i;
     bool will_fragment;
+    struct vr_ip *ip4_hdr = NULL;
+    struct vr_ip6 *ip6_hdr = NULL;
+    unsigned int pull_len = 0;
+    int parse_ret;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -978,6 +986,25 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 #endif
         vr_dpdk_packet_wakeup(vif);
         return 0;
+    }
+
+    /*
+     * Find TCP header with SYN flag inside the packet
+     * destined to VM and do dpdk_adjust_tcp_mss() on it.
+     */
+    if (vr_to_vm_mss_adj && vif_is_virtual(vif)) {
+        ip4_hdr = (struct vr_ip *)pkt_data_at_offset(pkt,
+            pkt->vp_data + VR_ETHER_HLEN);
+        if (vr_ip_is_ip6(ip4_hdr))
+            ip6_hdr = (struct vr_ip6 *)ip4_hdr;
+
+        parse_ret = vr_ip_transport_parse(ip4_hdr, ip6_hdr, NULL, m->buf_len,
+                        dpdk_adjust_tcp_mss, NULL, NULL, NULL, &pull_len);
+
+        if (parse_ret) {
+            vr_dpdk_pfree(m, VP_DROP_PULL);
+            return -1;
+        }
     }
 
     /* Set a flag indicating that the packet being processed is going to be
