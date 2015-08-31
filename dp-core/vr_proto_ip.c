@@ -820,7 +820,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
 
     frag->f_received += (ntohs(ip->ip_len) - (ip->ip_hl * 4));
     if (vr_ip_fragment_tail(ip)) {
-        frag->f_expected = ((ntohs(ip->ip_frag_off) && 0x1FFF) * 8) +
+        frag->f_expected = ((ntohs(ip->ip_frag_off) & 0x1FFF) * 8) +
             ntohs(ip->ip_len) - (ip->ip_hl * 4) ;
     }
 
