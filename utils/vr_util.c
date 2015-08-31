@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <sys/socket.h>
 #if defined(__linux__)
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
