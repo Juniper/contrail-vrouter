@@ -627,6 +627,8 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     if (fmd->fmd_vlan != VLAN_ID_INVALID)
         return !handled;
 
+    eth = (struct vr_eth *)pkt_data(pkt);
+
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (pkt_pull(pkt, pull_len) < 0) {
         drop_reason = VP_DROP_PULL;
@@ -683,7 +685,6 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
             if (l4_type == L4_TYPE_DHCP_REQUEST) {
                 if (!(pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED)) {
-                    eth = (struct vr_eth *)pkt_data(pkt);
                     rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
                                 eth->eth_smac);
                     if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
@@ -1112,11 +1113,6 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
-        goto drop;
-    }
-
-    if (!nh->nh_validate_src) {
-        drop_reason = VP_DROP_INVALID_NH;
         goto drop;
     }
 
