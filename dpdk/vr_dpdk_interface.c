@@ -831,7 +831,7 @@ dpdk_get_ether_header_len(const void *data)
  * @param mtu_size MTU size
  * @param do_outer_ip_csum Whether calculate the outer IP checksum (in
  * software)
- * @param lcore_id An ID of the core executing this function
+ * @param lcore_id An ID of the lcore executing this function
  *
  * @return Number of output fragments (packets)
  */
@@ -1245,10 +1245,12 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
             if (queue->rxq_ops.f_stats(queue->q_queue_h,
                 &rx_stats, 0) == 0) {
                 if (queue->rxq_ops.f_rx == rte_port_ring_reader_ops.f_rx) {
-                    stats->vis_queue_ipackets = rx_stats.n_pkts_in;
+                    /* DPDK ports count dropped packets twice */
+                    stats->vis_queue_ipackets = rx_stats.n_pkts_in - rx_stats.n_pkts_drop;
                     stats->vis_queue_ierrors = rx_stats.n_pkts_drop;
                 } else {
-                    stats->vis_port_ipackets = rx_stats.n_pkts_in;
+                    /* DPDK ports count dropped packets twice */
+                    stats->vis_port_ipackets = rx_stats.n_pkts_in - rx_stats.n_pkts_drop;
                     stats->vis_port_ierrors = rx_stats.n_pkts_drop;
                 }
             }
@@ -1266,10 +1268,12 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
             if (queue->txq_ops.f_stats(queue->q_queue_h,
                 &tx_stats, 0) == 0) {
                 if (queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
-                    stats->vis_queue_opackets = tx_stats.n_pkts_in;
+                    /* DPDK ports count dropped packets twice */
+                    stats->vis_queue_opackets = tx_stats.n_pkts_in - tx_stats.n_pkts_drop;
                     stats->vis_queue_oerrors = tx_stats.n_pkts_drop;
                 } else {
-                    stats->vis_port_opackets = tx_stats.n_pkts_in;
+                    /* DPDK ports count dropped packets twice */
+                    stats->vis_port_opackets = tx_stats.n_pkts_in - tx_stats.n_pkts_drop;
                     stats->vis_port_oerrors = tx_stats.n_pkts_drop;
                 }
             }

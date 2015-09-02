@@ -483,6 +483,15 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     struct rte_kni_ops kni_ops;
     struct rte_kni *kni;
 
+    if (!vr_dpdk.kni_inited) {
+        /*
+         * If the host does not support KNIs (i.e. RedHat), we'll get
+         * a panic here.
+         */
+        rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
+        vr_dpdk.kni_inited = true;
+    }
+
     /* get eth device info */
     memset(&dev_info, 0, sizeof(dev_info));
     rte_eth_dev_info_get(port_id, &dev_info);

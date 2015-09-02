@@ -335,7 +335,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     /* Check input parameters */
     if (queue_id >= vr_dpdk_virtio_nrxqs(vif)) {
-        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s RX queue%"
+        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s RX queue %"
             PRIu16 "\n", vif->vif_name, queue_id);
         return NULL;
     }
@@ -356,7 +356,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     };
     rx_queue->q_queue_h = rx_queue->rxq_ops.f_create(&reader_params, socket_id);
     if (rx_queue->q_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s RX queue%"
+        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s RX queue %"
             PRIu16 "\n", vif->vif_name, queue_id);
         return NULL;
     }
@@ -432,7 +432,7 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s TX queue%"
+        RTE_LOG(ERR, VROUTER, "    error creating virtio device %s TX queue %"
             PRIu16 "\n", vif->vif_name, queue_id);
         return NULL;
     }

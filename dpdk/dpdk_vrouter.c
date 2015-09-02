@@ -296,17 +296,20 @@ dpdk_argv_update(void)
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
         RTE_LOG(INFO, VROUTER, "Using VLAN TCI: %" PRIu16 "\n", vr_dpdk.vlan_tag);
     }
-    RTE_LOG(INFO, VROUTER,  "Bridge Table limit: %" PRIu32 "\t"
-                            "Bridge Table overflow limit: %" PRIu32 "\n",
-                            vr_bridge_entries, vr_bridge_oentries);
-    RTE_LOG(INFO, VROUTER,  "Flow Table limit: %" PRIu32 "\t"
-                            "Flow Table overflow limit: %" PRIu32 "\n",
-                            vr_flow_entries, vr_oflow_entries);
-    RTE_LOG(INFO, VROUTER,  "MPLS labels limit: %" PRIu32 "\t"
-                            "Nexthops limit: %" PRIu32 "\n",
-                            vr_mpls_labels, vr_nexthops);
-    RTE_LOG(INFO, VROUTER,  "VRF tables limit: %" PRIu32 "\n",
-                            vr_vrfs);
+    RTE_LOG(INFO, VROUTER, "Bridge Table limit:          %" PRIu32 "\n",
+                vr_bridge_entries);
+    RTE_LOG(INFO, VROUTER, "Bridge Table overflow limit: %" PRIu32 "\n",
+                vr_bridge_oentries);
+    RTE_LOG(INFO, VROUTER, "Flow Table limit:            %" PRIu32 "\n",
+                vr_flow_entries);
+    RTE_LOG(INFO, VROUTER, "Flow Table overflow limit:   %" PRIu32 "\n",
+                vr_oflow_entries);
+    RTE_LOG(INFO, VROUTER, "MPLS labels limit:           %" PRIu32 "\n",
+                vr_mpls_labels);
+    RTE_LOG(INFO, VROUTER, "Nexthops limit:              %" PRIu32 "\n",
+                vr_nexthops);
+    RTE_LOG(INFO, VROUTER, "VRF tables limit:            %" PRIu32 "\n",
+                vr_vrfs);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < dpdk_argc - 1; i += 2) {
         RTE_LOG(INFO, VROUTER, " %12s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
@@ -354,12 +357,6 @@ dpdk_init(void)
 
     /* set default log level to INFO */
     rte_set_log_level(RTE_LOG_INFO);
-
-    /* TODO: If the host does not support KNIs (i.e. RedHat), we'll get
-     * a panic here.
-     * So the initialization should be moved to vr_dpdk_knidev_init()
-     */
-    rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
 
     ret = dpdk_mempools_create();
     if (ret < 0)

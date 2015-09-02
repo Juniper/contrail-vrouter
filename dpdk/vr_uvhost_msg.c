@@ -389,7 +389,7 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
     }
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
-        vr_uvhost_log("Client %s: calling handler for message %d\n",
+        vr_uvhost_log("Client %s: handling message %d\n",
             /* strip socket prefix */
             vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX), msg->request);
         if (vru_cl->vruc_num_fds_sent > 0) {
@@ -604,7 +604,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 
     ret = vr_uvh_cl_call_handler(vru_cl);
     if (ret < 0) {
-        vr_uvhost_log("Error calling handler for message %d client %s\n",
+        vr_uvhost_log("Error handling message %d client %s\n",
                       vru_cl->vruc_msg.request, vru_cl->vruc_path);
         ret = -1;
         goto cleanup;
