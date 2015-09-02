@@ -34,6 +34,7 @@
 #define AGENT_TRAP_ZERO_TTL         12
 #define AGENT_TRAP_ICMP_ERROR       13
 #define AGENT_TRAP_TOR_CONTROL_PKT  14
+#define AGENT_TRAP_FLOW_ACTION_HOLD 15
 #define MAX_AGENT_HDR_COMMANDS      15
 
 enum rt_type{
