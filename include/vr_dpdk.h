@@ -144,13 +144,16 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_VM_MEMPOOL_SZ       1024
 /* How many objects (mbufs) to keep in per-lcore VM mempool cache */
 #define VR_DPDK_VM_MEMPOOL_CACHE_SZ (VR_DPDK_RX_BURST_SZ*8)
-/* Number of mbufs in TX ring */
-#define VR_DPDK_TX_RING_SZ          (VR_DPDK_TX_BURST_SZ*2)
+/* Number of mbufs in TX rings (like ring to push, socket, VLAN rings etc */
+#define VR_DPDK_TX_RING_SZ          (VR_DPDK_TX_BURST_SZ*8)
 /* RX ring minimum number of pointers to transfer (cache line / size of ptr) */
 #define VR_DPDK_RX_RING_CHUNK_SZ    1
-/* Number of mbufs in lcore RX ring.
- * Must be bigger than mempool size due to the headers and other mempools */
-#define VR_DPDK_RX_RING_SZ          (VR_DPDK_RSS_MEMPOOL_SZ*2)
+/* Number of mbufs in lcore RX ring (we retry in case enqueue fails) */
+#define VR_DPDK_RX_RING_SZ          1024
+/* Number of retries to enqueue packets */
+#define VR_DPDK_RETRY_NUM           4
+/* Delay between retries */
+#define VR_DPDK_RETRY_US            15
 /* Use timer to measure flushes (slower, but should improve latency) */
 #define VR_DPDK_USE_TIMER           false
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
@@ -191,6 +194,30 @@ extern int dpdk_vlan_forwarding_if_add(void);
  * for outer headers. */
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
+/*
+ * Use IO lcores:
+ *   true  - IO lcores distribute packet among forwarding lcores
+ *   false - forwarding lcores distribute among other forwarding lcores
+ */
+#define VR_DPDK_USE_IO_LCORES       false
+/*
+ * Whether IO lcore share CPUs with forwarding lcores
+ *   true  - each IO lcore has an affinity mask of all the forwarding
+ *           lcores it distributes packets to
+ *           Example: if core mask is 0xf and FWD_LCORES_PER_IO is 2,
+ *             there are will be 4 forwarding lcores: 7@0,8@1,9@2,10@3
+ *             and 2 shared IO lcores: 3@(0,1),4@(2,3)
+ *   false - IO lcore has a dedicated CPU core
+ *           Example: if core mask is 0x3f and FWD_LCORES_PER_IO is 2,
+ *             there are will be 4 forwarding lcores: 7@1,8@2,9@4,10@5
+ *             and 2 dedicated IO lcores: 3@0,4@3
+ */
+#define VR_DPDK_SHARED_IO_LCORES    false
+/*
+ * Create IO lcore for the specified number of forwarding lcores.
+ * The maximum number of IO lcores is limited by IO lcore IDs below.
+ */
+#define VR_DPDK_FWD_LCORES_PER_IO   3
 
 /*
  * DPDK LCore IDs
@@ -199,12 +226,22 @@ enum {
     VR_DPDK_KNI_LCORE_ID = 0,
     VR_DPDK_TIMER_LCORE_ID,
     VR_DPDK_UVHOST_LCORE_ID,
+    /*
+     * The actual number of IO lcores depends on the number of
+     * forwarding lcores.
+     */
+    VR_DPDK_IO_LCORE_ID,
+    VR_DPDK_MAX_IO_LCORE_ID,
     /* [PACKET_ID..FWD_ID) lcores have TX queues, but no RX queues */
     VR_DPDK_PACKET_LCORE_ID,
     VR_DPDK_NETLINK_LCORE_ID,
-    /* the actual number of forwarding lcores depends on affinity mask */
-    VR_DPDK_FWD_LCORE_ID
+    /* The actual number of forwarding lcores depends on affinity mask. */
+    VR_DPDK_FWD_LCORE_ID,
 };
+
+/* Maximum number of IO lcores */
+#define VR_DPDK_MAX_IO_LCORES (VR_DPDK_MAX_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
+
 
 /*
  * VRouter/DPDK Data Structures
@@ -297,10 +334,18 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_q_slist lcore_rx_head;
     /* TX queues head */
     struct vr_dpdk_q_slist lcore_tx_head;
-    /* Number of rings to push for the lcore */
-    volatile uint16_t lcore_nb_rings_to_push;
-    /* Number of bond queues to TX */
-    volatile uint16_t lcore_nb_bonds_to_tx;
+    union {
+        /* Forwarding lcore: number of rings to push for the lcore */
+        volatile uint16_t lcore_nb_rings_to_push;
+        /* IO lcore: number of forwarding lcores to distribute */
+        uint16_t lcore_nb_fwd_lcores;
+    };
+    union {
+        /* Forwarding lcore: number of bond queues to TX */
+        volatile uint16_t lcore_nb_bonds_to_tx;
+        /* IO lcore: first forwarding lcore ID to distribute */
+        uint16_t lcore_first_fwd_lcore_id;
+    };
     /* Number of hardware RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
     /* Lcore command */
@@ -374,7 +419,9 @@ struct vr_dpdk_global {
     /* VLAN tag */
     uint16_t vlan_tag;
     /* Number of forwarding lcores */
-    unsigned nb_fwd_lcores;
+    uint16_t nb_fwd_lcores;
+    /* Number of IO lcores */
+    uint16_t nb_io_lcores;
     /* Packet lcore event socket
      * TODO: refactor to use event FD
      */

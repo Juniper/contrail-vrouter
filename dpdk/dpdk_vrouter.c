@@ -31,6 +31,8 @@
 #include <rte_kni.h>
 #include <rte_timer.h>
 
+#define LCORES_ARG "--lcores"
+
 /* dp-core parameters */
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
@@ -48,7 +50,7 @@ struct vr_dpdk_global vr_dpdk;
 static char *dpdk_argv[] = {
     "dpdk",
     /* the argument will be updated in dpdk_init() */
-    "--lcores", NULL,
+    LCORES_ARG, NULL,
     "-m", VR_DPDK_MAX_MEM,
     "-n", VR_DPDK_MAX_MEMCHANNELS,
     /* up to ten optional arguments (5 pairs of argument + option) */
@@ -165,12 +167,12 @@ dpdk_mempools_create(void)
  *      0 if the system does not have enough cores
  */
 static uint64_t
-dpdk_core_mask_get(void)
+dpdk_core_mask_get(long system_cpus_count)
 {
     cpu_set_t cs;
     uint64_t cpu_core_mask = 0;
     int i;
-    long system_cpus_count, core_mask_count;
+    long core_mask_count;
 
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0) {
         RTE_LOG(ERR, VROUTER, "Error getting affinity."
@@ -203,17 +205,7 @@ dpdk_core_mask_get(void)
      * Do not allow to run vRouter on all the cores available, as some have
      * to be spared for virtual machines.
      */
-    system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
-    if (system_cpus_count == -1) {
-        RTE_LOG(ERR, VROUTER, "Error getting number of processors."
-            " Falling back do the default core mask 0x%" PRIx64 "\n",
-                (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
-        return cpu_core_mask;
-    }
-
-    core_mask_count
-        = __builtin_popcountll((unsigned long long)cpu_core_mask);
-
+    core_mask_count = __builtin_popcountll((unsigned long long)cpu_core_mask);
     if (core_mask_count == system_cpus_count) {
         RTE_LOG(NOTICE, VROUTER, "Use taskset(1) to set the core mask."
             " Falling back do the default core mask 0x%" PRIx64 "\n",
@@ -224,33 +216,114 @@ dpdk_core_mask_get(void)
     return cpu_core_mask;
 }
 
-/* Stringify core mask, i.e. 0xf -> 5@0,6@1,7@2,8@3 */
+/* Stringify shred IO core mask, i.e. 0xf -> 3@(0,1),4@(2,3) */
 static char *
-dpdk_core_mask_stringify(uint64_t core_mask)
+dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
 {
-    int ret, lcore_id = 0, core_id = 0;
+    int cpu_id = 0;
+    int io_lcore_id = VR_DPDK_IO_LCORE_ID;
     static char core_mask_string[VR_DPDK_STR_BUF_SZ];
+    static char io_cpus_string[VR_DPDK_STR_BUF_SZ];
     char *p = core_mask_string;
-    bool first_lcore = true;
+    char *iop = io_cpus_string;
+    int nb_fwd_cores = 0;
+
+    if (!VR_DPDK_USE_IO_LCORES || !VR_DPDK_SHARED_IO_LCORES)
+        return "";
 
     while (core_mask) {
         if (core_mask & 1) {
-            if (first_lcore)
-                first_lcore = false;
-            else
-                *p++ = ',';
+            /* add CPU ID to IO lcore string */
+            if (iop != io_cpus_string)
+                *iop++ = ',';
 
-            ret = snprintf(p,
-            sizeof(core_mask_string) - (p - core_mask_string),
-                    "%d@%d", lcore_id + VR_DPDK_FWD_LCORE_ID, core_id);
-            p += ret;
-
-            if (p - core_mask_string >= sizeof(core_mask_string))
+            iop += snprintf(iop,
+                    sizeof(io_cpus_string) - (iop - io_cpus_string),
+                    "%d", cpu_id);
+            if (iop - io_cpus_string >= sizeof(io_cpus_string)) {
+                RTE_LOG(ERR, VROUTER, "Error stringifying IO CPU ID: buffer overflow\n");
                 return NULL;
-            lcore_id++;
+            }
+
+            nb_fwd_cores++;
+            if (nb_fwd_cores >= VR_DPDK_FWD_LCORES_PER_IO
+                || (core_mask >> 1) == 0) {
+                if (io_lcore_id > VR_DPDK_MAX_IO_LCORE_ID) {
+                    RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: IO lcores limit exceeded\n");
+                    return NULL;
+                }
+
+                p += snprintf(p,
+                        sizeof(core_mask_string) - (p - core_mask_string),
+                        "%d@(%s),", io_lcore_id, io_cpus_string);
+                if (p - core_mask_string >= sizeof(core_mask_string)) {
+                    RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: buffer overflow\n");
+                    return NULL;
+                }
+
+                io_lcore_id++;
+                iop = io_cpus_string;
+                nb_fwd_cores = 0;
+            }
         }
         core_mask >>= 1;
-        core_id++;
+        cpu_id++;
+    }
+    *p = '\0';
+    return core_mask_string;
+}
+
+/* Stringify forwarding and dedicated IO core mask, i.e. 0xf -> 7@0,8@1,9@2,10@3 */
+static char *
+dpdk_fwd_core_mask_stringify(uint64_t core_mask)
+{
+    int cpu_id = 0;
+    int fwd_lcore_id = VR_DPDK_FWD_LCORE_ID;
+    static char core_mask_string[VR_DPDK_STR_BUF_SZ];
+    char *p = core_mask_string;
+    int io_lcore_id = VR_DPDK_IO_LCORE_ID;
+    int nb_fwd_cores = 0;
+
+    while (core_mask) {
+        if (core_mask & 1) {
+            if (p != core_mask_string)
+                *p++ = ',';
+
+            if (VR_DPDK_USE_IO_LCORES && !VR_DPDK_SHARED_IO_LCORES
+                    && nb_fwd_cores == 0) {
+                /* first dedicated CPU is an IO lcore */
+                if (io_lcore_id > VR_DPDK_MAX_IO_LCORE_ID) {
+                    RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: IO lcores limit exceeded\n");
+                    return NULL;
+                }
+
+                p += snprintf(p,
+                        sizeof(core_mask_string) - (p - core_mask_string),
+                        "%d@%d", io_lcore_id, cpu_id);
+                if (p - core_mask_string >= sizeof(core_mask_string)) {
+                    RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: buffer overflow\n");
+                    return NULL;
+                }
+                io_lcore_id++;
+            } else {
+                /* forwarding lcore */
+                p += snprintf(p,
+                        sizeof(core_mask_string) - (p - core_mask_string),
+                        "%d@%d", fwd_lcore_id, cpu_id);
+                if (p - core_mask_string >= sizeof(core_mask_string)) {
+                    RTE_LOG(ERR, VROUTER, "Error stringifying forwarding core mask: buffer overflow\n");
+                    return NULL;
+                }
+                fwd_lcore_id++;
+            }
+
+            nb_fwd_cores++;
+            if (nb_fwd_cores > VR_DPDK_FWD_LCORES_PER_IO)
+                nb_fwd_cores = 0;
+
+        }
+        core_mask >>= 1;
+        cpu_id++;
     }
     *p = '\0';
     return core_mask_string;
@@ -262,7 +335,9 @@ dpdk_argv_update(void)
 {
     long int system_cpus_count;
     int i;
-    char *core_mask_str;
+    uint64_t core_mask, mask_lm_bit;
+    char *io_core_mask_str;
+    char *fwd_core_mask_str;
     static char lcores_string[VR_DPDK_STR_BUF_SZ];
 
     /* get number of available CPUs */
@@ -271,23 +346,76 @@ dpdk_argv_update(void)
         system_cpus_count = __builtin_popcountll(
                 (unsigned long long)VR_DPDK_DEF_LCORE_MASK);
     }
-
-    core_mask_str = dpdk_core_mask_stringify(dpdk_core_mask_get());
-
-    /* sanity check */
-    if (core_mask_str == NULL || system_cpus_count == 0)
+    if (system_cpus_count == 0)
         return -1;
 
-    if (snprintf(lcores_string, sizeof(lcores_string), "(0-%d)@(0-%ld),%s",
-        VR_DPDK_FWD_LCORE_ID - 1, system_cpus_count - 1, core_mask_str)
+    core_mask = dpdk_core_mask_get(system_cpus_count);
+
+    /* calculate number of forwarding and IO lcores */
+    vr_dpdk.nb_fwd_lcores = __builtin_popcountll(core_mask);
+    vr_dpdk.nb_io_lcores = 0;
+    if (VR_DPDK_USE_IO_LCORES) {
+        if (VR_DPDK_SHARED_IO_LCORES) {
+            vr_dpdk.nb_io_lcores = (vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORES_PER_IO - 1)
+                                    /VR_DPDK_FWD_LCORES_PER_IO;
+        } else {
+            vr_dpdk.nb_io_lcores = (vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORES_PER_IO)
+                                    /(VR_DPDK_FWD_LCORES_PER_IO + 1);
+            vr_dpdk.nb_fwd_lcores -= vr_dpdk.nb_io_lcores;
+        }
+    }
+
+    /* sanity checks */
+    if (vr_dpdk.nb_fwd_lcores == 0) {
+        RTE_LOG(ERR, VROUTER, "Error configuring lcores: no forwarding lcores defined\n");
+        return -1;
+    }
+    if (vr_dpdk.nb_io_lcores > 1
+        && vr_dpdk.nb_fwd_lcores == VR_DPDK_FWD_LCORES_PER_IO*(vr_dpdk.nb_io_lcores - 1)) {
+        /*
+         * The last IO lcore has no forwarding lcores.
+         * Decrease the number of IO lcores and continue.
+         */
+        RTE_LOG(INFO, VROUTER, "Adjusting number of IO lcores: %u -> %u\n",
+            vr_dpdk.nb_io_lcores, vr_dpdk.nb_io_lcores - 1);
+        vr_dpdk.nb_io_lcores--;
+        /* remove the leftmost bit from the core mask */
+        mask_lm_bit = core_mask;
+        mask_lm_bit |= mask_lm_bit >> 32;
+        mask_lm_bit |= mask_lm_bit >> 16;
+        mask_lm_bit |= mask_lm_bit >> 8;
+        mask_lm_bit |= mask_lm_bit >> 4;
+        mask_lm_bit |= mask_lm_bit >> 2;
+        mask_lm_bit |= mask_lm_bit >> 1;
+        mask_lm_bit ^= mask_lm_bit >> 1;
+        RTE_LOG(INFO, VROUTER, "Adjusting core mask: 0x%"PRIx64" -> 0x%"PRIx64"\n",
+            core_mask, core_mask ^ mask_lm_bit);
+        core_mask ^= mask_lm_bit;
+    }
+
+    io_core_mask_str = dpdk_shared_io_core_mask_stringify(core_mask);
+    if (io_core_mask_str == NULL)
+        return -1;
+
+    fwd_core_mask_str = dpdk_fwd_core_mask_stringify(core_mask);
+    if (fwd_core_mask_str == NULL)
+        return -1;
+
+    /* lcores order: service, IO, lcores with TX queues, forwaridng lcores */
+    if (snprintf(lcores_string, sizeof(lcores_string),
+        "(0-%d)@(0-%ld),%s(%d-%d)@(0-%ld),%s",
+        VR_DPDK_IO_LCORE_ID - 1, system_cpus_count - 1,
+        io_core_mask_str,
+        VR_DPDK_PACKET_LCORE_ID, VR_DPDK_FWD_LCORE_ID - 1, system_cpus_count - 1,
+        fwd_core_mask_str)
             == sizeof(lcores_string)) {
         return -1;
     }
 
     /* find and update the argument */
     for (i = 0; i < dpdk_argc; i++) {
-        if (dpdk_argv[i] == NULL) {
-            dpdk_argv[i] = lcores_string;
+        if (strncmp(LCORES_ARG, dpdk_argv[i], sizeof(LCORES_ARG)) == 0) {
+            dpdk_argv[i + 1] = lcores_string;
             break;
         }
     }
@@ -362,16 +490,18 @@ dpdk_init(void)
     if (ret < 0)
         return ret;
 
-    /* Get number of ports found in scan */
+    /* get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count();
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
-    vr_dpdk.nb_fwd_lcores = rte_lcore_count();
-    vr_dpdk.nb_fwd_lcores -= VR_DPDK_FWD_LCORE_ID;
+    /* get number of cores */
     RTE_LOG(INFO, VROUTER, "Using %d forwarding lcore(s)\n",
                             vr_dpdk.nb_fwd_lcores);
-    RTE_LOG(INFO, VROUTER, "Using %d service lcore(s)\n",
-                            VR_DPDK_FWD_LCORE_ID);
+    RTE_LOG(INFO, VROUTER, "Using %d IO lcore(s)\n",
+                            vr_dpdk.nb_io_lcores);
+    RTE_LOG(INFO, VROUTER, "Using %d service lcores\n",
+                            rte_lcore_count() - vr_dpdk.nb_fwd_lcores
+                            - vr_dpdk.nb_io_lcores);
 
     /* init timer subsystem */
     rte_timer_subsystem_init();
