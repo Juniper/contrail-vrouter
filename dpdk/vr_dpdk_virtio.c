@@ -660,7 +660,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
     struct virtio_net_hdr_mrg_rxbuf virtio_hdr = {{0, 0, 0, 0, 0, 0}, 0};
     uint64_t buff_addr = 0;
     uint64_t buff_hdr_addr = 0;
-    uint32_t head[VR_DPDK_VIRTIO_TX_BURST_SZ], packet_len = 0;
+    uint32_t head[VR_DPDK_VIRTIO_TX_BURST_SZ];
     uint32_t head_idx, packet_success = 0;
     uint16_t avail_idx, res_cur_idx;
     uint16_t res_base_idx, res_end_idx;
@@ -709,10 +709,14 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         head[head_idx] = vq->vdv_avail->ring[(res_cur_idx + head_idx) &
                     (vq->vdv_size - 1)];
 
-    /*Prefetch descriptor index. */
+    /* Prefetch descriptor index. */
     rte_prefetch0(&vq->vdv_desc[head[packet_success]]);
 
     while (res_cur_idx != res_end_idx) {
+        uint32_t offset = 0, vb_offset = 0;
+        uint32_t pkt_len, len_to_cpy, data_len, total_copied = 0;
+        uint8_t hdr = 0, uncompleted_pkt = 0;
+
         /* Get descriptor from available ring */
         desc = &vq->vdv_desc[head[packet_success]];
 
@@ -725,39 +729,81 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
 
         /* Copy virtio_hdr to packet and increment buffer address */
         buff_hdr_addr = buff_addr;
-        packet_len = rte_pktmbuf_data_len(buff) + sizeof(struct virtio_net_hdr);
 
         /*
          * If the descriptors are chained the header and data are
          * placed in separate buffers.
          */
-        if (likely(desc->flags & VRING_DESC_F_NEXT)) {
-            desc->len = sizeof(struct virtio_net_hdr);
+        if (likely(desc->flags & VRING_DESC_F_NEXT)
+            && (desc->len == sizeof(struct virtio_net_hdr))) {
             /*
              * TODO: verify that desc->next is sane below.
              */
             desc = &vq->vdv_desc[desc->next];
             /* Buffer address translation. */
             buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
-            desc->len = rte_pktmbuf_data_len(buff);
         } else {
-            buff_addr += sizeof(struct virtio_net_hdr);
-            desc->len = packet_len;
+            vb_offset += sizeof(struct virtio_net_hdr);
+            hdr = 1;
         }
+
+        pkt_len = rte_pktmbuf_pkt_len(buff);
+        data_len = rte_pktmbuf_data_len(buff);
+        len_to_cpy = RTE_MIN(data_len,
+            hdr ? desc->len - sizeof(struct virtio_net_hdr) : desc->len);
+        while (total_copied < pkt_len) {
+            /* Copy mbuf data to buffer */
+            rte_memcpy((void *)(uintptr_t)(buff_addr + vb_offset),
+                rte_pktmbuf_mtod(buff, const void *) + offset,
+                len_to_cpy);
+
+            offset += len_to_cpy;
+            vb_offset += len_to_cpy;
+            total_copied += len_to_cpy;
+
+            /* The whole packet completes */
+            if (likely(total_copied == pkt_len))
+                break;
+
+            /* The current segment completes */
+            if (offset == data_len) {
+                buff = buff->next;
+                offset = 0;
+                data_len = rte_pktmbuf_data_len(buff);
+            }
+
+            /* The current vring descriptor done */
+            if (vb_offset == desc->len) {
+                if (desc->flags & VRING_DESC_F_NEXT) {
+                    desc = &vq->vdv_desc[desc->next];
+                    buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+                    vb_offset = 0;
+                } else {
+                    /* Room in vring buffer is not enough */
+                    uncompleted_pkt = 1;
+                    break;
+                }
+            }
+            len_to_cpy = RTE_MIN(data_len - offset, desc->len - vb_offset);
+        };
 
         /* Update used ring with desc information */
         vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].id =
                             head[packet_success];
-        vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].len = packet_len;
 
-        /* Copy mbuf data to buffer */
-        /* FIXME for sg mbuf and the case that desc couldn't hold the mbuf data */
-        rte_memcpy((void *)(uintptr_t)buff_addr,
-            rte_pktmbuf_mtod(buff, const void *),
-            rte_pktmbuf_data_len(buff));
+        /* Drop the packet if it is uncompleted */
+        if (unlikely(uncompleted_pkt == 1))
+            vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].len =
+                            sizeof(struct virtio_net_hdr);
+        else
+            vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].len =
+                            pkt_len + sizeof(struct virtio_net_hdr);
 
         res_cur_idx++;
         packet_success++;
+
+        if (unlikely(uncompleted_pkt == 1))
+            continue;
 
         rte_memcpy((void *)(uintptr_t)buff_hdr_addr,
             (const void *)&virtio_hdr, sizeof(struct virtio_net_hdr));
