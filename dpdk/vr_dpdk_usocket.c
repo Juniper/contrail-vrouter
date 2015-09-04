@@ -785,7 +785,7 @@ usock_alloc(unsigned short proto, unsigned short type)
             usockp->usock_mbuf_pool = rte_mempool_create("packet_mbuf_pool",
                     PKT0_MBUF_POOL_SIZE, PKT0_MBUF_PACKET_SIZE,
                     PKT0_MBUF_POOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private),
-                    rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+                    vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                     rte_socket_id(), 0);
             if (!usockp->usock_mbuf_pool)
                 goto error_exit;

@@ -18,6 +18,7 @@
 #define _VR_DPDK_H_
 
 #include "vr_os.h"
+#include "vr_dpdk_compat.h"
 #include "vr_interface.h"
 #include "vr_packet.h"
 #include "vr_fragment.h"
@@ -477,14 +478,6 @@ struct vr_dpdk_global {
 
 extern struct vr_dpdk_global vr_dpdk;
 
-/**
- *  Enable sent/received/dropped packets statistics
- */
-#define DPDK_KNIDEV_WRITER_STATS_COLLECT    1
-#define DPDK_KNIDEV_READER_STATS_COLLECT    1
-#define DPDK_VIRTIO_WRITER_STATS_COLLECT    1
-#define DPDK_VIRTIO_READER_STATS_COLLECT    1
-
 /*
  * rte_mbuf <=> vr_packet conversion
  *
@@ -540,7 +533,9 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
 /*
  * dpdk_vrouter.c
  */
-/* pktmbuf constructor with vr_packet support */
+/* A packet mbuf pool constructor with vr_packet support */
+void vr_dpdk_pktmbuf_pool_init(struct rte_mempool *mp, void *opaque_arg);
+/* The packet mbuf constructor with vr_packet support */
 void vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i);
 /* Check if the stop flag is set */
 int vr_dpdk_is_stop_flag_set(void);

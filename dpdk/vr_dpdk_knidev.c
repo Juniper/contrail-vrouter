@@ -24,7 +24,7 @@
 /*
  * KNI Reader
  */
-#if DPDK_KNIDEV_READER_STATS_COLLECT == 1
+#ifdef RTE_PORT_STATS_COLLECT
 
 #define DPDK_KNIDEV_READER_STATS_PKTS_IN_ADD(port, val) \
     port->stats.n_pkts_in += val
@@ -121,7 +121,7 @@ dpdk_knidev_reader_stats_read(void *port,
 /*
  * KNI Writer
  */
-#if DPDK_KNIDEV_WRITER_STATS_COLLECT == 1
+#ifdef RTE_PORT_STATS_COLLECT
 
 #define DPDK_KNIDEV_WRITER_STATS_PKTS_IN_ADD(port, val) \
     port->stats.n_pkts_in += val
