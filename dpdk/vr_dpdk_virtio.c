@@ -217,7 +217,7 @@ vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
     if (!ret){
         *blksize = (uint64_t)fd_stat.st_blksize;
     } else {
-      RTE_LOG(DEBUG, VROUTER, "Function fstat() failed: %s  %s \n",
+      RTE_LOG(DEBUG, UVHOST, "Function fstat() failed: %s  %s \n",
               __func__, strerror(errno));
     }
 
@@ -241,15 +241,17 @@ vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs)
             vif_data_mmap = &(vif_mmap_addrs->vu_mmap_data[i]);
             ret = vr_dpdk_virtio_uvh_vif_region_munmap(vif_data_mmap);
             if (ret) {
-                RTE_LOG(INFO, VROUTER,
+                RTE_LOG(INFO, UVHOST,
                         "munmap() failed: %s , memleak: vif_idx_region %d %s\n",
                         strerror(errno), i, __func__);
             }
             memset(vif_data_mmap, 0, sizeof(vr_dpdk_uvh_mmap_addr_t));
         }
     }
-    /* Memleak, when vr_dpdk_virtio_uvh_vif fails.
-     * At this moment there is no solution to fix memleak when munmap() fails. */
+    /*
+     * Memleak, when vr_dpdk_virtio_uvh_vif fails.
+     * At this moment there is no solution when munmap() fails.
+     */
     memset(vif_mmap_addrs, 0, sizeof(vr_dpdk_uvh_vif_mmap_addr_t));
     return 0;
 }
@@ -264,8 +266,9 @@ vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t
 {
     uint64_t alignment = vif_data_mmap->unmap_blksz;
 
-    /* if return value  == -1, munmap(2) failed for a region and set errno,
-     *  still is possible unmap. */
+    /*
+     * if return value  == -1, munmap(2) failed for a region and set errno,
+     */
     return (munmap((void *)(uintptr_t)
             RTE_ALIGN_FLOOR(vif_data_mmap->unmap_mmap_addr, alignment),
             RTE_ALIGN_CEIL(vif_data_mmap->unmap_size, alignment))
