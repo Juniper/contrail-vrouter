@@ -704,7 +704,9 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
     /* TODO: IPv6 support */
     /* TODO: VLAN support */
     if (likely(eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
-        mbuf->ol_flags |= PKT_RX_IPV4_HDR;
+#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
+        mbuf->packet_type |= RTE_PTYPE_L3_IPV4;
+#endif
         ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr
                                     + sizeof(struct ether_hdr));
         ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr
@@ -723,8 +725,17 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
                     !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
             switch (ipv4_hdr->next_proto_id) {
             case IPPROTO_TCP:
+#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
+                mbuf->packet_type |= RTE_PTYPE_L4_TCP;
+#endif
+                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
+
+                hash = rte_hash_crc_4byte(*l4_ptr, hash);
+                break;
             case IPPROTO_UDP:
-                mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
+#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
+                mbuf->packet_type |= RTE_PTYPE_L4_UDP;
+#endif
                 l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
 
                 hash = rte_hash_crc_4byte(*l4_ptr, hash);
@@ -754,8 +765,8 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPD
 
     /* prefetch the mbufs */
     for (i = 0; i < nb_pkts; i++) {
-        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
-        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], uint8_t *) + RTE_CACHE_LINE_SIZE);
+        rte_prefetch0(rte_pktmbuf_mtod(pkts[i], uint8_t *));
+        rte_prefetch0(rte_pktmbuf_mtod_offset(pkts[i], uint8_t *, RTE_CACHE_LINE_SIZE));
     }
 
     /* emulate VLAN stripping if needed */
