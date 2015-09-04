@@ -65,21 +65,26 @@ static int dpdk_argc = RTE_DIM(dpdk_argv) - 10;
 /* Timestamp logger */
 static FILE *timestamp_log_stream;
 
-/* Pktmbuf constructor with vr_packet support */
+/* A packet mbuf pool constructor with vr_packet support */
+void vr_dpdk_pktmbuf_pool_init(struct rte_mempool *mp, void *opaque_arg)
+{
+    struct rte_pktmbuf_pool_private priv;
+
+    /* set private mbuf size for vr_packet */
+    priv.mbuf_data_room_size = mp->elt_size - sizeof(struct rte_mbuf)
+        - sizeof(struct vr_packet);
+    priv.mbuf_priv_size = sizeof(struct vr_packet);
+
+    rte_pktmbuf_pool_init(mp, &priv);
+}
+
+/* The packet mbuf constructor with vr_packet support */
 void
 vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigned i)
 {
     struct rte_mbuf *m = _m;
     struct vr_packet *pkt;
     rte_pktmbuf_init(mp, opaque_arg, _m, i);
-
-    /* decrease rte packet size to fit vr_packet struct */
-    m->buf_len -= sizeof(struct vr_packet);
-    RTE_VERIFY(0 < m->buf_len);
-
-    /* start of buffer is just after vr_packet structure */
-    m->buf_addr += sizeof(struct vr_packet);
-    m->buf_physaddr += sizeof(struct vr_packet);
 
     /* basic vr_packet initialization */
     pkt = vr_dpdk_mbuf_to_pkt(m);
@@ -95,7 +100,7 @@ dpdk_mempools_create(void)
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool", VR_DPDK_RSS_MEMPOOL_SZ,
             VR_DPDK_MBUF_SZ, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
-            rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+            vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
             rte_socket_id(), 0);
     if (vr_dpdk.rss_mempool == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error creating RSS mempool: %s (%d)\n",
@@ -107,7 +112,7 @@ dpdk_mempools_create(void)
     vr_dpdk.frag_direct_mempool = rte_mempool_create("frag_direct_mempool",
             VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ, VR_DPDK_FRAG_DIRECT_MBUF_SZ,
             VR_DPDK_FRAG_DIRECT_MEMPOOL_CACHE_SZ,
-            sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init,
+            sizeof(struct rte_pktmbuf_pool_private), vr_dpdk_pktmbuf_pool_init,
             NULL, vr_dpdk_pktmbuf_init, NULL, rte_socket_id(), 0);
     if (vr_dpdk.frag_direct_mempool == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error creating FRAG_DIRECT mempool: %s (%d)\n",
@@ -141,7 +146,7 @@ dpdk_mempools_create(void)
         vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
                 VR_DPDK_VM_MEMPOOL_SZ, VR_DPDK_MBUF_SZ, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
                 sizeof(struct rte_pktmbuf_pool_private),
-                rte_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
+                vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                 rte_socket_id(), 0);
         if (vr_dpdk.free_mempools[i] == NULL) {
             RTE_LOG(CRIT, VROUTER, "Error creating VM mempool %d: %s (%d)\n",

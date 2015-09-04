@@ -1291,10 +1291,12 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
     struct vr_interface_stats *stats;
     uint8_t port_id;
     struct rte_eth_stats eth_stats;
+    struct rte_eth_xstats *eth_xstats = NULL;
     struct vr_dpdk_lcore *lcore;
     struct vr_dpdk_queue *queue;
     struct vr_dpdk_queue_params *queue_params;
     uint16_t queue_id;
+    int nb_xstats, i;
 
     /* check if vif is a PMD */
     if (!vif_is_fabric(vif) || vif->vif_os == NULL)
@@ -1303,6 +1305,31 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
     port_id = ((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id;
     if (rte_eth_stats_get(port_id, &eth_stats) != 0)
         return;
+
+    /*
+     * TODO: In DPDK 2.1 ierrors includes XEC (l3_l4_xsum_error) counter.
+     * The counter seems to include no check sum UDP packets. As a workaround
+     * we count out the XEC from ierrors using rte_eth_xstats_get().
+     */
+    nb_xstats = rte_eth_xstats_get(port_id, eth_xstats, 0);
+    if (nb_xstats > 0) {
+        eth_xstats = rte_malloc("xstats",
+            sizeof(*eth_xstats)*nb_xstats, 0);
+        if (eth_xstats != NULL) {
+            if (rte_eth_xstats_get(port_id, eth_xstats, nb_xstats)
+                    == nb_xstats) {
+                /* look for XEC counter */
+                for (i = 0; i < nb_xstats; i++) {
+                    if (strncmp(eth_xstats[i].name, "l3_l4_xsum_error",
+                        sizeof(eth_xstats[i].name)) == 0) {
+                        eth_stats.ierrors -= eth_xstats[i].value;
+                        break;
+                    }
+                }
+            }
+            rte_free(eth_xstats);
+        }
+    }
 
     /* per-lcore device counters */
     lcore = vr_dpdk.lcores[lcore_id];

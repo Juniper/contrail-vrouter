@@ -323,7 +323,7 @@ dpdk_pktmbuf_copy_bits(const struct rte_mbuf *mbuf, int offset,
     do {
         if (offset < rte_pktmbuf_data_len(mbuf)) {
             /* copy a piece of data */
-            from = (void *)(rte_pktmbuf_mtod(mbuf, uintptr_t) + offset);
+            from = (void *)(rte_pktmbuf_mtod_offset(mbuf, uintptr_t, offset));
             copy = rte_pktmbuf_data_len(mbuf) - offset;
             if (copy > len)
                 copy = len;
@@ -640,7 +640,7 @@ dpdk_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
         int len = rte_pktmbuf_data_len(m) - offset;
         void *tmp_buf = buf;
 
-        rte_memcpy(tmp_buf, rte_pktmbuf_mtod(m, char *) + offset, len);
+        rte_memcpy(tmp_buf, rte_pktmbuf_mtod_offset(m, char *, offset), len);
         hdr_len -= len;
         tmp_buf = (void *)((uintptr_t)tmp_buf + len);
 
