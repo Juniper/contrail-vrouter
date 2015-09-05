@@ -690,7 +690,10 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                     if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
                         trap = false;
                 }
+            } else if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
+                trap = false;
             }
+
 
             if (trap) {
                 vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
