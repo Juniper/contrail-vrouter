@@ -392,7 +392,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
         }
 
         ret = rte_eth_rx_queue_setup(port_id, i, VR_DPDK_NB_RXD,
-            rte_eth_dev_socket_id(port_id), &rx_queue_conf, mempool);
+            SOCKET_ID_ANY, &rx_queue_conf, mempool);
         if (ret < 0) {
             /* return mempool to the list */
             if (mempool != vr_dpdk.rss_mempool)
@@ -414,7 +414,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
     /* configure TX queues */
     for (i = 0; i < ethdev->ethdev_nb_tx_queues; i++) {
         ret = rte_eth_tx_queue_setup(port_id, i, VR_DPDK_NB_TXD,
-            rte_eth_dev_socket_id(port_id), &tx_queue_conf);
+            SOCKET_ID_ANY, &tx_queue_conf);
         if (ret < 0) {
             RTE_LOG(ERR, VROUTER, "    error setting up eth device %" PRIu8 " TX queue %d"
                     ": %s (%d)\n", port_id, i, rte_strerror(-ret), -ret);
