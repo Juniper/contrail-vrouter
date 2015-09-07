@@ -53,7 +53,6 @@ static void
 vr_linux_fragment_assembler(struct work_struct *work)
 {
     uint32_t hash, index;
-    unsigned long flags;
 
     struct vr_packet *pkt;
     struct vr_linux_fragment_bucket *vfb;
@@ -89,9 +88,9 @@ vr_linux_fragment_assembler(struct work_struct *work)
             index = (hash % VR_LINUX_ASSEMBLER_BUCKETS);
             vfb = &vr_linux_assembler_table[index];
 
-            spin_lock_irqsave(&vfb->vfb_lock, flags);
+            spin_lock_bh(&vfb->vfb_lock);
             vr_fragment_assembler(&vfb->vfb_frag_list, tail);
-            spin_unlock_irqrestore(&vfb->vfb_lock, flags);
+            spin_unlock_bh(&vfb->vfb_lock);
         }
 
         tail = tail_n;
@@ -126,17 +125,16 @@ static void
 vr_linux_assembler_table_scan(void *arg)
 {
     unsigned int i, j, scanned = 0;
-    unsigned long flags;
 
     struct vr_linux_fragment_bucket *vfb;
 
     i = vr_linux_assembler_scan_index;
     for (j = 0; j < VR_LINUX_ASSEMBLER_BUCKETS; j++) {
         vfb = &vr_linux_assembler_table[(i + j) % VR_LINUX_ASSEMBLER_BUCKETS];
-        spin_lock_irqsave(&vfb->vfb_lock, flags);
+        spin_lock_bh(&vfb->vfb_lock);
         if (vfb->vfb_frag_list)
             scanned += vr_assembler_table_scan(&vfb->vfb_frag_list);
-        spin_unlock_irqrestore(&vfb->vfb_lock, flags);
+        spin_unlock_bh(&vfb->vfb_lock);
         if (scanned > vr_linux_assembler_scan_thresh) {
             j++;
             break;

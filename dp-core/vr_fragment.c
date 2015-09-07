@@ -299,7 +299,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
     }
 
     if (vr_ip_fragment_tail(ip)) {
-        frag->f_expected = ((ntohs(ip->ip_frag_off) && 0x1FFF) * 8) +
+        frag->f_expected = ((ntohs(ip->ip_frag_off) & 0x1FFF) * 8) +
             ntohs(ip->ip_len) - (ip->ip_hl * 4) ;
     }
     frag->f_received += (ntohs(ip->ip_len) - (ip->ip_hl * 4));
@@ -349,8 +349,10 @@ vr_fragment_assembler(struct vr_fragment **head_p,
 
     if (frag->f_port_info_valid) {
         while ((fqe = frag->f_qe)) {
-            memset(&fmd, 0, sizeof(fmd));
+            vr_init_forwarding_md(&fmd);
             pnode = &fqe->fqe_pnode;
+            fmd.fmd_vlan = pnode->pl_vlan;
+            fmd.fmd_dvrf = pnode->pl_vrf;
             vr_flow_flush_pnode(router, pnode, NULL, &fmd);
             frag->f_qe = fqe->fqe_next;
             vr_fragment_queue_element_free(fqe, VP_DROP_CLONED_ORIGINAL);
