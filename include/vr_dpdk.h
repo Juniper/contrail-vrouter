@@ -419,6 +419,8 @@ struct vr_dpdk_global {
     struct rte_ring *vlan_ring;
     /* VLAN forwarding KNI handler */
     struct rte_kni *vlan_kni;
+    /* KNI module inited global flag */
+    bool kni_inited;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
@@ -549,7 +551,9 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 #if (RTE_LOG_LEVEL == RTE_LOG_DEBUG)
 #define DPDK_DEBUG_VAR(v) v
 #define DPDK_UDEBUG(t, h, ...)                          \
-    (void)(((RTE_LOGTYPE_ ## t & rte_logs.type)) ?      \
+    (void)(((RTE_LOG_DEBUG <= RTE_LOG_LEVEL) &&         \
+        (RTE_LOG_DEBUG <= rte_logs.level) &&            \
+        (RTE_LOGTYPE_ ## t & rte_logs.type)) ?          \
     vr_dpdk_ulog(RTE_LOG_DEBUG,                         \
         RTE_LOGTYPE_ ## t, h, # t ": " __VA_ARGS__) : 0)
 #else

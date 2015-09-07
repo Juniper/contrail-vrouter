@@ -17,10 +17,6 @@
  */
 #define VR_DPDK_VIRTIO_TX_BURST_SZ VR_DPDK_TX_BURST_SZ
 /*
- * Size of ring to send packets from virtio RX queue to lcore for forwarding
- */
-#define VR_DPDK_VIRTIO_TX_RING_SZ (64 * VR_DPDK_TX_RING_SZ)
-/*
  * Maximum number of queues per virtio device
  */
 #define VR_DPDK_VIRTIO_MAX_QUEUES 1
