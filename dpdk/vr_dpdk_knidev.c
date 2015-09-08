@@ -15,6 +15,7 @@
  */
 
 #include "vr_dpdk.h"
+#include "vr_packet.h"
 
 #include <rte_ethdev.h>
 #include <rte_kni.h>
@@ -435,10 +436,15 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
                 ethdev_port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->
                             ethdev_port_id);
                 if (ethdev_port_id == port_id) {
+                    new_mtu += sizeof(struct vr_eth);
                     vif->vif_mtu = new_mtu;
                     if (vif->vif_bridge)
                         vif->vif_bridge->vif_mtu = new_mtu;
                 }
+            } else if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+               /* Ethernet header size + 802.1q header size */
+               new_mtu += sizeof(struct vr_eth) + sizeof(uint32_t);
+               vif->vif_mtu = new_mtu;
             }
         }
     }
