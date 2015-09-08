@@ -66,6 +66,10 @@ struct sandesh_object_md sandesh_md[] = {
                     (VR_FLOW_MAX_CPUS * sizeof(unsigned int))),
         .obj_type_string        =       "vr_flow_req",
     },
+    [VR_LINK_LOCAL_OBJECT_ID]   =   {
+        .obj_len                =   4 * sizeof(vr_link_local_ports_req),
+        .obj_type_string        =       "vr_link_local_ports_req",
+    },
 };
 
 static unsigned int

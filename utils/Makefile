@@ -29,6 +29,7 @@ MIRROR = mirror
 VRFSTATS = vrfstats
 DROPSTATS = dropstats
 VXLAN = vxlan
+LLOCAL = llocal
 
 SANDESH_OBJS = $(SRC_ROOT)/sandesh/gen-c/vr_types.o
 
@@ -68,6 +69,9 @@ $(DROPSTATS): $(DROPSTATS).c $(SANDESH_OBJS) $(LIB_NAME)
 	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
 
 $(VXLAN): $(VXLAN).c $(SANDESH_OBJS) $(LIB_NAME)
+	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
+
+$(LLOCAL): $(llocal).c $(SANDESH_OBJS) $(LIB_NAME)
 	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
 
 $(LIB_NAME): $(LIBOBJS)

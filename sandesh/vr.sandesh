@@ -272,3 +272,11 @@ buffer sandesh vr_drop_stats_req {
     47: i64             vds_l2_no_route;
     48: i64             vds_arp_reply_no_route;
 }
+
+buffer sandesh vr_link_local_ports_req {
+    1: sandesh_op   h_op;
+    2: i32          vllp_rid;
+    3: u16          vllp_proto;
+    4: u16          vllp_marker;
+    5: u16          vllp_port;
+}
