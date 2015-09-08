@@ -17,6 +17,7 @@
 #include "vr_datapath.h"
 #include "vr_hash.h"
 #include "vr_ip_mtrie.h"
+#include "vr_llocal.h"
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
@@ -85,88 +86,6 @@ jhash(void *key, uint32_t length, uint32_t initval)
 }
 #endif
 
-
-bool
-vr_valid_link_local_port(struct vrouter *router, int family,
-                         int proto, int port)
-{
-    unsigned char data;
-    unsigned int tmp;
-
-    if (!router->vr_link_local_ports)
-        return false;
-
-    if ((family != AF_INET) ||
-        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
-        return false;
-
-    if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
-        return false;
-
-    tmp = port - VR_DYNAMIC_PORT_START;
-    if (proto == VR_IP_PROTO_UDP)
-        tmp += (router->vr_link_local_ports_size * 8 / 2);
-
-    data = router->vr_link_local_ports[(tmp / 8)];
-    if (data & (1 << (tmp % 8)))
-        return true;
-
-    return false;
-}
-
-static void
-vr_clear_link_local_port(struct vrouter *router, int family,
-                       int proto, int port)
-{
-    unsigned char *data;
-    unsigned int tmp;
-
-    if (!router->vr_link_local_ports)
-        return;
-
-    if ((family != AF_INET) ||
-        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
-        return;
-
-    if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
-        return;
-
-    tmp = port - VR_DYNAMIC_PORT_START;
-    if (proto == VR_IP_PROTO_UDP)
-        tmp += (router->vr_link_local_ports_size * 8 / 2);
-
-    data = &router->vr_link_local_ports[(tmp / 8)];
-    *data &= (~(1 << (tmp % 8)));
-
-    return;
-}
-
-static void
-vr_set_link_local_port(struct vrouter *router, int family,
-                       int proto, int port)
-{
-    unsigned char *data;
-    unsigned int tmp;
-
-    if (!router->vr_link_local_ports)
-        return;
-
-    if ((family != AF_INET) ||
-        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
-        return;
-
-    if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
-        return;
-
-    tmp = port - VR_DYNAMIC_PORT_START;
-    if (proto == VR_IP_PROTO_UDP)
-        tmp += (router->vr_link_local_ports_size * 8 / 2);
-
-    data = &router->vr_link_local_ports[tmp / 8];
-    *data |= (1 << (tmp % 8));
-
-    return;
-}
 
 static void
 vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe,
@@ -1541,52 +1460,6 @@ vr_flow_table_init(struct vrouter *router)
     }
 
     return vr_flow_table_info_init(router);
-}
-
-static void
-vr_link_local_ports_reset(struct vrouter *router)
-{
-    if (router->vr_link_local_ports) {
-        memset(router->vr_link_local_ports,
-               0, router->vr_link_local_ports_size);
-    }
-
-    return;
-}
-
-static void
-vr_link_local_ports_exit(struct vrouter *router)
-{
-    if (router->vr_link_local_ports) {
-        vr_free(router->vr_link_local_ports);
-        router->vr_link_local_ports = NULL;
-        router->vr_link_local_ports_size = 0;
-    }
-
-    return;
-}
-
-static int
-vr_link_local_ports_init(struct vrouter *router)
-{
-    unsigned int port_range, bytes;
-
-    if (router->vr_link_local_ports)
-        return 0;
-
-    /*  Udp and TCP inclusive of low and high limits*/
-    port_range = 2 * ((VR_DYNAMIC_PORT_END - VR_DYNAMIC_PORT_START) + 1);
-    /* Make it 16 bit boundary */
-    bytes = (port_range + 15) & ~15;
-    /* Bits to Bytes */
-    bytes /= 8;
-
-    router->vr_link_local_ports = vr_zalloc(bytes);
-    if (!router->vr_link_local_ports)
-        return -1;
-    router->vr_link_local_ports_size = bytes;
-
-    return 0;
 }
 
 /* flow module exit and init */
