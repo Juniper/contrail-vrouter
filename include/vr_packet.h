@@ -39,7 +39,7 @@
 /* Size of GRE header with key */
 #define VR_GRE_KEY_HDR_LEN      8
 
-#define VR_DYNAMIC_PORT_START   32768
+#define VR_DYNAMIC_PORT_START   0
 #define VR_DYNAMIC_PORT_END     65535
 
 /*
