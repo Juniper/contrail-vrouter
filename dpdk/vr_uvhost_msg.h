@@ -21,6 +21,7 @@
 typedef enum vrnu_msg_type {
     VRNU_MSG_VIF_ADD = 1,
     VRNU_MSG_VIF_DEL,
+    VRNU_MSG_VIF_DEL_ACK,
     VRNU_MSG_MAX
 } vrnu_msg_type_t;
 
