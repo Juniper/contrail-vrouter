@@ -715,10 +715,11 @@ error:
  * Returns 0 on success, -1 otherwise.
  */
 int
-vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
+vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg, int fd)
 {
     unsigned int cidx = msg->vrnu_vif_idx;
     vr_uvh_client_t *vru_cl;
+    vrnu_msg_type_t msg_send = VRNU_MSG_VIF_DEL_ACK;
 
     if (cidx >= VR_UVH_MAX_CLIENTS) {
         vr_uvhost_log("Couldn't delete vhost client due to bad index %d\n",
@@ -740,6 +741,11 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
     }
 
     vr_uvhost_del_client(vru_cl);
+
+    if (send(fd, (void *) &msg_send, sizeof(msg_send), 0 ) != sizeof(msg_send)) {
+        vr_uvhost_log("Couldn't send ACK message for deletion, vif: %d\n", cidx);
+        return -1;
+    }
 
     return 0;
 }
@@ -891,7 +897,7 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
             break;
 
         case VRNU_MSG_VIF_DEL:
-            ret = vr_uvh_nl_vif_del_handler(&msg.vrnum_vif_del);
+            ret = vr_uvh_nl_vif_del_handler(&msg.vrnum_vif_del, fd);
             break;
 
         default:
