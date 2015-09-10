@@ -129,11 +129,7 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
             if (ret) {
                 vr_uvhost_log("Get block size failed for FD %d on vhost client %s \n",
                               vru_cl->vruc_fds_sent[i], vru_cl->vruc_path);
-                /* For munmap(2) RTE_* alignment.
-                 * If unmap_blksz == 1; then munmap() can deallocates
-                 * all regions except first.
-                 */
-                vif_mmap_addrs->vu_mmap_data[i].unmap_blksz = 1;
+                return -1;
             }
 
             vif_mmap_addrs->vu_mmap_data[i].unmap_mmap_addr = ((uint64_t)
