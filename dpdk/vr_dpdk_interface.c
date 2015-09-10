@@ -77,10 +77,10 @@ dpdk_virtual_if_del(struct vr_interface *vif)
 
     vr_dpdk_lcore_if_unschedule(vif);
 
-    /*
-     * TODO - User space vhost thread need to ack the deletion of the vif.
-     */
-
+    if (ret) {
+        RTE_LOG(ERR, VROUTER, "Deleting vif %u virtual device %s\n",
+                vif->vif_idx, vif->vif_name);
+    }
     return ret;
 }
 
