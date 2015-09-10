@@ -1022,119 +1022,6 @@ vr_kunmap_atomic(void *va)
 #endif
 }
 
-static int
-lh_pull_inner_headers_fast_udp_helper(unsigned char *va,
-                                      int (*tunnel_type_cb)(unsigned int,
-                                            unsigned int, unsigned short *),
-                                      int *encap_type, int *pkt_typep,
-                                      unsigned int *pull_lenp,
-                                      struct vr_udp *udph, unsigned int frag_size,
-                                      struct vr_ip **iphp, struct vr_ip6 **ip6hp)
-{
-    unsigned int pull_len = *pull_lenp;
-    unsigned int label, control_data;
-    int pkt_type = 0;
-    struct vr_ip6 *ip6h = NULL;
-    struct vr_ip *iph = NULL;
-    struct vr_eth *eth = NULL;
-    unsigned short eth_proto;
-
-    if (vr_mpls_udp_port(ntohs(udph->udp_dport))) {
-
-        *encap_type = PKT_ENCAP_MPLS;
-        /* Take into consideration, the MPLS header and 4 bytes of
-         * control information that might exist for L2 packet */
-        if (frag_size < (pull_len + VR_MPLS_HDR_LEN +
-                                VR_L2_MCAST_CTRL_DATA_LEN)) {
-            return PKT_RET_SLOW_PATH;
-        }
-
-        label = ntohl(*(uint32_t *)(va + pull_len));
-        control_data = *(uint32_t *)(va + pull_len + VR_MPLS_HDR_LEN);
-
-        /* Identify whether the packet is L2 or not using the label and
-         * control data */
-        pkt_type = tunnel_type_cb(label, control_data, NULL);
-        if (pkt_type <= 0)
-            return PKT_RET_UNHANDLED;
-
-        if (pkt_type == PKT_MPLS_TUNNEL_L3) {
-            /* L3 packet */
-            iph = (struct vr_ip *) (va + pull_len + VR_MPLS_HDR_LEN);
-            if (vr_ip_is_ip6(iph)) {
-                ip6h = (struct vr_ip6 *)iph;
-                pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip6);
-            } else {
-                pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
-            }
-        } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
-            /* L2 Multicast packet with control information and
-             * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
-            eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
-                    VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
-            pull_len += VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN +
-                            VR_VXLAN_HDR_LEN + sizeof(struct vr_eth);
-        } else if ((pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) ||
-                    (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST_EVPN)) {
-            /* L2 packet with no control information */
-            eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN);
-            pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_eth);
-        } else {
-            return PKT_RET_UNHANDLED;
-        }
-
-        if (frag_size < pull_len)
-            return PKT_RET_SLOW_PATH;
-
-    } else if (ntohs(udph->udp_dport) == VR_VXLAN_UDP_DST_PORT) {
-        *encap_type = PKT_ENCAP_VXLAN;
-        /* Take into consideration, the VXLAN header ethernet header */
-        pull_len += sizeof(struct vr_vxlan) + ETH_HLEN;
-
-        if (frag_size < pull_len)
-            return PKT_RET_SLOW_PATH;
-
-        eth = (struct vr_eth *)(va + sizeof(struct vr_vxlan));
-    } else {
-        return PKT_RET_UNHANDLED;
-    }
-
-    if (eth) {
-
-        eth_proto = eth->eth_proto;
-        while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
-            eth_proto = ((struct vr_vlan_hdr *) (va + pull_len))->vlan_proto;
-            pull_len += sizeof(struct vr_vlan_hdr);
-            if (frag_size < pull_len)
-                return PKT_RET_SLOW_PATH;
-        }
-
-        if (ntohs(eth_proto) == VR_ETH_PROTO_IP) {
-            iph = (struct vr_ip *)(va + pull_len);
-            pull_len += sizeof(struct iphdr);
-            if (frag_size < pull_len)
-                return PKT_RET_SLOW_PATH;
-        } else if (ntohs(eth_proto) == VR_ETH_PROTO_IP6) {
-            ip6h = (struct vr_ip6 *)(va + pull_len);
-            iph = (struct vr_ip *)ip6h;
-            pull_len += sizeof(struct ipv6hdr);
-            if (frag_size < pull_len)
-                return PKT_RET_SLOW_PATH;
-        } else if (ntohs(eth_proto) == VR_ETH_PROTO_ARP) {
-            pull_len += sizeof(struct vr_arp);
-            if (frag_size < pull_len)
-                return PKT_RET_SLOW_PATH;
-        }
-    }
-
-    *pull_lenp = pull_len;
-    *iphp = iph;
-    *ip6hp = ip6h;
-    *pkt_typep = pkt_type;
-
-    return 0;
-}
-
 /*
  * lh_pull_inner_headers_fast_udp - implements the functionality of
  * lh_pull_inner_headers_fast for UDP packets.
@@ -1194,10 +1081,9 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
         udph = (struct vr_udp *) pkt_data(pkt);
     }
 
-    helper_ret = lh_pull_inner_headers_fast_udp_helper(va, tunnel_type_cb,
-                                      encap_type, &pkt_type,
-                                      &pull_len,
-                                      udph, frag_size, &iph, &ip6h);
+    helper_ret = vr_inner_pkt_parse(va, tunnel_type_cb, encap_type, &pkt_type,
+                                    &pull_len, udph->udp_dport, frag_size, &iph,
+                                    &ip6h, 0 /* no GRE proto */);
     if (helper_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
     } else if (helper_ret == PKT_RET_UNHANDLED) {
@@ -1362,19 +1248,17 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
 {
     struct sk_buff *skb = vp_os_packet(pkt);
     unsigned short pkt_headlen, *gre_hdr = NULL, gre_proto,
-                   hdr_len = VR_GRE_BASIC_HDR_LEN, eth_proto;
+                   hdr_len = VR_GRE_BASIC_HDR_LEN;
     unsigned char *va = NULL;
     skb_frag_t *frag;
     unsigned int frag_size, pull_len, hlen = 0, tcp_size, skb_pull_len,
-                 label, control_data, tcph_pull_len = 0, l2_len = 0;
+                 tcph_pull_len = 0;
     unsigned short th_csum = 0;
     struct vr_ip *iph  = NULL;
     struct vr_ip6 *ip6h  = NULL;
     struct tcphdr *tcph = NULL;
-    struct vr_eth *eth = NULL;
-    int pkt_type, parse_ret;
+    int pkt_type = 0, helper_ret, parse_ret;
 
-    *encap_type = PKT_ENCAP_MPLS;
     pkt_headlen = pkt_head_len(pkt);
     if (pkt_headlen) {
         if (pkt_headlen > hdr_len) {
@@ -1467,77 +1351,13 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
         goto unhandled;
     }
 
-    /* Take into consideration, the MPLS header and 4 bytes of
-     * control information that might exist for L2 packet */
-    if (frag_size < (pull_len + VR_MPLS_HDR_LEN +
-                            VR_L2_MCAST_CTRL_DATA_LEN))
+    helper_ret = vr_inner_pkt_parse(va, tunnel_type_cb, encap_type, &pkt_type,
+                                    &pull_len, 0 /*no UDP dport*/,frag_size,
+                                    &iph, &ip6h, gre_proto);
+    if (helper_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
-
-    label = ntohl(*(uint32_t *)(va + pull_len));
-    control_data = *(uint32_t *)(va + pull_len + VR_MPLS_HDR_LEN);
-
-    /* Identify whether the packet is L2 or not using the label and
-     * control data */
-    pkt_type = tunnel_type_cb(label, control_data, NULL);
-    if (pkt_type <= 0)
+    } else if (helper_ret == PKT_RET_UNHANDLED) {
         goto unhandled;
-
-    if (pkt_type == PKT_MPLS_TUNNEL_L3) {
-        /* L3 packet */
-        iph = (struct vr_ip *) (va + pull_len + VR_MPLS_HDR_LEN);
-        if (vr_ip_is_ip6(iph)) {
-            pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip6);
-            ip6h = (struct vr_ip6 *)iph;
-        } else {
-            pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
-        }
-    } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
-        /* L2 Multicast packet with control information and
-         * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
-        l2_len = VR_VXLAN_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN;
-        eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN + l2_len);
-
-        pull_len += VR_MPLS_HDR_LEN + l2_len + sizeof(struct vr_eth);
-    } else if ((pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) ||
-               (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST_EVPN)) {
-        /* L2 packet with no control information */
-        eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN);
-        pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_eth);
-    } else {
-        goto unhandled;
-    }
-
-    if (frag_size < pull_len)
-        goto slow_path;
-
-    if (eth) {
-
-        eth_proto = eth->eth_proto;
-        l2_len += sizeof(struct vr_eth);
-        while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
-            eth_proto = ((struct vr_vlan_hdr *) (va + pull_len))->vlan_proto;
-            pull_len += sizeof(struct vr_vlan_hdr);
-            l2_len += sizeof(struct vr_vlan_hdr);
-            if (frag_size < pull_len)
-                goto slow_path;
-        }
-
-        if (ntohs(eth_proto) == VR_ETH_PROTO_IP) {
-            iph = (struct vr_ip *)(va + pull_len);
-            pull_len += sizeof(struct iphdr);
-            if (frag_size < pull_len)
-                goto slow_path;
-        } else if (ntohs(eth_proto) == VR_ETH_PROTO_IP6) {
-            ip6h = (struct vr_ip6 *)(va + pull_len);
-            iph = (struct vr_ip*) ip6h;
-            pull_len += sizeof(struct ipv6hdr);
-            if (frag_size < pull_len)
-                goto slow_path;
-        } else if (ntohs(eth_proto) == VR_ETH_PROTO_ARP) {
-            pull_len += sizeof(struct vr_arp);
-            if (frag_size < pull_len)
-                goto slow_path;
-        }
     }
 
     parse_ret = vr_ip_transport_parse(iph, ip6h,

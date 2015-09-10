@@ -25,9 +25,6 @@
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
 
-extern void
-dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
-                    unsigned char iph_len);
 
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
