@@ -214,9 +214,9 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
 int
 vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
                 unsigned int, unsigned short *), int *encap_type,
-                int *pkt_typep, unsigned int *pull_lenp, unsigned short udp_dport,
+                int *pkt_typep, unsigned int *pull_lenp,
                 unsigned int frag_size, struct vr_ip **iphp,
-                struct vr_ip6 **ip6hp, unsigned short gre_proto)
+                struct vr_ip6 **ip6hp, unsigned short gre_proto_udp_dport)
 {
     unsigned int pull_len = *pull_lenp;
     unsigned int label, control_data;
@@ -226,8 +226,8 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
     struct vr_eth *eth = NULL;
     unsigned short eth_proto;
 
-    if (vr_mpls_udp_port(ntohs(udp_dport)) ||
-            gre_proto == VR_GRE_PROTO_MPLS) {
+    if (vr_mpls_udp_port(ntohs(gre_proto_udp_dport)) ||
+            gre_proto_udp_dport == VR_GRE_PROTO_MPLS_NO) {
 
         *encap_type = PKT_ENCAP_MPLS;
         /* Take into consideration, the MPLS header and 4 bytes of
@@ -274,7 +274,7 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
         if (frag_size < pull_len)
             return PKT_RET_SLOW_PATH;
 
-    } else if (ntohs(udp_dport) == VR_VXLAN_UDP_DST_PORT) {
+    } else if (ntohs(gre_proto_udp_dport) == VR_VXLAN_UDP_DST_PORT) {
         *encap_type = PKT_ENCAP_VXLAN;
         /* Take into consideration, the VXLAN header ethernet header */
         pull_len += sizeof(struct vr_vxlan) + VR_ETHER_HLEN;
@@ -291,7 +291,7 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
 
         eth_proto = eth->eth_proto;
         while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
-            eth_proto = ((struct vr_vlan_hdr *) (va + pull_len))->vlan_proto;
+            eth_proto = ((struct vr_vlan_hdr *)(va + pull_len))->vlan_proto;
             pull_len += sizeof(struct vr_vlan_hdr);
             if (frag_size < pull_len)
                 return PKT_RET_SLOW_PATH;
@@ -318,7 +318,8 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
     *pull_lenp = pull_len;
     *iphp = iph;
     *ip6hp = ip6h;
-    *pkt_typep = pkt_type;
+    if (pkt_typep)
+        *pkt_typep = pkt_type;
 
     return 0;
 }

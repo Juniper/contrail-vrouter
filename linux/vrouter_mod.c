@@ -1082,8 +1082,8 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
     }
 
     helper_ret = vr_inner_pkt_parse(va, tunnel_type_cb, encap_type, &pkt_type,
-                                    &pull_len, udph->udp_dport, frag_size, &iph,
-                                    &ip6h, 0 /* no GRE proto */);
+                                    &pull_len, frag_size, &iph, &ip6h,
+                                    udph->udp_dport);
     if (helper_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
     } else if (helper_ret == PKT_RET_UNHANDLED) {
@@ -1346,14 +1346,14 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
         ASSERT(gre_hdr != NULL);
     }
 
-    gre_proto = ntohs(*(gre_hdr + 1));
-    if (gre_proto != VR_GRE_PROTO_MPLS) {
+    gre_proto = *(gre_hdr + 1);
+    if (gre_proto != VR_GRE_PROTO_MPLS_NO) {
         goto unhandled;
     }
 
     helper_ret = vr_inner_pkt_parse(va, tunnel_type_cb, encap_type, &pkt_type,
-                                    &pull_len, 0 /*no UDP dport*/,frag_size,
-                                    &iph, &ip6h, gre_proto);
+                                    &pull_len, frag_size, &iph, &ip6h,
+                                    gre_proto);
     if (helper_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
     } else if (helper_ret == PKT_RET_UNHANDLED) {

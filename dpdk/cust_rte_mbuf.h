@@ -524,12 +524,12 @@ extern "C" {
  * We need support for MPLS over UDP.
  *
  */
-#define RTE_CONTRAIL_PTYPE_TUNNEL_MPLS_UDP   0x00007000
+#define DPDK_PTYPE_TUNNEL_MPLS_UDP   0x00007000
 /**
  * Added custom header directive - GRE tunneling
  * We need support for MPLS over GRE.
  */
-#define RTE_CONTRAIL_PTYPE_TUNNEL_MPLS_GRE    0x00008000
+#define DPDK_PTYPE_TUNNEL_MPLS_GRE    0x00008000
 /**
  * Mask of tunneling packet types.
  */
@@ -712,14 +712,29 @@ extern "C" {
                                                  RTE_PTYPE_INNER_L3_MASK | \
                                                  RTE_PTYPE_INNER_L4_MASK))
 
-typedef enum POINTER_SUM{
+/**
+ * A macro that points to the start of the data in the mbuf.
+ *
+ * The returned pointer is cast to type t. Before using this
+ * function, the user must ensure that m_headlen(m) is large enough to
+ * read its data.
+ *
+ * @param m
+ *   The packet mbuf.
+ * @param t
+ *   The type to cast the result into.
+ */
+#define rte_pktmbuf_mtod_offset(m, t, o)        \
+         ((t)((char *)(m)->buf_addr + (m)->data_off + (o)))
+
+typedef enum POINTER_SUM {
     L2_INNER = 0,
     L3_INNER,
     L4_INNER,
     L2_OUTER,
     L3_OUTER,
     L4_OUTER
-}MBUF_PTR_SUM ;
+} MBUF_PTR_SUM ;
 
 /*
 #ifdef __cplusplus

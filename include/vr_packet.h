@@ -419,11 +419,10 @@ int vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                         unsigned int *tcph_pull_lenp,
                         unsigned int *pull_lenp);
 int vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
-                                                unsigned int, unsigned short *),
-                        int *encap_type, int *pkt_typep, unsigned int *pull_lenp,
-                        unsigned short udp_dport, unsigned int frag_size,
-                        struct vr_ip **iphp, struct vr_ip6 **ip6hp,
-                        unsigned short gre_proto);
+                    unsigned int, unsigned short *), int *encap_type,
+                    int *pkt_typep, unsigned int *pull_lenp,
+                    unsigned int frag_size, struct vr_ip **iphp,
+                    struct vr_ip6 **ip6hp, unsigned short gre_proto_udp_dport);
 
 #define MCAST_IP                        (0xE0000000)
 #define MCAST_IP_MASK                   (0xF0000000)
