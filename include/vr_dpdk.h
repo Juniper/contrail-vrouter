@@ -192,6 +192,12 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 
+
+/*
+ * Messages between UVHOST and VROUTER.
+ */
+#define VROUTER_UVHOST_TIMEOUT_VIF_DEL_ACK 5
+
 /*
  * DPDK LCore IDs
  */

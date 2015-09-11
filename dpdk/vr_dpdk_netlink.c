@@ -157,8 +157,15 @@ static struct vr_mtransport dpdk_nl_transport = {
 int
 vr_netlink_uvhost_vif_del(unsigned int vif_idx)
 {
+    struct timeval tv;
     vrnu_msg_t msg;
+    vrnu_msg_type_t msg_ack;
+    fd_set rfds;
+    int ret = 0;
 
+    /*
+     * Send msg
+     */
     msg.vrnum_type = VRNU_MSG_VIF_DEL;
     msg.vrnum_vif_del.vrnu_vif_idx = vif_idx;
 
@@ -170,6 +177,38 @@ vr_netlink_uvhost_vif_del(unsigned int vif_idx)
         RTE_LOG(ERR, VROUTER, "    error deleting vif %u from user space vhost:"
             " %s (%d)\n", vif_idx, rte_strerror(errno), errno);
         return -1;
+    }
+    FD_ZERO(&rfds);
+    FD_SET(vr_nl_uvh_sock, &rfds);
+
+    /*
+     * Set timeout for ACK msg
+     * TODO: add define, I am waiting for Andryi
+     */
+    tv.tv_sec = VROUTER_UVHOST_TIMEOUT_VIF_DEL_ACK;
+    tv.tv_usec = 0;
+
+    ret = select(vr_nl_uvh_sock + 1, &rfds, NULL, NULL, &tv);
+    if (ret == 0 ) {
+        RTE_LOG(ERR, UVHOST, "    error deleting vif %u: ACK message timeout "
+            " %s (%d)\n", vif_idx, rte_strerror(errno), errno);
+        return -1;
+    } else if (ret < 0 ) {
+        RTE_LOG(ERR, UVHOST, "    error deleting vif %u: select "
+            " %s (%d)\n", vif_idx, rte_strerror(errno), errno);
+        return -1;
+    }
+    if (FD_ISSET(vr_nl_uvh_sock, &rfds)) {
+        ret = recv(vr_nl_uvh_sock, (void *)&msg_ack, sizeof(vrnu_msg_type_t), MSG_DONTWAIT);
+        if (ret != sizeof(vrnu_msg_type_t)) {
+            RTE_LOG(ERR, UVHOST, "    error deleting vif %u: recv "
+                    " %s (%d)\n", vif_idx, rte_strerror(errno), errno);
+            return -1;
+        }
+        if (msg_ack != VRNU_MSG_VIF_DEL_ACK) {
+            RTE_LOG(ERR, UVHOST, "    error deleting vif %u: "
+                    "incorrect ACK message: %d\n", vif_idx, msg_ack);
+        }
     }
 
     return 0;
