@@ -20,6 +20,7 @@ struct sandesh_object_md sandesh_md[] = {
     },
     [VR_NEXTHOP_OBJECT_ID]      =   {
         .obj_len                =       4 * sizeof(vr_nexthop_req),
+        .obj_get_size           =       vr_nexthop_req_get_size,
         .obj_type_string        =       "vr_nexthop_req",
     },
     [VR_ROUTE_OBJECT_ID]        =   {
@@ -78,6 +79,9 @@ sandesh_proto_buf_len(unsigned int object_type, void *object)
 {
     if (!object && object_type != VR_RESPONSE_OBJECT_ID)
         return 0;
+
+    if (sandesh_md[object_type].obj_get_size)
+        return sandesh_md[object_type].obj_get_size(object);
 
     return sandesh_md[object_type].obj_len;
 }
