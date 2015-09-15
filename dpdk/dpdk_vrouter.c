@@ -789,10 +789,21 @@ main(int argc, char *argv[])
         return ret;
     }
 
+    /* Init fragment assembler */
+    ret = dpdk_fragment_assembler_init();
+    if (ret != 0) {
+        vr_dpdk_host_exit();
+        dpdk_fragment_assembler_exit();
+        dpdk_exit();
+        return ret;
+    }
+
     /* create VLAN forwarding interface if needed */
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
         ret = dpdk_vlan_forwarding_if_add();
         if (ret != 0) {
+            vr_dpdk_host_exit();
+            dpdk_fragment_assembler_exit();
             dpdk_exit();
             return ret;
         }
@@ -802,6 +813,7 @@ main(int argc, char *argv[])
     ret = rte_eal_mp_remote_launch(vr_dpdk_lcore_launch, NULL, CALL_MASTER);
 
     rte_eal_mp_wait_lcore();
+    dpdk_fragment_assembler_exit();
     dpdk_netlink_exit();
     vr_dpdk_host_exit();
     dpdk_exit();

@@ -1204,7 +1204,7 @@ struct host_os dpdk_host = {
 
     .hos_add_mpls                   =    dpdk_add_mpls,
     .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
-    /* TODO: support .hos_enqueue_to_assembler */
+    .hos_enqueue_to_assembler       =    dpdk_fragment_assembler_enqueue,
     .hos_set_log_level              =    dpdk_set_log_level,
     .hos_set_log_type               =    dpdk_set_log_type,
     .hos_get_log_level              =    dpdk_get_log_level,
