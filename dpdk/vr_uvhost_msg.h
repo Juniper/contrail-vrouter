@@ -21,6 +21,7 @@
 typedef enum vrnu_msg_type {
     VRNU_MSG_VIF_ADD = 1,
     VRNU_MSG_VIF_DEL,
+    VRNU_MSG_VIF_DEL_ACK,
     VRNU_MSG_MAX
 } vrnu_msg_type_t;
 
@@ -43,4 +44,5 @@ typedef struct vrnu_msg {
     };
 } vrnu_msg_t;
 int vr_uvh_nl_listen_handler(int fd, void *arg);
+extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
 #endif /* __VR_UVHOST_MSG_H__ */
