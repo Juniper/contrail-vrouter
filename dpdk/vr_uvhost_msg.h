@@ -43,4 +43,5 @@ typedef struct vrnu_msg {
     };
 } vrnu_msg_t;
 int vr_uvh_nl_listen_handler(int fd, void *arg);
+extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
 #endif /* __VR_UVHOST_MSG_H__ */
