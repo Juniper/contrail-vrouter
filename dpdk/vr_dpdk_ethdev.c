@@ -16,6 +16,9 @@
 
 #include "vr_dpdk.h"
 
+#include <vr_mpls.h>
+#include "cust_rte_mbuf.h"
+
 #include <rte_eth_bond.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
@@ -679,53 +682,227 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
     return 0;
 }
 
-/* Emulate smart NIC RSS hash
- * TODO: add MPLSoGRE case
- * Returns:
- *     0  if the mbuf has been hashed by NIC
- *     1  otherwise
+/* dpdk_mbuf_emulate_protocol_type_and_offsets
+ *
+ * We can use a mbuf structure - (tx_offload=> inner/outer header len) for
+ * creating relative pointer address.
+ * (http://dpdk.org/browse/dpdk/tree/lib/librte_mbuf/rte_mbuf.h#n851)
+ *
+ * Also, in the new version of DPDK (DPDK 2.1.0) is changed packet_type
+ * definition (http://dpdk.org/browse/dpdk/tree/lib/librte_mbuf/rte_mbuf.h#n784)
+ * Instead of variable packet_type I use the variable udata64
+ *
+ * If we combine the new features in the DPDK we can use information for easy
+ * packet parsing.
+ *
  */
+static inline int
+dpdk_mbuf_emulate_protocol_type_and_offsets(struct rte_mbuf *mbuf)
+{
+    struct vr_eth *eth_header = rte_pktmbuf_mtod(mbuf, struct vr_eth *);
+    struct vr_ip *ipv4_header = NULL;
+    struct vr_ip6 *ipv6_header = NULL;
+    struct vr_udp *udp_header = NULL;
+    struct vr_gre *gre_header = NULL;
+    struct tcphdr *tcp_header = NULL;
+    uint32_t *simple_mpls_header = NULL;
+    unsigned int pull_len = VR_ETHER_HLEN, ipv4_len;
+    int encap_type, helper_ret;
+    unsigned short gre_proto_udp_dport = 0, gre_header_len = 4;
+
+    /* Outer header. */
+    mbuf->outer_l2_len = VR_ETHER_HLEN;
+    if (rte_cpu_to_be_16(eth_header->eth_proto) == VR_ETH_PROTO_IP) {
+        /* In the feature we should use `new` protocol type in a mbuf
+         * structure. Change userdata64 to packet_type. */
+        mbuf->udata64 |= RTE_PTYPE_L3_IPV4;
+        ipv4_header = (struct vr_ip *)((uintptr_t)eth_header +
+            sizeof(struct vr_eth));
+        ipv4_len = (ipv4_header->ip_hl) * IPV4_IHL_MULTIPLIER;
+        pull_len += ipv4_len;
+
+        if (ipv4_header->ip_proto == VR_IP_PROTO_GRE) {
+            /* In future we should use `new` protocol type in
+             * a mbuf structure */
+            mbuf->udata64 |= RTE_PTYPE_L3_IPV4_EXT |
+                RTE_PTYPE_TUNNEL_GRE;
+            gre_header = (struct vr_gre *)((uintptr_t)ipv4_header +
+                ipv4_len);
+
+            if (rte_cpu_to_be_16(gre_header->gre_proto) == VR_GRE_PROTO_MPLS) {
+                /* In case, when MPLS parsing fail or MPLS has not set BoS,
+                 * len has only IP header. */
+                mbuf->outer_l3_len = ((uintptr_t)gre_header -
+                    ((uintptr_t)mbuf->outer_l2_len + (uintptr_t)eth_header));
+
+                if (unlikely(gre_header->gre_flags & (~(VR_GRE_FLAG_CSUM |
+                                                        VR_GRE_FLAG_KEY)))) {
+                    RTE_LOG(DEBUG, VROUTER, "Outer MPLS parsing failed, %s\n",
+                        __func__);
+                    return 1;
+                }
+
+                if (gre_header->gre_flags & VR_GRE_FLAG_CSUM)
+                    gre_header_len += (VR_GRE_CKSUM_HDR_LEN -
+                        VR_GRE_BASIC_HDR_LEN);
+                if (gre_header->gre_flags & VR_GRE_FLAG_KEY)
+                    gre_header_len += (VR_GRE_KEY_HDR_LEN -
+                        VR_GRE_BASIC_HDR_LEN);
+
+                pull_len += gre_header_len;
+
+                simple_mpls_header = (uint32_t *)((uintptr_t)gre_header +
+                    gre_header_len);
+
+                /* The bottom of stack is NOT set to 1 */
+                if (unlikely(!(rte_cpu_to_be_32(*simple_mpls_header) & 0x100))) {
+                    RTE_LOG(DEBUG, VROUTER,
+                        "GRE: MPLS header has not set BoS to 1.\n");
+                    return 1;
+                }
+
+                mbuf->udata64 |= DPDK_PTYPE_TUNNEL_MPLS_GRE;
+                /* In case, when everything is OK,
+                 * len is set to IP header size  + GRE header size. */
+                mbuf->outer_l3_len = ((uintptr_t)simple_mpls_header -
+                    ((uintptr_t)mbuf->outer_l2_len + (uintptr_t)eth_header));
+
+                gre_proto_udp_dport = gre_header->gre_proto;
+            }
+        } else if (ipv4_header->ip_proto == VR_IP_PROTO_UDP) {
+            mbuf->udata64 |= RTE_PTYPE_L4_UDP;
+            udp_header = (struct vr_udp *)((uintptr_t)ipv4_header + ipv4_len);
+
+            /* In case, when MPLS parsing fail or MPLS has not set BoS,
+             * len is set to IP header size  */
+            mbuf->outer_l3_len = ((uintptr_t)udp_header -
+                ((uintptr_t)mbuf->l2_len) + (uintptr_t)eth_header);
+            pull_len += sizeof(struct vr_udp);
+
+            simple_mpls_header = (uint32_t *)((uintptr_t)udp_header +
+                sizeof(struct vr_udp));
+            mbuf->udata64 |= RTE_PTYPE_L3_IPV4_EXT;
+            /* The bottom of stack is NOT set to 1 */
+            if (unlikely(!(rte_cpu_to_be_32(*simple_mpls_header) & 0x100))) {
+                RTE_LOG(DEBUG, VROUTER,
+                    "UDP: MPLS has not set BoS to 1.\n");
+                return 1;
+            }
+
+            /* In case, when everything is OK,
+             * len is set to IP header size + UDP header size. */
+            mbuf->outer_l3_len = ((uintptr_t)simple_mpls_header -
+                ((uintptr_t)mbuf->l2_len) + (uintptr_t)eth_header);
+            mbuf->udata64 |= DPDK_PTYPE_TUNNEL_MPLS_UDP;
+
+            gre_proto_udp_dport = udp_header->udp_dport;
+        }
+
+        if (unlikely(gre_proto_udp_dport == 0 ||
+                !(mbuf->udata64 & RTE_PTYPE_TUNNEL_MASK &
+                (DPDK_PTYPE_TUNNEL_MPLS_UDP | DPDK_PTYPE_TUNNEL_MPLS_GRE)))) {
+            return 1;
+        }
+
+        /*
+         * From now, ipv4_header and ipv6_header point to inner headers.
+         * Outer headers are not needed anymore, so there are no separate
+         * inner/outer pointers defined.
+         */
+        helper_ret = vr_inner_pkt_parse(rte_pktmbuf_mtod(mbuf, unsigned char *),
+                                        vr_mpls_tunnel_type, &encap_type,
+                                        NULL, &pull_len, mbuf->buf_len,
+                                        &ipv4_header, &ipv6_header,
+                                        gre_proto_udp_dport);
+        if (unlikely(helper_ret != 0 ||
+                encap_type == PKT_ENCAP_VXLAN) /* we don't support VXLAN */)
+            return -1;
+
+        helper_ret = vr_ip_transport_parse(ipv4_header, ipv6_header,
+                                           &tcp_header, mbuf->buf_len,
+                                           dpdk_adjust_tcp_mss, NULL, NULL,
+                                           NULL, &pull_len);
+        if (unlikely(helper_ret != 0))
+            return -1;
+
+        /* TODO: do we need this? it's possible to get other data about inner
+         * packet if needed. */
+        if (ipv6_header) {
+            mbuf->udata64 |= RTE_PTYPE_INNER_L3_IPV6;
+            mbuf->l3_len = sizeof(struct vr_ip6);
+        } else if (!ipv6_header && ipv4_header){
+            mbuf->udata64 |= RTE_PTYPE_INNER_L3_IPV4;
+            mbuf->l3_len = ipv4_header->ip_hl * IPV4_IHL_MULTIPLIER;
+        } else {
+            return -1;
+        }
+
+        if (tcp_header)
+            mbuf->udata64 |= RTE_PTYPE_INNER_L4_TCP;
+
+        if (unlikely(!ipv6_header && ipv4_header && vr_ip_fragment(ipv4_header))) {
+            RTE_LOG(DEBUG, VROUTER, "Fragmented IP inner packet, %s\n",
+                __func__);
+            return 1;
+        }
+
+        return 0;
+
+    }/* else
+
+      TODO IPv6
+      TODO VLAN */
+    return 0;
+}
+
 static inline int
 dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
 {
-    struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(mbuf, struct ether_hdr *);
     struct ipv4_hdr *ipv4_hdr;
     uint64_t *ipv4_addr_ptr;
     uint32_t *l4_ptr;
     uint32_t hash = 0;
-    uint8_t iph_len;
 
-    if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH)) {
+    /*
+     * BUG: mbuf->ol_flags & PKT_RX_RSS_HASH is mistakenaly set for
+     * MPLS over GRE packets
+     */
+    if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH &&
+            (mbuf->udata64 & DPDK_PTYPE_TUNNEL_MPLS_GRE) == 0)) {
         RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
                 __func__, mbuf->hash.rss);
         return 0;
     }
 
-    /* TODO: IPv6 support */
-    /* TODO: VLAN support */
-    if (likely(eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+    /* TODO: inner IPv6 support */
+    /* TODO: inner VLAN support */
+    if (likely(mbuf->udata64 |= RTE_PTYPE_L3_IPV4)) {
         mbuf->ol_flags |= PKT_RX_IPV4_HDR;
-        ipv4_hdr = (struct ipv4_hdr *)((uintptr_t)eth_hdr
-                                    + sizeof(struct ether_hdr));
-        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr
-                                    + offsetof(struct ipv4_hdr, src_addr));
+
+        if (mbuf->udata64 & DPDK_PTYPE_TUNNEL_MPLS_GRE) {
+            ipv4_hdr = rte_pktmbuf_mtod_offset(mbuf, struct ipv4_hdr *,
+                mbuf->outer_l2_len + mbuf->outer_l3_len +
+                sizeof(uint32_t) + mbuf->outer_l2_len);
+        } else {
+            ipv4_hdr = rte_pktmbuf_mtod_offset(mbuf, struct ipv4_hdr *,
+                mbuf->outer_l2_len);
+        }
+        ipv4_addr_ptr = (uint64_t *)((uintptr_t)ipv4_hdr +
+            offsetof(struct ipv4_hdr, src_addr));
 
         /* We use SSE4.2 CRC hash. No need to match NIC's Toeplitz hash ATM. */
         /* Hash src and dst address at a time */
         hash = rte_hash_crc_8byte(*ipv4_addr_ptr, hash);
 
-        iph_len = (ipv4_hdr->version_ihl & IPV4_HDR_IHL_MASK) *
-                    IPV4_IHL_MULTIPLIER;
-
         if (likely((rte_pktmbuf_data_len(mbuf) > sizeof(struct ether_hdr)
-                    + iph_len
+                    + mbuf->l3_len
                     + sizeof(struct udp_hdr)) &&
                     !vr_ip_fragment((struct vr_ip *)ipv4_hdr))) {
             switch (ipv4_hdr->next_proto_id) {
             case IPPROTO_TCP:
             case IPPROTO_UDP:
                 mbuf->ol_flags |= PKT_RX_IPV4_HDR_EXT;
-                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + iph_len);
+                l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + mbuf->l3_len);
 
                 hash = rte_hash_crc_4byte(*l4_ptr, hash);
                 break;
@@ -747,8 +924,9 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
  *     1  if the RSS need to be emulated
  */
 int
-vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
-    uint32_t nb_pkts)
+vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
+                          struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
+                          uint32_t nb_pkts)
 {
     unsigned i;
 
@@ -773,6 +951,7 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPD
 
     /* emulate RSS hash */
     for (i = 0; i < nb_pkts; i++) {
+        dpdk_mbuf_emulate_protocol_type_and_offsets(pkts[i]);
         if (likely(dpdk_mbuf_rss_hash(pkts[i]) == 0)) {
             return 0;
         }

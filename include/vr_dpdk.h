@@ -565,7 +565,9 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 #define DPDK_DEBUG_VAR(v)
 #define DPDK_UDEBUG(t, h, ...)
 #endif
-
+/* Helper to adjust TCP MSS */
+void dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
+                            unsigned char iph_len);
 /*
  * vr_dpdk_interface.c
  */
