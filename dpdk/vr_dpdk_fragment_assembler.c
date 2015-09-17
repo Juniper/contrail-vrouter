@@ -49,7 +49,7 @@ dpdk_fragment_assembler(void *arg)
         return;
 
     cpu = vr_get_cpu() - VR_DPDK_FWD_LCORE_ID;
-    assert(cpu >= 0 && cpu < VR_DPDK_FWD_LCORE_ID);
+    assert(cpu >= 0 && cpu < (vr_num_cpus - VR_DPDK_FWD_LCORE_ID));
 
     /*
      * first, reverse the list, since packets that came later are at the
@@ -133,7 +133,7 @@ dpdk_assembler_table_init(void)
 
     /* Intentionally the vr_assembler_table_scan_init() is not called here as
      * it would set up timers on the timer lcore. For the timers the forwarding
-     * lcores are used, therefore allowing for complete lock elimination. */ 
+     * lcores are used, therefore allowing for complete lock elimination. */
 
     return 0;
 }
@@ -226,7 +226,7 @@ dpdk_fragment_assembler_table_scan(void *arg)
     struct fragment_bucket *vfb;
 
     cpu = vr_get_cpu() - VR_DPDK_FWD_LCORE_ID;
-    assert(cpu >= 0 && cpu < VR_DPDK_FWD_LCORE_ID);
+    assert(cpu >= 0 && cpu < (vr_num_cpus - VR_DPDK_FWD_LCORE_ID));
 
     i = assembler_scan_index;
     for (j = 0; j < VR_LINUX_ASSEMBLER_BUCKETS; j++) {
