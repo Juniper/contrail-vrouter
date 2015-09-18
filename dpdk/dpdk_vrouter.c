@@ -238,7 +238,12 @@ dpdk_core_mask_get(long system_cpus_count)
     return cpu_core_mask;
 }
 
-/* Stringify shared IO core mask, i.e. 0xf -> 3@(0,1),4@(2,3) */
+/*
+ * dpdk_shared_io_core_mask_stringify - stringify shared IO core mask
+ * Example: if core mask is 0xf and FWD_LCORES_PER_IO is 2,
+ *          there are will be 4 forwarding lcores: 7@0,8@1,9@2,10@3
+ *          and 2 shared IO lcores: 3@(0,1),4@(2,3)
+ */
 static char *
 dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
 {
@@ -270,9 +275,11 @@ dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
             nb_fwd_cores++;
             if (nb_fwd_cores >= VR_DPDK_FWD_LCORES_PER_IO
                 || (core_mask >> 1) == 0) {
-                if (io_lcore_id > VR_DPDK_MAX_IO_LCORE_ID) {
-                    RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: IO lcores limit exceeded\n");
-                    return NULL;
+                if (io_lcore_id > VR_DPDK_LAST_IO_LCORE_ID) {
+                    RTE_LOG(WARNING, VROUTER,
+                        "Warning: IO lcores limit exceeded (%d > %d)\n",
+                        io_lcore_id, VR_DPDK_LAST_IO_LCORE_ID);
+                    break;
                 }
 
                 p += snprintf(p,
@@ -295,7 +302,13 @@ dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
     return core_mask_string;
 }
 
-/* Stringify forwarding and dedicated IO core mask, i.e. 0xf -> 7@0,8@1,9@2,10@3 */
+/*
+ * dpdk_fwd_core_mask_stringify - stringify forwarding and dedicated IO
+ *                                core mask
+ * Example: if core mask is 0x3f and FWD_LCORES_PER_IO is 2,
+ *             there are will be 4 forwarding lcores: 7@1,8@2,9@4,10@5
+ *             and 2 dedicated IO lcores: 3@0,4@3
+ */
 static char *
 dpdk_fwd_core_mask_stringify(uint64_t core_mask)
 {
@@ -314,9 +327,11 @@ dpdk_fwd_core_mask_stringify(uint64_t core_mask)
             if (VR_DPDK_USE_IO_LCORES && !VR_DPDK_SHARED_IO_LCORES
                     && nb_fwd_cores == 0) {
                 /* first dedicated CPU is an IO lcore */
-                if (io_lcore_id > VR_DPDK_MAX_IO_LCORE_ID) {
-                    RTE_LOG(ERR, VROUTER, "Error stringifying IO core mask: IO lcores limit exceeded\n");
-                    return NULL;
+                if (io_lcore_id > VR_DPDK_LAST_IO_LCORE_ID) {
+                    RTE_LOG(WARNING, VROUTER,
+                        "Warning: IO lcores limit exceeded (%d > %d)\n",
+                        io_lcore_id, VR_DPDK_LAST_IO_LCORE_ID);
+                    break;
                 }
 
                 p += snprintf(p,
