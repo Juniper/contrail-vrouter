@@ -233,7 +233,10 @@ enum {
      * forwarding lcores.
      */
     VR_DPDK_IO_LCORE_ID,
-    VR_DPDK_MAX_IO_LCORE_ID,
+    VR_DPDK_IO_LCORE_ID2,
+    VR_DPDK_IO_LCORE_ID3,
+    VR_DPDK_IO_LCORE_ID4,
+    VR_DPDK_LAST_IO_LCORE_ID,
     /* [PACKET_ID..FWD_ID) lcores have TX queues, but no RX queues */
     VR_DPDK_PACKET_LCORE_ID,
     VR_DPDK_NETLINK_LCORE_ID,
@@ -242,7 +245,7 @@ enum {
 };
 
 /* Maximum number of IO lcores */
-#define VR_DPDK_MAX_IO_LCORES (VR_DPDK_MAX_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
+#define VR_DPDK_MAX_IO_LORES (VR_DPDK_LAST_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
 
 
 /*
@@ -336,18 +339,10 @@ struct vr_dpdk_lcore {
     struct vr_dpdk_q_slist lcore_rx_head;
     /* TX queues head */
     struct vr_dpdk_q_slist lcore_tx_head;
-    union {
-        /* Forwarding lcore: number of rings to push for the lcore */
-        volatile uint16_t lcore_nb_rings_to_push;
-        /* IO lcore: number of forwarding lcores to distribute */
-        uint16_t lcore_nb_fwd_lcores;
-    };
-    union {
-        /* Forwarding lcore: number of bond queues to TX */
-        volatile uint16_t lcore_nb_bonds_to_tx;
-        /* IO lcore: first forwarding lcore ID to distribute */
-        uint16_t lcore_first_fwd_lcore_id;
-    };
+    /* Forwarding lcore: number of rings to push for the lcore */
+    volatile uint16_t lcore_nb_rings_to_push;
+    /* Forwarding lcore: number of bond queues to TX */
+    volatile uint16_t lcore_nb_bonds_to_tx;
     /* Number of hardware RX queues assigned to the lcore (for the scheduler) */
     uint16_t lcore_nb_rx_queues;
     /* Lcore command */
@@ -361,6 +356,10 @@ struct vr_dpdk_lcore {
 
     /**********************************************************************/
     /* Big and less frequently used fields */
+    /* Number of lcores to distribute packets to */
+    uint16_t lcore_nb_dst_lcores;
+    /* List of forwarding lcore indexes based on VR_DPDK_FWD_LCORE_ID */
+    uint16_t lcore_dst_lcore_idxs[VR_MAX_CPUS];
     /* Table of RX queues */
     struct vr_dpdk_queue lcore_rx_queues[VR_MAX_INTERFACES];
     /* Table of TX queues */
@@ -566,14 +565,16 @@ int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
 int vr_dpdk_ethdev_filtering_init(struct vr_interface *vif, struct vr_dpdk_ethdev *ethdev);
 /* Init RSS */
 int vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev);
-/* Emulate smart NIC RX for a burst of mbufs
- * Returns:
- *     0  if at least one mbuf has been hashed by NIC, so there is
- *        no need to emulate RSS
- *     1  if the RSS need to be emulated
+/*
+ * vr_dpdk_ethdev_rx_emulate - emulate smart NIC RX:
+ *  - strip VLAN tags for packets received from fabric interface
+ *  - calculate RSS hash if it is not present
+ *  - recalculate RSS hash for MPLSoGRE packets
+ *
+ * Returns 0 on no hash changes, otherwise a bitmask of mbufs to distribute.
  */
-int vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
-    uint32_t nb_pkts);
+uint64_t vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts);
 
 /*
  * vr_dpdk_flow_mem.c
@@ -674,14 +675,17 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
         tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
     }
 }
-/* Hash and distribute mbufs */
+/*
+ * Distribute mbufs among forwarding lcores using hash.rss.
+ * The destination lcores are listed in lcore->lcore_dst_lcores.
+ */
 void
-vr_dpdk_lcore_distribute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
-    uint32_t nb_pkts);
-/* Send a burst of mbufs to vRouter */
+vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts);
+/* Pass mbufs to dp-core. */
 void
-vr_dpdk_lcore_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
-    uint32_t nb_pkts);
+vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts);
 /* Handle an IPC command */
 int vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore);
 /* Busy wait for a command to complete on a specific lcore */

@@ -473,7 +473,7 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
         /* convert mbuf to vr_packet */
         vr_dpdk_packet_get(usockp->usock_mbuf, usockp->usock_vif);
         /* send the mbuf to vRouter */
-        vr_dpdk_lcore_vroute(usockp->usock_vif, &usockp->usock_mbuf, 1);
+        vr_dpdk_lcore_vroute(lcore, usockp->usock_vif, &usockp->usock_mbuf, 1);
         /* flush packet TX queues immediately */
         vr_dpdk_lcore_flush(lcore);
     } else {
