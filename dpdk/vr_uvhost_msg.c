@@ -187,7 +187,7 @@ vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
  * vr_uvhm_map_addr - map a virtual address sent by the vhost client into
  * a server virtual address.
  *
- * Returns a pointer to teh corresponding location on success, NULL otherwise.
+ * Returns a pointer to the corresponding location on success, NULL otherwise.
  */
 static void *
 vr_uvhm_map_addr(vr_uvh_client_t *vru_cl, uint64_t addr)

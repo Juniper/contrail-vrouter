@@ -70,7 +70,7 @@ dpdk_lcore_least_used_io_get(void)
     unsigned int num_queues;
 
     for (lcore_id = VR_DPDK_IO_LCORE_ID;
-            lcore_id <= VR_DPDK_MAX_IO_LCORE_ID; lcore_id++) {
+            lcore_id <= VR_DPDK_LAST_IO_LCORE_ID; lcore_id++) {
 
         lcore = vr_dpdk.lcores[lcore_id];
         /* IO lcores are optional */
@@ -451,50 +451,43 @@ dpdk_lcore_delay_us(unsigned us)
     rcu_thread_online();
 }
 
-/* Hash and distribute mbufs */
+/*
+ * Distribute mbufs among forwarding lcores using hash.rss.
+ * The destination lcores are listed in lcore->lcore_dst_lcore_idxs.
+ */
 void
-vr_dpdk_lcore_distribute(struct vr_interface *vif,
+vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts)
 {
     const unsigned lcore_id = rte_lcore_id();
-    const unsigned this_lcore_id = lcore_id - VR_DPDK_FWD_LCORE_ID;
+    uint16_t nb_dst_lcores = lcore->lcore_nb_dst_lcores;
+    uint16_t *dst_lcore_idxs = lcore->lcore_dst_lcore_idxs;
     struct rte_mbuf *mbuf;
     int i, j, ret, retry;
     int nb_retry_lcores;
-    unsigned dst_lcore_id = 0;
+    uint16_t dst_lcore_idx = 0;
     uint32_t lcore_nb_pkts, chunk_nb_pkts;
     /*
-     * TODO: forwarding lcores also distribute MPLSoGRE packets.
-     * Will be fixed by the next commit.
-     */
-#if (VR_DPDK_USE_IO_LCORES == true)
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    uint16_t nb_fwd_lcores = lcore->lcore_nb_fwd_lcores;
-    uint16_t first_fwd_lcore_id = lcore->lcore_first_fwd_lcore_id;
-#else
-    uint16_t nb_fwd_lcores = vr_dpdk.nb_fwd_lcores;
-    uint16_t first_fwd_lcore_id = VR_DPDK_FWD_LCORE_ID;
-#endif
-    /* Per lcore bursts (+1 for the header) */
-    /* Header bits:
+     * Per lcore bursts (+1 for the header)
+     * Header bits:
      *   63    - always set to 1
      *   48-32 - vif_idx
      *   31-0  - nb_pkts + 1 (the header)
      */
-    /* +chunk size for the round up */
-    struct rte_mbuf *lcore_pkts[nb_fwd_lcores][nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ];
+    struct rte_mbuf *lcore_pkts[nb_dst_lcores][nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ];
     struct vr_interface_stats *stats;
-    unsigned retry_lcores[nb_fwd_lcores];
+    unsigned retry_lcores[nb_dst_lcores];
 
     RTE_LOG(DEBUG, VROUTER, "%s: distributing %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
     /* init the headers */
-    for (i = 0; i < nb_fwd_lcores; i++) {
+    for (i = 0; i < nb_dst_lcores; i++) {
         lcore_pkts[i][0] = (struct rte_mbuf *)(((uintptr_t)1 << 63)
                 | ((uintptr_t)vif->vif_idx << 32) | 1);
         retry_lcores[i] = i;
-        rte_prefetch0(vr_dpdk.lcores[i + first_fwd_lcore_id]->lcore_rx_ring);
+        rte_prefetch0(vr_dpdk.lcores[dst_lcore_idxs[i]
+                + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring);
     }
 
     /* distribute the burst among the forwarding lcores */
@@ -502,50 +495,46 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif,
         mbuf = pkts[i];
         rte_prefetch0(rte_pktmbuf_mtod(mbuf, char *));
 
-        if (VR_DPDK_USE_IO_LCORES) {
-            /* distribute among forwarding lcores */
-            dst_lcore_id = mbuf->hash.rss % nb_fwd_lcores;
-        } else {
-            /* distribute among other lcores */
-            dst_lcore_id = mbuf->hash.rss % (nb_fwd_lcores - 1);
-            if (dst_lcore_id >= this_lcore_id)
-                dst_lcore_id++;
-        }
+        dst_lcore_idx = mbuf->hash.rss % nb_dst_lcores;
 
         /* put the mbuf to the burst */
-        lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_id][0] & 0xFFFFFFFFU;
+        lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0xFFFFFFFFU;
 
         RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
-             __func__, lcore_id, mbuf->hash.rss, lcore_nb_pkts, dst_lcore_id + first_fwd_lcore_id);
+             __func__, lcore_id, mbuf->hash.rss, lcore_nb_pkts,
+            dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID);
 
-        lcore_pkts[dst_lcore_id][lcore_nb_pkts] = mbuf;
+        lcore_pkts[dst_lcore_idx][lcore_nb_pkts] = mbuf;
         /* increase number of packets in the burst */
-        lcore_pkts[dst_lcore_id][0] = (struct rte_mbuf *)(
-                            (uintptr_t)lcore_pkts[dst_lcore_id][0] + 1);
+        lcore_pkts[dst_lcore_idx][0] = (struct rte_mbuf *)(
+                            (uintptr_t)lcore_pkts[dst_lcore_idx][0] + 1);
     }
 
     stats = vif_get_stats(vif, lcore_id);
+
     /*
      * Pass distributed bursts to other forwarding lcores.
      * Retry on full RX rings.
      */
     for (retry = 0; retry < VR_DPDK_RETRY_NUM; retry++) {
         nb_retry_lcores = 0;
-        for (i = 0; i < nb_fwd_lcores; i++) {
-            dst_lcore_id = retry_lcores[i];
+        for (i = 0; i < nb_dst_lcores; i++) {
+            dst_lcore_idx = retry_lcores[i];
 
-            lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_id][0] & 0xFFFFFFFFU;
+            lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0xFFFFFFFFU;
             if (likely(lcore_nb_pkts > 1)) {
                 RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
-                     __func__, lcore_nb_pkts, dst_lcore_id + first_fwd_lcore_id);
+                     __func__, lcore_nb_pkts,
+                    dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID);
 
                 /* round up the number of packets to the chunk size */
                 chunk_nb_pkts = (lcore_nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
                         /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
                 /* IO and other forwarding lcores enqueue packets */
                 ret = rte_ring_mp_enqueue_bulk(
-                        vr_dpdk.lcores[dst_lcore_id + first_fwd_lcore_id]->lcore_rx_ring,
-                        (void **)&lcore_pkts[dst_lcore_id][0],
+                        vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID]
+                            ->lcore_rx_ring,
+                        (void **)&lcore_pkts[dst_lcore_idx][0],
                         chunk_nb_pkts);
                 if (unlikely(ret == -ENOBUFS)) {
                     /* drop packets if it's the last retry */
@@ -554,19 +543,20 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif,
                         stats->vis_queue_ierrors += lcore_nb_pkts - 1;
 
                         RTE_LOG(DEBUG, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
-                            __func__, dst_lcore_id + first_fwd_lcore_id, lcore_nb_pkts,
-                            rte_ring_count(vr_dpdk.lcores[dst_lcore_id + first_fwd_lcore_id]->lcore_rx_ring),
-                            rte_ring_free_count(vr_dpdk.lcores[dst_lcore_id + first_fwd_lcore_id]->lcore_rx_ring));
+                            __func__, dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID,
+                            lcore_nb_pkts,
+                            rte_ring_count(vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
+                            rte_ring_free_count(vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring));
 
                         /* ring is full, drop the packets */
                         for (j = 1; j < lcore_nb_pkts; j++) {
-                            vr_dpdk_pfree(lcore_pkts[dst_lcore_id][j], VP_DROP_INTERFACE_DROP);
+                            vr_dpdk_pfree(lcore_pkts[dst_lcore_idx][j], VP_DROP_INTERFACE_DROP);
                         }
                     } else {
                         /* mark the lcore to retry */
-                        retry_lcores[nb_retry_lcores++] = dst_lcore_id;
+                        retry_lcores[nb_retry_lcores++] = dst_lcore_idx;
                         RTE_LOG(DEBUG, VROUTER, "%s: retrying %d lcore %u...\n",
-                            __func__, retry, dst_lcore_id + first_fwd_lcore_id);
+                            __func__, retry, dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID);
 
                     }
                 } else {
@@ -581,20 +571,20 @@ vr_dpdk_lcore_distribute(struct vr_interface *vif,
         /* pause a bit */
         dpdk_lcore_delay_us(VR_DPDK_RETRY_US);
 
-        nb_fwd_lcores = nb_retry_lcores;
+        nb_dst_lcores = nb_retry_lcores;
     } /* for all tries */
 }
 
-/* Send a burst of mbufs to vRouter */
+/*
+ * vr_dpdk_lcore_vroute - pass mbufs to dp-core.
+ */
 void
-vr_dpdk_lcore_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
-    uint32_t nb_pkts)
+vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts)
 {
-    unsigned i;
+    int i;
     struct rte_mbuf *mbuf;
     struct vr_packet *pkt;
-    unsigned lcore_id;
-    struct vr_dpdk_lcore * lcore;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
 
@@ -602,8 +592,6 @@ vr_dpdk_lcore_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_
          __func__, nb_pkts, vif->vif_name);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
-        lcore_id = rte_lcore_id();
-        lcore = vr_dpdk.lcores[lcore_id];
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
@@ -655,9 +643,97 @@ vr_dpdk_lcore_vroute(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_
     }
 }
 
-/* RX and distribute/route packets */
-static inline uint64_t
-dpdk_lcore_rx(struct vr_dpdk_lcore *lcore, bool distribute)
+/*
+ * dpdk_lcore_rxqs_vroute - receive packets from RX queues and pass them
+ * to dp-core.
+ *
+ * The function is used by forwaridng lcores.
+ *
+ * For MPLSoGRE traffic the packets will be distributed among other
+ * forwarding lcores.
+ *
+ * Returns total number of received packets.
+ */
+static uint64_t
+dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
+{
+    uint64_t total_pkts = 0;
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
+    struct rte_mbuf *pkts_to_distribute[VR_DPDK_RX_BURST_SZ];
+    struct vr_dpdk_queue *rx_queue;
+    uint32_t nb_pkts;
+    uint32_t nb_pkts_to_route;
+    uint32_t nb_pkts_to_distribute;
+    uint64_t mask_to_distribute;
+    int i;
+
+    /* for all hardware RX queues */
+    SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
+        /* burst RX */
+        rte_prefetch0(rx_queue->q_queue_h);
+        nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->q_queue_h, pkts,
+                VR_DPDK_RX_BURST_SZ);
+        if (likely(nb_pkts > 0)) {
+            rte_prefetch0(rx_queue->q_vif);
+
+            total_pkts += nb_pkts;
+
+            /*
+             * Thanks to NIC RSS packets received from the fabric should
+             * be just routed.
+             *
+             * Yet for MPLSoGRE packets we recalculate the hashes and
+             * redistribute only those altered packets to other lcores.
+             */
+            if (vif_is_fabric(rx_queue->q_vif)) {
+                /* (Re)calculate hashes and strip VLAN tags. */
+                mask_to_distribute = vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif,
+                                                    pkts, nb_pkts);
+                if (likely(mask_to_distribute == 0)) {
+                    /* Packets have been hashed by NIC, just route them. */
+                    vr_dpdk_lcore_vroute(lcore, rx_queue->q_vif, pkts, nb_pkts);
+                } else {
+                    /* Split packets to route and to distribute. */
+
+                    nb_pkts_to_route = 0;
+                    nb_pkts_to_distribute = 0;
+                    for (i = 0; i < nb_pkts; i++) {
+                        if (mask_to_distribute & 1ULL) {
+                            pkts_to_distribute[nb_pkts_to_distribute++] = pkts[i];
+                        } else {
+                            pkts[nb_pkts_to_route++] = pkts[i];
+                        }
+                    }
+
+                    /* Some of the packets got new hash, distribute them. */
+                    vr_dpdk_lcore_distribute(lcore, rx_queue->q_vif,
+                            pkts_to_distribute, nb_pkts_to_distribute);
+                    /* Route the rest of the packets. */
+                    vr_dpdk_lcore_vroute(lcore, rx_queue->q_vif, pkts,
+                            nb_pkts_to_route);
+                }
+            } else {
+                /* For non-fabric interfaces we always distribute the packets. */
+                vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts);
+                /* Distribute all the packets. */
+                vr_dpdk_lcore_distribute(lcore, rx_queue->q_vif, pkts, nb_pkts);
+            }
+        }
+    }
+
+    return total_pkts;
+}
+
+/*
+ * dpdk_lcore_rxqs_distribute - receive packets from RX queues and
+ * distribute them among forwarding lcores.
+ *
+ * The function is used by IO lcores.
+ *
+ * Returns total number of received packets.
+ */
+static uint64_t
+dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore)
 {
     uint64_t total_pkts = 0;
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
@@ -674,36 +750,21 @@ dpdk_lcore_rx(struct vr_dpdk_lcore *lcore, bool distribute)
             rte_prefetch0(rx_queue->q_vif);
 
             total_pkts += nb_pkts;
-            if (VR_DPDK_USE_IO_LCORES) {
-                /* IO lcores distribute packets */
-                /* TODO: for MPLSoGRE we need to call rx_emulate anyway */
-                if (distribute) {
-                    vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts);
-                    /* distribute the packets among forwarding lcores */
-                    vr_dpdk_lcore_distribute(rx_queue->q_vif, pkts, nb_pkts);
-                } else {
-                    /* forwarding lcores just route packets */
-                    vr_dpdk_lcore_vroute(rx_queue->q_vif, pkts, nb_pkts);
-                }
-            } else {
-                /* no IO lcores, so check if we need to distribute packets */
-                if (likely(vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts) == 0)) {
-                    /* packets have been hashed by NIC, just route them */
-                    vr_dpdk_lcore_vroute(rx_queue->q_vif, pkts, nb_pkts);
-                } else {
-                    /* distribute the packets among other forwarding lcores */
-                    vr_dpdk_lcore_distribute(rx_queue->q_vif, pkts, nb_pkts);
-                }
-            }
+
+            /* (Re)calculate hashes and strip VLAN tags. */
+            vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, nb_pkts);
+            /* Distribute all the packets. */
+            vr_dpdk_lcore_distribute(lcore, rx_queue->q_vif, pkts, nb_pkts);
         }
     }
 
     return total_pkts;
 }
 
+
 /* Forwarding lcore RX ring handling */
 static inline uint64_t
-dpdk_lcore_ring_rx(struct vr_dpdk_lcore *lcore)
+dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore)
 {
     uint64_t total_pkts = 0;
     uintptr_t header;
@@ -738,7 +799,7 @@ dpdk_lcore_ring_rx(struct vr_dpdk_lcore *lcore)
         vif = __vrouter_get_interface(router, vif_idx);
         if (likely(vif != NULL)) {
             /* skip the header */
-            vr_dpdk_lcore_vroute(vif, &pkts[1], nb_pkts - 1);
+            vr_dpdk_lcore_vroute(lcore, vif, &pkts[1], nb_pkts - 1);
         } else {
             /* the vif is no longer available, just drop the packets */
             for (i = 1; i < nb_pkts; i++)
@@ -751,7 +812,7 @@ dpdk_lcore_ring_rx(struct vr_dpdk_lcore *lcore)
 
 /* Forwarding lcore push TX rings */
 static inline uint64_t
-dpdk_lcore_rings_push(struct vr_dpdk_lcore *lcore)
+dpdk_lcore_tx_rings_push(struct vr_dpdk_lcore *lcore)
 {
     uint64_t total_pkts = 0;
     struct rte_ring *ring;
@@ -806,7 +867,7 @@ dpdk_lcore_io_rxtx(struct vr_dpdk_lcore *lcore)
 {
     uint64_t total_pkts = 0;
 
-    total_pkts += dpdk_lcore_rx(lcore, true);
+    total_pkts += dpdk_lcore_rxqs_distribute(lcore);
 
     /* make a short pause if no single packet received */
     if (unlikely(total_pkts == 0)) {
@@ -830,17 +891,18 @@ dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
     struct vr_dpdk_queue *tx_queue;
 
-    /* TODO: skip RX queues with no packets to read
+    /*
+     * TODO: skip RX queues with no packets to read
      * RX operation for KNIs is quite expensive. We used rx_queue_mask to
      * mask out the ports with no packets to read (i.e. read them less
      * frequently). We need to implement the same functionality for the
      * list of RX queues now.
      */
-    total_pkts += dpdk_lcore_rx(lcore, false);
+    total_pkts += dpdk_lcore_rxqs_vroute(lcore);
     /* handle lcore RX ring */
-    total_pkts += dpdk_lcore_ring_rx(lcore);
+    total_pkts += dpdk_lcore_rx_ring_vroute(lcore);
     /* push TX rings */
-    total_pkts += dpdk_lcore_rings_push(lcore);
+    total_pkts += dpdk_lcore_tx_rings_push(lcore);
 
     /* make a short pause if no single packet received */
     if (unlikely(total_pkts == 0)) {
@@ -903,10 +965,54 @@ dpdk_lcore_signals_init(unsigned lcore_id)
     }
 }
 
-/* Init forwarding lcore context */
+/*
+ * dpdk_lcore_dst_lcores_stringify - stringify lcores to distribute packets.
+ */
+static char *
+dpdk_lcore_dst_lcores_stringify(struct vr_dpdk_lcore *lcore)
+{
+    int i;
+    static char lcores_str[VR_DPDK_STR_BUF_SZ];
+    char *p = lcores_str;
+
+    for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
+        if (p != lcores_str)
+            *p++ = ',';
+
+        p += snprintf(p,
+                sizeof(lcores_str) - (p - lcores_str),
+                "%d", lcore->lcore_dst_lcore_idxs[i] + VR_DPDK_FWD_LCORE_ID);
+        if (p - lcores_str >= sizeof(lcores_str)) {
+            RTE_LOG(ERR, VROUTER,
+                "Error stringifying lcores to distribute: buffer overflow\n");
+            return NULL;
+        }
+    }
+    *p = '\0';
+    return lcores_str;
+}
+
+/*
+ * dpdk_lcore_fwd_init - init forwarding lcore context.
+ * Returns 0 on success, -errno otherwise.
+ */
 static int
 dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
 {
+    int i;
+
+    /* Init table of lcores to distribute packets to. */
+    lcore->lcore_nb_dst_lcores = vr_dpdk.nb_fwd_lcores - 1;
+    for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
+        lcore->lcore_dst_lcore_idxs[i] = i;
+        if (lcore->lcore_dst_lcore_idxs[i] >= lcore_id - VR_DPDK_FWD_LCORE_ID)
+            lcore->lcore_dst_lcore_idxs[i]++;
+    }
+    RTE_LOG(INFO, VROUTER,
+        "Lcore %u: distributing MPLSoGRE packets to [%s]\n",
+        lcore_id, dpdk_lcore_dst_lcores_stringify(lcore));
+
+
     /*
      * Allocate multi-producer single-consumer RX ring.
      * IO and other forwarding lcores will enqueue packets.
@@ -922,23 +1028,28 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
     return 0;
 }
 
-/* Init IO lcore context */
+/*
+ * dpdk_lcore_io_init - init IO lcore context.
+ * Returns 0 on success, -errno otherwise.
+ */
 static int
 dpdk_lcore_io_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
 {
-    lcore->lcore_first_fwd_lcore_id =
-        VR_DPDK_FWD_LCORES_PER_IO*(lcore_id - VR_DPDK_IO_LCORE_ID);
+    int i;
+    unsigned first_fwd_lcore_idx = VR_DPDK_FWD_LCORES_PER_IO
+            * (lcore_id - VR_DPDK_IO_LCORE_ID);
 
-    lcore->lcore_nb_fwd_lcores = vr_dpdk.nb_fwd_lcores
-        - lcore->lcore_first_fwd_lcore_id;
+    /* Init table of lcores to distribute packets to. */
+    lcore->lcore_nb_dst_lcores = vr_dpdk.nb_fwd_lcores
+            - first_fwd_lcore_idx;
+    if (lcore->lcore_nb_dst_lcores > VR_DPDK_FWD_LCORES_PER_IO)
+        lcore->lcore_nb_dst_lcores = VR_DPDK_FWD_LCORES_PER_IO;
 
-    if (lcore->lcore_nb_fwd_lcores > VR_DPDK_FWD_LCORES_PER_IO)
-        lcore->lcore_nb_fwd_lcores = VR_DPDK_FWD_LCORES_PER_IO;
-    lcore->lcore_first_fwd_lcore_id += VR_DPDK_FWD_LCORE_ID;
-
-    RTE_LOG(INFO, VROUTER, "IO lcore %u: distributing among lcores [%u-%u]\n",
-        lcore_id, lcore->lcore_first_fwd_lcore_id,
-            lcore->lcore_first_fwd_lcore_id + lcore->lcore_nb_fwd_lcores - 1);
+    for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
+        lcore->lcore_dst_lcore_idxs[i] = first_fwd_lcore_idx + i;
+    }
+    RTE_LOG(INFO, VROUTER, "IO lcore %u: distributing all packets to [%s]\n",
+        lcore_id, dpdk_lcore_dst_lcores_stringify(lcore));
 
     return 0;
 }
@@ -963,7 +1074,7 @@ dpdk_lcore_init(unsigned lcore_id)
 
     /* lcore-specific initializations */
     if (lcore_id >= VR_DPDK_IO_LCORE_ID
-        && lcore_id <= VR_DPDK_MAX_IO_LCORE_ID) {
+        && lcore_id <= VR_DPDK_LAST_IO_LCORE_ID) {
         ret = dpdk_lcore_io_init(lcore_id, lcore);
         if (ret != 0)
             return ret;
@@ -1372,7 +1483,7 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
         break;
     default:
         if (lcore_id >= VR_DPDK_IO_LCORE_ID
-            && lcore_id <= VR_DPDK_MAX_IO_LCORE_ID) {
+            && lcore_id <= VR_DPDK_LAST_IO_LCORE_ID) {
             dpdk_lcore_io_loop();
         } else if (lcore_id >= VR_DPDK_FWD_LCORE_ID) {
             dpdk_lcore_fwd_loop();

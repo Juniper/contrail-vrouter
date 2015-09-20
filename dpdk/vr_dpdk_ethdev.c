@@ -679,11 +679,12 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
     return 0;
 }
 
-/* Emulate smart NIC RSS hash
+/*
+ * dpdk_mbuf_rss_hash - emulate RSS hash for the mbuf.
+ *
+ * Returns 0 if the mbuf's hash was OK, 1 if the hash was recalculated.
+ *
  * TODO: add MPLSoGRE case
- * Returns:
- *     0  if the mbuf has been hashed by NIC
- *     1  otherwise
  */
 static inline int
 dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
@@ -751,17 +752,20 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf)
     return 1;
 }
 
-/* Emulate smart NIC RX for a burst of mbufs
- * Returns:
- *     0  if at least one mbuf has been hashed by NIC, so there is
- *        no need to emulate RSS
- *     1  if the RSS need to be emulated
+/*
+ * vr_dpdk_ethdev_rx_emulate - emulate smart NIC RX:
+ *  - strip VLAN tags for packets received from fabric interface
+ *  - calculate RSS hash if not present
+ *  - recalculate RSS hash for MPLSoGRE packets
+ *
+ * Returns 0 on no hash changes, otherwise a bitmask of mbufs to distribute.
  */
-int
-vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
-    uint32_t nb_pkts)
+uint64_t
+vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
+    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts)
 {
     unsigned i;
+    uint64_t mask_to_distribute = 0;
 
     /* prefetch the mbufs */
     for (i = 0; i < nb_pkts; i++) {
@@ -784,10 +788,10 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPD
 
     /* emulate RSS hash */
     for (i = 0; i < nb_pkts; i++) {
-        if (likely(dpdk_mbuf_rss_hash(pkts[i]) == 0)) {
-            return 0;
+        if (unlikely(dpdk_mbuf_rss_hash(pkts[i]) != 0)) {
+            mask_to_distribute |= 1ULL << i;
         }
     }
 
-    return 1;
+    return mask_to_distribute;
 }

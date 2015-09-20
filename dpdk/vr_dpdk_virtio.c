@@ -806,9 +806,10 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         res_cur_idx++;
         packet_success++;
 
+        /* TODO: in DPDK 2.1 we do not copy the header
         if (unlikely(uncompleted_pkt == 1))
             continue;
-
+        */
         rte_memcpy((void *)(uintptr_t)buff_hdr_addr,
             (const void *)&virtio_hdr, sizeof(struct virtio_net_hdr));
 
