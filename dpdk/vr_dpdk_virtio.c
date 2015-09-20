@@ -473,7 +473,7 @@ vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
     return NULL;
 }
 
-#if DPDK_VIRTIO_READER_STATS_COLLECT == 1
+#ifdef RTE_PORT_STATS_COLLECT
 
 #define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val) \
         port->stats.n_pkts_in += val
@@ -630,7 +630,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     return pkts_sent;
 }
 
-#if DPDK_VIRTIO_WRITER_STATS_COLLECT == 1
+#ifdef RTE_PORT_STATS_COLLECT
 
 #define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val) \
         port->stats.n_pkts_in += val
@@ -758,7 +758,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         while (total_copied < pkt_len) {
             /* Copy mbuf data to buffer */
             rte_memcpy((void *)(uintptr_t)(buff_addr + vb_offset),
-                rte_pktmbuf_mtod(buff, const void *) + offset,
+                rte_pktmbuf_mtod_offset(buff, const void *, offset),
                 len_to_cpy);
 
             offset += len_to_cpy;
