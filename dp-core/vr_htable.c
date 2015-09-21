@@ -280,10 +280,7 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
             !oentries || !get_entry_key)
         return NULL;
 
-    if (entries % VR_HENTRIES_PER_BUCKET) {
-        vr_module_error(-EINVAL, __FUNCTION__, __LINE__, entries);
-        return NULL;
-    }
+    entries = entries + (VR_HENTRIES_PER_BUCKET - (entries % VR_HENTRIES_PER_BUCKET));
 
     table = vr_zalloc(sizeof(struct vr_htable), VR_HTABLE_OBJECT);
     if (!table) {
