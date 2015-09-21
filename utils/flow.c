@@ -145,8 +145,8 @@ dump_legend(void)
 static void
 dump_table(struct flow_table *ft)
 {
-    unsigned int i, j, fi, need_flag_print = 0;
-    struct vr_flow_entry *fe;
+    unsigned int i, j, fi, next_index, need_flag_print = 0;
+    struct vr_flow_entry *fe, *ofe;
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
     const char *drop_reason = NULL;
@@ -275,8 +275,23 @@ dump_table(struct flow_table *ft)
                 if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
                     printf(", %d", fe->fe_sec_mirror_id);
             }
-            printf(" UdpSrcPort %d", fe->fe_udp_src_port);
-            printf(")\n\n");
+            printf(" UdpSrcPort %d)\n", fe->fe_udp_src_port);
+            printf("\tOflow entries: ");
+            j = 0;
+
+            next_index = fe->fe_hentry.hentry_next_index;
+
+            while (next_index != VR_INVALID_HENTRY_INDEX) {
+                ofe = (struct vr_flow_entry *)((char *)ft->ft_entries +
+                        (next_index * sizeof(*fe)));
+                printf(" %6d", ofe->fe_hentry.hentry_index);
+                if ((++j % 32) == 0)
+                    printf("\n\t");
+
+                next_index = ofe->fe_hentry.hentry_next_index;
+            }
+
+            printf("\n\n");
         }
     }
 
