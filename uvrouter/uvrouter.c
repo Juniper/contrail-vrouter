@@ -30,6 +30,10 @@ get_random_bytes(void *buf, int nbytes)
 {
 }
 
+void
+yield()
+{
+}
 
 uint32_t
 jhash(void *key, uint32_t length, uint32_t initval)
