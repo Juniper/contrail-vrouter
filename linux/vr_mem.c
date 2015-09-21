@@ -50,8 +50,7 @@ mem_dev_mmap(struct file *fp, struct vm_area_struct *vma)
         return -ENOMEM;
 
     size = vma->vm_end - vma->vm_start;
-    flow_table_size = vr_flow_table_size(router) +
-        vr_oflow_table_size(router);
+    flow_table_size = vr_flow_table_size(router);
     if (size > flow_table_size)
         return -EINVAL;
 
