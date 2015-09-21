@@ -9,9 +9,9 @@
 
 typedef struct vr_bmap_opaque  *vr_bmap_t;
 
+unsigned int vr_bitmap_used_bits(vr_bmap_t);
 bool vr_bitmap_valid_bit(vr_bmap_t, unsigned int);
-bool vr_bitmap_set_bit(vr_bmap_t, unsigned int);
-int vr_bitmap_get_first_free_bit(vr_bmap_t);
+int vr_bitmap_set_first_free_bit(vr_bmap_t);
 bool vr_bitmap_clear_bit(vr_bmap_t, unsigned int);
 void vr_bitmap_delete(vr_bmap_t);
 vr_bmap_t vr_bitmap_create(unsigned int);
