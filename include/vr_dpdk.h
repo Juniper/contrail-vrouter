@@ -354,7 +354,7 @@ vr_dpdk_mbuf_reset(struct vr_packet *pkt)
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
 
     pkt->vp_head = mbuf->buf_addr;
-    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->pkt.data_len;
+    pkt->vp_tail = rte_pktmbuf_headroom(mbuf) + mbuf->data_len;
     pkt->vp_end = mbuf->buf_len;
     pkt->vp_len = pkt->vp_tail - pkt->vp_data;
 

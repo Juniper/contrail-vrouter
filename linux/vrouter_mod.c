@@ -409,6 +409,13 @@ lh_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 }
 
 static void
+lh_work_flush(void)
+{
+    flush_scheduled_work();
+    return;
+}
+
+static void
 lh_delay_op(void)
 {
     synchronize_net();
@@ -476,6 +483,13 @@ lh_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
     cb_data->rcd_router = router;
     call_rcu(&cb_data->rcd_rcu, rcu_cb);
 
+    return;
+}
+
+static void
+lh_defer_flush(void)
+{
+    rcu_barrier();
     return;
 }
 
@@ -2379,6 +2393,8 @@ struct host_os linux_host = {
     .hos_pkt_from_vm_tcp_mss_adj    =       lh_pkt_from_vm_tcp_mss_adj,
     .hos_pkt_may_pull               =       lh_pkt_may_pull,
     .hos_gro_process                =       lh_gro_process,
+    .hos_defer_flush                =       lh_defer_flush,
+    .hos_work_flush                 =       lh_work_flush,
 };
     
 struct host_os *
@@ -2575,8 +2591,6 @@ vrouter_linux_exit(void)
     vr_message_exit();
     vr_mem_exit();
     vrouter_exit(false);
-    flush_scheduled_work();
-    rcu_barrier();
     return;
 }
 
