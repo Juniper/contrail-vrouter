@@ -65,6 +65,12 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
     }
 
+     /* If ECMP source, we force routing */
+     if (fmd->fmd_ecmp_src_nh_index != -1) {
+         resp_mac = vif->vif_mac;
+         fmd->fmd_ecmp_src_nh_index = -1;
+     }
+
 
     /*
      * situations that are handled here (from_fabric)
@@ -112,9 +118,8 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
          * the originator is a bare metal (fmd->fmd_src)
          */
         if (to_vcp || to_gateway ||
-                ((nh) &&
-                 ((nh->nh_type == NH_ENCAP) ||
-                  (fmd->fmd_src == TOR_SOURCE)))) {
+                (nh && ((nh->nh_type == NH_ENCAP) ||
+                (fmd->fmd_src == TOR_SOURCE)))) {
             if (stats)
                 stats->vrf_arp_physical_stitch++;
         } else {
@@ -123,11 +128,12 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             return MR_FLOOD;
         }
     } else {
-        /*
-         * if there is no stitching information, but flood flag is set
-         * we should flood
-         */
+
         if (!stitched && flood) {
+            /*
+             * if there is no stitching information, but flood flag is set
+             * we should flood
+             */
             if (stats)
                 stats->vrf_arp_virtual_flood++;
             return MR_FLOOD;
