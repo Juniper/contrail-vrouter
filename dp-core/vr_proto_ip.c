@@ -1023,9 +1023,8 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
             if (!(rt.rtr_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))
                 return MR_DROP;
 
-            /* If ECMP, we need to route the L3 packets */
-            VR_MAC_COPY(dmac, vif->vif_mac);
-            return MR_PROXY;
+            /* Mark it as ecmp source. -1 is invalid */
+            fmd->fmd_ecmp_src_nh_index = 0;
         }
 
         rt.rtr_nh = NULL;
