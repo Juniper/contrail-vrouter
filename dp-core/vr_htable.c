@@ -279,11 +279,9 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
     if (!is_valid_entry || !key_size || !entry_size || !entries ||
             !oentries || !get_entry_key)
         return NULL;
-
-    if (entries % VR_HENTRIES_PER_BUCKET) {
-        vr_module_error(-EINVAL, __FUNCTION__, __LINE__, entries);
-        return NULL;
-    }
+    /* Ceil to near upper number, which is dividable by VR_HTABLE_OBJECT. */
+    entries = ((entries + VR_HENTRIES_PER_BUCKET -1) / VR_HENTRIES_PER_BUCKET)
+               * VR_HENTRIES_PER_BUCKET;
 
     table = vr_zalloc(sizeof(struct vr_htable), VR_HTABLE_OBJECT);
     if (!table) {
