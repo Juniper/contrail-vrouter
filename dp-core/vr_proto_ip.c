@@ -985,11 +985,29 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     rt.rtr_req.rtr_family = AF_INET;
     rt.rtr_req.rtr_prefix = (uint8_t *)&rt_prefix;
-    *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_dpa);
     rt.rtr_req.rtr_prefix_size = 4;
     rt.rtr_req.rtr_prefix_len = 32;
     rt.rtr_req.rtr_mac = mac;
 
+    if (!vr_grat_arp(sarp)) {
+        *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_spa);
+        vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
+
+        if (rt.rtr_nh->nh_type == NH_COMPOSITE) {
+            /* The source of ARP request can not be anything other than ECMP */
+            if (!(rt.rtr_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))
+                return MR_DROP;
+
+            /* Mark it as ecmp source. -1 is invalid */
+            fmd->fmd_ecmp_src_nh_index = 0;
+        }
+
+        rt.rtr_nh = NULL;
+        rt.rtr_req.rtr_prefix_len = 32;
+        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    }
+
+    *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_dpa);
     vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
 
     if (vr_grat_arp(sarp)) {
