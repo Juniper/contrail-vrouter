@@ -95,12 +95,19 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
 
 #if (RTE_VERSION < RTE_VERSION_NUM(2, 1, 0, 0))
     /* decrease rte packet size to fit vr_packet struct */
-    m->buf_len -= sizeof(struct vr_packet);
+    /* TODO: See explanation of the TODO below. Commented out:
+     *   m->buf_len -= sizeof(struct vr_packet); */
     RTE_VERIFY(0 < m->buf_len);
 
     /* start of buffer is just after vr_packet structure */
-    m->buf_addr += sizeof(struct vr_packet);
-    m->buf_physaddr += sizeof(struct vr_packet);
+    /* TODO: This is a workaround that allows for correct freeing of the
+     * indirect mbufs that are result of IP fragmentation. It only affects DPDK
+     * prior to 2.1. This works only because we (currently) never prepend large
+     * enough data to the mbuf and we can afford to keep the vr_packet
+     * structure in the headspace of the mbuf without moving forward these
+     * pointers. Commented out:
+     *   m->buf_addr += sizeof(struct vr_packet);
+     *   m->buf_physaddr += sizeof(struct vr_packet); */
 #endif
 
     /* basic vr_packet initialization */
