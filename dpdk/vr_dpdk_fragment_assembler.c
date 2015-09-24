@@ -93,9 +93,10 @@ dpdk_assembler_table_exit(void)
 
     if (assembler_table) {
         for (i = 0; i < vr_dpdk.nb_fwd_lcores; ++i) {
-            if (assembler_table[i] != NULL)
+            if (assembler_table[i] != NULL) {
                 vr_free(assembler_table[i], VR_ASSEMBLER_TABLE_OBJECT);
-            assembler_table = NULL;
+                assembler_table[i] = NULL;
+            }
         }
 
         vr_free(assembler_table, VR_ASSEMBLER_TABLE_OBJECT);
@@ -165,7 +166,8 @@ dpdk_fragment_queue_exit(void)
     }
 
     for (i = 0; i < vr_dpdk.nb_fwd_lcores; ++i) {
-        vr_fragment_queue_free(&per_cpu_queues[i].queue);
+        if (per_cpu_queues[i].queue.vfq_tail != NULL)
+            vr_fragment_queue_free(&per_cpu_queues[i].queue);
     }
 
     vr_free(per_cpu_queues, VR_FRAGMENT_QUEUE_OBJECT);
