@@ -110,12 +110,12 @@ extern int dpdk_vlan_forwarding_if_add(void);
 /* Maximum number of bond interfaces per lcore */
 #define VR_DPDK_MAX_BONDS           2
 /* Max size of a single packet */
-#define VR_DPDK_MAX_PACKET_SZ       2048
+#define VR_DPDK_MAX_PACKET_SZ       9160
 /* Number of bytes needed for each mbuf */
 #define VR_DPDK_MBUF_SZ             (VR_DPDK_MAX_PACKET_SZ      \
                                     + sizeof(struct rte_mbuf)   \
-                                    + RTE_PKTMBUF_HEADROOM      \
-                                    + sizeof(struct vr_packet))
+                                    + sizeof(struct vr_packet) \
+                                    + RTE_PKTMBUF_HEADROOM)
 /* Size of direc mbuf used for fragmentation. It needs a headroom as it holds
  * the IP headers of the fragments and we have to prepend an outer (tunnel)
  * header. */

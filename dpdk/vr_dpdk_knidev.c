@@ -17,6 +17,7 @@
 #include "vr_dpdk.h"
 #include "vr_packet.h"
 
+#include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_kni.h>
 #include <rte_malloc.h>
@@ -412,45 +413,77 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 {
     struct vrouter *router = vrouter_get(0);
     struct vr_interface *vif;
-    int i = 0;
-    uint8_t ethdev_port_id;
-    int ret = 0;
+    int i, ret;
+    uint8_t ethdev_port_id, slave_port_id;
+    struct vr_dpdk_ethdev *ethdev = NULL;
 
-    RTE_LOG(INFO, VROUTER, "Change MTU of eth device %" PRIu8 " to %u\n",
+    RTE_LOG(INFO, VROUTER, "Changing eth device %" PRIu8 " MTU to %u\n",
                     port_id, new_mtu);
     if (port_id >= rte_eth_dev_count()) {
-        RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
+        RTE_LOG(ERR, VROUTER, "Error changing eth device %"PRIu8" MTU: invalid eth device\n", port_id);
         return -EINVAL;
     }
 
-    ret =  rte_eth_dev_set_mtu(port_id, new_mtu);
-
-    if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "Change MTU of eth device %" PRIu8 " to %u"
-                        " failed (%d)\n", port_id, new_mtu, ret);
+    /*
+     * TODO: DPDK bond PMD does not implement mtu_set op, so we need to
+     * set the MTU manually for all the slaves.
+     */
+    /* Bond vif uses first slave port ID. */
+    if (router->vr_eth_if) {
+        ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
+        if (ethdev && ethdev->ethdev_nb_slaves > 0) {
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                if (port_id == ethdev->ethdev_slaves[i])
+                    break;
+            }
+            /* Clear ethdev if no port match. */
+            if (i >= ethdev->ethdev_nb_slaves)
+                ethdev = NULL;
+        }
     }
-    else { /* On success, inform vrouter about new MTU */
-        for (i = 0; i < router->vr_max_interfaces; i++) {
-            vif = __vrouter_get_interface(router, i);
-            if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
-                ethdev_port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->
-                            ethdev_port_id);
-                if (ethdev_port_id == port_id) {
-                    /* Ethernet header size */
-                    new_mtu += sizeof(struct vr_eth);
-                    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
-                        /* 802.1q header size */
-                        new_mtu += sizeof(uint32_t);
-                    }
-                    vif->vif_mtu = new_mtu;
-                    if (vif->vif_bridge)
-                        vif->vif_bridge->vif_mtu = new_mtu;
+    if (ethdev && ethdev->ethdev_nb_slaves > 0) {
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+            slave_port_id = ethdev->ethdev_slaves[i];
+            RTE_LOG(INFO, VROUTER, "    changing bond member eth device %" PRIu8
+                " MTU to %u\n", slave_port_id, new_mtu);
+
+            ret =  rte_eth_dev_set_mtu(slave_port_id, new_mtu);
+            if (ret < 0) {
+                RTE_LOG(ERR, VROUTER, "    error changing bond member eth device %" PRIu8
+                    " MTU: %s (%d)\n", slave_port_id, rte_strerror(-ret), -ret);
+                return ret;
+            }
+        }
+    } else {
+        ret =  rte_eth_dev_set_mtu(port_id, new_mtu);
+        if (ret < 0) {
+            RTE_LOG(ERR, VROUTER, "Error changing eth device %" PRIu8
+                " MTU: %s (%d)\n", port_id, rte_strerror(-ret), -ret);
+        }
+        return ret;
+    }
+
+    /* On success, inform vrouter about new MTU */
+    for (i = 0; i < router->vr_max_interfaces; i++) {
+        vif = __vrouter_get_interface(router, i);
+        if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+            ethdev_port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->
+                        ethdev_port_id);
+            if (ethdev_port_id == port_id) {
+                /* Ethernet header size */
+                new_mtu += sizeof(struct vr_eth);
+                if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+                    /* 802.1q header size */
+                    new_mtu += sizeof(uint32_t);
                 }
+                vif->vif_mtu = new_mtu;
+                if (vif->vif_bridge)
+                    vif->vif_bridge->vif_mtu = new_mtu;
             }
         }
     }
 
-    return ret;
+    return 0;
 }
 
 

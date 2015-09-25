@@ -95,10 +95,10 @@ static char *dpdk_argv[] = {
 /* Timestamp logger */
 static FILE *timestamp_log_stream;
 
-#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
 /* A packet mbuf pool constructor with vr_packet support */
 void vr_dpdk_pktmbuf_pool_init(struct rte_mempool *mp, void *opaque_arg)
 {
+#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
     struct rte_pktmbuf_pool_private priv;
 
     /* Set private mbuf size for vr_packet. */
@@ -107,13 +107,11 @@ void vr_dpdk_pktmbuf_pool_init(struct rte_mempool *mp, void *opaque_arg)
     priv.mbuf_priv_size = sizeof(struct vr_packet);
 
     rte_pktmbuf_pool_init(mp, &priv);
-}
 #else
-void vr_dpdk_pktmbuf_pool_init(struct rte_mempool *mp, void *opaque_arg)
-{
-    rte_pktmbuf_pool_init(mp, opaque_arg);
-}
+    rte_pktmbuf_pool_init(mp, (void *)(mp->elt_size - sizeof(struct rte_mbuf)
+        - sizeof(struct vr_packet)));
 #endif
+}
 
 /* The packet mbuf constructor with vr_packet support */
 void
