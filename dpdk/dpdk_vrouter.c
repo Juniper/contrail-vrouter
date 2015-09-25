@@ -31,7 +31,40 @@
 #include <rte_kni.h>
 #include <rte_timer.h>
 
-#define LCORES_ARG "--lcores"
+/* vRouter/DPDK command-line options. */
+enum vr_opt_index {
+#define NO_DAEMON_OPT           "no-daemon"
+    NO_DAEMON_OPT_INDEX,
+#define HELP_OPT                "help"
+    HELP_OPT_INDEX,
+#define VERSION_OPT             "version"
+    VERSION_OPT_INDEX,
+#define VLAN_TCI_OPT            "vlan_tci"
+    VLAN_TCI_OPT_INDEX,
+#define VLAN_NAME_OPT           "vlan_fwd_intf_name"
+    VLAN_NAME_OPT_INDEX,
+#define VDEV_OPT                "vdev"
+    VDEV_OPT_INDEX,
+#define BRIDGE_ENTRIES_OPT      "vr_bridge_entries"
+    BRIDGE_ENTRIES_OPT_INDEX,
+#define BRIDGE_OENTRIES_OPT     "vr_bridge_oentries"
+    BRIDGE_OENTRIES_OPT_INDEX,
+#define FLOW_ENTRIES_OPT        "vr_flow_entries"
+    FLOW_ENTRIES_OPT_INDEX,
+#define OFLOW_ENTRIES_OPT       "vr_oflow_entries"
+    OFLOW_ENTRIES_OPT_INDEX,
+#define MPLS_LABELS_OPT         "vr_mpls_labels"
+    MPLS_LABELS_OPT_INDEX,
+#define NEXTHOPS_OPT            "vr_nexthops"
+    NEXTHOPS_OPT_INDEX,
+#define VRFS_OPT                "vr_vrfs"
+    VRFS_OPT_INDEX,
+#define SOCKET_MEM_OPT          "socket-mem"
+    SOCKET_MEM_OPT_INDEX,
+#define LCORES_OPT              "lcores"
+    LCORES_OPT_INDEX,
+    MAX_OPT_INDEX
+};
 
 /* dp-core parameters */
 extern unsigned int vr_bridge_entries;
@@ -46,21 +79,18 @@ extern char *ContrailBuildInfo;
 /* Global vRouter/DPDK structure */
 struct vr_dpdk_global vr_dpdk;
 
-/* Arguments for EAL init */
+/* EAL command line options for rte_eal_init() */
 static char *dpdk_argv[] = {
     "dpdk",
-    /* the argument will be updated in dpdk_init() */
-    LCORES_ARG, NULL,
-    "-m", VR_DPDK_MAX_MEM,
     "-n", VR_DPDK_MAX_MEMCHANNELS,
-    /* up to ten optional arguments (5 pairs of argument + option) */
+    "-m", VR_DPDK_DEF_MEM,
+    /* Up to 5 pairs of argument-value (for vdev, lcores, socket-mem options). */
     NULL, NULL,
     NULL, NULL,
     NULL, NULL,
     NULL, NULL,
     NULL, NULL
 };
-static int dpdk_argc = RTE_DIM(dpdk_argv) - 10;
 
 /* Timestamp logger */
 static FILE *timestamp_log_stream;
@@ -366,7 +396,51 @@ dpdk_fwd_core_mask_stringify(uint64_t core_mask)
     return core_mask_string;
 }
 
-/* Updates parameters of EAL initialization in dpdk_argv[]. */
+/*
+ * dpdk_argv_remove - remove specific argument and value from dpdk_argv[]
+ * Returns 0 on success, < 0 otherwise.
+ */
+static int
+dpdk_argv_remove(char *arg)
+{
+    int i;
+    int len = strlen(arg);
+
+    for (i = 0; i < RTE_DIM(dpdk_argv) - 1; i++) {
+        if (strncmp(dpdk_argv[i], arg, len) == 0) {
+            dpdk_argv[i] = NULL;
+            dpdk_argv[i + 1] = NULL;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+/*
+ * dpdk_argv_append - append argument and value to dpdk_argv[]
+ * Returns 0 on success, < 0 otherwise.
+ */
+static int
+dpdk_argv_append(char *arg, char *val)
+{
+    int i;
+
+    for (i = 0; i < RTE_DIM(dpdk_argv) - 1; i++) {
+        if (dpdk_argv[i] == NULL && dpdk_argv[i + 1] == NULL) {
+            dpdk_argv[i] = arg;
+            dpdk_argv[i + 1] = val;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+/*
+ * dpdk_argv_update - update EAL command line options for rte_eal_init()
+ * Returns number of arguments in dpdk_argv on success, < 0 otherwise.
+ */
 static int
 dpdk_argv_update(void)
 {
@@ -448,14 +522,9 @@ dpdk_argv_update(void)
             == sizeof(lcores_string)) {
         return -1;
     }
-
-    /* find and update the argument */
-    for (i = 0; i < dpdk_argc; i++) {
-        if (strncmp(LCORES_ARG, dpdk_argv[i], sizeof(LCORES_ARG)) == 0) {
-            dpdk_argv[i + 1] = lcores_string;
-            break;
-        }
-    }
+    /* Append lcores option. */
+    if (dpdk_argv_append("--"LCORES_OPT, lcores_string) != 0)
+        return -1;
 
     /* print out configuration */
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
@@ -476,11 +545,13 @@ dpdk_argv_update(void)
     RTE_LOG(INFO, VROUTER, "VRF tables limit:            %" PRIu32 "\n",
                 vr_vrfs);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
-    for (i = 1; i < dpdk_argc - 1; i += 2) {
+    for (i = 1; i < RTE_DIM(dpdk_argv) - 1; i += 2) {
+        if (dpdk_argv[i] == NULL)
+            break;
         RTE_LOG(INFO, VROUTER, " %12s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
     }
 
-    return 0;
+    return i;
 }
 
 static void
@@ -504,12 +575,13 @@ dpdk_init(void)
         return ret;
     }
 
-    if (dpdk_argv_update() == -1) {
+    ret = dpdk_argv_update();
+    if (ret == -1) {
         RTE_LOG(ERR, VROUTER, "Error updating lcores arguments\n");
         return -1;
     }
 
-    ret = rte_eal_init(dpdk_argc, dpdk_argv);
+    ret = rte_eal_init(ret, dpdk_argv);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "Error initializing EAL\n");
         return ret;
@@ -672,49 +744,34 @@ vr_dpdk_exit_trigger(void)
     return;
 }
 
-enum vr_opt_index {
-    NO_DAEMON_OPT_INDEX,
-    HELP_OPT_INDEX,
-    VERSION_OPT_INDEX,
-    VLAN_TCI_OPT_INDEX,
-    VLAN_NAME_OPT_INDEX,
-    VDEV_OPT_INDEX,
-    BRIDGE_ENTRIES_OPT_INDEX,
-    BRIDGE_OENTRIES_OPT_INDEX,
-    FLOW_ENTRIES_OPT_INDEX,
-    OFLOW_ENTRIES_OPT_INDEX,
-    MPLS_LABELS_OPT_INDEX,
-    NEXTHOPS_OPT_INDEX,
-    VRFS_OPT_INDEX,
-    MAX_OPT_INDEX
-};
-
 static struct option long_options[] = {
-    [NO_DAEMON_OPT_INDEX]           =   {"no-daemon",           no_argument,
+    [NO_DAEMON_OPT_INDEX]           =   {NO_DAEMON_OPT,         no_argument,
                                                     &no_daemon_set,         1},
-    [HELP_OPT_INDEX]                =   {"help",                no_argument,
+    [HELP_OPT_INDEX]                =   {HELP_OPT,              no_argument,
                                                     NULL,                   0},
-    [VERSION_OPT_INDEX]             =   {"version",             no_argument,
+    [VERSION_OPT_INDEX]             =   {VERSION_OPT,           no_argument,
                                                     NULL,                   0},
-    [VLAN_TCI_OPT_INDEX]            =   {"vlan_tci",            required_argument,
+    [VLAN_TCI_OPT_INDEX]            =   {VLAN_TCI_OPT,          required_argument,
                                                     NULL,                   0},
-    [VLAN_NAME_OPT_INDEX]           =   {"vlan_fwd_intf_name",  required_argument,
+    [VLAN_NAME_OPT_INDEX]           =   {VLAN_NAME_OPT,         required_argument,
                                                     NULL,                   0},
-    [VDEV_OPT_INDEX]                =   {"vdev",                required_argument,
+    [VDEV_OPT_INDEX]                =   {VDEV_OPT,              required_argument,
                                                     NULL,                   0},
-    [BRIDGE_ENTRIES_OPT_INDEX]      =   {"vr_bridge_entries",   required_argument,
+    [BRIDGE_ENTRIES_OPT_INDEX]      =   {BRIDGE_ENTRIES_OPT,    required_argument,
                                                     NULL,                   0},
-    [BRIDGE_OENTRIES_OPT_INDEX]     =   {"vr_bridge_oentries",  required_argument,
+    [BRIDGE_OENTRIES_OPT_INDEX]     =   {BRIDGE_OENTRIES_OPT,   required_argument,
                                                     NULL,                   0},
-    [FLOW_ENTRIES_OPT_INDEX]        =   {"vr_flow_entries",     required_argument,
+    [FLOW_ENTRIES_OPT_INDEX]        =   {FLOW_ENTRIES_OPT,      required_argument,
                                                     NULL,                   0},
-    [OFLOW_ENTRIES_OPT_INDEX]       =   {"vr_oflow_entries",    required_argument,
+    [OFLOW_ENTRIES_OPT_INDEX]       =   {OFLOW_ENTRIES_OPT,     required_argument,
                                                     NULL,                   0},
-    [MPLS_LABELS_OPT_INDEX]         =   {"vr_mpls_labels",      required_argument,
+    [MPLS_LABELS_OPT_INDEX]         =   {MPLS_LABELS_OPT,       required_argument,
                                                     NULL,                   0},
-    [NEXTHOPS_OPT_INDEX]            =   {"vr_nexthops",         required_argument,
+    [NEXTHOPS_OPT_INDEX]            =   {NEXTHOPS_OPT,          required_argument,
                                                     NULL,                   0},
-    [VRFS_OPT_INDEX]                =   {"vr_vrfs",             required_argument,
+    [VRFS_OPT_INDEX]                =   {VRFS_OPT,              required_argument,
+                                                    NULL,                   0},
+    [SOCKET_MEM_OPT_INDEX]          =   {SOCKET_MEM_OPT,        required_argument,
                                                     NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
@@ -724,39 +781,35 @@ static void
 Usage(void)
 {
     printf(
-        "Usage:   contrail-vrouter-dpdk [--no-daemon] [--help] [--version]\n"
-        "             [--vdev <config>]\n"
-        "             [--vlan_tci <tci>] [--vlan_fwd_intf_name <name>]\n"
-        "             [--vr_bridge_entries <number>] [--vr_bridge_oentries <number>]\n"
-        "             [--vr_flow_entries <number>] [--vr_oflow_entries <number>]\n"
-        "             [--vr_mpls_labels <number>] [--vr_nexthops <number>]\n"
-        "             [--vr_vrfs <number>]\n"
+        "Usage: contrail-vrouter-dpdk [options]\n"
+        "    --"NO_DAEMON_OPT"  Do not demonize the vRouter\n"
+        "    --"HELP_OPT"       This help\n"
+        "    --"VERSION_OPT"    Display build information\n"
         "\n"
-        "--no-daemon  Do not demonize the vRouter\n"
-        "--help       Prints this help message\n"
-        "--version    Prints build information\n"
+        "    --"VDEV_OPT" CONF          Add a virtual device.\n"
+        "                         The argument format is <driver><id>[,key=val,...]\n"
+        "                         (ex: --"VDEV_OPT" eth_bond0,mode=4,slave=0000:04:00.0)\n"
+        "    --"SOCKET_MEM_OPT" MB,...  Memory to allocate on sockets.\n"
+        "                         (ex: --"SOCKET_MEM_OPT" 256,256)\n"
         "\n"
-        "--vdev                 <config>    Virtual device configuration\n"
-        "--vlan_tci             <tci>       VLAN tag control information\n"
-        "--vlan_fwd_intf_name   <name>      VLAN forwarding interface name\n"
+        "    --"VLAN_TCI_OPT" TCI             VLAN tag control information to use\n"
+        "    --"VLAN_NAME_OPT" NAME  VLAN forwarding interface name\n"
         "\n"
-        "--vr_bridge_entries    <number>    Bridge Table limit\n"
-        "--vr_bridge_oentries   <number>    Bridge Table overflow limit\n"
-        "--vr_flow_entries      <number>    Flow Table limit\n"
-        "--vr_oflow_entries     <number>    Flow Table overflow limit\n"
-        "--vr_mpls_labels       <number>    MPLS labels limit\n"
-        "--vr_nexthops          <number>    Nexthop limit\n"
-        "--vr_vrfs              <number>    VRF tables limit\n"
+        "    --"BRIDGE_ENTRIES_OPT" NUM   Bridge table limit\n"
+        "    --"BRIDGE_OENTRIES_OPT" NUM  Bridge table overflow limit\n"
+        "    --"FLOW_ENTRIES_OPT" NUM     Flow table limit\n"
+        "    --"OFLOW_ENTRIES_OPT" NUM    Flow overflow table limit\n"
+        "    --"MPLS_LABELS_OPT" NUM      MPLS table limit\n"
+        "    --"NEXTHOPS_OPT" NUM         Nexthop table limit\n"
+        "    --"VRFS_OPT" NUM             VRF tables limit\n"
         );
 
     exit(1);
 }
 
 static void
-parse_long_opts(int opt_flow_index, char *opt_arg)
+parse_long_opts(int opt_flow_index, char *optarg)
 {
-    int i;
-
     errno = 0;
     switch (opt_flow_index) {
     case NO_DAEMON_OPT_INDEX:
@@ -791,20 +844,12 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
      * an interface with name defined here.
      */
     case VLAN_NAME_OPT_INDEX:
-        strncpy(vr_dpdk.vlan_name, opt_arg, sizeof(vr_dpdk.vlan_name) - 1);
+        strncpy(vr_dpdk.vlan_name, optarg, sizeof(vr_dpdk.vlan_name) - 1);
         break;
 
 
     case VDEV_OPT_INDEX:
-        /* find a pair of free arguments */
-        for (i = 0; i < RTE_DIM(dpdk_argv) - 1; i++) {
-            if (dpdk_argv[i] == NULL && dpdk_argv[i + 1] == NULL) {
-                dpdk_argv[i] = "--vdev";
-                dpdk_argv[i + 1] = opt_arg;
-                dpdk_argc += 2;
-                break;
-            }
-        }
+        dpdk_argv_append("--"VDEV_OPT, optarg);
         break;
 
     case BRIDGE_ENTRIES_OPT_INDEX:
@@ -854,6 +899,12 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         if (errno != 0) {
             vr_vrfs = VR_DEF_VRFS;
         }
+        break;
+
+    case SOCKET_MEM_OPT_INDEX:
+        /* Remove -m option if present. */
+        dpdk_argv_remove("-m");
+        dpdk_argv_append("--"SOCKET_MEM_OPT, optarg);
         break;
 
     case HELP_OPT_INDEX:
