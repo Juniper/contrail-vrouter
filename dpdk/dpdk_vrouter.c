@@ -352,16 +352,17 @@ dpdk_fwd_core_mask_stringify(uint64_t core_mask)
             if (p != core_mask_string)
                 *p++ = ',';
 
+            if (nb_fwd_cores == 0
+                && io_lcore_id == VR_DPDK_LAST_IO_LCORE_ID + 1) {
+                RTE_LOG(WARNING, VROUTER,
+                    "Warning: IO lcores limit exceeded (%d > %d)\n",
+                    io_lcore_id, VR_DPDK_LAST_IO_LCORE_ID);
+                io_lcore_id++;
+            }
             if (VR_DPDK_USE_IO_LCORES && !VR_DPDK_SHARED_IO_LCORES
-                    && nb_fwd_cores == 0) {
+                    && nb_fwd_cores == 0
+                    && io_lcore_id <= VR_DPDK_LAST_IO_LCORE_ID) {
                 /* first dedicated CPU is an IO lcore */
-                if (io_lcore_id > VR_DPDK_LAST_IO_LCORE_ID) {
-                    RTE_LOG(WARNING, VROUTER,
-                        "Warning: IO lcores limit exceeded (%d > %d)\n",
-                        io_lcore_id, VR_DPDK_LAST_IO_LCORE_ID);
-                    break;
-                }
-
                 p += snprintf(p,
                         sizeof(core_mask_string) - (p - core_mask_string),
                         "%d@%d", io_lcore_id, cpu_id);
@@ -467,9 +468,13 @@ dpdk_argv_update(void)
         if (VR_DPDK_SHARED_IO_LCORES) {
             vr_dpdk.nb_io_lcores = (vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORES_PER_IO - 1)
                                     /VR_DPDK_FWD_LCORES_PER_IO;
+            if (vr_dpdk.nb_io_lcores > VR_DPDK_MAX_IO_LORES)
+                vr_dpdk.nb_io_lcores = VR_DPDK_MAX_IO_LORES;
         } else {
             vr_dpdk.nb_io_lcores = (vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORES_PER_IO)
                                     /(VR_DPDK_FWD_LCORES_PER_IO + 1);
+            if (vr_dpdk.nb_io_lcores > VR_DPDK_MAX_IO_LORES)
+                vr_dpdk.nb_io_lcores = VR_DPDK_MAX_IO_LORES;
             vr_dpdk.nb_fwd_lcores -= vr_dpdk.nb_io_lcores;
         }
     }

@@ -985,7 +985,7 @@ dpdk_lcore_dst_lcores_stringify(struct vr_dpdk_lcore *lcore)
         if (p - lcores_str >= sizeof(lcores_str)) {
             RTE_LOG(ERR, VROUTER,
                 "Error stringifying lcores to distribute: buffer overflow\n");
-            return NULL;
+            return "(incomplete)";
         }
     }
     *p = '\0';
