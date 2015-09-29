@@ -279,7 +279,7 @@ vr_htable_create(unsigned int entries, unsigned int oentries,
     if (!is_valid_entry || !key_size || !entry_size || !entries ||
             !oentries || !get_entry_key)
         return NULL;
-    /* Ceil to near upper number, which is dividable by VR_HTABLE_OBJECT. */
+    /* Ceil to near upper number, which is dividable by VR_HENTRIES_PER_BUCKET. */
     entries = ((entries + VR_HENTRIES_PER_BUCKET -1) / VR_HENTRIES_PER_BUCKET)
                * VR_HENTRIES_PER_BUCKET;
 
