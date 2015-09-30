@@ -1198,14 +1198,26 @@ dpdk_if_get_mtu(struct vr_interface *vif)
 {
     uint8_t port_id;
     uint16_t mtu;
+    unsigned l3_mtu;
+
+    l3_mtu = vif->vif_mtu;
 
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
-        if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
+        /* TODO: DPDK bond interfaces does not provide MTU (MTU is 0) */
+        if (rte_eth_dev_get_mtu(port_id, &mtu) == 0 && mtu > 0)
             return mtu;
+
+        /* Decrement Ethernet header size. */
+        l3_mtu -= sizeof(struct vr_eth);
+        if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+            /* Decrement 802.1q header size. */
+            l3_mtu -= sizeof(uint32_t);
+        }
     }
 
-    return vif->vif_mtu;
+
+    return l3_mtu;
 }
 
 static void
