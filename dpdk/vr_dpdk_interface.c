@@ -171,7 +171,10 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     return ret;
 }
 
-/* Add VLAN forwarding interface */
+/*
+ * dpdk_vlan_forwarding_if_add - add VLAN forwarding interface
+ * Returns 0 on success, < 0 otherwise.
+ */
 int
 dpdk_vlan_forwarding_if_add(void)
 {
@@ -182,12 +185,12 @@ dpdk_vlan_forwarding_if_add(void)
         sizeof(vlan_fwd_intf.vif_name));
     vlan_fwd_intf.vif_type = VIF_TYPE_VLAN;
 
-    RTE_LOG(INFO, VROUTER, "Adding VLAN forwarding device %s\n",
+    RTE_LOG(INFO, VROUTER, "Adding VLAN forwarding interface %s\n",
         vr_dpdk.vlan_name);
 
     ret = vr_dpdk_knidev_init(0, &vlan_fwd_intf);
     if (ret != 0) {
-        RTE_LOG(ERR, VROUTER, "Error creating KNI for VLAN forwarding intf\n");
+        RTE_LOG(ERR, VROUTER, "Error initializing KNI for VLAN forwarding interface\n");
         return ret;
     }
 
@@ -201,7 +204,9 @@ dpdk_vlan_forwarding_if_add(void)
     vr_dpdk.vlan_ring = vr_dpdk_ring_allocate(VR_DPDK_FWD_LCORE_ID,
         vr_dpdk.vlan_name, VR_DPDK_TX_RING_SZ, RING_F_SC_DEQ);
     if (!vr_dpdk.vlan_ring) {
-        RTE_LOG(ERR, VROUTER, "Error creating a ring for VLAN forwarding intf\n");
+        RTE_LOG(ERR, VROUTER, "Error allocating ring for VLAN forwarding interface\n");
+        vr_dpdk.vlan_kni = NULL;
+        vr_dpdk_knidev_release(&vlan_fwd_intf);
         return -1;
     }
 
@@ -338,7 +343,8 @@ dpdk_vhost_if_add(struct vr_interface *vif)
         port_id = vif->vif_os_idx;
     }
     else {
-        /* The Agent passes xconnect fabric interface in cross_connect_idx,
+        /*
+         * The Agent passes xconnect fabric interface in cross_connect_idx,
          * but dp-core does not copy it into vr_interface. Instead
          * it looks for an interface with os_idx == cross_connect_idx
          * and sets vif->vif_bridge if there is such an interface.

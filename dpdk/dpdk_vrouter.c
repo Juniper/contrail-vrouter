@@ -1019,15 +1019,10 @@ main(int argc, char *argv[])
         return ret;
     }
 
-    /* create VLAN forwarding interface if needed */
+    /* Create VLAN forwarding interface if needed. */
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
-        ret = dpdk_vlan_forwarding_if_add();
-        if (ret != 0) {
-            vr_dpdk_host_exit();
-            dpdk_fragment_assembler_exit();
-            dpdk_exit();
-            return ret;
-        }
+        dpdk_vlan_forwarding_if_add();
+        /* vRouter can start without the forwarding if, so ignore any errors. */
     }
 
     /* run all the lcores */
