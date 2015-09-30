@@ -1199,7 +1199,8 @@ dpdk_if_get_mtu(struct vr_interface *vif)
 
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
-        if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
+        /* TODO: DPDK bond interfaces does not provide MTU (MTU is 0) */
+        if (rte_eth_dev_get_mtu(port_id, &mtu) == 0 && mtu > 0)
             return mtu;
     }
 
