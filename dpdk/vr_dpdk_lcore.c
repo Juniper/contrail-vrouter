@@ -617,7 +617,8 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
          * forwarded to the kernel.
          */
         if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)
-                && mbuf->vlan_tci != vr_dpdk.vlan_tag)) {
+                && mbuf->vlan_tci != vr_dpdk.vlan_tag
+                && vr_dpdk.vlan_ring)) {
             if (rte_vlan_insert(&mbuf)) {
                 vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
                 continue;
@@ -921,7 +922,8 @@ dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
      * This is done only by the first forwarding lcore.
      */
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID
-            && lcore == vr_dpdk.lcores[VR_DPDK_FWD_LCORE_ID]) {
+            && lcore == vr_dpdk.lcores[VR_DPDK_FWD_LCORE_ID]
+            && vr_dpdk.vlan_ring) {
         /*
          * Receive packets from VLAN interface and send them to the wire.
          * Those packets will not be seen in vifdump on the physical vif.
