@@ -1689,7 +1689,8 @@ vr_flow_req_destroy(vr_flow_req *req)
 vr_flow_req *
 vr_flow_req_get(vr_flow_req *ref_req)
 {
-    unsigned int hold_stat_size = vr_num_cpus * sizeof(uint32_t);
+    unsigned int hold_stat_size;
+    unsigned int num_cpus = vr_num_cpus;
     vr_flow_req *req = vr_zalloc(sizeof(*req));
 
     if (!req)
@@ -1702,12 +1703,16 @@ vr_flow_req_get(vr_flow_req *ref_req)
         req->fr_pcap_meta_data_size = 0;
     }
 
+    if (num_cpus > VR_FLOW_MAX_CPUS)
+        num_cpus = VR_FLOW_MAX_CPUS;
+
+    hold_stat_size = num_cpus * sizeof(uint32_t);
     req->fr_hold_stat = vr_zalloc(hold_stat_size);
     if (!req->fr_hold_stat) {
         vr_free(req);
         return NULL;
     }
-    req->fr_hold_stat_size = hold_stat_size;
+    req->fr_hold_stat_size = num_cpus;
 
     return req;
 }
@@ -1719,7 +1724,7 @@ void
 vr_flow_req_process(void *s_req)
 {
     int ret = 0;
-    unsigned int i;
+    unsigned int i, object = VR_FLOW_OBJECT_ID;
     bool need_destroy = false;
     uint64_t hold_count = 0;
 
@@ -1748,7 +1753,7 @@ vr_flow_req_process(void *s_req)
         resp->fr_added = router->vr_flow_table_info->vfti_added;
         resp->fr_cpus = vr_num_cpus;
         /* we only have space for 64 stats block max when encoding */
-        for (i = 0; ((i < vr_num_cpus) && (i < 64)); i++) {
+        for (i = 0; ((i < vr_num_cpus) && (i < VR_FLOW_MAX_CPUS)); i++) {
             resp->fr_hold_stat[i] =
                 router->vr_flow_table_info->vfti_hold_count[i];
             hold_count += resp->fr_hold_stat[i];
@@ -1756,6 +1761,7 @@ vr_flow_req_process(void *s_req)
 
         resp->fr_created = hold_count;
 
+        object = VR_FLOW_INFO_OBJECT_ID;
         break;
 
     case FLOW_OP_FLOW_SET:
@@ -1768,7 +1774,7 @@ vr_flow_req_process(void *s_req)
     }
 
 send_response:
-    vr_message_response(VR_FLOW_OBJECT_ID, resp, ret);
+    vr_message_response(object, resp, ret);
     if (need_destroy) {
         vr_flow_req_destroy(resp);
     }
