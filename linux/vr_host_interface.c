@@ -106,8 +106,10 @@ vr_skb_set_rxhash(struct sk_buff *skb, __u32 val)
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     skb->rxhash = val;
 #endif
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
     skb->rxhash = val;
+#else
+    skb->hash = val;
 #endif
 }
 
@@ -125,8 +127,10 @@ vr_skb_get_rxhash(struct sk_buff *skb)
 #else
     return 0;
 #endif
-#else
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
     return skb->rxhash;
+#else
+    return skb->hash;
 #endif
 }
 
