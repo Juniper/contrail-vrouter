@@ -698,7 +698,7 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
                     nb_pkts_to_route = 0;
                     nb_pkts_to_distribute = 0;
                     for (i = 0; i < nb_pkts; i++) {
-                        if (mask_to_distribute & 1ULL) {
+                        if (mask_to_distribute & (1ULL << i)) {
                             pkts_to_distribute[nb_pkts_to_distribute++] = pkts[i];
                         } else {
                             pkts[nb_pkts_to_route++] = pkts[i];

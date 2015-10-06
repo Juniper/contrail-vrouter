@@ -684,7 +684,9 @@ vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *ethdev)
 /*
  * dpdk_mbuf_rss_hash - emulate RSS hash for the mbuf.
  *
- * Returns 0 if the mbuf's hash was OK, 1 if the hash was recalculated.
+ * Returns:
+ *     0 if hash was not calculated
+ *     1 if hash was calculated.
  *
  * TODO: add inner VLAN and inner IPv6 packet suport.
  */
@@ -729,15 +731,24 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
         mbuf->hash.rss = hash;
         RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n",
                 __func__, mbuf->hash.rss);
+
+        return 1;
     }
 
-    return 1;
+    return 0;
 }
 
 /* dpdk_mbuf_parse_and_hash_packets
  *
  * Parse incoming packet. Check L2, L3 headers, encapsulation type, perform
  * TCP MSS adjust if needed, then call hashing function to.
+ *
+ * Return:
+ *   -1 if packet length is too short to contain valid header
+ *   0 if there is no need to perform hashing (ie. unsupported encap type,
+ *       packet already hashed)
+ *   dpdk_mbuf_rss_hash() if hashing is needed. dpdk_mbuf_rss_hash() returns 1
+ *       if hash was calculated, 0 if not.
  *
  * TODO: add VLAN, VXLAN and IPv6 support.
  *
@@ -764,11 +775,12 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
 
     if (likely(eth_hdr->eth_proto == rte_cpu_to_be_16(VR_ETH_PROTO_IP))) {
         ipv4_hdr = (struct vr_ip *)((uintptr_t)eth_hdr + VR_ETHER_HLEN);
+
+        if (unlikely(mbuf_data_len < pull_len + sizeof(struct vr_ip)))
+            return -1;
+
         ipv4_len = (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER;
         pull_len += ipv4_len;
-
-        if (unlikely(mbuf_data_len < pull_len))
-            return -1;
 
         if (ipv4_hdr->ip_proto == VR_IP_PROTO_GRE) {
             gre_hdr = (struct vr_gre *)((uintptr_t)ipv4_hdr + ipv4_len);
@@ -800,8 +812,9 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
                  * removed here and will be set after we perform hashing.
                  */
                 mbuf->ol_flags &= ~PKT_RX_RSS_HASH;
+                /* Go to parsing. */
             } else {
-                return 0;
+                return 0; /* Looks like GRE, but no MPLS. */
             }
         } else if (ipv4_hdr->ip_proto == VR_IP_PROTO_UDP) {
             /* At this point the packet may be:
@@ -830,12 +843,15 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
                     return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
 
                 gre_udp_encap = udp_hdr->udp_dport;
+                /* Go to parsing. */
             } else { /* TODO: VXLAN support */
-                return 0;
+                return 0; /* UDP from the wire, but not MPLS-over-UDP. */
             }
         } else if ((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0) {
             /* Looks like no tunneling, perhaps a packet from a VM. */
             return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
+        } else {
+            return 0; /* Not MPLS-over-GRE, not MPLS-over-UDP, not anything from VM. */
         }
 
         helper_ret = vr_inner_pkt_parse(rte_pktmbuf_mtod(mbuf, unsigned char *),
@@ -869,6 +885,8 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             /* TODO: internal IPv6 support */
             if (gre_hdr && ipv4_inner_hdr)
                 ipv4_hdr = ipv4_inner_hdr;
+
+            /* Go to hashing */
         }
     } else {
         return 0; /* TODO: VLAN tag support */
@@ -889,8 +907,8 @@ uint64_t
 vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t *nb_pkts)
 {
-    struct rte_mbuf *pkts_ret[VR_DPDK_RX_BURST_SZ];
-    uint64_t mask_to_distribute = 0;
+    uint64_t mask_to_distribute = 0, mask_to_distribute_ret = 0,
+             mask_to_drop = 0;
     unsigned i, nb_pkts_ret = 0;
     int ret;
 
@@ -917,28 +935,41 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     for (i = 0; i < *nb_pkts; i++) {
         ret = dpdk_mbuf_parse_and_hash_packets(pkts[i]);
 
-        /*
-         * Return code indicates if packet is too short to be valid. Such
-         * packets are dropped here. Valid packets are put continuously to one
-         * array, to avoid routing/distributing invalid packets. At the end of
-         * the process, caller gets array of valid packets and new number of
-         * packets in the array.
+        /**
+         * ret:
+         *     -1 -> packet is invalid and needs to be dropped
+         *      1 -> packet to be distributed (bit in mask_to_distribute set)
+         *      0 -> packet to be routed (bit in mask_to_distribute not set)
          */
-        if (likely(ret == 0)) {
-            pkts_ret[nb_pkts_ret++] = pkts[i];
-        } else if (ret == -1) {
-            vr_dpdk_pfree(pkts[i], VP_DROP_PULL);
-        } else if (ret == 1) {
-            mask_to_distribute |= 1ULL << nb_pkts_ret;
-            pkts_ret[nb_pkts_ret++] = pkts[i];
+        if (ret == 1) {
+            mask_to_distribute |= 1ULL << i;
+        } else if (unlikely(ret == -1)) {
+            mask_to_drop |= 1ULL << i;
         }
     }
 
-    /* return array without dropped packets */
-    for (i = 0; i < nb_pkts_ret; i++) {
-        pkts[i] = pkts_ret[i];
+    /**
+     * Drop invalid packets masked with mask_to_drop and remove them from the
+     * array. Bits in mask_to_distribute need to be rewritten in order to get
+     * rid of bits refering to dropped packets.
+     */
+    if (unlikely(mask_to_drop != 0)) {
+        for (i = 0; i < *nb_pkts; i++) {
+            if (mask_to_drop & (1ULL << i)) {
+                vr_dpdk_pfree(pkts[i], VP_DROP_PULL);
+            } else {
+                pkts[nb_pkts_ret] = pkts[i];
+                if (mask_to_distribute & (1ULL << i)) {
+                    mask_to_distribute_ret |= 1ULL << nb_pkts_ret;
+                }
+                nb_pkts_ret++;
+            }
+        }
+
+        /* Return number of valid packets and update mask_to_distribute */
+        *nb_pkts = nb_pkts_ret;
+        mask_to_distribute = mask_to_distribute_ret;
     }
-    *nb_pkts = nb_pkts_ret;
 
     return mask_to_distribute;
 }
