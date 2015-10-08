@@ -2047,6 +2047,15 @@ lh_get_enabled_log_types(int *size)
    return NULL;
 }
 
+static void
+lh_soft_reset(struct vrouter *router)
+{
+    flush_scheduled_work();
+    rcu_barrier();
+
+    return;
+}
+
 struct host_os linux_host = {
     .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
@@ -2095,6 +2104,7 @@ struct host_os linux_host = {
     .hos_set_log_type               =       lh_set_log_type,
     .hos_get_log_level              =       lh_get_log_level,
     .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
+    .hos_soft_reset                 =       lh_soft_reset,
 };
     
 struct host_os *
@@ -2285,8 +2295,6 @@ vrouter_linux_exit(void)
     vr_assembler_exit();
     vr_mem_exit();
     vrouter_exit(false);
-    flush_scheduled_work();
-    rcu_barrier();
     return;
 }
 
