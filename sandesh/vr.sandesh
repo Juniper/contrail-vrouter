@@ -45,6 +45,7 @@ buffer sandesh vr_nexthop_req {
     18: list<i32>   nhr_nh_list;
     19: i32         nhr_label;
     20: list<i32>   nhr_label_list;
+    21: i16         nhr_nh_count;
 }
 
 buffer sandesh vr_interface_req {

@@ -35,7 +35,7 @@ static uint32_t nh_id, if_id, vrf_id, flags;
 static int nh_set, command, type, dump_marker = -1;
 
 static bool dump_pending = false;
-static int comp_nh[10], lbl[10];
+static int comp_nh[32], lbl[32];
 static int comp_nh_ind = 0, lbl_ind = 0;
 
 static struct in_addr sip, dip;
@@ -182,7 +182,7 @@ nh_print_newline_header(void)
 void
 vr_nexthop_req_process(void *s_req)
 {
-    unsigned int i;
+    unsigned int i, printed = 0;
     struct in_addr a;
     char flags_mem[500];
     char fam[100];
@@ -198,21 +198,25 @@ vr_nexthop_req_process(void *s_req)
     else
         strcpy(fam, "N/A");
 
-    printf("Id:%-9d  Type:%-8s  Fmly:%8s  Flags:%s  Rid:%d  Ref_cnt:%d Vrf:%d",
+    printf("Id:%-9d  Type:%-13s  Fmly:%8s  Rid:%d  Ref_cnt:%-10d Vrf:%d",
                 req->nhr_id, nh_type(req->nhr_type), fam,
-                nh_flags(req->nhr_flags, req->nhr_type, flags_mem),
                 req->nhr_rid, req->nhr_ref_cnt, req->nhr_vrf);
+    nh_print_newline_header();
+    printf("Flags:%s",
+            nh_flags(req->nhr_flags, req->nhr_type, flags_mem));
 
     if (req->nhr_type == NH_RCV) {
         nh_print_newline_header();
         printf("Oif:%d\n", req->nhr_encap_oif_id);
     } else if (req->nhr_type == NH_ENCAP) {
         nh_print_newline_header();
-        printf("EncapFmly:%04x Oif:%d Len:%d Data:", req->nhr_encap_family, req->nhr_encap_oif_id, req->nhr_encap_size);
+        printf("EncapFmly:%04x Oif:%d Len:%d", ' ',
+                req->nhr_encap_family, req->nhr_encap_oif_id, req->nhr_encap_size);
+        nh_print_newline_header();
+        printf("Encap Data: ", ' ');
         for (i = 0; i< req->nhr_encap_size; i++) {
             printf("%02x ", (unsigned char)req->nhr_encap[i]);
         }
-        printf("\n");
     } else if (req->nhr_type == NH_TUNNEL) {
         nh_print_newline_header();
         printf("Oif:%d Len:%d Flags %s Data:", req->nhr_encap_oif_id,
@@ -233,23 +237,33 @@ vr_nexthop_req_process(void *s_req)
         }
     } else if (req->nhr_type == NH_VRF_TRANSLATE) {
         nh_print_newline_header();
-        printf("Vrf:%d\n", req->nhr_vrf);
+        printf("Vrf:%d\n", ' ',  req->nhr_vrf);
     } else if (req->nhr_type == NH_COMPOSITE) {
         nh_print_newline_header();
         printf("Sub NH(label):");
         for (i = 0; i < req->nhr_nh_list_size; i++) {
-            printf(" %d", req->nhr_nh_list[i]);
+            if (printed > 60) {
+                nh_print_newline_header();
+                printf("%14c", ' ');
+                printed = 0;
+            }
+            printed += printf(" %d", req->nhr_nh_list[i]);
             if (req->nhr_label_list[i] >= 0)
-                printf("(%d)", req->nhr_label_list[i]);
+                printed += printf("(%d)", req->nhr_label_list[i]);
         }
-        printf("\n");
+
+        if (req->nhr_nh_count &&
+                (req->nhr_nh_count - req->nhr_nh_list_size)) {
+            printf(" and %u more components...\n",
+                    req->nhr_nh_count - req->nhr_nh_list_size);
+        }
     }
 
     if (command == SANDESH_OP_DUMP) {
         dump_marker = req->nhr_id;
     }
 
-    printf("\n");
+    printf("\n\n");
 }
 
 void

@@ -16,6 +16,9 @@ extern "C" {
  */
 #define VR_DEF_NEXTHOPS                 65536
 #define NH_TABLE_ENTRIES                VR_DEF_NEXTHOPS
+
+#define VR_NEXTHOP_COMPONENT_DUMP_LIMIT 16
+
 #define NH_DISCARD_ID                   0
 
 enum nexthop_type {
@@ -157,6 +160,7 @@ extern int vr_nexthop_add(vr_nexthop_req *);
 extern int vr_nexthop_get(vr_nexthop_req *);
 extern int vr_nexthop_dump(vr_nexthop_req *);
 extern bool vr_gateway_nexthop(struct vr_nexthop *);
+extern unsigned int vr_nexthop_req_get_size(void *);
 
 extern struct vr_nexthop *vr_discard_nh;
 #ifdef __cplusplus

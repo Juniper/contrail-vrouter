@@ -11,6 +11,7 @@
 struct sandesh_object_md {
     unsigned int obj_len;
     char *obj_type_string;
+    unsigned int (*obj_get_size)(void *);
 };
 
 void *sandesh_alloc(unsigned int);

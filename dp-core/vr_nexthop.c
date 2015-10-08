@@ -2338,12 +2338,28 @@ generate_resp:
     return ret;
 }
 
+unsigned int
+vr_nexthop_req_get_size(void *req_p)
+{
+    vr_nexthop_req *req = (vr_nexthop_req *)req_p;
+
+    if (req->nhr_type == NH_COMPOSITE)
+        return (4 * sizeof(*req) + (req->nhr_nh_list_size * 4));
+
+    return 4 * sizeof(*req);
+}
+
 /* we expect the caller to bzero req, before sending it here */
 static int
 vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
 {
-    unsigned char *encap = NULL;
     unsigned int i;
+    unsigned char *encap = NULL;
+
+    bool dump = false;
+
+    if (req->h_op == SANDESH_OP_DUMP)
+        dump = true;
 
     req->nhr_type = nh->nh_type;
     req->nhr_family = nh->nh_family;
@@ -2376,7 +2392,10 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
         break;
 
     case NH_COMPOSITE:
-        req->nhr_nh_list_size = nh->nh_component_cnt;
+        req->nhr_nh_list_size = req->nhr_nh_count =  nh->nh_component_cnt;
+        if (dump && (req->nhr_nh_list_size > VR_NEXTHOP_COMPONENT_DUMP_LIMIT))
+            req->nhr_nh_list_size = VR_NEXTHOP_COMPONENT_DUMP_LIMIT;
+
         if (nh->nh_component_cnt) {
             req->nhr_nh_list =
                 vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int),
@@ -2384,7 +2403,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             if (!req->nhr_nh_list)
                 return -ENOMEM;
 
-            req->nhr_label_list_size = nh->nh_component_cnt;
+            req->nhr_label_list_size = req->nhr_nh_list_size;
             req->nhr_label_list =
                 vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int),
                         VR_NEXTHOP_REQ_LIST_OBJECT);
@@ -2511,6 +2530,7 @@ vr_nexthop_get(vr_nexthop_req *req)
     nh = __vrouter_get_nexthop(router, req->nhr_id);
     if (nh) {
         resp = vr_nexthop_req_get();
+        resp->h_op = SANDESH_OP_GET;
         if (resp)
             ret = vr_nexthop_make_req(resp, nh);
         else
@@ -2554,15 +2574,16 @@ vr_nexthop_dump(vr_nexthop_req *r)
             if (!resp && (ret = -ENOMEM))
                 goto generate_response;
 
-           ret = vr_nexthop_make_req(resp, nh);
-           if (ret || ((ret = vr_message_dump_object(dumper,
-                           VR_NEXTHOP_OBJECT_ID, resp)) <= 0)) {
-               vr_nexthop_req_destroy(resp);
-               if (ret <= 0)
-                   break;
-           }
+            resp->h_op = SANDESH_OP_DUMP;
+            ret = vr_nexthop_make_req(resp, nh);
+            if (ret || ((ret = vr_message_dump_object(dumper,
+                                VR_NEXTHOP_OBJECT_ID, resp)) <= 0)) {
+                vr_nexthop_req_destroy(resp);
+                if (ret <= 0)
+                    break;
+            }
 
-           vr_nexthop_req_destroy(resp);
+            vr_nexthop_req_destroy(resp);
         }
     }
 
