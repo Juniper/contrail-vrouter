@@ -53,22 +53,6 @@ struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
 struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 
-
-static bool
-bridge_entry_valid(vr_htable_t htable, vr_hentry_t *hentry,
-                                              unsigned int index)
-{
-    struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
-    if (!htable || !be)
-        return false;
-
-    if (be->be_flags & VR_BE_VALID_FLAG)
-        return true;
-
-    return false;
-}
-
-
 bool
 vr_unknown_uc_flood(struct vr_interface *ingress_vif,
         struct vr_nexthop *ingress_nh)
@@ -91,7 +75,7 @@ vr_find_bridge_entry(struct vr_bridge_entry_key *key)
     if (!vn_rtable || !key)
         return NULL;
 
-    return (struct vr_bridge_entry *)vr_find_hentry(vn_rtable, key);
+    return (struct vr_bridge_entry *)vr_find_hentry(vn_rtable, key, 0);
 }
 
 struct vr_bridge_entry *
@@ -105,7 +89,7 @@ vr_find_free_bridge_entry(unsigned int vrf_id, char *mac)
 
     key.be_vrf_id = vrf_id;
     VR_MAC_COPY(key.be_mac, mac);
-    be = (struct vr_bridge_entry *)vr_find_free_hentry(vn_rtable, &key);
+    be = (struct vr_bridge_entry *)vr_find_free_hentry(vn_rtable, &key, 0);
     return be;
 }
 
@@ -184,6 +168,7 @@ static void
 bridge_table_entry_free(vr_htable_t table, vr_hentry_t *hentry,
         unsigned int index, void *data)
 {
+    struct vr_nexthop *nh;
     struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
     if (!be)
         return;
@@ -192,8 +177,9 @@ bridge_table_entry_free(vr_htable_t table, vr_hentry_t *hentry,
     be->be_flags &= ~VR_BE_VALID_FLAG;
 
     if (be->be_nh) {
-        vrouter_put_nexthop(be->be_nh);
+        nh = be->be_nh;
         be->be_nh = NULL;
+        vrouter_put_nexthop(nh);
     }
     vr_release_hentry(table, hentry);
 
@@ -381,12 +367,17 @@ generate_response:
 }
 
 vr_hentry_key
-bridge_entry_key(vr_htable_t table, vr_hentry_t *entry)
+bridge_entry_key(vr_htable_t table, vr_hentry_t *entry, unsigned int
+        *key_len)
 {
-    struct vr_bridge_entry *be = (struct vr_bridge_entry *)entry;
+    struct vr_bridge_entry *be = CONTAINER_OF(be_hentry,
+                        struct vr_bridge_entry, entry);
 
-    if (!entry)
+    if (!entry || (!(be->be_flags & VR_BE_VALID_FLAG)))
         return NULL;
+
+    if (key_len)
+        *key_len = sizeof(be->be_key);
 
     return &be->be_key;
 }
@@ -399,10 +390,9 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     if (rtable->algo_data)
         return 0;
 
-    rtable->algo_data = vr_htable_create(vr_bridge_entries,
-            vr_bridge_oentries, sizeof(struct vr_bridge_entry),
-                sizeof(struct vr_bridge_entry_key), bridge_entry_valid,
-                bridge_entry_key);
+    rtable->algo_data = vr_htable_create(vrouter_get(0), vr_bridge_entries,
+                vr_bridge_oentries, sizeof(struct vr_bridge_entry),
+                sizeof(struct vr_bridge_entry_key), 0, bridge_entry_key);
 
     if (!rtable->algo_data)
         return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,

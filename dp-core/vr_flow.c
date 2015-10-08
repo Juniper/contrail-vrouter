@@ -7,6 +7,7 @@
 #include <vr_types.h>
 #include <vrouter.h>
 #include <vr_packet.h>
+#include <vr_htable.h>
 #include <vr_flow.h>
 #include <vr_mirror.h>
 #include "vr_interface.h"
@@ -24,8 +25,6 @@
 #define VR_NUM_OFLOW_TABLES         1
 #define VR_DEF_OFLOW_ENTRIES        (8 * 1024)
 
-#define VR_FLOW_ENTRIES_PER_BUCKET  4U
-
 #define VR_MAX_FLOW_TABLE_HOLD_COUNT \
                                     4096
 
@@ -33,12 +32,12 @@ unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
 
 /*
- * host can provide its own btables. Point in case is the DPDK. In DPDK,
+ * host can provide its own memory . Point in case is the DPDK. In DPDK,
  * we allocate the table from hugepages and just ask the flow module to
  * use those tables
  */
-struct vr_btable *vr_flow_table;
-struct vr_btable *vr_oflow_table;
+void *vr_flow_table;
+void *vr_oflow_table;
 /*
  * The flow table memory can also be a file that could be mapped. The path
  * is set by somebody and passed to agent for it to map
@@ -201,9 +200,9 @@ vr_init_flow_entry(struct vr_flow_entry *fe)
 
 
 static void
-vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
-        unsigned int index)
+vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe, unsigned int index)
 {
+
     memset(&fe->fe_stats, 0, sizeof(fe->fe_stats));
 
     if (fe->fe_hold_list) {
@@ -225,9 +224,25 @@ vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
     fe->fe_udp_src_port = 0;
     fe->fe_tcp_flags = 0;
 
+    vr_release_hentry(router->vr_flow_table, &fe->fe_hentry);
     return;
 }
 
+static vr_hentry_key
+vr_get_flow_key(vr_htable_t flow_table, vr_hentry_t *entry,
+        unsigned int *key_len)
+{
+    struct vr_flow_entry *fe = CONTAINER_OF(fe_hentry,
+                             struct vr_flow_entry, entry);
+
+    if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+        return NULL;
+
+    if (key_len)
+        *key_len = fe->fe_key.key_len;
+
+    return &fe->fe_key;
+}
 
 static inline bool
 vr_set_flow_active(struct vr_flow_entry *fe)
@@ -239,27 +254,20 @@ vr_set_flow_active(struct vr_flow_entry *fe)
 static inline struct vr_flow_entry *
 vr_flow_table_entry_get(struct vrouter *router, unsigned int i)
 {
-    return (struct vr_flow_entry *)vr_btable_get(router->vr_flow_table, i);
-}
-
-static inline struct vr_flow_entry *
-vr_oflow_table_entry_get(struct vrouter *router, unsigned int i)
-{
-    return (struct vr_flow_entry *)vr_btable_get(router->vr_oflow_table, i);
+    return (struct vr_flow_entry *)vr_get_hentry_by_index(router->vr_flow_table, i);
 }
 
 unsigned int
 vr_flow_table_size(struct vrouter *router)
 {
-    return vr_btable_size(router->vr_flow_table);
+    return vr_htable_size(router->vr_flow_table);
 }
 
-unsigned int
-vr_oflow_table_size(struct vrouter *router)
+static unsigned int
+vr_flow_table_oflow_entries(struct vrouter *router)
 {
-    return vr_btable_size(router->vr_oflow_table);
+    return vr_htable_oflow_entries(router->vr_flow_table);
 }
-
 /*
  * this is used by the mmap code. mmap sees the whole flow table
  * (including the overflow table) as one large table. so, given
@@ -269,35 +277,17 @@ vr_oflow_table_size(struct vrouter *router)
 void *
 vr_flow_get_va(struct vrouter *router, uint64_t offset)
 {
-    struct vr_btable *table = router->vr_flow_table;
-    unsigned int size = vr_flow_table_size(router);
-
-    if (offset >= vr_flow_table_size(router)) {
-        table = router->vr_oflow_table;
-        offset -= size;
-    }
-
-    return vr_btable_get_address(table, offset);
+    return vr_htable_get_address(router->vr_flow_table, offset);
 }
 
 struct vr_flow_entry *
 vr_get_flow_entry(struct vrouter *router, int index)
 {
-    struct vr_btable *table;
-
     if (index < 0)
         return NULL;
 
-    if ((unsigned int)index < vr_flow_entries)
-        table = router->vr_flow_table;
-    else {
-        table = router->vr_oflow_table;
-        index -= vr_flow_entries;
-        if ((unsigned int)index >= vr_oflow_entries)
-            return NULL;
-    }
-
-    return (struct vr_flow_entry *)vr_btable_get(table, index);
+    return (struct vr_flow_entry *)
+            vr_get_hentry_by_index(router->vr_flow_table, index);
 }
 
 static void
@@ -345,46 +335,19 @@ static struct vr_flow_entry *
 vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
         bool need_hold, unsigned int *fe_index)
 {
-    unsigned int i, index, hash;
-    struct vr_flow_entry *tmp_fe, *fe = NULL;
+    struct vr_flow_entry *fe;
 
-    *fe_index = 0;
-
-    hash = vr_hash(key, key->key_len, 0);
-
-    index = (hash % vr_flow_entries) & ~(VR_FLOW_ENTRIES_PER_BUCKET - 1);
-    for (i = 0; i < VR_FLOW_ENTRIES_PER_BUCKET; i++) {
-        tmp_fe = vr_flow_table_entry_get(router, index);
-        if (tmp_fe && !(tmp_fe->fe_flags & VR_FLOW_FLAG_ACTIVE)) {
-            if (vr_set_flow_active(tmp_fe)) {
-                vr_init_flow_entry(tmp_fe);
-                fe = tmp_fe;
-                break;
-            }
-        }
-        index++;
-    }
-
-    if (!fe) {
-        index = hash % vr_oflow_entries;
-        for (i = 0; i < vr_oflow_entries; i++) {
-            tmp_fe = vr_oflow_table_entry_get(router, index);
-            if (tmp_fe && !(tmp_fe->fe_flags & VR_FLOW_FLAG_ACTIVE)) {
-                if (vr_set_flow_active(tmp_fe)) {
-                    vr_init_flow_entry(tmp_fe);
-                    fe = tmp_fe;
-                    break;
-                }
-            }
-            index = (index + 1) % vr_oflow_entries;
-        }
-
-        if (fe)
-            *fe_index += vr_flow_entries;
-    }
-
+    fe = (struct vr_flow_entry *)vr_find_free_hentry(router->vr_flow_table, key, key->key_len);
     if (fe) {
-        *fe_index += index;
+
+        if (!vr_set_flow_active(fe)) {
+            vr_printf("vrouter: Used hentry found for a free flow entry\n");
+            return NULL;
+        }
+
+        vr_init_flow_entry(fe);
+        *fe_index = fe->fe_hentry.hentry_index;
+
         if (need_hold) {
             fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue));
             if (!fe->fe_hold_list) {
@@ -400,64 +363,27 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
             fe->fe_key.key_len = key->key_len;
             memcpy(&fe->fe_key, key, key->key_len);
         }
+
     }
 
     return fe;
 }
 
-static inline struct vr_flow_entry *
-vr_flow_table_lookup(struct vr_flow *key, uint16_t type,
-        struct vr_btable *table, unsigned int table_size,
-        unsigned int bucket_size, unsigned int hash, unsigned int *fe_index)
-{
-    unsigned int i;
-    struct vr_flow_entry *flow_e;
-
-    hash %= table_size;
-
-    if (!bucket_size) {
-        bucket_size = table_size;
-    } else {
-        hash &= ~(bucket_size - 1);
-    }
-
-    for (i = 0; i < bucket_size; i++) {
-        flow_e = (struct vr_flow_entry *)vr_btable_get(table,
-                (hash + i) % table_size);
-        if (flow_e &&
-                (flow_e->fe_flags & VR_FLOW_FLAG_ACTIVE) &&
-                (flow_e->fe_type == type)) {
-            if (!memcmp(&flow_e->fe_key, key, key->key_len)) {
-                *fe_index = (hash + i) % table_size;
-                return flow_e;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-
 struct vr_flow_entry *
 vr_find_flow(struct vrouter *router, struct vr_flow *key,
         uint8_t type, unsigned int *fe_index)
 {
-    unsigned int hash;
-    struct vr_flow_entry *flow_e;
+    struct vr_flow_entry *fe;
 
-    hash = vr_hash(key, key->key_len, 0);
 
-    /* first look in the regular flow table */
-    flow_e = vr_flow_table_lookup(key, type, router->vr_flow_table,
-            vr_flow_entries, VR_FLOW_ENTRIES_PER_BUCKET, hash, fe_index);
-    /* if not in the regular flow table, lookup in the overflow flow table */
-    if (!flow_e) {
-        flow_e = vr_flow_table_lookup(key, type, router->vr_oflow_table,
-                vr_oflow_entries, 0, hash, fe_index);
-        *fe_index += vr_flow_entries;
+    fe = (struct vr_flow_entry *)vr_find_hentry(router->vr_flow_table,
+                                                    key, key->key_len);
+    if (fe) {
+        if (fe_index)
+            *fe_index = fe->fe_hentry.hentry_index;
     }
 
-    return flow_e;
+    return fe;
 }
 
 void
@@ -933,6 +859,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     struct vr_flow_entry *flow_e;
 
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
+
 
     flow_e = vr_find_flow(router, key, pkt->vp_type,  &fe_index);
     if (!flow_e) {
@@ -1555,8 +1482,7 @@ vr_flow_req_process(void *s_req)
 
         need_destroy = true;
         resp->fr_op = req->fr_op;
-        resp->fr_ftable_size = vr_flow_table_size(router) +
-            vr_oflow_table_size(router);
+        resp->fr_ftable_size = vr_flow_table_size(router);
 #if defined(__linux__) && defined(__KERNEL__)
         resp->fr_ftable_dev = vr_flow_major;
 #endif
@@ -1576,6 +1502,7 @@ vr_flow_req_process(void *s_req)
         }
 
         resp->fr_created = hold_count;
+        resp->fr_oflow_entries = vr_flow_table_oflow_entries(router);
 
         object = VR_FLOW_INFO_OBJECT_ID;
         break;
@@ -1645,13 +1572,8 @@ static void
 vr_flow_table_destroy(struct vrouter *router)
 {
     if (router->vr_flow_table) {
-        vr_btable_free(router->vr_flow_table);
+        vr_htable_delete(router->vr_flow_table);
         router->vr_flow_table = NULL;
-    }
-
-    if (router->vr_oflow_table) {
-        vr_btable_free(router->vr_oflow_table);
-        router->vr_oflow_table = NULL;
     }
 
     vr_flow_table_info_destroy(router);
@@ -1668,14 +1590,7 @@ vr_flow_table_reset(struct vrouter *router)
     struct vr_flow_md flmd;
 
     start = end = 0;
-    if (router->vr_flow_table)
-        end = vr_btable_entries(router->vr_flow_table);
-
-    if (router->vr_oflow_table) {
-        if (!end)
-            start = vr_flow_entries;
-        end += vr_btable_entries(router->vr_oflow_table);
-    }
+    end = vr_flow_entries + vr_oflow_entries;
 
     if (end) {
         flmd.flmd_defer_data = NULL;
@@ -1697,39 +1612,18 @@ vr_flow_table_reset(struct vrouter *router)
     return;
 }
 
-
 static int
 vr_flow_table_init(struct vrouter *router)
 {
     if (!router->vr_flow_table) {
-        if (vr_flow_entries % VR_FLOW_ENTRIES_PER_BUCKET)
-            return vr_module_error(-EINVAL, __FUNCTION__,
-                    __LINE__, vr_flow_entries);
 
-        if (vr_flow_table) {
-            router->vr_flow_table = vr_flow_table;
-        } else {
-            router->vr_flow_table = vr_btable_alloc(vr_flow_entries,
-                    sizeof(struct vr_flow_entry));
-        }
+        router->vr_flow_table = vr_htable_attach(router, vr_flow_entries,
+                vr_flow_table, vr_oflow_entries, vr_oflow_table,
+                sizeof(struct vr_flow_entry), 0, 0, vr_get_flow_key);
 
         if (!router->vr_flow_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__,
-                    __LINE__, vr_flow_entries);
-        }
-    }
-
-    if (!router->vr_oflow_table) {
-        if (vr_oflow_table) {
-            router->vr_oflow_table = vr_oflow_table;
-        } else {
-            router->vr_oflow_table = vr_btable_alloc(vr_oflow_entries,
-                    sizeof(struct vr_flow_entry));
-        }
-
-        if (!router->vr_oflow_table) {
-            return vr_module_error(-ENOMEM, __FUNCTION__,
-                    __LINE__, vr_oflow_entries);
+                    __LINE__, vr_flow_entries + vr_oflow_entries);
         }
     }
 

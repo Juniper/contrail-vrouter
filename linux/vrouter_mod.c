@@ -2340,6 +2340,15 @@ lh_create_timer(struct vr_timer *vtimer)
     return 0;
 }
 
+static void
+lh_soft_reset(struct vrouter *router)
+{
+    flush_scheduled_work();
+    rcu_barrier();
+
+    return;
+}
+
 struct host_os linux_host = {
     .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
@@ -2384,6 +2393,7 @@ struct host_os linux_host = {
     .hos_pkt_may_pull               =       lh_pkt_may_pull,
     .hos_gro_process                =       lh_gro_process,
     .hos_enqueue_to_assembler       =       lh_enqueue_to_assembler,
+    .hos_soft_reset                 =       lh_soft_reset,
 };
     
 struct host_os *
@@ -2581,8 +2591,6 @@ vrouter_linux_exit(void)
     vr_assembler_exit();
     vr_mem_exit();
     vrouter_exit(false);
-    flush_scheduled_work();
-    rcu_barrier();
     return;
 }
 
