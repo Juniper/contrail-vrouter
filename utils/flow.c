@@ -67,6 +67,7 @@ struct flow_table {
     unsigned int ft_cpus;
     unsigned int ft_hold_oflows;
     unsigned int ft_hold_stat_count;
+    unsigned int ft_oflow_entries;
     u_int32_t ft_hold_stat[128];
     char flow_table_path[256];
 } main_table;
@@ -146,8 +147,8 @@ dump_legend(void)
 static void
 dump_table(struct flow_table *ft)
 {
-    unsigned int i, j, fi, need_flag_print = 0;
-    struct vr_flow_entry *fe;
+    unsigned int i, j, fi, next_index, need_flag_print = 0;
+    struct vr_flow_entry *fe, *ofe;
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
     const char *drop_reason = NULL;
@@ -163,7 +164,7 @@ dump_table(struct flow_table *ft)
         if (i != (ft->ft_hold_stat_count - 1))
             printf(" ");
     }
-    printf(")(oflows %u)\n\n", ft->ft_hold_oflows);
+    printf(")(oflow entries %u, oflows %u)\n\n", ft->ft_oflow_entries, ft->ft_hold_oflows);
 
     dump_legend();
 
@@ -301,8 +302,28 @@ dump_table(struct flow_table *ft)
                     printf(", %d", fe->fe_sec_mirror_id);
             }
             printf(" UdpSrcPort %d", fe->fe_udp_src_port);
-            printf(")\n\n");
         }
+
+        j = 0;
+        next_index = fe->fe_hentry.hentry_next_index;
+        while (next_index != VR_INVALID_HENTRY_INDEX) {
+            ofe = (struct vr_flow_entry *)((char *)ft->ft_entries +
+                        (next_index * sizeof(*fe)));
+            if (j == 0) {
+                if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+                    printf("%6d", i);
+
+                printf("\n\tOflow entries:\n\t");
+            }
+            printf(" %d ", ofe->fe_hentry.hentry_index);
+            if ((++j % 16) == 0)
+                printf("\n\t");
+
+            next_index = ofe->fe_hentry.hentry_next_index;
+        }
+
+        if ((fe->fe_flags & VR_FLOW_FLAG_ACTIVE) || j)
+            printf("\n\n");
     }
 
     return;
@@ -545,6 +566,7 @@ flow_table_map(vr_flow_req *req)
     ft->ft_hold_oflows = req->fr_hold_oflows;
     ft->ft_added = req->fr_added;
     ft->ft_cpus = req->fr_cpus;
+    ft->ft_oflow_entries = req->fr_oflow_entries;
 
     if (req->fr_hold_stat && req->fr_hold_stat_size) {
         ft->ft_hold_stat_count = req->fr_hold_stat_size;

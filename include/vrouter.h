@@ -115,6 +115,7 @@ struct host_os {
     void (*hos_del_mpls)(struct vrouter *, unsigned);
     int (*hos_enqueue_to_assembler)(struct vrouter *, struct vr_packet *,
             struct vr_forwarding_md *);
+    void (*hos_soft_reset)(struct vrouter *);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -157,6 +158,7 @@ struct host_os {
 #define vr_pkt_may_pull                 vrouter_host->hos_pkt_may_pull
 #define vr_gro_process                  vrouter_host->hos_gro_process
 #define vr_enqueue_to_assembler         vrouter_host->hos_enqueue_to_assembler
+#define vr_soft_reset                   vrouter_host->hos_soft_reset
 
 struct vrouter {
     unsigned char vr_vrrp_mac[VR_ETHER_ALEN];
@@ -173,8 +175,7 @@ struct vrouter {
     struct vr_rtable *vr_inet_mcast_rtable;
     struct vr_rtable *vr_bridge_rtable;
 
-    struct vr_btable *vr_flow_table;
-    struct vr_btable *vr_oflow_table;
+    vr_htable_t vr_flow_table;
     struct vr_flow_table_info *vr_flow_table_info;
     unsigned int vr_flow_table_info_size;
 
