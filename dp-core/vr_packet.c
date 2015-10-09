@@ -278,13 +278,15 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
     } else if (ip_proto == VR_IP_PROTO_UDP &&
                 ntohs(gre_udp_encap) == VR_VXLAN_UDP_DST_PORT) {
         *encap_type = PKT_ENCAP_VXLAN;
-        /* Take into consideration, the VXLAN header ethernet header */
-        pull_len += sizeof(struct vr_vxlan) + VR_ETHER_HLEN;
+        pull_len += sizeof(struct vr_vxlan);
 
-        if (frag_size < pull_len)
+        /* Take into consideration, the VXLAN header ethernet header */
+        if (frag_size < pull_len + VR_ETHER_HLEN)
             return PKT_RET_SLOW_PATH;
 
-        eth = (struct vr_eth *)(va + sizeof(struct vr_vxlan));
+        eth = (struct vr_eth *)(va + pull_len);
+
+        pull_len += VR_ETHER_HLEN;
     } else {
         return PKT_RET_UNHANDLED;
     }

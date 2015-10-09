@@ -47,6 +47,14 @@ vr_mpls_udp_port(unsigned short port)
     return false;
 }
 
+static inline bool
+vr_vxlan_udp_port(unsigned short port)
+{
+    if (port == VR_VXLAN_UDP_DST_PORT)
+        return true;
+
+    return false;
+}
 
 static inline bool
 vr_mpls_is_label_mcast(unsigned int lbl)
