@@ -581,7 +581,11 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     return 0;
 }
 
-/* Release KNI */
+/*
+ * vr_dpdk_knidev_release - release KNI interface and remove it from the
+ * global list.
+ * Returns 0 on success, < 0 otherwise.
+ */
 int
 vr_dpdk_knidev_release(struct vr_interface *vif)
 {
