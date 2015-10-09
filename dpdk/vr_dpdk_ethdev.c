@@ -780,8 +780,6 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
  *   dpdk_mbuf_rss_hash() if hashing is needed. dpdk_mbuf_rss_hash() returns 1
  *       if hash was calculated, 0 if not.
  *
- * TODO: VXLAN support.
- *
  * TODO: if we ever need to set L4 lengths or packet type flags, or other info
  * about received packets, this is a good place to do it.
  */
@@ -877,12 +875,16 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             if (unlikely((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0))
                 return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
 
-            if (likely(vr_mpls_udp_port(rte_be_to_cpu_16(udp_hdr->udp_dport)))) {
+            switch (rte_be_to_cpu_16(udp_hdr->udp_dport)) {
+            case VR_MPLS_OVER_UDP_OLD_DST_PORT:
+            case VR_MPLS_OVER_UDP_NEW_DST_PORT:
+            case VR_VXLAN_UDP_DST_PORT:
                 pull_len += sizeof(struct vr_udp);
                 gre_udp_encap = udp_hdr->udp_dport;
-                /* Go to parsing. */
-            } else { /* TODO: VXLAN support */
-                return 0; /* UDP from the wire, but not MPLS-over-UDP. */
+                break;
+
+            default: /* UDP from the wire, but not MPLS-over-UDP nor VXLAN. */
+                return 0;
             }
         } else if ((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0) {
             /* Looks like no tunneling, perhaps a packet from a VM. */
