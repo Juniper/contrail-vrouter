@@ -7,6 +7,7 @@
 #define __VR_FLOW_H__
 
 #include "vr_defs.h"
+#include "vr_htable.h"
 
 #define VR_FLOW_ACTION_DROP         0x0
 #define VR_FLOW_ACTION_HOLD         0x1
@@ -282,6 +283,7 @@ struct vr_flow_queue {
 #define VR_FLOW_KEY_PAD ((8 - (sizeof(struct vr_flow) % 8)) % 8)
 
 struct vr_dummy_flow_entry {
+    vr_hentry_t fe_hentry;
     struct vr_flow fe_key;
     uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
@@ -306,6 +308,7 @@ struct vr_dummy_flow_entry {
 
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
+    vr_hentry_t fe_hentry;
     struct vr_flow fe_key;
     uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
@@ -345,11 +348,8 @@ struct vr_flow_entry {
 
 extern unsigned int vr_flow_entries, vr_oflow_entries;
 
-#define VR_FLOW_TABLE_SIZE          (vr_flow_entries * \
-                sizeof(struct vr_flow_entry))
-
-#define VR_OFLOW_TABLE_SIZE         (vr_oflow_entries *\
-                sizeof(struct vr_flow_entry))
+#define VR_FLOW_TABLE_SIZE   (vr_flow_entries * sizeof(struct vr_flow_entry))
+#define VR_OFLOW_TABLE_SIZE  (vr_oflow_entries * sizeof(struct vr_flow_entry))
 
 struct vr_flow_md {
     struct vrouter *flmd_router;
@@ -376,7 +376,6 @@ extern bool vr_flow_forward(struct vrouter *,
 void *vr_flow_get_va(struct vrouter *, uint64_t);
 
 unsigned int vr_flow_table_size(struct vrouter *);
-unsigned int vr_oflow_table_size(struct vrouter *);
 
 struct vr_flow_entry *vr_get_flow_entry(struct vrouter *, int);
 flow_result_t vr_flow_lookup(struct vrouter *, struct vr_flow *,
