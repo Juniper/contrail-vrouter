@@ -210,10 +210,10 @@ vr_nexthop_req_process(void *s_req)
         printf("Oif:%d\n", req->nhr_encap_oif_id);
     } else if (req->nhr_type == NH_ENCAP) {
         nh_print_newline_header();
-        printf("EncapFmly:%04x Oif:%d Len:%d", ' ',
+        printf("EncapFmly:%04x Oif:%d Len:%d",
                 req->nhr_encap_family, req->nhr_encap_oif_id, req->nhr_encap_size);
         nh_print_newline_header();
-        printf("Encap Data: ", ' ');
+        printf("Encap Data: ");
         for (i = 0; i< req->nhr_encap_size; i++) {
             printf("%02x ", (unsigned char)req->nhr_encap[i]);
         }
@@ -237,7 +237,7 @@ vr_nexthop_req_process(void *s_req)
         }
     } else if (req->nhr_type == NH_VRF_TRANSLATE) {
         nh_print_newline_header();
-        printf("Vrf:%d\n", ' ',  req->nhr_vrf);
+        printf("Vrf:%d\n", req->nhr_vrf);
     } else if (req->nhr_type == NH_COMPOSITE) {
         nh_print_newline_header();
         printf("Sub NH(label):");
