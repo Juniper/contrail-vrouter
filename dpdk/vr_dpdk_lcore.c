@@ -486,8 +486,14 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
         lcore_pkts[i][0] = (struct rte_mbuf *)(((uintptr_t)1 << 63)
                 | ((uintptr_t)vif->vif_idx << 32) | 1);
         retry_lcores[i] = i;
-        rte_prefetch0(vr_dpdk.lcores[dst_lcore_idxs[i]
-                + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring);
+        if (likely(vr_dpdk.lcores[dst_lcore_idxs[i] +
+                                            VR_DPDK_FWD_LCORE_ID] != NULL)) {
+            rte_prefetch0(vr_dpdk.lcores[dst_lcore_idxs[i] +
+                            VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring);
+        } else {
+            RTE_LOG(ERR, VROUTER, "%s: No forwarding lcore.\n", __func__);
+            return;
+        }
     }
 
     /* distribute the burst among the forwarding lcores */
