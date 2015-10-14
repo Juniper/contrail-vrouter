@@ -780,8 +780,6 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
  *   dpdk_mbuf_rss_hash() if hashing is needed. dpdk_mbuf_rss_hash() returns 1
  *       if hash was calculated, 0 if not.
  *
- * TODO: VXLAN support.
- *
  * TODO: if we ever need to set L4 lengths or packet type flags, or other info
  * about received packets, this is a good place to do it.
  */
@@ -798,7 +796,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
     unsigned int pull_len = VR_ETHER_HLEN, ipv4_len;
     int encap_type, helper_ret;
     unsigned short gre_udp_encap = 0, gre_hdr_len = VR_GRE_BASIC_HDR_LEN,
-                   eth_proto;
+                   eth_proto, udp_port;
     uint16_t mbuf_data_len = rte_pktmbuf_data_len(mbuf);
 
     if (unlikely(mbuf_data_len < pull_len))
@@ -877,12 +875,14 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             if (unlikely((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0))
                 return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
 
-            if (likely(vr_mpls_udp_port(rte_be_to_cpu_16(udp_hdr->udp_dport)))) {
+            udp_port = rte_be_to_cpu_16(udp_hdr->udp_dport);
+            if (likely(vr_mpls_udp_port(udp_port) || vr_vxlan_udp_port(udp_port))) {
                 pull_len += sizeof(struct vr_udp);
                 gre_udp_encap = udp_hdr->udp_dport;
                 /* Go to parsing. */
-            } else { /* TODO: VXLAN support */
-                return 0; /* UDP from the wire, but not MPLS-over-UDP. */
+            } else {
+                /* UDP from the wire, but not MPLS-over-UDP nor VXLAN. */
+                return 0;
             }
         } else if ((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0) {
             /* Looks like no tunneling, perhaps a packet from a VM. */
