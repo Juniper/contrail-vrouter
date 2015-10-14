@@ -431,8 +431,9 @@ static void
 dpdk_monitoring_stop(struct vr_interface *monitored_vif,
     struct vr_interface *monitoring_vif)
 {
+#if !VR_DPDK_ENABLE_PROMISC
     uint8_t port_id;
-
+#endif
     /* check if the monitored vif was reused */
     if (vr_dpdk.monitorings[monitored_vif->vif_idx] != monitoring_vif->vif_idx)
         return;
@@ -443,11 +444,12 @@ dpdk_monitoring_stop(struct vr_interface *monitored_vif,
 
     /* clear monitoring redirection */
     vr_dpdk.monitorings[monitored_vif->vif_idx] = VR_MAX_INTERFACES;
-
+#if !VR_DPDK_ENABLE_PROMISC
     if(vif_is_fabric(monitored_vif)) {
         port_id = (((struct vr_dpdk_ethdev *)(monitored_vif->vif_os))->ethdev_port_id);
         rte_eth_promiscuous_disable(port_id);
     }
+#endif
 }
 
 /* Add monitoring interface */
