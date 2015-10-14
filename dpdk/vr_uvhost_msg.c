@@ -63,7 +63,9 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
     /* VIRTIO_NET_F_CTRL_VQ is enough for vMX and FreeBSD */
     vru_cl->vruc_msg.u64 = (1ULL << VIRTIO_NET_F_CTRL_VQ) |
                            (1ULL << VIRTIO_NET_F_CSUM) |
-                           (1ULL << VIRTIO_NET_F_GUEST_CSUM);
+                           (1ULL << VIRTIO_NET_F_GUEST_CSUM) |
+                           (1ULL << VHOST_F_LOG_ALL);
+
     vru_cl->vruc_msg.size = sizeof(vru_cl->vruc_msg.u64);
 
     return 0;
