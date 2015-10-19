@@ -700,7 +700,7 @@ void vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg);
 /* Schedule an asslembler work on an lcore */
 void vr_dpdk_lcore_schedule_assembler_work(struct vr_dpdk_lcore *lcore,
         void (*fun)(void *arg), void *arg);
-
+void dpdk_lcore_exit(unsigned lcore_id);
 /*
  * vr_dpdk_netlink.c
  */

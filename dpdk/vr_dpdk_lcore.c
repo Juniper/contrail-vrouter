@@ -1094,11 +1094,10 @@ dpdk_lcore_init(unsigned lcore_id)
 }
 
 /* Exit forwarding lcore */
-static void
+void
 dpdk_lcore_exit(unsigned lcore_id)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    rcu_unregister_thread();
 
     /* wait for interface operation to complete */
     vr_dpdk_if_lock();
@@ -1492,7 +1491,7 @@ vr_dpdk_lcore_launch(__attribute__((unused)) void *dummy)
         break;
     }
 
-    dpdk_lcore_exit(lcore_id);
+    rcu_unregister_thread();
 
     return 0;
 }

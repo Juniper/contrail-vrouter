@@ -953,6 +953,7 @@ int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    unsigned int lcore_id;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
     strncpy(vr_dpdk.vlan_name, VR_DPDK_VLAN_FWD_DEF_NAME,
         sizeof(vr_dpdk.vlan_name) - 1);
@@ -1029,6 +1030,8 @@ main(int argc, char *argv[])
     ret = rte_eal_mp_remote_launch(vr_dpdk_lcore_launch, NULL, CALL_MASTER);
 
     rte_eal_mp_wait_lcore();
+    RTE_LCORE_FOREACH_SLAVE(lcore_id)
+        dpdk_lcore_exit(lcore_id);
     dpdk_fragment_assembler_exit();
     dpdk_netlink_exit();
     vr_dpdk_host_exit();
