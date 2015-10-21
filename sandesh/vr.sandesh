@@ -34,8 +34,8 @@ buffer sandesh vr_nexthop_req {
     7:  i32         nhr_encap_len;
     8:  i32         nhr_encap_family;
     9:  i32         nhr_vrf;
-    10: i32         nhr_tun_sip;
-    11: i32         nhr_tun_dip;
+    10: u32         nhr_tun_sip;
+    11: u32         nhr_tun_dip;
     12: i16         nhr_tun_sport;
     13: i16         nhr_tun_dport;
     14: i32         nhr_ref_cnt;
@@ -66,7 +66,7 @@ buffer sandesh vr_interface_req {
    16:  i32         vifr_ref_cnt;
    17: i32          vifr_marker;
    18:  list<byte>  vifr_mac;
-   19: i32          vifr_ip;
+   19: u32          vifr_ip;
    20: i32          vifr_context;
    21: i16          vifr_mir_id;
    22: i32          vifr_speed;
@@ -132,8 +132,8 @@ buffer sandesh vr_flow_req {
     6: i32          fr_ftable_size;
     7: i16          fr_ftable_dev;
     8: i32          fr_rindex;
-    9: i32          fr_flow_sip;
-   10: i32          fr_flow_dip;
+    9: u32          fr_flow_sip;
+   10: u32          fr_flow_dip;
    11: i16          fr_flow_sport;
    12: i16          fr_flow_dport;
    13: byte         fr_flow_proto;
@@ -141,7 +141,7 @@ buffer sandesh vr_flow_req {
    15: i16          fr_flow_dvrf;
    16: i16          fr_mir_id;
    17: i16          fr_sec_mir_id;
-   18: i32          fr_mir_sip;
+   18: u32          fr_mir_sip;
    19: i16          fr_mir_sport;
    20: list<byte>   fr_pcap_meta_data;
    21: i16          fr_mir_vrf;
