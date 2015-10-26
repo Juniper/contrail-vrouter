@@ -223,8 +223,8 @@ vr_route_req_process(void *s_req)
         if (rt->rtr_label_flags & VR_BE_FLOOD_DHCP_FLAG)
             strcat(flags, "Df");
 
-        printf("%5d", rt->rtr_index);
-        for (i = 0; i < 5; i++)
+        printf("%-9d", rt->rtr_index);
+        for (i = 0; i < 3; i++)
             printf(" ");
 
         ret = printf("%s", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
@@ -238,7 +238,7 @@ vr_route_req_process(void *s_req)
         else
             ret = printf(" %16c", '-');
 
-        printf(" %10d\n", rt->rtr_nh_id);
+        printf("   %10d\n", rt->rtr_nh_id);
     }
 
     if (cmd_op != SANDESH_OP_DUMP)
@@ -466,7 +466,7 @@ vr_route_op(void)
         } else {
             printf("Kernel L2 Bridge table %d/%d\n\n", req->rtr_rid, cmd_vrf_id);
             dump_legend(cmd_family_id);
-            printf("Index     DestMac                          Flags       Label/VNID      Nexthop\n");
+            printf("Index            DestMac                    Flags       Label/VNID      Nexthop\n");
         }
     }
 
