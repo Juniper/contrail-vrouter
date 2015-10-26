@@ -198,7 +198,7 @@ vr_route_req_process(void *s_req)
         if (rt->rtr_label_flags & VR_BE_FLOOD_DHCP_FLAG)
             strcat(flags, "Df");
 
-        ret = printf("%-8d", rt->rtr_index);
+        ret = printf("%-9d", rt->rtr_index);
         for (i = ret; i < 12; i++)
             printf(" ");
 
