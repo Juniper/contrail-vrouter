@@ -546,7 +546,8 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             vr_init_forwarding_md(&cmd);
             fmd = &cmd;
         }
-        fmd->fmd_label = rt.rtr_req.rtr_label;
+        vr_forwarding_md_set_label(fmd, rt.rtr_req.rtr_label,
+                VR_LABEL_TYPE_UNKNOWN);
     }
 
     if (pull_len && !pkt_push(pkt, pull_len)) {

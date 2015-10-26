@@ -324,7 +324,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
     fmd->fmd_outer_src_ip = ip->ip_saddr;
-    fmd->fmd_label = label;
+    vr_forwarding_md_set_label(fmd, label, VR_LABEL_TYPE_MPLS);
 
     /* Store the TTL in packet. Will be used for multicast replication */
     pkt->vp_ttl = ttl;

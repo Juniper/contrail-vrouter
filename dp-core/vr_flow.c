@@ -467,17 +467,14 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
      * returns a different nexthop, in which case the ecmp index will return
      * a bad nexthop. to avoid that, we will cache the label, and reuse it
      */
-    if (pkt->vp_nh &&
-            (pkt->vp_nh->nh_type == NH_VRF_TRANSLATE) &&
-            (pkt->vp_nh->nh_flags & NH_FLAG_VNID))
-        pnode->pl_flags |= PN_FLAG_LABEL_IS_VNID;
-
     pkt->vp_nh = NULL;
 
     pnode->pl_vif_idx = pkt->vp_if->vif_idx;
     if (fmd) {
         pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
         pnode->pl_label = fmd->fmd_label;
+        if (vr_forwarding_md_label_is_vxlan_id(fmd))
+            pnode->pl_flags |= PN_FLAG_LABEL_IS_VXLAN_ID;
         if (fmd->fmd_to_me)
             pnode->pl_flags |= PN_FLAG_TO_ME;
     }
@@ -839,7 +836,14 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
     flow_result_t result;
 
     fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
-    fmd->fmd_label = pnode->pl_label;
+    if (pnode->pl_flags & PN_FLAG_LABEL_IS_VXLAN_ID) {
+        vr_forwarding_md_set_label(fmd, pnode->pl_label,
+                VR_LABEL_TYPE_VXLAN_ID);
+    } else {
+        vr_forwarding_md_set_label(fmd, pnode->pl_label,
+                VR_LABEL_TYPE_MPLS);
+    }
+
     if (pnode->pl_flags & PN_FLAG_TO_ME)
         fmd->fmd_to_me = 1;
 
@@ -862,7 +866,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
     if (!pkt->vp_nh) {
         if (vif_is_fabric(pkt->vp_if) && fmd &&
                 (fmd->fmd_label >= 0)) {
-            if (!(pnode->pl_flags & PN_FLAG_LABEL_IS_VNID))
+            if (!vr_forwarding_md_label_is_vxlan_id(fmd))
                 pkt->vp_nh = __vrouter_get_label(router, fmd->fmd_label);
         }
     }

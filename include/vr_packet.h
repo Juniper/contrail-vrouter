@@ -699,6 +699,12 @@ enum {
     TOR_SOURCE,
 };
 
+enum {
+    VR_LABEL_TYPE_UNKNOWN,
+    VR_LABEL_TYPE_MPLS,
+    VR_LABEL_TYPE_VXLAN_ID
+};
+
 /*
  * forwarding metadata is something that is carried through out the
  * forwarding path. we are constrained by what can be held in the
@@ -707,6 +713,8 @@ enum {
  * degradation, if so used. please also watch what you are doing with
  * this variable
  */
+#define FMD_FLAG_LABEL_IS_VXLAN_ID      0x01
+
 struct vr_forwarding_md {
     int32_t fmd_flow_index;
     int32_t fmd_label;
@@ -718,6 +726,7 @@ struct vr_forwarding_md {
     uint16_t fmd_udp_src_port;
     uint8_t fmd_to_me;
     uint8_t fmd_src;
+    uint8_t fmd_flags;
 };
 
 static inline void
@@ -733,6 +742,38 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_udp_src_port = 0;
     fmd->fmd_to_me = 0;
     fmd->fmd_src = 0;
+    fmd->fmd_flags = 0;
+    return;
+}
+
+static inline bool
+vr_forwarding_md_label_is_vxlan_id(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_flags & FMD_FLAG_LABEL_IS_VXLAN_ID)
+        return true;
+    return false;
+}
+
+static inline void
+vr_forwarding_md_update_label_type(struct vr_forwarding_md *fmd,
+        unsigned int type)
+{
+    if (type == VR_LABEL_TYPE_VXLAN_ID) {
+        fmd->fmd_flags |= FMD_FLAG_LABEL_IS_VXLAN_ID;
+    } else {
+        fmd->fmd_flags &= ~FMD_FLAG_LABEL_IS_VXLAN_ID;
+    }
+
+    return;
+}
+
+static inline void
+vr_forwarding_md_set_label(struct vr_forwarding_md *fmd, unsigned int label,
+        unsigned int type)
+{
+    fmd->fmd_label = label;
+    vr_forwarding_md_update_label_type(fmd, type);
+
     return;
 }
 
