@@ -25,6 +25,7 @@
 #define VR_IP_PROTO_UDP         17
 #define VR_IP_PROTO_GRE         47
 #define VR_IP_PROTO_ICMP6       58
+#define VR_IP_PROTO_SCTP        132
 #define VR_GRE_FLAG_CSUM        (ntohs(0x8000))
 #define VR_GRE_FLAG_KEY         (ntohs(0x2000))
 #define VR_DHCP_SRC_PORT        68
@@ -607,6 +608,13 @@ struct vr_udp {
     unsigned short udp_dport;
     unsigned short udp_length;
     unsigned short udp_csum;
+} __attribute__((packed));
+
+struct vr_sctp {
+    unsigned short sctp_sport;
+    unsigned short sctp_dport;
+    unsigned int sctp_vtag;
+    unsigned int sctp_csum;
 } __attribute__((packed));
 
 #define VR_ICMP_TYPE_ECHO_REPLY     0

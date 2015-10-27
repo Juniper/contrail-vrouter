@@ -101,6 +101,8 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
             } else if ((ip_proto == VR_IP_PROTO_ICMP) ||
                        (ip_proto == VR_IP_PROTO_ICMP6)) {
                 pull_len += sizeof(struct vr_icmp);
+            } else if (ip_proto == VR_IP_PROTO_SCTP) {
+               pull_len += sizeof(struct vr_sctp);
             }
 
             if (frag_size < pull_len) {
