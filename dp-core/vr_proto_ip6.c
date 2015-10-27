@@ -156,7 +156,8 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
             dport = icmph->icmp_type;
         }
     } else if ((ip6->ip6_nxt == VR_IP_PROTO_TCP) ||
-            (ip6->ip6_nxt == VR_IP_PROTO_UDP)) {
+            (ip6->ip6_nxt == VR_IP_PROTO_UDP) ||
+            (ip6->ip6_nxt == VR_IP_PROTO_SCTP)) {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
     } else {
