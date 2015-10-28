@@ -1792,8 +1792,11 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
     ip = (struct vr_ip *)pkt_network_header(pkt);
     if (vr_ip_is_ip6(ip)) {
         pkt->vp_type = VP_TYPE_IP6;
-    } else {
+    } else if (vr_ip_is_ip4(ip)) {
         pkt->vp_type = VP_TYPE_IP;
+    } else {
+        vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
+        return 0;
     }
 
     if (vr_pkt_is_diag(pkt)) {
