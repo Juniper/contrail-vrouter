@@ -816,7 +816,7 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         ip6h = (struct vr_ip6 *) (skb->head + pkt->vp_data);
         proto = ip6h->ip6_nxt;
         hlen = sizeof(struct vr_ip6);
-    } else {
+    } else if (vr_ip_is_ip4(iph)) {
         /*
          * If this is a fragment and not the first one, it can be ignored
          */
@@ -827,6 +827,8 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         proto = iph->ip_proto;
         hlen = iph->ip_hl * 4;
         opt_len = hlen - sizeof(struct vr_ip);
+    } else {
+        goto out;
     }
 
 
@@ -1085,9 +1087,12 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
             if (vr_ip_is_ip6(iph)) {
                 ip6h = (struct vr_ip6 *)iph;
                 pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip6);
-            } else {
+            } else if (vr_ip_is_ip4(iph)) {
                 pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
+            } else {
+                goto unhandled;
             }
+
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
             /* L2 Multicast packet with control information and 
              * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
@@ -1202,7 +1207,7 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                     }
                 }
                 th_csum = tcph->check;
-            } else if (ip_proto == VR_IP_PROTO_ICMP) {
+            } else if (!ip6h && (ip_proto == VR_IP_PROTO_ICMP)) {
                 icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
                 th_csum = icmph->icmp_csum;
                 if (vr_icmp_error(icmph)) {
@@ -1239,10 +1244,10 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                         }
                     }
                 }
-            } else if (iph->ip_proto == VR_IP_PROTO_UDP) {
+            } else if (ip_proto == VR_IP_PROTO_UDP) {
                 th_csum = ((struct udphdr *)
                         ((unsigned char *)iph + hlen))->check;
-            } else if (ip_proto == VR_IP_PROTO_ICMP6) {
+            } else if (ip6h && (ip_proto == VR_IP_PROTO_ICMP6)) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
@@ -1534,8 +1539,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
         if (vr_ip_is_ip6(iph)) {
             pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip6);
             ip6h = (struct vr_ip6 *)iph;
-        } else {
+        } else if (vr_ip_is_ip4(iph)) {
             pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
+        } else {
+            goto unhandled;
         }
     } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
         /* L2 Multicast packet with control information and
@@ -1642,7 +1649,7 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                     }
                 }
                 th_csum = tcph->check;
-            } else if (ip_proto == VR_IP_PROTO_ICMP) {
+            } else if (!ip6h && ip_proto == VR_IP_PROTO_ICMP) {
                 icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
                 th_csum = icmph->icmp_csum;
                 if (vr_icmp_error(icmph)) {
@@ -1683,7 +1690,7 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
             } else if (ip_proto == VR_IP_PROTO_UDP) {
                 th_csum = ((struct udphdr *)
                         ((unsigned char *)iph + hlen))->check;
-            } else if (ip_proto == VR_IP_PROTO_ICMP6) {
+            } else if (ip6h && (ip_proto == VR_IP_PROTO_ICMP6)) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
@@ -2083,7 +2090,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                     tcph = (struct tcphdr *) ((char *) iph +  hlen);
                 }
                 th_csum = tcph->check;
-            } else if (l4_proto == VR_IP_PROTO_ICMP) {
+            } else if (!ip6h && (l4_proto == VR_IP_PROTO_ICMP)) {
                 icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
                 th_csum = icmph->icmp_csum;
                 if (vr_icmp_error(icmph)) {
@@ -2141,7 +2148,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             } else if (l4_proto == VR_IP_PROTO_UDP) {
                 th_csum = ((struct udphdr *)
                         ((unsigned char *)iph + hlen))->check;
-            } else if (l4_proto == VR_IP_PROTO_ICMP6) {
+            } else if (ip6h && (l4_proto == VR_IP_PROTO_ICMP6)) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */

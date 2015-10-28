@@ -354,10 +354,14 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     if (nh->nh_family == AF_INET) {
         ip = (struct vr_ip *)pkt_data(pkt);
-        if (!vr_ip_is_ip6(ip))
+        if (vr_ip_is_ip4(ip)) {
             pkt->vp_type = VP_TYPE_IP;
-        else
+        } else if (vr_ip_is_ip6(ip)) {
             pkt->vp_type = VP_TYPE_IP6;
+        } else {
+            drop_reason = VP_DROP_INVALID_PROTOCOL;
+            goto dropit;
+        }
 
         pkt_set_network_header(pkt, pkt->vp_data);
         pkt_set_inner_network_header(pkt, pkt->vp_data);
