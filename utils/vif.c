@@ -11,17 +11,20 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "vr_os.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
+
 #if defined(__linux__)
 #include <asm/types.h>
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_ether.h>
+
 
 #include <net/if.h>
 #include <net/ethernet.h>
@@ -66,7 +69,7 @@ static unsigned int core = (unsigned)-1;
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vif_set, vhost_phys_set, core_set;
+static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -77,6 +80,8 @@ static int platform;
 
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
+
+static vr_interface_req gl_msg_req;
 
 static void Usage(void);
 
@@ -326,6 +331,10 @@ vr_interface_req_process(void *s)
 
     if (!get_set && !list_set)
         return;
+    if (rate_set) {
+        gl_msg_req = *req;
+        return;
+    }
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
     for (; printed < 12; printed++)
@@ -520,7 +529,7 @@ vr_intf_op(struct nl_client *cl, unsigned int op)
         return vhost_create();
 
     if ((op == SANDESH_OP_DUMP) ||
-            ((op == SANDESH_OP_GET) && !(add_set))) {
+            ((op == SANDESH_OP_GET) && !(add_set) && !(rate_set))) {
         vr_interface_print_header();
     }
 
@@ -615,7 +624,7 @@ Usage()
     printf("\t   \t--vif <vif ID>]\n");
     printf( "[--id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
-    printf("\t   [--get <intf_id>][--kernel][--core <core number>]\n");
+    printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
     printf("\t   [--list][--core <core number>]\n");
     printf("\t   [--help]\n");
@@ -628,6 +637,7 @@ enum if_opt_index {
     ADD_OPT_INDEX,
     CREATE_OPT_INDEX,
     GET_OPT_INDEX,
+    RATE_OPT_INDEX,
     LIST_OPT_INDEX,
     VRF_OPT_INDEX,
     MAC_OPT_INDEX,
@@ -653,6 +663,7 @@ static struct option long_options[] = {
     [ADD_OPT_INDEX]         =   {"add",         required_argument,  &add_set,           1},
     [CREATE_OPT_INDEX]      =   {"create",      required_argument,  &create_set,        1},
     [GET_OPT_INDEX]         =   {"get",         required_argument,  &get_set,           1},
+    [RATE_OPT_INDEX]        =   {"rate",        no_argument,        &rate_set,          1},
     [LIST_OPT_INDEX]        =   {"list",        no_argument,        &list_set,          1},
     [VRF_OPT_INDEX]         =   {"vrf",         required_argument,  &vrf_set,           1},
     [MAC_OPT_INDEX]         =   {"mac",         required_argument,  &mac_set,           1},
@@ -839,11 +850,11 @@ validate_options(void)
     }
 
     if (get_set) {
-        if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set))
-            Usage();
+       //if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set))
+        //   printf("kindex %d\n", kindex_set);
+        //   Usage();
         return;
     }
-
     if (delete_set) {
         if (sum_opt > 1)
             Usage();
@@ -888,7 +899,247 @@ validate_options(void)
             Usage();
     }
 
+    if (rate_set) {
+        if (!get_set) {
+            Usage();
+        }
+    }
+
     return;
+}
+
+static int
+rate_stats(struct nl_client *cl, unsigned int vr_op)
+{
+    struct timeval now;
+    struct timeval last_time;
+    long long diff_ms;
+
+    struct tm *tm;
+    char fmt[80] = {0};
+
+    struct rx_stats {
+        /* RX_DEVICE */
+        int64_t rx_device_ipackets;
+        int64_t rx_device_ibytes;
+        int64_t rx_device_ierrors;
+        int64_t rx_device_inonmbufs;
+        /* RX_PORT */
+        int64_t rx_port_ipackets;
+        int64_t rx_port_isyscalls;
+        int64_t rx_port_ierrors;
+        int64_t rx_port_inombufs;
+        /* RX_QUEUE */
+        int64_t rx_queue_ipackets;
+        int64_t rx_queue_ierrors;
+        /* Without DPDK support */
+        int64_t rx_ipackets;
+        int64_t rx_ibytes;
+        int64_t rx_ierrors;
+    };
+    struct rx_stats actual_rx_counters = {0};
+    struct rx_stats previous_rx_counters = {0};
+    struct rx_stats rx_rate = {0};
+
+    struct tx_stats {
+        /* TX_DEVICE */
+        int64_t tx_device_opackets;
+        int64_t tx_device_obytes;
+        int64_t tx_device_oerrors;
+        /* TX_PORT */
+        int64_t tx_port_opackets;
+        int64_t tx_port_osyscalls;
+        int64_t tx_port_oerrors;
+        /* TX_QUEUE */
+        int64_t tx_queue_opackets;
+        int64_t tx_queue_oerrors;
+        /* Without DPDK supports */
+        int64_t tx_opackets;
+        int64_t tx_obytes;
+        int64_t tx_oerrors;
+    };
+    struct tx_stats actual_tx_counters = {0};
+    struct tx_stats previous_tx_counters = {0};
+    struct tx_stats tx_rate = {0};
+
+    vr_interface_req prev_msg = {0};
+
+    gettimeofday(&last_time, NULL);
+
+    while(true) {
+        memset(&actual_rx_counters, 0, sizeof(struct rx_stats));
+        memset(&actual_tx_counters, 0, sizeof(struct tx_stats));
+
+        vr_intf_op(cl, vr_op);
+        usleep(1000000);
+        gettimeofday(&now, NULL);
+        diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
+        diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
+        assert(diff_ms > 0);
+        if (system("clear") == -1 ) {
+            printf("Error: system() failed\n");
+        }
+
+        tm = (struct tm *)localtime(&now.tv_sec);
+        if (tm) {
+            strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
+            printf("%s\n", fmt);
+        }
+        printf("Interface rate statistics\n");
+        printf("-------------------------\n\n");
+        printf("vif%d/%d \n", gl_msg_req.vifr_rid, gl_msg_req.vifr_idx);
+
+        if (platform == DPDK_PLATFORM ) {
+
+            actual_rx_counters.rx_device_ipackets = gl_msg_req.vifr_dev_ipackets;
+            actual_rx_counters.rx_device_ierrors = gl_msg_req.vifr_dev_ierrors;
+            actual_rx_counters.rx_device_ibytes = gl_msg_req.vifr_dev_ibytes;
+            actual_rx_counters.rx_device_inonmbufs = gl_msg_req.vifr_dev_inombufs;
+            rx_rate.rx_device_ipackets =
+                ((actual_rx_counters.rx_device_ipackets - previous_rx_counters.rx_device_ipackets) * 1000)/diff_ms;
+
+            rx_rate.rx_device_ierrors =
+                ((actual_rx_counters.rx_device_ierrors - previous_rx_counters.rx_device_ierrors) * 1000)/diff_ms;
+
+            rx_rate.rx_device_ibytes =
+                ((actual_rx_counters.rx_device_ibytes - previous_rx_counters.rx_device_ibytes ) * 1000)/diff_ms;
+
+            rx_rate.rx_device_inonmbufs =
+                ((actual_rx_counters.rx_device_inonmbufs - previous_rx_counters.rx_device_inonmbufs) * 1000)/diff_ms;
+
+            vr_interface_pbem_counters_print("RX device", true,
+                  rx_rate.rx_device_ipackets, rx_rate.rx_device_ibytes,
+                  rx_rate.rx_device_ierrors, rx_rate.rx_device_inonmbufs);
+
+            actual_rx_counters.rx_port_ipackets = gl_msg_req.vifr_port_ipackets;
+            actual_rx_counters.rx_port_ierrors = gl_msg_req.vifr_port_ierrors;
+            actual_rx_counters.rx_port_inombufs = gl_msg_req.vifr_port_inombufs;
+            actual_rx_counters.rx_port_isyscalls = gl_msg_req.vifr_port_isyscalls;
+
+            rx_rate.rx_port_ipackets =
+                ((actual_rx_counters.rx_port_ipackets - previous_rx_counters.rx_port_ipackets) * 1000)/diff_ms;
+
+            rx_rate.rx_port_ierrors =
+                ((actual_rx_counters.rx_port_ierrors - previous_rx_counters.rx_port_ierrors) * 1000)/diff_ms;
+
+            rx_rate.rx_port_inombufs =
+                ((actual_rx_counters.rx_port_inombufs - previous_rx_counters.rx_port_inombufs) * 1000)/diff_ms;
+
+            rx_rate.rx_port_isyscalls =
+                ((actual_rx_counters.rx_port_isyscalls - previous_rx_counters.rx_port_isyscalls) * 1000)/diff_ms;
+
+            vr_interface_pesm_counters_print("RX port  ", true,
+                  rx_rate.rx_port_ipackets, rx_rate.rx_port_ierrors,
+                  rx_rate.rx_port_isyscalls, rx_rate.rx_port_inombufs);
+
+            actual_rx_counters.rx_queue_ipackets = gl_msg_req.vifr_queue_ipackets;
+            actual_rx_counters.rx_queue_ierrors = gl_msg_req.vifr_queue_ierrors;
+
+            rx_rate.rx_queue_ipackets =
+                ((actual_rx_counters.rx_queue_ipackets - previous_rx_counters.rx_queue_ipackets) * 1000)/diff_ms;
+
+            rx_rate.rx_queue_ierrors =
+                ((actual_rx_counters.rx_queue_ierrors - previous_rx_counters.rx_queue_ierrors) * 1000)/diff_ms;
+
+            vr_interface_pe_counters_print("RX queue ", true,
+                  rx_rate.rx_queue_ipackets, rx_rate.rx_queue_ierrors);
+
+        }
+
+        actual_rx_counters.rx_ipackets = gl_msg_req.vifr_ipackets;
+        actual_rx_counters.rx_ibytes   = gl_msg_req.vifr_ibytes;
+        actual_rx_counters.rx_ierrors  = gl_msg_req.vifr_ierrors;
+
+        rx_rate.rx_ipackets =
+            ((actual_rx_counters.rx_ipackets - previous_rx_counters.rx_ipackets) * 1000)/diff_ms;
+
+        rx_rate.rx_ibytes =
+            ((actual_rx_counters.rx_ibytes - previous_rx_counters.rx_ibytes) * 1000)/diff_ms;
+
+        rx_rate.rx_ierrors =
+            ((actual_rx_counters.rx_ierrors - previous_rx_counters.rx_ierrors) * 1000)/diff_ms;
+
+        vr_interface_pbem_counters_print("RX", true, rx_rate.rx_ipackets,
+                rx_rate.rx_ibytes, rx_rate.rx_ierrors, 0);
+
+
+        actual_tx_counters.tx_opackets = gl_msg_req.vifr_opackets;
+        actual_tx_counters.tx_obytes   = gl_msg_req.vifr_obytes;
+        actual_tx_counters.tx_oerrors  = gl_msg_req.vifr_oerrors;
+
+        tx_rate.tx_opackets =
+            ((actual_tx_counters.tx_opackets - previous_tx_counters.tx_opackets) * 1000)/diff_ms;
+
+        tx_rate.tx_obytes =
+            ((actual_tx_counters.tx_obytes - previous_tx_counters.tx_obytes) * 1000)/diff_ms;
+
+        tx_rate.tx_oerrors =
+            ((actual_tx_counters.tx_oerrors - previous_tx_counters.tx_oerrors) * 1000)/diff_ms;
+
+
+        vr_interface_pbem_counters_print("TX", true, tx_rate.tx_opackets,
+                tx_rate.tx_obytes, tx_rate.tx_oerrors, 0);
+
+
+        if (platform == DPDK_PLATFORM ) {
+
+            actual_tx_counters.tx_queue_opackets = gl_msg_req.vifr_queue_opackets;
+            actual_tx_counters.tx_queue_oerrors = gl_msg_req.vifr_queue_oerrors;
+
+            tx_rate.tx_queue_opackets =
+                ((actual_tx_counters.tx_queue_opackets - previous_tx_counters.tx_queue_opackets) * 1000)/diff_ms;
+
+            tx_rate.tx_queue_oerrors =
+                ((actual_tx_counters.tx_queue_oerrors - previous_tx_counters.tx_queue_oerrors) * 1000)/diff_ms;
+
+            vr_interface_pe_counters_print("TX queue ", true,
+                    tx_rate.tx_queue_opackets, tx_rate.tx_queue_oerrors);
+
+            actual_tx_counters.tx_port_opackets = gl_msg_req.vifr_port_opackets;
+            actual_tx_counters.tx_port_oerrors = gl_msg_req.vifr_port_oerrors;
+            actual_tx_counters.tx_port_osyscalls = gl_msg_req.vifr_port_osyscalls;
+
+            tx_rate.tx_port_opackets =
+                ((actual_tx_counters.tx_port_opackets - previous_tx_counters.tx_port_opackets) * 1000)/diff_ms;
+
+            tx_rate.tx_port_oerrors =
+                ((actual_tx_counters.tx_port_oerrors - previous_tx_counters.tx_port_oerrors) * 1000)/diff_ms;
+
+            tx_rate.tx_port_osyscalls =
+                ((actual_tx_counters.tx_port_osyscalls - previous_tx_counters.tx_port_osyscalls) * 1000)/diff_ms;
+
+            vr_interface_pesm_counters_print("TX port  ", true,
+                    tx_rate.tx_port_opackets, tx_rate.tx_port_oerrors,
+                    tx_rate.tx_port_osyscalls, 0);
+
+            actual_tx_counters.tx_device_opackets = gl_msg_req.vifr_dev_opackets;
+            actual_tx_counters.tx_device_oerrors = gl_msg_req.vifr_dev_oerrors;
+            actual_tx_counters.tx_device_obytes = gl_msg_req.vifr_dev_obytes;
+
+            tx_rate.tx_device_opackets =
+                ((actual_tx_counters.tx_device_opackets - previous_tx_counters.tx_device_opackets) * 1000)/diff_ms;
+
+            tx_rate.tx_device_oerrors =
+                ((actual_tx_counters.tx_device_oerrors - previous_tx_counters.tx_device_oerrors) * 1000)/diff_ms;
+
+            tx_rate.tx_device_obytes =
+                ((actual_tx_counters.tx_device_obytes - previous_tx_counters.tx_device_obytes ) * 1000)/diff_ms;
+
+            vr_interface_pbem_counters_print("TX device", true,
+                    tx_rate.tx_device_opackets, tx_rate.tx_device_obytes,
+                    tx_rate.tx_device_oerrors, 0);
+        }
+
+        printf("\n");
+
+        last_time = now;
+        prev_msg = gl_msg_req;
+        previous_rx_counters = actual_rx_counters;
+        previous_tx_counters = actual_tx_counters;
+    }
+
+
+    return 0;
 }
 
 int
@@ -1001,19 +1252,20 @@ main(int argc, char *argv[])
                 strerror(errno), errno);
         exit(-ENOMEM);
     }
-
-    if (add_set) {
-        /*
-         * for addition, we need to see whether the interface already
-         * exists in vrouter or not. so, get can return error if the
-         * interface does not exist in vrouter
-         */
-        ignore_error = true;
-        vr_intf_op(cl, SANDESH_OP_GET);
-        ignore_error = false;
+    if (!rate_set) {
+        if (add_set) {
+            /*
+             * for addition, we need to see whether the interface already
+             * exists in vrouter or not. so, get can return error if the
+             * interface does not exist in vrouter
+             */
+            ignore_error = true;
+            vr_intf_op(cl, SANDESH_OP_GET);
+            ignore_error = false;
+        }
+        vr_intf_op(cl, vr_op);
+        return 0;
+    } else {
+      rate_stats(cl, vr_op);
     }
-
-    vr_intf_op(cl, vr_op);
-
-    return 0;
 }
