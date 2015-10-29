@@ -679,6 +679,7 @@ vr_send_vrf_stats_dump(struct nl_client *cl, unsigned int router_id, int marker)
     req.h_op = SANDESH_OP_DUMP;
     req.vsr_rid = router_id;
     req.vsr_marker = marker;
+    req.vsr_family = AF_INET;
 
     return vr_sendmsg(cl, &req, "vr_vrf_stats_req");
 }
@@ -693,6 +694,7 @@ vr_send_vrf_stats_get(struct nl_client *cl, unsigned int router_id,
     req.h_op = SANDESH_OP_GET;
     req.vsr_rid = router_id;
     req.vsr_vrf = vrf;
+    req.vsr_family = AF_INET;
 
     return vr_sendmsg(cl, &req, "vr_vrf_stats_req");
 }
