@@ -65,6 +65,7 @@ vif_bridge_get_index(struct vr_interface *pvif, struct vr_interface *vif)
             vif->vif_src_mac);
     if (!be)
         return -1;
+
     return be->vif_bridge_hentry.hentry_index;
 }
 
@@ -98,6 +99,7 @@ vif_bridge_alloc(vr_htable_t htable, unsigned short vlan,
     vbe = (struct vif_bridge_entry *)vr_find_free_hentry(htable, &key, 0);
     if (!vbe)
         return NULL;
+
     memcpy(&vbe->vbe_key, &key, sizeof(key));
     return vbe;
 }
@@ -151,6 +153,9 @@ vif_bridge_get_key(vr_htable_t table, vr_hentry_t *entry, unsigned int
 
     if (!entry)
         return entry;
+
+    if (key_size)
+        *key_size = sizeof(struct vif_bridge_key);
 
     return (vr_hentry_key)(&vif_be->vbe_key);
 }
