@@ -1301,8 +1301,17 @@ vif_get_mtu(struct vr_interface *vif)
 static void
 vif_free(struct vr_interface *vif)
 {
+    int i;
+
     if (!vif)
         return;
+
+    for (i = 0; i < vr_num_cpus; i++) {
+        if (vif->vif_stats[i].vis_queue_ierrors_to_lcore) {
+            vr_free(vif->vif_stats[i].vis_queue_ierrors_to_lcore,
+                VR_INTERFACE_TO_LCORE_ERRORS_OBJECT);
+        }
+    }
 
     if (vif->vif_stats)
         vr_free(vif->vif_stats, VR_INTERFACE_STATS_OBJECT);
@@ -1724,7 +1733,7 @@ vif_transport_valid(vr_interface_req *req)
 int
 vr_interface_add(vr_interface_req *req, bool need_response)
 {
-    int ret = 0;
+    int i, ret = 0;
     struct vr_interface *vif = NULL;
     struct vrouter *router = vrouter_get(req->vifr_rid);
 
@@ -1756,6 +1765,15 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (!vif->vif_stats) {
         ret = -ENOMEM;
         goto generate_resp;
+    }
+
+    for (i = 0; i < vr_num_cpus; i++) {
+        vif->vif_stats[i].vis_queue_ierrors_to_lcore = vr_zalloc(vr_num_cpus *
+                sizeof(uint64_t), VR_INTERFACE_TO_LCORE_ERRORS_OBJECT);
+        if (!vif->vif_stats[i].vis_queue_ierrors_to_lcore) {
+            ret = -ENOMEM;
+            goto generate_resp;
+        }
     }
 
     vif->vif_type = req->vifr_type;
@@ -1830,6 +1848,8 @@ static void
 vr_interface_add_response(vr_interface_req *req,
                             struct vr_interface_stats *stats)
 {
+    int i;
+
     req->vifr_ibytes += stats->vis_ibytes;
     req->vifr_ipackets += stats->vis_ipackets;
     req->vifr_ierrors += stats->vis_ierrors;
@@ -1838,6 +1858,9 @@ vr_interface_add_response(vr_interface_req *req,
     req->vifr_oerrors += stats->vis_oerrors;
 
     req->vifr_queue_ipackets += stats->vis_queue_ipackets;
+    for (i = 0; i < vr_num_cpus; i++)
+        req->vifr_queue_ierrors_to_lcore[i] += stats->vis_queue_ierrors_to_lcore[i];
+    req->vifr_queue_ierrors_to_lcore_size = vr_num_cpus;
     req->vifr_queue_ierrors += stats->vis_queue_ierrors;
     req->vifr_queue_opackets += stats->vis_queue_opackets;
     req->vifr_queue_oerrors += stats->vis_queue_oerrors;
@@ -1863,7 +1886,7 @@ static void
 vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
                         unsigned int core)
 {
-    unsigned int cpu;
+    unsigned int cpu, i;
     struct vr_interface_settings settings;
 
     req->vifr_core = core;
@@ -1918,6 +1941,8 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_oerrors = 0;
     /* queue counters */
     req->vifr_queue_ipackets = 0;
+    for (i = 0; i < VR_MAX_CPUS; i++)
+        req->vifr_queue_ierrors_to_lcore[i] = 0;
     req->vifr_queue_ierrors = 0;
     req->vifr_queue_opackets = 0;
     req->vifr_queue_oerrors = 0;
@@ -1985,6 +2010,11 @@ vr_interface_req_get(void)
     req->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN,
             VR_INTERFACE_REQ_NAME_OBJECT);
 
+    req->vifr_queue_ierrors_to_lcore = vr_zalloc(VR_MAX_CPUS * sizeof(uint64_t),
+            VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT);
+    if (req->vifr_queue_ierrors_to_lcore)
+        req->vifr_queue_ierrors_to_lcore_size = 0;
+
     return req;
 }
 
@@ -2007,6 +2037,12 @@ vr_interface_req_destroy(vr_interface_req *req)
 
     if (req->vifr_name)
         vr_free(req->vifr_name, VR_INTERFACE_REQ_NAME_OBJECT);
+
+    if (req->vifr_queue_ierrors_to_lcore) {
+        vr_free(req->vifr_queue_ierrors_to_lcore,
+            VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT);
+        req->vifr_queue_ierrors_to_lcore_size = 0;
+    }
 
     vr_free(req, VR_INTERFACE_REQ_OBJECT);
     return;

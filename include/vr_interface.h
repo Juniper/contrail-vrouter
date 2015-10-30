@@ -111,6 +111,7 @@ struct vr_interface_stats {
     uint64_t vis_oerrors;
     /* queue counters */
     uint64_t vis_queue_ipackets;
+    uint64_t *vis_queue_ierrors_to_lcore;
     uint64_t vis_queue_ierrors;
     uint64_t vis_queue_opackets;
     uint64_t vis_queue_oerrors;

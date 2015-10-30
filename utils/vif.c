@@ -323,6 +323,29 @@ vr_interface_pe_counters_print(const char *title, bool print_always,
     }
 }
 
+static void
+vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
+            uint64_t *errors, uint32_t size)
+{
+    int i;
+
+    if (print_always) {
+        for (i = 0; i < size; i++) {
+            vr_interface_print_head_space();
+            vr_interface_core_print();
+            printf("%s to lcore %d errors:%" PRId64 "\n", title, i, errors[i]);
+        }
+    } else {
+        for (i = 0; i < size; i++) {
+            if (errors[i]) {
+                vr_interface_print_head_space();
+                vr_interface_core_print();
+                printf("%s to lcore %d errors:%" PRId64 "\n", title, i, errors[i]);
+            }
+        }
+    }
+}
+
 void
 vr_interface_req_process(void *s)
 {
@@ -330,17 +353,29 @@ vr_interface_req_process(void *s)
     vr_interface_req *req = (vr_interface_req *)s;
     vr_interface_req rate_req_temp = {0};
     unsigned int printed = 0;
+    bool print_zero = false; /* Do not print zeroed DPDK stats in --list mode */
 
     if (add_set)
         vr_ifindex = req->vifr_idx;
 
     if (!get_set && !list_set)
         return;
+
     if (rate_set) {
+        print_zero = true; /* Print zeroed DPDK stats in --rate mode */
 
         rate_req_temp = *req;
+        rate_req_temp.vifr_queue_ierrors_to_lcore = malloc(VR_MAX_CPUS * sizeof(uint64_t));
+        memcpy(rate_req_temp.vifr_queue_ierrors_to_lcore,
+                req->vifr_queue_ierrors_to_lcore,
+                req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+
         rate_stats_diff(req);
+
         prev_req = rate_req_temp;
+        memcpy(prev_req.vifr_queue_ierrors_to_lcore,
+                rate_req_temp.vifr_queue_ierrors_to_lcore,
+                rate_req_temp.vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
     }
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
@@ -403,14 +438,17 @@ vr_interface_req_process(void *s)
             req->vifr_mtu, req->vifr_ref_cnt);
 
     if (platform == DPDK_PLATFORM) {
-        vr_interface_pbem_counters_print("RX device", true,
+        vr_interface_pbem_counters_print("RX device", print_zero,
                 req->vifr_dev_ipackets, req->vifr_dev_ibytes,
                 req->vifr_dev_ierrors, req->vifr_dev_inombufs);
-        vr_interface_pesm_counters_print("RX port  ", true,
+        vr_interface_pesm_counters_print("RX port  ", print_zero,
                 req->vifr_port_ipackets, req->vifr_port_ierrors,
                 req->vifr_port_isyscalls, req->vifr_port_inombufs);
-        vr_interface_pe_counters_print("RX queue ", true,
+        vr_interface_pe_counters_print("RX queue ", print_zero,
                 req->vifr_queue_ipackets, req->vifr_queue_ierrors);
+        vr_interface_e_per_lcore_counters_print("RX queue", print_zero,
+                req->vifr_queue_ierrors_to_lcore,
+                req->vifr_queue_ierrors_to_lcore_size);
     }
 
     vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,
@@ -419,12 +457,12 @@ vr_interface_req_process(void *s)
              req->vifr_obytes, req->vifr_oerrors, 0);
 
     if (platform == DPDK_PLATFORM) {
-        vr_interface_pe_counters_print("TX queue ", true,
+        vr_interface_pe_counters_print("TX queue ", print_zero,
                 req->vifr_queue_opackets, req->vifr_queue_oerrors);
-        vr_interface_pesm_counters_print("TX port  ", true,
+        vr_interface_pesm_counters_print("TX port  ", print_zero,
                 req->vifr_port_opackets, req->vifr_port_oerrors,
                 req->vifr_port_osyscalls, 0);
-        vr_interface_pbem_counters_print("TX device", true,
+        vr_interface_pbem_counters_print("TX device", print_zero,
                 req->vifr_dev_opackets, req->vifr_dev_obytes,
                 req->vifr_dev_oerrors, 0);
     }
@@ -917,7 +955,7 @@ static void
 rate_stats_diff(vr_interface_req *req)
 {
     struct timeval now;
-    int64_t diff_ms = 0;
+    int64_t diff_ms = 0, i = 0;
 
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
@@ -947,6 +985,11 @@ rate_stats_diff(vr_interface_req *req)
         ((req->vifr_queue_ipackets - prev_req.vifr_queue_ipackets) * 1000)/diff_ms;
     req->vifr_queue_ierrors =
         ((req->vifr_queue_ierrors - prev_req.vifr_queue_ierrors) * 1000)/diff_ms;
+    for (i = 0; i < req->vifr_queue_ierrors_to_lcore_size; i++) {
+        req->vifr_queue_ierrors_to_lcore[i] =
+            ((req->vifr_queue_ierrors_to_lcore[i] -
+                prev_req.vifr_queue_ierrors_to_lcore[i]) * 1000)/diff_ms;
+    }
 
     req->vifr_ipackets =
         ((req->vifr_ipackets - prev_req.vifr_ipackets) * 1000)/diff_ms;
@@ -989,7 +1032,7 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
     char fmt[80] = {0};
 
     gettimeofday(&last_time, NULL);
-    while(true) {
+    while (true) {
         usleep(1000000);
         if (system("clear") == -1 ) {
             fprintf(stderr, "Error: system() failed.\n");
@@ -1134,6 +1177,8 @@ main(int argc, char *argv[])
     if (!rate_set) {
         vr_intf_op(cl, vr_op);
     } else {
+        prev_req.vifr_queue_ierrors_to_lcore = malloc(VR_MAX_CPUS * sizeof(uint64_t));
+        memset(prev_req.vifr_queue_ierrors_to_lcore, 0, VR_MAX_CPUS * sizeof(uint64_t));
         rate_stats(cl, vr_op);
     }
     return 0;
