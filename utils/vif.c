@@ -16,12 +16,14 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+
 #if defined(__linux__)
 #include <asm/types.h>
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_ether.h>
+
 
 #include <net/if.h>
 #include <net/ethernet.h>
@@ -66,7 +68,7 @@ static unsigned int core = (unsigned)-1;
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vif_set, vhost_phys_set, core_set;
+static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -77,6 +79,8 @@ static int platform;
 
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
+
+static vr_interface_req prev_req;
 
 static void Usage(void);
 
@@ -326,6 +330,67 @@ vr_interface_req_process(void *s)
 
     if (!get_set && !list_set)
         return;
+    if (rate_set) {
+        /* RX */
+        req->vifr_dev_ipackets =
+            ((req->vifr_dev_ipackets -  prev_req.vifr_dev_ipackets) * 1000)/1000;
+        req->vifr_dev_ibytes =
+            ((req->vifr_dev_ibytes -  prev_req.vifr_dev_ibytes) * 1000)/1000;
+        req->vifr_dev_ierrors =
+            ((req->vifr_dev_ierrors - prev_req.vifr_dev_ierrors) * 1000)/1000;
+        req->vifr_dev_inombufs =
+            ((req->vifr_dev_inombufs - prev_req.vifr_dev_inombufs) * 1000)/1000;
+
+        req->vifr_port_ipackets =
+            ((req->vifr_port_ipackets - prev_req.vifr_port_ipackets) * 1000)/1000;
+        req->vifr_port_ierrors =
+             ((req->vifr_port_ierrors - prev_req.vifr_port_ierrors) * 1000)/1000;
+        req->vifr_port_isyscalls =
+             ((req->vifr_port_isyscalls - prev_req.vifr_port_isyscalls) * 1000)/1000;
+        req->vifr_port_inombufs =
+            ((req->vifr_port_inombufs - prev_req.vifr_port_inombufs) * 1000)/1000;
+
+        req->vifr_queue_ipackets =
+            ((req->vifr_queue_ipackets - prev_req.vifr_queue_ipackets) * 1000)/1000;
+        req->vifr_queue_ierrors =
+            ((req->vifr_queue_ierrors - prev_req.vifr_queue_ierrors) * 1000)/1000;
+
+        req->vifr_ipackets =
+            ((req->vifr_ipackets - prev_req.vifr_ipackets) * 1000)/1000;
+        req->vifr_ibytes =
+            ((req->vifr_ibytes - prev_req.vifr_ibytes) * 1000)/1000;
+        req->vifr_ierrors =
+            ((req->vifr_ierrors - prev_req.vifr_ierrors) * 1000)/1000;
+
+
+        /*TX*/
+        req->vifr_opackets =
+             ((req->vifr_opackets - prev_req.vifr_opackets) * 1000)/1000;
+        req->vifr_obytes =
+            ((req->vifr_obytes - prev_req.vifr_obytes) * 1000)/1000;
+        req->vifr_oerrors =
+            ((req->vifr_oerrors - prev_req.vifr_oerrors) * 1000)/1000;
+
+        req->vifr_queue_opackets =
+            ((req->vifr_queue_opackets - prev_req.vifr_queue_opackets) * 1000)/1000;
+        req->vifr_queue_oerrors =
+            ((req->vifr_queue_oerrors - prev_req.vifr_queue_oerrors) * 1000)/1000;
+
+        req->vifr_port_opackets =
+            ((req->vifr_port_opackets - prev_req.vifr_port_opackets) * 1000)/1000;
+        req->vifr_port_oerrors =
+            ((req->vifr_port_oerrors - prev_req.vifr_port_oerrors) * 1000)/1000;
+
+        req->vifr_dev_opackets =
+            ((req->vifr_dev_opackets - prev_req.vifr_dev_opackets  ) * 1000)/1000;
+        req->vifr_dev_obytes =
+            ((req->vifr_dev_obytes - prev_req.vifr_dev_obytes) * 1000)/1000;
+        req->vifr_dev_oerrors =
+            ((req->vifr_dev_oerrors - prev_req.vifr_dev_oerrors) * 1000)/1000;
+
+        prev_req = *req;
+
+    }
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
     for (; printed < 12; printed++)
@@ -387,13 +452,13 @@ vr_interface_req_process(void *s)
             req->vifr_mtu, req->vifr_ref_cnt);
 
     if (platform == DPDK_PLATFORM) {
-        vr_interface_pbem_counters_print("RX device", false,
+        vr_interface_pbem_counters_print("RX device", true,
                 req->vifr_dev_ipackets, req->vifr_dev_ibytes,
                 req->vifr_dev_ierrors, req->vifr_dev_inombufs);
-        vr_interface_pesm_counters_print("RX port  ", false,
+        vr_interface_pesm_counters_print("RX port  ", true,
                 req->vifr_port_ipackets, req->vifr_port_ierrors,
                 req->vifr_port_isyscalls, req->vifr_port_inombufs);
-        vr_interface_pe_counters_print("RX queue ", false,
+        vr_interface_pe_counters_print("RX queue ", true,
                 req->vifr_queue_ipackets, req->vifr_queue_ierrors);
     }
 
@@ -403,12 +468,12 @@ vr_interface_req_process(void *s)
              req->vifr_obytes, req->vifr_oerrors, 0);
 
     if (platform == DPDK_PLATFORM) {
-        vr_interface_pe_counters_print("TX queue ", false,
+        vr_interface_pe_counters_print("TX queue ", true,
                 req->vifr_queue_opackets, req->vifr_queue_oerrors);
-        vr_interface_pesm_counters_print("TX port  ", false,
+        vr_interface_pesm_counters_print("TX port  ", true,
                 req->vifr_port_opackets, req->vifr_port_oerrors,
                 req->vifr_port_osyscalls, 0);
-        vr_interface_pbem_counters_print("TX device", false,
+        vr_interface_pbem_counters_print("TX device", true,
                 req->vifr_dev_opackets, req->vifr_dev_obytes,
                 req->vifr_dev_oerrors, 0);
     }
@@ -520,7 +585,7 @@ vr_intf_op(struct nl_client *cl, unsigned int op)
         return vhost_create();
 
     if ((op == SANDESH_OP_DUMP) ||
-            ((op == SANDESH_OP_GET) && !(add_set))) {
+            ((op == SANDESH_OP_GET) && !(add_set) && !(rate_set))) {
         vr_interface_print_header();
     }
 
@@ -615,7 +680,7 @@ Usage()
     printf("\t   \t--vif <vif ID>]\n");
     printf( "[--id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
-    printf("\t   [--get <intf_id>][--kernel][--core <core number>]\n");
+    printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
     printf("\t   [--list][--core <core number>]\n");
     printf("\t   [--help]\n");
@@ -628,6 +693,7 @@ enum if_opt_index {
     ADD_OPT_INDEX,
     CREATE_OPT_INDEX,
     GET_OPT_INDEX,
+    RATE_OPT_INDEX,
     LIST_OPT_INDEX,
     VRF_OPT_INDEX,
     MAC_OPT_INDEX,
@@ -653,6 +719,7 @@ static struct option long_options[] = {
     [ADD_OPT_INDEX]         =   {"add",         required_argument,  &add_set,           1},
     [CREATE_OPT_INDEX]      =   {"create",      required_argument,  &create_set,        1},
     [GET_OPT_INDEX]         =   {"get",         required_argument,  &get_set,           1},
+    [RATE_OPT_INDEX]        =   {"rate",        no_argument,        &rate_set,          1},
     [LIST_OPT_INDEX]        =   {"list",        no_argument,        &list_set,          1},
     [VRF_OPT_INDEX]         =   {"vrf",         required_argument,  &vrf_set,           1},
     [MAC_OPT_INDEX]         =   {"mac",         required_argument,  &mac_set,           1},
@@ -837,13 +904,11 @@ validate_options(void)
             Usage();
         return;
     }
-
     if (get_set) {
-        if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set))
+        if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set && !rate_set))
             Usage();
         return;
     }
-
     if (delete_set) {
         if (sum_opt > 1)
             Usage();
@@ -888,7 +953,29 @@ validate_options(void)
             Usage();
     }
 
+    if (rate_set) {
+        if (!get_set) {
+            Usage();
+        }
+    }
+
     return;
+}
+
+static void
+rate_stats(struct nl_client *cl, unsigned int vr_op)
+{
+    while(true) {
+        if (system("clear") == -1 ) {
+            printf("Error: system() failed\n");
+        }
+        printf("Interface rate statistics\n");
+        printf("-------------------------\n\n");
+        if (vr_intf_op(cl, vr_op)) {
+            printf("Communication problem with agent.\n\n");
+        }
+        usleep(1000000);
+    }
 }
 
 int
@@ -906,7 +993,7 @@ main(int argc, char *argv[])
 
     while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:C:DPi:",
                     long_options, &option_index)) >= 0) {
-            switch (opt) {
+        switch (opt) {
             case 'a':
                 add_set = 1;
                 parse_long_opts(ADD_OPT_INDEX, optarg);
@@ -985,7 +1072,7 @@ main(int argc, char *argv[])
             case '?':
             default:
                 Usage();
-            }
+        }
     }
 
     validate_options();
@@ -1001,7 +1088,6 @@ main(int argc, char *argv[])
                 strerror(errno), errno);
         exit(-ENOMEM);
     }
-
     if (add_set) {
         /*
          * for addition, we need to see whether the interface already
@@ -1012,8 +1098,10 @@ main(int argc, char *argv[])
         vr_intf_op(cl, SANDESH_OP_GET);
         ignore_error = false;
     }
-
-    vr_intf_op(cl, vr_op);
-
+    if (!rate_set) {
+        vr_intf_op(cl, vr_op);
+    } else {
+        rate_stats(cl, vr_op);
+    }
     return 0;
 }
