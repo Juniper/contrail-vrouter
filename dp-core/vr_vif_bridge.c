@@ -38,7 +38,7 @@ vif_bridge_get(vr_htable_t htable, unsigned short vlan,
     key.vbk_vlan = vlan;
     VR_MAC_COPY(key.vbk_mac, mac);
 
-    return (struct vif_bridge_entry *)vr_find_hentry(htable, &key, 0);
+    return (struct vif_bridge_entry *)vr_htable_find_hentry(htable, &key, 0);
 }
 
 struct vr_interface *
@@ -81,7 +81,7 @@ vif_bridge_free(vr_htable_t htable, vr_hentry_t *hentry,
     memset(&be->vbe_key, 0, sizeof(struct vif_bridge_key));
     be->vbe_vif = NULL;
 
-    vr_release_hentry(htable, hentry);
+    vr_htable_release_hentry(htable, hentry);
     return;
 }
 
@@ -95,7 +95,8 @@ vif_bridge_alloc(vr_htable_t htable, unsigned short vlan,
     key.vbk_vlan = vlan;
     VR_MAC_COPY(key.vbk_mac, mac);
 
-    vbe = (struct vif_bridge_entry *)vr_find_free_hentry(htable, &key, 0);
+    vbe = (struct vif_bridge_entry *)vr_htable_find_free_hentry(htable,
+                                                                &key, 0);
     if (!vbe)
         return NULL;
     memcpy(&vbe->vbe_key, &key, sizeof(key));

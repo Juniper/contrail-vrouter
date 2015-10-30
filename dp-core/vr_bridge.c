@@ -75,7 +75,7 @@ vr_find_bridge_entry(struct vr_bridge_entry_key *key)
     if (!vn_rtable || !key)
         return NULL;
 
-    return (struct vr_bridge_entry *)vr_find_hentry(vn_rtable, key, 0);
+    return (struct vr_bridge_entry *)vr_htable_find_hentry(vn_rtable, key, 0);
 }
 
 struct vr_bridge_entry *
@@ -89,7 +89,8 @@ vr_find_free_bridge_entry(unsigned int vrf_id, char *mac)
 
     key.be_vrf_id = vrf_id;
     VR_MAC_COPY(key.be_mac, mac);
-    be = (struct vr_bridge_entry *)vr_find_free_hentry(vn_rtable, &key, 0);
+    be = (struct vr_bridge_entry *)vr_htable_find_free_hentry(vn_rtable,
+                                                                &key, 0);
     return be;
 }
 
@@ -181,7 +182,7 @@ bridge_table_entry_free(vr_htable_t table, vr_hentry_t *hentry,
         be->be_nh = NULL;
         vrouter_put_nexthop(nh);
     }
-    vr_release_hentry(table, hentry);
+    vr_htable_release_hentry(table, hentry);
 
     return;
 }
@@ -216,7 +217,7 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
         be = (struct vr_bridge_entry *)
-                vr_get_hentry_by_index(vn_rtable, rt->rtr_req.rtr_index);
+             vr_htable_get_hentry_by_index(vn_rtable, rt->rtr_req.rtr_index);
         if (!be)
             return NULL;
 
@@ -313,7 +314,8 @@ __bridge_table_dump(struct vr_message_dumper *dumper)
     struct vr_bridge_entry *be;
 
     for(i = 0; i < (vr_bridge_entries + vr_bridge_oentries); i++) {
-        be = (struct vr_bridge_entry *) vr_get_hentry_by_index(vn_rtable, i);
+        be = (struct vr_bridge_entry *)
+                vr_htable_get_hentry_by_index(vn_rtable, i);
         if (!be)
             continue;
         if (be->be_flags & VR_BE_VALID_FLAG) {

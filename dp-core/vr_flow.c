@@ -224,7 +224,7 @@ vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe, unsigned i
     fe->fe_udp_src_port = 0;
     fe->fe_tcp_flags = 0;
 
-    vr_release_hentry(router->vr_flow_table, &fe->fe_hentry);
+    vr_htable_release_hentry(router->vr_flow_table, &fe->fe_hentry);
     return;
 }
 
@@ -254,7 +254,8 @@ vr_set_flow_active(struct vr_flow_entry *fe)
 static inline struct vr_flow_entry *
 vr_flow_table_entry_get(struct vrouter *router, unsigned int i)
 {
-    return (struct vr_flow_entry *)vr_get_hentry_by_index(router->vr_flow_table, i);
+    return (struct vr_flow_entry *)
+            vr_htable_get_hentry_by_index(router->vr_flow_table, i);
 }
 
 unsigned int
@@ -287,7 +288,7 @@ vr_get_flow_entry(struct vrouter *router, int index)
         return NULL;
 
     return (struct vr_flow_entry *)
-            vr_get_hentry_by_index(router->vr_flow_table, index);
+            vr_htable_get_hentry_by_index(router->vr_flow_table, index);
 }
 
 static void
@@ -337,7 +338,8 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
 {
     struct vr_flow_entry *fe;
 
-    fe = (struct vr_flow_entry *)vr_find_free_hentry(router->vr_flow_table, key, key->key_len);
+    fe = (struct vr_flow_entry *)
+         vr_htable_find_free_hentry(router->vr_flow_table, key, key->key_len);
     if (fe) {
 
         if (!vr_set_flow_active(fe)) {
@@ -376,7 +378,7 @@ vr_find_flow(struct vrouter *router, struct vr_flow *key,
     struct vr_flow_entry *fe;
 
 
-    fe = (struct vr_flow_entry *)vr_find_hentry(router->vr_flow_table,
+    fe = (struct vr_flow_entry *)vr_htable_find_hentry(router->vr_flow_table,
                                                     key, key->key_len);
     if (fe) {
         if (fe_index)
