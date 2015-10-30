@@ -9,6 +9,7 @@
 #include "vr_defs.h"
 #include "vr_types.h"
 #include "vr_htable.h"
+#include "vrouter.h"
 
 /*
  * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
@@ -111,6 +112,7 @@ struct vr_interface_stats {
     uint64_t vis_oerrors;
     /* queue counters */
     uint64_t vis_queue_ipackets;
+    uint64_t vis_queue_ierrors_to_lcore[VR_MAX_CPUS];
     uint64_t vis_queue_ierrors;
     uint64_t vis_queue_opackets;
     uint64_t vis_queue_oerrors;
