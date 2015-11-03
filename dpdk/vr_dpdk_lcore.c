@@ -466,7 +466,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     int i, j, ret, retry;
     int nb_retry_lcores;
     uint16_t dst_lcore_idx = 0;
-    uint32_t lcore_nb_pkts, chunk_nb_pkts;
+    uint32_t lcore_nb_pkts, chunk_nb_pkts, hashval;
     /*
      * Per lcore bursts (+1 for the header)
      * Header bits:
@@ -494,14 +494,18 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     for (i = 0; i < nb_pkts; i++) {
         mbuf = pkts[i];
         rte_prefetch0(rte_pktmbuf_mtod(mbuf, char *));
+        if (likely(mbuf->ol_flags & PKT_RX_RSS_HASH))
+            hashval = mbuf->hash.rss;
+        else
+            hashval = 0;
 
-        dst_lcore_idx = mbuf->hash.rss % nb_dst_lcores;
+        dst_lcore_idx = hashval % nb_dst_lcores;
 
         /* put the mbuf to the burst */
         lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0xFFFFFFFFU;
 
         RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
-             __func__, lcore_id, mbuf->hash.rss, lcore_nb_pkts,
+             __func__, lcore_id, hashval, lcore_nb_pkts,
             dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID);
 
         lcore_pkts[dst_lcore_idx][lcore_nb_pkts] = mbuf;
