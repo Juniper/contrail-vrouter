@@ -6,7 +6,6 @@
 #include <vr_htable.h>
 #include <vr_btable.h>
 #include <vr_hash.h>
-#include <vr_bitmap.h>
 #include <vrouter.h>
 
 #define VR_HENTRIES_PER_BUCKET 4
@@ -29,7 +28,8 @@ struct vr_htable {
     struct vr_btable *ht_otable;
     struct vr_btable *ht_dtable;
     get_hentry_key ht_get_key;
-    vr_bmap_t ht_free_oentries;
+    vr_hentry_t *ht_free_oentry_head;
+    unsigned int ht_used_oentries;
 };
 
 struct vr_hentry_delete_data {
@@ -50,7 +50,7 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
         return;
 
     for (i = marker; i < table->ht_hentries + table->ht_oentries; i++) {
-        ent = vr_get_hentry_by_index(htable, i);
+        ent = vr_htable_get_hentry_by_index(htable, i);
         if(ent->hentry_flags & VR_HENTRY_FLAG_VALID)
             cb(htable, ent, i, data);
     }
@@ -58,8 +58,68 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
     return;
 }
 
+static vr_hentry_t *
+vr_htable_get_free_oentry(struct vr_htable *table)
+{
+    vr_hentry_t *ent;
+
+    if (!table)
+        return NULL;
+
+    do {
+
+        /*
+         * Get the head of the free list. And move the head to next free
+         * entry. This can become NULL while the loop is in progress
+         */
+        ent = table->ht_free_oentry_head;
+        if (!ent)
+            return NULL;
+
+        if (__sync_bool_compare_and_swap(&table->ht_free_oentry_head,
+                    ent, ent->hentry_next)) {
+            ent->hentry_next = NULL;
+            (void)__sync_add_and_fetch(&table->ht_used_oentries, 1);
+            return ent;
+        }
+
+    } while (1);
+
+    return NULL;
+}
+
+static void
+vr_htable_put_free_oentry(struct vr_htable *table, vr_hentry_t *ent)
+{
+
+    vr_hentry_t *tmp;
+
+    if (!table || !ent)
+        return;
+
+    tmp = NULL;
+    do {
+
+        /*
+         * Insert this new entry as head.
+         */
+        tmp = table->ht_free_oentry_head;
+        ent->hentry_next = tmp;
+
+        if (__sync_bool_compare_and_swap(&table->ht_free_oentry_head,
+                                                            tmp, ent)) {
+            (void)__sync_sub_and_fetch(&table->ht_used_oentries, 1);
+            return;
+        }
+
+    } while (1);
+
+    return;
+}
+
+
 vr_hentry_t *
-vr_get_hentry_by_index(vr_htable_t htable, unsigned int index)
+vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
 
@@ -77,7 +137,7 @@ vr_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 
 
 static void
-vr_hentry_defer_delete(struct vrouter *router, void *arg)
+vr_htable_hentry_defer_delete(struct vrouter *router, void *arg)
 {
     vr_hentry_t *ent;
     struct vr_hentry_delete_data *defer_data;
@@ -86,7 +146,8 @@ vr_hentry_defer_delete(struct vrouter *router, void *arg)
     defer_data = (struct vr_hentry_delete_data *)arg;
     table = (struct vr_htable *)(defer_data->hd_table);
 
-    ent = vr_get_hentry_by_index((vr_htable_t)table, defer_data->hd_index);
+    ent = vr_htable_get_hentry_by_index((vr_htable_t)table,
+                                        defer_data->hd_index);
     /* Might be under the process of flushing */
     if (!ent)
         return;
@@ -96,13 +157,11 @@ vr_hentry_defer_delete(struct vrouter *router, void *arg)
     ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
     ent->hentry_flags = 0;
 
-    /* The entry is up for grab */
-    vr_bitmap_clear_bit(table->ht_free_oentries,
-                         (defer_data->hd_index - table->ht_hentries));
+    vr_htable_put_free_oentry(table, ent);
 }
 
 static void
-vr_hentry_scheduled_delete(void *arg)
+vr_htable_hentry_scheduled_delete(void *arg)
 {
     unsigned int count;
     struct vr_hentry_delete_data *delete_data, *defer_data;
@@ -111,7 +170,7 @@ vr_hentry_scheduled_delete(void *arg)
 
     delete_data = (struct vr_hentry_delete_data *)arg;
 
-    head_ent = vr_get_hentry_by_index(
+    head_ent = vr_htable_get_hentry_by_index(
             (vr_htable_t)(delete_data->hd_table), delete_data->hd_index);
 
     if (!head_ent)
@@ -182,7 +241,7 @@ vr_hentry_scheduled_delete(void *arg)
                 defer_data->hd_table = delete_data->hd_table;
                 defer_data->hd_index = ent->hentry_index;
                 vr_defer(delete_data->hd_table->ht_router,
-                                vr_hentry_defer_delete, (void *)defer_data);
+                         vr_htable_hentry_defer_delete, (void *)defer_data);
             }
         }
 
@@ -197,7 +256,7 @@ vr_hentry_scheduled_delete(void *arg)
 }
 
 void
-vr_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
+vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
 {
     unsigned int cpu_num, delete_index, index;
     struct vr_hentry_delete_data *delete_data;
@@ -219,7 +278,7 @@ vr_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
     ent->hentry_flags |= VR_HENTRY_FLAG_DELETE_MARKED;
 
-    head_ent = vr_get_hentry_by_index(htable, ent->hentry_bucket_index);
+    head_ent = vr_htable_get_hentry_by_index(htable, ent->hentry_bucket_index);
     delete_index = head_ent->hentry_index / table->ht_bucket_size;
     delete_data = vr_btable_get(table->ht_dtable, delete_index);
 
@@ -231,7 +290,7 @@ vr_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
 
         /* Schedule the deletion on a cpu based on bucket index */
         cpu_num = head_ent->hentry_index % vr_num_cpus;
-        vr_schedule_work(cpu_num, vr_hentry_scheduled_delete,
+        vr_schedule_work(cpu_num, vr_htable_hentry_scheduled_delete,
                                                 (void *)delete_data);
     }
 
@@ -239,7 +298,7 @@ vr_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
 }
 
 vr_hentry_t *
-vr_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
+vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
 {
     unsigned int hash, tmp_hash, i;
     struct vr_htable *table = (struct vr_htable *)htable;
@@ -268,7 +327,6 @@ vr_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
             if (__sync_bool_compare_and_swap(&ent->hentry_flags,
                         (ent->hentry_flags & ~VR_HENTRY_FLAG_VALID),
                         VR_HENTRY_FLAG_VALID)) {
-                ent->hentry_index = ind;
                 ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
                 return ent;
             }
@@ -278,13 +336,12 @@ vr_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
     bucket_index = ind;
 
     if (table->ht_oentries) {
-        ind = vr_bitmap_alloc_bit(table->ht_free_oentries);
-        if (ind == -1)
+
+        o_ent = vr_htable_get_free_oentry(table);
+        if (!o_ent)
             return NULL;
 
-        o_ent = vr_btable_get(table->ht_otable, ind);
         o_ent->hentry_bucket_index = bucket_index;
-        o_ent->hentry_index = ind + table->ht_hentries;
         o_ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
         o_ent->hentry_flags = VR_HENTRY_FLAG_VALID;
 
@@ -315,7 +372,7 @@ vr_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
 }
 
 int
-vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t *hentry)
+vr_htable_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t *hentry)
 {
     unsigned int hash, tmp_hash, ind, i, key_len, ent_key_len;
     vr_hentry_t *ent;
@@ -383,7 +440,7 @@ vr_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t *hentry)
 }
 
 vr_hentry_t *
-vr_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
+vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
 {
     unsigned int hash, tmp_hash, ind, i, ent_key_len;
     vr_hentry_t *ent, *o_ent;
@@ -446,7 +503,7 @@ vr_htable_oflow_entries(vr_htable_t htable)
     struct vr_htable *table = (struct vr_htable *)htable;
 
     if (table)
-        return vr_bitmap_used_bits(table->ht_free_oentries);
+        return table->ht_used_oentries;
 
     return 0;
 }
@@ -491,7 +548,7 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
 {
     int i;
     struct vr_htable *table;
-    vr_hentry_t *ent;
+    vr_hentry_t *ent, *prev;
     struct iovec iov;
 
     if (!entry_size || !entries || !get_entry_key)
@@ -538,12 +595,6 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
             goto exit;
         }
 
-        table->ht_free_oentries = vr_bitmap_create(oentries);
-        if (!table->ht_free_oentries) {
-            vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, oentries);
-            goto exit;
-        }
-
         /*
          * If there is an over flow table, create the delete data for
          * main flow table
@@ -559,12 +610,22 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
 
     for (i = 0; i < entries; i++) {
         ent = vr_btable_get(table->ht_htable, i);
+        ent->hentry_index = i;
         ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
     }
 
+
+    prev = NULL;
     for (i = 0; i < oentries; i++) {
         ent = vr_btable_get(table->ht_otable, i);
+        ent->hentry_index = entries + i;
         ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
+        if (i == 0)
+            table->ht_free_oentry_head = ent;
+        else
+            prev->hentry_next = ent;
+
+        prev = ent;
     }
 
     table->ht_hentries = entries;
@@ -574,6 +635,7 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
     table->ht_get_key = get_entry_key;
     table->ht_bucket_size = bucket_size;
     table->ht_router = router;
+    table->ht_used_oentries = 0;
 
     return (vr_htable_t)table;
 
@@ -612,9 +674,6 @@ vr_htable_delete(vr_htable_t htable)
 
     if (table->ht_dtable)
         vr_btable_free(table->ht_dtable);
-
-    if (table->ht_free_oentries)
-        vr_bitmap_delete(table->ht_free_oentries);
 
     vr_free(table);
 
