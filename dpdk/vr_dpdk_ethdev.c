@@ -793,6 +793,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
     struct vr_ip6 *ipv6_inner_hdr = NULL;
     struct vr_udp *udp_hdr = NULL;
     struct vr_gre *gre_hdr = NULL;
+    struct vlan_hdr *vlan_hdr;
     unsigned int pull_len = VR_ETHER_HLEN, ipv4_len;
     int encap_type, helper_ret;
     unsigned short gre_udp_encap = 0, gre_hdr_len = VR_GRE_BASIC_HDR_LEN,
@@ -808,6 +809,14 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
     while (eth_proto == VR_ETH_PROTO_VLAN) {
         if (unlikely(mbuf_data_len < pull_len + VR_VLAN_HLEN))
             return -1;
+
+        /* Store the first VLAN TCI for further use. */
+        if (likely((mbuf->ol_flags & PKT_RX_VLAN_PKT) == 0)) {
+            vlan_hdr = (struct vlan_hdr *)(eth_hdr + 1);
+            mbuf->ol_flags |= PKT_RX_VLAN_PKT;
+            mbuf->vlan_tci = rte_be_to_cpu_16(vlan_hdr->vlan_tci);
+        }
+
         eth_proto = ((struct vr_vlan_hdr *)((uintptr_t)eth_hdr + pull_len))->vlan_proto;
         eth_proto = rte_be_to_cpu_16(eth_proto);
         pull_len += VR_VLAN_HLEN;

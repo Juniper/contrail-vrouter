@@ -590,6 +590,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     struct vr_packet *pkt;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct vr_packet *p_clone;
+    unsigned short vlan_id = VLAN_ID_INVALID;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -639,10 +640,14 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
         rte_pktmbuf_dump(stdout, mbuf, 0x60);
 #endif
 
+        if ((mbuf->ol_flags & PKT_RX_VLAN_PKT) != 0) {
+            vlan_id = mbuf->vlan_tci & 0xFFF;
+        }
+
         /* convert mbuf to vr_packet */
         pkt = vr_dpdk_packet_get(mbuf, vif);
         /* send the packet to vRouter */
-        vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
+        vif->vif_rx(vif, pkt, vlan_id);
     }
 }
 
