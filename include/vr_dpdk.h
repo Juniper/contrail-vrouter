@@ -349,8 +349,10 @@ struct vr_dpdk_lcore {
     volatile uint16_t lcore_cmd;
     /* Lcore command arguments */
     volatile uint64_t lcore_cmd_arg;
-    /* RX ring */
+    /* RX ring with packets from other lcores (i.e. for MPLSoGRE). */
     struct rte_ring *lcore_rx_ring;
+    /* RX ring with packets from IO lcore. */
+    struct rte_ring *lcore_io_rx_ring;
     /* Flag controlling the assembler work */
     bool do_fragment_assembly;
 
@@ -682,8 +684,9 @@ vr_dpdk_lcore_flush(struct vr_dpdk_lcore *lcore)
  * The destination lcores are listed in lcore->lcore_dst_lcores.
  */
 void
-vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
-    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts);
+vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
+    struct vr_interface *vif, struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ],
+    uint32_t nb_pkts);
 /* Pass mbufs to dp-core. */
 void
 vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
