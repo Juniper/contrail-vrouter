@@ -12,11 +12,15 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
+#include <termios.h>
+
 
 #include "vr_os.h"
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 
 #if defined(__linux__)
 #include <asm/types.h>
@@ -44,6 +48,12 @@
 #include "nl_util.h"
 #include "ini_parser.h"
 
+#define RATE_NO_EVENT 0x0
+#define RATE_NEXT_INTERFACE 0x1
+#define RATE_PREVIOUS_INTERFACE 0x2
+
+#define LISTING_NUM_OF_LINE  3
+#define MAX_OUTPUT_IF 32
 
 #define VHOST_TYPE_STRING           "vhost"
 #define AGENT_TYPE_STRING           "agent"
@@ -81,13 +91,18 @@ static int platform;
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
 
-static vr_interface_req prev_req;
+static vr_interface_req prev_req[MAX_OUTPUT_IF];
 static struct timeval last_time;
 
+static int number_interface = 0;
+static unsigned char key_event = RATE_NO_EVENT;
 
 static void Usage(void);
-static void rate_stats_diff(vr_interface_req *);
+
+static void rate_stats_diff(vr_interface_req *, vr_interface_req *);
 static void rate_stats(struct nl_client *, unsigned int);
+static int is_stdin_hit();
+static void list_rate_print(vr_interface_req *req);
 
 static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_POLICY_ENABLED,   "P",    "Policy"            },
@@ -324,6 +339,37 @@ vr_interface_pe_counters_print(const char *title, bool print_always,
 }
 
 void
+list_rate_print(vr_interface_req *req)
+{
+    int printed = 0;
+    uint64_t tx_errors = 0;
+    uint64_t rx_errors = 0;
+
+    rx_errors = (req->vifr_dev_ierrors + req->vifr_port_ierrors + req->vifr_queue_ierrors
+                 + req->vifr_ierrors);
+    tx_errors = (req->vifr_dev_oerrors + req->vifr_port_oerrors + req->vifr_queue_oerrors
+                 + req->vifr_oerrors);
+
+    printed = printf("%s: %s", vr_if_transport_string(req),
+                        req->vifr_name);
+    for (; printed < 22; printed++)
+        printf(" ");
+    printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
+    for (; printed < 22; printed++)
+        printf(" ");
+
+    printed = printf("%lu %ld", rx_errors, req->vifr_ipackets);
+    for (; printed < 22; printed++)
+        printf(" ");
+
+    printed = printf("%ld %ld", tx_errors, req->vifr_opackets);
+    for (; printed < 22; printed++)
+        printf(" ");
+    printf("\n\n\n");
+    return;
+}
+
+void
 vr_interface_req_process(void *s)
 {
     char name[50];
@@ -339,10 +385,20 @@ vr_interface_req_process(void *s)
     if (rate_set) {
 
         rate_req_temp = *req;
-        rate_stats_diff(req);
-        prev_req = rate_req_temp;
+        rate_stats_diff(req, &prev_req[rate_req_temp.vifr_idx % MAX_OUTPUT_IF]);
+        prev_req[rate_req_temp.vifr_idx % MAX_OUTPUT_IF] = rate_req_temp;
     }
+    if (rate_set && list_set){
+        if  ((key_event & RATE_PREVIOUS_INTERFACE) && (rate_req_temp.vifr_idx -1) >  dump_marker) {
+            dump_marker=(dump_marker < 0)?-1:--dump_marker;
+            return;
 
+        } else if (number_interface >= 1) {
+            list_rate_print(req);
+            number_interface--;
+        }
+        return;
+    }
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
     for (; printed < 12; printed++)
         printf(" ");
@@ -431,9 +487,10 @@ vr_interface_req_process(void *s)
 
     printf("\n");
 
-    if (list_set)
-        dump_marker = req->vifr_idx;
+    if (list_set){
 
+        dump_marker = req->vifr_idx;
+    }
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
         vr_vrf_assign_dump = true;
         dump_pending = true;
@@ -535,8 +592,8 @@ vr_intf_op(struct nl_client *cl, unsigned int op)
     if (create_set)
         return vhost_create();
 
-    if ((op == SANDESH_OP_DUMP) ||
-            ((op == SANDESH_OP_GET) && !(add_set) && !(rate_set))) {
+    if ((op == SANDESH_OP_DUMP &&  !(rate_set)) ||
+            ((op == SANDESH_OP_GET) && !(add_set) )) {
         vr_interface_print_header();
     }
 
@@ -633,7 +690,7 @@ Usage()
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
-    printf("\t   [--list][--core <core number>]\n");
+    printf("\t   [--list][--core <core number>][--rate]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -865,12 +922,15 @@ validate_options(void)
             Usage();
         return;
     }
-
     if (list_set) {
         if (!core_set) {
+            if (rate_set && !(sum_opt > 2))
+                return;
             if (sum_opt > 1)
                 Usage();
         } else {
+            if(rate_set && !(sum_opt > 3))
+               return;
             if (sum_opt != 2)
                 Usage();
         }
@@ -914,7 +974,7 @@ validate_options(void)
 
 
 static void
-rate_stats_diff(vr_interface_req *req)
+rate_stats_diff(vr_interface_req *req, vr_interface_req *prev_req)
 {
     struct timeval now;
     int64_t diff_ms = 0;
@@ -922,63 +982,62 @@ rate_stats_diff(vr_interface_req *req)
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
-    last_time = now;
-
+    assert(diff_ms > 0);
     /* RX */
     req->vifr_dev_ipackets =
-        ((req->vifr_dev_ipackets -  prev_req.vifr_dev_ipackets) * 1000)/diff_ms;
+        ((req->vifr_dev_ipackets -  prev_req->vifr_dev_ipackets) * 1000)/diff_ms;
     req->vifr_dev_ibytes =
-        ((req->vifr_dev_ibytes -  prev_req.vifr_dev_ibytes) * 1000)/diff_ms;
+        ((req->vifr_dev_ibytes -  prev_req->vifr_dev_ibytes) * 1000)/diff_ms;
     req->vifr_dev_ierrors =
-        ((req->vifr_dev_ierrors - prev_req.vifr_dev_ierrors) * 1000)/diff_ms;
+        ((req->vifr_dev_ierrors - prev_req->vifr_dev_ierrors) * 1000)/diff_ms;
     req->vifr_dev_inombufs =
-        ((req->vifr_dev_inombufs - prev_req.vifr_dev_inombufs) * 1000)/diff_ms;
+        ((req->vifr_dev_inombufs - prev_req->vifr_dev_inombufs) * 1000)/diff_ms;
 
     req->vifr_port_ipackets =
-        ((req->vifr_port_ipackets - prev_req.vifr_port_ipackets) * 1000)/diff_ms;
+        ((req->vifr_port_ipackets - prev_req->vifr_port_ipackets) * 1000)/diff_ms;
     req->vifr_port_ierrors =
-        ((req->vifr_port_ierrors - prev_req.vifr_port_ierrors) * 1000)/diff_ms;
+        ((req->vifr_port_ierrors - prev_req->vifr_port_ierrors) * 1000)/diff_ms;
     req->vifr_port_isyscalls =
-        ((req->vifr_port_isyscalls - prev_req.vifr_port_isyscalls) * 1000)/diff_ms;
+        ((req->vifr_port_isyscalls - prev_req->vifr_port_isyscalls) * 1000)/diff_ms;
     req->vifr_port_inombufs =
-        ((req->vifr_port_inombufs - prev_req.vifr_port_inombufs) * 1000)/diff_ms;
+        ((req->vifr_port_inombufs - prev_req->vifr_port_inombufs) * 1000)/diff_ms;
 
     req->vifr_queue_ipackets =
-        ((req->vifr_queue_ipackets - prev_req.vifr_queue_ipackets) * 1000)/diff_ms;
+        ((req->vifr_queue_ipackets - prev_req->vifr_queue_ipackets) * 1000)/diff_ms;
     req->vifr_queue_ierrors =
-        ((req->vifr_queue_ierrors - prev_req.vifr_queue_ierrors) * 1000)/diff_ms;
+        ((req->vifr_queue_ierrors - prev_req->vifr_queue_ierrors) * 1000)/diff_ms;
 
     req->vifr_ipackets =
-        ((req->vifr_ipackets - prev_req.vifr_ipackets) * 1000)/diff_ms;
+        ((req->vifr_ipackets - prev_req->vifr_ipackets) * 1000)/diff_ms;
     req->vifr_ibytes =
-        ((req->vifr_ibytes - prev_req.vifr_ibytes) * 1000)/diff_ms;
+        ((req->vifr_ibytes - prev_req->vifr_ibytes) * 1000)/diff_ms;
     req->vifr_ierrors =
-        ((req->vifr_ierrors - prev_req.vifr_ierrors) * 1000)/diff_ms;
+        ((req->vifr_ierrors - prev_req->vifr_ierrors) * 1000)/diff_ms;
 
     /* TX */
     req->vifr_opackets =
-        ((req->vifr_opackets - prev_req.vifr_opackets) * 1000)/diff_ms;
+        ((req->vifr_opackets - prev_req->vifr_opackets) * 1000)/diff_ms;
     req->vifr_obytes =
-        ((req->vifr_obytes - prev_req.vifr_obytes) * 1000)/diff_ms;
+        ((req->vifr_obytes - prev_req->vifr_obytes) * 1000)/diff_ms;
     req->vifr_oerrors =
-        ((req->vifr_oerrors - prev_req.vifr_oerrors) * 1000)/diff_ms;
+        ((req->vifr_oerrors - prev_req->vifr_oerrors) * 1000)/diff_ms;
 
     req->vifr_queue_opackets =
-        ((req->vifr_queue_opackets - prev_req.vifr_queue_opackets) * 1000)/diff_ms;
+        ((req->vifr_queue_opackets - prev_req->vifr_queue_opackets) * 1000)/diff_ms;
     req->vifr_queue_oerrors =
-        ((req->vifr_queue_oerrors - prev_req.vifr_queue_oerrors) * 1000)/diff_ms;
+        ((req->vifr_queue_oerrors - prev_req->vifr_queue_oerrors) * 1000)/diff_ms;
 
     req->vifr_port_opackets =
-        ((req->vifr_port_opackets - prev_req.vifr_port_opackets) * 1000)/diff_ms;
+        ((req->vifr_port_opackets - prev_req->vifr_port_opackets) * 1000)/diff_ms;
     req->vifr_port_oerrors =
-        ((req->vifr_port_oerrors - prev_req.vifr_port_oerrors) * 1000)/diff_ms;
+        ((req->vifr_port_oerrors - prev_req->vifr_port_oerrors) * 1000)/diff_ms;
 
     req->vifr_dev_opackets =
-        ((req->vifr_dev_opackets - prev_req.vifr_dev_opackets  ) * 1000)/diff_ms;
+        ((req->vifr_dev_opackets - prev_req->vifr_dev_opackets  ) * 1000)/diff_ms;
     req->vifr_dev_obytes =
-        ((req->vifr_dev_obytes - prev_req.vifr_dev_obytes) * 1000)/diff_ms;
+        ((req->vifr_dev_obytes - prev_req->vifr_dev_obytes) * 1000)/diff_ms;
     req->vifr_dev_oerrors =
-        ((req->vifr_dev_oerrors - prev_req.vifr_dev_oerrors) * 1000)/diff_ms;
+        ((req->vifr_dev_oerrors - prev_req->vifr_dev_oerrors) * 1000)/diff_ms;
 
 }
 
@@ -987,34 +1046,96 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
 {
     struct tm *tm;
     char fmt[80] = {0};
-
-    gettimeofday(&last_time, NULL);
+    int ret = 0;
+    char kb_input[2] = {0};
+    struct winsize terminal_size = {0};
+    /* How many cycles we are waiting for usleep. */
+    int initialized = 2;
     while(true) {
-        usleep(1000000);
-        if (system("clear") == -1 ) {
-            fprintf(stderr, "Error: system() failed.\n");
-            exit(1);
+        while(!is_stdin_hit() || get_set){
+            gettimeofday(&last_time, NULL);
+            /* Skipping fist difference output. */
+            if((0 > (--initialized))){
+                usleep(1000000);
+            }
+            /* Get terminal parameters. */
+            ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size);
+            ret = system("clear");
+            if (ret == -1) {
+                fprintf(stderr, "Error: system() failed.\n");
+                exit(1);
+            }
+            printf("Interface rate statistics\n");
+            printf("-------------------------\n\n");
+            number_interface = (terminal_size.ws_row - 6) / LISTING_NUM_OF_LINE ;
+            number_interface = number_interface > MAX_OUTPUT_IF?MAX_OUTPUT_IF: number_interface ;
+            if (number_interface <= 0) {
+                printf(" Size of terminal is too small.\n");
+                continue;
+            }
+            if (vr_intf_op(cl, vr_op)) {
+                fprintf(stderr, "Communication problem with vRouter.\n\n");
+                exit(1);
+            }
+            if(list_set) {
+                printf("Key 'q' for quit, key 'j' for previous entry, key 'k' for next entry.\n");
+            }
+            tm = localtime(&last_time.tv_sec);
+            if (tm) {
+                strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
+                printf("%s \n", fmt);
+            }
+            key_event = RATE_NO_EVENT;
         }
-        printf("Interface rate statistics\n");
-        printf("-------------------------\n\n");
+        /*
+         * We must get minimum 2 characters,
+         * otherwise we will be in outter loop, always.
+         * */
+        fgets(kb_input, 2, stdin);
+        switch (tolower(kb_input[0])) {
+            case 'q':
+                return;
+           case 'j':
+                dump_marker=(dump_marker < 0)?-1:--dump_marker;
+                memset(&prev_req, 0, sizeof(vr_interface_req) * MAX_OUTPUT_IF);
+                initialized = 2;
+                key_event = RATE_PREVIOUS_INTERFACE;
+                break;
 
-        if (vr_intf_op(cl, vr_op)) {
-            fprintf(stderr, "Communication problem with vRouter.\n\n");
-            exit(1);
-        }
+           case 'k':
+                dump_marker++;
+                memset(&prev_req, 0, sizeof(vr_interface_req) * MAX_OUTPUT_IF);
+                initialized = 2;
+                key_event = RATE_NEXT_INTERFACE;
+                break;
 
-        tm = localtime(&last_time.tv_sec);
-        if (tm) {
-            strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
-            printf("%s \n", fmt);
+          default:
+                key_event = RATE_NO_EVENT;
+                break;
         }
+        fflush(NULL);
     }
+}
+
+static int
+is_stdin_hit()
+{
+    struct timeval tv;
+    fd_set fds;
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
+    return FD_ISSET(STDIN_FILENO, &fds);
 }
 
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    static struct termios old_term_set, new_term_set;
     /*
      * the proto of the socket changes based on whether we are creating an
      * interface in linux or doing an operation in vrouter
@@ -1134,7 +1255,18 @@ main(int argc, char *argv[])
     if (!rate_set) {
         vr_intf_op(cl, vr_op);
     } else {
+        /*
+         * tc[get/set]attr functions are for changing terminal behavior.
+         * We dont have to write enter (newline) for get character from terminal.
+         * */
+        tcgetattr(STDIN_FILENO, &old_term_set);
+        new_term_set = old_term_set;
+        new_term_set.c_lflag &= ~(ICANON);
+        tcsetattr(STDIN_FILENO, TCSANOW, &new_term_set);
+
         rate_stats(cl, vr_op);
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_term_set);
     }
     return 0;
 }
