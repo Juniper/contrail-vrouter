@@ -545,14 +545,21 @@ agent_drv_add(struct vr_interface *vif,
         vif->vif_mtu = 1514;
 
     vif->vif_set_rewrite = agent_set_rewrite;
-    vif->vif_tx = agent_tx;
-    vif->vif_rx = agent_rx;
-    vif->vif_send = agent_send;
 
+    /**
+     * At this moment, vif_tx() and vif_tx() are vif_discard_tx() and
+     * vif_discard_rx(). Let them stay this way until we succesfully call
+     * platform-dependent implementation of hif_add(). On some platfoms it may
+     * set up resoruces needed by hif_tx(), which is called by agent_tx().
+     */
     ret = hif_ops->hif_add(vif);
     if (ret) {
         return ret;
     }
+
+    vif->vif_tx = agent_tx;
+    vif->vif_rx = agent_rx;
+    vif->vif_send = agent_send;
 
     ret = hif_ops->hif_add_tap(vif);
     if (ret)
