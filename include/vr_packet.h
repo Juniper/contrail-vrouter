@@ -302,7 +302,12 @@ struct vr_arp {
 static inline bool
 vr_grat_arp(struct vr_arp *sarp)
 {
-    if (sarp->arp_spa == sarp->arp_dpa)
+    /*
+     * Treat below two as Gratuitous ARP
+     * Null source IP - ARP Probe
+     * Source IP same as dest IP - ARP Announcement
+     */
+    if ((!sarp->arp_spa) || (sarp->arp_spa == sarp->arp_dpa))
         return true;
     return false;
 }
