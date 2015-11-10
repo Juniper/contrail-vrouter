@@ -539,7 +539,7 @@ dpdk_agent_if_add(struct vr_interface *vif)
                 vif->vif_idx, vif->vif_name);
 
     /* check if packet device is already added */
-    if (vr_dpdk.packet_ring != NULL) {
+    if (vr_dpdk.packet_transport != NULL) {
         RTE_LOG(ERR, VROUTER, "    error adding packet device %s: already exist\n",
             vif->vif_name);
         return -EEXIST;

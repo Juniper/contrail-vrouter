@@ -94,16 +94,14 @@ wait_for_connection:
 void
 dpdk_packet_socket_close(void)
 {
-    void *usockp;
-
     if (!vr_dpdk.packet_transport)
         return;
 
     /* close and free up the memory both for packet usock and binded event usock */
-    usockp = vr_dpdk.packet_transport;
+    vr_usocket_close(vr_dpdk.packet_transport);
+    vr_dpdk_packet_wakeup(NULL);
     vr_dpdk.packet_transport = NULL;
     vr_dpdk.packet_event_sock = NULL;
-    vr_usocket_close(usockp);
 
     return;
 }
