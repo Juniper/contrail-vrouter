@@ -12,11 +12,15 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
+#include <termios.h>
+
 
 #include "vr_os.h"
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 
 #if defined(__linux__)
 #include <asm/types.h>
@@ -44,6 +48,9 @@
 #include "nl_util.h"
 #include "ini_parser.h"
 
+
+#define LISTING_NUM_OF_LINE  3
+#define MAX_OUTPUT_IF 32
 
 #define VHOST_TYPE_STRING           "vhost"
 #define AGENT_TYPE_STRING           "agent"
@@ -81,13 +88,26 @@ static int platform;
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
 
-static vr_interface_req prev_req;
+static vr_interface_req prev_req[MAX_OUTPUT_IF];
 static struct timeval last_time;
 
 
+static bool is_rate_initialized = false;
+static int number_interface_offset = 0;
+static int number_interface = 0;
+
+
 static void Usage(void);
-static void rate_stats_diff(vr_interface_req *);
+
+static void list_header_print(void);
+static void list_get_print(vr_interface_req *);
+static void list_rate_print(vr_interface_req *);
+static void rate_process(vr_interface_req *req, vr_interface_req *prev_req);
+static void rate_stats_diff(vr_interface_req *, vr_interface_req *);
 static void rate_stats(struct nl_client *, unsigned int);
+
+
+static int is_stdin_hit();
 
 static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_POLICY_ENABLED,   "P",    "Policy"            },
@@ -346,36 +366,15 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
     }
 }
 
-void
-vr_interface_req_process(void *s)
+static void
+list_get_print(vr_interface_req *req)
 {
-    char name[50];
-    vr_interface_req *req = (vr_interface_req *)s;
-    vr_interface_req rate_req_temp = {0};
-    unsigned int printed = 0;
-    bool print_zero = false; /* Do not print zeroed DPDK stats in --list mode */
-
-    if (add_set)
-        vr_ifindex = req->vifr_idx;
-
-    if (!get_set && !list_set)
-        return;
+    char name[50] = {0};
+    int printed = 0;
+    bool print_zero = false;
 
     if (rate_set) {
-        print_zero = true; /* Print zeroed DPDK stats in --rate mode */
-
-        rate_req_temp = *req;
-        rate_req_temp.vifr_queue_ierrors_to_lcore = malloc(VR_MAX_CPUS * sizeof(uint64_t));
-        memcpy(rate_req_temp.vifr_queue_ierrors_to_lcore,
-                req->vifr_queue_ierrors_to_lcore,
-                req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
-
-        rate_stats_diff(req);
-
-        prev_req = rate_req_temp;
-        memcpy(prev_req.vifr_queue_ierrors_to_lcore,
-                rate_req_temp.vifr_queue_ierrors_to_lcore,
-                rate_req_temp.vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+        print_zero = true;
     }
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
@@ -386,22 +385,22 @@ vr_interface_req_process(void *s)
         printf("PMD: %d", req->vifr_os_idx);
     } else if (platform == DPDK_PLATFORM) {
         switch (req->vifr_type) {
-        case VIF_TYPE_PHYSICAL:
-            printf("PCI: %d:%d:%d.%d",
-                    (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
-                    (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
-            break;
+            case VIF_TYPE_PHYSICAL:
+                printf("PCI: %d:%d:%d.%d",
+                        (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
+                        (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+                break;
 
-        case VIF_TYPE_MONITORING:
-            printf("Monitoring: %s for vif%d/%d", req->vifr_name,
-                    req->vifr_rid, req->vifr_os_idx);
-            break;
+            case VIF_TYPE_MONITORING:
+                printf("Monitoring: %s for vif%d/%d", req->vifr_name,
+                        req->vifr_rid, req->vifr_os_idx);
+                break;
 
-        default:
-            if (req->vifr_name)
-                printf("%s: %s", vr_if_transport_string(req),
-                        req->vifr_name);
-            break;
+            default:
+                if (req->vifr_name)
+                    printf("%s: %s", vr_if_transport_string(req),
+                            req->vifr_name);
+                break;
         }
 
     } else {
@@ -452,9 +451,9 @@ vr_interface_req_process(void *s)
     }
 
     vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,
-             req->vifr_ibytes, req->vifr_ierrors, 0);
+            req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
-             req->vifr_obytes, req->vifr_oerrors, 0);
+            req->vifr_obytes, req->vifr_oerrors, 0);
 
     if (platform == DPDK_PLATFORM) {
         vr_interface_pe_counters_print("TX queue ", print_zero,
@@ -469,14 +468,167 @@ vr_interface_req_process(void *s)
 
     printf("\n");
 
-    if (list_set)
-        dump_marker = req->vifr_idx;
-
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
         vr_vrf_assign_dump = true;
         dump_pending = true;
         printf("VRF table(vlan:vrf):\n");
         vr_ifindex = req->vifr_idx;
+    }
+
+    return;
+}
+
+static void
+list_header_print(void)
+{
+    int printed = 0;
+
+    printed = printf("Interface name");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("VIF ID");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("RX");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("TX");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printf("\n");
+
+    printed = strlen("Errors");
+    for (; printed < 30 * 2; printed++)
+        printf(" ");
+
+    printed = printf("Errors   Packets");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printf("Errors   Packets");
+
+    printf("\n\n");
+}
+
+static void
+list_rate_print(vr_interface_req *req)
+{
+    int printed = 0;
+    uint64_t tx_errors = 0;
+    uint64_t rx_errors = 0;
+    unsigned int i = 0;
+
+    rx_errors = (req->vifr_dev_ierrors + req->vifr_port_ierrors + req->vifr_queue_ierrors
+                 + req->vifr_ierrors);
+    tx_errors = (req->vifr_dev_oerrors + req->vifr_port_oerrors + req->vifr_queue_oerrors
+                 + req->vifr_oerrors);
+
+    for (i = 0; i < req->vifr_queue_ierrors_to_lcore_size; i++) {
+        tx_errors += req->vifr_queue_ierrors_to_lcore[i];
+    }
+
+    printed = printf("%s: %s", vr_if_transport_string(req),
+                        req->vifr_name);
+    for (; printed < 30; printed++)
+        printf(" ");
+    printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("%lu %ld", rx_errors, req->vifr_ipackets);
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("%ld %ld", tx_errors, req->vifr_opackets);
+    for (; printed < 30; printed++)
+        printf(" ");
+    printf("\n\n\n");
+    return;
+}
+
+static void
+rate_process(vr_interface_req *req, vr_interface_req *prev_req)
+{
+    vr_interface_req rate_req_temp = {0};
+    uint64_t *temp_prev_req_ptr = NULL;
+
+    if (is_rate_initialized) {
+
+        temp_prev_req_ptr = prev_req->vifr_queue_ierrors_to_lcore;
+        *prev_req = *req;
+        prev_req->vifr_queue_ierrors_to_lcore = temp_prev_req_ptr;
+        memcpy(prev_req->vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+        rate_stats_diff(req, prev_req);
+        return;
+    }
+
+    rate_req_temp = *req;
+    rate_req_temp.vifr_queue_ierrors_to_lcore = calloc(VR_MAX_CPUS, sizeof(uint64_t));
+
+    if (!rate_req_temp.vifr_queue_ierrors_to_lcore) {
+        fprintf(stderr, "Fail, memory allocation. (%s:%d).", __FILE__ , __LINE__);
+        exit(1);
+    }
+
+    memcpy(rate_req_temp.vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+
+    rate_stats_diff(req, prev_req);
+
+    temp_prev_req_ptr = prev_req->vifr_queue_ierrors_to_lcore;
+    *prev_req = rate_req_temp;
+    prev_req->vifr_queue_ierrors_to_lcore = temp_prev_req_ptr;
+
+    memcpy(prev_req->vifr_queue_ierrors_to_lcore,
+            rate_req_temp.vifr_queue_ierrors_to_lcore,
+            rate_req_temp.vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+
+    if ((rate_req_temp.vifr_queue_ierrors_to_lcore)) {
+        free(rate_req_temp.vifr_queue_ierrors_to_lcore);
+        rate_req_temp.vifr_queue_ierrors_to_lcore = NULL;
+    }
+}
+
+void
+vr_interface_req_process(void *s)
+{
+    vr_interface_req *req = (vr_interface_req *)s;
+    unsigned int printed = 0;
+
+
+    if (add_set)
+        vr_ifindex = req->vifr_idx;
+
+    if (!get_set && !list_set)
+        return;
+
+    if (rate_set) {
+
+        if (list_set) {
+            if ((number_interface_offset > 0)) {
+                number_interface_offset--;
+            } else if (number_interface >= 1) {
+                rate_process(req, &prev_req[number_interface - 1]);
+                    list_rate_print(req);
+                number_interface--;
+            }
+            dump_marker = req->vifr_idx;
+            return;
+        } else {
+            rate_process(req, &prev_req[0]);
+        }
+    }
+        list_get_print(req);
+    if (list_set){
+
+        dump_marker = req->vifr_idx;
     }
 
     return;
@@ -573,9 +725,11 @@ vr_intf_op(struct nl_client *cl, unsigned int op)
     if (create_set)
         return vhost_create();
 
-    if ((op == SANDESH_OP_DUMP) ||
-            ((op == SANDESH_OP_GET) && !(add_set) && !(rate_set))) {
+    if ((op == SANDESH_OP_DUMP &&  !(rate_set)) ||
+            ((op == SANDESH_OP_GET) && !(add_set) )) {
         vr_interface_print_header();
+    } else if (rate_set) {
+       list_header_print(); 
     }
 
 op_retry:
@@ -671,7 +825,7 @@ Usage()
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
-    printf("\t   [--list][--core <core number>]\n");
+    printf("\t   [--list][--core <core number>][--rate]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -903,12 +1057,15 @@ validate_options(void)
             Usage();
         return;
     }
-
     if (list_set) {
         if (!core_set) {
+            if (rate_set && !(sum_opt > 2))
+                return;
             if (sum_opt > 1)
                 Usage();
         } else {
+            if(rate_set && !(sum_opt > 3))
+               return;
             if (sum_opt != 2)
                 Usage();
         }
@@ -952,7 +1109,7 @@ validate_options(void)
 
 
 static void
-rate_stats_diff(vr_interface_req *req)
+rate_stats_diff(vr_interface_req *req, vr_interface_req *prev_req)
 {
     struct timeval now;
     int64_t diff_ms = 0, i = 0;
@@ -960,68 +1117,68 @@ rate_stats_diff(vr_interface_req *req)
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
-    last_time = now;
-
+    assert(diff_ms > 0);
     /* RX */
     req->vifr_dev_ipackets =
-        ((req->vifr_dev_ipackets -  prev_req.vifr_dev_ipackets) * 1000)/diff_ms;
+        ((req->vifr_dev_ipackets -  prev_req->vifr_dev_ipackets) * 1000)/diff_ms;
     req->vifr_dev_ibytes =
-        ((req->vifr_dev_ibytes -  prev_req.vifr_dev_ibytes) * 1000)/diff_ms;
+        ((req->vifr_dev_ibytes -  prev_req->vifr_dev_ibytes) * 1000)/diff_ms;
     req->vifr_dev_ierrors =
-        ((req->vifr_dev_ierrors - prev_req.vifr_dev_ierrors) * 1000)/diff_ms;
+        ((req->vifr_dev_ierrors - prev_req->vifr_dev_ierrors) * 1000)/diff_ms;
     req->vifr_dev_inombufs =
-        ((req->vifr_dev_inombufs - prev_req.vifr_dev_inombufs) * 1000)/diff_ms;
+        ((req->vifr_dev_inombufs - prev_req->vifr_dev_inombufs) * 1000)/diff_ms;
 
     req->vifr_port_ipackets =
-        ((req->vifr_port_ipackets - prev_req.vifr_port_ipackets) * 1000)/diff_ms;
+        ((req->vifr_port_ipackets - prev_req->vifr_port_ipackets) * 1000)/diff_ms;
     req->vifr_port_ierrors =
-        ((req->vifr_port_ierrors - prev_req.vifr_port_ierrors) * 1000)/diff_ms;
+        ((req->vifr_port_ierrors - prev_req->vifr_port_ierrors) * 1000)/diff_ms;
     req->vifr_port_isyscalls =
-        ((req->vifr_port_isyscalls - prev_req.vifr_port_isyscalls) * 1000)/diff_ms;
+        ((req->vifr_port_isyscalls - prev_req->vifr_port_isyscalls) * 1000)/diff_ms;
     req->vifr_port_inombufs =
-        ((req->vifr_port_inombufs - prev_req.vifr_port_inombufs) * 1000)/diff_ms;
+        ((req->vifr_port_inombufs - prev_req->vifr_port_inombufs) * 1000)/diff_ms;
 
     req->vifr_queue_ipackets =
-        ((req->vifr_queue_ipackets - prev_req.vifr_queue_ipackets) * 1000)/diff_ms;
+        ((req->vifr_queue_ipackets - prev_req->vifr_queue_ipackets) * 1000)/diff_ms;
     req->vifr_queue_ierrors =
-        ((req->vifr_queue_ierrors - prev_req.vifr_queue_ierrors) * 1000)/diff_ms;
+        ((req->vifr_queue_ierrors - prev_req->vifr_queue_ierrors) * 1000)/diff_ms;
+
     for (i = 0; i < req->vifr_queue_ierrors_to_lcore_size; i++) {
         req->vifr_queue_ierrors_to_lcore[i] =
             ((req->vifr_queue_ierrors_to_lcore[i] -
-                prev_req.vifr_queue_ierrors_to_lcore[i]) * 1000)/diff_ms;
+                prev_req->vifr_queue_ierrors_to_lcore[i]) * 1000)/diff_ms;
     }
 
     req->vifr_ipackets =
-        ((req->vifr_ipackets - prev_req.vifr_ipackets) * 1000)/diff_ms;
+        ((req->vifr_ipackets - prev_req->vifr_ipackets) * 1000)/diff_ms;
     req->vifr_ibytes =
-        ((req->vifr_ibytes - prev_req.vifr_ibytes) * 1000)/diff_ms;
+        ((req->vifr_ibytes - prev_req->vifr_ibytes) * 1000)/diff_ms;
     req->vifr_ierrors =
-        ((req->vifr_ierrors - prev_req.vifr_ierrors) * 1000)/diff_ms;
+        ((req->vifr_ierrors - prev_req->vifr_ierrors) * 1000)/diff_ms;
 
     /* TX */
     req->vifr_opackets =
-        ((req->vifr_opackets - prev_req.vifr_opackets) * 1000)/diff_ms;
+        ((req->vifr_opackets - prev_req->vifr_opackets) * 1000)/diff_ms;
     req->vifr_obytes =
-        ((req->vifr_obytes - prev_req.vifr_obytes) * 1000)/diff_ms;
+        ((req->vifr_obytes - prev_req->vifr_obytes) * 1000)/diff_ms;
     req->vifr_oerrors =
-        ((req->vifr_oerrors - prev_req.vifr_oerrors) * 1000)/diff_ms;
+        ((req->vifr_oerrors - prev_req->vifr_oerrors) * 1000)/diff_ms;
 
     req->vifr_queue_opackets =
-        ((req->vifr_queue_opackets - prev_req.vifr_queue_opackets) * 1000)/diff_ms;
+        ((req->vifr_queue_opackets - prev_req->vifr_queue_opackets) * 1000)/diff_ms;
     req->vifr_queue_oerrors =
-        ((req->vifr_queue_oerrors - prev_req.vifr_queue_oerrors) * 1000)/diff_ms;
+        ((req->vifr_queue_oerrors - prev_req->vifr_queue_oerrors) * 1000)/diff_ms;
 
     req->vifr_port_opackets =
-        ((req->vifr_port_opackets - prev_req.vifr_port_opackets) * 1000)/diff_ms;
+        ((req->vifr_port_opackets - prev_req->vifr_port_opackets) * 1000)/diff_ms;
     req->vifr_port_oerrors =
-        ((req->vifr_port_oerrors - prev_req.vifr_port_oerrors) * 1000)/diff_ms;
+        ((req->vifr_port_oerrors - prev_req->vifr_port_oerrors) * 1000)/diff_ms;
 
     req->vifr_dev_opackets =
-        ((req->vifr_dev_opackets - prev_req.vifr_dev_opackets  ) * 1000)/diff_ms;
+        ((req->vifr_dev_opackets - prev_req->vifr_dev_opackets  ) * 1000)/diff_ms;
     req->vifr_dev_obytes =
-        ((req->vifr_dev_obytes - prev_req.vifr_dev_obytes) * 1000)/diff_ms;
+        ((req->vifr_dev_obytes - prev_req->vifr_dev_obytes) * 1000)/diff_ms;
     req->vifr_dev_oerrors =
-        ((req->vifr_dev_oerrors - prev_req.vifr_dev_oerrors) * 1000)/diff_ms;
+        ((req->vifr_dev_oerrors - prev_req->vifr_dev_oerrors) * 1000)/diff_ms;
 
 }
 
@@ -1030,34 +1187,101 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
 {
     struct tm *tm;
     char fmt[80] = {0};
+    int ret = 0;
+    char kb_input[2] = {0};
+    struct winsize terminal_size = {0};
+    unsigned int local_number_interface_offset = number_interface_offset;
+    unsigned int i = 0;
 
-    gettimeofday(&last_time, NULL);
+    is_rate_initialized = true;
     while (true) {
-        usleep(1000000);
-        if (system("clear") == -1 ) {
-            fprintf(stderr, "Error: system() failed.\n");
-            exit(1);
-        }
-        printf("Interface rate statistics\n");
-        printf("-------------------------\n\n");
+        while (!is_stdin_hit() || get_set) {
 
-        if (vr_intf_op(cl, vr_op)) {
-            fprintf(stderr, "Communication problem with vRouter.\n\n");
-            exit(1);
-        }
+            number_interface_offset = local_number_interface_offset;
+            gettimeofday(&last_time, NULL);
+            usleep(1000000);
+            /* Get terminal parameters. */
+            ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size);
+            ret = system("clear");
+            if (ret == -1) {
+                fprintf(stderr, "Error: system() failed.\n");
+                exit(1);
+            }
+            printf("Interface rate statistics\n");
+            printf("-------------------------\n\n");
+            number_interface = (terminal_size.ws_row - 8) / LISTING_NUM_OF_LINE ;
+            number_interface =
+                (number_interface > MAX_OUTPUT_IF? MAX_OUTPUT_IF: number_interface);
 
-        tm = localtime(&last_time.tv_sec);
-        if (tm) {
-            strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
-            printf("%s \n", fmt);
+            if (number_interface <= 0) {
+                printf(" Size of terminal is too small.\n");
+                continue;
+            }
+            if (vr_intf_op(cl, vr_op)) {
+                fprintf(stderr, "Communication problem with vRouter.\n\n");
+                exit(1);
+            }
+            /* We need reinitialize dump_marker variable, because we are in loop */
+            dump_marker = -1;
+            is_rate_initialized = false;
+            if(list_set) {
+                printf("Key 'q' for quit, key 'j' for previous entry, key 'k' for next entry.\n");
+            }
+            tm = localtime(&last_time.tv_sec);
+            if (tm) {
+                strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
+                printf("%s \n", fmt);
+            }
         }
+        /*
+         * We must get minimum 2 characters,
+         * otherwise we will be in outter loop, always.
+         * */
+        fgets(kb_input, 2, stdin);
+        switch (tolower(kb_input[0])) {
+            case 'q':
+                return;
+
+            case 'j':
+                is_rate_initialized = true;
+                local_number_interface_offset =
+                    ((local_number_interface_offset <= 0)?
+                     0:
+                     --local_number_interface_offset);
+                break;
+
+            case 'k':
+                is_rate_initialized = true;
+                local_number_interface_offset++;
+                break;
+
+            default:
+                break;
+        }
+        fflush(NULL);
     }
+}
+
+static int
+is_stdin_hit()
+{
+    struct timeval tv;
+    fd_set fds;
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
+    return FD_ISSET(STDIN_FILENO, &fds);
 }
 
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    unsigned int i = 0;
+    static struct termios old_term_set, new_term_set;
     /*
      * the proto of the socket changes based on whether we are creating an
      * interface in linux or doing an operation in vrouter
@@ -1091,8 +1315,8 @@ main(int argc, char *argv[])
                 break;
 
             case 'k':
-                parse_long_opts(KINDEX_OPT_INDEX, optarg);
                 kindex_set = 1;
+                parse_long_opts(KINDEX_OPT_INDEX, optarg);
                 break;
 
             case 'l':
@@ -1177,9 +1401,37 @@ main(int argc, char *argv[])
     if (!rate_set) {
         vr_intf_op(cl, vr_op);
     } else {
-        prev_req.vifr_queue_ierrors_to_lcore = malloc(VR_MAX_CPUS * sizeof(uint64_t));
-        memset(prev_req.vifr_queue_ierrors_to_lcore, 0, VR_MAX_CPUS * sizeof(uint64_t));
+
+        for (i = 0; i < MAX_OUTPUT_IF; i++) {
+
+            prev_req[i].vifr_queue_ierrors_to_lcore =
+               (calloc(VR_MAX_CPUS, sizeof(uint64_t)));
+
+            if (!(prev_req[i].vifr_queue_ierrors_to_lcore)) {
+                fprintf(stderr, "Fail, memory allocation. (%s:%d).", __FILE__ , __LINE__);
+                exit(1);
+            }
+        }
+
+        /*
+         * tc[get/set]attr functions are for changing terminal behavior.
+         * We dont have to write enter (newline) for getting character from terminal.
+         *
+         */
+        tcgetattr(STDIN_FILENO, &old_term_set);
+        new_term_set = old_term_set;
+        new_term_set.c_lflag &= ~(ICANON);
+        tcsetattr(STDIN_FILENO, TCSANOW, &new_term_set);
+
         rate_stats(cl, vr_op);
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_term_set);
+        for (i = 0; i < MAX_OUTPUT_IF; i++) {
+           if (prev_req[i].vifr_queue_ierrors_to_lcore) {
+                free(prev_req[i].vifr_queue_ierrors_to_lcore);
+                prev_req[i].vifr_queue_ierrors_to_lcore = NULL;
+           }
+        }
+
     }
     return 0;
 }
