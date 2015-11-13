@@ -1155,6 +1155,9 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
     /* Note: iph is set for both ipv4 and ipv6 cases */
     if (iph) {
         if (vr_ip_is_ip6(iph)) {
+            if (!ip6h)
+                goto unhandled;
+
             ip_proto = ip6h->ip6_nxt;
             hlen = sizeof(struct vr_ip6);
             thdr_valid = true;
@@ -1597,6 +1600,9 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
     if (iph) {
 
         if (vr_ip_is_ip6(iph)) {
+            if (!ip6h)
+                goto unhandled;
+
             ip_proto = ip6h->ip6_nxt;
             hlen = sizeof(struct vr_ip6);
             thdr_valid = true;
