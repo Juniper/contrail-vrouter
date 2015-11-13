@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/smp.h>
+#include <linux/sysctl.h>
 #include <linux/netdevice.h>
 #include <linux/cpumask.h>
 #include <linux/time.h>
@@ -2159,7 +2160,7 @@ static struct ctl_path vrouter_path[] =
     { }
 };
 
-static ctl_table vrouter_table[] =
+static struct ctl_table vrouter_table[] =
 {
     {
         .procname       = "perfr",
