@@ -268,9 +268,9 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
 }
 
 /*
- * arp responses from vhostX need to be cross connected. nothing
- * needs to be done for arp responses from VMs, while responses
- * from fabric needs to be Xconnected and sent to agent
+ * Vrouter needs to handle only the ARP responses that are destined to
+ * 'me'. All other ARP response traffic, needs to be flooded through out
+ * the domain. This is identified by fmd_to_me flag.
  */
 static int
 vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
@@ -278,27 +278,51 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
 {
     struct vr_interface *vif = pkt->vp_if;
     struct vr_packet *cloned_pkt;
+    int handled = 1;
 
-    if (vif_mode_xconnect(vif) || vif->vif_type == VIF_TYPE_HOST)
-        return vif_xconnect(vif, pkt, fmd);
+    /*
+     * If Vhost or fabric in cross connct mode, simply cross connect the
+     * packet
+     */
+    if (vif_mode_xconnect(vif) || vif->vif_type == VIF_TYPE_HOST) {
+        vif_xconnect(vif, pkt, fmd);
+        return handled;
+    }
 
-    if (vif->vif_type != VIF_TYPE_PHYSICAL) {
-        if (vif_is_virtual(vif)) {
-            vr_preset(pkt);
-            return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+    if (vif_is_virtual(vif)) {
+
+        /* If not destined to me flood it */
+        if (!fmd->fmd_to_me)
+            return !handled;
+
+        /* If destined to me, Agent is interested in it */
+        vr_preset(pkt);
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+        return handled;
+    }
+
+    if (vif_is_fabric(vif)) {
+
+        /* If a tunneled packet, just flood in domain */
+        if (fmd->fmd_label >= 0)
+            return !handled;
+
+        /* If fabric: Agent and kernel are interested in it */
+        cloned_pkt = vr_pclone(pkt);
+        if (cloned_pkt) {
+            vr_preset(cloned_pkt);
+            vif_xconnect(vif, cloned_pkt, fmd);
         }
-        vr_pfree(pkt, VP_DROP_INVALID_IF);
-        return 0;
+
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+
+        return handled;
     }
 
+    /* Any other Response can be dropped */
+    vr_pfree(pkt, VP_DROP_INVALID_IF);
 
-    cloned_pkt = vr_pclone(pkt);
-    if (cloned_pkt) {
-        vr_preset(cloned_pkt);
-        vif_xconnect(vif, cloned_pkt, fmd);
-    }
-
-    return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+    return handled;
 }
 
 /*
@@ -312,10 +336,7 @@ int
 vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    int handled = 1;
-    int nheader;
-
-    struct vr_arp *sarp;
+    int nheader, handled = 1;
 
     if (pkt->vp_flags & VP_FLAG_MULTICAST)
         goto unhandled;
@@ -325,11 +346,7 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         goto unhandled;
 
     if (pkt->vp_type == VP_TYPE_ARP) {
-        if (pkt->vp_len < (nheader + sizeof(*sarp)))
-            goto unhandled;
-
-        sarp = (struct vr_arp *)(pkt_data(pkt) + nheader);
-        if (ntohs(sarp->arp_op) != VR_ARP_OP_REQUEST)
+        if (pkt->vp_len < (nheader + sizeof(struct vr_arp)))
             goto unhandled;
 
         pkt_pull(pkt, nheader);
@@ -423,7 +440,7 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
         return vr_handle_arp_request(&sarp, pkt, fmd);
 
     case VR_ARP_OP_REPLY:
-        vr_handle_arp_reply(&sarp, pkt, fmd);
+        return vr_handle_arp_reply(&sarp, pkt, fmd);
         break;
 
     default:
