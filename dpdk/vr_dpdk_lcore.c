@@ -472,8 +472,9 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
      * Per lcore bursts (+1 for the header)
      * Header bits:
      *   63    - always set to 1
-     *   48-32 - vif_idx
-     *   31-0  - nb_pkts + 1 (the header)
+     *   62-46 - vif_idx
+     *   45-13 - vif_gen
+     *   12-0  - nb_pkts + 1 (the header)
      */
     struct rte_mbuf *lcore_pkts[nb_dst_lcores][nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ];
     struct vr_interface_stats *stats;
@@ -485,7 +486,9 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
     /* init the headers */
     for (i = 0; i < nb_dst_lcores; i++) {
         lcore_pkts[i][0] = (struct rte_mbuf *)(((uintptr_t)1 << 63)
-                | ((uintptr_t)vif->vif_idx << 32) | 1);
+                | ((uintptr_t)vif->vif_idx << 46)
+                | ((uintptr_t)vif->vif_gen << 13)
+                | 1 /* the header */);
         retry_lcores[i] = i;
         if (io_lcore) {
             rte_prefetch0(vr_dpdk.lcores[dst_lcore_idxs[i]
@@ -508,7 +511,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
         dst_lcore_idx = hashval % nb_dst_lcores;
 
         /* put the mbuf to the burst */
-        lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0xFFFFFFFFU;
+        lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0x1FFFU;
 
         RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
              __func__, lcore_id, hashval, lcore_nb_pkts,
@@ -532,7 +535,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
             dst_lcore_idx = retry_lcores[i];
             dst_fwd_lcore_idx = dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID;
 
-            lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0xFFFFFFFFU;
+            lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0] & 0x1FFFU;
             if (likely(lcore_nb_pkts > 1)) {
                 RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
                      __func__, lcore_nb_pkts, dst_fwd_lcore_idx);
@@ -810,6 +813,7 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
     int i, ret;
     uint32_t nb_pkts, chunk_nb_pkts;
     unsigned short vif_idx;
+    unsigned int vif_gen;
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ + VR_DPDK_RX_RING_CHUNK_SZ];
 
     /* dequeue the first chunk */
@@ -818,10 +822,11 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
     if (likely(ret == 0)) {
         header = (uintptr_t)pkts[0];
         RTE_VERIFY((header & (1ULL << 63)) != 0);
-        nb_pkts = header & 0xFFFFFFFFU;
+        nb_pkts = header & 0x1FFFU;
         RTE_VERIFY(nb_pkts - 1 <= VR_DPDK_RX_BURST_SZ);
         total_pkts += nb_pkts - 1;
-        vif_idx = header >> 32 & 0xFFFF;
+        vif_idx = header >> 46 & 0xFFFF;
+        vif_gen = header >> 13 & 0xFFFFFFFFU;
 
         if (nb_pkts > VR_DPDK_RX_RING_CHUNK_SZ) {
             /* round up to the chunk size */
@@ -834,7 +839,7 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
             RTE_VERIFY(ret == 0);
         }
         vif = __vrouter_get_interface(router, vif_idx);
-        if (likely(vif != NULL)) {
+        if (likely(vif != NULL) && vif->vif_gen == vif_gen) {
             /* skip the header */
             vr_dpdk_lcore_vroute(lcore, vif, &pkts[1], nb_pkts - 1);
         } else {

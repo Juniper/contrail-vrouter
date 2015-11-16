@@ -1529,6 +1529,7 @@ vrouter_add_interface(struct vr_interface *vif, vr_interface_req *vifr)
 
     vif->vif_router = router;
     vif->vif_users++;
+    vif->vif_gen = router->vr_interface_gen++;
     router->vr_interfaces[vif->vif_idx] = vif;
 
     switch (vif->vif_type) {

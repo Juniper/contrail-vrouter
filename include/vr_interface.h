@@ -177,6 +177,8 @@ struct vr_interface {
     unsigned short vif_idx;
     unsigned short vif_vrf;
     unsigned short vif_mtu;
+    /*  Generation number is incrementing every time a vif is added. */
+    unsigned int vif_gen;
 
     struct vrouter *vif_router;
     struct vr_interface_stats *vif_stats;

@@ -35,8 +35,8 @@ dpdk_virtual_if_add(struct vr_interface *vif)
     int ret;
     uint16_t nrxqs, ntxqs;
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u virtual device %s\n",
-                vif->vif_idx, vif->vif_name);
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) virtual device %s\n",
+                vif->vif_idx, vif->vif_gen, vif->vif_name);
 
     nrxqs = vr_dpdk_virtio_nrxqs(vif);
     /* virtio TX is thread safe, so we assign TX queue to each lcore */
@@ -253,9 +253,9 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u eth device %" PRIu8 " PCI " PCI_PRI_FMT
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) eth device %" PRIu8 " PCI " PCI_PRI_FMT
         " MAC " MAC_FORMAT "\n",
-        vif->vif_idx, port_id, pci_address.domain, pci_address.bus,
+        vif->vif_idx, vif->vif_gen, port_id, pci_address.domain, pci_address.bus,
         pci_address.devid, pci_address.function,
         MAC_VALUE(mac_addr.addr_bytes));
 
@@ -369,9 +369,9 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u KNI device %s at eth device %" PRIu8
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) KNI device %s at eth device %" PRIu8
                 " MAC " MAC_FORMAT "\n",
-                vif->vif_idx, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
+                vif->vif_idx, vif->vif_gen, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
     if (slave_port_id != VR_DPDK_INVALID_PORT_ID) {
         port_id = slave_port_id;
@@ -461,9 +461,9 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     struct vr_interface *monitored_vif;
     struct vrouter *router = vrouter_get(vif->vif_rid);
 
-    RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u KNI device %s"
+    RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u (gen. %u) KNI device %s"
                 " to monitor vif %u\n",
-                vif->vif_idx, vif->vif_name, monitored_vif_id);
+                vif->vif_idx, vif->vif_gen, vif->vif_name, monitored_vif_id);
 
     /* Check if vif exist.
      * We don't need vif reference in order to monitor it.
@@ -535,8 +535,8 @@ dpdk_agent_if_add(struct vr_interface *vif)
 {
     int ret;
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u packet device %s\n",
-                vif->vif_idx, vif->vif_name);
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) packet device %s\n",
+                vif->vif_idx, vif->vif_gen, vif->vif_name);
 
     /* check if packet device is already added */
     if (vr_dpdk.packet_transport != NULL) {
