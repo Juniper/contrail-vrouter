@@ -77,6 +77,7 @@ parse_ini_file(void)
         copy_line(ini_data, line, &index);
     }
 
+
     fclose(fp);
     return 0;
 }
