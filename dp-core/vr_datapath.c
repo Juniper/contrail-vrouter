@@ -271,8 +271,17 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
 
     case MR_FLOOD:
     default:
-        handled = false;
+        /*
+         * If the packet is from Service Instance VM, we dont flood the
+         * packet any where
+         */
+        if (!vif_is_service(pkt->vp_if)) {
+            handled = false;
+        } else {
+            vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        }
         break;
+
     }
 
     return handled;
@@ -571,7 +580,7 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
      * happen)
      */
     if ((pkt->vp_flags & VP_FLAG_MULTICAST) &&
-            (vif_is_service(vif))) {
+            (vif_is_service(vif)) && (pkt->vp_type != VP_TYPE_ARP)) {
         vif_drop_pkt(vif, pkt, 1);
         return 0;
     }
