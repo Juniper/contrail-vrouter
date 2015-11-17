@@ -1269,15 +1269,18 @@ jhash(void *key, uint32_t length, uint32_t initval)
 
 
 
-/* Convert internal packet fields
+/**
+ * vr_dpdk_packet_get - convert DPDK mbuf to dp-core vr_packet
  * Based on linux_get_packet()
+ *
+ * Return vr_packet pointer.
  */
 struct vr_packet *
 vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif)
 {
     struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(m);
     pkt->vp_cpu = rte_lcore_id();
-    /* vp_head is set in vr_dpdk_pktmbuf_init() */
+    pkt->vp_head = m->buf_addr;
 
     pkt->vp_tail = rte_pktmbuf_headroom(m) + rte_pktmbuf_data_len(m);
     pkt->vp_data = rte_pktmbuf_headroom(m);
