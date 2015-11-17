@@ -4,6 +4,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <stdio.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
@@ -12,11 +13,14 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
+#include <termios.h>
 
 #include "vr_os.h"
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 
 #if defined(__linux__)
 #include <asm/types.h>
@@ -45,6 +49,9 @@
 #include "ini_parser.h"
 
 
+#define LISTING_NUM_OF_LINE  3
+#define MAX_OUTPUT_IF 32
+
 #define VHOST_TYPE_STRING           "vhost"
 #define AGENT_TYPE_STRING           "agent"
 #define PHYSICAL_TYPE_STRING        "physical"
@@ -69,7 +76,7 @@ static unsigned int core = (unsigned)-1;
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set;
+static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, all_cores_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool ignore_error = false, dump_pending = false;
@@ -81,13 +88,35 @@ static int platform;
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
 
-static vr_interface_req prev_req;
+static vr_interface_req prev_req[VR_MAX_INTERFACES];
 static struct timeval last_time;
 
 
+static bool is_rate_initialized = false;
+
+
+/*
+ * How many times we partialy ignores function call vr_interface_req_process.
+ * For more information please read comment description for function:
+ *  vr_interface_req_process
+ *
+ */
+static int ignore_number_interface = 0;
+
+/*
+ * How many interfaces we will print/count rate statistics
+ */
+static int print_number_interface = 0;
+
 static void Usage(void);
-static void rate_stats_diff(vr_interface_req *);
+
+static void list_header_print(void);
+static void list_get_print(vr_interface_req *);
+static void list_rate_print(vr_interface_req *);
+static void rate_process(vr_interface_req *req, vr_interface_req *prev_req);
+static void rate_stats_diff(vr_interface_req *, vr_interface_req *);
 static void rate_stats(struct nl_client *, unsigned int);
+static int is_stdin_hit();
 
 static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_POLICY_ENABLED,   "P",    "Policy"            },
@@ -327,14 +356,16 @@ static void
 vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
             uint64_t *errors, uint32_t size)
 {
-    int i;
+    unsigned int i;
 
     if (print_always) {
+        vr_interface_print_head_space();
+        printf("%s to lcore", title);
         for (i = 0; i < size; i++) {
-            vr_interface_print_head_space();
-            vr_interface_core_print();
-            printf("%s to lcore %d errors:%" PRId64 "\n", title, i, errors[i]);
+            printf(" %" PRId64 , errors[i]);
         }
+        printf("\n");
+
     } else {
         for (i = 0; i < size; i++) {
             if (errors[i]) {
@@ -346,36 +377,15 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
     }
 }
 
-void
-vr_interface_req_process(void *s)
+static void
+list_get_print(vr_interface_req *req)
 {
-    char name[50];
-    vr_interface_req *req = (vr_interface_req *)s;
-    vr_interface_req rate_req_temp = {0};
-    unsigned int printed = 0;
-    bool print_zero = false; /* Do not print zeroed DPDK stats in --list mode */
-
-    if (add_set)
-        vr_ifindex = req->vifr_idx;
-
-    if (!get_set && !list_set)
-        return;
+    char name[50] = {0};
+    int printed = 0;
+    bool print_zero = false;
 
     if (rate_set) {
-        print_zero = true; /* Print zeroed DPDK stats in --rate mode */
-
-        rate_req_temp = *req;
-        rate_req_temp.vifr_queue_ierrors_to_lcore = malloc(VR_MAX_CPUS * sizeof(uint64_t));
-        memcpy(rate_req_temp.vifr_queue_ierrors_to_lcore,
-                req->vifr_queue_ierrors_to_lcore,
-                req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
-
-        rate_stats_diff(req);
-
-        prev_req = rate_req_temp;
-        memcpy(prev_req.vifr_queue_ierrors_to_lcore,
-                rate_req_temp.vifr_queue_ierrors_to_lcore,
-                rate_req_temp.vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+        print_zero = true;
     }
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
@@ -386,22 +396,22 @@ vr_interface_req_process(void *s)
         printf("PMD: %d", req->vifr_os_idx);
     } else if (platform == DPDK_PLATFORM) {
         switch (req->vifr_type) {
-        case VIF_TYPE_PHYSICAL:
-            printf("PCI: %d:%d:%d.%d",
-                    (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
-                    (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
-            break;
+            case VIF_TYPE_PHYSICAL:
+                printf("PCI: %d:%d:%d.%d",
+                        (req->vifr_os_idx >> 16), (req->vifr_os_idx >> 8) & 0xFF,
+                        (req->vifr_os_idx >> 3) & 0x1F, (req->vifr_os_idx & 0x7));
+                break;
 
-        case VIF_TYPE_MONITORING:
-            printf("Monitoring: %s for vif%d/%d", req->vifr_name,
-                    req->vifr_rid, req->vifr_os_idx);
-            break;
+            case VIF_TYPE_MONITORING:
+                printf("Monitoring: %s for vif%d/%d", req->vifr_name,
+                        req->vifr_rid, req->vifr_os_idx);
+                break;
 
-        default:
-            if (req->vifr_name)
-                printf("%s: %s", vr_if_transport_string(req),
-                        req->vifr_name);
-            break;
+            default:
+                if (req->vifr_name)
+                    printf("%s: %s", vr_if_transport_string(req),
+                            req->vifr_name);
+                break;
         }
 
     } else {
@@ -446,15 +456,18 @@ vr_interface_req_process(void *s)
                 req->vifr_port_isyscalls, req->vifr_port_inombufs);
         vr_interface_pe_counters_print("RX queue ", print_zero,
                 req->vifr_queue_ipackets, req->vifr_queue_ierrors);
-        vr_interface_e_per_lcore_counters_print("RX queue", print_zero,
-                req->vifr_queue_ierrors_to_lcore,
-                req->vifr_queue_ierrors_to_lcore_size);
+
+        if (!(get_set && rate_set && all_cores_set)) {
+            vr_interface_e_per_lcore_counters_print("RX queue", print_zero,
+                    req->vifr_queue_ierrors_to_lcore,
+                    req->vifr_queue_ierrors_to_lcore_size);
+        }
     }
 
     vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,
-             req->vifr_ibytes, req->vifr_ierrors, 0);
+            req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
-             req->vifr_obytes, req->vifr_oerrors, 0);
+            req->vifr_obytes, req->vifr_oerrors, 0);
 
     if (platform == DPDK_PLATFORM) {
         vr_interface_pe_counters_print("TX queue ", print_zero,
@@ -469,14 +482,186 @@ vr_interface_req_process(void *s)
 
     printf("\n");
 
-    if (list_set)
-        dump_marker = req->vifr_idx;
-
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
         vr_vrf_assign_dump = true;
         dump_pending = true;
         printf("VRF table(vlan:vrf):\n");
         vr_ifindex = req->vifr_idx;
+    }
+
+    return;
+}
+
+static void
+list_header_print(void)
+{
+    int printed = 0;
+
+    printed = printf("Interface name");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("VIF ID");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("RX");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("TX");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printf("\n");
+
+    printed = strlen("Errors");
+    for (; printed < 30 * 2; printed++)
+        printf(" ");
+
+    printed = printf("Errors   Packets");
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printf("Errors   Packets");
+
+    printf("\n\n");
+}
+
+static void
+list_rate_print(vr_interface_req *req)
+{
+    int printed = 0;
+    uint64_t tx_errors = 0;
+    uint64_t rx_errors = 0;
+    unsigned int i = 0;
+
+    rx_errors = (req->vifr_dev_ierrors + req->vifr_port_ierrors + req->vifr_queue_ierrors
+                 + req->vifr_ierrors);
+    tx_errors = (req->vifr_dev_oerrors + req->vifr_port_oerrors + req->vifr_queue_oerrors
+                 + req->vifr_oerrors);
+
+    for (i = 0; i < req->vifr_queue_ierrors_to_lcore_size; i++) {
+        tx_errors += req->vifr_queue_ierrors_to_lcore[i];
+    }
+
+    printed = printf("%s: %s", vr_if_transport_string(req),
+                        req->vifr_name);
+    for (; printed < 30; printed++)
+        printf(" ");
+    printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("%lu %ld", rx_errors, req->vifr_ipackets);
+    for (; printed < 30; printed++)
+        printf(" ");
+
+    printed = printf("%ld %ld", tx_errors, req->vifr_opackets);
+    for (; printed < 30; printed++)
+        printf(" ");
+    printf("\n\n\n");
+    return;
+}
+
+static void
+rate_process(vr_interface_req *req, vr_interface_req *prev_req)
+{
+    vr_interface_req rate_req_temp = {0};
+    uint64_t *temp_prev_req_ptr = NULL;
+
+    if (is_rate_initialized) {
+        temp_prev_req_ptr = prev_req->vifr_queue_ierrors_to_lcore;
+        *prev_req = *req;
+        prev_req->vifr_queue_ierrors_to_lcore = temp_prev_req_ptr;
+        memcpy(prev_req->vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+        rate_stats_diff(req, prev_req);
+        return;
+    }
+
+    rate_req_temp = *req;
+    rate_req_temp.vifr_queue_ierrors_to_lcore = calloc(VR_MAX_CPUS, sizeof(uint64_t));
+
+    if (!rate_req_temp.vifr_queue_ierrors_to_lcore) {
+        fprintf(stderr, "Fail, memory allocation. (%s:%d).", __FILE__ , __LINE__);
+        exit(1);
+    }
+
+    memcpy(rate_req_temp.vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore,
+            req->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+
+    rate_stats_diff(req, prev_req);
+
+    temp_prev_req_ptr = prev_req->vifr_queue_ierrors_to_lcore;
+    *prev_req = rate_req_temp;
+    prev_req->vifr_queue_ierrors_to_lcore = temp_prev_req_ptr;
+
+    memcpy(prev_req->vifr_queue_ierrors_to_lcore,
+            rate_req_temp.vifr_queue_ierrors_to_lcore,
+            rate_req_temp.vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+
+    if ((rate_req_temp.vifr_queue_ierrors_to_lcore)) {
+        free(rate_req_temp.vifr_queue_ierrors_to_lcore);
+        rate_req_temp.vifr_queue_ierrors_to_lcore = NULL;
+    }
+}
+
+/*
+ * The function is called by functions sandesh_decode.
+ * In case, when we sent SANDESH_OP_DUMP (usually --list parameter) msg to nl_client,
+ * then sandesh_decode calls vr_interface_req_process in "loop".
+ * Variable dump_marker (dump_marker < next_interface.vif_id) sets which
+ * interface is successor.
+ *
+ * For SANDESH_OP_DUMP msg we SHOULD change variable dump_marker;
+ * Otherwise we can be in infinity loop.
+ */
+void
+vr_interface_req_process(void *s)
+{
+    vr_interface_req *req = (vr_interface_req *)s;
+
+    if (add_set)
+        vr_ifindex = req->vifr_idx;
+
+    if (!get_set && !list_set)
+        return;
+
+    if (rate_set) {
+
+        if (list_set) {
+
+            /*
+             * We are in loop (which cannot be controlled by us)
+             * (see function comment)
+             *
+             * Ignores first interfaces outputs.
+             */
+            if (ignore_number_interface > 0) {
+                ignore_number_interface--;
+            /*
+             * How many interface we should print
+             * Value of variable number_interface is computed:
+             * (get_terminal_lines - header_lines)/(lines_per_interface)
+             */
+            } else if (print_number_interface >= 1) {
+                rate_process(req, &prev_req[req->vifr_idx % VR_MAX_INTERFACES]);
+                list_rate_print(req);
+                print_number_interface--;
+            }
+            /* Mandatory, otherwise we can be in infinity loop.*/
+            dump_marker = req->vifr_idx;
+            return;
+        }
+        rate_process(req, &prev_req[req->vifr_idx % VR_MAX_INTERFACES]);
+    }
+    list_get_print(req);
+    if (list_set){
+
+        dump_marker = req->vifr_idx;
     }
 
     return;
@@ -573,9 +758,11 @@ vr_intf_op(struct nl_client *cl, unsigned int op)
     if (create_set)
         return vhost_create();
 
-    if ((op == SANDESH_OP_DUMP) ||
-            ((op == SANDESH_OP_GET) && !(add_set) && !(rate_set))) {
+    if ((op == SANDESH_OP_DUMP &&  !(rate_set)) ||
+            ((op == SANDESH_OP_GET) && !(add_set) )) {
         vr_interface_print_header();
+    } else if (rate_set) {
+       list_header_print();
     }
 
 op_retry:
@@ -669,9 +856,9 @@ Usage()
     printf("\t   \t--vif <vif ID>]\n");
     printf( "[--id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
-    printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
+    printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate][--all-cores]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
-    printf("\t   [--list][--core <core number>]\n");
+    printf("\t   [--list][--core <core number>][--rate]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -683,6 +870,7 @@ enum if_opt_index {
     CREATE_OPT_INDEX,
     GET_OPT_INDEX,
     RATE_OPT_INDEX,
+    ALL_CORES_OPT_INDEX,
     LIST_OPT_INDEX,
     VRF_OPT_INDEX,
     MAC_OPT_INDEX,
@@ -709,6 +897,7 @@ static struct option long_options[] = {
     [CREATE_OPT_INDEX]      =   {"create",      required_argument,  &create_set,        1},
     [GET_OPT_INDEX]         =   {"get",         required_argument,  &get_set,           1},
     [RATE_OPT_INDEX]        =   {"rate",        no_argument,        &rate_set,          1},
+    [ALL_CORES_OPT_INDEX]   =   {"all-cores",   no_argument,        &all_cores_set,     1},
     [LIST_OPT_INDEX]        =   {"list",        no_argument,        &list_set,          1},
     [VRF_OPT_INDEX]         =   {"vrf",         required_argument,  &vrf_set,           1},
     [MAC_OPT_INDEX]         =   {"mac",         required_argument,  &mac_set,           1},
@@ -739,131 +928,131 @@ parse_long_opts(int option_index, char *opt_arg)
         *(long_options[option_index].flag) = 1;
 
     switch (option_index) {
-    case ADD_OPT_INDEX:
-        strncpy(if_name, opt_arg, sizeof(if_name) - 1);
-        if_kindex = if_nametoindex(opt_arg);
-        if (isdigit(opt_arg[0]))
-            if_pmdindex = strtol(opt_arg, NULL, 0);
-        vr_op = SANDESH_OP_ADD;
-        break;
+        case ADD_OPT_INDEX:
+            strncpy(if_name, opt_arg, sizeof(if_name) - 1);
+            if_kindex = if_nametoindex(opt_arg);
+            if (isdigit(opt_arg[0]))
+                if_pmdindex = strtol(opt_arg, NULL, 0);
+            vr_op = SANDESH_OP_ADD;
+            break;
 
-    case CREATE_OPT_INDEX:
-        strncpy(if_name, opt_arg, sizeof(if_name) - 1);
-        break;
+        case CREATE_OPT_INDEX:
+            strncpy(if_name, opt_arg, sizeof(if_name) - 1);
+            break;
 
-    case VRF_OPT_INDEX:
-        vrf_id = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
-
-    case MAC_OPT_INDEX:
-        mac_opt = ether_aton(opt_arg);
-        if (mac_opt)
-            memcpy(vr_ifmac, mac_opt, sizeof(vr_ifmac));
-        break;
-
-    case DELETE_OPT_INDEX:
-        vr_op = SANDESH_OP_DELETE;
-        vr_ifindex = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
-
-    case GET_OPT_INDEX:
-        vr_op = SANDESH_OP_GET;
-        vr_ifindex = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
-
-    case VIF_OPT_INDEX:
-        /* we carry monitored vif index in OS index field */
-        if_kindex = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
-
-    case VINDEX_OPT_INDEX:
-        vif_index = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
-
-    case POLICY_OPT_INDEX:
-        vr_ifflags |= VIF_FLAG_POLICY_ENABLED;
-        break;
-
-    case PMD_OPT_INDEX:
-        vr_ifflags |= VIF_FLAG_PMD;
-        break;
-
-    case LIST_OPT_INDEX:
-        vr_op = SANDESH_OP_DUMP;
-        break;
-
-    case CORE_OPT_INDEX:
-        core = (unsigned)strtol(opt_arg, NULL, 0);
-        if (errno) {
-            printf("Error parsing core %s: %s (%d)\n", opt_arg,
-                    strerror(errno), errno);
-            Usage();
-        }
-        break;
-
-    case TYPE_OPT_INDEX:
-        vr_if_type = vr_get_if_type(optarg);
-        if (vr_if_type == VIF_TYPE_HOST)
-            need_xconnect_if = true;
-        if (vr_if_type == VIF_TYPE_MONITORING) {
-            if (platform != DPDK_PLATFORM)
+        case VRF_OPT_INDEX:
+            vrf_id = strtoul(opt_arg, NULL, 0);
+            if (errno)
                 Usage();
+            break;
 
-            need_vif_id = true;
-            /* set default values for mac and vrf */
-            vrf_id = 0;
-            vrf_set = 1;
-            vr_ifmac[0] = 0x2; /* locally administered */
-            mac_set = 1;
-        }
-        break;
+        case MAC_OPT_INDEX:
+            mac_opt = ether_aton(opt_arg);
+            if (mac_opt)
+                memcpy(vr_ifmac, mac_opt, sizeof(vr_ifmac));
+            break;
 
-    case SET_OPT_INDEX:
-        vr_op = SANDESH_OP_ADD;
-        vr_ifindex = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
+        case DELETE_OPT_INDEX:
+            vr_op = SANDESH_OP_DELETE;
+            vr_ifindex = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                Usage();
+            break;
 
-    case VLAN_OPT_INDEX:
-        vr_ifflags |= VIF_FLAG_SERVICE_IF;
-        vlan_id = strtoul(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
-        break;
+        case GET_OPT_INDEX:
+            vr_op = SANDESH_OP_GET;
+            vr_ifindex = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                Usage();
+            break;
 
-    case XCONNECT_OPT_INDEX:
-        if_xconnect_kindex = if_nametoindex(opt_arg);
-        if (isdigit(opt_arg[0])) {
-            if_pmdindex = strtol(opt_arg, NULL, 0);
-        } else if (!if_xconnect_kindex) {
-            printf("%s does not seem to be a valid physical interface name\n",
-                    opt_arg);
-            Usage();
-        }
+        case VIF_OPT_INDEX:
+            /* we carry monitored vif index in OS index field */
+            if_kindex = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                Usage();
+            break;
 
-        break;
+        case VINDEX_OPT_INDEX:
+            vif_index = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                Usage();
+            break;
 
-    case DHCP_OPT_INDEX:
-        vr_ifflags |= VIF_FLAG_DHCP_ENABLED;
-        break;
+        case POLICY_OPT_INDEX:
+            vr_ifflags |= VIF_FLAG_POLICY_ENABLED;
+            break;
 
-    case VHOST_PHYS_OPT_INDEX:
-        vr_ifflags |= VIF_FLAG_VHOST_PHYS;
-        break;
+        case PMD_OPT_INDEX:
+            vr_ifflags |= VIF_FLAG_PMD;
+            break;
 
-    default:
-        break;
+        case LIST_OPT_INDEX:
+            vr_op = SANDESH_OP_DUMP;
+            break;
+
+        case CORE_OPT_INDEX:
+            core = (unsigned)strtol(opt_arg, NULL, 0);
+            if (errno) {
+                printf("Error parsing core %s: %s (%d)\n", opt_arg,
+                        strerror(errno), errno);
+                Usage();
+            }
+            break;
+
+        case TYPE_OPT_INDEX:
+            vr_if_type = vr_get_if_type(optarg);
+            if (vr_if_type == VIF_TYPE_HOST)
+                need_xconnect_if = true;
+            if (vr_if_type == VIF_TYPE_MONITORING) {
+                if (platform != DPDK_PLATFORM)
+                    Usage();
+
+                need_vif_id = true;
+                /* set default values for mac and vrf */
+                vrf_id = 0;
+                vrf_set = 1;
+                vr_ifmac[0] = 0x2; /* locally administered */
+                mac_set = 1;
+            }
+            break;
+
+        case SET_OPT_INDEX:
+            vr_op = SANDESH_OP_ADD;
+            vr_ifindex = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                Usage();
+            break;
+
+        case VLAN_OPT_INDEX:
+            vr_ifflags |= VIF_FLAG_SERVICE_IF;
+            vlan_id = strtoul(opt_arg, NULL, 0);
+            if (errno)
+                Usage();
+            break;
+
+        case XCONNECT_OPT_INDEX:
+            if_xconnect_kindex = if_nametoindex(opt_arg);
+            if (isdigit(opt_arg[0])) {
+                if_pmdindex = strtol(opt_arg, NULL, 0);
+            } else if (!if_xconnect_kindex) {
+                printf("%s does not seem to be a valid physical interface name\n",
+                        opt_arg);
+                Usage();
+            }
+
+            break;
+
+        case DHCP_OPT_INDEX:
+            vr_ifflags |= VIF_FLAG_DHCP_ENABLED;
+            break;
+
+        case VHOST_PHYS_OPT_INDEX:
+            vr_ifflags |= VIF_FLAG_VHOST_PHYS;
+            break;
+
+        default:
+            break;
     }
 
     return;
@@ -874,8 +1063,7 @@ validate_options(void)
 {
     unsigned int sum_opt = 0, i;
 
-    for (i = 0; i < (sizeof(long_options) / sizeof(long_options[0]));
-                i++) {
+    for (i = 0; i < (sizeof(long_options) / sizeof(long_options[0])); i++) {
         if (long_options[i].flag)
             sum_opt += *(long_options[i].flag);
     }
@@ -894,7 +1082,8 @@ validate_options(void)
         return;
     }
     if (get_set) {
-        if ((sum_opt > 1) && (sum_opt != 3) && (!kindex_set && !core_set && !rate_set))
+        if ((sum_opt > 1) && (sum_opt != 3) &&
+                (!kindex_set && !core_set && !rate_set && all_cores_set))
             Usage();
         return;
     }
@@ -903,12 +1092,15 @@ validate_options(void)
             Usage();
         return;
     }
-
     if (list_set) {
         if (!core_set) {
+            if (rate_set && !(sum_opt > 2))
+                return;
             if (sum_opt > 1)
                 Usage();
         } else {
+            if(rate_set && !(sum_opt > 3))
+               return;
             if (sum_opt != 2)
                 Usage();
         }
@@ -952,7 +1144,7 @@ validate_options(void)
 
 
 static void
-rate_stats_diff(vr_interface_req *req)
+rate_stats_diff(vr_interface_req *req, vr_interface_req *prev_req)
 {
     struct timeval now;
     int64_t diff_ms = 0, i = 0;
@@ -960,68 +1152,66 @@ rate_stats_diff(vr_interface_req *req)
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
-    last_time = now;
-
+    assert(diff_ms > 0);
     /* RX */
     req->vifr_dev_ipackets =
-        ((req->vifr_dev_ipackets -  prev_req.vifr_dev_ipackets) * 1000)/diff_ms;
+        ((req->vifr_dev_ipackets - prev_req->vifr_dev_ipackets) * 1000)/diff_ms;
     req->vifr_dev_ibytes =
-        ((req->vifr_dev_ibytes -  prev_req.vifr_dev_ibytes) * 1000)/diff_ms;
+        ((req->vifr_dev_ibytes - prev_req->vifr_dev_ibytes) * 1000)/diff_ms;
     req->vifr_dev_ierrors =
-        ((req->vifr_dev_ierrors - prev_req.vifr_dev_ierrors) * 1000)/diff_ms;
+        ((req->vifr_dev_ierrors - prev_req->vifr_dev_ierrors) * 1000)/diff_ms;
     req->vifr_dev_inombufs =
-        ((req->vifr_dev_inombufs - prev_req.vifr_dev_inombufs) * 1000)/diff_ms;
+        ((req->vifr_dev_inombufs - prev_req->vifr_dev_inombufs) * 1000)/diff_ms;
 
     req->vifr_port_ipackets =
-        ((req->vifr_port_ipackets - prev_req.vifr_port_ipackets) * 1000)/diff_ms;
+        ((req->vifr_port_ipackets - prev_req->vifr_port_ipackets) * 1000)/diff_ms;
     req->vifr_port_ierrors =
-        ((req->vifr_port_ierrors - prev_req.vifr_port_ierrors) * 1000)/diff_ms;
+        ((req->vifr_port_ierrors - prev_req->vifr_port_ierrors) * 1000)/diff_ms;
     req->vifr_port_isyscalls =
-        ((req->vifr_port_isyscalls - prev_req.vifr_port_isyscalls) * 1000)/diff_ms;
+        ((req->vifr_port_isyscalls - prev_req->vifr_port_isyscalls) * 1000)/diff_ms;
     req->vifr_port_inombufs =
-        ((req->vifr_port_inombufs - prev_req.vifr_port_inombufs) * 1000)/diff_ms;
+        ((req->vifr_port_inombufs - prev_req->vifr_port_inombufs) * 1000)/diff_ms;
 
     req->vifr_queue_ipackets =
-        ((req->vifr_queue_ipackets - prev_req.vifr_queue_ipackets) * 1000)/diff_ms;
+        ((req->vifr_queue_ipackets - prev_req->vifr_queue_ipackets) * 1000)/diff_ms;
     req->vifr_queue_ierrors =
-        ((req->vifr_queue_ierrors - prev_req.vifr_queue_ierrors) * 1000)/diff_ms;
+        ((req->vifr_queue_ierrors - prev_req->vifr_queue_ierrors) * 1000)/diff_ms;
+
     for (i = 0; i < req->vifr_queue_ierrors_to_lcore_size; i++) {
         req->vifr_queue_ierrors_to_lcore[i] =
             ((req->vifr_queue_ierrors_to_lcore[i] -
-                prev_req.vifr_queue_ierrors_to_lcore[i]) * 1000)/diff_ms;
+                prev_req->vifr_queue_ierrors_to_lcore[i]) * 1000)/diff_ms;
     }
-
     req->vifr_ipackets =
-        ((req->vifr_ipackets - prev_req.vifr_ipackets) * 1000)/diff_ms;
+        ((req->vifr_ipackets - prev_req->vifr_ipackets) * 1000)/diff_ms;
     req->vifr_ibytes =
-        ((req->vifr_ibytes - prev_req.vifr_ibytes) * 1000)/diff_ms;
+        ((req->vifr_ibytes - prev_req->vifr_ibytes) * 1000)/diff_ms;
     req->vifr_ierrors =
-        ((req->vifr_ierrors - prev_req.vifr_ierrors) * 1000)/diff_ms;
-
+        ((req->vifr_ierrors - prev_req->vifr_ierrors) * 1000)/diff_ms;
     /* TX */
     req->vifr_opackets =
-        ((req->vifr_opackets - prev_req.vifr_opackets) * 1000)/diff_ms;
+        ((req->vifr_opackets - prev_req->vifr_opackets) * 1000)/diff_ms;
     req->vifr_obytes =
-        ((req->vifr_obytes - prev_req.vifr_obytes) * 1000)/diff_ms;
+        ((req->vifr_obytes - prev_req->vifr_obytes) * 1000)/diff_ms;
     req->vifr_oerrors =
-        ((req->vifr_oerrors - prev_req.vifr_oerrors) * 1000)/diff_ms;
+        ((req->vifr_oerrors - prev_req->vifr_oerrors) * 1000)/diff_ms;
 
     req->vifr_queue_opackets =
-        ((req->vifr_queue_opackets - prev_req.vifr_queue_opackets) * 1000)/diff_ms;
+        ((req->vifr_queue_opackets - prev_req->vifr_queue_opackets) * 1000)/diff_ms;
     req->vifr_queue_oerrors =
-        ((req->vifr_queue_oerrors - prev_req.vifr_queue_oerrors) * 1000)/diff_ms;
+        ((req->vifr_queue_oerrors - prev_req->vifr_queue_oerrors) * 1000)/diff_ms;
 
     req->vifr_port_opackets =
-        ((req->vifr_port_opackets - prev_req.vifr_port_opackets) * 1000)/diff_ms;
+        ((req->vifr_port_opackets - prev_req->vifr_port_opackets) * 1000)/diff_ms;
     req->vifr_port_oerrors =
-        ((req->vifr_port_oerrors - prev_req.vifr_port_oerrors) * 1000)/diff_ms;
+        ((req->vifr_port_oerrors - prev_req->vifr_port_oerrors) * 1000)/diff_ms;
 
     req->vifr_dev_opackets =
-        ((req->vifr_dev_opackets - prev_req.vifr_dev_opackets  ) * 1000)/diff_ms;
+        ((req->vifr_dev_opackets - prev_req->vifr_dev_opackets  ) * 1000)/diff_ms;
     req->vifr_dev_obytes =
-        ((req->vifr_dev_obytes - prev_req.vifr_dev_obytes) * 1000)/diff_ms;
+        ((req->vifr_dev_obytes - prev_req->vifr_dev_obytes) * 1000)/diff_ms;
     req->vifr_dev_oerrors =
-        ((req->vifr_dev_oerrors - prev_req.vifr_dev_oerrors) * 1000)/diff_ms;
+        ((req->vifr_dev_oerrors - prev_req->vifr_dev_oerrors) * 1000)/diff_ms;
 
 }
 
@@ -1030,34 +1220,104 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
 {
     struct tm *tm;
     char fmt[80] = {0};
-
-    gettimeofday(&last_time, NULL);
+    int ret = 0;
+    char kb_input[2] = {0};
+    struct winsize terminal_size = {0};
+    int local_ignore_number_interface = ignore_number_interface;
+    int local_print_number_interface = print_number_interface;
+    is_rate_initialized = true;
     while (true) {
-        usleep(1000000);
-        if (system("clear") == -1 ) {
-            fprintf(stderr, "Error: system() failed.\n");
-            exit(1);
-        }
-        printf("Interface rate statistics\n");
-        printf("-------------------------\n\n");
 
-        if (vr_intf_op(cl, vr_op)) {
-            fprintf(stderr, "Communication problem with vRouter.\n\n");
-            exit(1);
-        }
+        while (!is_stdin_hit() || get_set) {
+            ignore_number_interface = local_ignore_number_interface;
+            gettimeofday(&last_time, NULL);
+            is_rate_initialized || usleep(1000000);
+            /* Get terminal parameters. */
+            ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size);
 
-        tm = localtime(&last_time.tv_sec);
-        if (tm) {
-            strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
-            printf("%s \n", fmt);
+            print_number_interface = (terminal_size.ws_row - 9) / LISTING_NUM_OF_LINE ;
+            print_number_interface =
+                (print_number_interface > MAX_OUTPUT_IF? MAX_OUTPUT_IF: print_number_interface);
+            local_print_number_interface = print_number_interface;
+            if (print_number_interface <= 0) {
+                printf(" Size of terminal is too small.\n");
+                continue;
+            }
+            ret = system("clear");
+            if (ret == -1) {
+                fprintf(stderr, "Error: system() failed.\n");
+                exit(1);
+            }
+            printf("Interface rate statistics\n");
+            printf("-------------------------\n\n");
+            if (vr_intf_op(cl, vr_op)) {
+                fprintf(stderr, "Communication problem with vRouter.\n\n");
+                exit(1);
+            }
+            if(list_set) {
+                printf("Key 'q' for quit, key 'j' for previous page, key 'k' for next page.\n");
+            }
+            tm = localtime(&last_time.tv_sec);
+            if (tm) {
+                strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
+                printf("%s \n", fmt);
+            }
+
+            /* We need reinitialize dump_marker variable, because we are in loop */
+            dump_marker = -1;
+            is_rate_initialized = false;
         }
+        /*
+         * We must get minimum 2 characters,
+         * otherwise we will be in outer loop, always.
+         * */
+        fgets(kb_input, 2, stdin);
+        switch (tolower(kb_input[0])) {
+            case 'q':
+                return;
+
+            case 'j':
+                local_ignore_number_interface =
+                    ((local_ignore_number_interface - local_print_number_interface <= 0)?
+                     0:
+                     (--local_ignore_number_interface) - local_print_number_interface);
+                break;
+
+            case 'k':
+                local_ignore_number_interface =
+                        ((++local_ignore_number_interface) + local_print_number_interface);
+                break;
+
+            default:
+                break;
+        }
+        fflush(NULL);
     }
+}
+
+static int
+is_stdin_hit()
+{
+    struct timeval tv;
+    fd_set fds;
+    int fd_option = 0;
+    fd_option = fcntl(STDIN_FILENO, F_GETFL);
+    fcntl(STDIN_FILENO, F_SETFL, fd_option | O_NONBLOCK);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
+    return FD_ISSET(STDIN_FILENO, &fds);
 }
 
 int
 main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    unsigned int i = 0;
+    static struct termios old_term_set, new_term_set;
     /*
      * the proto of the socket changes based on whether we are creating an
      * interface in linux or doing an operation in vrouter
@@ -1091,8 +1351,8 @@ main(int argc, char *argv[])
                 break;
 
             case 'k':
-                parse_long_opts(KINDEX_OPT_INDEX, optarg);
                 kindex_set = 1;
+                parse_long_opts(KINDEX_OPT_INDEX, optarg);
                 break;
 
             case 'l':
@@ -1177,9 +1437,37 @@ main(int argc, char *argv[])
     if (!rate_set) {
         vr_intf_op(cl, vr_op);
     } else {
-        prev_req.vifr_queue_ierrors_to_lcore = malloc(VR_MAX_CPUS * sizeof(uint64_t));
-        memset(prev_req.vifr_queue_ierrors_to_lcore, 0, VR_MAX_CPUS * sizeof(uint64_t));
+
+        for (i = 0; i < VR_MAX_INTERFACES; i++) {
+
+            prev_req[i].vifr_queue_ierrors_to_lcore =
+                (calloc(VR_MAX_CPUS, sizeof(uint64_t)));
+
+            if (!(prev_req[i].vifr_queue_ierrors_to_lcore)) {
+                fprintf(stderr, "Fail, memory allocation. (%s:%d).", __FILE__ , __LINE__);
+                exit(1);
+            }
+        }
+
+        /*
+         * tc[get/set]attr functions are for changing terminal behavior.
+         * We dont have to write enter (newline) for getting character from terminal.
+         *
+         */
+        tcgetattr(STDIN_FILENO, &old_term_set);
+        new_term_set = old_term_set;
+        new_term_set.c_lflag &= ~(ICANON);
+        tcsetattr(STDIN_FILENO, TCSANOW, &new_term_set);
+
         rate_stats(cl, vr_op);
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_term_set);
+        for (i = 0; i < VR_MAX_INTERFACES; i++) {
+            if (prev_req[i].vifr_queue_ierrors_to_lcore) {
+                free(prev_req[i].vifr_queue_ierrors_to_lcore);
+                prev_req[i].vifr_queue_ierrors_to_lcore = NULL;
+            }
+        }
+
     }
     return 0;
 }
