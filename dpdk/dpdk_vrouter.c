@@ -157,8 +157,8 @@ dpdk_mempools_create(void)
     vr_dpdk.frag_direct_mempool = rte_mempool_create("frag_direct_mempool",
             VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ, VR_DPDK_FRAG_DIRECT_MBUF_SZ,
             VR_DPDK_FRAG_DIRECT_MEMPOOL_CACHE_SZ,
-            sizeof(struct rte_pktmbuf_pool_private), vr_dpdk_pktmbuf_pool_init,
-            NULL, vr_dpdk_pktmbuf_init, NULL, rte_socket_id(), 0);
+            sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init,
+            NULL, rte_pktmbuf_init, NULL, rte_socket_id(), 0);
     if (vr_dpdk.frag_direct_mempool == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error creating FRAG_DIRECT mempool: %s (%d)\n",
             rte_strerror(rte_errno), rte_errno);
