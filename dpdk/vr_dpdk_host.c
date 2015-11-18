@@ -264,10 +264,12 @@ dpdk_pktmbuf_copy(struct rte_mbuf *md,
 static struct vr_packet *
 dpdk_pclone(struct vr_packet *pkt)
 {
-    /* TODO: pktmbuf_clone version should be faster, but at the moment
-     *       vr_dpdk_mbuf_to_pkt returns original vr_packet structure
+    /*
+     * TODO: We have not tested pclone option on DPDK 2.0. - (mbuf leak).
      */
-#if 0
+
+/* Macro RTE_VERSION is workaround, we have mbuf leak in DPDK 2.0 */
+#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
     struct rte_mbuf *m, *m_clone;
     struct vr_packet *pkt_clone;
 
@@ -279,8 +281,8 @@ dpdk_pclone(struct vr_packet *pkt)
 
     /* clone vr_packet data */
     pkt_clone = vr_dpdk_mbuf_to_pkt(m_clone);
-    /* TODO: vr_dpdk_mbuf_to_pkt never returns pointer to the vr_packet copy */
     *pkt_clone = *pkt;
+    pkt_clone->cpu = vr_get_cpu();
 
     return pkt_clone;
 #else
