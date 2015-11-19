@@ -51,8 +51,7 @@ vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
 
     for (i = marker; i < table->ht_hentries + table->ht_oentries; i++) {
         ent = vr_htable_get_hentry_by_index(htable, i);
-        if(ent->hentry_flags & VR_HENTRY_FLAG_VALID)
-            cb(htable, ent, i, data);
+        cb(htable, ent, i, data);
     }
 
     return;
@@ -118,8 +117,12 @@ vr_htable_put_free_oentry(struct vr_htable *table, vr_hentry_t *ent)
 }
 
 
+/*
+ * Returns the hash entry given an index. Does not validate whether the
+ * entry is Valid or not
+ */
 vr_hentry_t *
-vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
+__vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
 
@@ -135,6 +138,21 @@ vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
     return NULL;
 }
 
+/*
+ * Returns the hash entry, given an index, only if Valid
+ */
+vr_hentry_t *
+vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
+{
+    vr_hentry_t *ent;
+
+    ent = __vr_htable_get_hentry_by_index(htable, index);
+    if(ent && (ent->hentry_flags & VR_HENTRY_FLAG_VALID))
+        return ent;
+
+    return NULL;
+}
+
 
 static void
 vr_htable_hentry_defer_delete(struct vrouter *router, void *arg)
@@ -146,7 +164,7 @@ vr_htable_hentry_defer_delete(struct vrouter *router, void *arg)
     defer_data = (struct vr_hentry_delete_data *)arg;
     table = (struct vr_htable *)(defer_data->hd_table);
 
-    ent = vr_htable_get_hentry_by_index((vr_htable_t)table,
+    ent = __vr_htable_get_hentry_by_index((vr_htable_t)table,
                                         defer_data->hd_index);
     /* Might be under the process of flushing */
     if (!ent)
@@ -170,7 +188,7 @@ vr_htable_hentry_scheduled_delete(void *arg)
 
     delete_data = (struct vr_hentry_delete_data *)arg;
 
-    head_ent = vr_htable_get_hentry_by_index(
+    head_ent = __vr_htable_get_hentry_by_index(
             (vr_htable_t)(delete_data->hd_table), delete_data->hd_index);
 
     if (!head_ent)
@@ -278,7 +296,7 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
     ent->hentry_flags |= VR_HENTRY_FLAG_DELETE_MARKED;
 
-    head_ent = vr_htable_get_hentry_by_index(htable, ent->hentry_bucket_index);
+    head_ent = __vr_htable_get_hentry_by_index(htable, ent->hentry_bucket_index);
     delete_index = head_ent->hentry_index / table->ht_bucket_size;
     delete_data = vr_btable_get(table->ht_dtable, delete_index);
 
