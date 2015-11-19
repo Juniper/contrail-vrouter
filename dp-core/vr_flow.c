@@ -271,13 +271,6 @@ vr_flow_set_active(struct vr_flow_entry *fe)
             VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_NEW_FLOW);
 }
 
-static inline struct vr_flow_entry *
-vr_flow_table_entry_get(struct vrouter *router, unsigned int i)
-{
-    return (struct vr_flow_entry *)
-            vr_htable_get_hentry_by_index(router->vr_flow_table, i);
-}
-
 unsigned int
 vr_flow_table_size(struct vrouter *router)
 {
