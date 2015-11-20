@@ -49,11 +49,10 @@
 #define MEM_DEV                 "/dev/flow"
 int mem_fd;
 
-static int dvrf_set, mir_set, help_set;
+static int dvrf_set, mir_set, show_evicted_set, help_set;
 static unsigned short dvrf;
 static int flow_index, list, flow_cmd, mirror = -1;
-static int rate;
-static int stats;
+static int rate, stats;
 
 struct flow_table {
     struct vr_flow_entry *ft_entries;
@@ -180,6 +179,12 @@ dump_table(struct flow_table *ft)
         need_drop_reason = 0;
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
         if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
+            if ((fe->fe_flags & VR_FLOW_FLAG_EVICTED) &&
+                    !show_evicted_set) {
+                continue;
+            }
+
+
             if (fe->fe_type == VP_TYPE_IP) {
                 in_src.s_addr = fe->fe_key.flow4_sip;
                 in_dest.s_addr = fe->fe_key.flow4_dip;
@@ -777,18 +782,20 @@ Usage(void)
     printf("           [-i flow_index]\n");
     printf("           [--mirror=mirror table index]\n");
     printf("           [-l]\n");
+    printf("           [--show-evicted]\n");
     printf("           [-r]\n");
     printf("           [-s]\n");
     printf("\n");
 
-    printf("-f <flow_index>\t Set forward action for flow at flow_index <flow_index>\n");
-    printf("-d <flow_index>\t Set drop action for flow at flow_index <flow_index>\n");
-    printf("-i <flow_index>\t Invalidate flow at flow_index <flow_index>\n");
-    printf("--mirror\t mirror index to mirror to\n");
-    printf("-l\t\t List all flows\n");
-    printf("-r\t\t Start dumping flow setup rate\n");
-    printf("-s\t\t Start dumping flow stats\n");
-    printf("--help\t\t Print this help\n");
+    printf("-f <flow_index> Set forward action for flow at flow_index <flow_index>\n");
+    printf("-d <flow_index> Set drop action for flow at flow_index <flow_index>\n");
+    printf("-i <flow_index> Invalidate flow at flow_index <flow_index>\n");
+    printf("--mirror        Mirror index to mirror to\n");
+    printf("-l              List flows\n");
+    printf("--show-evicted  Show evicted flows too\n");
+    printf("-r              Start dumping flow setup rate\n");
+    printf("-s              Start dumping flow stats\n");
+    printf("--help          Print this help\n");
 
     exit(-EINVAL);
 }
@@ -796,21 +803,26 @@ Usage(void)
 enum opt_flow_index {
     DVRF_OPT_INDEX,
     MIRROR_OPT_INDEX,
+    SHOW_EVICTED_OPT_INDEX,
     HELP_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
 static struct option long_options[] = {
-    [DVRF_OPT_INDEX]    = {"dvrf",   required_argument, &dvrf_set, 1},
-    [MIRROR_OPT_INDEX]  = {"mirror", required_argument, &mir_set,  1},
-    [HELP_OPT_INDEX]    = {"help",   no_argument,       &help_set, 1},
-    [MAX_OPT_INDEX]     = { NULL,    0,                 0,         0}
+    [DVRF_OPT_INDEX]            = {"dvrf",          required_argument, &dvrf_set,           1},
+    [MIRROR_OPT_INDEX]          = {"mirror",        required_argument, &mir_set,            1},
+    [SHOW_EVICTED_OPT_INDEX]    = {"show-evicted",  no_argument,       &show_evicted_set,   1},
+    [HELP_OPT_INDEX]            = {"help",          no_argument,       &help_set,           1},
+    [MAX_OPT_INDEX]             = { NULL,           0,                 0,                   0}
 };
 
 static void
 validate_options(void)
 {
     if (!flow_index && !list && !rate && !stats)
+        Usage();
+
+    if (show_evicted_set && !list)
         Usage();
 
     return;
@@ -831,6 +843,9 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         mirror = strtoul(opt_arg, NULL, 0);
         if (errno)
             Usage();
+        break;
+
+    case SHOW_EVICTED_OPT_INDEX:
         break;
 
     case HELP_OPT_INDEX:
