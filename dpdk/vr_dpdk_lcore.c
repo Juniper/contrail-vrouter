@@ -649,17 +649,28 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
          * be stripped. If not (untagged or another tag), it should be
          * forwarded to the kernel.
          */
-        if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)
-                && mbuf->vlan_tci != vr_dpdk.vlan_tag)) {
-            if (vr_dpdk.vlan_ring == NULL || rte_vlan_insert(&mbuf)) {
-                vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
+        if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID &&
+                vif_is_fabric(vif))) {
+            if (mbuf->vlan_tci != vr_dpdk.vlan_tag) {
+                if (vr_dpdk.vlan_ring == NULL || rte_vlan_insert(&mbuf)) {
+                    vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
+                    continue;
+                }
+                /* Packets will be dequeued in dpdk_lcore_fwd_io() */
+                if (rte_ring_mp_enqueue(vr_dpdk.vlan_ring, mbuf) != 0)
+                    vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
+                /* Nothing to route, take the next packet. */
                 continue;
+            } else {
+                /* Clear the VLAN flag for the case when the received packet
+                 * belongs to vRouter's VLAN. This resembles the kernel vRouter
+                 * behaviour, in which case a separate vlanX interface (that
+                 * the vRouter is binded to) strips the tag and vRouter gets
+                 * clean ethernet frames from fabric interface. If we did not
+                 * do this, the VLAN tag would be passed to dp-core processing
+                 * and vhost connectivity would be corrupted. */
+                mbuf->ol_flags &= ~PKT_RX_VLAN_PKT;
             }
-            /* Packets will be dequeued in dpdk_lcore_fwd_io() */
-            if (rte_ring_mp_enqueue(vr_dpdk.vlan_ring, mbuf) != 0)
-                vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
-            /* Nothing to route, take the next packet. */
-            continue;
         }
 
 #ifdef VR_DPDK_RX_PKT_DUMP
