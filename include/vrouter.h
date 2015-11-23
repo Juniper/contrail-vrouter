@@ -255,6 +255,8 @@ struct vrouter {
     unsigned int vr_ip;
 
     struct vr_interface **vr_interfaces;
+    /*  Generation number is incrementing every time a vif is added. */
+    unsigned int vr_interface_gen;
     unsigned int vr_max_interfaces;
 
     unsigned int vr_max_nexthops;
