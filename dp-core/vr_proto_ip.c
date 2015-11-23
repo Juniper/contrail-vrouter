@@ -1050,7 +1050,7 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
 
     if (vr_grat_arp(sarp)) {
         if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_TRAP_FLAG)
-            return MR_TRAP;
+            return MR_MIRROR;
         return MR_FLOOD;
     }
 

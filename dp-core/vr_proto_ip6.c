@@ -316,8 +316,12 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
         break;
 
-    case MR_TRAP:
-        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+    case MR_MIRROR:
+        pkt_c = vr_pclone(pkt);
+        if (pkt_c)
+            vr_trap(pkt_c, fmd->fmd_dvrf, AGENT_TRAP_ARP, NULL);
+
+        handled = false;
         break;
 
     case MR_DROP:
