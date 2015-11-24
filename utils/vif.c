@@ -1261,8 +1261,11 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
         /*
          * We must get minimum 2 characters,
          * otherwise we will be in outer loop, always.
-         * */
-        fgets(kb_input, 2, stdin);
+         */
+        /* To suppress the warning return if EOF. */
+        if (fgets(kb_input, 2, stdin) == NULL)
+            return;
+
         switch (tolower(kb_input[0])) {
             case 'q':
                 return;

@@ -242,8 +242,8 @@ buffer sandesh vrouter_ops {
    11: i32          vo_vrfs;
    12: string       vo_build_info;
    13: u32          vo_log_level;
-   14: list<u32>    vo_log_type_enable;
-   15: list<u32>    vo_log_type_disable;
+   14: list<i32>    vo_log_type_enable;
+   15: list<i32>    vo_log_type_disable;
    16: i32          vo_perfr;
    17: i32          vo_perfs;
    18: i32          vo_from_vm_mss_adj;

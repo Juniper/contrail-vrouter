@@ -165,9 +165,11 @@ struct vr_vrf_assign {
 };
 
 struct vr_interface {
+    unsigned int vif_flags;
+    /*  Generation number is incrementing every time a vif is added. */
+    unsigned int vif_gen;
     unsigned short vif_type;
     unsigned short vif_rid;
-    unsigned int vif_flags;
     /*
      * unsigned short does not cut it, because initial value for
      * each entry in the table is -1. negative value of table
@@ -177,12 +179,11 @@ struct vr_interface {
     unsigned short vif_idx;
     unsigned short vif_vrf;
     unsigned short vif_mtu;
-    /*  Generation number is incrementing every time a vif is added. */
-    unsigned int vif_gen;
+    unsigned short vif_vlan_id;
+    unsigned short vif_ovlan_id;
 
     struct vrouter *vif_router;
     struct vr_interface_stats *vif_stats;
-
 
     void *vif_os;
     int (*vif_tx)(struct vr_interface *, struct vr_packet *,
@@ -199,6 +200,8 @@ struct vr_interface {
     unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
             struct vr_forwarding_md *, unsigned char *, unsigned short);
     unsigned char vif_mac[VR_ETHER_ALEN];
+    uint8_t vif_transport;
+    uint8_t vif_mirror_id;
 #ifdef __KERNEL__
 #if defined(__linux__)
     struct napi_struct vr_napi;
@@ -210,16 +213,11 @@ struct vr_interface {
     void (*saved_if_input) (struct ifnet *, struct mbuf *);
 #endif
 #endif
-    uint8_t vif_mirror_id; /* best placed here for now - less space wasted */
-    /* Big and less frequently used fileds */
+    /* Big and less frequently used fields. */
     struct vr_interface *vif_parent;
     struct vr_interface *vif_bridge;
     unsigned int vif_users;
     unsigned int vif_os_idx;
-    unsigned short vif_vlan_id;
-    unsigned short vif_ovlan_id;
-    unsigned short vif_vrf_table_users;
-    uint8_t vif_transport;
 
     struct vr_vrf_assign *vif_vrf_table;
     int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
@@ -231,6 +229,7 @@ struct vr_interface {
     vr_htable_t vif_btable;
     unsigned char vif_rewrite[VR_ETHER_HLEN];
     unsigned char vif_name[VR_INTERFACE_NAME_LEN];
+    unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
 };
 

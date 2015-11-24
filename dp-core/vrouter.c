@@ -245,6 +245,12 @@ vrouter_get(unsigned int vr_id)
     return &router;
 }
 
+unsigned int
+vrouter_generation_num_get(struct vrouter *router)
+{
+    return ++router->vr_generation_num;
+}
+
 static void
 vrouter_ops_destroy(vrouter_ops *req)
 {

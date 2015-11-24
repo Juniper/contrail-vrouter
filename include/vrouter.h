@@ -255,8 +255,8 @@ struct vrouter {
     unsigned int vr_ip;
 
     struct vr_interface **vr_interfaces;
-    /*  Generation number is incrementing every time a vif is added. */
-    unsigned int vr_interface_gen;
+    /*  Generation number is incrementing every time it is used. */
+    unsigned int vr_generation_num;
     unsigned int vr_max_interfaces;
 
     unsigned int vr_max_nexthops;
@@ -305,6 +305,8 @@ extern volatile bool vr_not_ready;
 extern struct host_os *vrouter_host;
 
 extern struct vrouter *vrouter_get(unsigned int);
+extern unsigned int vrouter_generation_num_get(struct vrouter *router);
+
 extern int vrouter_init(void);
 extern int vr_module_error(int, const char *, int, int);
 extern int vhost_init(void);

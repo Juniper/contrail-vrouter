@@ -435,20 +435,6 @@ vr_trap(struct vr_packet *pkt, unsigned short trap_vrf,
     return 0;
 }
 
-static inline bool
-vr_my_pkt(unsigned char *pkt_mac, struct vr_interface *vif)
-{
-    /*
-     * Packet is destined to us if:
-     * 1) IF destination MAC is our Mac
-     * 2) If VIF is service interface
-     */
-    if (VR_MAC_CMP(pkt_mac, vif->vif_mac) || vif_is_service(vif))
-        return true;
-
-    return false;
-}
-
 unsigned int
 vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
