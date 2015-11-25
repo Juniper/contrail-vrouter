@@ -500,7 +500,6 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 {
     struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
     vr_dpdk_virtioq_t *vq = p->rx_virtioq;
-    rte_prefetch0(vq->vdv_avail);
     uint16_t vq_hard_avail_idx, i;
     uint16_t num_pkts, next_desc_idx, next_avail_idx, pkts_sent = 0;
     struct vring_desc *desc;
