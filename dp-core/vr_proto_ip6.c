@@ -143,6 +143,7 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
     unsigned short nh_id;
 
     struct vr_icmp *icmph;
+    fat_flow_port_mask_t port_mask;
 
     t_hdr = (unsigned short *)((char *)ip6 + sizeof(struct vr_ip6));
     if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
@@ -163,6 +164,25 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
     } else {
         sport = 0;
         dport = 0;
+    }
+
+    port_mask = vr_flow_fat_flow_lookup(router, pkt, ip6->ip6_nxt,
+            sport, dport);
+    switch (port_mask) {
+    case SOURCE_PORT_MASK:
+        sport = 0;
+        break;
+
+    case DESTINATION_PORT_MASK:
+        dport = 0;
+        break;
+
+    case ALL_PORT_MASK:
+        sport = dport = 0;
+        break;
+
+    default:
+        break;
     }
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);

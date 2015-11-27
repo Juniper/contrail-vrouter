@@ -79,6 +79,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_htable_object);
     printf("Interface                       %" PRIu64 "\n",
             stats->vms_interface_object);
+    printf("Interface Fat Flow Config       %" PRIu64 "\n",
+            stats->vms_interface_fat_flow_config_object);
     printf("Interface MAC                   %" PRIu64 "\n",
             stats->vms_interface_mac_object);
     printf("Interface Request               %" PRIu64 "\n",

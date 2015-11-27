@@ -9,6 +9,7 @@
 #include "vr_defs.h"
 #include "vr_types.h"
 #include "vr_htable.h"
+#include "vr_flow.h"
 
 /*
  * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
@@ -164,6 +165,19 @@ struct vr_vrf_assign {
     unsigned int va_nh_id;
 };
 
+#define VIF_FAT_FLOW_NUM_BITMAPS    (64)
+#define VIF_FAT_FLOW_BITMAP_SIZE    (1024)
+#define VIF_FAT_FLOW_BITMAP_BYTES   (VIF_FAT_FLOW_BITMAP_SIZE / 8)
+
+#define VIF_FAT_FLOW_NOPROTO_INDEX  0
+#define VIF_FAT_FLOW_TCP_INDEX      1
+#define VIF_FAT_FLOW_UDP_INDEX      2
+#define VIF_FAT_FLOW_SCTP_INDEX     3
+#define VIF_FAT_FLOW_MAXPROTO_INDEX 4
+
+#define VIF_FAT_FLOW_PORT(p_p)      ((p_p) && 0xFFFF)
+#define VIF_FAT_FLOW_PROTOCOL(p_p)  (((p_p) >> 16) & 0xFF)
+
 struct vr_interface {
     unsigned int vif_flags;
     /*  Generation number is incrementing every time a vif is added. */
@@ -184,7 +198,6 @@ struct vr_interface {
 
     struct vrouter *vif_router;
     struct vr_interface_stats *vif_stats;
-
     void *vif_os;
     int (*vif_tx)(struct vr_interface *, struct vr_packet *,
             struct vr_forwarding_md *);
@@ -199,6 +212,14 @@ struct vr_interface {
 
     unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
             struct vr_forwarding_md *, unsigned char *, unsigned short);
+    uint8_t **vif_fat_flow_ports[VIF_FAT_FLOW_MAXPROTO_INDEX];
+    /* 
+     * one for tcp, another for udp, one for sctp and one for
+     * everything else
+     */
+    uint16_t *vif_fat_flow_config[VIF_FAT_FLOW_MAXPROTO_INDEX];
+    uint16_t vif_fat_flow_config_size[VIF_FAT_FLOW_MAXPROTO_INDEX];
+
     unsigned char vif_mac[VR_ETHER_ALEN];
     uint8_t vif_transport;
     uint8_t vif_mirror_id;
@@ -278,5 +299,6 @@ extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
-
+extern fat_flow_port_mask_t vif_fat_flow_lookup(struct vr_interface *,
+        uint8_t, uint16_t, uint16_t);
 #endif /* __VR_INTERFACE_H__ */

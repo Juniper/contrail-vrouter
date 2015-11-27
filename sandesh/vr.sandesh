@@ -100,6 +100,7 @@ buffer sandesh vr_interface_req {
     49: i32         vifr_bridge_idx;
     50: i16         vifr_ovlan_id;
     51: byte        vifr_transport;
+    52: list<i32>    vifr_fat_flow_protocol_port;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -319,6 +320,7 @@ buffer sandesh vr_mem_stats_req {
    56:  i64             vms_usock_buf_object;
    57:  i64             vms_usock_iovec_object;
    58:  i64             vms_vrouter_req_object;
+   59:  i64             vms_interface_fat_flow_config_object;
 }
 
 buffer sandesh vr_drop_stats_req {

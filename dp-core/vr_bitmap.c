@@ -79,6 +79,19 @@ vr_bitmap_get_first_free_bit(vr_bmap_t b)
 }
 
 bool
+vr_bitmap_is_set_bit(vr_bmap_t b, unsigned int bit)
+{
+    unsigned int bit_data;
+    struct vr_bitmap *bmap = (struct vr_bitmap *)b;
+
+    bit_data = bmap->bmap_data[(bit / 8)];
+    if (bit_data & (1 << (bit % 8)))
+        return true;
+
+    return false;
+}
+
+bool
 vr_bitmap_clear_bit(vr_bmap_t b, unsigned int bit)
 {
     uint8_t *data;

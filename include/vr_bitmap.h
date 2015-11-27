@@ -16,6 +16,5 @@ bool vr_bitmap_clear_bit(vr_bmap_t, unsigned int);
 void vr_bitmap_delete(vr_bmap_t);
 vr_bmap_t vr_bitmap_create(unsigned int);
 
-
 #endif
 
