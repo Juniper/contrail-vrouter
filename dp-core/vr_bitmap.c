@@ -75,6 +75,38 @@ vr_bitmap_alloc_bit(vr_bmap_t b)
 }
 
 bool
+vr_bitmap_is_set_bit(vr_bmap_t b, unsigned int bit)
+{
+    unsigned int bit_data;
+    struct vr_bitmap *bmap = (struct vr_bitmap *)b;
+
+    bit_data = bmap->bmap_data[(bit / VR_BITMAP_STRIDE_LEN)];
+    if (bit_data & (1 << (bit % VR_BITMAP_STRIDE_LEN)))
+        return true;
+
+    return false;
+}
+
+bool
+vr_bitmap_set_bit(vr_bmap_t b, unsigned int bit)
+{
+    struct vr_bitmap *bmap = (struct vr_bitmap *)b;
+
+    if (!bmap || (bit >= bmap->bmap_bits))
+        return false;
+
+    if (vr_bitmap_is_set_bit(b, bit))
+        return false;
+
+    (void)__sync_fetch_and_or(&bmap->bmap_data[(bit / VR_BITMAP_STRIDE_LEN)],
+            (1 << (bit % VR_BITMAP_STRIDE_LEN)));
+    (void)__sync_add_and_fetch(&bmap->bmap_used_bits, 1);
+
+    return true;
+}
+
+
+bool
 vr_bitmap_clear_bit(vr_bmap_t b, unsigned int bit)
 {
     struct vr_bitmap *bmap = (struct vr_bitmap *)b;
