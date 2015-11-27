@@ -23,6 +23,10 @@ static int vm_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
 static mac_response_t vm_mac_request(struct vr_interface *, struct vr_packet *,
                 struct vr_forwarding_md *, unsigned char *);
+static void vif_fat_flow_free(uint8_t **);
+static int vif_fat_flow_add(struct vr_interface *, vr_interface_req *);
+static bool vif_fat_flow_port_is_set(struct vr_interface *, uint8_t,
+                uint16_t);
 
 void vif_attach(struct vr_interface *);
 void vif_detach(struct vr_interface *);
@@ -1279,6 +1283,8 @@ vif_get_mtu(struct vr_interface *vif)
 static void
 vif_free(struct vr_interface *vif)
 {
+    unsigned int i;
+
     if (!vif)
         return;
 
@@ -1297,6 +1303,18 @@ vif_free(struct vr_interface *vif)
 
     if (vif->vif_btable) {
         vif_bridge_deinit(vif);
+    }
+
+    for (i = 0; i < VIF_FAT_FLOW_MAXPROTO_INDEX; i++) {
+        if (vif->vif_fat_flow_config[i]) {
+            vr_free(vif->vif_fat_flow_config[i]);
+            vif->vif_fat_flow_config[i] = NULL;
+        }
+
+        if (vif->vif_fat_flow_ports[i]) {
+            vif_fat_flow_free(vif->vif_fat_flow_ports[i]);
+            vif->vif_fat_flow_ports[i] = NULL;
+        }
     }
 
     vr_free(vif);
@@ -1674,6 +1692,9 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
 
+    if ((ret = vif_fat_flow_add(vif, req)))
+        return ret;
+
     return 0;
 }
 
@@ -1768,6 +1789,10 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         strncpy(vif->vif_name, req->vifr_name, sizeof(vif->vif_name) - 1);
     }
 
+    ret = vif_fat_flow_add(vif, req);
+    if (ret)
+        goto generate_resp;
+
     /*
      * the order below is probably not intuitive, but we do this because
      * the moment we do a drv_add, packets will start coming in and find
@@ -1800,9 +1825,12 @@ generate_resp:
 }
 
 static void
-vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
+__vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
 {
-    unsigned int i;
+    uint8_t proto;
+    uint16_t port;
+    unsigned int i, j;
+
     struct vr_interface_stats *stats;
     struct vr_interface_settings settings;
 
@@ -1874,7 +1902,64 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
         }
     }
 
+    for (i = 0; i < VIF_FAT_FLOW_MAXPROTO_INDEX; i++) {
+        switch (i) {
+        case VIF_FAT_FLOW_TCP_INDEX:
+            proto = VR_IP_PROTO_TCP;
+            break;
+
+        case VIF_FAT_FLOW_UDP_INDEX:
+            proto = VR_IP_PROTO_UDP;
+            break;
+
+        case VIF_FAT_FLOW_SCTP_INDEX:
+            proto = VR_IP_PROTO_SCTP;
+            break;
+
+        default:
+            proto = 0;
+            break;
+        }
+
+        if (req->vifr_fat_flow_protocol_port &&
+                req->vifr_fat_flow_protocol_port_size) {
+            for (j = 0; j < intf->vif_fat_flow_config_size[i]; j++) {
+                port = intf->vif_fat_flow_config[i][j];
+                if (vif_fat_flow_port_is_set(intf, i, port)) {
+                    req->vifr_fat_flow_protocol_port[j] = (proto << 16) | port;
+                } else {
+                    vr_printf("vif0/%u: FatFlow port %u in configuration,"
+                            " but not in operational DB\n",
+                            intf->vif_idx, port);
+                }
+            }
+        }
+    }
+
     return;
+}
+
+static int
+vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif)
+{
+    unsigned int i, fat_flow_config_size;
+
+    fat_flow_config_size = 0;
+    for (i = 0; i < VIF_FAT_FLOW_MAXPROTO_INDEX; i++)
+        fat_flow_config_size += vif->vif_fat_flow_config_size[i];
+
+    if (fat_flow_config_size) {
+        req->vifr_fat_flow_protocol_port =
+            vr_zalloc(fat_flow_config_size * sizeof(uint32_t));
+        if (!req->vifr_fat_flow_protocol_port) {
+            return -ENOMEM;
+        }
+        req->vifr_fat_flow_protocol_port_size = fat_flow_config_size;
+    }
+
+    __vr_interface_make_req(req, vif);
+
+    return 0;
 }
 
 static vr_interface_req *
@@ -1900,6 +1985,18 @@ vr_interface_req_get(void)
 
 
 static void
+vr_interface_req_free_fat_flow_config(vr_interface_req *req)
+{
+    if (req->vifr_fat_flow_protocol_port) {
+        vr_free(req->vifr_fat_flow_protocol_port);
+        req->vifr_fat_flow_protocol_port = NULL;
+        req->vifr_fat_flow_protocol_port_size = 0;
+    }
+
+    return;
+}
+
+static void
 vr_interface_req_destroy(vr_interface_req *req)
 {
     if (!req)
@@ -1918,6 +2015,8 @@ vr_interface_req_destroy(vr_interface_req *req)
     if (req->vifr_name)
         vr_free(req->vifr_name);
 
+    vr_interface_req_free_fat_flow_config(req);
+
     vr_free(req);
     return;
 }
@@ -1926,6 +2025,7 @@ static int
 vr_interface_get(vr_interface_req *req)
 {
     int ret = 0;
+
     struct vr_interface *vif = NULL;
     struct vrouter *router;
     vr_interface_req *resp = NULL;
@@ -1948,12 +2048,12 @@ vr_interface_get(vr_interface_req *req)
             goto generate_response;
         }
 
-        vr_interface_make_req(resp, vif);
+        ret = vr_interface_make_req(resp, vif);
     } else
         ret = -ENOENT;
 
 generate_response:
-    vr_message_response(VR_INTERFACE_OBJECT_ID, resp, ret);
+    vr_message_response(VR_INTERFACE_OBJECT_ID, ret ? NULL : resp, ret);
     if (resp)
         vr_interface_req_destroy(resp);
 
@@ -1997,6 +2097,8 @@ vr_interface_dump(vr_interface_req *r)
             if (ret <= 0)
                 break;
         }
+
+        vr_interface_req_free_fat_flow_config(resp);
     }
 
 generate_response:
@@ -2137,6 +2239,362 @@ vif_vrf_table_set(struct vr_interface *vif, unsigned int vlan,
     }
 
     return 0;
+}
+
+unsigned int
+vif_fat_flow_get_proto_index(uint8_t proto)
+{
+    unsigned int proto_index = VIF_FAT_FLOW_NOPROTO_INDEX;
+
+    switch (proto) {
+    case VR_IP_PROTO_TCP:
+        proto_index = VIF_FAT_FLOW_TCP_INDEX;
+        break;
+
+    case VR_IP_PROTO_UDP:
+        proto_index = VIF_FAT_FLOW_UDP_INDEX;
+        break;
+
+    case VR_IP_PROTO_SCTP:
+        proto_index = VIF_FAT_FLOW_SCTP_INDEX;
+        break;
+
+    default:
+        break;
+    }
+
+    return proto_index;
+}
+
+static uint8_t vif_fat_flow_mem_zero[VIF_FAT_FLOW_BITMAP_BYTES];
+
+static void
+__vif_fat_flow_free_defer_cb(struct vrouter *router, void *data)
+{
+    struct vr_defer_data *vdd = (struct vr_defer_data *)data;
+
+    if (!vdd || !vdd->vdd_data)
+        return;
+
+    vr_free(vdd->vdd_data);
+    return;
+}
+
+void
+__vif_fat_flow_try_free(struct vr_interface *vif, unsigned int proto_index,
+        unsigned int port_row)
+{
+    uint8_t *mem_column, **mem_row;
+    struct vr_defer_data *vdd_row, *vdd_column;
+
+    mem_row = vif->vif_fat_flow_ports[proto_index];
+    if (!mem_row)
+        return;
+    mem_column = mem_row[port_row];
+
+    if (!memcmp(mem_column, vif_fat_flow_mem_zero,
+                sizeof(vif_fat_flow_mem_zero))) {
+        vdd_column = vr_get_defer_data(sizeof(*vdd_column));
+        if (!vdd_column)
+            return;
+
+        vif->vif_fat_flow_ports[proto_index][port_row] = NULL;
+        vdd_column->vdd_data = (void *)mem_column;
+        vr_defer(vif->vif_router, __vif_fat_flow_free_defer_cb, vdd_column);
+
+        if (!memcmp(mem_row, vif_fat_flow_mem_zero,
+                    VIF_FAT_FLOW_NUM_BITMAPS)) {
+            vdd_row = vr_get_defer_data(sizeof(*vdd_row));
+            if (!vdd_row)
+                return;
+
+            vif->vif_fat_flow_ports[proto_index] = NULL;
+            vdd_row->vdd_data = (void *)mem_row;
+            vr_defer(vif->vif_router, __vif_fat_flow_free_defer_cb, vdd_row);
+        }
+
+
+        return;
+    }
+
+    return;
+}
+
+static void
+vif_fat_flow_free(uint8_t  **mem)
+{
+    int i;
+
+    if (!mem)
+        return;
+
+    for (i = 0; i < VIF_FAT_FLOW_NUM_BITMAPS; i++) {
+        if (mem[i]) {
+            vr_free(mem[i]);
+            mem[i] = NULL;
+        }
+    }
+
+    vr_free(mem);
+    return;
+}
+
+int
+__vif_fat_flow_delete(struct vr_interface *vif, unsigned int proto_index,
+        uint16_t port)
+{
+    unsigned int port_row, port_word, port_bit;
+
+    if (!vif->vif_fat_flow_ports[proto_index])
+        return -EINVAL;
+
+    port_row = (port / VIF_FAT_FLOW_BITMAP_SIZE);
+    port_word = (port % VIF_FAT_FLOW_BITMAP_SIZE) / (sizeof(uint8_t) * 8);
+    port_bit = (port % VIF_FAT_FLOW_BITMAP_SIZE) % (sizeof(uint8_t) * 8);
+
+    if (!vif->vif_fat_flow_ports[proto_index][port_row])
+        return -EINVAL;
+
+    vif->vif_fat_flow_ports[proto_index][port_row][port_word] &=
+        ~(1 << port_bit);
+
+    __vif_fat_flow_try_free(vif, proto_index, port_row);
+
+    return 0;
+}
+
+int
+vif_fat_flow_delete(struct vr_interface *vif, uint8_t proto, uint16_t port)
+{
+    unsigned int proto_index;
+
+    proto_index = vif_fat_flow_get_proto_index(proto);
+    return __vif_fat_flow_delete(vif, proto_index, port);
+}
+
+
+int
+__vif_fat_flow_add(struct vr_interface *vif, uint8_t proto, uint16_t port)
+{
+    unsigned int proto_index, port_row, port_word, port_bit;
+
+    bool alloced = false;
+
+    proto_index = vif_fat_flow_get_proto_index(proto);
+
+    if (!vif->vif_fat_flow_ports[proto_index]) {
+        vif->vif_fat_flow_ports[proto_index] =
+            vr_zalloc(VIF_FAT_FLOW_NUM_BITMAPS * sizeof(unsigned int *));
+        if (!vif->vif_fat_flow_ports)
+            return -ENOMEM;
+        alloced = true;
+    }
+
+    port_row = (port / VIF_FAT_FLOW_BITMAP_SIZE);
+    port_word = (port % VIF_FAT_FLOW_BITMAP_SIZE) / (sizeof(uint8_t) * 8);
+    port_bit = (port % VIF_FAT_FLOW_BITMAP_SIZE) % (sizeof(uint8_t) * 8);
+
+    if (!vif->vif_fat_flow_ports[proto_index][port_row]) {
+        vif->vif_fat_flow_ports[proto_index][port_row] =
+            vr_zalloc(VIF_FAT_FLOW_BITMAP_BYTES);
+        if (!vif->vif_fat_flow_ports[proto_index][port_row]) {
+            if (alloced) {
+                vr_free(vif->vif_fat_flow_ports[proto_index]);
+                return -ENOMEM;
+            }
+        }
+    }
+
+    vif->vif_fat_flow_ports[proto_index][port_row][port_word] |=
+        (1 << port_bit);
+
+    return 0;
+}
+
+static int
+vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
+{
+    uint8_t proto, proto_index;
+    uint16_t port,
+             old_fat_flow_config_sizes[VIF_FAT_FLOW_MAXPROTO_INDEX] = { 0 };
+    uint16_t *vif_old_fat_flow_config[VIF_FAT_FLOW_MAXPROTO_INDEX] = { NULL };
+
+    int i, j, ret;
+    unsigned int size;
+    bool add;
+
+    if (!req->vifr_fat_flow_protocol_port_size) {
+        return 0;
+    } else {
+        if (!req->vifr_fat_flow_protocol_port)
+            return -EINVAL;
+    }
+
+    /*
+     * we ideally have to take a difference between the old and the new
+     * values and add only those that are new and delete those that are
+     * not present in the new, but are present in the old
+     *
+     * So, first save the old values to a local array.
+     */
+    memcpy(old_fat_flow_config_sizes, vif->vif_fat_flow_config_size,
+            sizeof(old_fat_flow_config_sizes));
+    memset(vif->vif_fat_flow_config_size, 0,
+            sizeof(vif->vif_fat_flow_config_size));
+
+    memcpy(vif_old_fat_flow_config, vif->vif_fat_flow_config,
+            sizeof(vif_old_fat_flow_config));
+    memset(vif->vif_fat_flow_config, 0, sizeof(vif->vif_fat_flow_config));
+
+    /*
+     * sandesh is expensive. hence we would like to avoid adding more fields
+     * to sandesh, if it can be helped. now, such a constraint presents a
+     * challenge to know the number of ports present in the request -
+     * information that is needed to allocate space to store the current
+     * configuration. so, we loop and try to identify the number of ports
+     * present per protocol in the request
+     */
+    for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
+        proto = VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]);
+        port = VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]);
+        proto_index = vif_fat_flow_get_proto_index(proto);
+
+        vif->vif_fat_flow_config_size[proto_index]++;
+    }
+
+    /*
+     * ...and then use that information to allocate the array that holds the
+     * configuration
+     */
+    for (i = 0; i < VIF_FAT_FLOW_MAXPROTO_INDEX; i++) {
+        if (vif->vif_fat_flow_config_size[i]) {
+            vif->vif_fat_flow_config[i] =
+                vr_zalloc(vif->vif_fat_flow_config_size[i] * sizeof(uint16_t));
+            if (!vif->vif_fat_flow_config[i])
+                return -ENOMEM;
+
+            /*
+             * reset the size so that we can make use of the variable as an
+             * index while storing ports
+             */
+            vif->vif_fat_flow_config_size[i] = 0;
+        }
+    }
+
+    /* loop through the request and add the new ports */
+    for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
+        add = true;
+
+        proto = VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]);
+        port = VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]);
+        proto_index = vif_fat_flow_get_proto_index(proto);
+        if (proto_index == VIF_FAT_FLOW_NOPROTO_INDEX)
+            port = proto;
+
+
+        /* store the port in the protocol specific config */
+        if (vif->vif_fat_flow_config[proto_index]) {
+            size = vif->vif_fat_flow_config_size[proto_index]++;
+            vif->vif_fat_flow_config[proto_index][size] = port;
+        }
+
+        /*
+         * strike out the common ports with the old configuration in the
+         * old configuration so that we can delete the absentees in the
+         * new configuration and not add ones that were already present
+         * in the old configuration
+         */
+        for (j = 0; j < old_fat_flow_config_sizes[proto_index]; j++) {
+            if (vif_old_fat_flow_config[proto_index][j] == port) {
+                /* already present in the old configuration. hence no additon */
+                vif_old_fat_flow_config[proto_index][j] = 0;
+                add = false;
+                break;
+            }
+        }
+
+        /* add the new one... */
+        if (add) {
+            ret = __vif_fat_flow_add(vif, proto, port);
+            if (ret)
+                return ret;
+        }
+    }
+
+    /* ..and finally delete the old configuration */
+    for (i = 0; i < VIF_FAT_FLOW_MAXPROTO_INDEX; i++) {
+        for (j = 0; j < old_fat_flow_config_sizes[i]; j++) {
+            if (vif_old_fat_flow_config[i] && vif_old_fat_flow_config[i][j])
+                __vif_fat_flow_delete(vif, i, vif_old_fat_flow_config[i][j]);
+        }
+
+        if (old_fat_flow_config_sizes[i] && vif_old_fat_flow_config[i]) {
+            vr_free(vif_old_fat_flow_config[i]);
+            vif_old_fat_flow_config[i] = NULL;
+        }
+    }
+
+    return 0;
+}
+
+static bool
+vif_fat_flow_port_is_set(struct vr_interface *vif, uint8_t proto_index,
+        uint16_t port)
+{
+    unsigned int row, column, byte, bit;
+
+    row = proto_index;
+    column = port / VIF_FAT_FLOW_BITMAP_SIZE;
+
+    if (vif->vif_fat_flow_ports[row]) {
+        if (vif->vif_fat_flow_ports[row][column]) {
+            byte = (port % VIF_FAT_FLOW_BITMAP_SIZE) / 8;
+            bit = (port % VIF_FAT_FLOW_BITMAP_SIZE) % 8;
+            if (vif->vif_fat_flow_ports[row][column][byte] &
+                    (1 << bit))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+fat_flow_port_mask_t
+vif_fat_flow_lookup(struct vr_interface *vif, uint8_t proto,
+        uint16_t sport, uint16_t dport)
+{
+    unsigned int proto_index;
+    uint16_t h_sport, h_dport;
+    bool sport_set = false, dport_set = false;
+
+    proto_index = vif_fat_flow_get_proto_index(proto);
+    if (!vif->vif_fat_flow_config[proto_index])
+        return NO_PORT_MASK;
+
+    if (proto_index == VIF_FAT_FLOW_NOPROTO_INDEX) {
+        h_sport = h_dport = proto;
+    } else {
+        h_sport = ntohs(sport);
+        h_dport = ntohs(dport);
+    }
+
+    sport_set = vif_fat_flow_port_is_set(vif, proto_index, h_sport);
+    dport_set = vif_fat_flow_port_is_set(vif, proto_index, h_dport);
+    if (sport_set && dport_set) {
+        if (proto_index == VIF_FAT_FLOW_NOPROTO_INDEX) {
+            return ALL_PORT_MASK;
+        } else if (h_dport <= h_sport) {
+            return SOURCE_PORT_MASK;
+        } else {
+            return DESTINATION_PORT_MASK;
+        }
+    } else if (sport_set) {
+        return DESTINATION_PORT_MASK;
+    } else if (dport_set) {
+        return SOURCE_PORT_MASK;
+    }
+
+    return NO_PORT_MASK;
 }
 
 

@@ -256,9 +256,10 @@ void
 vr_interface_req_process(void *s)
 {
     char name[50];
-    vr_interface_req *req = (vr_interface_req *)s;
-    unsigned int printed = 0;
     int platform = get_platform();
+    unsigned int printed = 0, i;
+
+    vr_interface_req *req = (vr_interface_req *)s;
 
     if (add_set)
         vr_ifindex = req->vifr_idx;
@@ -332,7 +333,29 @@ vr_interface_req_process(void *s)
     printf("TX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors);
+    if (req->vifr_fat_flow_protocol_port_size) {
+        vr_interface_print_head_space();
+        printed = 0;
+        printed += printf("FatFlows: ");
+        for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
+            printed += printf("%d:%d",
+                    VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]),
+                    VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]));
+            if (i == (req->vifr_fat_flow_protocol_port_size - 1)) {
+                printf("\n");
+            } else if (printed > 68) {
+                printf("\n");
+                printed = 0;
+                vr_interface_print_head_space();
+                /* %12 corresponds to "ComboFlows: " */
+                printed += printf("%12c", ' ');
+            } else {
+                printf(", ");
+            }
+        }
+    }
     printf("\n");
+
 
     if (list_set)
         dump_marker = req->vifr_idx;

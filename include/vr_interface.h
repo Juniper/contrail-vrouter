@@ -9,6 +9,7 @@
 #include "vr_defs.h"
 #include "vr_types.h"
 #include "vr_htable.h"
+#include "vr_flow.h"
 
 /*
  * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
@@ -141,6 +142,19 @@ struct vr_vrf_assign {
     unsigned int va_nh_id;
 };
 
+#define VIF_FAT_FLOW_NUM_BITMAPS    (64)
+#define VIF_FAT_FLOW_BITMAP_SIZE    (1024)
+#define VIF_FAT_FLOW_BITMAP_BYTES   (VIF_FAT_FLOW_BITMAP_SIZE / 8)
+
+#define VIF_FAT_FLOW_NOPROTO_INDEX  0
+#define VIF_FAT_FLOW_TCP_INDEX      1
+#define VIF_FAT_FLOW_UDP_INDEX      2
+#define VIF_FAT_FLOW_SCTP_INDEX     3
+#define VIF_FAT_FLOW_MAXPROTO_INDEX 4
+
+#define VIF_FAT_FLOW_PORT(p_p)      ((p_p) && 0xFFFF)
+#define VIF_FAT_FLOW_PROTOCOL(p_p)  (((p_p) >> 16) & 0xFF)
+
 struct vr_interface {
     unsigned short vif_type;
     unsigned short vif_vrf;
@@ -168,6 +182,13 @@ struct vr_interface {
      * entries is also vital for table_users calculation.
      */
     struct vr_vrf_assign *vif_vrf_table;
+    uint8_t **vif_fat_flow_ports[VIF_FAT_FLOW_MAXPROTO_INDEX];
+    /* 
+     * one for tcp, another for udp, one for sctp and one for
+     * everything else
+     */
+    uint16_t *vif_fat_flow_config[VIF_FAT_FLOW_MAXPROTO_INDEX];
+    uint16_t vif_fat_flow_config_size[VIF_FAT_FLOW_MAXPROTO_INDEX];
 
     void *vif_os;
     int (*vif_send)(struct vr_interface *, struct vr_packet *, void *);
@@ -253,5 +274,6 @@ extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
-
+extern fat_flow_port_mask_t vif_fat_flow_lookup(struct vr_interface *,
+        uint8_t, uint16_t, uint16_t);
 #endif /* __VR_INTERFACE_H__ */

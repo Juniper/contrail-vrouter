@@ -306,6 +306,13 @@ struct vr_flow_trap_arg {
     struct vr_flow_stats vfta_stats;
 };
 
+typedef enum {
+    NO_PORT_MASK,
+    SOURCE_PORT_MASK,
+    DESTINATION_PORT_MASK,
+    ALL_PORT_MASK,
+} fat_flow_port_mask_t;
+
 struct vr_packet;
 struct vrouter;
 
@@ -339,5 +346,7 @@ int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
+fat_flow_port_mask_t vr_flow_fat_flow_lookup(struct vrouter *,
+        struct vr_packet *, uint16_t, uint16_t, uint16_t);
 
 #endif /* __VR_FLOW_H__ */
