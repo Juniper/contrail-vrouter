@@ -693,8 +693,8 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
                                           struct vr_ip6 *ipv6_hdr)
 {
     uint64_t *ip_addr_ptr;
-    uint32_t *l4_ptr;
-    uint32_t hash = 0, l4_off = 8;
+    uint32_t *l4_ptr = NULL;
+    uint32_t hash = 0;
     unsigned char ip_proto, i;
 
     if (likely(ipv4_hdr != NULL)) {
@@ -709,12 +709,7 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
         hash = rte_hash_crc_8byte(*ip_addr_ptr, hash);
 
         ip_proto = ipv4_hdr->ip_proto;
-
-        /**
-         * Offset to L4 = src addr + dst addr + options len. It's already
-         * 8 bytes, so increase by length of the options field, if present.
-         */
-        l4_off += (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER - sizeof(struct vr_ip);
+        l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER);
     } else if (ipv6_hdr != NULL) {
         /**
          * Both source and destination IPv6 addresses are 16-bytes long,
@@ -723,39 +718,26 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
          * to the middle, and from the middle to the end. In the header, first
          * comes source address, which is followed by destination address. This
          * lets us to set the pointer to the beginning of source address and
-         * move it by 32 bits after hash is calculated.
+         * move it by 64 bits after hash is calculated.
          */
         for (i = 0; i < 4; i++) {
             ip_addr_ptr = (uint64_t *)((uintptr_t)ipv6_hdr +
-                            offsetof(struct ipv6_hdr, src_addr) + 4*i);
+                            offsetof(struct ipv6_hdr, src_addr) + 8*i);
             hash = rte_hash_crc_8byte(*ip_addr_ptr, hash);
         }
 
         ip_proto = ipv6_hdr->ip6_nxt;
-
-        /**
-         * Offset to L4 remains 8 bytes (a half of destination address).
-         * In case of extended header, L4 is not hashed.
-         */
+         /* In case of extended header L4 is not hashed. */
+        l4_ptr = (uint32_t *)((uintptr_t)ipv6_hdr + sizeof(struct ipv6_hdr));
     } else {
         return 0;
     }
 
     switch (ip_proto) {
     case VR_IP_PROTO_TCP:
-#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
-        mbuf->packet_type |= RTE_PTYPE_L4_TCP;
-#endif
-        l4_ptr = (uint32_t *)((uintptr_t)ip_addr_ptr + l4_off);
-
         hash = rte_hash_crc_4byte(*l4_ptr, hash);
         break;
     case VR_IP_PROTO_UDP:
-#if (RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0))
-        mbuf->packet_type |= RTE_PTYPE_L4_UDP;
-#endif
-        l4_ptr = (uint32_t *)((uintptr_t)ip_addr_ptr + l4_off);
-
         hash = rte_hash_crc_4byte(*l4_ptr, hash);
         break;
     }
@@ -856,7 +838,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
                 gre_udp_encap = gre_hdr->gre_proto;
 
                 /*
-                 * mbuf->ol_flags & PKT_RX_RSS_HASH is mistakenaly set
+                 * mbuf->ol_flags & PKT_RX_RSS_HASH is mistakenly set
                  * by the NIC driver for MPLS over GRE packets. It is
                  * removed here and will be set after we perform hashing.
                  */
