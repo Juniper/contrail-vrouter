@@ -156,7 +156,7 @@ struct vr_flow_stats {
 
 #define VR_MAX_FLOW_QUEUE_ENTRIES   3U
 
-#define PN_FLAG_LABEL_IS_VNID       0x1
+#define PN_FLAG_LABEL_IS_VXLAN_ID   0x1
 #define PN_FLAG_TO_ME               0x2
 
 struct vr_packet_node {
