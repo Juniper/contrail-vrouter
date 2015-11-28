@@ -848,6 +848,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
     unsigned short nh_id;
 
     struct vr_icmp *icmph;
+    fat_flow_port_mask_t port_mask;
 
     t_hdr = (unsigned short *)((char *)ip + (ip->ip_hl * 4));
 
@@ -868,13 +869,33 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
             sport = 0;
             dport = icmph->icmp_type;
         }
+
     } else if ((ip->ip_proto == VR_IP_PROTO_TCP) ||
-            (ip->ip_proto == VR_IP_PROTO_UDP)) {
+            (ip->ip_proto == VR_IP_PROTO_UDP))  {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
     } else {
         sport = 0;
         dport = 0;
+    }
+
+    port_mask = vr_flow_fat_flow_lookup(router, pkt, ip->ip_proto,
+            sport, dport);
+    switch (port_mask) {
+    case SOURCE_PORT_MASK:
+        sport = 0;
+        break;
+
+    case DESTINATION_PORT_MASK:
+        dport = 0;
+        break;
+
+    case ALL_PORT_MASK:
+        sport = dport = 0;
+        break;
+
+    default:
+        break;
     }
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);

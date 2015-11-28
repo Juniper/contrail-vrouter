@@ -1149,6 +1149,27 @@ __vr_flow_forward(flow_result_t result, struct vr_packet *pkt,
     return forward;
 }
 
+fat_flow_port_mask_t
+vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
+        uint16_t l4_proto, uint16_t sport, uint16_t dport)
+{
+    struct vr_nexthop *nh;
+    struct vr_interface *vif_l = NULL;
+
+    if (vif_is_virtual(pkt->vp_if)) {
+        vif_l = pkt->vp_if;
+    } else if (vif_is_fabric(pkt->vp_if)) {
+        if ((nh = pkt->vp_nh) && (nh->nh_flags & NH_FLAG_VALID)) {
+            vif_l = nh->nh_dev;
+        }
+    }
+
+    if (!vif_l)
+        return NO_PORT_MASK;
+
+    return vif_fat_flow_lookup(vif_l, l4_proto, sport, dport);
+}
+
 bool
 vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
