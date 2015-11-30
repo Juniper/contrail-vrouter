@@ -1688,6 +1688,17 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
 
     fe->fe_flags = VR_FLOW_FLAG_MASK(req->fr_flags);
     if (new_flow) {
+
+        req->fr_flow_bytes = fe->fe_stats.flow_bytes;
+        req->fr_flow_packets = fe->fe_stats.flow_packets;
+        req->fr_flow_stats_oflow = (fe->fe_stats.flow_bytes_oflow |
+                (fe->fe_stats.flow_packets_oflow << 16));
+
+        if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW) {
+            if (fe->fe_stats.flow_packets || fe->fe_stats.flow_packets_oflow)
+                memset(&fe->fe_stats, 0, sizeof(fe->fe_stats));
+        }
+
         if (fe->fe_flags & VR_RFLOW_VALID) {
             rfe = vr_get_flow_entry(router, fe->fe_rflow);
             if (rfe) {
@@ -1702,7 +1713,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     vr_flow_udp_src_port(router, fe);
 
     if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
-        fe->fe_flags ^= VR_FLOW_FLAG_NEW_FLOW;
+        fe->fe_flags &= ~VR_FLOW_FLAG_NEW_FLOW;
 
     ret = vr_flow_schedule_transition(router, req, fe);
 
