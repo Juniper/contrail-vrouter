@@ -213,7 +213,7 @@ struct vr_interface {
     unsigned char *(*vif_set_rewrite)(struct vr_interface *, struct vr_packet *,
             struct vr_forwarding_md *, unsigned char *, unsigned short);
     uint8_t **vif_fat_flow_ports[VIF_FAT_FLOW_MAXPROTO_INDEX];
-    /* 
+    /*
      * one for tcp, another for udp, one for sctp and one for
      * everything else
      */

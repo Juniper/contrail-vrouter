@@ -2566,7 +2566,10 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
     bool add;
 
     if (!req->vifr_fat_flow_protocol_port_size) {
-        return 0;
+        if (!memcmp(vif->vif_fat_flow_config_size, old_fat_flow_config_sizes,
+                sizeof(old_fat_flow_config_sizes))) {
+            return 0;
+        }
     } else {
         if (!req->vifr_fat_flow_protocol_port)
             return -EINVAL;

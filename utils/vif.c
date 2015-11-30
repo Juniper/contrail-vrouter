@@ -490,8 +490,8 @@ list_get_print(vr_interface_req *req)
                 printf("\n");
                 printed = 0;
                 vr_interface_print_head_space();
-                /* %12 corresponds to "ComboFlows: " */
-                printed += printf("%12c", ' ');
+                /* %10 corresponds to "FatFlows: " */
+                printed += printf("%10c", ' ');
             } else {
                 printf(", ");
             }
