@@ -183,7 +183,7 @@ struct vr_interface {
      */
     struct vr_vrf_assign *vif_vrf_table;
     uint8_t **vif_fat_flow_ports[VIF_FAT_FLOW_MAXPROTO_INDEX];
-    /* 
+    /*
      * one for tcp, another for udp, one for sctp and one for
      * everything else
      */
