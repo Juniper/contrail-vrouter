@@ -816,7 +816,7 @@ dpdk_get_ether_header_len(const void *data)
 {
     struct ether_hdr *eth = (struct ether_hdr *)data;
 
-    if (ntohs(eth->ether_type) == ETHER_TYPE_VLAN)
+    if (eth->ether_type == rte_cpu_to_be_16(ETHER_TYPE_VLAN))
         return sizeof(struct ether_hdr) + sizeof(struct vlan_hdr);
     else
         return sizeof(struct ether_hdr);
@@ -895,7 +895,7 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
 
         uint16_t eth_hlen = dpdk_get_ether_header_len(outer_header_ptr);
         struct vr_ip *outer_ip = (struct vr_ip *)(outer_header_ptr + eth_hlen);
-        outer_ip->ip_len = htons(rte_pktmbuf_pkt_len(m) - eth_hlen);
+        outer_ip->ip_len = rte_cpu_to_be_16(rte_pktmbuf_pkt_len(m) - eth_hlen);
         m->l2_len = mbuf_in->l2_len;
         m->l3_len = mbuf_in->l3_len;
 
@@ -908,7 +908,8 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
             unsigned header_len = outer_ip->ip_hl * 4;
             struct vr_udp *udp = (struct vr_udp *)((char *)outer_ip +
                     header_len);
-            udp->udp_length = htons(ntohs(outer_ip->ip_len) - header_len);
+            udp->udp_length = rte_cpu_to_be_16(
+                    rte_be_to_cpu_16(outer_ip->ip_len) - header_len);
         }
 
         /* If it is necessary to calculate (in software) IP header checksum.

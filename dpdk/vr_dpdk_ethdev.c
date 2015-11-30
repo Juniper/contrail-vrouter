@@ -785,10 +785,10 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
     if (unlikely(mbuf_data_len < pull_len))
         return -1;
 
-    eth_proto = rte_be_to_cpu_16(eth_hdr->eth_proto);
+    eth_proto = eth_hdr->eth_proto;
 
     /* Skip VLAN tag. It may be present if we handle tagged packet from VM. */
-    while (eth_proto == VR_ETH_PROTO_VLAN) {
+    while (eth_proto == rte_cpu_to_be_16(VR_ETH_PROTO_VLAN)) {
         if (unlikely(mbuf_data_len < pull_len + VR_VLAN_HLEN))
             return -1;
 
@@ -800,11 +800,10 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
         }
 
         eth_proto = ((struct vr_vlan_hdr *)((uintptr_t)eth_hdr + pull_len))->vlan_proto;
-        eth_proto = rte_be_to_cpu_16(eth_proto);
         pull_len += VR_VLAN_HLEN;
     }
 
-    if (likely(eth_proto == VR_ETH_PROTO_IP)) {
+    if (likely(eth_proto == rte_cpu_to_be_16(VR_ETH_PROTO_IP))) {
         ipv4_hdr = (struct vr_ip *)((uintptr_t)eth_hdr + pull_len);
 
         if (unlikely(mbuf_data_len < pull_len + sizeof(struct vr_ip)))
@@ -922,7 +921,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             }
             /* Go to hashing */
         }
-    } else if (eth_proto == VR_ETH_PROTO_IP6) {
+    } else if (eth_proto == rte_cpu_to_be_16(VR_ETH_PROTO_IP6)) {
         ipv6_hdr = (struct vr_ip6 *)((uintptr_t)eth_hdr + pull_len);
 
         if (unlikely(mbuf_data_len < pull_len + sizeof(struct vr_ip6)))

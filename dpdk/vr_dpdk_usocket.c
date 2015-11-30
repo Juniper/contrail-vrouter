@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
+#include <rte_byteorder.h>
 #include <rte_errno.h>
 #include <rte_hexdump.h>
 #include <rte_timer.h>
@@ -1046,7 +1047,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
     switch (usockp->usock_type) {
     case TCP:
         sin.sin_family = AF_INET;
-        sin.sin_port = htons(VR_NETLINK_TCP_PORT);
+        sin.sin_port = rte_cpu_to_be_16(VR_NETLINK_TCP_PORT);
         sin.sin_addr.s_addr = INADDR_ANY;
         addr = (struct sockaddr *)&sin;
         addrlen = sizeof(sin);

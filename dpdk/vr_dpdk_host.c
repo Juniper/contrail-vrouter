@@ -860,12 +860,12 @@ dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
                 opt_ptr[opt_off+3] = max_mss & 0xff;
 
                 /* Recalculate checksum */
-                csum = (unsigned short)(~ntohs(tcph->check));
+                csum = (unsigned short)(~rte_cpu_to_be_16(tcph->check));
                 csum = csum + (unsigned short)~pkt_mss;
                 csum = (csum & 0xffff) + (csum >> 16);
                 csum += max_mss;
                 csum = (csum & 0xffff) + (csum >> 16);
-                tcph->check = htons(~((unsigned short)csum));
+                tcph->check = rte_cpu_to_be_16(~((unsigned short)csum));
             }
             return;
 
@@ -912,7 +912,7 @@ dpdk_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         /*
          * If this is a fragment and not the first one, it can be ignored
          */
-        if (ip4h->ip_frag_off & htons(IP_OFFMASK))
+        if (ip4h->ip_frag_off & rte_cpu_to_be_16(IP_OFFMASK))
             goto out;
     } else if (pkt->vp_type == VP_TYPE_IP6) {
         iph_len = offset = sizeof(struct vr_ip6);
