@@ -522,6 +522,7 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     struct rte_kni_conf kni_conf;
     struct rte_kni_ops kni_ops;
     struct rte_kni *kni;
+    struct rte_config *rte_conf = rte_eal_get_configuration();
 
     if (!vr_dpdk.kni_inited) {
         /*
@@ -544,6 +545,19 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     kni_conf.id = dev_info.pci_dev->id;
     kni_conf.group_id = port_id;
     kni_conf.mbuf_size = VR_DPDK_MAX_PACKET_SZ;
+    /*
+     * Due to DPDK commit 41a6ebd, now to prevent packet reordering in KNI
+     * we have to bind KNI kernel thread to a first online unused CPU.
+     */
+    for (i = 0; i < RTE_MAX_LCORE; i++) {
+        if (lcore_config[i].detected
+                && rte_conf->lcore_role[VR_DPDK_FWD_LCORE_ID + i] == ROLE_OFF) {
+            kni_conf.force_bind = 1;
+            kni_conf.core_id = i;
+            RTE_LOG(INFO, VROUTER, "    bind KNI kernel thread to CPU %d\n", i);
+            break;
+        }
+    }
 
     /* KNI options
      *
