@@ -467,7 +467,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
     struct rte_mbuf *mbuf;
     int i, j, ret, retry;
     int nb_retry_lcores;
-    uint16_t dst_lcore_idx = 0, dst_fwd_lcore_idx = 0;
+    uint16_t dst_lcore_idx, dst_fwd_lcore_idx;
     uint32_t lcore_nb_pkts, chunk_nb_pkts, hashval;
     struct rte_mbuf *lcore_pkts[nb_dst_lcores][nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ];
     struct vr_interface_stats *stats;
@@ -503,16 +503,15 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
             hashval = 0;
 
         dst_lcore_idx = hashval % nb_dst_lcores;
+        dst_fwd_lcore_idx = dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID;
 
         /* put the mbuf to the burst */
         lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0]
                                                  & LCORE_RX_RING_NB_PKTS_MASK;
-
         RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
-             __func__, lcore_id, hashval, lcore_nb_pkts,
-            dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID);
-
+             __func__, lcore_id, hashval, lcore_nb_pkts, dst_fwd_lcore_idx);
         lcore_pkts[dst_lcore_idx][lcore_nb_pkts] = mbuf;
+
         /* increase number of packets in the burst */
         lcore_pkts[dst_lcore_idx][0] = (struct rte_mbuf *)(
                             (uintptr_t)lcore_pkts[dst_lcore_idx][0] + 1);
@@ -542,15 +541,13 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
                 if (io_lcore) {
                     /* IO lcore enqueue packets. */
                     ret = rte_ring_sp_enqueue_bulk(
-                            vr_dpdk.lcores[dst_fwd_lcore_idx]
-                                           ->lcore_io_rx_ring,
+                            vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring,
                             (void **)&lcore_pkts[dst_lcore_idx][0],
                             chunk_nb_pkts);
                 } else {
                     /* Other forwarding lcores enqueue packets. */
                     ret = rte_ring_mp_enqueue_bulk(
-                            vr_dpdk.lcores[dst_fwd_lcore_idx]
-                                           ->lcore_rx_ring,
+                            vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_rx_ring,
                             (void **)&lcore_pkts[dst_lcore_idx][0],
                             chunk_nb_pkts);
                 }
@@ -559,24 +556,21 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
                     if (unlikely(retry == VR_DPDK_RETRY_NUM - 1)) {
                         /* count out the header */
                         stats->vis_queue_ierrors += lcore_nb_pkts - 1;
-                        stats->vis_queue_ierrors_to_lcore[dst_fwd_lcore_idx] += lcore_nb_pkts - 1;
+                        stats->vis_queue_ierrors_to_lcore[dst_fwd_lcore_idx]
+                                                          += lcore_nb_pkts - 1;
 
                         if (io_lcore) {
                             RTE_LOG(DEBUG, VROUTER, "%s: lcore %u IO ring is full, dropping %u packets: %d/%d\n",
                                     __func__, dst_fwd_lcore_idx,
                                     lcore_nb_pkts,
-                                    rte_ring_count(vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx]
-                                        + VR_DPDK_FWD_LCORE_ID]->lcore_io_rx_ring),
-                                    rte_ring_free_count(vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx]
-                                        + VR_DPDK_FWD_LCORE_ID]->lcore_io_rx_ring));
+                                    rte_ring_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring),
+                                    rte_ring_free_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring));
                         } else {
                             RTE_LOG(DEBUG, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
                                     __func__, dst_fwd_lcore_idx,
                                     lcore_nb_pkts,
-                                    rte_ring_count(vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx]
-                                        + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring),
-                                    rte_ring_free_count(vr_dpdk.lcores[dst_lcore_idxs[dst_lcore_idx]
-                                        + VR_DPDK_FWD_LCORE_ID]->lcore_rx_ring));
+                                    rte_ring_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_rx_ring),
+                                    rte_ring_free_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_rx_ring));
                         }
 
                         /* ring is full, drop the packets */
