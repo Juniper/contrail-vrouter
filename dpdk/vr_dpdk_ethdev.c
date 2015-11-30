@@ -854,13 +854,19 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
              */
             udp_hdr = (struct vr_udp *)((uintptr_t)ipv4_hdr + ipv4_len);
 
-            if (unlikely(udp_hdr == NULL ||
-                    (mbuf_data_len < pull_len + sizeof(struct vr_udp))))
+            if (unlikely(mbuf_data_len < pull_len + sizeof(struct vr_udp)))
                 return -1;
 
             /*
              * If it is a packet from VM, it for sure will not be MPLS-over-UDP,
              * so go directly to hashing procedure.
+             */
+            /*
+             * TODO: we can't rely on RSS_HASH flag here, since there might be
+             * NICs which does not set the flag yet carry MPLSoUDP packets.
+             *
+             * Instead we have to check the vif type to make sure the packet is
+             * from a VM.
              */
             if (unlikely((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0))
                 return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
