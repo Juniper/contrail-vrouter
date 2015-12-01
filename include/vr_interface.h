@@ -43,6 +43,16 @@
 
 #define vif_needs_dev(vif)          ((vif->vif_type != VIF_TYPE_VIRTUAL_VLAN))
 
+/* DPDK definitions */
+#define vif_is_vm(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL) &&\
+                                    (vif->vif_transport == VIF_TRANSPORT_PMD))
+#define vif_is_namespace(vif)  ((vif->vif_type == VIF_TYPE_VIRTUAL) &&\
+                                    (vif->vif_transport == VIF_TRANSPORT_ETH))
+#define vif_is_agent(vif)      ((vif->vif_type == VIF_TYPE_AGENT) &&\
+                                    (vif->vif_transport == VIF_TRANSPORT_SOCKET))
+#define vif_is_monitoring(vif) (vif->vif_type == VIF_TYPE_MONITORING)
+
+
 #define VR_INTERFACE_NAME_LEN       64
 
 #define VIF_TRANSPORT_VIRTUAL       0
@@ -81,10 +91,6 @@
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
-#define VIF_TRANSPORT_VIRTUAL       0
-#define VIF_TRANSPORT_ETH           1
-#define VIF_TRANSPORT_PMD           2
-#define VIF_TRANSPORT_SOCKET        3
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)

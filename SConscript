@@ -135,7 +135,7 @@ if sys.platform != 'darwin':
         #    '-lrte_pmd_mlx4',
         #    '-lrte_pmd_ring',
         #    '-lrte_pmd_pcap',
-        #    '-lrte_pmd_af_packet',
+            '-lrte_pmd_af_packet',
             '-Wl,--end-group',
             '-Wl,--no-whole-archive'
         ]
