@@ -653,7 +653,8 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
     }
 
     /* update device bond information after the device has been configured */
-    dpdk_ethdev_bond_info_update(ethdev);
+    if (ethdev->ethdev_ptr->driver) /* af_packet has no driver and no bond info */
+        dpdk_ethdev_bond_info_update(ethdev);
 
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
