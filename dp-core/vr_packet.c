@@ -77,10 +77,14 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
     /* Note: iph is set for both ipv4 and ipv6 cases */
     if (iph) {
         if (vr_ip_is_ip6(iph)) {
-            ip_proto = ip6h->ip6_nxt;
-            hlen = sizeof(struct vr_ip6);
-            thdr_valid = true;
-        } else {
+            if (ip6h) {
+                ip_proto = ip6h->ip6_nxt;
+                hlen = sizeof(struct vr_ip6);
+                thdr_valid = true;
+            } else {
+                return PKT_RET_UNHANDLED;
+            }
+        } else if (vr_ip_is_ip4(iph)) {
             ip_proto = iph->ip_proto;
             /*
              * Account for IP options
@@ -90,6 +94,8 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                 hlen = iph->ip_hl * 4;
                 pull_len += (hlen - sizeof(struct vr_ip));
             }
+        } else {
+            return PKT_RET_UNHANDLED;
         }
 
         if (thdr_valid) {
@@ -180,7 +186,7 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
             } else if (iph->ip_proto == VR_IP_PROTO_UDP) {
                 th_csum = ((struct vr_udp *)
                             ((unsigned char *)iph + hlen))->udp_csum;
-            } else if (ip_proto == VR_IP_PROTO_ICMP6) {
+            } else if ((ip_proto == VR_IP_PROTO_ICMP6) && ip6h) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
@@ -255,8 +261,10 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
             if (vr_ip_is_ip6(iph)) {
                 ip6h = (struct vr_ip6 *)iph;
                 pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip6);
-            } else {
+            } else if (vr_ip_is_ip4(iph)) {
                 pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
+            } else {
+                return PKT_RET_UNHANDLED;
             }
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
             /* L2 Multicast packet with control information and

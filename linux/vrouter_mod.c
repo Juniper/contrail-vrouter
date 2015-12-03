@@ -839,7 +839,7 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         ip6h = (struct vr_ip6 *) (skb->head + pkt->vp_data);
         proto = ip6h->ip6_nxt;
         hlen = sizeof(struct vr_ip6);
-    } else {
+    } else if (vr_ip_is_ip4(iph)) {
         /*
          * If this is a fragment and not the first one, it can be ignored
          */
@@ -850,6 +850,8 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
         proto = iph->ip_proto;
         hlen = iph->ip_hl * 4;
         opt_len = hlen - sizeof(struct vr_ip);
+    } else {
+        goto out;
     }
 
 
@@ -1098,6 +1100,8 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                       &pull_len);
     if (parse_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
+    } else if (parse_ret == PKT_RET_UNHANDLED) {
+        goto unhandled;
     }
 
     if ((skb->end - skb->tail) < pull_len) {
@@ -1368,6 +1372,8 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                       &pull_len);
     if (parse_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
+    } else if (helper_ret == PKT_RET_UNHANDLED) {
+        goto unhandled;
     }
 
     /* See whether we can accomodate the whole packet we are pulling to
@@ -1754,7 +1760,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                     tcph = (struct tcphdr *) ((char *) iph +  hlen);
                 }
                 th_csum = tcph->check;
-            } else if (l4_proto == VR_IP_PROTO_ICMP) {
+            } else if (!ip6h && (l4_proto == VR_IP_PROTO_ICMP)) {
                 icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
                 th_csum = icmph->icmp_csum;
                 if (vr_icmp_error(icmph)) {
@@ -1812,7 +1818,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             } else if (l4_proto == VR_IP_PROTO_UDP) {
                 th_csum = ((struct udphdr *)
                         ((unsigned char *)iph + hlen))->check;
-            } else if (l4_proto == VR_IP_PROTO_ICMP6) {
+            } else if (ip6h && (l4_proto == VR_IP_PROTO_ICMP6)) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */

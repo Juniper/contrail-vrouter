@@ -787,13 +787,16 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
         if (network_off) {
             ip = (struct vr_ip *)(pkt_data_at_offset(pkt, network_off));
-            if (!vr_ip_is_ip6(ip)) {
+            if (vr_ip_is_ip4(ip)) {
                 transport_off = network_off + (ip->ip_hl * 4);
                 proto = ip->ip_proto;
-            } else {
+            } else if (vr_ip_is_ip6(ip)) {
                 ip6 = (struct vr_ip6 *)ip;
                 transport_off = network_off + sizeof(struct vr_ip6);
                 proto = ip6->ip6_nxt;
+            } else {
+                lh_pfree_skb(skb, VP_DROP_INVALID_PROTOCOL);
+                return 0;
             }
 
             skb_set_network_header(skb, (network_off - skb_headroom(skb)));
@@ -2032,10 +2035,14 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
             goto drop;
         }
     } else {
-        if (vr_ip_is_ip6((struct vr_ip *)pkt_data(pkt)))
-            pkt->vp_type = VP_TYPE_IP6;
-        else
+        if (vr_ip_is_ip4((struct vr_ip *)pkt_data(pkt))) {
             pkt->vp_type = VP_TYPE_IP;
+        } else if (vr_ip_is_ip6((struct vr_ip *)pkt_data(pkt))) {
+            pkt->vp_type = VP_TYPE_IP6;
+        } else {
+            drop_reason = VP_DROP_INVALID_PROTOCOL;
+            goto drop;
+        }
 
         pkt_set_network_header(pkt, pkt->vp_data);
         pkt_set_inner_network_header(pkt, pkt->vp_data);

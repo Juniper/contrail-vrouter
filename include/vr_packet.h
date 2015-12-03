@@ -451,12 +451,19 @@ vr_eth_proto_to_pkt_type(unsigned short eth_proto)
 }
 
 static inline bool
+vr_ip_is_ip4(struct vr_ip *iph)
+{
+    if ((iph->ip_version & 0xf) == 0x4)
+        return true;
+    return false;
+}
+
+static inline bool
 vr_ip_is_ip6(struct vr_ip *iph)
 {
     if ((iph->ip_version & 0xf) == 0x6)
         return true;
-    else
-        return false;
+    return false;
 }
 static inline unsigned char *pkt_network_header(struct vr_packet *);
 
@@ -478,7 +485,7 @@ vr_ip_fragment_tail(struct vr_ip *iph)
     bool more = (frag & VR_IP_MF) ? true : false;
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
-    if (vr_ip_is_ip6(iph))
+    if (!vr_ip_is_ip4(iph))
         return false;
 
     if (!more && offset)
@@ -528,7 +535,7 @@ vr_ip_fragment_head(struct vr_ip *iph)
     bool more = (frag & VR_IP_MF) ? true : false;
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
-    if (vr_ip_is_ip6(iph))
+    if (!vr_ip_is_ip4(iph))
         return false;
 
     if (more && !offset)
@@ -544,7 +551,7 @@ vr_ip_fragment(struct vr_ip *iph)
     bool more = (frag & VR_IP_MF) ? true : false;
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
-    if (vr_ip_is_ip6(iph))
+    if (!vr_ip_is_ip4(iph))
         return false;
 
     if (offset || more)
@@ -559,7 +566,7 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
     unsigned short frag = ntohs(iph->ip_frag_off);
     unsigned short offset = frag & VR_IP_FRAG_OFFSET_MASK;
 
-    if (vr_ip_is_ip6(iph))
+    if (!vr_ip_is_ip4(iph))
         return true;
 
     if (offset)
