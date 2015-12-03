@@ -52,6 +52,14 @@
 #define LISTING_NUM_OF_LINE  3
 #define MAX_OUTPUT_IF 32
 
+#define SET_TIMEOUT_MS 1000
+#define CORRECT_ERROR_CNT(cur_error_cnt_ptr, prev_error_cnt_ptr) \
+    if (*((uint64_t *) cur_error_cnt_ptr) < *((uint64_t *) prev_error_cnt_ptr)) { \
+       *((uint64_t *) cur_error_cnt_ptr) = *((uint64_t *) prev_error_cnt_ptr); }
+
+#define COMPUTE_DIFFERENCE(new, old, counter, diff_time_ms) \
+    new->counter = ((new->counter - old->counter) * 1000)/diff_time_ms
+
 #define VHOST_TYPE_STRING           "vhost"
 #define AGENT_TYPE_STRING           "agent"
 #define PHYSICAL_TYPE_STRING        "physical"
@@ -358,23 +366,12 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
 {
     unsigned int i;
 
-    if (print_always) {
-        vr_interface_print_head_space();
-        printf("%s to lcore", title);
-        for (i = 0; i < size; i++) {
-            printf(" %" PRId64 , errors[i]);
-        }
-        printf("\n");
-
-    } else {
-        for (i = 0; i < size; i++) {
-            if (errors[i]) {
-                vr_interface_print_head_space();
-                vr_interface_core_print();
-                printf("%s to lcore %d errors:%" PRId64 "", title, i, errors[i]);
-            }
-        }
+    vr_interface_print_head_space();
+    printf("%s errors to lcore", title);
+    for (i = 0; i < size; i++) {
+        printf(" %" PRId64 , errors[i]);
     }
+    printf("\n");
 }
 
 static void
@@ -539,7 +536,7 @@ list_rate_print(vr_interface_req *req)
     tx_errors = (req->vifr_dev_oerrors + req->vifr_port_oerrors + req->vifr_queue_oerrors
                  + req->vifr_oerrors);
 
-    printed = printf("%s: %s", vr_if_transport_string(req),
+    printed = printf("%s: %s", vr_get_if_type_string(req->vifr_type),
                         req->vifr_name);
     for (; printed < 30; printed++)
         printf(" ");
@@ -547,11 +544,11 @@ list_rate_print(vr_interface_req *req)
     for (; printed < 24; printed++)
         printf(" ");
 
-    printed = printf("%-7lu  %-7ld", rx_errors, req->vifr_ipackets);
+    printed = printf("%-7"PRIu64 "  %-7"PRIu64, rx_errors, req->vifr_ipackets);
     for (; printed < 30; printed++)
         printf(" ");
 
-    printed = printf("%-7ld  %-7ld", tx_errors, req->vifr_opackets);
+    printed = printf("%-7"PRIu64 "  %-7"PRIu64, tx_errors, req->vifr_opackets);
     for (; printed < 25; printed++)
         printf(" ");
     printf("\n\n\n");
@@ -678,7 +675,7 @@ vhost_create(void)
     struct vn_if vhost;
     struct nl_response *resp;
 
-    bzero(&vhost, sizeof(vhost));
+    memset(&vhost, 0, sizeof(vhost));
     strncpy(vhost.if_name, if_name, sizeof(vhost.if_name) - 1);
     strncpy(vhost.if_kind, VHOST_KIND, sizeof(vhost.if_kind) - 1);
     memcpy(vhost.if_mac, vr_ifmac, sizeof(vhost.if_mac));
@@ -1138,73 +1135,70 @@ static void
 rate_stats_diff(vr_interface_req *req, vr_interface_req *prev_req)
 {
     struct timeval now;
-    int64_t diff_ms = 0, i = 0;
+    int64_t diff_ms = 0;
+    unsigned int i = 0;
 
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
     assert(diff_ms > 0);
+
+    /* TODO:
+     * Sometimes error counters have decreasing trend.
+     *
+     * Workaround:
+     * If previous value is bigger than current value, then we assign
+     * previous value to current value => difference is equal to 0
+     */
+
+    CORRECT_ERROR_CNT(&(req->vifr_dev_ierrors), &(prev_req->vifr_dev_ierrors));
+    CORRECT_ERROR_CNT(&(req->vifr_port_ierrors), &(prev_req->vifr_port_ierrors));
+    CORRECT_ERROR_CNT(&(req->vifr_queue_ierrors), &(prev_req->vifr_queue_ierrors));
+    CORRECT_ERROR_CNT(&(req->vifr_ierrors), &(prev_req->vifr_ierrors));
+
+    CORRECT_ERROR_CNT(&(req->vifr_dev_oerrors), &(prev_req->vifr_dev_oerrors));
+    CORRECT_ERROR_CNT(&(req->vifr_port_oerrors), &(prev_req->vifr_port_oerrors));
+    CORRECT_ERROR_CNT(&(req->vifr_queue_oerrors), &(prev_req->vifr_queue_oerrors));
+    CORRECT_ERROR_CNT(&(req->vifr_oerrors), &(prev_req->vifr_oerrors));
+
     /* RX */
-    req->vifr_dev_ipackets =
-        ((req->vifr_dev_ipackets - prev_req->vifr_dev_ipackets) * 1000)/diff_ms;
-    req->vifr_dev_ibytes =
-        ((req->vifr_dev_ibytes - prev_req->vifr_dev_ibytes) * 1000)/diff_ms;
-    req->vifr_dev_ierrors =
-        ((req->vifr_dev_ierrors - prev_req->vifr_dev_ierrors) * 1000)/diff_ms;
-    req->vifr_dev_inombufs =
-        ((req->vifr_dev_inombufs - prev_req->vifr_dev_inombufs) * 1000)/diff_ms;
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_ibytes, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_ipackets, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_ierrors, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_inombufs, diff_ms);
 
-    req->vifr_port_ipackets =
-        ((req->vifr_port_ipackets - prev_req->vifr_port_ipackets) * 1000)/diff_ms;
-    req->vifr_port_ierrors =
-        ((req->vifr_port_ierrors - prev_req->vifr_port_ierrors) * 1000)/diff_ms;
-    req->vifr_port_isyscalls =
-        ((req->vifr_port_isyscalls - prev_req->vifr_port_isyscalls) * 1000)/diff_ms;
-    req->vifr_port_inombufs =
-        ((req->vifr_port_inombufs - prev_req->vifr_port_inombufs) * 1000)/diff_ms;
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_isyscalls, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_ipackets, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_ierrors, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_inombufs, diff_ms);
 
-    req->vifr_queue_ipackets =
-        ((req->vifr_queue_ipackets - prev_req->vifr_queue_ipackets) * 1000)/diff_ms;
-    req->vifr_queue_ierrors =
-        ((req->vifr_queue_ierrors - prev_req->vifr_queue_ierrors) * 1000)/diff_ms;
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_queue_ierrors, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_queue_ipackets, diff_ms);
 
     for (i = 0; i < req->vifr_queue_ierrors_to_lcore_size; i++) {
-        req->vifr_queue_ierrors_to_lcore[i] =
-            ((req->vifr_queue_ierrors_to_lcore[i] -
-                prev_req->vifr_queue_ierrors_to_lcore[i]) * 1000)/diff_ms;
+        COMPUTE_DIFFERENCE(req, prev_req, vifr_queue_ierrors_to_lcore[i], diff_ms);
     }
-    req->vifr_ipackets =
-        ((req->vifr_ipackets - prev_req->vifr_ipackets) * 1000)/diff_ms;
-    req->vifr_ibytes =
-        ((req->vifr_ibytes - prev_req->vifr_ibytes) * 1000)/diff_ms;
-    req->vifr_ierrors =
-        ((req->vifr_ierrors - prev_req->vifr_ierrors) * 1000)/diff_ms;
+
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_ibytes, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_ipackets, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_ierrors, diff_ms);
+
     /* TX */
-    req->vifr_opackets =
-        ((req->vifr_opackets - prev_req->vifr_opackets) * 1000)/diff_ms;
-    req->vifr_obytes =
-        ((req->vifr_obytes - prev_req->vifr_obytes) * 1000)/diff_ms;
-    req->vifr_oerrors =
-        ((req->vifr_oerrors - prev_req->vifr_oerrors) * 1000)/diff_ms;
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_obytes, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_opackets, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_oerrors, diff_ms);
 
-    req->vifr_queue_opackets =
-        ((req->vifr_queue_opackets - prev_req->vifr_queue_opackets) * 1000)/diff_ms;
-    req->vifr_queue_oerrors =
-        ((req->vifr_queue_oerrors - prev_req->vifr_queue_oerrors) * 1000)/diff_ms;
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_queue_oerrors, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_queue_opackets, diff_ms);
 
-    req->vifr_port_opackets =
-        ((req->vifr_port_opackets - prev_req->vifr_port_opackets) * 1000)/diff_ms;
-    req->vifr_port_oerrors =
-        ((req->vifr_port_oerrors - prev_req->vifr_port_oerrors) * 1000)/diff_ms;
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_osyscalls, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_opackets, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_port_oerrors, diff_ms);
 
-    req->vifr_dev_opackets =
-        ((req->vifr_dev_opackets - prev_req->vifr_dev_opackets  ) * 1000)/diff_ms;
-    req->vifr_dev_obytes =
-        ((req->vifr_dev_obytes - prev_req->vifr_dev_obytes) * 1000)/diff_ms;
-    req->vifr_dev_oerrors =
-        ((req->vifr_dev_oerrors - prev_req->vifr_dev_oerrors) * 1000)/diff_ms;
-
-}
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_obytes, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_opackets, diff_ms);
+    COMPUTE_DIFFERENCE(req, prev_req, vifr_dev_oerrors, diff_ms);
+ }
 
 static void
 rate_stats(struct nl_client *cl, unsigned int vr_op)
@@ -1222,7 +1216,7 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
         while (!is_stdin_hit() || get_set) {
             ignore_number_interface = local_ignore_number_interface;
             gettimeofday(&last_time, NULL);
-            first_rate_iter || usleep(1000000);
+            first_rate_iter || usleep(SET_TIMEOUT_MS * 1000);
             /* Get terminal parameters. */
             ioctl(STDOUT_FILENO, TIOCGWINSZ, &terminal_size);
 
@@ -1231,7 +1225,8 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
                 (print_number_interface > MAX_OUTPUT_IF? MAX_OUTPUT_IF: print_number_interface);
             local_print_number_interface = print_number_interface;
             if (print_number_interface <= 0) {
-                printf(" Size of terminal is too small.\n");
+                printf("Size of terminal is too small.\n");
+                first_rate_iter = true;
                 continue;
             }
             ret = system("clear");
@@ -1272,14 +1267,14 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
 
             case 'k':
                 local_ignore_number_interface =
-                    ((local_ignore_number_interface - local_print_number_interface <= 0)?
+                    (local_ignore_number_interface - local_print_number_interface <= 0)?
                      0:
-                     (local_ignore_number_interface) - local_print_number_interface);
+                     (local_ignore_number_interface - local_print_number_interface);
                 break;
 
             case 'j':
                 local_ignore_number_interface =
-                        ((local_ignore_number_interface) + local_print_number_interface);
+                        (local_ignore_number_interface + local_print_number_interface);
                 break;
 
             default:
@@ -1428,8 +1423,8 @@ main(int argc, char *argv[])
     }
     if (!rate_set) {
         vr_intf_op(cl, vr_op);
-    } else {
 
+    } else {
         for (i = 0; i < VR_MAX_INTERFACES; i++) {
 
             prev_req[i].vifr_queue_ierrors_to_lcore =
@@ -1440,6 +1435,7 @@ main(int argc, char *argv[])
                 exit(1);
             }
         }
+
         fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
         /*
          * tc[get/set]attr functions are for changing terminal behavior.
