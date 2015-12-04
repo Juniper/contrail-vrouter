@@ -152,7 +152,7 @@ struct vr_vrf_assign {
 #define VIF_FAT_FLOW_SCTP_INDEX     3
 #define VIF_FAT_FLOW_MAXPROTO_INDEX 4
 
-#define VIF_FAT_FLOW_PORT(p_p)      ((p_p) && 0xFFFF)
+#define VIF_FAT_FLOW_PORT(p_p)      ((p_p) & 0xFFFF)
 #define VIF_FAT_FLOW_PROTOCOL(p_p)  (((p_p) >> 16) & 0xFF)
 
 struct vr_interface {
