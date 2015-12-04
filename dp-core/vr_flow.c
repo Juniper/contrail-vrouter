@@ -60,6 +60,8 @@ static void vr_flow_set_forwarding_md(struct vrouter *, struct vr_flow_entry *,
 static int
 __vr_flow_schedule_transition(struct vrouter *, struct vr_flow_entry *,
         unsigned int, unsigned short);
+static bool vr_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
+        struct vr_flow_entry *);
 
 struct vr_flow_entry *vr_find_flow(struct vrouter *, struct vr_flow *,
         uint8_t, unsigned int *);
@@ -1038,6 +1040,9 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
     }
 
     if (tcph) {
+        if (vr_flow_is_fat_flow(router, pkt, flow_e))
+            return;
+
         /*
          * there are some optimizations here that makes the code slightly
          * not so frugal. For e.g.: the *_R flags are used to make sure that
@@ -1223,6 +1228,17 @@ __vr_flow_forward(flow_result_t result, struct vr_packet *pkt,
     }
 
     return forward;
+}
+
+static bool
+vr_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_flow_entry *fe)
+{
+    if (pkt->vp_type == VP_TYPE_IP) {
+        return vr_inet_flow_is_fat_flow(router, pkt, fe);
+    }
+
+    return false;
 }
 
 fat_flow_port_mask_t
