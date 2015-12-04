@@ -839,6 +839,21 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
     return 0;
 }
 
+bool
+vr_inet_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_flow_entry *fe)
+{
+    if (!fe->fe_key.flow4_sport || !fe->fe_key.flow4_dport) {
+        if ((fe->fe_key.flow4_proto == VR_IP_PROTO_TCP) ||
+                (fe->fe_key.flow4_proto == VR_IP_PROTO_UDP) ||
+                (fe->fe_key.flow4_proto == VR_IP_PROTO_SCTP)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static int
 vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip *ip,

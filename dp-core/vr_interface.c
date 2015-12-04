@@ -1829,7 +1829,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
 {
     uint8_t proto;
     uint16_t port;
-    unsigned int i, j;
+    unsigned int i, j, k = 0;
 
     struct vr_interface_stats *stats;
     struct vr_interface_settings settings;
@@ -1926,7 +1926,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
             for (j = 0; j < intf->vif_fat_flow_config_size[i]; j++) {
                 port = intf->vif_fat_flow_config[i][j];
                 if (vif_fat_flow_port_is_set(intf, i, port)) {
-                    req->vifr_fat_flow_protocol_port[j] = (proto << 16) | port;
+                    req->vifr_fat_flow_protocol_port[k++] = (proto << 16) | port;
                 } else {
                     vr_printf("vif0/%u: FatFlow port %u in configuration,"
                             " but not in operational DB\n",
@@ -2459,7 +2459,6 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
      */
     for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
         proto = VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]);
-        port = VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]);
         proto_index = vif_fat_flow_get_proto_index(proto);
 
         vif->vif_fat_flow_config_size[proto_index]++;
