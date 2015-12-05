@@ -165,7 +165,6 @@ vr_htable_hentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
     if (!table || !ent)
         return;
 
-    ent->hentry_next = NULL;
     ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
     ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
 
