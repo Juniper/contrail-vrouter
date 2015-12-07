@@ -627,21 +627,13 @@ __vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe)
 
     flags = fe->fe_flags;
     if (flags & VR_FLOW_FLAG_ACTIVE) {
-        if (vr_flow_start_modify(router, fe)) {
-            flags = __sync_fetch_and_or(&fe->fe_flags,
-                    VR_FLOW_FLAG_EVICT_CANDIDATE);
-            if (flags & VR_FLOW_FLAG_EVICT_CANDIDATE) {
-                goto unset_modified;
-            } else {
-                return true;
-            }
+        flags = __sync_fetch_and_or(&fe->fe_flags,
+                VR_FLOW_FLAG_EVICT_CANDIDATE);
+        if (!(flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
+            return true;
         }
     }
 
-    return false;
-
-unset_modified:
-    vr_flow_stop_modify(router, fe);
     return false;
 }
 
@@ -653,37 +645,56 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe)
 
     struct vr_flow_entry *rfe = NULL;
 
+    /* start modifying the entry */
+    if (!vr_flow_start_modify(router, fe))
+        return;
+
     if (fe->fe_rflow >= 0) {
         rfe = vr_get_flow_entry(router, fe->fe_rflow);
-        if (rfe && (rfe->fe_rflow == index)) {
+        if (rfe) {
+            evict_forward_flow = false;
             if (rfe->fe_tcp_flags & VR_FLOW_TCP_DEAD) {
-                evict_forward_flow = __vr_flow_mark_evict(router, rfe);
+                if (!vr_flow_start_modify(router, rfe)) {
+                    /* no modification. hence...*/
+                    rfe = NULL;
+                } else {
+                    if (rfe->fe_rflow == index) {
+                        evict_forward_flow = __vr_flow_mark_evict(router, rfe);
+                    }
+                }
             } else {
-                evict_forward_flow = false;
+                /* no modification. hence...*/
+                rfe = NULL;
             }
-        } else {
-            rfe = NULL;
         }
     }
 
+    /*
+     * presence of rfe means that we might need to reset the evict bit
+     * or at the minimum reset the modified bit under failure conditions
+     */
     if (evict_forward_flow) {
         if (__vr_flow_mark_evict(router, fe)) {
             if (__vr_flow_schedule_transition(router, fe,
-                        index, fe->fe_flags) < 0) {
-                if (rfe)
-                    vr_flow_reset_evict(router, rfe);
-                vr_flow_reset_evict(router, fe);
+                        index, fe->fe_flags)) {
+                return;
+            } else {
+                goto reset_evict;
             }
-        } else {
-            goto unset_modified;
         }
     }
 
-    return;
-
-unset_modified:
+    /* stop modifying the forward and the reverse */
     if (rfe)
         vr_flow_stop_modify(router, rfe);
+    vr_flow_stop_modify(router, fe);
+
+    return;
+
+reset_evict:
+    if (rfe)
+        vr_flow_reset_evict(router, rfe);
+    vr_flow_reset_evict(router, fe);
 
     return;
 }
