@@ -258,6 +258,7 @@ vr_interface_req_process(void *s)
     char name[50];
     int platform = get_platform();
     unsigned int printed = 0, i;
+    uint16_t proto, port;
 
     vr_interface_req *req = (vr_interface_req *)s;
 
@@ -336,11 +337,22 @@ vr_interface_req_process(void *s)
     if (req->vifr_fat_flow_protocol_port_size) {
         vr_interface_print_head_space();
         printed = 0;
-        printed += printf("FatFlows: ");
+        printed += printf("FatFlows (Protocol/Port): ");
         for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
-            printed += printf("%d:%d",
-                    VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]),
-                    VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]));
+            proto = VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]);
+            port = VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]);
+            if (!proto) {
+                proto = port;
+                port = 0;
+            }
+
+            printed += printf("%d:", proto);
+            if (port) {
+                printed += printf("%d", port);
+            } else {
+                printed += printf("%c", '*');
+            }
+
             if (i == (req->vifr_fat_flow_protocol_port_size - 1)) {
                 printf("\n");
             } else if (printed > 68) {
