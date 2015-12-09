@@ -129,7 +129,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_RX_BURST_SZ         32
 #define VR_DPDK_TX_BURST_SZ         32
 /* Number of mbufs in RSS mempool */
-#define VR_DPDK_RSS_MEMPOOL_SZ      16384
+#define VR_DPDK_RSS_MEMPOOL_SZ      65536 
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
 /* Number of mbufs in FRAG_DIRECT mempool */
