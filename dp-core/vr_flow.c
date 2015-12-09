@@ -204,7 +204,7 @@ vr_init_flow_entry(struct vr_flow_entry *fe)
 
 
 static void
-vr_reset_active_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
+__vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index)
 {
     if (fe->fe_hold_list) {
@@ -231,16 +231,24 @@ vr_reset_active_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
 }
 
 static void
-vr_reset_flow_entry(struct vrouter *router, struct vr_flow_entry *fe,
+vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index)
 {
-    vr_reset_active_flow_entry(router, fe, index);
+    __vr_flow_reset_entry(router, fe, index);
     memset(&fe->fe_stats, 0, sizeof(fe->fe_stats));
     fe->fe_flags = 0;
 
     return;
 }
 
+static void
+vr_flow_reset_active_entry(struct vrouter *router, struct vr_flow_entry *fe,
+        unsigned int index)
+{
+    __vr_flow_reset_entry(router, fe, index);
+
+    return;
+}
 
 static inline bool
 vr_set_flow_active(struct vr_flow_entry *fe)
@@ -370,10 +378,12 @@ vr_flow_evict_flow(struct vrouter *router, struct vr_flow_entry *fe,
             (fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
         flags = fe->fe_flags | VR_FLOW_FLAG_ACTIVE |
             VR_FLOW_FLAG_EVICT_CANDIDATE;
-        (void)__sync_bool_compare_and_swap(&fe->fe_flags, flags,
+        if (__sync_bool_compare_and_swap(&fe->fe_flags, flags,
                 (flags ^ VR_FLOW_FLAG_EVICT_CANDIDATE) |
-                VR_FLOW_FLAG_EVICTED);
-        vr_flow_stop_modify(router, fe);
+                VR_FLOW_FLAG_EVICTED)) {
+            vr_flow_stop_modify(router, fe);
+            vr_flow_reset_active_entry(router, fe, index);
+        }
     }
 
     return;
@@ -404,7 +414,7 @@ vr_flow_defer_cb(struct vrouter *router, void *arg)
     }
 
     if (vfdd->vfdd_delete) {
-        vr_reset_flow_entry(router, fe, vfdd->vfdd_fe_index);
+        vr_flow_reset_entry(router, fe, vfdd->vfdd_fe_index);
     } else {
         rfe = vr_get_flow_entry(router, fe->fe_rflow);
         vr_flow_evict_flow(router, fe, vfdd->vfdd_fe_index);
@@ -444,14 +454,16 @@ vr_flow_defer(struct vr_flow_md *flmd, struct vr_flow_entry *fe)
     struct vr_flow_defer_data *vfdd;
 
     if (!vdd || !vdd->vdd_data) {
-        if (fe->fe_rflow) {
-            rfe = vr_get_flow_entry(flmd->flmd_router, fe->fe_rflow);
-            vr_flow_reset_evict(flmd->flmd_router, rfe);
+        if (flmd->flmd_flags & VR_FLOW_FLAG_EVICT_CANDIDATE) {
+            if (fe->fe_rflow) {
+                rfe = vr_get_flow_entry(flmd->flmd_router, fe->fe_rflow);
+                vr_flow_reset_evict(flmd->flmd_router, rfe);
+            }
+            vr_flow_reset_evict(flmd->flmd_router, fe);
         }
-        vr_flow_reset_evict(flmd->flmd_router, fe);
 
         if (!(flmd->flmd_flags & VR_FLOW_FLAG_ACTIVE)) {
-            vr_reset_flow_entry(flmd->flmd_router, fe, flmd->flmd_index);
+            vr_flow_reset_entry(flmd->flmd_router, fe, flmd->flmd_index);
         }
 
         return;
@@ -494,7 +506,7 @@ vr_flow_table_get_free_entry(struct vrouter *router, struct vr_btable *table,
                          VR_FLOW_FLAG_NEW_FLOW));
                 if (swapped) {
                     alloced = true;
-                    vr_reset_active_flow_entry(router, fe, i);
+                    vr_flow_reset_active_entry(router, fe, i);
                     break;
                 }
             }
@@ -534,7 +546,7 @@ vr_flow_get_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type
             fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue),
                     VR_FLOW_QUEUE_OBJECT);
             if (!fe->fe_hold_list) {
-                vr_reset_flow_entry(router, fe, *fe_index);
+                vr_flow_reset_entry(router, fe, *fe_index);
                 fe = NULL;
             } else {
                 fe->fe_hold_list->vfq_index = *fe_index;
@@ -728,8 +740,9 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe,
     struct vr_flow_entry *rfe = NULL;
 
     /* start modifying the entry */
-    if (!vr_flow_start_modify(router, fe))
+    if (!vr_flow_start_modify(router, fe)) {
         return;
+    }
 
     if (fe->fe_rflow >= 0) {
         rfe = vr_get_flow_entry(router, fe->fe_rflow);
@@ -740,7 +753,7 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe,
                     /* no modification. hence...*/
                     rfe = NULL;
                 } else {
-                    if (rfe->fe_rflow == index) {
+                    if ((rfe->fe_rflow == index) || (rfe->fe_rflow < 0)) {
                         evict_forward_flow = __vr_flow_mark_evict(router, rfe);
                     }
                 }
@@ -757,7 +770,7 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe,
      */
     if (evict_forward_flow) {
         if (__vr_flow_mark_evict(router, fe)) {
-            if (__vr_flow_schedule_transition(router, fe,
+            if (!__vr_flow_schedule_transition(router, fe,
                         index, fe->fe_flags)) {
                 return;
             } else {
@@ -1020,6 +1033,39 @@ vr_flow_init_close(struct vrouter *router, struct vr_flow_entry *flow_e,
 }
 
 static void
+vr_flow_tcp_rflow_set(struct vrouter *router, struct vr_flow_entry *fe,
+        struct vr_flow_entry *rfe)
+{
+    uint16_t flags = 0;
+
+    if (!fe || !rfe)
+        return;
+
+    if (rfe->fe_tcp_flags & VR_FLOW_TCP_SYN) {
+        flags |= VR_FLOW_TCP_SYN_R;
+    }
+
+    if (rfe->fe_tcp_flags & VR_FLOW_TCP_RST) {
+        flags |= VR_FLOW_TCP_RST;
+    }
+
+    if (rfe->fe_tcp_flags & VR_FLOW_TCP_DEAD) {
+        flags |= VR_FLOW_TCP_DEAD;
+    }
+
+    if (rfe->fe_tcp_flags & VR_FLOW_TCP_FIN) {
+        flags |= VR_FLOW_TCP_FIN_R;
+    }
+
+    if (rfe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED) {
+        flags |= (VR_FLOW_TCP_ESTABLISHED | VR_FLOW_TCP_ESTABLISHED_R);
+    }
+
+    (void)__sync_fetch_and_or(&fe->fe_tcp_flags, flags);
+    return;
+}
+
+static void
 vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
@@ -1170,6 +1216,26 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
     return;
 }
 
+static inline bool
+vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
+{
+    bool allow;
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        allow = vr_inet_flow_allow_new_flow(router, pkt);
+        if (!allow)
+            return allow;
+    }
+
+    if ((vr_flow_hold_limit) &&
+            (vr_flow_table_hold_count(router) >
+             VR_MAX_FLOW_TABLE_HOLD_COUNT)) {
+        return false;
+    }
+
+    return true;
+}
+
 flow_result_t
 vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
                struct vr_packet *pkt, struct vr_forwarding_md *fmd)
@@ -1185,9 +1251,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
             (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY))
             return FLOW_FORWARD;
 
-        if ((vr_flow_hold_limit) &&
-                (vr_flow_table_hold_count(router) >
-                 VR_MAX_FLOW_TABLE_HOLD_COUNT)) {
+        if (!vr_flow_allow_new_flow(router, pkt)) {
             vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
             return FLOW_CONSUMED;
         }
@@ -1831,10 +1895,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         if (fe->fe_flags & VR_RFLOW_VALID) {
             rfe = vr_get_flow_entry(router, fe->fe_rflow);
             if (rfe) {
-                if (rfe->fe_tcp_flags & VR_FLOW_TCP_SYN) {
-                    (void)__sync_fetch_and_or(&fe->fe_tcp_flags,
-                            VR_FLOW_TCP_SYN_R);
-                }
+                vr_flow_tcp_rflow_set(router, fe, rfe);
             }
         }
     }
@@ -2080,7 +2141,7 @@ vr_flow_table_reset(struct vrouter *router)
                 flmd.flmd_flags = fe->fe_flags;
                 fe->fe_action = VR_FLOW_ACTION_DROP;
                 vr_flush_entry(router, fe, &flmd, &fmd);
-                vr_reset_flow_entry(router, fe, i);
+                vr_flow_reset_entry(router, fe, i);
             }
         }
     }
