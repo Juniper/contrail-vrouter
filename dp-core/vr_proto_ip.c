@@ -840,6 +840,17 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
 }
 
 bool
+vr_inet_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
+{
+    struct vr_ip *iph = (struct vr_ip *)pkt_network_header(pkt);
+
+    if (vr_ip_fragment(iph) && !vr_ip_fragment_head(iph))
+        return false;
+
+    return true;
+}
+
+bool
 vr_inet_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
         struct vr_flow_entry *fe)
 {
