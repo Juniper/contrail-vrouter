@@ -84,6 +84,8 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
     int i;
     int ret;
     vr_uvh_client_mem_region_t *region;
+    void *madv_addr;
+    uint64_t madv_size;
     VhostUserMemory *vum_msg;
     uint64_t size;
     vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs = (
@@ -133,6 +135,24 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                 vr_uvhost_log("Get block size failed for FD %d on vhost client %s \n",
                               vru_cl->vruc_fds_sent[i], vru_cl->vruc_path);
                 return -1;
+            }
+
+            /*
+             * Prevent guest memory from being dumped in vrouter-dpdk core
+             */
+            madv_addr = (void *)((uintptr_t)RTE_ALIGN_FLOOR(region->vrucmr_mmap_addr,
+                                  vif_mmap_addrs->vu_mmap_data[i].unmap_blksz));
+            madv_size = RTE_ALIGN_CEIL(size, vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
+
+            if (madvise(madv_addr, madv_size, MADV_DONTDUMP)) {
+                vr_uvhost_log("Error in madvise at addr 0x%" PRIx64 ", size 0x%"
+                              PRIx64 "for fd %d on vhost client %s (%s)\n",
+                              region->vrucmr_mmap_addr,
+                              size, vru_cl->vruc_fds_sent[i],
+                              vru_cl->vruc_path, rte_strerror(errno));
+                /*
+                 * Failure is not catastrophic, so continue below.
+                 */
             }
 
             vif_mmap_addrs->vu_mmap_data[i].unmap_mmap_addr = ((uint64_t)
