@@ -31,8 +31,13 @@ typedef enum {
 #define VR_FLOW_FLAG_VRFT               0x4000
 #define VR_FLOW_FLAG_LINK_LOCAL         0x8000
 
-#define VR_FLOW_FLAG_MASK(flag)     ((flag) & ~(VR_FLOW_FLAG_EVICT_CANDIDATE |\
-            VR_FLOW_FLAG_EVICTED | VR_FLOW_FLAG_NEW_FLOW))
+#define VR_FLOW_FLAG_DP_FLAGS           (VR_FLOW_FLAG_EVICT_CANDIDATE |\
+                                            VR_FLOW_FLAG_EVICTED |\
+                                            VR_FLOW_FLAG_NEW_FLOW)
+
+#define VR_FLOW_FLAG_DP_BITS(fe)        (((fe)->fe_flags) &\
+                                            (VR_FLOW_FLAG_DP_FLAGS))
+#define VR_FLOW_FLAG_MASK(flag)         ((flag) & ~(VR_FLOW_FLAG_DP_FLAGS))
 /* rest of the flags are action specific */
 
 /* for NAT */
