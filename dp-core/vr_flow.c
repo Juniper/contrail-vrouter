@@ -296,6 +296,22 @@ vr_flow_get_va(struct vrouter *router, uint64_t offset)
     return vr_htable_get_address(router->vr_flow_table, offset);
 }
 
+static struct vr_flow_entry *
+__vr_get_flow_entry(struct vrouter *router, int index)
+{
+    struct vr_flow_entry *fe;
+
+    if (index < 0)
+        return NULL;
+
+    fe = (struct vr_flow_entry *)
+            __vr_htable_get_hentry_by_index(router->vr_flow_table, index);
+    if (fe && (fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+        return fe;
+
+    return NULL;
+}
+
 struct vr_flow_entry *
 vr_get_flow_entry(struct vrouter *router, int index)
 {
@@ -2009,7 +2025,7 @@ vr_flow_table_reset(struct vrouter *router)
         flmd.flmd_defer_data = NULL;
         vr_init_forwarding_md(&fmd);
         for (i = start; i < end; i++) {
-            fe = vr_get_flow_entry(router, i);
+            fe = __vr_get_flow_entry(router, i);
             if (fe) {
                 flmd.flmd_index = i;
                 flmd.flmd_flags = fe->fe_flags;
