@@ -1783,7 +1783,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (fe->fe_action == VR_FLOW_ACTION_DROP)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
 
-    fe->fe_flags = VR_FLOW_FLAG_MASK(req->fr_flags);
+    fe->fe_flags = VR_FLOW_FLAG_DP_BITS(fe) |
+        VR_FLOW_FLAG_MASK(req->fr_flags);
     if (new_flow) {
 
         req->fr_flow_bytes = fe->fe_stats.flow_bytes;
