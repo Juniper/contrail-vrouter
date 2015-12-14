@@ -545,8 +545,11 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 
         mbuf_flags = 0;
         pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
-        if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
-            mbuf_flags |= PKT_RX_IP_CKSUM_BAD;
+        /* If address conversion fails the pkt_addr is NULL */
+        if (likely(pkt_addr != NULL)) {
+            if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
+                mbuf_flags |= PKT_RX_IP_CKSUM_BAD;
+        }
 
         /*
          * Ignore virtio header in first descriptor as we don't support
@@ -568,7 +571,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         } else {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
                 __func__, vq, i);
-            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+            /* pkt_addr has been translated earlier */
             if (pkt_addr) {
                 pkt_addr += sizeof(struct virtio_net_hdr);
                 pkt_len = desc->len - sizeof(struct virtio_net_hdr);
