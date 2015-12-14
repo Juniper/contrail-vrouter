@@ -87,7 +87,7 @@ static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_se
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set;
 
 static unsigned int vr_op, vr_if_type;
-static bool ignore_error = false, dump_pending = false;
+static bool dump_pending = false;
 static bool vr_vrf_assign_dump = false;
 static int dump_marker = -1, var_marker = -1;
 
@@ -843,8 +843,7 @@ Usage()
     printf("\t   \t--type [vhost|agent|physical|virtual|monitoring]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
     printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
-    printf("\t   \t--vif <vif ID>]\n");
-    printf( "[--id <intf_id> --pmd --pci]\n");
+    printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -1417,9 +1416,9 @@ main(int argc, char *argv[])
          * exists in vrouter or not. so, get can return error if the
          * interface does not exist in vrouter
          */
-        ignore_error = true;
+        vr_ignore_nl_errors = true;
         vr_intf_op(cl, SANDESH_OP_GET);
-        ignore_error = false;
+        vr_ignore_nl_errors = false;
     }
     if (!rate_set) {
         vr_intf_op(cl, vr_op);
