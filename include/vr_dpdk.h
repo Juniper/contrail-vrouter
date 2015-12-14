@@ -75,7 +75,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 /* Default lcore mask. Used only when sched_getaffinity() is failed */
 #define VR_DPDK_DEF_LCORE_MASK      0xf
 /* Default memory size to allocate at startup (in MBs) */
-#define VR_DPDK_DEF_MEM             "512"
+#define VR_DPDK_DEF_MEM             "1024"
 /* Number of memory channels to use */
 #define VR_DPDK_MAX_MEMCHANNELS     "4"
 /* Use UDP source port hashing */
