@@ -421,6 +421,8 @@ nh_vxlan_tunnel_helper(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
     }
 
+    vr_forwarding_md_update_label_type(fmd, VR_LABEL_TYPE_VXLAN_ID);
+
     /* Add the vxlan header */
     vxlanh = (struct vr_vxlan *)pkt_push(pkt, sizeof(struct vr_vxlan));
     vxlanh->vxlan_vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
@@ -527,7 +529,9 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
         return 0;
     }
 
-    fmd->fmd_label = nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh_label;
+    vr_forwarding_md_set_label(fmd,
+            nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh_label,
+            VR_LABEL_TYPE_UNKNOWN);
     return nh_output(pkt, member_nh, fmd);
 
 drop:
@@ -825,14 +829,13 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     label = fmd->fmd_label;
     for (i = 0; i < nh->nh_component_cnt; i++) {
-
         clone_size = 0;
         dir_nh = nh->nh_component_nh[i].cnh;
 
         /* We need to copy back the original label from Bridge lookaup
          * as previous iteration would have manipulated that
          */
-        fmd->fmd_label = label;
+        vr_forwarding_md_set_label(fmd, label, VR_LABEL_TYPE_UNKNOWN);
         fmd->fmd_dvrf = pkt_vrf;
 
         /* If direct nexthop is not valid, dont process it */
@@ -1010,7 +1013,8 @@ nh_composite_tor(struct vr_packet *pkt, struct vr_nexthop *nh,
             break;
         }
 
-        fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
+        vr_forwarding_md_set_label(fmd, nh->nh_component_nh[i].cnh_label,
+                VR_LABEL_TYPE_UNKNOWN);
         fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
         nh_output(new_pkt, dir_nh, fmd);
     }
@@ -1062,7 +1066,8 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
             break;
         }
 
-        fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
+        vr_forwarding_md_set_label(fmd, nh->nh_component_nh[i].cnh_label,
+                VR_LABEL_TYPE_UNKNOWN);
         fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
         nh_output(new_pkt, dir_nh, fmd);
     }
@@ -1183,7 +1188,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
              * Add vxlan encapsulation. The vxlan id need to be taken
              * from Bridge entry
              */
-            fmd->fmd_label = label;
+            vr_forwarding_md_set_label(fmd, label, VR_LABEL_TYPE_UNKNOWN);
             fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
             if (nh_vxlan_tunnel_helper(new_pkt, fmd, sip, sip) == false) {
                 vr_pfree(new_pkt, VP_DROP_PUSH);
@@ -1197,7 +1202,8 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
 
         /* MPLS label for outer header encapsulation */
-        fmd->fmd_label = nh->nh_component_nh[i].cnh_label;
+        vr_forwarding_md_set_label(fmd, nh->nh_component_nh[i].cnh_label,
+                VR_LABEL_TYPE_UNKNOWN);
         fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
         nh_output(new_pkt, dir_nh, fmd);
     }
@@ -1415,6 +1421,8 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!fmd || fmd->fmd_label < 0)
         return vr_forward(nh->nh_router, pkt, fmd);
 
+    vr_forwarding_md_update_label_type(fmd, VR_LABEL_TYPE_MPLS);
+
     if (fmd->fmd_udp_src_port)
         udp_src_port = fmd->fmd_udp_src_port;
 
@@ -1549,6 +1557,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!fmd || fmd->fmd_label < 0)
         return vr_forward(nh->nh_router, pkt, fmd);
 
+    vr_forwarding_md_update_label_type(fmd, VR_LABEL_TYPE_MPLS);
 
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
