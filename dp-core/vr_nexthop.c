@@ -666,13 +666,14 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
      */
     if (pkt->vp_type == VP_TYPE_IP6)
         l4_type = vr_ip6_well_known_packet(pkt);
+    else if (pkt_src == PKT_SRC_TOR_REPL_TREE)
+        l4_type = vr_ip_well_known_packet(pkt);
+
 
     /*
-     * Special control packets need to be handled only if from VM or BMS
+     * Special control packets need to be handled only if BMS
      */
     if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
-        if (pkt->vp_type == VP_TYPE_IP)
-            l4_type = vr_ip_well_known_packet(pkt);
 
         /*
          * If packet is identified as known packet, we always trap
@@ -684,12 +685,9 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             trap = true;
 
             if (l4_type == L4_TYPE_DHCP_REQUEST) {
-                if (!(pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED)) {
-                    rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf,
-                                eth->eth_smac);
-                    if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
-                        trap = false;
-                }
+                rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf, eth->eth_smac);
+                if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
+                    trap = false;
             } else if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
                 trap = false;
             }
