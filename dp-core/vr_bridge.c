@@ -49,6 +49,8 @@ void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
 struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
+extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
+extern l4_pkt_type_t vr_ip6_well_known_packet(struct vr_packet *);
 
 
 static bool
@@ -451,13 +453,45 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
     int reason, handled;
     struct vr_vrf_stats *stats;
+    l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
+    int8_t *dmac;
+
+    dmac = (int8_t *) pkt_data(pkt);
+
+    pull_len = 0;
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
+        pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+        if (pull_len && !pkt_pull(pkt, pull_len)) {
+            vr_pfree(pkt, VP_DROP_PULL);
+            return 0;
+        }
+    }
 
     /* Do the bridge lookup for the packets not meant for "me" */
     if (!fmd->fmd_to_me) {
+
+        /*
+         * If DHCP packet coming from VM, Trap it to Agent before doing the bridge
+         * lookup itself
+         */
+        if (vif_is_virtual(pkt->vp_if)) {
+            if (pkt->vp_type == VP_TYPE_IP)
+                l4_type = vr_ip_well_known_packet(pkt);
+            else if (pkt->vp_type == VP_TYPE_IP6)
+                l4_type = vr_ip6_well_known_packet(pkt);
+
+            if (l4_type == L4_TYPE_DHCP_REQUEST) {
+                if (pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED) {
+                    vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+                    return 0;
+                }
+            }
+        }
+
         rt.rtr_req.rtr_label_flags = 0;
         rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
         rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-        rt.rtr_req.rtr_mac =(int8_t *) pkt_data(pkt);
+        rt.rtr_req.rtr_mac = dmac;
         /* If multicast L2 packet, use broadcast composite nexthop */
         if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
             rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
@@ -495,11 +529,6 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
     /* Adjust MSS for V4 and V6 packets */
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
-        pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-        if (!pkt_pull(pkt, pull_len)) {
-            vr_pfree(pkt, VP_DROP_PULL);
-            return 0;
-        }
 
         if (vif_is_virtual(pkt->vp_if) &&
                 vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj) {
@@ -517,11 +546,6 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
             return 0;
         }
-
-        if (!pkt_push(pkt, pull_len)) {
-            vr_pfree(pkt, VP_DROP_PUSH);
-            return 0;
-        }
     }
 
 
@@ -536,6 +560,11 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         }
         vr_forwarding_md_set_label(fmd, rt.rtr_req.rtr_label,
                 VR_LABEL_TYPE_UNKNOWN);
+    }
+
+    if (pull_len && !pkt_push(pkt, pull_len)) {
+        vr_pfree(pkt, VP_DROP_PUSH);
+        return 0;
     }
 
     nh_output(pkt, nh, fmd);
