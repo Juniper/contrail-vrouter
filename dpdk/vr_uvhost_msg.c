@@ -5,6 +5,8 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
+#include <sys/poll.h>
+
 #include "vr_dpdk.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk_usocket.h"
@@ -140,9 +142,11 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
             /*
              * Prevent guest memory from being dumped in vrouter-dpdk core
              */
-            madv_addr = (void *)((uintptr_t)RTE_ALIGN_FLOOR(region->vrucmr_mmap_addr,
-                                  vif_mmap_addrs->vu_mmap_data[i].unmap_blksz));
-            madv_size = RTE_ALIGN_CEIL(size, vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
+            madv_addr = (void *)(
+                           (uintptr_t)RTE_ALIGN_FLOOR(region->vrucmr_mmap_addr,
+                           vif_mmap_addrs->vu_mmap_data[i].unmap_blksz));
+            madv_size = RTE_ALIGN_CEIL(size, 
+                           vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
 
             if (madvise(madv_addr, madv_size, MADV_DONTDUMP)) {
                 vr_uvhost_log("Error in madvise at addr 0x%" PRIx64 ", size 0x%"
@@ -275,10 +279,9 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
 
     /*
      * Now that the addresses have been set, the virtio queue is ready for
-     * forwarding.
+     * forwarding. This is the last message from qemu, so call fd has been set.
      *
-     * TODO - need a memory barrier here. Also , queue may need to be set to
-     * READY after callfd is set.
+     * TODO - need a memory barrier here for non-x86 CPU.
      */
     if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
         vr_uvhost_log("Couldn't set virtio queue ready in vhost server, "
@@ -460,7 +463,8 @@ vr_uvh_cl_send_reply(int fd, vr_uvh_client_t *vru_cl)
                        VHOST_USER_HSIZE + msg->size, MSG_DONTWAIT);
             if ((ret < 0) || (ret != (VHOST_USER_HSIZE + msg->size))) {
                 /*
-                 * TODO - handle EAGAIN/EWOULDBLOCK
+                 * Socket to qemu should never be full as it sleeps waiting
+                 * for a reply to the previous request.
                  */
                 vr_uvhost_log("Error sending vhost user reply to %s\n",
                               vru_cl->vruc_path);
@@ -882,7 +886,8 @@ error:
  * that the user space vhost server should listen on for connections from
  * qemu.
  *
- * Returns 0 on success, -1 otherwise.
+ * Returns 0, but logs a message if an error occurs. Returning error would
+ * result in connection to netlink being removed from poll().
  */
 static int
 vr_uvh_nl_msg_handler(int fd, void *arg)
@@ -895,7 +900,7 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
         if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
             vr_uvhost_log("Error %d in netlink msg receive in vhost server\n",
                           errno);
-            return ret;
+            return 0;
         } else {
             return 0;
         }
@@ -904,7 +909,7 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
     if (ret != sizeof(msg)) {
         vr_uvhost_log("Received msg of length %d, expected %d in vhost server",
                       ret, sizeof(msg));
-        return -1;
+        return 0;
     }
 
     switch (msg.vrnum_type) {
@@ -923,7 +928,7 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
             break;
     }
 
-    return ret;
+    return 0;
 }
 
 /*

@@ -222,6 +222,12 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_FWD_LCORES_PER_IO   3
 
 /*
+ * Number of open fds needed for vrouter (other than one uvhost fd per
+ * interface)
+ */
+#define VR_DPDK_NUM_FDS    512
+
+/*
  * DPDK LCore IDs
  */
 enum {
