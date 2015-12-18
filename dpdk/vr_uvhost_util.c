@@ -5,10 +5,10 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
+#include <sys/poll.h>
+
 #include "vr_dpdk.h"
 #include "vr_uvhost_util.h"
-
-#define MAX_UVHOST_FDS 1024
 
 typedef struct uvh_fd_s {
     int uvh_fd;
@@ -19,8 +19,6 @@ typedef struct uvh_fd_s {
 /* Global variables */
 static uvh_fd_t uvh_rfds[MAX_UVHOST_FDS];
 static uvh_fd_t uvh_wfds[MAX_UVHOST_FDS];
-static fd_set uvh_rfdset, uvh_wfdset;
-static int uvh_max_fd = 0;
 
 /*
  * vr_uvhost_log - logs user space vhost messages to a file.
@@ -55,7 +53,7 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, UVHOST, "Deleting FD %d from the select pool...\n", fd);
+    RTE_LOG(DEBUG, UVHOST, "Deleting FD %d from the poll pool...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
@@ -78,7 +76,6 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     }
 
     fds[i].uvh_fd = -1;
-    vr_uvh_recalc_max_fd();
 
     close(fd);
 
@@ -100,7 +97,7 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, UVHOST, "Adding FD %d to the select pool...\n", fd);
+    RTE_LOG(DEBUG, UVHOST, "Adding FD %d to the poll pool...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
@@ -115,10 +112,6 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
             fds[i].uvh_fd_arg = fd_handler_arg;
             fds[i].uvh_fd_fn = fd_handler;
 
-            if (fd > uvh_max_fd) {
-                uvh_max_fd = fd;
-            }
-
             return 0;
         }
     }
@@ -129,16 +122,13 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
 }
 
 /*
- * vr_uvhost_fdset_init - initializes the read and write FD sets before
- * we enter the select loop.
+ * vr_uvhost_fds_init - initializes the read and write fds before
+ * we enter the poll loop.
  */
 void
-vr_uvhost_fdset_init(void)
+vr_uvhost_fds_init(void)
 {
     int i;
-
-    FD_ZERO(&uvh_rfdset);
-    FD_ZERO(&uvh_wfdset);
 
     for (i = 0; i < MAX_UVHOST_FDS; i++) {
         uvh_rfds[i].uvh_fd = -1;
@@ -149,122 +139,80 @@ vr_uvhost_fdset_init(void)
 }
 
 /*
- * vr_uvh_max_fd - returns the max FD for select.
- */
-int
-vr_uvh_max_fd(void)
-{
-    return uvh_max_fd;
-}
-
-/*
- * vr_uvh_recalc_max_fd - recalculates the max FD to -1.
- */
-void
-vr_uvh_recalc_max_fd(void)
-{
-    int i;
-
-    uvh_max_fd = -1;
-    for (i = 0; i < MAX_UVHOST_FDS; i++) {
-        if (uvh_rfds[i].uvh_fd != -1
-            && uvh_rfds[i].uvh_fd > uvh_max_fd) {
-            uvh_max_fd = uvh_rfds[i].uvh_fd;
-        }
-        if (uvh_wfds[i].uvh_fd != -1
-            && uvh_wfds[i].uvh_fd > uvh_max_fd) {
-            uvh_max_fd = uvh_wfds[i].uvh_fd;
-        }
-    }
-}
-
-/*
- * vr_uvh_rfdset_p - returns a pointer to the fdset corresponding to the
- * read fds.
- */
-fd_set *
-vr_uvh_rfdset_p(void)
-{
-    int i;
-
-    FD_ZERO(&uvh_rfdset);
-
-    for (i = 0; i < MAX_UVHOST_FDS; i++) {
-        if (uvh_rfds[i].uvh_fd == -1) {
-            continue;
-        }
-
-        FD_SET(uvh_rfds[i].uvh_fd, &uvh_rfdset);
-    }
-
-    return &uvh_rfdset;
-}
-
-/*
- * vr_uvh_wfdset_p - returns a pointer to the write fdset.
- */
-fd_set *
-vr_uvh_wfdset_p(void)
-{
-    int i;
-
-    FD_ZERO(&uvh_wfdset);
-
-    for (i = 0; i < MAX_UVHOST_FDS; i++) {
-        if (uvh_wfds[i].uvh_fd == -1) {
-            continue;
-        }
-
-        FD_SET(uvh_wfds[i].uvh_fd, &uvh_wfdset);
-    }
-
-    return &uvh_wfdset;
-}
-
-/*
- * vr_uvh_call_fd_handlers_internal - internal function to call the handler
- * for all fds that are set in the fd_set.
+ * vr_uvh_call_fd_handlers_internal - call the handler associated with the 
+ * given fd. 
  *
- * Returns 0 on success, error FD otherwise.
+ * Returns 0 on success, -1 otherwise.
  */
 static int
-vr_uvh_call_fd_handlers_internal(uvh_fd_t *fd_arr, fd_set *fdset_ptr)
+vr_uvh_call_fd_handlers_internal(uvh_fd_t *fd_arr, int fd)
 {
     int i, ret = 0;
 
     for (i = 0; i < MAX_UVHOST_FDS; i++) {
-        if (fd_arr[i].uvh_fd == -1) {
+        if (fd_arr[i].uvh_fd != fd) {
             continue;
         }
 
-        if (FD_ISSET(fd_arr[i].uvh_fd, fdset_ptr)) {
-            ret = fd_arr[i].uvh_fd_fn(fd_arr[i].uvh_fd, fd_arr[i].uvh_fd_arg);
-            if (ret)
-                return fd_arr[i].uvh_fd;
+        ret = fd_arr[i].uvh_fd_fn(fd_arr[i].uvh_fd, fd_arr[i].uvh_fd_arg);
+        if (ret) {
+            return -1;
+        } else {
+            return 0;
         }
     }
 
-    return 0;
+    return -1;
 }
 
 /*
  * vr_uvh_call_fd_handlers - call the handler for each FD that is set upon
- * return from select().
+ * return from poll().
  *
- * Returns 0 on success, -1 otherwise.
+ * Returns nothing. 
  */
-int
-vr_uvh_call_fd_handlers(void)
+void
+vr_uvh_call_fd_handlers(struct pollfd *fds, nfds_t nfds)
 {
+    unsigned int i;
     int ret;
 
-    ret = vr_uvh_call_fd_handlers_internal(uvh_rfds, &uvh_rfdset);
-    if (ret)
-        vr_uvhost_del_fd(ret, UVH_FD_READ);
+    for (i = 0; i < nfds; i++) {
+        if (fds[i].fd >= 0) {
+            if (fds[i].revents & POLLIN) {
+                ret = vr_uvh_call_fd_handlers_internal(uvh_rfds, fds[i].fd);
+                if (ret) {
+                    RTE_LOG(INFO, UVHOST, "Error: deleting fd %d "
+                            "from poll\n", fds[i].fd);
+                    vr_uvhost_del_fd(fds[i].fd, UVH_FD_READ);
+                }
+            }
+        }
+    }
 
-    ret = vr_uvh_call_fd_handlers_internal(uvh_wfds, &uvh_wfdset);
-    if (ret)
-        vr_uvhost_del_fd(ret, UVH_FD_WRITE);
+    return;
+}
 
-    return 0;
+/*
+ * vr_uvh_init_pollfds - initializes the array to pass to poll based on the
+ * state of the fds.
+ *
+ * Returns nothing.
+ */
+void
+vr_uvh_init_pollfds(struct pollfd *fds, nfds_t *nfds)
+{
+    unsigned int i, count = 0;
+
+    for (i = 0; i < MAX_UVHOST_FDS; i++) {
+        if (uvh_rfds[i].uvh_fd != -1) {
+            fds[count].fd = uvh_rfds[i].uvh_fd;
+            fds[count].events = POLLIN;
+            count++;
+        }
+    }
+
+    *nfds = count;
+
+    return;
 }
