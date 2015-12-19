@@ -24,6 +24,7 @@
 #include <rte_ip_frag.h>
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
+#include <rte_eth_af_packet.h>
 
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
@@ -132,11 +133,10 @@ dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, uint8_t port_id)
     rte_memcpy(addr, &rte_eth_devices[port_id].pci_dev->addr, sizeof(struct rte_pci_addr));
 }
 
-int
+void
 dpdk_vif_attach_ethdev(struct vr_interface *vif,
         struct vr_dpdk_ethdev *ethdev)
 {
-    int ret = 0;
     struct ether_addr mac_addr;
     struct rte_eth_dev_info dev_info;
 
@@ -167,8 +167,6 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
         rte_eth_macaddr_get(ethdev->ethdev_port_id, &mac_addr);
         memcpy(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN);
     }
-
-    return ret;
 }
 
 /*
@@ -211,6 +209,74 @@ dpdk_vlan_forwarding_if_add(void)
     }
 
     return 0;
+}
+
+/*
+ * Add af_packet virtual device to communicate with veth namespace devices.
+ * The device is removed with dpdk_fabric_af_packet_if_del().
+ */
+static int
+dpdk_af_packet_if_add(struct vr_interface *vif) {
+    int ret;
+    char params[VR_INTERFACE_NAME_LEN + 7];
+    char name[VR_INTERFACE_NAME_LEN];
+    struct vr_dpdk_ethdev *ethdev;
+    uint8_t port_id;
+
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) af_packet device %s type %d transport %d\n",
+            vif->vif_idx, vif->vif_gen, vif->vif_name, vif->vif_type, vif->vif_transport);
+
+    ret = snprintf(name, VR_INTERFACE_NAME_LEN, "eth_af_packet_%d", vif->vif_idx);
+    if (ret < 0 || ret > VR_INTERFACE_NAME_LEN) {
+        RTE_LOG(ERR, VROUTER, "Error creating name for AF_PACKET %s\n", name);
+        return ret;
+    }
+
+    ret = snprintf(params, sizeof(params),
+                    /* TODO: Optional af_packet mmap parameters
+                     *
+                     * "iface=%s,qpairs=%d,blocksz=%d,framesz=%d,framecnt=%d",
+                     * vif->vif_name, 16, 4096, 2048, 512);
+                     */
+                  "iface=%s", vif->vif_name);
+    if (ret < 0 || ret > sizeof(params)) {
+        RTE_LOG(ERR, VROUTER, "Error creating config for AF_PACKET %s\n", name);
+        return ret;
+    }
+
+    ret = rte_pmd_af_packet_devinit(name, params);
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Error initializing AF_PACKET device %s\n", name);
+        return ret;
+    }
+    port_id = (uint8_t)(rte_eth_dev_allocated(name) - rte_eth_devices);
+
+    ethdev = &vr_dpdk.ethdevs[port_id];
+    if (ethdev->ethdev_ptr != NULL) {
+        RTE_LOG(ERR, VROUTER,
+                "Error adding AF_PACKET device: PMD ID %"PRIu8" already added.\n",
+                port_id);
+        return -EEXIST;
+    }
+    ethdev->ethdev_port_id = port_id;
+
+    ret = vr_dpdk_ethdev_init(ethdev);
+    if (ret != 0)
+        return ret;
+
+    dpdk_vif_attach_ethdev(vif, ethdev);
+
+    ret = rte_eth_dev_start(port_id);
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Error starting eth device %" PRIu8": %s (%d)\n",
+                port_id, rte_strerror(-ret), -ret);
+        return ret;
+    }
+
+    /* schedule RX/TX queues */
+    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+        ethdev->ethdev_nb_rss_queues, &vr_dpdk_ethdev_rx_queue_init,
+        ethdev->ethdev_nb_tx_queues, &vr_dpdk_ethdev_tx_queue_init);
 }
 
 /* Add fabric interface */
@@ -272,9 +338,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     if (ret != 0)
         return ret;
 
-    ret = dpdk_vif_attach_ethdev(vif, ethdev);
-    if (ret)
-        return ret;
+    dpdk_vif_attach_ethdev(vif, ethdev);
 
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
@@ -301,33 +365,57 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         ethdev->ethdev_nb_tx_queues, &vr_dpdk_ethdev_tx_queue_init);
 }
 
-/* Delete fabric interface */
+/* Delete fabric or af_packet interface */
 static int
-dpdk_fabric_if_del(struct vr_interface *vif)
+dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
 {
     uint8_t port_id;
+    struct vr_dpdk_ethdev *ethdev;
+    struct rte_eth_dev *ethdev_ptr;
 
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u\n", vif->vif_idx);
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u %s device\n", vif->vif_idx,
+            vif_is_fabric(vif) ? "eth" : "af_packet");
 
     /*
      * If dpdk_fabric_if_add() failed before dpdk_vif_attach_ethdev,
      * then vif->vif_os will be NULL.
      */
     if (vif->vif_os == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error deleting eth dev %s: already removed\n",
-                vif->vif_name);
+        RTE_LOG(ERR, VROUTER, "    error deleting %s dev %s: already removed\n",
+                vif_is_fabric(vif) ? "eth" : "af_packet", vif->vif_name);
         return -EEXIST;
     }
 
-    port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
+    ethdev = (struct vr_dpdk_ethdev *)(vif->vif_os);
+    ethdev_ptr = ethdev->ethdev_ptr;
+    port_id = ethdev->ethdev_port_id;
 
     /* unschedule RX/TX queues */
     vr_dpdk_lcore_if_unschedule(vif);
 
     rte_eth_dev_stop(port_id);
 
+    /* af_packet release */
+    if (vif_is_namespace(vif)) {
+        /**
+         * af_packet does not implement rte_driver.uninit() that should
+         * free memory and call rte_eth_dev_release_port(). If we ever wanted
+         * to move to the pcap driver, we should call rte_eth_dev_close(),
+         * then rte_eth_dev_detach(). _detach() will call .uninit(), that is
+         * implemented in pcap. .uninit() will free memory and call
+         * _release_port().
+         */
+        rte_eth_dev_close(port_id);
+
+        rte_free(ethdev_ptr->data->dev_private);
+        rte_free(ethdev_ptr->data);
+        rte_free(ethdev_ptr->pci_dev);
+
+        rte_eth_dev_release_port(ethdev_ptr);
+    }
+
     /* release eth device */
-    return vr_dpdk_ethdev_release(vif->vif_os);
+    return vr_dpdk_ethdev_release(ethdev);
 }
 
 /* Add vhost interface */
@@ -582,26 +670,16 @@ dpdk_if_add(struct vr_interface *vif)
     if (vr_dpdk_is_stop_flag_set())
         return -EINPROGRESS;
 
-    if (vif_is_fabric(vif)) {
-        return dpdk_fabric_if_add(vif);
-    } else if (vif_is_virtual(vif)) {
-        return dpdk_virtual_if_add(vif);
-    } else if (vif_is_vhost(vif)) {
-        return dpdk_vhost_if_add(vif);
-    } else if (vif->vif_type == VIF_TYPE_AGENT) {
-        if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
-            return dpdk_agent_if_add(vif);
+    if      (vif_is_fabric(vif))        return dpdk_fabric_if_add(vif);
+    else if (vif_is_vm(vif))            return dpdk_virtual_if_add(vif);
+    else if (vif_is_namespace(vif))     return dpdk_af_packet_if_add(vif);
+    else if (vif_is_vhost(vif))         return dpdk_vhost_if_add(vif);
+    else if (vif_is_agent(vif))         return dpdk_agent_if_add(vif);
+    else if (vif_is_monitoring(vif))    return dpdk_monitoring_if_add(vif);
 
-        RTE_LOG(ERR, VROUTER, "Error adding vif %d packet device %s: "
-                "unsupported transport %d\n",
-                vif->vif_idx, vif->vif_name, vif->vif_transport);
-        return -EFAULT;
-    } else if (vif->vif_type == VIF_TYPE_MONITORING) {
-        return dpdk_monitoring_if_add(vif);
-    }
-
-    RTE_LOG(ERR, VROUTER, "Error adding vif %d (%s): unsupported interface type %d\n",
-            vif->vif_idx, vif->vif_name, vif->vif_type);
+    RTE_LOG(ERR, VROUTER,
+            "Error adding vif %d (%s): unsupported interface type %d transport %d\n",
+            vif->vif_idx, vif->vif_name, vif->vif_type, vif->vif_transport);
 
     return -EFAULT;
 }
@@ -612,18 +690,12 @@ dpdk_if_del(struct vr_interface *vif)
     if (vr_dpdk_is_stop_flag_set())
         return -EINPROGRESS;
 
-    if (vif_is_fabric(vif)) {
-        return dpdk_fabric_if_del(vif);
-    } else if (vif_is_virtual(vif)) {
-        return dpdk_virtual_if_del(vif);
-    } else if (vif_is_vhost(vif)) {
-        return dpdk_vhost_if_del(vif);
-    } else if (vif->vif_type == VIF_TYPE_AGENT) {
-        if (vif->vif_transport == VIF_TRANSPORT_SOCKET)
-            return dpdk_agent_if_del(vif);
-    } else if (vif->vif_type == VIF_TYPE_MONITORING) {
-        return dpdk_monitoring_if_del(vif);
-    }
+    if      (vif_is_fabric(vif) ||
+             vif_is_namespace(vif))    return dpdk_fabric_af_packet_if_del(vif);
+    else if (vif_is_vm(vif))           return dpdk_virtual_if_del(vif);
+    else if (vif_is_vhost(vif))        return dpdk_vhost_if_del(vif);
+    else if (vif_is_agent(vif))        return dpdk_agent_if_del(vif);
+    else if (vif_is_monitoring(vif))   return dpdk_monitoring_if_del(vif);
 
     RTE_LOG(ERR, VROUTER, "Unsupported interface type %d index %d\n",
             vif->vif_type, vif->vif_idx);
