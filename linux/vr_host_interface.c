@@ -782,7 +782,8 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             skb_set_network_header(skb, (network_off - skb_headroom(skb)));
             skb_reset_mac_len(skb);
         }
-    } else if (vr_pkt_type_is_overlay(pkt->vp_type)) {
+    } else if (vr_pkt_type_is_overlay(pkt->vp_type) ||
+            vr_pkt_needs_csum_gso_update(pkt)) {
         network_off = pkt_get_inner_network_header_off(pkt);
 
         if (network_off) {
