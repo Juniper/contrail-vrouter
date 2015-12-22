@@ -494,6 +494,17 @@ vr_pkt_type_is_overlay(unsigned short type)
 }
 
 static inline bool
+vr_pkt_needs_csum_gso_update(struct vr_packet *pkt)
+{
+    if (pkt->vp_flags & VP_FLAG_FROM_DP) {
+        if (pkt->vp_flags & (VP_FLAG_CSUM_PARTIAL | VP_FLAG_GSO))
+            return true;
+    }
+
+    return false;
+}
+
+static inline bool
 vr_pkt_is_diag(struct vr_packet *pkt)
 {
     if (pkt->vp_flags & VP_FLAG_DIAG)
