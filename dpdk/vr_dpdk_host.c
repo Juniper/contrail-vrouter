@@ -24,6 +24,7 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <sys/user.h>
+#include <sys/resource.h>
 
 #include <rte_cycles.h>
 #include <rte_errno.h>
@@ -1313,6 +1314,49 @@ vr_dpdk_host_exit(void)
     return;
 }
 
+/*
+ * vr_dpdk_set_fd_limit - set the max number of open files for the process. The
+ * user space vhost server requires one socket per interface. Allow a few more than
+ * that.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+vr_dpdk_set_fd_limit(void)
+{
+    struct rlimit rl;
+    int ret, old_cur;
+
+    ret = getrlimit(RLIMIT_NOFILE, &rl);
+    if (ret != 0) {
+        RTE_LOG(ERR, VROUTER,
+            "Could not get resource limits, error %d\n", errno);
+        return -1;
+    }
+
+    old_cur = (int) rl.rlim_cur;
+    if (rl.rlim_max < (VR_MAX_INTERFACES + VR_DPDK_NUM_FDS)) {
+        rl.rlim_cur = rl.rlim_max;
+    } else {
+        rl.rlim_cur = VR_MAX_INTERFACES + VR_DPDK_NUM_FDS;
+    }
+
+    ret = setrlimit(RLIMIT_NOFILE, &rl);
+    if (ret) {
+        RTE_LOG(ERR, VROUTER,
+            "Could not set fd limit to %d (max %d), error %d\n",
+                (int) rl.rlim_cur, (int) rl.rlim_max, errno);
+        return -1;
+    }
+
+    RTE_LOG(INFO, VROUTER,
+        "set fd limit to %d (prev %d, max %d)\n",
+        (int) rl.rlim_cur, old_cur, (int) rl.rlim_max);
+
+    return 0;
+}
+
+
 /* Init vRouter */
 int
 vr_dpdk_host_init(void)
@@ -1344,6 +1388,15 @@ vr_dpdk_host_init(void)
      * Turn off GRO/GSO as they are not implemented with DPDK.
      */
     vr_perfr = vr_perfs = 0;
+
+    /*
+     * Allow at least one file descriptor per interface (as required by the
+     * user space vhost server.
+     */
+    ret = vr_dpdk_set_fd_limit();
+    if (ret) {
+        return ret;
+    }
 
     ret = vrouter_init();
     if (ret)

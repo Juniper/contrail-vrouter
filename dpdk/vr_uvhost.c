@@ -5,6 +5,8 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
+#include <sys/poll.h>
+
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_uvhost.h"
@@ -26,6 +28,7 @@
 
 /* Global variables */
 vr_uvh_exit_callback_t vr_uvhost_exit_fn;
+struct pollfd pollfds[MAX_UVHOST_FDS];
 
 /*
  * vr_uvhost_init - initializes the user space vhost server and waits
@@ -81,7 +84,7 @@ vr_uvhost_start(void *arg)
 {
     int s = 0, ret, err;
     struct sockaddr_un sun;
-    fd_set *rfdset, *wfdset;
+    nfds_t nfds;
 
     vr_uvhost_client_init();
 
@@ -121,10 +124,11 @@ vr_uvhost_start(void *arg)
         goto error;
     }
 
-    vr_uvhost_fdset_init();
+    vr_uvhost_fds_init();
 
     if (vr_uvhost_add_fd(vr_dpdk.uvhost_event_fd, UVH_FD_READ, NULL, NULL)) {
-        vr_uvhost_log("    error adding server event FD %d\n", vr_dpdk.uvhost_event_fd);
+        vr_uvhost_log("    error adding server event FD %d\n", 
+                      vr_dpdk.uvhost_event_fd);
         goto error;
     }
     if (vr_uvhost_add_fd(s, UVH_FD_READ, NULL, vr_uvh_nl_listen_handler)) {
@@ -133,13 +137,11 @@ vr_uvhost_start(void *arg)
     }
 
     while (1) {
-        vr_uvh_recalc_max_fd();
-        rfdset = vr_uvh_rfdset_p();
-        wfdset = vr_uvh_wfdset_p();
+        vr_uvh_init_pollfds(pollfds, &nfds);
 
         rcu_thread_offline();
-        if (select(vr_uvh_max_fd()+1, rfdset, wfdset, NULL, NULL) == -1) {
-            vr_uvhost_log("    error selecting FDs: %s (%d)\n",
+        if (poll(pollfds, nfds, -1) < 0) {
+            vr_uvhost_log("    error polling FDs: %s (%d)\n",
                             rte_strerror(errno), errno);
             goto error;
         }
@@ -148,10 +150,8 @@ vr_uvhost_start(void *arg)
             break;
 
         rcu_thread_online();
-        if (vr_uvh_call_fd_handlers()) {
-            vr_uvhost_log("    error calling socket handlers\n");
-            goto error;
-        }
+
+        vr_uvh_call_fd_handlers(pollfds, nfds);
     }
 
 error:

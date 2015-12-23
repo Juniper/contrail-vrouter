@@ -8,6 +8,8 @@
 #ifndef __VR_UVHOST_UTIL_H__
 #define __VR_UVHOST_UTIL_H__
 
+#define MAX_UVHOST_FDS VR_MAX_INTERFACES
+
 typedef int (*uvh_fd_handler_t)(int fd, void *arg);
 
 typedef enum uvh_fd_type {
@@ -15,15 +17,12 @@ typedef enum uvh_fd_type {
     UVH_FD_WRITE = 2
 } uvh_fd_type_t;
 
-void vr_uvhost_fdset_init(void);
+void vr_uvhost_fds_init(void);
 int vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
                      uvh_fd_handler_t fd_handler);
 int vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type);
-void vr_uvh_recalc_max_fd(void);
 void vr_uvhost_log(const char *format, ...);
-int vr_uvh_max_fd(void);
-fd_set *vr_uvh_rfdset_p(void);
-fd_set *vr_uvh_wfdset_p(void);
-int vr_uvh_call_fd_handlers(void);
+void vr_uvh_call_fd_handlers(struct pollfd *fds, nfds_t nfds);
+void vr_uvh_init_pollfds(struct pollfd *fds, nfds_t *nfds);
 
 #endif /* __VR_UVHOST_UTIL_H__ */
