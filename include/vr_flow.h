@@ -290,8 +290,8 @@ struct vr_dummy_flow_entry {
     struct vr_flow fe_key;
     uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
-    unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
+    unsigned int fe_tcp_seq;
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
@@ -314,8 +314,8 @@ struct vr_flow_entry {
     struct vr_flow fe_key;
     uint8_t fe_key_packing;
     uint16_t fe_tcp_flags;
-    unsigned int fe_tcp_seq;
     struct vr_flow_queue *fe_hold_list;
+    unsigned int fe_tcp_seq;
     unsigned short fe_action;
     unsigned short fe_flags;
     int fe_rflow;
