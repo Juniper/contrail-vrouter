@@ -475,8 +475,12 @@ vr_ip_dont_fragment_set(struct vr_packet *pkt)
     struct vr_ip *ip;
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (vr_ip_is_ip6(ip))
+        return true;
+
     if (ntohs(ip->ip_frag_off) & VR_IP_DF)
         return true;
+
     return false;
 }
 
