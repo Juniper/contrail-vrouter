@@ -1317,7 +1317,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_GSO;
 
     overhead_len = VR_VXLAN_HDR_LEN;
-    if (pkt->vp_type == VP_TYPE_IP) {
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
             if (pkt->vp_flags & VP_FLAG_MULTICAST) {
@@ -1441,7 +1441,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     /* Calculate the head space for mpls,udp ip and eth */
     mudp_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
 
-    if (pkt->vp_type == VP_TYPE_IP) {
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         overhead_len = mudp_head_space;
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
@@ -1574,9 +1574,11 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         sizeof(struct vr_gre);
 
 
-    if (pkt->vp_type == VP_TYPE_IP) {
-        /* If there are any L2 headers lets add those as well. For L3
-         * unicast, folloowing will add no extra overhead */
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
+        /*
+         * If there are any L2 headers lets add those as well. For L3
+         * unicast, following will add no extra overhead
+         */
         overhead_len = gre_head_space;
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
                 vr_ip_dont_fragment_set(pkt)) {
