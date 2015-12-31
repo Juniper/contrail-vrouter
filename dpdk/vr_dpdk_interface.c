@@ -63,6 +63,22 @@ dpdk_virtual_if_add(struct vr_interface *vif)
 }
 
 /*
+ * dpdk_virtual_vlan_if_add - add a virtual VLAN interface to vRouter.
+ * Returns 0 on success, < 0 otherwise.
+ */
+static int
+dpdk_virtual_vlan_if_add(struct vr_interface *vif)
+{
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) virtual VLAN(o/i) %u/%u device %s\n",
+                vif->vif_idx, vif->vif_gen, vif->vif_ovlan_id, vif->vif_vlan_id,
+                vif->vif_name);
+    RTE_LOG(INFO, VROUTER, "    parent vif %u device %s\n",
+                vif->vif_parent->vif_idx, vif->vif_parent->vif_name);
+
+    return 0;
+}
+
+/*
  * dpdk_virtual_if_del - deletes a virtual (virtio) interface from vrouter.
  * Returns 0 on success, -1 otherwise.
  */
@@ -82,6 +98,19 @@ dpdk_virtual_if_del(struct vr_interface *vif)
     }
 
     return ret;
+}
+
+/*
+ * dpdk_virtual_vlan_if_del - deletes a virtual VLAN interface from vRouter.
+ * Returns 0 on success, < 0 otherwise.
+ */
+static int
+dpdk_virtual_vlan_if_del(struct vr_interface *vif)
+{
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u virtual VLAN(o/i) %u/%u device\n",
+                vif->vif_idx, vif->vif_ovlan_id, vif->vif_vlan_id);
+
+    return 0;
 }
 
 static inline void
@@ -672,6 +701,7 @@ dpdk_if_add(struct vr_interface *vif)
 
     if      (vif_is_fabric(vif))        return dpdk_fabric_if_add(vif);
     else if (vif_is_vm(vif))            return dpdk_virtual_if_add(vif);
+    else if (vif_is_vlan(vif))          return dpdk_virtual_vlan_if_add(vif);
     else if (vif_is_namespace(vif))     return dpdk_af_packet_if_add(vif);
     else if (vif_is_vhost(vif))         return dpdk_vhost_if_add(vif);
     else if (vif_is_agent(vif))         return dpdk_agent_if_add(vif);
@@ -693,12 +723,14 @@ dpdk_if_del(struct vr_interface *vif)
     if      (vif_is_fabric(vif) ||
              vif_is_namespace(vif))    return dpdk_fabric_af_packet_if_del(vif);
     else if (vif_is_vm(vif))           return dpdk_virtual_if_del(vif);
+    else if (vif_is_vlan(vif))         return dpdk_virtual_vlan_if_del(vif);
     else if (vif_is_vhost(vif))        return dpdk_vhost_if_del(vif);
     else if (vif_is_agent(vif))        return dpdk_agent_if_del(vif);
     else if (vif_is_monitoring(vif))   return dpdk_monitoring_if_del(vif);
 
-    RTE_LOG(ERR, VROUTER, "Unsupported interface type %d index %d\n",
-            vif->vif_type, vif->vif_idx);
+    RTE_LOG(ERR, VROUTER,
+            "Error deleting vif %d: unsupported interface type %d transport %d\n",
+            vif->vif_idx, vif->vif_type, vif->vif_transport);
 
     return -EFAULT;
 }
