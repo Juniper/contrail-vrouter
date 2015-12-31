@@ -532,8 +532,8 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
             lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0]
                                                   & LCORE_RX_RING_NB_PKTS_MASK;
             if (likely(lcore_nb_pkts > 1)) {
-                RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet to lcore %u\n",
-                     __func__, lcore_nb_pkts, dst_fwd_lcore_idx);
+                RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet(s) to lcore %u\n",
+                     __func__, lcore_nb_pkts - 1, dst_fwd_lcore_idx);
 
                 /* round up the number of packets to the chunk size */
                 chunk_nb_pkts = (lcore_nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
@@ -611,7 +611,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     struct rte_mbuf *mbuf;
     struct vr_packet *pkt;
     struct vr_dpdk_queue *monitoring_tx_queue;
-    struct vr_packet *p_clone;
+    struct rte_mbuf *p_copy;
     unsigned short vlan_id = VLAN_ID_INVALID;
 
     RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
@@ -624,10 +624,15 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
                 mbuf = pkts[i];
                 /* convert mbuf to vr_packet */
                 pkt = vr_dpdk_packet_get(mbuf, vif);
-                p_clone = vr_pclone(pkt);
-                if (likely(p_clone != NULL))
+                /*
+                 * dp-core changes the original packet, so clone does not work
+                 * as expected here.
+                 */
+                p_copy = vr_dpdk_pktmbuf_copy(mbuf, vr_dpdk.rss_mempool);
+                if (likely(p_copy != NULL)) {
                     monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
-                        vr_dpdk_pkt_to_mbuf(p_clone));
+                                                        p_copy);
+                }
             }
         }
     }
