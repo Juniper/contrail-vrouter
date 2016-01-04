@@ -226,7 +226,7 @@ dpdk_af_packet_if_add(struct vr_interface *vif) {
     RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) af_packet device %s type %d transport %d\n",
             vif->vif_idx, vif->vif_gen, vif->vif_name, vif->vif_type, vif->vif_transport);
 
-    ret = snprintf(name, VR_INTERFACE_NAME_LEN, "eth_af_packet_%d", vif->vif_idx);
+    ret = snprintf(name, VR_INTERFACE_NAME_LEN, "eth_vif_%d", vif->vif_idx);
     if (ret < 0 || ret > VR_INTERFACE_NAME_LEN) {
         RTE_LOG(ERR, VROUTER, "Error creating name for AF_PACKET %s\n", name);
         return ret;
