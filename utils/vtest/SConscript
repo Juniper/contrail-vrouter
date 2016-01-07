@@ -20,11 +20,21 @@ xml_cpppath = os.popen('xml2-config --cflags | sed \'s/\-I//g\'').read()
 #env.Append(CPPPATH = xml_cpppath)
 
 # CFLAGS
-env.Append(CCFLAGS = '-g')
+env.Append(CCFLAGS = '-g -std=gnu99')
+
+
+libvrutil = 'vrutil'
+libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'), 
+                  env.Object('udp_util.lo', '../udp_util.c'),
+                  env.Object('ini_parser.lo', '../ini_parser.c'),
+                  env.Object('vr_util.lo', '../vr_util.c')]
+
+env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh'])
-env.Replace(LIBS = ['sandesh-c', 'dp_sandesh_c', 'xml2'])
+env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'xml2', 'pcap', 'rt'])
+
 
 sandesh_gen = env.Program('sandesh_gen.c')
 
@@ -39,6 +49,11 @@ vtest_src = [
                 'vt_gen_message_modules.c',
                 'vt_gen_sandesh.c',
                 'vt_gen_sandesh_expect.c',
+                'vhost/uvhost.c',
+                'vhost/util.c',
+                'vhost/client.c',
+                'vhost/virt_queue.c',
+                'vhost/sh_mem.c',
             ]
 
 

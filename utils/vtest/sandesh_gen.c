@@ -54,8 +54,9 @@ static char part_gen[] = {"\
         return NULL;\n\n\
     node = node->xmlChildrenNode;\n\
     while (node) {\n\
-        if (!node->content || !strlen(node->content)) {\n\
-            return NULL;\n\
+        if (node->type == XML_TEXT_NODE) {\n\
+            node = node->next;\n\
+            continue;\n\
         }\n\n\
 "
 };
@@ -395,13 +396,19 @@ gen(FILE *fp)
             gen_write(ofp, 0, "\"");
             gen_raw_write(ofp, 0, var, var_len);
             gen_write(ofp, 0, "\"");
-            gen_write(ofp, 0, ", strlen(node->content))) {\n");
+            gen_write(ofp, 0, ", sizeof(");
+            gen_write(ofp, 0, "\"");
+            gen_raw_write(ofp, 0, var, var_len);
+            gen_write(ofp, 0, "\"");
+            gen_write(ofp, 0, "))) {\n");
 
             gen_write(fp_expect, 0, "if (!strncmp(node->name, ");
             gen_write(fp_expect, 0, "\"");
             gen_raw_write(fp_expect, 0, var, var_len);
             gen_write(fp_expect, 0, "\"");
-            gen_write(fp_expect, 0, ", strlen(node->content))) {\n");
+            gen_write(fp_expect, 0, ", strlen(node->name))) {\n");
+
+            gen_write(ofp, nesting, "if (node->children && node->children->content)\n");
 
             gen_write(ofp, ++nesting, "req->");
             gen_raw_write(ofp, 0, var, var_len);
@@ -410,64 +417,64 @@ gen(FILE *fp)
             gen_write(fp_expect, nesting, "");
 
             if (!strncmp(type, "i32", strlen("i32"))) {
-                gen_write(ofp, 0, "strtoul(node->content, NULL, 0);\n");
+                gen_write(ofp, 0, "strtoul(node->children->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_int_compare(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
                 gen_write(fp_expect, 0, ",\n");
-                gen_write(fp_expect, nesting + 4, "strtoul(node->content, NULL, 0)");
+                gen_write(fp_expect, nesting + 4, "strtoul(node->children->content, NULL, 0)");
                 gen_write(fp_expect, 0, ");\n");
 
             } else if (!strncmp(type, "u32", strlen("u32"))) {
-                gen_write(ofp, 0, "strtoul(node->content, NULL, 0);\n");
+                gen_write(ofp, 0, "strtoul(node->children->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_int_compare(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
                 gen_write(fp_expect, 0, ",\n");
-                gen_write(fp_expect, nesting + 4, "strtoul(node->content, NULL, 0)");
+                gen_write(fp_expect, nesting + 4, "strtoul(node->children->content, NULL, 0)");
                 gen_write(fp_expect, 0, ");\n");
 
             } else if (!strncmp(type, "i64", strlen("i64"))) {
-                gen_write(ofp, 0, "strtoull(node->content, NULL, 0);\n");
+                gen_write(ofp, 0, "strtoull(node->children->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_int64_compare(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
                 gen_write(fp_expect, 0, ",\n");
-                gen_write(fp_expect, nesting + 4, "strtoul(node->content, NULL, 0)");
+                gen_write(fp_expect, nesting + 4, "strtoul(node->children->content, NULL, 0)");
                 gen_write(fp_expect, 0, ");\n");
 
             } else if (!strncmp(type, "i16", strlen("i16"))) {
-                gen_write(ofp, 0, "strtoul(node->content, NULL, 0);\n");
+                gen_write(ofp, 0, "strtoul(node->children->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_short_compare(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
                 gen_write(fp_expect, 0, ",\n");
-                gen_write(fp_expect, nesting + 4, "strtoul(node->content, NULL, 0));\n");
+                gen_write(fp_expect, nesting + 4, "strtoul(node->children->content, NULL, 0));\n");
 
             } else if (!strncmp(type, "byte", strlen("byte"))) {
-                gen_write(ofp, 0, "strtoul(node->content, NULL, 0);\n");
+                gen_write(ofp, 0, "strtoul(node->children->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_byte_compare(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
                 gen_write(fp_expect, 0, ",\n");
-                gen_write(fp_expect, nesting + 4, "strtoul(node->content, NULL, 0)");
+                gen_write(fp_expect, nesting + 4, "strtoul(node->children->content, NULL, 0)");
                 gen_write(fp_expect, 0, ");\n");
 
             } else if (!strncmp(type, "sandesh_op", strlen("sandesh_op"))) {
-                gen_write(ofp, 0, "vt_gen_op(node->content);\n");
+                gen_write(ofp, 0, "vt_gen_op(node->children->content);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_op_compare(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
-                gen_write(fp_expect, 0, ", node->content);\n");
+                gen_write(fp_expect, 0, ", node->children->content);\n");
 
             } else if (!strncmp(type, "flow_op", strlen("flow_op"))) {
-                gen_write(ofp, 0, "vt_gen_flow_op(node->content);\n");
+                gen_write(ofp, 0, "vt_gen_flow_op(node->children->content);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_flow_op_compare(");
                 gen_write(fp_expect, 0, "req->");
@@ -476,7 +483,7 @@ gen(FILE *fp)
 
             } else if (!strncmp(type, "list", strlen("list"))) {
                 if (!strncmp(sub_type, "byte", strlen("byte"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->content, GEN_TYPE_U8, &list_size);\n");
+                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U8, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
                     gen_write(fp_expect, 0, "req->");
@@ -485,10 +492,10 @@ gen(FILE *fp)
                     gen_write(fp_expect, nesting + 2, "req->");
                     gen_raw_write(fp_expect, 0, var, var_len);
                     gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->content, GEN_TYPE_U8);\n");
+                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U8);\n");
 
                 } else if (!strncmp(sub_type, "i16", strlen("i32"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->content, GEN_TYPE_U16, &list_size);\n");
+                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U16, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
                     gen_write(fp_expect, 0, "req->");
@@ -497,10 +504,10 @@ gen(FILE *fp)
                     gen_write(fp_expect, nesting + 2, "req->");
                     gen_raw_write(fp_expect, 0, var, var_len);
                     gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->content, GEN_TYPE_U16);\n");
+                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U16);\n");
 
                 } else if (!strncmp(sub_type, "i32", strlen("i32"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->content, GEN_TYPE_U32, &list_size);\n");
+                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U32, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
                     gen_write(fp_expect, 0, "req->");
@@ -509,10 +516,10 @@ gen(FILE *fp)
                     gen_write(fp_expect, nesting + 2, "req->");
                     gen_raw_write(fp_expect, 0, var, var_len);
                     gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->content, GEN_TYPE_U32);\n");
+                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U32);\n");
 
                 } else if (!strncmp(sub_type, "i64", strlen("i32"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->content, GEN_TYPE_U64, &list_size);\n");
+                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U64, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
                     gen_write(fp_expect, 0, "req->");
@@ -521,7 +528,7 @@ gen(FILE *fp)
                     gen_write(fp_expect, nesting + 2, "req->");
                     gen_raw_write(fp_expect, 0, var, var_len);
                     gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->content, GEN_TYPE_U64);\n");
+                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U64);\n");
 
                 }
 
@@ -529,12 +536,12 @@ gen(FILE *fp)
                 gen_raw_write(ofp, 0, var, var_len);
                 gen_write(ofp, 0, "_size = list_size;\n");
             } else if (!strncmp(type, "string", strlen("string"))) {
-                gen_write(ofp, 0, "vt_gen_string(node->content);\n");
+                gen_write(ofp, 0, "vt_gen_string(node->children->content);\n");
 
                 gen_write(fp_expect, 0, "result = strcmp(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
-                gen_write(fp_expect, 0, ", node->content);\n");
+                gen_write(fp_expect, 0, ", node->children->content);\n");
 
             }
 

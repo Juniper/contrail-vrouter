@@ -10,8 +10,8 @@
 extern "C" {
 #endif
 struct vn_if {
-    char if_name[IFNAMSIZ];
-    char if_kind[IFNAMSIZ];
+    char if_name[16];
+    char if_kind[16];
     char if_mac[6];
     unsigned int if_index;
     unsigned int if_type;
