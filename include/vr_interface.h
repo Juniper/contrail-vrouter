@@ -104,7 +104,7 @@ typedef enum {
     MR_FLOOD,
     MR_PROXY,
     MR_NOT_ME,
-    MR_TRAP,
+    MR_MIRROR,
     MR_TRAP_X,
     MR_XCONNECT,
 } mac_response_t;
