@@ -1080,19 +1080,35 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
         /* if NIC supports checksum offload */
         if (likely((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) &&
-                   !will_fragment))
+                   !will_fragment)) {
             /* Can not do hardware checksumming for fragmented packets */
             dpdk_hw_checksum(pkt);
-        else {
-            dpdk_sw_checksum(pkt, will_fragment);
+        } else {
+            /**
+             * Bypass checksum calculation for VM-VM traffic inside the same
+             * compute node, including traffic travelling through a network
+             * namespace. Such packets, when received from VM or NS, have
+             * PKT_RX_IP_CKSUM_BAD set in rte_mbuf, which is then translated to
+             * VP_FLAG_CSUM_PARTIAL during rte_mbuf to vr_packet convertion.
+             * If we send such packet to another VM, it will have
+             * VIRTIO_NET_HDR_F_DATA_VALID flag set in virtio header,
+             * to indicate that data is valid, despite invalid checksum.
+             *
+             * See for reference:
+             * dpdk/vr_dpdk_virtio.c:dpdk_virtio_dev_to_vm_tx_burst()
+             * dpdk/vr_dpdk_ethdev.c:vr_dpdk_ethdev_rx_emulate()
+             * dpdk/vr_dpdk_host.c:vr_dpdk_packet_get()
+             */
+            if (!vif_is_vm(vif)) {
+                dpdk_sw_checksum(pkt, will_fragment);
 
-            /* We could not calculate the inner checkums in hardware, but we
-             * still can do outer header in hardware. */
-            if (unlikely(will_fragment &&
-                        (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
-                dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+                /* We could not calculate the inner checkums in hardware, but we
+                 * still can do outer header in hardware. */
+                if (unlikely(will_fragment &&
+                            (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
+                    dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+            }
         }
-
     } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
         /* If NIC supports checksum offload.
          * Inner checksum is already done. Compute outer IPv4 checksum,
