@@ -1084,13 +1084,15 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             /* Can not do hardware checksumming for fragmented packets */
             dpdk_hw_checksum(pkt);
         else {
-            dpdk_sw_checksum(pkt, will_fragment);
+            if (!vif_is_vm(vif)) {
+                dpdk_sw_checksum(pkt, will_fragment);
 
-            /* We could not calculate the inner checkums in hardware, but we
-             * still can do outer header in hardware. */
-            if (unlikely(will_fragment &&
-                        (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
-                dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+                /* We could not calculate the inner checkums in hardware, but we
+                 * still can do outer header in hardware. */
+                if (unlikely(will_fragment &&
+                            (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
+                    dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+            }
         }
 
     } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {

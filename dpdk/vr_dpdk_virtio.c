@@ -808,6 +808,10 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         res_cur_idx++;
         packet_success++;
 
+        /* If packet is from namespace to VM, bypass checksum validation in guest */
+        if (buff->ol_flags & PKT_RX_IP_CKSUM_BAD)
+            virtio_hdr.hdr.flags = VIRTIO_NET_HDR_F_DATA_VALID;
+
         /* TODO: in DPDK 2.1 we do not copy the header
         if (unlikely(uncompleted_pkt == 1))
             continue;

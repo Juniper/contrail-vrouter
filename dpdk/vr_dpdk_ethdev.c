@@ -984,6 +984,10 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
         }
     }
 
+    if (unlikely(vif_is_namespace(vif)))
+        for (i = 0; i < *nb_pkts; i++)
+            pkts[i]->ol_flags |= PKT_RX_IP_CKSUM_BAD;
+
     /* no RSS needed for just one lcore */
     if (unlikely(vr_dpdk.nb_fwd_lcores == 1))
         return 0;
