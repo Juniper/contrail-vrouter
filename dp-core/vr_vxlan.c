@@ -19,6 +19,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
 {
     struct vr_vxlan *vxlan;
     unsigned int vnid, drop_reason;
+    unsigned int flags;
     struct vr_nexthop *nh;
     struct vr_forwarding_md c_fmd;
     struct vr_ip *ip;
@@ -32,7 +33,8 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     fmd->fmd_outer_src_ip = ip->ip_saddr;
 
     vxlan = (struct vr_vxlan *)pkt_data(pkt);
-    if (ntohl(vxlan->vxlan_flags) != VR_VXLAN_IBIT) {
+    flags = ntohl(vxlan->vxlan_flags);
+    if (!(flags & VR_VXLAN_IBIT)) {
         drop_reason = VP_DROP_INVALID_VNID;
         goto fail;
     }
@@ -57,7 +59,6 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         drop_reason = VP_DROP_INVALID_PACKET;
         goto fail;
     }
-    pkt->vp_flags |= VP_FLAG_GRO;
 
     if (nh->nh_vrf >= 0) {
         fmd->fmd_dvrf = nh->nh_vrf;
@@ -67,6 +68,12 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         fmd->fmd_dvrf = pkt->vp_if->vif_vrf;
     }
 
+    if (flags & VR_VXLAN_RABIT) {
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ROUTER_ALERT, NULL);
+        return 0;
+    }
+
+    pkt->vp_flags |= VP_FLAG_GRO;
     return nh_output(pkt, nh, fmd);
 
 fail:

@@ -716,6 +716,7 @@ struct vr_vxlan {
 } __attribute__((packed));
 
 #define VR_VXLAN_IBIT               0x08000000
+#define VR_VXLAN_RABIT              0x01000000
 #define VR_UDP_HEAD_SPACE           62 /* eth + Ip + iP + udp */
 
 /* Mirror packet can be either MPLSoGre or MPLSoUDP. Lets calculate the
