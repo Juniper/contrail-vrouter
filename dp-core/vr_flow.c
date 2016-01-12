@@ -213,7 +213,6 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe,
     }
     fe->fe_hold_list = NULL;
     fe->fe_key.flow_key_len = 0;
-    fe->fe_type = VP_TYPE_NULL;
     memset(&fe->fe_key, 0, sizeof(fe->fe_key));
 
     vr_flow_reset_mirror(router, fe, index);
@@ -224,7 +223,7 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe,
     fe->fe_udp_src_port = 0;
     fe->fe_tcp_flags = 0;
     fe->fe_flags &=
-        (VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_EVICT_CANDIDATE |
+        (VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_EVICTED |
          VR_FLOW_FLAG_NEW_FLOW);
 
     return;
@@ -236,6 +235,7 @@ vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe,
 {
     __vr_flow_reset_entry(router, fe, index);
     memset(&fe->fe_stats, 0, sizeof(fe->fe_stats));
+    fe->fe_type = VP_TYPE_NULL;
     fe->fe_flags = 0;
 
     return;
