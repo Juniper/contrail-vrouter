@@ -70,6 +70,9 @@ struct genl_ctrl_message {
 #define NLA_LEN(nla)                    (nla->nla_len - NLA_HDRLEN)
 #define GENLMSG_DATA(buf)               ((char *)buf + GENL_HDRLEN)
 
+/* Suppress NetLink error messages */
+extern bool vr_ignore_nl_errors;
+
 extern struct nl_client *nl_register_client(void);
 extern void nl_free_client(struct nl_client *cl);
 extern int nl_socket(struct nl_client *, int, int , int);

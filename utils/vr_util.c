@@ -32,6 +32,9 @@
 #include "vr_route.h"
 #include "ini_parser.h"
 
+/* Suppress NetLink error messages */
+bool vr_ignore_nl_errors = false;
+
 /* send and receive */
 int
 vr_recvmsg(struct nl_client *cl, bool dump)
@@ -144,7 +147,10 @@ vr_response_common_process(vr_response *resp, bool *dump_pending)
         *dump_pending = false;
 
     if (resp->resp_code < 0) {
-        printf("vRouter(Response): %s\n", strerror(-resp->resp_code));
+        if (!vr_ignore_nl_errors) {
+            printf("vRouter(Response): %s (%d)\n", strerror(-resp->resp_code),
+                    -resp->resp_code);
+        }
         ret = resp->resp_code;
     } else {
         if ((resp->resp_code & VR_MESSAGE_DUMP_INCOMPLETE) &&
