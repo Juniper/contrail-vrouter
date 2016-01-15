@@ -208,6 +208,7 @@ dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
 
 /**
  * Creates a copy of the given packet mbuf.
+ * TODO: remove once rte_pktmbuf_copy() is in DPDK
  *
  * Walks through all segments of the given packet mbuf, and for each of them:
  *  - Creates a new packet mbuf from the given pool.
@@ -223,9 +224,8 @@ dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
  *   - The pointer to the new "copy" mbuf on success.
  *   - NULL if allocation fails.
  */
-static inline struct rte_mbuf *
-dpdk_pktmbuf_copy(struct rte_mbuf *md,
-        struct rte_mempool *mp)
+inline struct rte_mbuf *
+vr_dpdk_pktmbuf_copy(struct rte_mbuf *md, struct rte_mempool *mp)
 {
     struct rte_mbuf *mc, *mi, **prev;
     uint32_t pktlen;
@@ -293,7 +293,7 @@ dpdk_pclone(struct vr_packet *pkt)
 
     m = vr_dpdk_pkt_to_mbuf(pkt);
 
-    m_copy = dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);
+    m_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);
     if (!m_copy)
         return NULL;
 
@@ -363,7 +363,6 @@ dpdk_pcopy(unsigned char *dst, struct vr_packet *p_src,
 
     return len;
 }
-
 
 static unsigned short
 dpdk_pfrag_len(struct vr_packet *pkt)
