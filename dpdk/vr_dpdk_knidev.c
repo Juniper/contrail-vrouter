@@ -204,6 +204,16 @@ send_burst(struct dpdk_knidev_writer *p)
 static int
 dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
 {
+    if ((uintptr_t)pkt < vr_dpdk.rss_mempool->elt_va_start ||
+        (uintptr_t)pkt > vr_dpdk.rss_mempool->elt_va_end   ||
+        (uintptr_t)pkt->buf_addr < vr_dpdk.rss_mempool->elt_va_start ||
+        (uintptr_t)pkt->buf_addr > vr_dpdk.rss_mempool->elt_va_end) {
+        RTE_LOG(ERR, VROUTER,
+            "TX to KNI failed: mbuf address is not from rss mempool\n");
+        vr_dpdk_pfree(pkt, VP_DROP_INVALID_PACKET);
+        return 0;
+    }
+
     struct dpdk_knidev_writer *p = (struct dpdk_knidev_writer *) port;
 
     p->tx_buf[p->tx_buf_count++] = pkt;
