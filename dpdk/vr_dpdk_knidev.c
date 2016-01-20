@@ -459,8 +459,8 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
         if (ret < 0) {
             RTE_LOG(ERR, VROUTER, "Error changing eth device %" PRIu8
                 " MTU: %s (%d)\n", port_id, rte_strerror(-ret), -ret);
+            return ret;
         }
-        return ret;
     }
 
     /* On success, inform vrouter about new MTU */
