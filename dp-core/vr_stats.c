@@ -226,6 +226,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_MTRIE_STATS_OBJECT].ms_free);
         response->vms_mtrie_table_object += (stats_block[VR_MTRIE_TABLE_OBJECT].ms_alloc -
                 stats_block[VR_MTRIE_TABLE_OBJECT].ms_free);
+        response->vms_network_address_object += (stats_block[VR_NETWORK_ADDRESS_OBJECT].ms_alloc -
+                stats_block[VR_NETWORK_ADDRESS_OBJECT].ms_free);
         response->vms_nexthop_object += (stats_block[VR_NEXTHOP_OBJECT].ms_alloc -
                 stats_block[VR_NEXTHOP_OBJECT].ms_free);
         response->vms_nexthop_component_object += (stats_block[VR_NEXTHOP_COMPONENT_OBJECT].ms_alloc -

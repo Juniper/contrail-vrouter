@@ -80,6 +80,18 @@ vrouter_free_nexthop(struct vr_nexthop *nh)
             vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
             nh->nh_component_nh = NULL;
         }
+    } else if ((nh->nh_type == NH_TUNNEL) &&
+            (nh->nh_flags & NH_FLAG_TUNNEL_UDP) &&
+            (nh->nh_family == AF_INET6)) {
+        if (nh->nh_udp_tun6_sip) {
+            vr_free(nh->nh_udp_tun6_sip, VR_NETWORK_ADDRESS_OBJECT);
+            nh->nh_udp_tun6_sip = NULL;
+        }
+
+        if (nh->nh_udp_tun6_dip) {
+            vr_free(nh->nh_udp_tun6_dip, VR_NETWORK_ADDRESS_OBJECT);
+            nh->nh_udp_tun6_dip = NULL;
+        }
     }
 
     if (nh->nh_dev) {
@@ -388,6 +400,45 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
      */
     ip->ip_csum = 0;
     ip->ip_csum = vr_ip_csum(ip);
+
+    return true;
+}
+
+static bool
+nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
+{
+    struct vr_ip6 *ip6;
+    struct vr_udp *udp;
+
+    /* udp Header */
+    udp = (struct vr_udp *)pkt_push(pkt, sizeof(struct vr_udp));
+    if (!udp) {
+        return false;
+    }
+
+    udp->udp_sport = nh->nh_udp_tun6_sport;
+    udp->udp_dport = nh->nh_udp_tun6_dport;
+    udp->udp_length = htons(pkt_len(pkt));
+    udp->udp_csum = 0;
+
+    /* And now the IP6 header */
+    ip6 = (struct vr_ip6 *)pkt_push(pkt, sizeof(struct vr_ip6));
+    if (!ip6) {
+        return false;
+    }
+
+    ip6->ip6_version = 6;
+    ip6->ip6_priority_l = 0;
+    ip6->ip6_priority_h = 0;
+    ip6->ip6_flow_l = 0;
+    ip6->ip6_flow_h = 0;
+    ip6->ip6_plen = htons(pkt_len(pkt) - sizeof(struct vr_ip6));
+    ip6->ip6_nxt = VR_IP_PROTO_UDP;
+    ip6->ip6_hlim = 64;
+
+    memcpy(ip6->ip6_src, nh->nh_udp_tun6_sip, VR_IP6_ADDRESS_LEN);
+    memcpy(ip6->ip6_dst, nh->nh_udp_tun6_dip, VR_IP6_ADDRESS_LEN);
+
 
     return true;
 }
@@ -1230,39 +1281,68 @@ static int
 nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
               struct vr_forwarding_md *fmd)
 {
+    unsigned int head_space;
+
     struct vr_packet *tmp;
     struct vr_ip *ip;
+    struct vr_ip6 *ip6;
     struct vr_udp *udp;
     struct vr_vrf_stats *stats;
 
     if (!fmd)
         goto send_fail;
 
-    if (pkt_head_space(pkt) < VR_UDP_HEAD_SPACE) {
-        tmp = vr_palloc_head(pkt, VR_UDP_HEAD_SPACE);
+    if (nh->nh_family == AF_INET)
+        head_space = VR_UDP_HEAD_SPACE;
+    else if (nh->nh_family == AF_INET6)
+        head_space = VR_UDP6_HEAD_SPACE;
+    else
+        goto send_fail;
+
+    if (pkt_head_space(pkt) < head_space) {
+        tmp = vr_palloc_head(pkt, head_space);
         if (!tmp)
             goto send_fail;
 
         pkt = tmp;
-        if (!pkt_reserve_head_space(pkt, VR_UDP_HEAD_SPACE))
+        if (!pkt_reserve_head_space(pkt, head_space))
             goto send_fail;
     }
 
-    if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
-                             nh->nh_udp_tun_dport, nh->nh_udp_tun_sip,
-                             nh->nh_udp_tun_dip) == false) {
-        goto send_fail;
+    if (nh->nh_family == AF_INET) {
+        if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
+                    nh->nh_udp_tun_dport, nh->nh_udp_tun_sip,
+                    nh->nh_udp_tun_dip) == false) {
+            goto send_fail;
+        }
+
+        if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
+            goto send_fail;
+
+        ip = (struct vr_ip *)(pkt_data(pkt));
+        udp = (struct vr_udp *)((char *)ip + ip->ip_hl * 4);
+        udp->udp_csum = vr_ip_partial_csum(ip);
+
+    } else if (nh->nh_family == AF_INET6) {
+        if (nh_udp_tunnel6_helper(pkt, nh) == false) {
+            goto send_fail;
+        }
+
+        ip6 = (struct vr_ip6 *)(pkt_data(pkt));
+        udp = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
+        udp->udp_csum = vr_ip6_partial_csum(ip6);
     }
+
+
     pkt_set_network_header(pkt, pkt->vp_data);
 
-    if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
-        goto send_fail;
     /*
      * Incase of mirroring set the inner network header to the newly added
      * header so that this is fragmented and checksummed
      */
     pkt_set_inner_network_header(pkt, pkt->vp_data);
 
+    /* for now let the tunnel type be IP regardless of ip or ip6 */
     if (pkt->vp_type == VP_TYPE_IP6)
         pkt->vp_type = VP_TYPE_IP6OIP;
     else if (pkt->vp_type == VP_TYPE_IP)
@@ -1270,12 +1350,6 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     else
         pkt->vp_type = VP_TYPE_IP;
 
-    /*
-     * Calculate the partial checksum for udp header
-     */
-    ip = (struct vr_ip *)(pkt_data(pkt));
-    udp = (struct vr_udp *)((char *)ip + ip->ip_hl * 4);
-    udp->udp_csum = vr_ip_partial_csum(ip);
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
@@ -2093,8 +2167,14 @@ static int
 nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
     struct vr_interface *vif, *old_vif;
-    if (!req->nhr_tun_sip || !req->nhr_tun_dip)
-        return -EINVAL;
+
+    if (req->nhr_family == AF_INET6) {
+        if (!req->nhr_tun_sip6 || !req->nhr_tun_dip6)
+            return -EINVAL;
+    } else {
+        if (!req->nhr_tun_sip || !req->nhr_tun_dip)
+            return -EINVAL;
+    }
 
     old_vif = nh->nh_dev;
     vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
@@ -2108,11 +2188,36 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_dev = vif;
         nh->nh_reach_nh = nh_gre_tunnel;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
-        nh->nh_udp_tun_sip = req->nhr_tun_sip;
-        nh->nh_udp_tun_dip = req->nhr_tun_dip;
-        nh->nh_udp_tun_sport = req->nhr_tun_sport;
-        nh->nh_udp_tun_dport = req->nhr_tun_dport;
-        nh->nh_udp_tun_encap_len = req->nhr_encap_size;
+        if (req->nhr_family == AF_INET) {
+            nh->nh_udp_tun_sip = req->nhr_tun_sip;
+            nh->nh_udp_tun_dip = req->nhr_tun_dip;
+            nh->nh_udp_tun_sport = req->nhr_tun_sport;
+            nh->nh_udp_tun_dport = req->nhr_tun_dport;
+            nh->nh_udp_tun_encap_len = req->nhr_encap_size;
+        } else if (req->nhr_family == AF_INET6) {
+            if (!nh->nh_udp_tun6_sip) {
+                nh->nh_udp_tun6_sip = vr_malloc(VR_IP6_ADDRESS_LEN,
+                        VR_NETWORK_ADDRESS_OBJECT);
+                if (!nh->nh_udp_tun6_sip)
+                    return -ENOMEM;
+            }
+            memcpy(nh->nh_udp_tun6_sip, req->nhr_tun_sip6, VR_IP6_ADDRESS_LEN);
+
+            if (!nh->nh_udp_tun6_dip) {
+                nh->nh_udp_tun6_dip = vr_malloc(VR_IP6_ADDRESS_LEN,
+                        VR_NETWORK_ADDRESS_OBJECT);
+                if (!nh->nh_udp_tun6_dip)
+                    return -ENOMEM;
+            }
+            memcpy(nh->nh_udp_tun6_dip, req->nhr_tun_dip6, VR_IP6_ADDRESS_LEN);
+
+            nh->nh_udp_tun6_sport = req->nhr_tun_sport;
+            nh->nh_udp_tun6_dport = req->nhr_tun_dport;
+            nh->nh_udp_tun6_encap_len = req->nhr_encap_size;
+        } else {
+            return -EINVAL;
+        }
+
         nh->nh_reach_nh = nh_udp_tunnel;
         /* VIF should be null, but lets clean if one is found */
         if (vif)
@@ -2282,7 +2387,7 @@ vr_nexthop_add(vr_nexthop_req *req)
                 !(nh->nh_flags & NH_FLAG_VALID))
             invalid_to_valid = true;
 
-        /* If valid to invalid lets propogate flags immediagtely */
+        /* If valid to invalid lets propogate flags immediately */
         if (!(req->nhr_flags & NH_FLAG_VALID) &&
                 (nh->nh_flags & NH_FLAG_VALID))
             nh->nh_flags = req->nhr_flags;
@@ -2381,6 +2486,11 @@ vr_nexthop_req_get_size(void *req_p)
 
     if (req->nhr_type == NH_COMPOSITE)
         return (4 * sizeof(*req) + (req->nhr_nh_list_size * 4));
+    else if ((req->nhr_type == NH_TUNNEL) &&
+            (req->nhr_flags & NH_FLAG_TUNNEL_UDP) &&
+            (req->nhr_family == AF_INET6)) {
+        return (4 * sizeof(*req) + (VR_IP6_ADDRESS_LEN * 2 * 4));
+    }
 
     return 4 * sizeof(*req);
 }
@@ -2470,11 +2580,24 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
         } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
-            req->nhr_tun_sip = nh->nh_udp_tun_sip;
-            req->nhr_tun_dip = nh->nh_udp_tun_dip;
-            req->nhr_encap_size = nh->nh_udp_tun_encap_len;
-            req->nhr_tun_sport = nh->nh_udp_tun_sport;
-            req->nhr_tun_dport = nh->nh_udp_tun_dport;
+            if (nh->nh_family == AF_INET) {
+                req->nhr_tun_sip = nh->nh_udp_tun_sip;
+                req->nhr_tun_dip = nh->nh_udp_tun_dip;
+                req->nhr_encap_size = nh->nh_udp_tun_encap_len;
+                req->nhr_tun_sport = nh->nh_udp_tun_sport;
+                req->nhr_tun_dport = nh->nh_udp_tun_dport;
+            } else if (nh->nh_family == AF_INET6) {
+                if (req->nhr_tun_sip6_size && req->nhr_tun_sip6)
+                    memcpy(req->nhr_tun_sip6, nh->nh_udp_tun6_sip,
+                            VR_IP6_ADDRESS_LEN);
+                if (req->nhr_tun_dip6_size && req->nhr_tun_dip6)
+                    memcpy(req->nhr_tun_dip6, nh->nh_udp_tun6_dip,
+                            VR_IP6_ADDRESS_LEN);
+                req->nhr_encap_size = nh->nh_udp_tun6_encap_len;
+                req->nhr_tun_sport = nh->nh_udp_tun6_sport;
+                req->nhr_tun_dport = nh->nh_udp_tun6_dport;
+            }
+
             if (req->nhr_encap_size)
                 encap = nh->nh_data;
             if (nh->nh_dev)
@@ -2516,9 +2639,49 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
 }
 
 static vr_nexthop_req *
-vr_nexthop_req_get(void)
+vr_nexthop_req_get(struct vr_nexthop *nh)
 {
-    return vr_zalloc(sizeof(vr_nexthop_req), VR_NEXTHOP_REQ_OBJECT);
+    vr_nexthop_req *nhr;
+
+    nhr = vr_zalloc(sizeof(vr_nexthop_req), VR_NEXTHOP_REQ_OBJECT);
+    if (!nhr)
+        return NULL;
+
+    if ((nh->nh_type == NH_TUNNEL) &&
+            (nh->nh_flags & NH_FLAG_TUNNEL_UDP) &&
+            (nh->nh_family == AF_INET6)) {
+        nhr->nhr_tun_sip6 = vr_malloc(VR_IP6_ADDRESS_LEN,
+                VR_NETWORK_ADDRESS_OBJECT);
+        if (!nhr->nhr_tun_sip6)
+            goto fail;
+        nhr->nhr_tun_sip6_size = VR_IP6_ADDRESS_LEN;
+
+        nhr->nhr_tun_dip6 = vr_malloc(VR_IP6_ADDRESS_LEN,
+                VR_NETWORK_ADDRESS_OBJECT);
+        if (!nhr->nhr_tun_dip6)
+            goto fail;
+        nhr->nhr_tun_dip6_size = VR_IP6_ADDRESS_LEN;
+    }
+
+    return nhr;
+
+fail:
+    if (nhr->nhr_tun_sip6) {
+        vr_free(nhr->nhr_tun_sip6, VR_IP6_ADDRESS_LEN);
+        nhr->nhr_tun_sip6 = NULL;
+    }
+
+    if (nhr->nhr_tun_dip6) {
+        vr_free(nhr->nhr_tun_dip6, VR_IP6_ADDRESS_LEN);
+        nhr->nhr_tun_dip6 = NULL;
+    }
+
+    if (nhr) {
+        vr_free(nhr, VR_NEXTHOP_REQ_OBJECT);
+        nhr = NULL;
+    }
+
+    return nhr;
 }
 
 static void
@@ -2545,6 +2708,16 @@ vr_nexthop_req_destroy(vr_nexthop_req *req)
         req->nhr_label_list_size = 0;
     }
 
+    if (req->nhr_tun_sip6) {
+        vr_free(req->nhr_tun_sip6, VR_NETWORK_ADDRESS_OBJECT);
+        req->nhr_tun_sip6 = NULL;
+    }
+
+    if (req->nhr_tun_dip6) {
+        vr_free(req->nhr_tun_dip6, VR_NETWORK_ADDRESS_OBJECT);
+        req->nhr_tun_dip6 = NULL;
+    }
+
     vr_free(req, VR_NEXTHOP_REQ_OBJECT);
     return;
 }
@@ -2565,7 +2738,12 @@ vr_nexthop_get(vr_nexthop_req *req)
 
     nh = __vrouter_get_nexthop(router, req->nhr_id);
     if (nh) {
-        resp = vr_nexthop_req_get();
+        resp = vr_nexthop_req_get(nh);
+        if (!resp) {
+            ret = -ENOMEM;
+            goto generate_response;
+        }
+
         resp->h_op = SANDESH_OP_GET;
         if (resp)
             ret = vr_nexthop_make_req(resp, nh);
@@ -2606,7 +2784,7 @@ vr_nexthop_dump(vr_nexthop_req *r)
             i < router->vr_max_nexthops; i++) {
         nh = __vrouter_get_nexthop(router, i);
         if (nh) {
-            resp = vr_nexthop_req_get();
+            resp = vr_nexthop_req_get(nh);
             if (!resp && (ret = -ENOMEM))
                 goto generate_response;
 

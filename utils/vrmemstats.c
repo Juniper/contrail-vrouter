@@ -121,6 +121,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_mtrie_stats_object);
     printf("Mtrie Table                     %" PRIu64 "\n",
             stats->vms_mtrie_table_object);
+    printf("Network Address                 %" PRIu64 "\n",
+            stats->vms_network_address_object);
     printf("Nexthop                         %" PRIu64 "\n",
             stats->vms_nexthop_object);
     printf("NextHop Component               %" PRIu64 "\n",
