@@ -105,6 +105,14 @@ struct vr_nexthop {
          } nh_udp_tun;
 
          struct {
+             uint8_t        *tun_sip6;
+             uint8_t        *tun_dip6;
+             unsigned short tun_sport6;
+             unsigned short tun_dport6;
+             uint16_t       tun_encap_len;
+         } nh_udp_tun6;
+
+         struct {
             unsigned short cnt;
             struct vr_component_nh *component;
          } nh_composite;
@@ -127,14 +135,24 @@ struct vr_nexthop {
 
 #define nh_encap_family         nh_u.nh_encap.encap_family
 #define nh_encap_len            nh_u.nh_encap.encap_len
+
 #define nh_gre_tun_sip          nh_u.nh_gre_tun.tun_sip
 #define nh_gre_tun_dip          nh_u.nh_gre_tun.tun_dip
+
 #define nh_udp_tun_sip          nh_u.nh_udp_tun.tun_sip
 #define nh_udp_tun_dip          nh_u.nh_udp_tun.tun_dip
 #define nh_udp_tun_sport        nh_u.nh_udp_tun.tun_sport
 #define nh_udp_tun_dport        nh_u.nh_udp_tun.tun_dport
-#define nh_gre_tun_encap_len    nh_u.nh_gre_tun.tun_encap_len
 #define nh_udp_tun_encap_len    nh_u.nh_udp_tun.tun_encap_len
+
+#define nh_udp_tun6_sip         nh_u.nh_udp_tun6.tun_sip6
+#define nh_udp_tun6_dip         nh_u.nh_udp_tun6.tun_dip6
+#define nh_udp_tun6_sport       nh_u.nh_udp_tun6.tun_sport6
+#define nh_udp_tun6_dport       nh_u.nh_udp_tun6.tun_dport6
+#define nh_udp_tun6_encap_len   nh_u.nh_udp_tun6.tun_encap_len
+
+#define nh_gre_tun_encap_len    nh_u.nh_gre_tun.tun_encap_len
+
 #define nh_component_cnt        nh_u.nh_composite.cnt
 #define nh_component_nh         nh_u.nh_composite.component
 

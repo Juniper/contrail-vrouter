@@ -186,11 +186,14 @@ vr_nexthop_req_process(void *s_req)
     struct in_addr a;
     char flags_mem[500];
     char fam[100];
+    char in6_dst[INET6_ADDRSTRLEN] = { 0 };
 
     vr_nexthop_req *req = (vr_nexthop_req *)(s_req);
 
     if (req->nhr_family == AF_INET)
         strcpy(fam, "AF_INET");
+    else if (req->nhr_family == AF_INET6)
+        strcpy(fam, "AF_INET6");
     else if (req->nhr_family == AF_BRIDGE)
         strcpy(fam, "AF_BRIDGE");
     else if (req->nhr_family == AF_UNSPEC)
@@ -226,13 +229,23 @@ vr_nexthop_req_process(void *s_req)
         }
         nh_print_newline_header();
         printf("Vrf:%d", req->nhr_vrf);
-        a.s_addr = req->nhr_tun_sip;
-        printf("  Sip:%s", inet_ntoa(a));
-        a.s_addr = req->nhr_tun_dip;
-        printf("  Dip:%s\n", inet_ntoa(a));
+        if (req->nhr_family == AF_INET) {
+            a.s_addr = req->nhr_tun_sip;
+            printf("  Sip:%s", inet_ntoa(a));
+            a.s_addr = req->nhr_tun_dip;
+            printf("  Dip:%s", inet_ntoa(a));
+        } else if (req->nhr_family == AF_INET6) {
+            printf("  Sip: %s",
+                    inet_ntop(AF_INET6, (struct in6_addr *)req->nhr_tun_sip6,
+                    in6_dst, sizeof(in6_dst)));
+            printf("  Dip: %s",
+                    inet_ntop(AF_INET6, (struct in6_addr *)req->nhr_tun_dip6,
+                    in6_dst, sizeof(in6_dst)));
+        }
 
         if (req->nhr_flags & NH_FLAG_TUNNEL_UDP) {
-            printf("        Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport),
+            nh_print_newline_header();
+            printf("Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport),
                                                   ntohs(req->nhr_tun_dport));
         }
     } else if (req->nhr_type == NH_VRF_TRANSLATE) {

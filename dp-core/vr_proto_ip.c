@@ -176,6 +176,31 @@ vr_ip_csum(struct vr_ip *ip)
 }
 
 unsigned short
+vr_ip6_partial_csum(struct vr_ip6 *ip6)
+{
+    unsigned int sum, i;
+    unsigned short csum, proto;
+    unsigned long long s = 0;
+
+    for (i = 0; i < 4; i++)
+        s += *((uint32_t *)ip6->ip6_src + i);
+
+    for (i = 0; i < 4; i++)
+        s += *((uint32_t *)ip6->ip6_dst + i);
+
+    s += ip6->ip6_plen;
+
+    proto = ip6->ip6_nxt;
+    s += htons(proto);
+
+    s = (s & 0xFFFFFFFF) + (s >> 32);
+    sum = (s & 0xFFFF) + (s >> 16);
+    csum = (sum & 0xFFFF) + (sum >> 16);
+
+    return csum;
+}
+
+unsigned short
 vr_ip_partial_csum(struct vr_ip *ip)
 {
     unsigned long long s;

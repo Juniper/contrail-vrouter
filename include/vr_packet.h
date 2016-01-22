@@ -386,34 +386,35 @@ struct vr_ip6_pseudo {
 struct vr_ip6 {
 #ifdef __KERNEL__
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-    unsigned int  
-               ip6_flow:20,
-               ip6_priority:8,
-               ip6_version:4;
+    uint8_t         ip6_priority_l:4,
+                    ip6_version:4;
+    uint8_t         ip6_priority_h:4,
+                    ip6_flow_l:4;
 #elif defined(__BIG_ENDIAN_BITFIELD)
-    unsigned int  
-               ip6_version:4,
-               ip6_priority:8,
-               ip6_flow:20;
+    uint8_t         ip6_version:4,
+                    ip6_priority_l:4;
+    uint8_t         ip6_flow_l:4,
+                    ip6_prioirty_h:4;
 #endif
 #else
 #if (__BYTE_ORDER == __LITTLE_ENDIAN)
-    unsigned int  
-               ip6_flow:20,
-               ip6_priority:8,
-               ip6_version:4;
+    uint8_t         ip6_priority_l:4,
+                    ip6_version:4;
+    uint8_t         ip6_priority_h:4,
+                    ip6_flow_l:4;
 #elif (__BYTE_ORDER == __BIG_ENDIAN)
-    unsigned int  
-               ip6_version:4,
-               ip6_priority:8,
-               ip6_flow:20;
+    uint8_t         ip6_version:4,
+                    ip6_priority_l:4;
+    uint8_t         ip6_flow_l:4,
+                    ip6_prioirty_h:4;
 #endif
 #endif
-    unsigned short  ip6_plen;
-    unsigned char   ip6_nxt;
-    unsigned char   ip6_hlim;
-    unsigned char ip6_src[VR_IP6_ADDRESS_LEN];
-    unsigned char ip6_dst[VR_IP6_ADDRESS_LEN];
+    uint16_t        ip6_flow_h;
+    uint16_t        ip6_plen;
+    uint8_t         ip6_nxt;
+    uint8_t         ip6_hlim;
+    uint8_t         ip6_src[VR_IP6_ADDRESS_LEN];
+    uint8_t         ip6_dst[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
 struct tcphdr;
@@ -718,6 +719,7 @@ struct vr_vxlan {
 #define VR_VXLAN_IBIT               0x08000000
 #define VR_VXLAN_RABIT              0x01000000
 #define VR_UDP_HEAD_SPACE           62 /* eth + Ip + iP + udp */
+#define VR_UDP6_HEAD_SPACE          82 /* eth + Ip + iP6 + udp */
 
 /* Mirror packet can be either MPLSoGre or MPLSoUDP. Lets calculate the
  * highest for head space */
@@ -760,6 +762,7 @@ extern unsigned short vr_ip_csum(struct vr_ip *);
 extern unsigned short vr_generate_unique_ip_id(void);
 extern void vr_proto_fragment(struct vr_interface *, struct vr_packet *);
 extern unsigned short vr_ip_partial_csum(struct vr_ip *);
+extern unsigned short vr_ip6_partial_csum(struct vr_ip6 *);
 
 enum {
     UNKNOWN_SOURCE,
