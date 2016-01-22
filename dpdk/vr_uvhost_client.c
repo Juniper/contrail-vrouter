@@ -7,6 +7,7 @@
 
 #include "vr_dpdk.h"
 #include "vr_uvhost_client.h"
+#include "vr_uvhost_util.h"
 
 static vr_uvh_client_t vr_uvh_clients[VR_UVH_MAX_CLIENTS];
 
