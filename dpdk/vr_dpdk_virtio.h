@@ -75,6 +75,7 @@ int vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                    unsigned int vring_base);
 int vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                   unsigned int *vring_basep);
+int vr_dpdk_virtio_recover_vring_base(unsigned int vif_idx, unsigned int vring_idx);
 int vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
                            struct vring_desc *vrucv_desc,
                            struct vring_avail *vrucv_avail,
