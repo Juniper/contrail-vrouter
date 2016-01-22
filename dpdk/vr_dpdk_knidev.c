@@ -506,7 +506,7 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
         rte_eth_dev_stop(port_id);
 
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP"
+        RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP "
                     "failed (%d)\n", port_id, ret);
     }
 
