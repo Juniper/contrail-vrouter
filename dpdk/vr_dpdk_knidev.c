@@ -486,24 +486,79 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     return 0;
 }
 
-
 /* Configure KNI state callback */
 static int
 dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 {
-    int ret = 0;
+    struct vrouter *router = vrouter_get(0);
+    int i, ret = 0;
+    uint8_t slave_port_id, master_port_id;
+    struct vr_dpdk_ethdev *ethdev = NULL;
 
-    RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
-                    port_id, if_up ? "UP" : "DOWN");
-    if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
-        RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
+    if (port_id >= rte_eth_dev_count()) {
+        RTE_LOG(ERR, VROUTER,
+                "Error configuring eth device %"PRIu8": invalid eth device\n",
+                port_id);
         return -EINVAL;
     }
 
-    if (if_up)
-        ret = rte_eth_dev_start(port_id);
-    else
-        rte_eth_dev_stop(port_id);
+   /**
+     * If we have bond configured, port_id points to the first bond slave,
+     * as KNI cannot be created over a master bond interface. In this case,
+     * to configure bond interface up, we need to call rte_eth_dev_start()
+     * over port IDs of bond slaves, then over a bond master. To configure the
+     * interface down, first put down the master, then slaves.
+     */
+
+    /* If bond is configured, check if requested port is a bond slave. */
+    if (router->vr_eth_if) {
+        ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
+        if (ethdev && ethdev->ethdev_nb_slaves > 0) {
+            master_port_id = ethdev->ethdev_port_id;
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                if (port_id == ethdev->ethdev_slaves[i])
+                    break;
+            }
+            /* Clear ethdev if no port match. */
+            if (i >= ethdev->ethdev_nb_slaves)
+                ethdev = NULL;
+        }
+    }
+
+    if (ethdev && ethdev->ethdev_nb_slaves > 0) { /* If bond configured. */
+        RTE_LOG(INFO, VROUTER, "Configuring eth bond device %" PRIu8 " %s\n",
+                master_port_id, if_up ? "UP" : "DOWN");
+
+        if (if_up) {
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                slave_port_id = ethdev->ethdev_slaves[i];
+                RTE_LOG(INFO, VROUTER,
+                        "    configuring bond member eth device %" PRIu8 " UP\n",
+                        slave_port_id);
+
+                ret = rte_eth_dev_start(slave_port_id);
+            }
+
+            ret = rte_eth_dev_start(master_port_id);
+        } else {
+            rte_eth_dev_stop(master_port_id);
+
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                slave_port_id = ethdev->ethdev_slaves[i];
+                RTE_LOG(INFO, VROUTER,
+                        "    configuring bond member eth device %" PRIu8 " DOWN\n",
+                        slave_port_id);
+
+                rte_eth_dev_stop(slave_port_id);
+            }
+        }
+    } else { /* No bond. */
+        RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
+                port_id, if_up ? "UP" : "DOWN");
+
+        if (if_up) ret = rte_eth_dev_start(port_id);
+        else       rte_eth_dev_stop(port_id);
+    }
 
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP "
