@@ -23,6 +23,7 @@ void vr_uvhost_fds_init(void);
 int vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
                      uvh_fd_handler_t fd_handler);
 int vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type);
+int vr_uvhost_del_fds_by_arg(void *arg);
 void vr_uvhost_log(const char *format, ...)
         __attribute__((format(printf, 1, 2)));
 void vr_uvh_call_fd_handlers(struct pollfd *fds, nfds_t nfds);

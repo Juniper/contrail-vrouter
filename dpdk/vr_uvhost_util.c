@@ -81,6 +81,27 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
 }
 
 /*
+ * vr_uvhost_del_fds_by_arg - deletes all FDs from the read/write lists matching
+ * the given argumen (pointer to a client). All the FDs found will be closed.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_uvhost_del_fds_by_arg(void *arg)
+{
+    int i;
+
+    for (i = 0; i < MAX_UVHOST_FDS; i++) {
+        if (uvh_rfds[i].uvh_fd_arg == arg)
+            vr_uvhost_del_fd(uvh_rfds[i].uvh_fd, UVH_FD_READ);
+        if (uvh_wfds[i].uvh_fd_arg == arg)
+            vr_uvhost_del_fd(uvh_wfds[i].uvh_fd, UVH_FD_WRITE);
+    }
+
+    return 0;
+}
+
+/*
  * vr_uvhost_add_fd - adds the specified FD into the read/write list that
  * the user space vhost server is waiting on. The type indicates if it
  * is a read/write socket and the handler is the function that is called when
