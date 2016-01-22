@@ -5,8 +5,6 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
-#include <sys/poll.h>
-
 #include "vr_dpdk.h"
 #include "vr_uvhost_util.h"
 
@@ -53,7 +51,7 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, UVHOST, "Deleting FD %d from the poll pool...\n", fd);
+    RTE_LOG(DEBUG, UVHOST, "Deleting FD %d...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
@@ -76,8 +74,30 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     }
 
     fds[i].uvh_fd = -1;
+    fds[i].uvh_fd_arg = NULL;
 
     close(fd);
+
+    return 0;
+}
+
+/*
+ * vr_uvhost_del_fds_by_arg - deletes all FDs from the read/write lists matching
+ * the given argument (pointer to a client). All the FDs found will be closed.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_uvhost_del_fds_by_arg(void *arg)
+{
+    int i;
+
+    for (i = 0; i < MAX_UVHOST_FDS; i++) {
+        if (uvh_rfds[i].uvh_fd > 0 && uvh_rfds[i].uvh_fd_arg == arg)
+            vr_uvhost_del_fd(uvh_rfds[i].uvh_fd, UVH_FD_READ);
+        if (uvh_wfds[i].uvh_fd > 0 && uvh_wfds[i].uvh_fd_arg == arg)
+            vr_uvhost_del_fd(uvh_wfds[i].uvh_fd, UVH_FD_WRITE);
+    }
 
     return 0;
 }
@@ -97,7 +117,7 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, UVHOST, "Adding FD %d to the poll pool...\n", fd);
+    RTE_LOG(DEBUG, UVHOST, "Adding FD %d...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
@@ -116,7 +136,7 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
         }
     }
 
-    vr_uvhost_log("Error adding FD %d: no space left\n", fd);
+    vr_uvhost_log("Error adding FD %d: no room for a new FD\n", fd);
 
     return -1;
 }
@@ -182,8 +202,6 @@ vr_uvh_call_fd_handlers(struct pollfd *fds, nfds_t nfds)
             if (fds[i].revents & POLLIN) {
                 ret = vr_uvh_call_fd_handlers_internal(uvh_rfds, fds[i].fd);
                 if (ret) {
-                    RTE_LOG(INFO, UVHOST, "Error: deleting fd %d "
-                            "from poll\n", fds[i].fd);
                     vr_uvhost_del_fd(fds[i].fd, UVH_FD_READ);
                 }
             }

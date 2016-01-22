@@ -217,8 +217,8 @@ vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
     if (!ret){
         *blksize = (uint64_t)fd_stat.st_blksize;
     } else {
-      RTE_LOG(DEBUG, UVHOST, "Function fstat() failed: %s  %s \n",
-              __func__, strerror(errno));
+        RTE_LOG(DEBUG, UVHOST, "Error getting file status for FD %d: %s (%d)\n",
+                fd, strerror(errno), errno);
     }
 
     return ret;
@@ -242,8 +242,8 @@ vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs)
             ret = vr_dpdk_virtio_uvh_vif_region_munmap(vif_data_mmap);
             if (ret) {
                 RTE_LOG(INFO, UVHOST,
-                        "munmap() failed: %s , memleak: vif_idx_region %d %s\n",
-                        strerror(errno), i, __func__);
+                        "Error unmapping memory region %d: %s (%d)\n",
+                        i, strerror(errno), errno);
             }
             memset(vif_data_mmap, 0, sizeof(vr_dpdk_uvh_mmap_addr_t));
         }
@@ -619,6 +619,8 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     vq->vdv_last_used_idx += pkts_sent;
     rte_wmb();
     vq->vdv_used->idx += pkts_sent;
+    RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
+            __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx);
     /* call guest if required (fixes iperf issue) */
     if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
         p->nb_syscalls++;
@@ -829,6 +831,8 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
 
     *(volatile uint16_t *)&vq->vdv_used->idx += count;
     vq->vdv_last_used_idx = res_end_idx;
+    RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
+            __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx);
 
     /* flush used->idx update before we read avail->flags. */
     rte_mb();
@@ -969,10 +973,44 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 }
 
 /*
- * vr_dpdk_set_vring_addr - Sets the address of the virtio descruptor and
+ * vr_dpdk_virtio_recover_vring_base - recovers the vring base from the shared
+ * memory after vRouter crash.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_dpdk_virtio_recover_vring_base(unsigned int vif_idx, unsigned int vring_idx)
+{
+    vr_dpdk_virtioq_t *vq;
+
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+        return -1;
+    }
+
+    if (vring_idx & 1) {
+        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
+    } else {
+        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    }
+
+    if (vq->vdv_used) {
+        /* Reading base index from the shared memory. */
+        if (vq->vdv_last_used_idx != vq->vdv_used->idx) {
+            RTE_LOG(INFO, UVHOST, "    recovering vring base %d -> %d\n",
+                    vq->vdv_last_used_idx, vq->vdv_used->idx);
+            vr_dpdk_virtio_set_vring_base(vif_idx, vring_idx, vq->vdv_used->idx);
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * vr_dpdk_set_vring_addr - Sets the address of the virtio descriptor and
  * available/used rings based on messages sent by the vhost client.
  *
- * Returns 0 on suucess, -1 otherwise.
+ * Returns 0 on success, -1 otherwise.
  */
 int
 vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
