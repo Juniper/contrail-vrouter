@@ -451,36 +451,25 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
 static int
 dpdk_vhost_if_add(struct vr_interface *vif)
 {
-    uint8_t port_id, slave_port_id = VR_DPDK_INVALID_PORT_ID;
+    uint8_t port_id;
     int ret;
     struct ether_addr mac_addr;
     struct vr_dpdk_ethdev *ethdev;
 
-    if (vif->vif_flags & VIF_FLAG_PMD) {
-        port_id = vif->vif_os_idx;
+    /*
+     * The Agent passes xconnect fabric interface in cross_connect_idx,
+     * but dp-core does not copy it into vr_interface. Instead
+     * it looks for an interface with os_idx == cross_connect_idx
+     * and sets vif->vif_bridge if there is such an interface.
+     */
+    ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
+    if (ethdev == NULL) {
+        RTE_LOG(ERR, VROUTER, "Error adding vif %u KNI device %s:"
+            " bridge vif %u ethdev is not initialized\n",
+                vif->vif_idx, vif->vif_name, vif->vif_bridge->vif_idx);
+        return -ENOENT;
     }
-    else {
-        /*
-         * The Agent passes xconnect fabric interface in cross_connect_idx,
-         * but dp-core does not copy it into vr_interface. Instead
-         * it looks for an interface with os_idx == cross_connect_idx
-         * and sets vif->vif_bridge if there is such an interface.
-         */
-        ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
-        if (ethdev == NULL) {
-            RTE_LOG(ERR, VROUTER, "Error adding vif %u KNI device %s:"
-                " bridge vif %u ethdev is not initialized\n",
-                    vif->vif_idx, vif->vif_name, vif->vif_bridge->vif_idx);
-            return -ENOENT;
-        }
-        port_id = ethdev->ethdev_port_id;
-        /*
-         * KNI does not support bond interfaces and generate random MACs,
-         * so we try to get a bond member instead.
-         */
-        if (ethdev->ethdev_nb_slaves > 0)
-            slave_port_id = ethdev->ethdev_slaves[0];
-    }
+    port_id = ethdev->ethdev_port_id;
 
     /* get interface MAC address */
     memset(&mac_addr, 0, sizeof(mac_addr));
@@ -490,8 +479,12 @@ dpdk_vhost_if_add(struct vr_interface *vif)
                 " MAC " MAC_FORMAT "\n",
                 vif->vif_idx, vif->vif_gen, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
 
-    if (slave_port_id != VR_DPDK_INVALID_PORT_ID) {
-        port_id = slave_port_id;
+    /*
+     * KNI does not support bond interfaces and generate random MACs,
+     * so we try to get a bond member instead.
+     */
+    if (ethdev->ethdev_nb_slaves > 0) {
+        port_id = ethdev->ethdev_slaves[0];
 
         memset(&mac_addr, 0, sizeof(mac_addr));
         rte_eth_macaddr_get(port_id, &mac_addr);
