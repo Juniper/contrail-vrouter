@@ -822,10 +822,6 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
      * Unmmaps Qemu's FD
      */
     vr_dpdk_virtio_uvh_vif_munmap(&vr_dpdk_virtio_uvh_vif_mmap[cidx]);
-    if (vru_cl->vruc_fd != -1) {
-        vr_uvhost_del_fd(vru_cl->vruc_fd, UVH_FD_READ);
-    }
-
     vr_uvhost_del_client(vru_cl);
 
     return 0;
