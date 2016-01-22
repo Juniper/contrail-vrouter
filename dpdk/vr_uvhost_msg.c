@@ -22,34 +22,37 @@
 
 #include <rte_errno.h>
 #include <rte_hexdump.h>
+
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
+#define uvhm_client_name(vru_cl) (vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX))
 
 /*
  * Prototypes for user space vhost message handlers
  */
 static int vr_uvmh_get_features(vr_uvh_client_t *vru_cl);
+static int vr_uvmh_set_features(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl);
-static int vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_set_vring_num(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl);
-static int vr_uvhm_set_call_fd(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl);
 
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
     vr_uvmh_get_features,
-    NULL,
+    vr_uvmh_set_features,
     NULL,
     NULL,
     vr_uvhm_set_mem_table,
     NULL,
     NULL,
-    vr_uvhm_set_ring_num_desc,
+    vr_uvhm_set_vring_num,
     vr_uvhm_set_vring_addr,
     vr_uvhm_set_vring_base,
     vr_uvhm_get_vring_base,
     NULL,
-    vr_uvhm_set_call_fd,
+    vr_uvhm_set_vring_call,
     NULL
 };
 
@@ -68,8 +71,25 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
                            (1ULL << VIRTIO_NET_F_CSUM) |
                            (1ULL << VIRTIO_NET_F_GUEST_CSUM) |
                            (1ULL << VHOST_F_LOG_ALL);
+    vr_uvhost_log("    GET FEATURES: returns 0x%"PRIx64"\n",
+                                            vru_cl->vruc_msg.u64);
 
     vru_cl->vruc_msg.size = sizeof(vru_cl->vruc_msg.u64);
+
+    return 0;
+}
+
+/*
+ * vr_uvmh_set_features - handle VHOST_USER_SET_FEATURES message from user space
+ * vhost client.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
+{
+    vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
+                                            vru_cl->vruc_msg.u64);
 
     return 0;
 }
@@ -94,11 +114,12 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                              &(vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx]));
 
     vum_msg = &vru_cl->vruc_msg.memory;
-    vr_uvhost_log("Number of memory regions: %d\n", vum_msg->nregions);
+    vr_uvhost_log("    SET MEM TABLE:\n");
     for (i = 0; i < vum_msg->nregions; i++) {
-        vr_uvhost_log("Region %d: physical address 0x%" PRIx64 ", size 0x%"
-                PRIx64 ", offset 0x%" PRIx64 "\n",
-                i, vum_msg->regions[i].guest_phys_addr,
+        vr_uvhost_log("    %d: FD %d addr 0x%" PRIx64 " size 0x%"
+                PRIx64 " off 0x%" PRIx64 "\n",
+                i, vru_cl->vruc_fds_sent[i],
+                vum_msg->regions[i].guest_phys_addr,
                 vum_msg->regions[i].memory_size,
                 vum_msg->regions[i].mmap_offset);
 
@@ -120,11 +141,11 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                                             0);
 
             if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
-                vr_uvhost_log("mmap for size 0x%" PRIx64 " failed for FD %d"
-                        " on vhost client %s (%s)\n",
-                        size,
-                        vru_cl->vruc_fds_sent[i],
-                        vru_cl->vruc_path, rte_strerror(errno));
+                vr_uvhost_log("Client %s: error mmaping FD %d size 0x%" PRIx64
+                        ": %s (%d)\n",
+                        uvhm_client_name(vru_cl),
+                        vru_cl->vruc_fds_sent[i], size,
+                        rte_strerror(errno), errno);
                 /* the file descriptor is no longer needed */
                 close(vru_cl->vruc_fds_sent[i]);
                 vru_cl->vruc_fds_sent[i] = -1;
@@ -134,8 +155,9 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
             ret = vr_dpdk_virtio_uvh_get_blk_size(vru_cl->vruc_fds_sent[i],
                                  &vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
             if (ret) {
-                vr_uvhost_log("Get block size failed for FD %d on vhost client %s \n",
-                              vru_cl->vruc_fds_sent[i], vru_cl->vruc_path);
+                vr_uvhost_log("Client %s: error getting block size for FD %d\n",
+                        uvhm_client_name(vru_cl),
+                        vru_cl->vruc_fds_sent[i]);
                 return -1;
             }
 
@@ -149,11 +171,12 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
                            vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
 
             if (madvise(madv_addr, madv_size, MADV_DONTDUMP)) {
-                vr_uvhost_log("Error in madvise at addr 0x%" PRIx64 ", size 0x%"
-                              PRIx64 "for fd %d on vhost client %s (%s)\n",
+                vr_uvhost_log("Client %s: error in madvise at addr 0x%" PRIx64 ", size 0x%"
+                              PRIx64 "for FD %d: %s (%d)\n",
+                              uvhm_client_name(vru_cl),
                               region->vrucmr_mmap_addr,
                               size, vru_cl->vruc_fds_sent[i],
-                              vru_cl->vruc_path, rte_strerror(errno));
+                              rte_strerror(errno), errno);
                 /*
                  * Failure is not catastrophic, so continue below.
                  */
@@ -178,32 +201,32 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
 }
 
 /*
- * vr_uvhm_set_ring_num_desc - handles VHOST_USER_SET_VRING_NUM message from
+ * vr_uvhm_set_vring_num - handles VHOST_USER_SET_VRING_NUM message from
  * the user space vhost client to set the number of descriptors in the virtio
  * ring.
  *
  * Returns 0 on success, -1 otherwise.
  */
 static int
-vr_uvhm_set_ring_num_desc(vr_uvh_client_t *vru_cl)
+vr_uvhm_set_vring_num(vr_uvh_client_t *vru_cl)
 {
     VhostUserMsg *vum_msg;
     unsigned int vring_idx;
 
     vum_msg = &vru_cl->vruc_msg;
     vring_idx = vum_msg->state.index;
+    vr_uvhost_log("    SET VRING NUM: vring %u num %u\n", vring_idx,
+                                 vum_msg->state.num);
 
     if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
-        vr_uvhost_log("Bad ring index %d received by vhost server\n",
-                      vring_idx);
+        vr_uvhost_log("Client %s: error setting vring %u num: invalid vring index\n",
+                        uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
     if (vr_dpdk_set_ring_num_desc(vru_cl->vruc_idx, vring_idx,
                                   vum_msg->state.num)) {
-        vr_uvhost_log("Could set number of vring descriptors in vhost server"
-                      " %d %d %d\n",
-                      vru_cl->vruc_idx, vring_idx,
-                      vum_msg->state.num);
+        vr_uvhost_log("Client %s: error setting vring %u size %u\n",
+                    uvhm_client_name(vru_cl), vring_idx, vum_msg->state.num);
         return -1;
     }
 
@@ -252,11 +275,15 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
     struct vring_used *vrucv_used;
 
     vaddr = &vru_cl->vruc_msg.addr;
-
     vring_idx = vaddr->index;
+    vr_uvhost_log("    SET VRING ADDR: vring %u flags 0x%x desc 0x%llx"
+                     " used 0x%llx avail 0x%llx\n",
+                     vring_idx, vaddr->flags, vaddr->desc_user_addr,
+                     vaddr->used_user_addr, vaddr->avail_user_addr);
+
     if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
-        vr_uvhost_log("Bad ring index %d received by vhost server\n",
-                      vring_idx);
+        vr_uvhost_log("Client %s: error setting vring %u addr: invalid vring index\n",
+                        uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
 
@@ -272,8 +299,8 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
 
     if (vr_dpdk_set_vring_addr(vru_cl->vruc_idx, vring_idx, vrucv_desc,
                                vrucv_avail, vrucv_used)) {
-        vr_uvhost_log("Couldn't set vring addresses in vhost server, %d %d\n",
-                      vru_cl->vruc_idx, vring_idx);
+        vr_uvhost_log("Client %s: error setting vring %u addresses\n",
+                uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
 
@@ -307,17 +334,19 @@ vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl)
 
     vum_msg = &vru_cl->vruc_msg;
     vring_idx = vum_msg->state.index;
+    vr_uvhost_log("    SET VRING BASE: vring %u base %u\n",
+                     vring_idx, vum_msg->state.num);
 
     if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
-        vr_uvhost_log("Bad ring index %d received by vhost server\n",
-                      vring_idx);
+        vr_uvhost_log("Client %s: error setting vring %u base: invalid vring index\n",
+                        uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
 
     if (vr_dpdk_virtio_set_vring_base(vru_cl->vruc_idx, vring_idx,
                                       vum_msg->state.num)) {
-        vr_uvhost_log("Couldn't set vring base in vhost server %d %d %d\n",
-                      vru_cl->vruc_idx, vring_idx, vum_msg->state.num);
+        vr_uvhost_log("Client %s: error setting vring %u base %u\n",
+                uvhm_client_name(vru_cl), vring_idx, vum_msg->state.num);
         return -1;
     }
 
@@ -338,56 +367,58 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
 
     vum_msg = &vru_cl->vruc_msg;
     vring_idx = vum_msg->state.index;
+    vr_uvhost_log("    GET VRING BASE: vring %u\n", vring_idx);
 
     if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
-        vr_uvhost_log("Bad ring index %d received by vhost server\n",
-                      vring_idx);
+        vr_uvhost_log("Client %s: error getting vring %u base: invalid vring index\n",
+                        uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
 
     if (vr_dpdk_virtio_get_vring_base(vru_cl->vruc_idx, vring_idx,
                                      &vum_msg->state.num)) {
-        vr_uvhost_log("Couldn't get vring base in vhost server %d %d\n",
-                      vru_cl->vruc_idx, vring_idx);
+        vr_uvhost_log("Client %s: error getting vring %u base index\n",
+                uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
 
     vum_msg->size = sizeof(struct vhost_vring_state);
+    vr_uvhost_log("    GET VRING BASE: returns %u\n", vum_msg->state.num);
 
     return 0;
 }
 
 /*
- * vr_uvhm_set_call_fd - handles a VHOST_USER_SET_VRING_CALL messsage
+ * vr_uvhm_set_vring_call - handles a VHOST_USER_SET_VRING_CALL messsage
  * from the vhost user client to set the eventfd to be used to interrupt the
  * guest, if required.
  *
  * Returns 0 on success, -1 otherwise.
  */
 static int
-vr_uvhm_set_call_fd(vr_uvh_client_t *vru_cl)
+vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl)
 {
     VhostUserMsg *vum_msg;
     unsigned int vring_idx;
 
     vum_msg = &vru_cl->vruc_msg;
     vring_idx = vum_msg->state.index;
+    vr_uvhost_log("    SET VRING CALL: vring %u FD %d\n", vring_idx,
+                                                vru_cl->vruc_fds_sent[0]);
 
     if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
-        vr_uvhost_log("Bad ring index %d received by vhost server in callfd\n",
-                      vring_idx);
+        vr_uvhost_log("Client %s: error setting vring %u call: invalid vring index\n",
+                        uvhm_client_name(vru_cl), vring_idx);
         return -1;
     }
 
     if (vr_dpdk_set_ring_callfd(vru_cl->vruc_idx, vring_idx,
                                 vru_cl->vruc_fds_sent[0])) {
-        vr_uvhost_log("Could not set callfd in vhost server"
-                      " %d %d %d\n",
-                      vru_cl->vruc_idx, vring_idx,
-                      vru_cl->vruc_fds_sent[0]);
+        vr_uvhost_log("Client %s: error setting vring %u call FD %d\n",
+                uvhm_client_name(vru_cl), vring_idx, vru_cl->vruc_fds_sent[0]);
         return -1;
     }
-    /* set FD to -1, so we do not close it on cleanup */
+    /* set FD to -1, so we do not close it in vr_uvh_cl_msg_handler() */
     vru_cl->vruc_fds_sent[0] = -1;
 
     return 0;
@@ -403,7 +434,6 @@ static int
 vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
 {
     VhostUserMsg *msg = &vru_cl->vruc_msg;
-    int i;
 
     if ((msg->request <= VHOST_USER_NONE) ||
             (msg->request >= VHOST_USER_MAX)) {
@@ -412,19 +442,11 @@ vr_uvh_cl_call_handler(vr_uvh_client_t *vru_cl)
 
     if (vr_uvhost_cl_msg_handlers[msg->request]) {
         vr_uvhost_log("Client %s: handling message %d\n",
-            /* strip socket prefix */
-            vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX), msg->request);
-        if (vru_cl->vruc_num_fds_sent > 0) {
-            for (i = 0; i < vru_cl->vruc_num_fds_sent; i++) {
-                vr_uvhost_log("    message %d sent FD: %d\n",
-                    msg->request, vru_cl->vruc_fds_sent[i]);
-            }
-        }
+                uvhm_client_name(vru_cl), msg->request);
         return vr_uvhost_cl_msg_handlers[msg->request](vru_cl);
     } else {
         vr_uvhost_log("Client %s: no handler defined for message %d\n",
-            /* strip socket prefix */
-            vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX), msg->request);
+                uvhm_client_name(vru_cl), msg->request);
     }
 
     return 0;
@@ -466,8 +488,8 @@ vr_uvh_cl_send_reply(int fd, vr_uvh_client_t *vru_cl)
                  * Socket to qemu should never be full as it sleeps waiting
                  * for a reply to the previous request.
                  */
-                vr_uvhost_log("Error sending vhost user reply to %s\n",
-                              vru_cl->vruc_path);
+                vr_uvhost_log("Client %s: error sending vhost user reply\n",
+                        uvhm_client_name(vru_cl));
                 return -1;
              }
 
@@ -520,14 +542,14 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                 goto cleanup;
             }
 
-            vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
-                          ret, vru_cl->vruc_path);
+            vr_uvhost_log("Client %s: error receiving message: %s (%d)\n",
+                    uvhm_client_name(vru_cl), strerror(errno), errno);
             ret = -1;
             goto cleanup;
         } else if (ret > 0) {
             if (mhdr.msg_flags & MSG_CTRUNC) {
-                vr_uvhost_log("Truncated control message from vhost client %s\n",
-                             vru_cl->vruc_path);
+                vr_uvhost_log("Client %s: error receiving message: truncated\n",
+                        uvhm_client_name(vru_cl));
                 ret = -1;
                 goto cleanup;
             }
@@ -539,8 +561,10 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                    vru_cl->vruc_num_fds_sent = (cmsg->cmsg_len - CMSG_LEN(0))/
                                                    sizeof(int);
                    if (vru_cl->vruc_num_fds_sent > VHOST_MEMORY_MAX_NREGIONS) {
-                        vr_uvhost_log("Too many FDs sent for client %s: %d\n",
-                                vru_cl->vruc_path,  vru_cl->vruc_num_fds_sent);
+                        vr_uvhost_log("Client %s: error handling FDs: too many FDs (%d > %d)\n",
+                                uvhm_client_name(vru_cl),
+                                vru_cl->vruc_num_fds_sent,
+                                VHOST_MEMORY_MAX_NREGIONS);
                        vru_cl->vruc_num_fds_sent = VHOST_MEMORY_MAX_NREGIONS;
                    }
 
@@ -559,8 +583,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             /*
              * recvmsg returned 0, so return error.
              */
-            vr_uvhost_log("Receive returned %d in vhost server for client %s\n",
-                          ret, vru_cl->vruc_path);
+            vr_uvhost_log("Client %s: shutdown at message receiving\n",
+                    uvhm_client_name(vru_cl));
             ret = -1;
             goto cleanup;
         }
@@ -600,14 +624,13 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             }
 
             vr_uvhost_log(
-                "Error: read returned %d, %d %d %d in vhost server for client %s\n",
-                ret, errno, read_len,
-                vru_cl->vruc_msg_bytes_read, vru_cl->vruc_path);
+                "Client %s: error reading message: %s (%d)\n",
+                uvhm_client_name(vru_cl), strerror(errno), errno);
             ret = -1;
             goto cleanup;
         } else if (ret == 0) {
-             vr_uvhost_log("Read returned %d in vhost server for client %s\n",
-                           ret, vru_cl->vruc_path);
+            vr_uvhost_log("Client %s: shutdown at message reading\n",
+                     uvhm_client_name(vru_cl));
             ret = -1;
             goto cleanup;
         }
@@ -627,16 +650,16 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 
     ret = vr_uvh_cl_call_handler(vru_cl);
     if (ret < 0) {
-        vr_uvhost_log("Error handling message %d client %s\n",
-                      vru_cl->vruc_msg.request, vru_cl->vruc_path);
+        vr_uvhost_log("Client %s: error handling message %d\n",
+                uvhm_client_name(vru_cl), vru_cl->vruc_msg.request);
         ret = -1;
         goto cleanup;
     }
 
     ret = vr_uvh_cl_send_reply(fd, vru_cl);
     if (ret < 0) {
-        vr_uvhost_log("Error sending reply for message %d client %s\n",
-                      vru_cl->vruc_msg.request, vru_cl->vruc_path);
+        vr_uvhost_log("Client %s: error sending reply for message %d\n",
+                uvhm_client_name(vru_cl), vru_cl->vruc_msg.request);
         ret = -1;
         goto cleanup;
     }
@@ -743,9 +766,10 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
     unsigned int cidx = msg->vrnu_vif_idx;
     vr_uvh_client_t *vru_cl;
 
+    vr_uvhost_log("Deleting vif %d virtual device\n", cidx);
+
     if (cidx >= VR_UVH_MAX_CLIENTS) {
-        vr_uvhost_log("Couldn't delete vhost client due to bad index %d\n",
-                      cidx);
+        vr_uvhost_log("    error deleting vif %u: invalid vif index\n", cidx);
         return -1;
     }
 
@@ -753,7 +777,7 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
 
     vru_cl = vr_uvhost_get_client(cidx);
     if (vru_cl == NULL) {
-        vr_uvhost_log("Couldn't find vhost client %d for deletion\n",
+        vr_uvhost_log("    error deleting vif %d: no client found\n",
                       cidx);
         return -1;
     }
@@ -907,7 +931,7 @@ vr_uvh_nl_msg_handler(int fd, void *arg)
     }
 
     if (ret != sizeof(msg)) {
-        vr_uvhost_log("Received msg of length %d, expected %d in vhost server",
+        vr_uvhost_log("Received msg of length %d, expected %zu in vhost server",
                       ret, sizeof(msg));
         return 0;
     }

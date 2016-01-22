@@ -5,8 +5,6 @@
  * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 
-#include <sys/poll.h>
-
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_uvhost.h"
