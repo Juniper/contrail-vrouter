@@ -973,6 +973,40 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
 }
 
 /*
+ * vr_dpdk_virtio_recover_vring_base - recovers the vring base from the shared
+ * memory after vRouter crash.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_dpdk_virtio_recover_vring_base(unsigned int vif_idx, unsigned int vring_idx)
+{
+    vr_dpdk_virtioq_t *vq;
+
+    if ((vif_idx >= VR_MAX_INTERFACES)
+        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+        return -1;
+    }
+
+    if (vring_idx & 1) {
+        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
+    } else {
+        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    }
+
+    if (vq->vdv_used) {
+        /* Reading base index from the shared memory. */
+        if (vq->vdv_last_used_idx != vq->vdv_used->idx) {
+            RTE_LOG(INFO, UVHOST, "    recovering vring base %d -> %d\n",
+                    vq->vdv_last_used_idx, vq->vdv_used->idx);
+            vr_dpdk_virtio_set_vring_base(vif_idx, vring_idx, vq->vdv_used->idx);
+        }
+    }
+
+    return 0;
+}
+
+/*
  * vr_dpdk_set_vring_addr - Sets the address of the virtio descriptor and
  * available/used rings based on messages sent by the vhost client.
  *
