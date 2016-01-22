@@ -417,10 +417,10 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     uint8_t ethdev_port_id, slave_port_id;
     struct vr_dpdk_ethdev *ethdev = NULL;
 
-    RTE_LOG(INFO, VROUTER, "Changing eth device %" PRIu8 " MTU to %u\n",
-                    port_id, new_mtu);
     if (port_id >= rte_eth_dev_count()) {
-        RTE_LOG(ERR, VROUTER, "Error changing eth device %"PRIu8" MTU: invalid eth device\n", port_id);
+        RTE_LOG(ERR, VROUTER,
+                "Error changing eth device %"PRIu8" MTU: invalid eth device\n",
+                port_id);
         return -EINVAL;
     }
 
@@ -429,36 +429,36 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
      * set the MTU manually for all the slaves.
      */
     /* Bond vif uses first slave port ID. */
-    if (router->vr_eth_if) {
+    if (router->vr_eth_if)
         ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
-        if (ethdev && ethdev->ethdev_nb_slaves > 0) {
-            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
-                if (port_id == ethdev->ethdev_slaves[i])
-                    break;
-            }
-            /* Clear ethdev if no port match. */
-            if (i >= ethdev->ethdev_nb_slaves)
-                ethdev = NULL;
-        }
-    }
-    if (ethdev && ethdev->ethdev_nb_slaves > 0) {
+
+    if (ethdev && vr_dpdk_ethdev_bond_port_match(port_id, ethdev)) {
+        RTE_LOG(INFO, VROUTER, "Changing bond eth device %" PRIu8 " MTU\n",
+                ethdev->ethdev_port_id);
+
         for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
             slave_port_id = ethdev->ethdev_slaves[i];
-            RTE_LOG(INFO, VROUTER, "    changing bond member eth device %" PRIu8
-                " MTU to %u\n", slave_port_id, new_mtu);
+            RTE_LOG(INFO, VROUTER,
+                    "    changing bond member eth device %" PRIu8 " MTU to %u\n",
+                    slave_port_id, new_mtu);
 
             ret =  rte_eth_dev_set_mtu(slave_port_id, new_mtu);
             if (ret < 0) {
-                RTE_LOG(ERR, VROUTER, "    error changing bond member eth device %" PRIu8
-                    " MTU: %s (%d)\n", slave_port_id, rte_strerror(-ret), -ret);
+                RTE_LOG(ERR, VROUTER,
+                        "    error changing bond member eth device %" PRIu8 " MTU: %s (%d)\n",
+                        slave_port_id, rte_strerror(-ret), -ret);
                 return ret;
             }
         }
     } else {
+        RTE_LOG(INFO, VROUTER, "Changing eth device %" PRIu8 " MTU to %u\n",
+                port_id, new_mtu);
+
         ret =  rte_eth_dev_set_mtu(port_id, new_mtu);
         if (ret < 0) {
-            RTE_LOG(ERR, VROUTER, "Error changing eth device %" PRIu8
-                " MTU: %s (%d)\n", port_id, rte_strerror(-ret), -ret);
+            RTE_LOG(ERR, VROUTER,
+                    "Error changing eth device %" PRIu8 " MTU: %s (%d)\n",
+                    port_id, rte_strerror(-ret), -ret);
         }
         return ret;
     }
@@ -486,19 +486,28 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     return 0;
 }
 
-
 /* Configure KNI state callback */
 static int
 dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 {
+    struct vrouter *router = vrouter_get(0);
+    struct vr_dpdk_ethdev *ethdev = NULL;
     int ret = 0;
+
+    if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
+        RTE_LOG(ERR, VROUTER, "%s: Invalid eth device %" PRIu8 "\n",
+                __func__, port_id);
+        return -EINVAL;
+    }
+
+    if (router->vr_eth_if)
+        ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
+
+    if (ethdev && vr_dpdk_ethdev_bond_port_match(port_id, ethdev))
+        port_id = ethdev->ethdev_port_id;
 
     RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
                     port_id, if_up ? "UP" : "DOWN");
-    if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
-        RTE_LOG(ERR, VROUTER, "Invalid eth device %" PRIu8 "\n", port_id);
-        return -EINVAL;
-    }
 
     if (if_up)
         ret = rte_eth_dev_start(port_id);
@@ -506,7 +515,7 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
         rte_eth_dev_stop(port_id);
 
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP"
+        RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP "
                     "failed (%d)\n", port_id, ret);
     }
 
