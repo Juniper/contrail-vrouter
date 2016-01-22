@@ -625,7 +625,24 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
     }
 }
 
+/* Check if port_id is a bond slave. */
+bool
+vr_dpdk_ethdev_bond_port_match(uint8_t port_id, struct vr_dpdk_ethdev *ethdev)
+{
+    int i;
 
+    if (ethdev->ethdev_nb_slaves > 0) {
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+            if (port_id == ethdev->ethdev_slaves[i])
+                break;
+        }
+
+        if (i < ethdev->ethdev_nb_slaves)
+            return true;
+    }
+
+    return false;
+}
 
 /* Init ethernet device */
 int

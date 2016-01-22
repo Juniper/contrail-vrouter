@@ -583,6 +583,8 @@ int vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev);
  */
 uint64_t vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t *nb_pkts);
+/* Check if port_id is a bond slave. */
+bool vr_dpdk_ethdev_bond_port_match(uint8_t port_id, struct vr_dpdk_ethdev *ethdev);
 
 /*
  * vr_dpdk_flow_mem.c
