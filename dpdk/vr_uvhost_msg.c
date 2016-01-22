@@ -260,6 +260,49 @@ vr_uvhm_map_addr(vr_uvh_client_t *vru_cl, uint64_t addr)
 }
 
 /*
+ * uvhm_check_vring_ready - check if virtual queue is ready to use and
+ * set the ready status.
+ *
+ * Returns 1 if vring ready, 0 otherwise.
+ */
+static int
+uvhm_check_vring_ready(vr_uvh_client_t *vru_cl, unsigned int vring_idx)
+{
+    unsigned int vif_idx = vru_cl->vruc_idx;
+    vr_dpdk_virtioq_t *vq;
+
+    if (vif_idx >= VR_MAX_INTERFACES) {
+        return 0;
+    }
+
+    if (vring_idx & 1) {
+        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
+    } else {
+        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    }
+
+    /* vring is ready if both call FD and addresses are set */
+    if (vq->vdv_desc && vq->vdv_callfd > 0 && vq->vdv_ready_state != VQ_READY) {
+        /*
+         * Now the virtio queue is ready for forwarding.
+         * TODO - need a memory barrier here for non-x86 CPU?
+         */
+        if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
+            vr_uvhost_log("Client %s: error setting vring %u ready state\n",
+                    uvhm_client_name(vru_cl), vring_idx);
+            return -1;
+        }
+
+        vr_uvhost_log("Client %s: vring %d is ready\n",
+                uvhm_client_name(vru_cl), vring_idx);
+
+        return 1;
+    }
+
+    return 0;
+}
+
+/*
  * vr_uvhm_set_vring_addr - handles a VHOST_USER_SET_VRING_ADDR message from
  * the user space vhost client to set the address of the virtio rings.
  *
@@ -304,18 +347,10 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    /*
-     * Now that the addresses have been set, the virtio queue is ready for
-     * forwarding. This is the last message from qemu, so call fd has been set.
-     *
-     * TODO - need a memory barrier here for non-x86 CPU.
-     */
-    if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
-        vr_uvhost_log("Couldn't set virtio queue ready in vhost server, "
-                      "%d %d\n",
-                      vru_cl->vruc_idx, vring_idx);
-        return -1;
-    }
+    /* Try to recover from the vRouter crash. */
+    vr_dpdk_virtio_recover_vring_base(vru_cl->vruc_idx, vring_idx);
+
+    uvhm_check_vring_ready(vru_cl, vring_idx);
 
     return 0;
 }
@@ -420,6 +455,8 @@ vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl)
     }
     /* set FD to -1, so we do not close it in vr_uvh_cl_msg_handler() */
     vru_cl->vruc_fds_sent[0] = -1;
+
+    uvhm_check_vring_ready(vru_cl, vring_idx);
 
     return 0;
 }
