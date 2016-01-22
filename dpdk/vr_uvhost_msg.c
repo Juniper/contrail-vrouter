@@ -36,6 +36,7 @@ static int vr_uvhm_set_vring_num(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_set_vring_kick(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl);
 
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
@@ -51,7 +52,7 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     vr_uvhm_set_vring_addr,
     vr_uvhm_set_vring_base,
     vr_uvhm_get_vring_base,
-    NULL,
+    vr_uvhm_set_vring_kick,
     vr_uvhm_set_vring_call,
     NULL
 };
@@ -304,18 +305,8 @@ vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
-    /*
-     * Now that the addresses have been set, the virtio queue is ready for
-     * forwarding. This is the last message from qemu, so call fd has been set.
-     *
-     * TODO - need a memory barrier here for non-x86 CPU.
-     */
-    if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
-        vr_uvhost_log("Couldn't set virtio queue ready in vhost server, "
-                      "%d %d\n",
-                      vru_cl->vruc_idx, vring_idx);
-        return -1;
-    }
+    /* Try to recover from the vRouter crash. */
+    vr_dpdk_virtio_recover_vring_base(vru_cl->vruc_idx, vring_idx);
 
     return 0;
 }
@@ -384,6 +375,79 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
 
     vum_msg->size = sizeof(struct vhost_vring_state);
     vr_uvhost_log("    GET VRING BASE: returns %u\n", vum_msg->state.num);
+
+    return 0;
+}
+
+/*
+ * uvhm_vring_is_ready - check if virtual queue is ready to use
+ *
+ * Returns 1 if ready, 0 otherwise.
+ */
+static int
+uvhm_vring_is_ready(vr_uvh_client_t *vru_cl, unsigned int vring_idx)
+{
+    unsigned int vif_idx = vru_cl->vruc_idx;
+    vr_dpdk_virtioq_t *vq;
+
+    if (vif_idx >= VR_MAX_INTERFACES) {
+        return 0;
+    }
+
+    if (vring_idx & 1) {
+        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
+    } else {
+        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    }
+
+    if (vq->vdv_desc && vq->vdv_callfd > 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/*
+ * vr_uvhm_set_vring_kick - handles a VHOST_USER_SET_VRING_KICK messsage
+ * from the vhost user client to set the eventfd to be used to interrupt the
+ * host, if required.
+ *
+ * We ignore this eventfd since vRouter is in a polling mode.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+vr_uvhm_set_vring_kick(vr_uvh_client_t *vru_cl)
+{
+    VhostUserMsg *vum_msg;
+    unsigned int vring_idx;
+
+    vum_msg = &vru_cl->vruc_msg;
+    vring_idx = vum_msg->state.index;
+    vr_uvhost_log("    SET VRING KICK: vring %u FD %d\n", vring_idx,
+                                                vru_cl->vruc_fds_sent[0]);
+
+    if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
+        vr_uvhost_log("Client %s: error setting vring %u kick: invalid vring index\n",
+                        uvhm_client_name(vru_cl), vring_idx);
+        return -1;
+    }
+    /* We ignore the kick FD, so it will be closed in vr_uvh_cl_msg_handler() */
+
+    /*
+     * Now the virtio queue is ready for forwarding.
+     * TODO - need a memory barrier here for non-x86 CPU?
+     */
+    if (uvhm_vring_is_ready(vru_cl, vring_idx)) {
+        if (vr_dpdk_set_virtq_ready(vru_cl->vruc_idx, vring_idx, VQ_READY)) {
+            vr_uvhost_log("Client %s: error setting vring %u ready state\n",
+                    uvhm_client_name(vru_cl), vring_idx);
+            return -1;
+        }
+
+        vr_uvhost_log("Client %s: vring %d is ready\n",
+                uvhm_client_name(vru_cl), vring_idx);
+    }
 
     return 0;
 }
