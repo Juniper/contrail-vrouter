@@ -25,6 +25,7 @@ static struct genl_ops vrouter_genl_ops[] = {
     {
         .cmd        =   SANDESH_REQUEST,
         .doit       =   netlink_trans_request,
+        .flags      =   GENL_ADMIN_PERM,
     },
 };
 
@@ -32,7 +33,7 @@ struct genl_family vrouter_genl_family = {
     .id         =   GENL_ID_GENERATE,
     .name       =   "vrouter",
     .version    =   1,
-    .maxattr    =   NL_ATTR_MAX,
+    .maxattr    =   NL_ATTR_MAX - 1,
     .netnsok    =   true,
 };
 
