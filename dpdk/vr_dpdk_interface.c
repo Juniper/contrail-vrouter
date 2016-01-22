@@ -1041,7 +1041,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue *monitoring_tx_queue;
-    struct vr_packet *p_clone;
+    struct rte_mbuf *p_copy;
     struct vr_interface_stats *stats;
     int ret;
     struct rte_mbuf *mbufs_out[VR_DPDK_FRAG_MAX_IP_FRAGS];
@@ -1063,10 +1063,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
-            p_clone = vr_pclone(pkt);
-            if (likely(p_clone != NULL)) {
+            p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);
+            if (likely(p_copy != NULL)) {
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
-                    vr_dpdk_pkt_to_mbuf(p_clone));
+                                p_copy);
             }
         }
     }
@@ -1238,7 +1238,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     unsigned vif_idx = vif->vif_idx;
     struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
     struct vr_dpdk_queue *monitoring_tx_queue;
-    struct vr_packet *p_clone;
+    struct rte_mbuf *p_copy;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -1252,10 +1252,10 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
-            p_clone = vr_pclone(pkt);
-            if (likely(p_clone != NULL)) {
+            p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);;
+            if (likely(p_copy != NULL)) {
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
-                    vr_dpdk_pkt_to_mbuf(p_clone));
+                                p_copy);
             }
         }
     }
