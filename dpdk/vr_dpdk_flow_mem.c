@@ -25,8 +25,8 @@ struct vr_hugepage_info {
     uint32_t num_pages;
 } vr_hugepage_md[HPI_MAX];
 
-extern struct vr_btable *vr_flow_table;
-extern struct vr_btable *vr_oflow_table;
+extern void *vr_flow_table;
+extern void *vr_oflow_table;
 extern unsigned char *vr_flow_path;
 
 static int
@@ -202,18 +202,11 @@ vr_dpdk_flow_mem_init(void)
 int
 vr_dpdk_flow_init(void)
 {
-    struct iovec iov;
 
-    iov.iov_base = vr_dpdk.flow_table;
-    iov.iov_len = VR_FLOW_TABLE_SIZE;
-    vr_flow_table = vr_btable_attach(&iov, 1, sizeof(struct vr_flow_entry));
+    vr_flow_table = vr_dpdk.flow_table;
+    vr_oflow_table = vr_dpdk.flow_table + VR_FLOW_TABLE_SIZE;
+
     if (!vr_flow_table)
-        return -1;
-
-    iov.iov_base = ((unsigned char *)vr_dpdk.flow_table + VR_FLOW_TABLE_SIZE);
-    iov.iov_len = VR_OFLOW_TABLE_SIZE;
-    vr_oflow_table = vr_btable_attach(&iov, 1, sizeof(struct vr_flow_entry));
-    if (!vr_oflow_table)
         return -1;
 
     return 0;

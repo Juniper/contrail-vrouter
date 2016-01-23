@@ -198,6 +198,7 @@ struct host_os {
     void (*hos_set_log_type)(unsigned int vr_log_type, int enable);
     unsigned int (*hos_get_log_level)(void);
     unsigned int *(*hos_get_enabled_log_types)(int *);
+    void (*hos_soft_reset)(struct vrouter *);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -244,6 +245,7 @@ struct host_os {
 #define vr_set_log_type                 vrouter_host->hos_set_log_type
 #define vr_get_log_level                vrouter_host->hos_get_log_level
 #define vr_get_enabled_log_types        vrouter_host->hos_get_enabled_log_types
+#define vr_soft_reset                   vrouter_host->hos_soft_reset
 
 struct vr_malloc_stats {
     int64_t ms_size;
@@ -268,8 +270,7 @@ struct vrouter {
     struct vr_rtable *vr_inet_mcast_rtable;
     struct vr_rtable *vr_bridge_rtable;
 
-    struct vr_btable *vr_flow_table;
-    struct vr_btable *vr_oflow_table;
+    vr_htable_t vr_flow_table;
     struct vr_flow_table_info *vr_flow_table_info;
     unsigned int vr_flow_table_info_size;
 

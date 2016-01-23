@@ -17,6 +17,11 @@
 
 extern int vrouter_host_init(unsigned int);
 extern unsigned int vr_num_cpus;
+extern unsigned int vr_bridge_entries;
+extern unsigned int vr_bridge_oentries;
+extern unsigned int vr_flow_entries;
+extern unsigned int vr_oflow_entries;
+
 
 unsigned int allocated = 0;
 
@@ -67,6 +72,16 @@ static void teardown(void **state) {
 
 int main(void) {
     int ret;
+
+
+    /*
+     * Initialise the tables to small values, in the test they
+     * are likely to fail with huge values
+     */
+    vr_bridge_entries = 1024;
+    vr_bridge_oentries = 64;
+    vr_flow_entries = 1024;
+    vr_oflow_entries = 64;
 
     /* test suite */
     const UnitTest tests[] = {
