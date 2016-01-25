@@ -51,7 +51,8 @@ int mem_fd;
 
 static int dvrf_set, mir_set, show_evicted_set, help_set;
 static unsigned short dvrf;
-static int flow_index, list, flow_cmd, mirror = -1;
+static int list, flow_cmd, mirror = -1;
+static unsigned long flow_index;
 static int rate, stats;
 
 struct flow_table {
@@ -76,8 +77,11 @@ vr_flow_req flow_req;
 
 
 struct vr_flow_entry *
-flow_get(unsigned int flow_index)
+flow_get(unsigned long flow_index)
 {
+    if (flow_index >= main_table.ft_num_entries)
+        return NULL;
+
     return &main_table.ft_entries[flow_index];
 }
 
@@ -734,13 +738,16 @@ flow_table_setup(void)
 }
 
 void
-flow_validate(int flow_index, char action)
+flow_validate(unsigned long flow_index, char action)
 {
     struct vr_flow_entry *fe;
 
     memset(&flow_req, 0, sizeof(flow_req));
 
     fe = flow_get(flow_index);
+    if (!fe)
+        return;
+
     if ((fe->fe_type != VP_TYPE_IP) && (fe->fe_type != VP_TYPE_IP6))
         return;
 
@@ -913,14 +920,21 @@ main(int argc, char *argv[])
     if (ret < 0)
         return ret;
 
-    if (list)
+    if (list) {
         flow_list();
-    else if (rate)
+    } else if (rate) {
         flow_rate();
-    else if (stats)
+    } else if (stats) {
         flow_stats();
-    else
+    } else {
+        if (flow_index >= main_table.ft_num_entries) {
+            printf("Flow index %lu is greater than available indices (%u)\n",
+                    flow_index, main_table.ft_num_entries - 1);
+            return -1;
+        }
+
         flow_validate(flow_index, flow_cmd);
+    }
 
     return 0;
 }
