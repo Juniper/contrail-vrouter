@@ -513,7 +513,12 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
     return ret;
 }
 
-/* Init KNI */
+/*
+ * vr_dpdk_knidev_init - initializes Kernel Network Interface device using
+ * specified Ethernet device port.
+ *
+ * Returns 0 on success, < 0 otherwise.
+ */
 int
 vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 {
@@ -531,6 +536,13 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
          */
         rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
         vr_dpdk.kni_inited = true;
+    }
+
+    /* Check if port is valid. */
+    if (!rte_eth_dev_is_valid_port(port_id)) {
+        RTE_LOG(ERR, VROUTER, "    error initializing KNI device %s: invalid eth device %"
+                PRIu8"\n", vif->vif_name, port_id);
+        return -EINVAL;
     }
 
     /* get eth device info */
