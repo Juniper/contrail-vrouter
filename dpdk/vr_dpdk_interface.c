@@ -1287,7 +1287,7 @@ dpdk_if_get_settings(struct vr_interface *vif,
     struct rte_eth_link link;
 
     memset(&link, 0, sizeof(link));
-    rte_eth_link_get(port_id, &link);
+    rte_eth_link_get_nowait(port_id, &link);
     if (link.link_speed != 0) {
         settings->vis_speed = link.link_speed;
         settings->vis_duplex = link.link_duplex == ETH_LINK_FULL_DUPLEX?
