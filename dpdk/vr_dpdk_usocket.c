@@ -37,6 +37,8 @@ static int vr_usocket_bind(struct vr_usocket *);
 static int usock_write(struct vr_usocket *);
 static int usock_read_init(struct vr_usocket *);
 
+extern unsigned int vr_max_flow_table_hold_count;
+
 /*
  * mark the error in socket for somebody to process/see
  */
@@ -516,8 +518,11 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
         for (i = 0; i < nb_pkts; i++) {
             if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) > 0)
                 stats->vis_port_opackets++;
-            else
+            else {
                 stats->vis_port_oerrors++;
+                RTE_LOG(ERR, USOCK, "sendmsg() mbuf %d/%d errno == %d\n",
+                        i, nb_pkts, errno);
+            }
 
             rte_pktmbuf_free(mbuf_arr[i]);
         }
@@ -685,7 +690,11 @@ retry_read:
 static struct vr_usocket *
 usock_alloc(unsigned short proto, unsigned short type)
 {
-    int sock_fd = -1, domain;
+    int sock_fd = -1, domain, ret;
+    /* socket TX buffer size = (hold flow table entries * 9060B of jumbo frame) */
+    int setsocksndbuff = vr_max_flow_table_hold_count * 9060;
+    int getsocksndbuff;
+    socklen_t getsocksndbufflen = sizeof(getsocksndbuff);
     int error = 0, flags;
     unsigned int buf_len;
     struct vr_usocket *usockp = NULL, *child;
@@ -723,10 +732,36 @@ usock_alloc(unsigned short proto, unsigned short type)
 
     if (is_socket) {
         sock_fd = socket(domain, sock_type, 0);
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: new socket FD %d\n", __func__,
+        RTE_LOG(INFO, USOCK, "%s[%lx]: new socket FD %d\n", __func__,
                 pthread_self(), sock_fd);
         if (sock_fd < 0)
             return NULL;
+
+        /* set socket send buffer size */
+        ret = setsockopt(sock_fd, SOL_SOCKET, SO_SNDBUF, &setsocksndbuff,
+                         sizeof(setsocksndbuff));
+        if (ret == 0) {
+            /* check if setting buffer succeeded */
+            ret = getsockopt(sock_fd, SOL_SOCKET, SO_SNDBUF, &getsocksndbuff,
+                             &getsocksndbufflen);
+            if (ret == 0) {
+                if (getsocksndbuff >= setsocksndbuff) {
+                    RTE_LOG(INFO, USOCK, "%s[%lx]: setting socket FD %d send buff size.\n"
+                            "Buffer size set to %d (requested %d)\n", __func__,
+                            pthread_self(), sock_fd, getsocksndbuff, setsocksndbuff);
+                } else { /* set other than requested */
+                    RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d send buff size failed.\n"
+                            "Buffer size set to %d (requested %d)\n", __func__,
+                            pthread_self(), sock_fd, getsocksndbuff, setsocksndbuff);
+                }
+            } else { /* requesting buffer size failed */
+                RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d send buff size %d failed\n",
+                         __func__, pthread_self(), sock_fd, setsocksndbuff);
+            }
+        } else { /* setting buffer size failed */
+            RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d send buff size %d failed\n",
+                     __func__, pthread_self(), sock_fd, setsocksndbuff);
+        }
     }
 
     usockp = vr_zalloc(sizeof(*usockp), VR_USOCK_OBJECT);
