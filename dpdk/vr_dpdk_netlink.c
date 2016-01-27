@@ -98,6 +98,7 @@ dpdk_netlink_receive(void *usockp, char *nl_buf,
     int ret;
     struct vr_message request;
 
+    memset(&request, 0, sizeof(request));
     request.vr_message_buf = nl_buf + HDR_LEN;
     request.vr_message_len = nl_len - HDR_LEN;
 
@@ -159,6 +160,7 @@ vr_netlink_uvhost_vif_del(unsigned int vif_idx)
 {
     vrnu_msg_t msg;
 
+    memset(&msg, 0, sizeof(msg));
     msg.vrnum_type = VRNU_MSG_VIF_DEL;
     msg.vrnum_vif_del.vrnu_vif_idx = vif_idx;
 
@@ -188,6 +190,7 @@ vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
 {
     vrnu_msg_t msg;
 
+    memset(&msg, 0, sizeof(msg));
     msg.vrnum_type = VRNU_MSG_VIF_ADD;
     strncpy(msg.vrnum_vif_add.vrnu_vif_name, vif_name,
             sizeof(msg.vrnum_vif_add.vrnu_vif_name) - 1);
