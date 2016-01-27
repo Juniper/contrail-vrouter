@@ -49,8 +49,7 @@ vr_dpdk_lcore_least_used_get(void)
             continue;
         lcore = vr_dpdk.lcores[lcore_id];
 
-        num_queues = lcore->lcore_nb_rx_queues +
-                      lcore->lcore_nb_rings_to_push;
+        num_queues = lcore->lcore_nb_rx_queues;
         if (num_queues < least_used_nb_queues) {
             least_used_nb_queues = num_queues;
             least_used_id = lcore_id;
