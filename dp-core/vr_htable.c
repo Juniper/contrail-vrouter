@@ -186,7 +186,7 @@ __vr_htable_hentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
         return;
 
     if (ent->hentry_index >= table->ht_hentries) {
-        head_ent = vr_htable_get_hentry_by_index((vr_htable_t)table,
+        head_ent = __vr_htable_get_hentry_by_index((vr_htable_t)table,
                                             ent->hentry_bucket_index);
         for (prev = head_ent; prev; prev = prev->hentry_next) {
             if (prev->hentry_next == ent) {
