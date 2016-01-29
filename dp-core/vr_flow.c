@@ -224,7 +224,6 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
         (VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_EVICTED |
          VR_FLOW_FLAG_NEW_FLOW);
 
-    vr_htable_release_hentry(router->vr_flow_table, &fe->fe_hentry);
     return;
 }
 
