@@ -456,8 +456,6 @@ vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl)
     /* set FD to -1, so we do not close it in vr_uvh_cl_msg_handler() */
     vru_cl->vruc_fds_sent[0] = -1;
 
-    uvhm_check_vring_ready(vru_cl, vring_idx);
-
     return 0;
 }
 
