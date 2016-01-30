@@ -342,6 +342,8 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     vr_hentry_t *head_ent;
     struct vr_htable *table = (struct vr_htable *)htable;
 
+    if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
+        return;
 
     if (ent->hentry_index < table->ht_hentries) {
         vr_htable_hentry_invalidate(table, ent);
