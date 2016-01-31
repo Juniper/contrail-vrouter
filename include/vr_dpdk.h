@@ -227,6 +227,9 @@ extern int dpdk_vlan_forwarding_if_add(void);
  */
 #define VR_DPDK_NUM_FDS    512
 
+/* Maximum number of HOLD entries in flow table */
+#define VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT 1024
+
 /*
  * DPDK LCore IDs
  */

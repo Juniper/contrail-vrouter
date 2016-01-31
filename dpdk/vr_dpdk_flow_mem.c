@@ -28,6 +28,7 @@ struct vr_hugepage_info {
 extern void *vr_flow_table;
 extern void *vr_oflow_table;
 extern unsigned char *vr_flow_path;
+extern unsigned int vr_max_flow_table_hold_count;
 
 static int
 vr_hugepage_info_init(void)
@@ -195,6 +196,10 @@ vr_dpdk_flow_mem_init(void)
 
     if (!vr_dpdk.flow_table)
         return -ENOMEM;
+
+    vr_max_flow_table_hold_count = VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT;
+    RTE_LOG(INFO, VROUTER, "Max HOLD flow entries set to %u\n",
+            vr_max_flow_table_hold_count);
 
     return 0;
 }

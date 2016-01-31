@@ -23,11 +23,11 @@
 
 #define VR_NUM_OFLOW_TABLES         1
 
-#define VR_MAX_FLOW_TABLE_HOLD_COUNT \
-                                    4096
+#define VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT 4096
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
+unsigned int vr_max_flow_table_hold_count = VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT;
 
 /*
  * host can provide its own memory . Point in case is the DPDK. In DPDK,
@@ -1158,7 +1158,7 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
 
     if ((vr_flow_hold_limit) &&
             (vr_flow_table_hold_count(router) >
-             VR_MAX_FLOW_TABLE_HOLD_COUNT)) {
+             vr_max_flow_table_hold_count)) {
         return false;
     }
 
