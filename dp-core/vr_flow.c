@@ -27,7 +27,6 @@
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
-unsigned int vr_max_flow_table_hold_count = VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT;
 
 /*
  * host can provide its own memory . Point in case is the DPDK. In DPDK,
@@ -41,7 +40,7 @@ void *vr_oflow_table;
  * is set by somebody and passed to agent for it to map
  */
 unsigned char *vr_flow_path;
-unsigned int vr_flow_hold_limit = 1;
+unsigned int vr_flow_hold_limit = VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT;
 
 #if defined(__linux__) && defined(__KERNEL__)
 extern unsigned short vr_flow_major;
@@ -1158,7 +1157,7 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
 
     if ((vr_flow_hold_limit) &&
             (vr_flow_table_hold_count(router) >
-             vr_max_flow_table_hold_count)) {
+             vr_flow_hold_limit)) {
         return false;
     }
 
