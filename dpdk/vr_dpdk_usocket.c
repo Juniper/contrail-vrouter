@@ -37,8 +37,6 @@ static int vr_usocket_bind(struct vr_usocket *);
 static int usock_write(struct vr_usocket *);
 static int usock_read_init(struct vr_usocket *);
 
-extern unsigned int vr_max_flow_table_hold_count;
-
 /*
  * mark the error in socket for somebody to process/see
  */
@@ -520,8 +518,8 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
                 stats->vis_port_opackets++;
             else {
                 stats->vis_port_oerrors++;
-                RTE_LOG(ERR, USOCK, "sendmsg() mbuf %d/%d errno == %d\n",
-                        i, nb_pkts, errno);
+                RTE_LOG(ERR, USOCK, "%s: sending mbuf %d of %d to agent socket"
+                        " failed (%d).\n", __func__, i + 1, nb_pkts, errno);
             }
 
             rte_pktmbuf_free(mbuf_arr[i]);
@@ -691,8 +689,8 @@ static struct vr_usocket *
 usock_alloc(unsigned short proto, unsigned short type)
 {
     int sock_fd = -1, domain, ret;
-    /* socket TX buffer size = (hold flow table entries * 9060B of jumbo frame) */
-    int setsocksndbuff = vr_max_flow_table_hold_count * 9060;
+    /* socket TX buffer size = (hold flow table entries * size of jumbo frame) */
+    int setsocksndbuff = vr_max_flow_table_hold_count * VR_DPDK_MAX_PACKET_SZ;
     int getsocksndbuff;
     socklen_t getsocksndbufflen = sizeof(getsocksndbuff);
     int error = 0, flags;
@@ -755,12 +753,12 @@ usock_alloc(unsigned short proto, unsigned short type)
                             pthread_self(), sock_fd, getsocksndbuff, setsocksndbuff);
                 }
             } else { /* requesting buffer size failed */
-                RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d send buff size %d failed\n",
-                         __func__, pthread_self(), sock_fd, setsocksndbuff);
+                RTE_LOG(ERR, USOCK, "%s[%lx]: getting socket FD %d send buff size failed (%d)\n",
+                         __func__, pthread_self(), sock_fd, errno);
             }
         } else { /* setting buffer size failed */
-            RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d send buff size %d failed\n",
-                     __func__, pthread_self(), sock_fd, setsocksndbuff);
+            RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d send buff size %d failed (%d)\n",
+                     __func__, pthread_self(), sock_fd, setsocksndbuff, errno);
         }
     }
 

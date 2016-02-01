@@ -34,6 +34,7 @@
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 extern int dpdk_vlan_forwarding_if_add(void);
+extern unsigned int vr_max_flow_table_hold_count;
 
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.
@@ -147,7 +148,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 /* How many objects (mbufs) to keep in per-lcore VM mempool cache */
 #define VR_DPDK_VM_MEMPOOL_CACHE_SZ (VR_DPDK_RX_BURST_SZ*8)
 /* Number of mbufs in TX rings (like ring to push, socket, VLAN rings etc */
-#define VR_DPDK_TX_RING_SZ          (VR_DPDK_TX_BURST_SZ*8)
+#define VR_DPDK_TX_RING_SZ          (VR_DPDK_TX_BURST_SZ*32)
 /* RX ring minimum number of pointers to transfer (cache line / size of ptr) */
 #define VR_DPDK_RX_RING_CHUNK_SZ    1
 /* Number of mbufs in lcore RX ring (we retry in case enqueue fails) */
@@ -228,7 +229,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 #define VR_DPDK_NUM_FDS    512
 
 /* Maximum number of HOLD entries in flow table */
-#define VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT 1024
+#define VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT 1000
 
 /*
  * DPDK LCore IDs
