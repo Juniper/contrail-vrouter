@@ -1343,6 +1343,7 @@ dpdk_lcore_fwd_loop(void)
         cur_cycles = rte_get_timer_cycles();
 #else
         cur_cycles++;
+        lcore->lcore_fwd_loops = cur_cycles;
 #endif
 
         /* run forwarding lcore RX/TX cycle */

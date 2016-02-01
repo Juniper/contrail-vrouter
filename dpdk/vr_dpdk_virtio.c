@@ -47,6 +47,10 @@ struct dpdk_virtio_writer {
     struct rte_port_out_stats stats;
     /* extra statistics */
     uint64_t nb_syscalls;
+    /* last packet TX */
+    uint64_t last_pkt_tx;
+    /* last TX flush */
+    uint64_t last_pkt_tx_flush;
 
     vr_dpdk_virtioq_t *tx_virtioq;
     struct rte_mbuf *tx_buf[VR_DPDK_VIRTIO_TX_BURST_SZ];
@@ -871,12 +875,23 @@ static int
 dpdk_virtio_to_vm_tx(void *port, struct rte_mbuf *pkt)
 {
     struct dpdk_virtio_writer *p = (struct dpdk_virtio_writer *)port;
+    const unsigned lcore_id = rte_lcore_id();
+    struct vr_dpdk_lcore *lcore = NULL;
+
+    if (lcore_id >= VR_DPDK_FWD_LCORE_ID) {
+        lcore = vr_dpdk.lcores[lcore_id];
+        p->last_pkt_tx = lcore->lcore_fwd_loops;
+    }
 
     p->tx_buf[p->tx_buf_count++] = pkt;
     DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(p, 1);
 
-    if (unlikely(p->tx_buf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ))
+    if (unlikely(p->tx_buf_count >= VR_DPDK_VIRTIO_TX_BURST_SZ)) {
         dpdk_virtio_send_burst(p);
+        if (lcore) {
+            p->last_pkt_tx_flush = lcore->lcore_fwd_loops;
+        }
+    }
 
     return 0;
 }
@@ -891,9 +906,38 @@ static int
 dpdk_virtio_to_vm_flush(void *port)
 {
     struct dpdk_virtio_writer *p = (struct dpdk_virtio_writer *)port;
+    unsigned lcore_id;
+    struct vr_dpdk_lcore *lcore = NULL;
 
-    if (p->tx_buf_count > 0)
-        dpdk_virtio_send_burst(p);
+    if (p->tx_buf_count == 0) {
+        return 0;
+    }
+
+    lcore_id = rte_lcore_id();
+    if (lcore_id >= VR_DPDK_FWD_LCORE_ID) {
+        lcore = vr_dpdk.lcores[lcore_id];
+    }
+
+    if (lcore) {
+        /*
+         * Flush the TX queue if it has been a while since it was last done OR
+         * if there are packets in the queue and no packets have been enqueued
+         * for a short while. The latter condition helps to reduce latency in
+         * case there isn't a lot of traffic on the queue.
+         */
+        if ((lcore->lcore_fwd_loops - p->last_pkt_tx_flush) <
+                    VR_DPDK_TX_FLUSH_LOOPS) {
+            if ((lcore->lcore_fwd_loops - p->last_pkt_tx) <
+                    VR_DPDK_TX_IDLE_LOOPS) {
+                return 0;
+            }
+        }
+    }
+
+    dpdk_virtio_send_burst(p);
+    if (lcore) {
+        p->last_pkt_tx_flush = lcore->lcore_fwd_loops;
+    }
 
     return 0;
 }
