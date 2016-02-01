@@ -130,7 +130,7 @@ extern unsigned int vr_max_flow_table_hold_count;
 #define VR_DPDK_RX_BURST_SZ         32
 #define VR_DPDK_TX_BURST_SZ         32
 /* Number of mbufs in RSS mempool */
-#define VR_DPDK_RSS_MEMPOOL_SZ      65536 
+#define VR_DPDK_RSS_MEMPOOL_SZ      32768
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
 /* Number of mbufs in FRAG_DIRECT mempool */
@@ -154,13 +154,18 @@ extern unsigned int vr_max_flow_table_hold_count;
 /* Number of mbufs in lcore RX ring (we retry in case enqueue fails) */
 #define VR_DPDK_RX_RING_SZ          1024
 /* Number of retries to enqueue packets */
-#define VR_DPDK_RETRY_NUM           4
+#define VR_DPDK_RETRY_NUM           1 
 /* Delay between retries */
 #define VR_DPDK_RETRY_US            15
 /* Use timer to measure flushes (slower, but should improve latency) */
 #define VR_DPDK_USE_TIMER           false
 /* TX flush timeout (in loops or US if USE_TIMER defined) */
-#define VR_DPDK_TX_FLUSH_LOOPS      5
+#define VR_DPDK_TX_FLUSH_LOOPS      16
+/* TX idle timeout - if packets are not sent to a VM for this many
+ * forwarding loops, its TX queue can be flushed if it is not
+ * empty (to reduce latency).
+ */
+#define VR_DPDK_TX_IDLE_LOOPS       5
 #define VR_DPDK_TX_FLUSH_US         100
 /*
  * Bond TX timeout (in ms)
@@ -363,6 +368,8 @@ struct vr_dpdk_lcore {
     struct rte_ring *lcore_rx_ring;
     /* RX ring with packets from IO lcore. */
     struct rte_ring *lcore_io_rx_ring;
+    /* Number of forwarding loops */
+    u_int64_t lcore_fwd_loops;
     /* Flag controlling the assembler work */
     bool do_fragment_assembly;
 
