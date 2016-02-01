@@ -189,7 +189,6 @@ vr_send_interface_dump(struct nl_client *cl, unsigned int router_id,
     req.vifr_rid = router_id;
     req.vifr_marker = marker;
     req.vifr_core = core;
-
     return vr_sendmsg(cl, &req, "vr_interface_req");
 }
 
@@ -229,7 +228,7 @@ vr_send_interface_delete(struct nl_client *cl, unsigned int router_id,
 int
 vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
         int os_index, int vif_index, int vif_xconnect_index, int vif_type,
-        unsigned int vrf, unsigned int flags, int8_t *vif_mac)
+        unsigned int vrf, unsigned int flags, int8_t *vif_mac, int8_t vif_transport)
 {
     int platform;
     vr_interface_req req;
@@ -253,6 +252,7 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
     req.vifr_rid = router_id;
     req.vifr_type = vif_type;
     req.vifr_flags = flags;
+    req.vifr_transport = vif_transport;
 
     if (vif_type == VIF_TYPE_HOST) {
         req.vifr_cross_connect_idx = vif_xconnect_index;
