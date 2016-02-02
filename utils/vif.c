@@ -70,6 +70,11 @@
 #define STATS_TYPE_STRING           "stats"
 #define MONITORING_TYPE_STRING      "monitoring"
 
+#define ETH_TRANSPORT_STRING        "eth"
+#define PMD_TRASPORT_STRING         "pmd"
+#define SOCKET_TRANSPORT_STRING     "socket"
+#define VIRTUAL_TRANSPORT_STRING    "virtual"
+
 static struct nl_client *cl;
 static char flag_string[32], if_name[IFNAMSIZ];
 static int if_kindex = -1, vrf_id, vr_ifindex = -1;
@@ -80,9 +85,10 @@ static int if_xconnect_kindex = -1;
 static short vlan_id = -1;
 static int vr_ifflags;
 static unsigned int core = (unsigned)-1;
+static int8_t vr_transport = 0;
 
 static int add_set, create_set, get_set, list_set;
-static int kindex_set, type_set, help_set, set_set, vlan_set, dhcp_set;
+static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set;
 
@@ -107,12 +113,11 @@ static bool first_rate_iter = false;
  * How many times we partially ignore function call vr_interface_req_process.
  * For more information please read comment description for function:
  *  vr_interface_req_process
- *
  */
 static int ignore_number_interface = 0;
 
 /*
- * How many interfaces we will print/count rate statistics
+ * How many interfaces we will print/count in rate statistics
  */
 static int print_number_interface = 0;
 
@@ -206,6 +211,27 @@ vr_get_if_type(char *type_str)
     else if (!strncmp(type_str, MONITORING_TYPE_STRING,
                 strlen(MONITORING_TYPE_STRING)))
         return VIF_TYPE_MONITORING;
+    else
+        Usage();
+
+    return 0;
+}
+
+static unsigned int
+vr_get_if_transport(char *transport_str)
+{
+    if (!strncmp(transport_str, ETH_TRANSPORT_STRING,
+                strlen(ETH_TRANSPORT_STRING)))
+        return VIF_TRANSPORT_ETH;
+    else if (!strncmp(transport_str, PMD_TRASPORT_STRING,
+                strlen(PMD_TRASPORT_STRING)))
+        return VIF_TRANSPORT_PMD;
+    else if (!strncmp(transport_str, VIRTUAL_TRANSPORT_STRING,
+                strlen(VIRTUAL_TRANSPORT_STRING)))
+        return VIF_TRANSPORT_VIRTUAL;
+    else if (!strncmp(transport_str, SOCKET_TRANSPORT_STRING,
+                strlen(SOCKET_TRANSPORT_STRING)))
+        return VIF_TRANSPORT_SOCKET;
     else
         Usage();
 
@@ -807,7 +833,7 @@ op_retry:
             vr_ifindex = if_kindex;
 
         ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
-                if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac);
+                if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac, vr_transport);
         break;
 
     case SANDESH_OP_DELETE:
@@ -875,6 +901,7 @@ Usage()
     printf("Usage: vif [--create <intf_name> --mac <mac>]\n");
     printf("\t   [--add <intf_name> --mac <mac> --vrf <vrf>\n");
     printf("\t   \t--type [vhost|agent|physical|virtual|monitoring]\n");
+    printf("\t   \t--transport [eth|pmd|virtual|socket]\n");
     printf("\t   \t--xconnect <physical interface name>\n");
     printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
     printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci]\n");
@@ -902,6 +929,7 @@ enum if_opt_index {
     PCI_OPT_INDEX,
     KINDEX_OPT_INDEX,
     TYPE_OPT_INDEX,
+    TRANSPORT_OPT_INDEX,
     SET_OPT_INDEX,
     VLAN_OPT_INDEX,
     XCONNECT_OPT_INDEX,
@@ -928,6 +956,7 @@ static struct option long_options[] = {
     [PCI_OPT_INDEX]         =   {"pci",         no_argument,        &pci_set,           1},
     [KINDEX_OPT_INDEX]      =   {"kernel",      no_argument,        &kindex_set,        1},
     [TYPE_OPT_INDEX]        =   {"type",        required_argument,  &type_set,          1},
+    [TRANSPORT_OPT_INDEX]   =   {"transport",   required_argument,  &transport_set,     1},
     [SET_OPT_INDEX]         =   {"set",         required_argument,  &set_set,           1},
     [VLAN_OPT_INDEX]        =   {"vlan",        required_argument,  &vlan_set,          1},
     [VHOST_PHYS_OPT_INDEX]  =   {"vhost-phys",  no_argument,        &vhost_phys_set,    1},
@@ -1036,6 +1065,10 @@ parse_long_opts(int option_index, char *opt_arg)
                 vr_ifmac[0] = 0x2; /* locally administered */
                 mac_set = 1;
             }
+            break;
+
+         case TRANSPORT_OPT_INDEX:
+            vr_transport = vr_get_if_transport(optarg);
             break;
 
         case SET_OPT_INDEX:
@@ -1347,7 +1380,7 @@ main(int argc, char *argv[])
     parse_ini_file();
     platform = get_platform();
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:v:p:C:DPi:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:T:v:p:C:DPi:",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
             case 'a':
@@ -1409,6 +1442,11 @@ main(int argc, char *argv[])
             case 't':
                 type_set = 1;
                 parse_long_opts(TYPE_OPT_INDEX, optarg);
+                break;
+
+            case 'T':
+                transport_set = 1;
+                parse_long_opts(TRANSPORT_OPT_INDEX, optarg);
                 break;
 
             case 'i':

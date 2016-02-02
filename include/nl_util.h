@@ -124,7 +124,7 @@ extern int vr_send_interface_get(struct nl_client *, unsigned int,
 extern int vr_send_interface_delete(struct nl_client *, unsigned int,
         char *, int);
 extern int vr_send_interface_add(struct nl_client *, int, char *, int,
-        int, int, int, unsigned int, unsigned int, int8_t *);
+        int, int, int, unsigned int, unsigned int, int8_t *, int8_t);
 
 
 extern int vr_send_mem_stats_get(struct nl_client *, unsigned intid);
