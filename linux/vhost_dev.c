@@ -265,7 +265,7 @@ vhost_if_add(struct vr_interface *vif)
             } else {
                 vr_printf("%s not added to vhost database. ",
                         vp->vp_dev->name);
-                vr_printf("Cross connect will not work\n"); 
+                vr_printf("Cross connect will not work\n");
             }
         }
     }
