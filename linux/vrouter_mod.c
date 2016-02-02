@@ -38,6 +38,7 @@ extern unsigned int vr_bridge_oentries;
 extern unsigned int vr_mpls_labels;
 extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
+extern unsigned int vr_flow_hold_limit;
 
 extern char *ContrailBuildInfo;
 
@@ -2347,6 +2348,7 @@ module_param(vr_bridge_oentries, uint, 0);
 module_param(vr_mpls_labels, uint, 0);
 module_param(vr_nexthops, uint, 0);
 module_param(vr_vrfs, uint, 0);
+module_param(vr_flow_hold_limit, uint, 0);
 
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 module_param(vr_use_linux_br, int, 0);

@@ -196,9 +196,9 @@ vr_dpdk_flow_mem_init(void)
     if (!vr_dpdk.flow_table)
         return -ENOMEM;
 
-    vr_max_flow_table_hold_count = VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT;
+    vr_flow_hold_limit = VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT;
     RTE_LOG(INFO, VROUTER, "Max HOLD flow entries set to %u\n",
-            vr_max_flow_table_hold_count);
+            vr_flow_hold_limit);
 
     return 0;
 }
