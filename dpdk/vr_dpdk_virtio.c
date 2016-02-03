@@ -1013,6 +1013,15 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
     rte_wmb();
     synchronize_rcu();
 
+    /* Reset the queue. We reset only those values we analyze in
+     * uvhm_check_vring_ready()
+     */
+    vq->vdv_desc = NULL;
+    if (vq->vdv_callfd) {
+        close(vq->vdv_callfd);
+        vq->vdv_callfd = 0;
+    }
+
     return 0;
 }
 
