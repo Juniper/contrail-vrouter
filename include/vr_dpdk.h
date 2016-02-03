@@ -34,7 +34,7 @@
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 extern int dpdk_vlan_forwarding_if_add(void);
-extern unsigned int vr_max_flow_table_hold_count;
+extern unsigned int vr_flow_hold_limit;
 
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.
