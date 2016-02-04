@@ -147,7 +147,7 @@ struct vr_flow {
 #define flow4_unused   key_u.ip4_key.ip4_unused
 #define flow6_family   key_u.ip6_key.ip6_family
 #define flow6_sip      key_u.ip6_key.ip6_sip
-#define flow6_dip      key_u.ip6_key.ip6_sip
+#define flow6_dip      key_u.ip6_key.ip6_dip
 #define flow6_sport    key_u.ip6_key.ip6_sport
 #define flow6_dport    key_u.ip6_key.ip6_dport
 #define flow6_nh_id    key_u.ip6_key.ip6_nh_id

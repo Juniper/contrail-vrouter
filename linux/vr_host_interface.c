@@ -925,20 +925,6 @@ linux_to_vr(struct vr_interface *vif, struct sk_buff *skb)
     return 0;
 }
 
-static bool
-linux_ipv6_proto_pull(struct ipv6hdr *ip6h)
-{
-    __u8 proto = ip6h->nexthdr;
-
-    if ((proto == VR_IP_PROTO_TCP) ||
-            (proto == VR_IP_PROTO_UDP) ||
-            (proto == VR_IP_PROTO_ICMP6)) {
-        return true;
-    }
-
-    return false;
-}
-
 static int
 linux_pull_outer_headers(struct sk_buff *skb)
 {
@@ -986,7 +972,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
 
         ip6h = ipv6_hdr(skb);
         thdr = true;
-        pull = linux_ipv6_proto_pull(ip6h);
+        pull = vr_ip6_proto_pull((struct vr_ip6 *)ip6h);
         if (pull) {
             ip_proto = ip6h->nexthdr;
         }
@@ -1041,6 +1027,17 @@ linux_pull_outer_headers(struct sk_buff *skb)
 
                 if (!pskb_may_pull(skb, offset))
                     goto pull_fail;
+            } else if (vr_icmp6_error(icmph)) {
+                offset += sizeof(struct ipv6hdr);
+                if (!pskb_may_pull(skb, offset))
+                    goto pull_fail;
+                ip6h = (struct ipv6hdr *)(skb->data + offset -
+                        sizeof(struct ipv6hdr));
+                if (vr_ip6_proto_pull((struct vr_ip6 *)ip6h)) {
+                    offset += sizeof(struct vr_icmp);
+                    if (!pskb_may_pull(skb, offset))
+                        goto pull_fail;
+                }
             }
         }
     }

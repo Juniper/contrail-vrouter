@@ -51,6 +51,20 @@ vr_ip_proto_pull(struct vr_ip *iph)
     return false;
 }
 
+bool
+vr_ip6_proto_pull(struct vr_ip6 *ip6h)
+{
+    unsigned char proto = ip6h->ip6_nxt;
+
+   if ((proto == VR_IP_PROTO_TCP) ||
+            (proto == VR_IP_PROTO_UDP) ||
+            (proto == VR_IP_PROTO_ICMP6)) {
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * vr_ip_transport_parse - parse IP packet to reach the L4 header
  */
@@ -72,6 +86,7 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
     unsigned short th_csum = 0;
     struct vr_icmp *icmph = NULL;
     struct vr_ip *icmp_pl_iph = NULL;
+    struct vr_ip6 *icmp_pl_ip6h = NULL;
 
 
     /* Note: iph is set for both ipv4 and ipv6 cases */
@@ -193,6 +208,36 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                     pull_len += 24;
                 } else if (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL) {
                     pull_len += 8;
+                } else if (vr_icmp6_error(icmph)) {
+                    pull_len += sizeof(struct vr_ip6);
+                    if (frag_size < pull_len)
+                        return PKT_RET_SLOW_PATH;
+                    icmp_pl_ip6h = (struct vr_ip6 *)(icmph + 1);
+                    if (vr_ip6_proto_pull(icmp_pl_ip6h)) {
+                        if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_TCP)
+                            pull_len += sizeof(struct vr_tcp);
+                        else if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_UDP)
+                            pull_len += sizeof(struct vr_udp);
+                        else
+                            pull_len += sizeof(struct vr_icmp);
+
+                        if (frag_size < pull_len)
+                            return PKT_RET_SLOW_PATH;
+
+                        if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_TCP) {
+                            th_csum = ((struct vr_tcp *)
+                                        ((unsigned char *)icmp_pl_ip6h +
+                                        sizeof(struct vr_ip6)))->tcp_csum;
+                        } else if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_UDP) {
+                            th_csum = ((struct vr_udp *)
+                                        ((unsigned char *)icmp_pl_ip6h +
+                                        sizeof(struct vr_ip6)))->udp_csum;
+                        } else if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_ICMP6) {
+                            th_csum = ((struct vr_icmp *)
+                                        ((unsigned char *)icmp_pl_ip6h +
+                                        sizeof(struct vr_ip6)))->icmp_csum;
+                        }
+                    }
                 }
 
                 if (frag_size < pull_len)
