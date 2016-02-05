@@ -496,8 +496,7 @@ vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
  * the packets can be handed to vrouter for forwarding. the virtio client is
  * usually a VM.
  *
- * Returns the number of packets to be sent to vrouter (0 if there is nothing
- * to do).
+ * Returns the number of packets received from the virtio.
  */
 static int
 dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
@@ -510,7 +509,6 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     char *pkt_addr, *tail_addr;
     struct rte_mbuf *mbuf;
     uint32_t pkt_len;
-    uint64_t mbuf_flags;
     vr_uvh_client_t *vru_cl;
 
     if (unlikely(vq->vdv_ready_state == VQ_NOT_READY)) {
@@ -546,14 +544,28 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
                              (vq->vdv_size - 1);
         next_desc_idx = vq->vdv_avail->ring[next_avail_idx];
         desc = &vq->vdv_desc[next_desc_idx];
+        vq->vdv_used->ring[next_avail_idx].id = next_desc_idx;
+        vq->vdv_used->ring[next_avail_idx].len = 0;
 
-        mbuf_flags = 0;
+        mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
+        if (unlikely(mbuf == NULL)) {
+            p->nb_nombufs++;
+            break;
+        }
+
+        pkts[pkts_sent] = mbuf;
+        pkts_sent++;
+
+        if (unlikely(desc->len == 0 || desc->addr == 0))
+            continue;
+
         pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
         /* If address conversion fails the pkt_addr is NULL */
-        if (likely(pkt_addr != NULL)) {
-            if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
-                mbuf_flags |= PKT_RX_IP_CKSUM_BAD;
-        }
+        if (unlikely(pkt_addr == NULL))
+            continue;
+
+        if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
+                mbuf->ol_flags |= PKT_RX_IP_CKSUM_BAD;
 
         /*
          * Ignore virtio header in first descriptor as we don't support
@@ -561,62 +573,47 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
          * (chain of 2) to the used list. The used index will, however, only
          * be updated at the end of the loop.
          */
-        vq->vdv_used->ring[next_avail_idx].id = next_desc_idx;
-        vq->vdv_used->ring[next_avail_idx].len = 0;
         if (likely(desc->flags & VRING_DESC_F_NEXT)) {
-            /*
-             * TODO - make sure desc->next is sane
-             */
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u F_NEXT\n",
                 __func__, vq, i);
             desc = &vq->vdv_desc[desc->next];
+            if (unlikely(desc->len == 0 || desc->addr == 0))
+                continue;
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
             pkt_len = desc->len;
         } else {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
                 __func__, vq, i);
             /* pkt_addr has been translated earlier */
-            if (pkt_addr) {
-                pkt_addr += sizeof(struct virtio_net_hdr);
-                pkt_len = desc->len - sizeof(struct virtio_net_hdr);
-            }
+            pkt_addr += sizeof(struct virtio_net_hdr);
+            pkt_len = desc->len - sizeof(struct virtio_net_hdr);
         }
 
-        if (likely(pkt_addr != NULL)) {
-            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
+        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u addr %p\n",
                 __func__, vq, i, pkt_addr);
-            /* No need to use a dedicated mempool at the moment, since there is
-             * no dedicated lcore to poll virtio interfaces */
-            mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
-            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u mbuf %p\n",
-                __func__, vq, i, mbuf);
-            if (unlikely(mbuf == NULL)) {
+
+        /* We do not support mbuf chains */
+        if (unlikely(pkt_len > mbuf->buf_len))
+            continue;
+        mbuf->data_len = pkt_len;
+        mbuf->pkt_len = pkt_len;
+
+        rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
+
+        /* gather mbuf from several vring buffers (fixes FreeBSD) */
+        while (unlikely(desc->flags & VRING_DESC_F_NEXT)) {
+            desc = &vq->vdv_desc[desc->next];
+            if (unlikely(desc->len == 0 || desc->addr == 0))
+                continue;
+            pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+            pkt_len = desc->len;
+
+            tail_addr = rte_pktmbuf_append(mbuf, pkt_len);
+            if (unlikely(tail_addr == NULL)) {
                 p->nb_nombufs++;
                 break;
             }
-
-            mbuf->data_len = pkt_len;
-            mbuf->pkt_len = pkt_len;
-            mbuf->ol_flags = mbuf_flags;
-
-            rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), pkt_addr, pkt_len);
-
-            /* gather mbuf from several vring buffers (fixes FreeBSD) */
-            while (unlikely(desc->flags & VRING_DESC_F_NEXT)) {
-                desc = &vq->vdv_desc[desc->next];
-                pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
-                pkt_len = desc->len;
-
-                tail_addr = rte_pktmbuf_append(mbuf, pkt_len);
-                if (unlikely(tail_addr == NULL)) {
-                    p->nb_nombufs++;
-                    break;
-                }
-                rte_memcpy(tail_addr, pkt_addr, pkt_len);
-            }
-
-            pkts[pkts_sent] = mbuf;
-            pkts_sent++;
+            rte_memcpy(tail_addr, pkt_addr, pkt_len);
         }
     }
 
@@ -625,7 +622,8 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     vq->vdv_used->idx += pkts_sent;
     RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
             __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx);
-    /* call guest if required (fixes iperf issue) */
+
+    /* Call guest if required. */
     if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
         p->nb_syscalls++;
         eventfd_write(vq->vdv_callfd, 1);
@@ -635,6 +633,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
             __func__, vq, pkts_sent);
 
     DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(p, pkts_sent);
+
     return pkts_sent;
 }
 
