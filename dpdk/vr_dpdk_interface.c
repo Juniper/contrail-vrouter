@@ -1309,6 +1309,10 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
     }
 }
 
+/* For non-bonded interfaces, use the xstats from the rte_eth_xstats_get() API.
+ * For bonded interfaces, this API is not available, so instead use xstats from
+ * it's individual slave interfaces
+ */
 static void 
 vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
 {
@@ -1350,7 +1354,7 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
     } while (port_num < ethdev->ethdev_nb_slaves);
 
     /* Stats cannot go negative */
-    if (eth_stats->ierrors < 0)
+    if ((int64_t)eth_stats->ierrors < 0)
         eth_stats->ierrors = 0;
 }
 
