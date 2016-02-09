@@ -57,6 +57,144 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
 };
 
 /*
+ * uvhm_mem_table_mmap - mmaps guest memory regions.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+uvhm_client_mmap(vr_uvh_client_t *vru_cl)
+{
+    int i;
+    int ret;
+    vr_uvh_client_mem_region_t *region;
+    VhostUserMemory *vum_msg;
+    uint64_t size;
+
+    vum_msg = &vru_cl->vruc_msg.memory;
+    vr_uvhost_log("Client %s: mapping %u memory regions:\n",
+            uvhm_client_name(vru_cl), vum_msg->nregions);
+
+    if (vum_msg->nregions > VHOST_MEMORY_MAX_NREGIONS) {
+        vr_uvhost_log("Client %s: error mapping guest memory: too many regions"
+                "(%"PRIu32" > %d)\n",
+                uvhm_client_name(vru_cl), vum_msg->nregions,
+                VHOST_MEMORY_MAX_NREGIONS);
+      return -1;
+    }
+    for (i = 0; i < vum_msg->nregions; i++) {
+        vr_uvhost_log("    %d: FD %d addr 0x%" PRIx64 " size 0x%"
+                PRIx64 " off 0x%" PRIx64 "\n",
+                i, vru_cl->vruc_fds_sent[i],
+                vum_msg->regions[i].guest_phys_addr,
+                vum_msg->regions[i].memory_size,
+                vum_msg->regions[i].mmap_offset);
+
+        if (vru_cl->vruc_fds_sent[i]) {
+            region = &vru_cl->vruc_mem_regions[i];
+
+            region->vrucmr_phys_addr = vum_msg->regions[i].guest_phys_addr;
+            region->vrucmr_size = vum_msg->regions[i].memory_size;
+            region->vrucmr_user_space_addr = vum_msg->regions[i].userspace_addr;
+
+            size = vum_msg->regions[i].mmap_offset +
+                       vum_msg->regions[i].memory_size;
+            region->vrucmr_mmap_addr = (uint64_t)
+                    mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                            vru_cl->vruc_fds_sent[i], 0);
+
+            if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
+                vr_uvhost_log("Client %s: error mmaping FD %d size 0x%" PRIx64
+                        ": %s (%d)\n",
+                        uvhm_client_name(vru_cl),
+                        vru_cl->vruc_fds_sent[i], size,
+                        rte_strerror(errno), errno);
+                /*
+                 * The file descriptors will be closed in vr_uvh_cl_msg_handler()
+                 */
+                return -1;
+            }
+            /* Get block size for the munmap(2). */
+            ret = vr_dpdk_virtio_uvh_get_blk_size(vru_cl->vruc_fds_sent[i],
+                    &region->vrucmr_blksize);
+            if (ret) {
+                vr_uvhost_log("Client %s: error getting block size for FD %d\n",
+                        uvhm_client_name(vru_cl),
+                        vru_cl->vruc_fds_sent[i]);
+                return -1;
+            }
+            region->vrucmr_mmap_addr_aligned = (void *)(uintptr_t)
+                RTE_ALIGN_FLOOR(region->vrucmr_mmap_addr,
+                        region->vrucmr_blksize);
+            region->vrucmr_size_aligned = RTE_ALIGN_CEIL(size,
+                    region->vrucmr_blksize);
+
+            /*
+             * Prevent guest memory from being dumped in vrouter-dpdk core.
+             */
+            if (madvise(region->vrucmr_mmap_addr_aligned,
+                    region->vrucmr_size_aligned, MADV_DONTDUMP)) {
+                vr_uvhost_log("Client %s: error in madvise at addr 0x%" PRIx64 ", size 0x%"
+                              PRIx64 "for FD %d: %s (%d)\n",
+                              uvhm_client_name(vru_cl),
+                              region->vrucmr_mmap_addr,
+                              size, vru_cl->vruc_fds_sent[i],
+                              rte_strerror(errno), errno);
+                /*
+                 * Failure is not catastrophic, so continue below.
+                 */
+            }
+
+            /* The file descriptor is no longer needed. */
+            close(vru_cl->vruc_fds_sent[i]);
+            vru_cl->vruc_fds_sent[i] = -1;
+            region->vrucmr_mmap_addr += vum_msg->regions[i].mmap_offset;
+        }
+    }
+
+    /* Save the number of regions. */
+    vru_cl->vruc_num_mem_regions = vum_msg->nregions;
+
+    return 0;
+}
+
+/*
+ * uvhm_mem_table_munmap - munmaps guest memory regions.
+ */
+static void
+uvhm_client_munmap(vr_uvh_client_t *vru_cl)
+{
+    int i, ret;
+    vr_uvh_client_mem_region_t *region;
+
+    vr_uvhost_log("Client %s: unmapping %u memory regions:\n",
+            uvhm_client_name(vru_cl), vru_cl->vruc_num_mem_regions);
+    for (i = 0; i < vru_cl->vruc_num_mem_regions; i++) {
+        region = &vru_cl->vruc_mem_regions[i];
+        if (region->vrucmr_mmap_addr_aligned) {
+            vr_uvhost_log("    %d: unmapping addr 0x%"PRIx64" size 0x%"PRIx64
+                    "\n", i, region->vrucmr_phys_addr, region->vrucmr_size);
+
+            ret = munmap(region->vrucmr_mmap_addr_aligned,
+                    region->vrucmr_size_aligned);
+            if (ret) {
+                vr_uvhost_log(
+                        "Client %s: error unmapping memory region %d: %s (%d)\n",
+                        uvhm_client_name(vru_cl), i, strerror(errno), errno);
+            }
+
+        }
+    }
+    /*
+     * Possible memory leak when munmap fails. At this moment there is no
+     * solution for that.
+     */
+    memset(vru_cl->vruc_mem_regions, 0, sizeof(vru_cl->vruc_mem_regions));
+    vru_cl->vruc_num_mem_regions = 0;
+
+    return;
+}
+
+/*
  * vr_uvmh_get_features - handle VHOST_USER_GET_FEATURES message from user space
  * vhost client.
  *
@@ -103,101 +241,11 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
 static int
 vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
 {
-    int i;
-    int ret;
-    vr_uvh_client_mem_region_t *region;
-    void *madv_addr;
-    uint64_t madv_size;
-    VhostUserMemory *vum_msg;
-    uint64_t size;
-    vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs = (
-                             &(vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx]));
-
-    vum_msg = &vru_cl->vruc_msg.memory;
     vr_uvhost_log("    SET MEM TABLE:\n");
-    for (i = 0; i < vum_msg->nregions; i++) {
-        vr_uvhost_log("    %d: FD %d addr 0x%" PRIx64 " size 0x%"
-                PRIx64 " off 0x%" PRIx64 "\n",
-                i, vru_cl->vruc_fds_sent[i],
-                vum_msg->regions[i].guest_phys_addr,
-                vum_msg->regions[i].memory_size,
-                vum_msg->regions[i].mmap_offset);
 
-        if (vru_cl->vruc_fds_sent[i]) {
-            region = &vru_cl->vruc_mem_regions[i];
-
-            region->vrucmr_phys_addr = vum_msg->regions[i].guest_phys_addr;
-            region->vrucmr_size = vum_msg->regions[i].memory_size;
-            region->vrucmr_user_space_addr = vum_msg->regions[i].userspace_addr;
-
-            size = vum_msg->regions[i].mmap_offset +
-                       vum_msg->regions[i].memory_size;
-            region->vrucmr_mmap_addr = (uint64_t)
-                                            mmap(0,
-                                            size,
-                                            PROT_READ | PROT_WRITE,
-                                            MAP_SHARED,
-                                            vru_cl->vruc_fds_sent[i],
-                                            0);
-
-            if (region->vrucmr_mmap_addr == ((uint64_t)MAP_FAILED)) {
-                vr_uvhost_log("Client %s: error mmaping FD %d size 0x%" PRIx64
-                        ": %s (%d)\n",
-                        uvhm_client_name(vru_cl),
-                        vru_cl->vruc_fds_sent[i], size,
-                        rte_strerror(errno), errno);
-                /* the file descriptor is no longer needed */
-                close(vru_cl->vruc_fds_sent[i]);
-                vru_cl->vruc_fds_sent[i] = -1;
-                return -1;
-            }
-            /* Set values for munmap(2) function. */
-            ret = vr_dpdk_virtio_uvh_get_blk_size(vru_cl->vruc_fds_sent[i],
-                                 &vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
-            if (ret) {
-                vr_uvhost_log("Client %s: error getting block size for FD %d\n",
-                        uvhm_client_name(vru_cl),
-                        vru_cl->vruc_fds_sent[i]);
-                return -1;
-            }
-
-            /*
-             * Prevent guest memory from being dumped in vrouter-dpdk core
-             */
-            madv_addr = (void *)(
-                           (uintptr_t)RTE_ALIGN_FLOOR(region->vrucmr_mmap_addr,
-                           vif_mmap_addrs->vu_mmap_data[i].unmap_blksz));
-            madv_size = RTE_ALIGN_CEIL(size, 
-                           vif_mmap_addrs->vu_mmap_data[i].unmap_blksz);
-
-            if (madvise(madv_addr, madv_size, MADV_DONTDUMP)) {
-                vr_uvhost_log("Client %s: error in madvise at addr 0x%" PRIx64 ", size 0x%"
-                              PRIx64 "for FD %d: %s (%d)\n",
-                              uvhm_client_name(vru_cl),
-                              region->vrucmr_mmap_addr,
-                              size, vru_cl->vruc_fds_sent[i],
-                              rte_strerror(errno), errno);
-                /*
-                 * Failure is not catastrophic, so continue below.
-                 */
-            }
-
-            vif_mmap_addrs->vu_mmap_data[i].unmap_mmap_addr = ((uint64_t)
-                                                       region->vrucmr_mmap_addr);
-            vif_mmap_addrs->vu_mmap_data[i].unmap_size = size;
-
-            /* the file descriptor is no longer needed */
-            close(vru_cl->vruc_fds_sent[i]);
-            vru_cl->vruc_fds_sent[i] = -1;
-            region->vrucmr_mmap_addr += vum_msg->regions[i].mmap_offset;
-        }
-    }
-
-    /* Save the number of regions. */
-    vru_cl->vruc_num_mem_regions = vum_msg->nregions;
-    vif_mmap_addrs->vu_nregions = vum_msg->nregions;
-
-    return 0;
+    /* Unmap previously mmaped guest memory. */
+    uvhm_client_munmap(vru_cl);
+    return uvhm_client_mmap(vru_cl);
 }
 
 /*
@@ -281,8 +329,8 @@ uvhm_check_vring_ready(vr_uvh_client_t *vru_cl, unsigned int vring_idx)
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
-    /* vring is ready if both call FD and addresses are set */
-    if (vq->vdv_desc && vq->vdv_callfd > 0 && vq->vdv_ready_state != VQ_READY) {
+    /* vring is ready when addresses are set. */
+    if (vq->vdv_desc && vq->vdv_ready_state != VQ_READY) {
         /*
          * Now the virtio queue is ready for forwarding.
          * TODO - need a memory barrier here for non-x86 CPU?
@@ -424,7 +472,7 @@ vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl)
 }
 
 /*
- * vr_uvhm_set_vring_call - handles a VHOST_USER_SET_VRING_CALL messsage
+ * vr_uvhm_set_vring_call - handles a VHOST_USER_SET_VRING_CALL message
  * from the vhost user client to set the eventfd to be used to interrupt the
  * guest, if required.
  *
@@ -716,10 +764,8 @@ cleanup:
         }
         rte_wmb();
         synchronize_rcu();
-        /*
-        * Unmaps qemu's FDs.
-        */
-        vr_dpdk_virtio_uvh_vif_munmap(&vr_dpdk_virtio_uvh_vif_mmap[vru_cl->vruc_idx]);
+        /* Unmap guest memory. */
+        uvhm_client_munmap(vru_cl);
     }
     /* clear state for next message from this client. */
     vru_cl->vruc_msg_bytes_read = 0;
@@ -818,10 +864,8 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
                       cidx);
         return -1;
     }
-    /*
-     * Unmmaps Qemu's FD
-     */
-    vr_dpdk_virtio_uvh_vif_munmap(&vr_dpdk_virtio_uvh_vif_mmap[cidx]);
+    /* Unmmap guest memory. */
+    uvhm_client_munmap(vru_cl);
     vr_uvhost_del_client(vru_cl);
 
     return 0;

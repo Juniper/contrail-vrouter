@@ -28,8 +28,6 @@ extern void dpdk_burst_rx(unsigned int, struct rte_mbuf *[],
                 struct vr_interface *, const char *, unsigned int);
 extern struct nlmsghdr *dpdk_nl_message_hdr(struct vr_message *);
 extern unsigned int dpdk_nl_message_len(struct vr_message *);
-extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
-        unsigned short);
 
 static int vr_usocket_accept(struct vr_usocket *);
 static int vr_usocket_connect(struct vr_usocket *);
