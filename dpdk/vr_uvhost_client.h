@@ -19,8 +19,11 @@
 typedef struct vr_uvh_client_mem_region {
     uint64_t vrucmr_phys_addr;
     uint64_t vrucmr_size;
+    uint64_t vrucmr_size_aligned;
     uint64_t vrucmr_user_space_addr;
     uint64_t vrucmr_mmap_addr;
+    void    *vrucmr_mmap_addr_aligned;
+    uint64_t vrucmr_blksize;            /**< FD block size */
 } vr_uvh_client_mem_region_t;
 
 typedef struct vr_uvh_client {
