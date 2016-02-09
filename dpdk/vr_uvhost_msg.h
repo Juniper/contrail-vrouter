@@ -10,12 +10,12 @@
 
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk.h"
+
 /*
  * Definitions of messages from the netlink thread that are handled by the
  * user space vhost thread
  */
 
-#define VR_UVH_VIF_PREFIX VR_SOCKET_DIR"/uvh_vif_"
 #define VHOST_USER_VERSION 1
 
 typedef enum vrnu_msg_type {
@@ -43,5 +43,4 @@ typedef struct vrnu_msg {
     };
 } vrnu_msg_t;
 int vr_uvh_nl_listen_handler(int fd, void *arg);
-extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
 #endif /* __VR_UVHOST_MSG_H__ */

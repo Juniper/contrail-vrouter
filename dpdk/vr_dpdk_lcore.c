@@ -30,9 +30,6 @@
 #include <rte_timer.h>
 #include <rte_kni.h>
 
-extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
-        unsigned short);
-
 /* Returns the least used lcore or VR_MAX_CPUS */
 unsigned
 vr_dpdk_lcore_least_used_get(void)
