@@ -205,6 +205,40 @@ static int
 dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
 {
     struct dpdk_knidev_writer *p = (struct dpdk_knidev_writer *) port;
+    struct rte_mbuf *pkt_copy;
+
+    /*
+     * KNI kernel module uses a trick to speed up packet processing. It takes
+     * a physical address of a memory pool, converts it to the kernel virtual
+     * address with phys_to_virt() and saves the address.
+     *
+     * Then in kni_net_rx_normal() instead of using phys_to_virt() per each
+     * packet, KNI just calculates the difference between the previously
+     * converted physical address of the given mempool and the packets
+     * physical address.
+     *
+     * It works well for the mbufs from the same mempool. It also works fine
+     * with any mempool allocated from the same physically contiguous memory
+     * segment.
+     *
+     * As soon as we get a mempool allocated from another memory segment, the
+     * difference calculations fail and thus we might have a crash.
+     *
+     * So we make sure the packet is from the RSS mempool. If not, we make
+     * a copy to the RSS mempool.
+     */
+    if (unlikely(pkt->pool != vr_dpdk.rss_mempool)) {
+        pkt_copy = vr_dpdk_pktmbuf_copy(pkt, vr_dpdk.rss_mempool);
+        /* The original mbuf is no longer needed. */
+        vr_dpdk_pfree(pkt, VP_DROP_CLONED_ORIGINAL);
+
+        if (unlikely(pkt_copy == NULL)) {
+            DPDK_KNIDEV_WRITER_STATS_PKTS_DROP_ADD(p, 1);
+            return -1;
+        }
+
+        pkt = pkt_copy;
+    }
 
     p->tx_buf[p->tx_buf_count++] = pkt;
     DPDK_KNIDEV_WRITER_STATS_PKTS_IN_ADD(p, 1);
