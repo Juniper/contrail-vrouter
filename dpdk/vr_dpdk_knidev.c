@@ -227,7 +227,11 @@ dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
      * So we make sure the packet is from the RSS mempool. If not, we make
      * a copy to the RSS mempool.
      */
-    if (unlikely(pkt->pool != vr_dpdk.rss_mempool)) {
+    if (unlikely(pkt->pool != vr_dpdk.rss_mempool ||
+            /* Check indirect mbuf's data is within the RSS mempool. */
+            rte_pktmbuf_mtod(pkt, uintptr_t) < vr_dpdk.rss_mempool->elt_va_start ||
+            rte_pktmbuf_mtod(pkt, uintptr_t) > vr_dpdk.rss_mempool->elt_va_end
+            )) {
         pkt_copy = vr_dpdk_pktmbuf_copy(pkt, vr_dpdk.rss_mempool);
         /* The original mbuf is no longer needed. */
         vr_dpdk_pfree(pkt, VP_DROP_CLONED_ORIGINAL);
