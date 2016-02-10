@@ -156,7 +156,7 @@ dump_table(struct flow_table *ft)
     char action, flag_string[sizeof(fe->fe_flags) * 8 + 32];
     unsigned int need_drop_reason = 0;
     const char *drop_reason = NULL;
-    char in_src[INET_ADDRSTRLEN], in_dest[INET6_ADDRSTRLEN];
+    char in_src[INET6_ADDRSTRLEN], in_dest[INET6_ADDRSTRLEN];
 
     printf("Flow table(size %lu, entries %u)\n\n", ft->ft_span,
             ft->ft_num_entries);
