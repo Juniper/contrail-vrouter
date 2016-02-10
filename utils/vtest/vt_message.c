@@ -17,7 +17,7 @@
 #define EXPECT  "message.expect"
 #define MESSAGE "message"
 
-extern struct vt_message_module *vt_message_modules;
+extern struct vt_message_module vt_message_modules[];
 extern unsigned int vt_message_modules_num;
 
 void *
