@@ -419,7 +419,9 @@ struct vr_ip6 {
 
 struct tcphdr;
 
-bool vr_ip_proto_pull(struct vr_ip *iph);
+bool vr_ip_proto_pull(struct vr_ip *);
+bool vr_ip6_proto_pull(struct vr_ip6 *);
+
 int vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
             struct tcphdr **tcphp, unsigned int frag_size,
             void (do_tcp_mss_adj)(struct tcphdr *, unsigned short, unsigned char),
@@ -690,6 +692,17 @@ vr_icmp_error(struct vr_icmp *icmph)
 
     if ((type == VR_ICMP_TYPE_DEST_UNREACH) ||
             (type == VR_ICMP_TYPE_TIME_EXCEEDED))
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_icmp6_error(struct vr_icmp *icmp6)
+{
+    uint8_t type = icmp6->icmp_type;
+
+    if (type < 128)
         return true;
 
     return false;
