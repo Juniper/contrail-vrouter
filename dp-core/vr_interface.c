@@ -1187,6 +1187,10 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
              * time of the interface
              */
         }
+
+        if (pvif->vif_sub_interfaces[vif->vif_vlan_id])
+            return -EEXIST;
+
         pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
     }
 
