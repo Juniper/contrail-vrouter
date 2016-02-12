@@ -36,7 +36,7 @@ typedef struct vr_dpdk_virtioq {
 
     volatile uint16_t   vdv_last_used_idx;
     volatile uint16_t   vdv_last_used_idx_res;
-    uint16_t            vdv_ready_state;
+    volatile uint16_t   vdv_ready_state;
     uint16_t            vdv_vif_idx;
 
     /* Big and less frequently used fields */
@@ -49,20 +49,6 @@ typedef struct vr_dpdk_virtioq {
     DPDK_DEBUG_VAR(uint32_t vdv_hash);
 } __rte_cache_aligned vr_dpdk_virtioq_t;
 
-typedef struct vr_dpdk_uvh_mmap_addr{
-    uint64_t unmap_mmap_addr;                 /**< mmap() returned address */
-    uint64_t unmap_size;                      /**< Size of allocated memory */
-    uint64_t unmap_blksz;                     /**< fd block size */
-} vr_dpdk_uvh_mmap_addr_t;
-
-typedef struct vr_dpdk_uvh_vif_mmap_addr{
-    uint32_t vu_nregions;
-    struct vr_dpdk_uvh_mmap_addr vu_mmap_data[VR_MAX_INTERFACES];
-} vr_dpdk_uvh_vif_mmap_addr_t;
-
-int vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize);
-int vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs);
-int vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t *const vif_data_mmap);
 uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
 uint16_t vr_dpdk_virtio_ntxqs(struct vr_interface *vif);
 struct vr_dpdk_queue *
@@ -75,17 +61,17 @@ int vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                    unsigned int vring_base);
 int vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                   unsigned int *vring_basep);
-int vr_dpdk_virtio_recover_vring_base(unsigned int vif_idx, unsigned int vring_idx);
-int vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
+int vr_dpdk_virtio_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
                            struct vring_desc *vrucv_desc,
                            struct vring_avail *vrucv_avail,
                            struct vring_used *vrucv_used);
-int vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
+int vr_dpdk_virtio_set_vring_num(unsigned int vif_idx, unsigned int vring_idx,
                               unsigned int num_desc);
-int vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
+int vr_dpdk_virtio_set_vring_call(unsigned int vif_idx, unsigned int vring_idx,
                             int callfd);
-int vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
-                            vq_ready_state_t ready);
+int vr_dpdk_virtio_start(unsigned int vif_idx);
+int vr_dpdk_virtio_stop(unsigned int vif_idx, bool force);
+
 void vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client);
 void *vr_dpdk_virtio_get_vif_client(unsigned int idx);
 
@@ -95,7 +81,6 @@ void vr_dpdk_virtio_xstats_update(struct vr_interface_stats *stats,
 extern struct rte_port_in_ops vr_dpdk_virtio_reader_ops;
 extern struct rte_port_out_ops vr_dpdk_virtio_writer_ops;
 
-extern vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
 extern struct vr_dpdk_virtioq vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 extern struct vr_dpdk_virtioq vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 

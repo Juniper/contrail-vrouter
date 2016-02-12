@@ -13,17 +13,8 @@
 #include <linux/virtio_net.h>
 #include <sys/eventfd.h>
 
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <rte_malloc.h>
 #include <rte_memcpy.h>
-
-vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
-extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
-        unsigned short);
 
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
@@ -39,6 +30,120 @@ static int dpdk_virtio_writer_stats_read(void *port,
 static int dpdk_virtio_reader_stats_read(void *port,
                                             struct rte_port_in_stats *stats,
                                             int clear);
+
+/*
+ * dpdk_virtio_vq_get - get a pointer to a virtio queue.
+ *
+ * Returns pointer to a virtual queue, NULL otherwise.
+ */
+static inline vr_dpdk_virtioq_t *
+dpdk_virtio_queue_get(unsigned int vif_idx, unsigned int vring_idx)
+{
+    if ((vif_idx >= VR_MAX_INTERFACES) ||
+            (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+        return NULL;
+    }
+
+    /*
+     * RX rings are even numbered and TX rings are odd numbered from the
+     * VM's point of view. From vrouter's point of view, VM's TX ring is
+     * vrouter's RX ring and vice versa.
+     */
+    if (vring_idx & 1) {
+        return &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
+    } else {
+        return &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    }
+}
+
+static inline bool
+dpdk_virtio_queue_is_ready(vr_dpdk_virtioq_t *vq)
+{
+    return vq->vdv_ready_state != VQ_NOT_READY;
+}
+
+/*
+ * dpdk_virtio_queue_reset - reset the virtio queue to the initial state.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+dpdk_virtio_queue_reset(vr_dpdk_virtioq_t *vq)
+{
+    uint16_t vif_idx = vq->vdv_vif_idx;
+
+    if (vq->vdv_callfd > 0)
+        close(vq->vdv_callfd);
+    if (vq->vdv_kickfd > 0)
+        close(vq->vdv_kickfd);
+
+    /* Reset all but the vif index. */
+    memset(vq, 0, sizeof(*vq));
+    vq->vdv_vif_idx = vif_idx;
+
+    /* Make sure the state is set to NOT READY. */
+    vq->vdv_ready_state = VQ_NOT_READY;
+
+    return 0;
+}
+
+/*
+ * dpdk_virtio_vring_base_recover - try to recover the vring base after
+ * a crash.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+dpdk_virtio_vring_base_recover(vr_dpdk_virtioq_t *vq)
+{
+    if (vq->vdv_used) {
+        /* Read the base index from shared memory. */
+        if (vq->vdv_last_used_idx != vq->vdv_used->idx) {
+            RTE_LOG(INFO, UVHOST, "    recovering vring base %d -> %d\n",
+                    vq->vdv_last_used_idx, vq->vdv_used->idx);
+
+            vq->vdv_last_used_idx = vq->vdv_used->idx;
+            vq->vdv_last_used_idx_res = vq->vdv_used->idx;
+
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+/*
+ * dpdk_virtio_queue_ready_set - sets the virtio queue ready state.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+dpdk_virtio_queue_ready_set(vr_dpdk_virtioq_t *vq, vq_ready_state_t ready)
+{
+    if (vq->vdv_ready_state == ready)
+        return -1;
+
+    switch (ready) {
+    case VQ_READY:
+        /* At first we try to recover from the vRouter crash. */
+        dpdk_virtio_vring_base_recover(vq);
+        rte_wmb();
+        vq->vdv_ready_state = VQ_READY;
+        break;
+
+    case VQ_NOT_READY:
+        vq->vdv_ready_state = VQ_NOT_READY;
+        rte_wmb();
+        /* Make sure all the lcores are aware of the change. */
+        synchronize_rcu();
+        break;
+
+    default:
+        return -1;
+    }
+
+    return 0;
+}
 
 /*
  * Virtio writer
@@ -101,16 +206,8 @@ dpdk_virtio_writer_free(void *port)
 
     tx_virtioq = ((struct dpdk_virtio_writer *)port)->tx_virtioq;
 
-    /* close FDs */
-    if (tx_virtioq->vdv_callfd > 0) {
-        close(tx_virtioq->vdv_callfd);
-    }
-    if (tx_virtioq->vdv_kickfd > 0) {
-        close(tx_virtioq->vdv_kickfd);
-    }
-
-    /* reset the virtio */
-    memset(tx_virtioq, 0, sizeof(vr_dpdk_virtioq_t));
+    /* Close FDs and reset the virtio. */
+    dpdk_virtio_queue_reset(tx_virtioq);
 
     rte_free(port);
 
@@ -182,16 +279,8 @@ dpdk_virtio_reader_free(void *port)
 
     rx_virtioq = ((struct dpdk_virtio_reader *)port)->rx_virtioq;
 
-    /* close FDs */
-    if (rx_virtioq->vdv_callfd > 0) {
-        close(rx_virtioq->vdv_callfd);
-    }
-    if (rx_virtioq->vdv_kickfd > 0) {
-        close(rx_virtioq->vdv_kickfd);
-    }
-
-    /* reset the virtio */
-    memset(rx_virtioq, 0, sizeof(vr_dpdk_virtioq_t));
+    /* Close FDs and reset the virtio. */
+    dpdk_virtio_queue_reset(rx_virtioq);
 
     rte_free(port);
 
@@ -205,80 +294,6 @@ struct rte_port_in_ops vr_dpdk_virtio_reader_ops = {
     .f_rx = dpdk_virtio_from_vm_rx,
     .f_stats = dpdk_virtio_reader_stats_read
 };
-
-/*
- * vr_dpdk_vrtio_uvh_get_blk_size - set the block size of fd.
- * On error -1 is returned, otherwise 0.
- */
-int
-vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
-{
-    struct stat fd_stat;
-    int ret;
-    memset(&fd_stat, 0, sizeof(stat));
-
-    ret = fstat(fd, &fd_stat);
-    if (!ret){
-        *blksize = (uint64_t)fd_stat.st_blksize;
-    } else {
-        RTE_LOG(DEBUG, UVHOST, "Error getting file status for FD %d: %s (%d)\n",
-                fd, strerror(errno), errno);
-    }
-
-    return ret;
-}
-
-
-/*
- * vr_dpdk_virtio_uvh_vif_munmap - Unmaps every region,
- * which has been allocated via Qemu's file descriptor.
- */
-int
-vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs)
-{
-   uint32_t i = 0;
-   int ret = 0;
-   vr_dpdk_uvh_mmap_addr_t *vif_data_mmap = NULL;
-
-   for (i = 0; i < vif_mmap_addrs->vu_nregions; i++) {
-        if (vif_mmap_addrs->vu_mmap_data[i].unmap_mmap_addr) {
-            vif_data_mmap = &(vif_mmap_addrs->vu_mmap_data[i]);
-            ret = vr_dpdk_virtio_uvh_vif_region_munmap(vif_data_mmap);
-            if (ret) {
-                RTE_LOG(INFO, UVHOST,
-                        "Error unmapping memory region %d: %s (%d)\n",
-                        i, strerror(errno), errno);
-            }
-            memset(vif_data_mmap, 0, sizeof(vr_dpdk_uvh_mmap_addr_t));
-        }
-    }
-    /*
-     * Memleak, when vr_dpdk_virtio_uvh_vif fails.
-     * At this moment there is no solution when munmap() fails.
-     */
-    memset(vif_mmap_addrs, 0, sizeof(vr_dpdk_uvh_vif_mmap_addr_t));
-    return 0;
-}
-
-/*
- * vr_dpdk_virtio_uvh_vif_region_munmap - deallocates specified region
- *
- */
-int
-vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t
-                                     *const vif_data_mmap)
-{
-    uint64_t alignment = vif_data_mmap->unmap_blksz;
-
-    /*
-     * if return value  == -1, munmap(2) failed for a region and set errno.
-     * We can still unmaps allocated memory.
-    */
-    return (munmap((void *)(uintptr_t)
-            RTE_ALIGN_FLOOR(vif_data_mmap->unmap_mmap_addr, alignment),
-            RTE_ALIGN_CEIL(vif_data_mmap->unmap_size, alignment))
-           );
-}
 
 /*
  * vr_dpdk_virtio_nrxqs - returns the number of receives queues for a virtio
@@ -353,9 +368,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     rx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* init virtio queue */
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx = 0;
-    vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_last_used_idx_res = 0;
+    dpdk_virtio_queue_reset(&vr_dpdk_virtio_rxqs[vif_idx][queue_id]);
     vr_dpdk_virtio_rxqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
 
     /* create the queue */
@@ -429,9 +442,7 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     tx_queue->q_vif = vrouter_get_interface(vif->vif_rid, vif_idx);
 
     /* init virtio queue */
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_ready_state = VQ_NOT_READY;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx = 0;
-    vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_last_used_idx_res = 0;
+    dpdk_virtio_queue_reset(&vr_dpdk_virtio_txqs[vif_idx][queue_id]);
     vr_dpdk_virtio_txqs[vif_idx][queue_id].vdv_vif_idx = vif->vif_idx;
 
     /* create the queue */
@@ -458,7 +469,7 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
  *
  * Returns address on success, NULL otherwise.
  */
-static char *
+static inline char *
 vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
 {
     int i;
@@ -511,7 +522,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     uint32_t pkt_len, nb_pkts = 0;
     vr_uvh_client_t *vru_cl;
 
-    if (unlikely(vq->vdv_ready_state == VQ_NOT_READY)) {
+    if (unlikely(!dpdk_virtio_queue_is_ready(vq))) {
         DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p is not ready\n",
                 __func__, vq);
         return 0;
@@ -678,7 +689,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
     uint8_t success = 0;
     vr_uvh_client_t *vru_cl;
 
-    if (unlikely(vq->vdv_ready_state == VQ_NOT_READY))
+    if (unlikely(!dpdk_virtio_queue_is_ready(vq)))
         return 0;
 
     vru_cl = vr_dpdk_virtio_get_vif_client(vq->vdv_vif_idx);
@@ -950,26 +961,14 @@ int
 vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                unsigned int vring_base)
 {
-    vr_dpdk_virtioq_t *vq;
+    vr_dpdk_virtioq_t *vq = dpdk_virtio_queue_get(vif_idx, vring_idx);
 
-    if ((vif_idx >= VR_MAX_INTERFACES)
-        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+    if (!vq)
         return -1;
-    }
-
-    /*
-     * RX rings are even numbered and TX rings are odd numbered from the
-     * VM's point of view. From vrouter's point of view, VM's TX ring is
-     * vrouter's RX ring and vice versa.
-     */
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
-    }
 
     vq->vdv_last_used_idx = vring_base;
     vq->vdv_last_used_idx_res = vring_base;
+
     return 0;
 }
 
@@ -983,109 +982,42 @@ int
 vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                unsigned int *vring_basep)
 {
-    vr_dpdk_virtioq_t *vq;
+    vr_dpdk_virtioq_t *vq = dpdk_virtio_queue_get(vif_idx, vring_idx);
 
-    if ((vif_idx >= VR_MAX_INTERFACES)
-        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+    if (!vq)
         return -1;
-    }
 
     /*
-     * RX rings are even numbered and TX rings are odd numbered from the
-     * VM's point of view. From vrouter's point of view, VM's TX ring is
-     * vrouter's RX ring and vice versa.
+     * GET VRING BASE is called when Qemu shuts down a virtio queue, so
+     * we should stop polling the queue now.
      */
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
-    }
+    dpdk_virtio_queue_ready_set(vq, VQ_NOT_READY);
 
+    /* Read the vring index after the queue has stopped. */
     *vring_basep = vq->vdv_last_used_idx;
 
-    /*
-     * This is usually called when qemu shuts down a virtio queue. Set the
-     * state to indicate that this queue should not be used any more.
-     */
-    vq->vdv_ready_state = VQ_NOT_READY;
-    rte_wmb();
-    synchronize_rcu();
-
-    /* Reset the queue. We reset only those values we analyze in
-     * uvhm_check_vring_ready()
-     */
-    vq->vdv_desc = NULL;
-    if (vq->vdv_callfd) {
-        close(vq->vdv_callfd);
-        vq->vdv_callfd = 0;
-    }
+    /* Reset the queue. */
+    dpdk_virtio_queue_reset(vq);
 
     return 0;
 }
 
 /*
- * vr_dpdk_virtio_recover_vring_base - recovers the vring base from the shared
- * memory after vRouter crash.
- *
- * Returns 0 on success, -1 otherwise.
- */
-int
-vr_dpdk_virtio_recover_vring_base(unsigned int vif_idx, unsigned int vring_idx)
-{
-    vr_dpdk_virtioq_t *vq;
-
-    if ((vif_idx >= VR_MAX_INTERFACES)
-        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
-        return -1;
-    }
-
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
-    }
-
-    if (vq->vdv_used) {
-        /* Reading base index from the shared memory. */
-        if (vq->vdv_last_used_idx != vq->vdv_used->idx) {
-            RTE_LOG(INFO, UVHOST, "    recovering vring base %d -> %d\n",
-                    vq->vdv_last_used_idx, vq->vdv_used->idx);
-            vr_dpdk_virtio_set_vring_base(vif_idx, vring_idx, vq->vdv_used->idx);
-        }
-    }
-
-    return 0;
-}
-
-/*
- * vr_dpdk_set_vring_addr - Sets the address of the virtio descriptor and
+ * vr_dpdk_virtio_set_vring_addr - Sets the address of the virtio descriptor and
  * available/used rings based on messages sent by the vhost client.
  *
  * Returns 0 on success, -1 otherwise.
  */
 int
-vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
+vr_dpdk_virtio_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
                        struct vring_desc *vrucv_desc,
                        struct vring_avail *vrucv_avail,
                        struct vring_used *vrucv_used)
 {
-    vr_dpdk_virtioq_t *vq;
+    vr_dpdk_virtioq_t *vq = dpdk_virtio_queue_get(vif_idx, vring_idx);
 
-    if ((vif_idx >= VR_MAX_INTERFACES)
-        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+    if (!vq)
         return -1;
-    }
-
-    /*
-     * RX rings are even numbered and TX rings are odd numbered from the
-     * VM's point of view. From vrouter's point of view, VM's TX ring is
-     * vrouter's RX ring and vice versa.
-     */
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
-    }
 
     vq->vdv_desc = vrucv_desc;
     vq->vdv_avail = vrucv_avail;
@@ -1101,31 +1033,19 @@ vr_dpdk_set_vring_addr(unsigned int vif_idx, unsigned int vring_idx,
 }
 
 /*
- * vr_dpdk_set_ring_num_desc - sets the number of descriptors in a vring
+ * vr_dpdk_virtio_set_vring_num - sets the number of descriptors in a vring
  * based on messages from the vhost client.
  *
  * Returns 0 on success, -1 otherwise.
  */
 int
-vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
+vr_dpdk_virtio_set_vring_num(unsigned int vif_idx, unsigned int vring_idx,
                           unsigned int num_desc)
 {
-    vr_dpdk_virtioq_t *vq;
+    vr_dpdk_virtioq_t *vq = dpdk_virtio_queue_get(vif_idx, vring_idx);
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx > 2 * VR_DPDK_VIRTIO_MAX_QUEUES)) {
+    if (!vq)
         return -1;
-    }
-
-    /*
-     * RX rings are even numbered and TX rings are odd numbered from the
-     * VM's point of view. From vrouter's point of view, VM's TX ring is
-     * vrouter's RX ring and vice versa.
-     */
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
-    }
 
     vq->vdv_size = num_desc;
 
@@ -1133,30 +1053,17 @@ vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
 }
 
 /*
- * vr_dpdk_set_ring_callfd - set the eventd used to raise interrupts in
+ * vr_dpdk_virtio_set_vring_call - set the eventd used to raise interrupts in
  * the guest (if required). Returns 0 on success, -1 otherwise.
  */
 int
-vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
+vr_dpdk_virtio_set_vring_call(unsigned int vif_idx, unsigned int vring_idx,
                         int callfd)
 {
-    vr_dpdk_virtioq_t *vq;
+    vr_dpdk_virtioq_t *vq = dpdk_virtio_queue_get(vif_idx, vring_idx);
 
-    if ((vif_idx >= VR_MAX_INTERFACES)
-        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
+    if (!vq)
         return -1;
-    }
-
-    /*
-     * RX rings are even numbered and TX rings are odd numbered from the
-     * VM's point of view. From vrouter's point of view, VM's TX ring is
-     * vrouter's RX ring and vice versa.
-     */
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
-    }
 
     if (vq->vdv_callfd > 0) {
         close(vq->vdv_callfd);
@@ -1167,34 +1074,68 @@ vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
 }
 
 /*
- * vr_dpdk_set_virtq_ready - sets the virtio queue ready state to indicate
- * whether forwarding can start on the virtio queue or not.
+ * vr_dpdk_virtio_stop - stop the virtio interface.
  *
  * Returns 0 on success, -1 otherwise.
  */
 int
-vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
-                        vq_ready_state_t ready)
+vr_dpdk_virtio_stop(unsigned int vif_idx, bool force)
 {
+    int i;
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES)
-        || (vring_idx >= (2 * VR_DPDK_VIRTIO_MAX_QUEUES))) {
-        return -1;
+    if (!force) {
+        /* Check if all the virtio queues are ready to stop. */
+        for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
+            vq = dpdk_virtio_queue_get(vif_idx, i);
+            if (!vq)
+                return -1;
+
+            if (dpdk_virtio_queue_is_ready(vq))
+                return -1;
+        }
     }
 
-    /*
-     * RX rings are even numbered and TX rings are odd numbered from the
-     * VM's point of view. From vrouter's point of view, VM's TX ring is
-     * vrouter's RX ring and vice versa.
-     */
-    if (vring_idx & 1) {
-        vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx/2];
-    } else {
-        vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
+    /* Disable and reset all the virtio queues. */
+    for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
+        vq = dpdk_virtio_queue_get(vif_idx, i);
+        if (!vq)
+            return -1;
+
+        dpdk_virtio_queue_ready_set(vq, VQ_NOT_READY);
+        dpdk_virtio_queue_reset(vq);
     }
 
-    vq->vdv_ready_state = ready;
+    return 0;
+}
+
+/*
+ * vr_dpdk_virtio_start - start the virtio interface.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_dpdk_virtio_start(unsigned int vif_idx)
+{
+    int i;
+    vr_dpdk_virtioq_t *vq;
+
+    /* Check if all the virtio queues are ready to start. */
+    for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
+        vq = dpdk_virtio_queue_get(vif_idx, i);
+        if (!vq || !vq->vdv_desc || !vq->vdv_avail ||
+                !vq->vdv_used || !vq->vdv_size)
+            return -1;
+    }
+
+    /* Enable all the virtio queues. */
+    for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
+        vq = dpdk_virtio_queue_get(vif_idx, i);
+        if (!vq)
+            return -1;
+
+        dpdk_virtio_queue_ready_set(vq, VQ_READY);
+    }
 
     return 0;
 }
@@ -1221,7 +1162,7 @@ vr_dpdk_virtio_set_vif_client(unsigned int idx, void *client)
  * vr_dpdk_virtio_get_vif_client - returns a pointer to per vif state if it
  * exists, NULL otherwise.
  */
-void *
+inline void *
 vr_dpdk_virtio_get_vif_client(unsigned int idx)
 {
     if (idx >= VR_MAX_INTERFACES) {
