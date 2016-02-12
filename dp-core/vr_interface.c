@@ -945,7 +945,8 @@ eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
     if (!len)
         return pkt_data(pkt);
 
-    if (pkt->vp_if->vif_type == VIF_TYPE_HOST) {
+    if ((pkt->vp_if->vif_type == VIF_TYPE_HOST) &&
+            !(pkt->vp_flags & VP_FLAG_FROM_DP)) {
         vr_preset(pkt);
         return pkt_data(pkt);
     }
@@ -1148,6 +1149,10 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
              * time of the interface
              */
         }
+
+        if (pvif->vif_sub_interfaces[vif->vif_vlan_id])
+            return -EEXIST;
+
         pvif->vif_sub_interfaces[vif->vif_vlan_id] = vif;
     }
 
