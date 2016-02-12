@@ -349,6 +349,7 @@ dump_table(struct flow_table *ft)
                     printf(", %d", fe->fe_sec_mirror_id);
             }
             printf(" UdpSrcPort %d", fe->fe_udp_src_port);
+            printf(")");
         }
 
         j = -1;
@@ -360,12 +361,12 @@ dump_table(struct flow_table *ft)
                 if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
                     printf("%6d", i);
 
-                printf("\n\tOflow entries:\n\t");
+                printf("\n     Oflow entries:\n\t");
                 j = 0;
             }
             j += printf(" %d", ofe->fe_hentry.hentry_index);
             if (j > 65) {
-                printf("\n\t");
+                printf("\n     ");
                 j = 0;
             }
 
@@ -755,6 +756,13 @@ flow_validate(unsigned long flow_index, char action)
     flow_req.fr_index = flow_index;
     flow_req.fr_family = VR_FLOW_FAMILY(fe->fe_type);
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
+    flow_req.fr_flow_ip = malloc(2 * VR_IP_ADDR_SIZE(fe->fe_type));
+    if (!flow_req.fr_flow_ip) {
+        printf("Unable to allocate %u bytes for storing address\n",
+                2 * VR_IP_ADDR_SIZE(fe->fe_type));
+        return;
+    }
+
     memcpy(flow_req.fr_flow_ip, fe->fe_key.flow_ip,
               2 * VR_IP_ADDR_SIZE(fe->fe_type));
     flow_req.fr_flow_ip_size = 2 * VR_IP_ADDR_SIZE(fe->fe_type);
@@ -778,7 +786,7 @@ flow_validate(unsigned long flow_index, char action)
         break;
 
     default:
-        return;
+        goto exit_validate;
     }
 
     if (mirror >= 0) {
@@ -789,6 +797,14 @@ flow_validate(unsigned long flow_index, char action)
 
 
     make_flow_req(&flow_req);
+
+exit_validate:
+    if (flow_req.fr_flow_ip) {
+        free(flow_req.fr_flow_ip);
+        flow_req.fr_flow_ip = NULL;
+        flow_req.fr_flow_ip_size = 0;
+    }
+
     return;
 }
 
