@@ -500,13 +500,15 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         return 0;
     }
 
-    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p num_pkts=%u\n",
+    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p AVAILABLE %u packets\n",
             __func__, vq, avail_pkts);
     for (i = 0; i < avail_pkts; i++) {
         /* Allocate a mbuf. */
         mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
         if (unlikely(mbuf == NULL)) {
             p->nb_nombufs++;
+            DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p no_mbufs=%"PRIu64"\n",
+                    __func__, vq, p->nb_nombufs);
             break;
         }
 
@@ -584,19 +586,33 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         rte_pktmbuf_free(mbuf);
     }
 
-    vq->vdv_last_used_idx += i;
-    rte_wmb();
-    vq->vdv_used->idx += i;
-    RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
-            __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx);
+    /*
+     * Do not call the guest if there are no descriptors processed.
+     *
+     * If there are no free mbufs on host, the TX queue in guest gets
+     * filled up. This makes the guest kernel to switch to interrupt mode
+     * and clear the VRING_AVAIL_F_NO_INTERRUPT flag.
+     *
+     * Meanwhile the host polls the virtio queue, sees the available
+     * descriptors and interrupts the guest. Those interrupts get unhandled by
+     * the guest virtio driver, so after 100K of the interrupts the IRQ get
+     * reported and disabled by the guest kernel.
+     */
+    if (likely(i >= 0)) {
+        vq->vdv_last_used_idx += i;
+        rte_wmb();
+        vq->vdv_used->idx += i;
+        RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %u avail->idx %u\n",
+                __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx, vq->vdv_avail->idx);
 
-    /* Call guest if required. */
-    if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
-        p->nb_syscalls++;
-        eventfd_write(vq->vdv_callfd, 1);
+        /* Call guest if required. */
+        if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
+            p->nb_syscalls++;
+            eventfd_write(vq->vdv_callfd, 1);
+        }
     }
 
-    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkts_sent %u\n",
+    DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p RETURNS %u pkts\n",
             __func__, vq, nb_pkts);
 
     DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(p, nb_pkts);
