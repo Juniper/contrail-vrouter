@@ -283,7 +283,8 @@ dump_table(struct flow_table *ft)
                 action = 'U';
             }
 
-            printf("    (");
+            printf("(");
+            printf("Gen: %u, ", fe->fe_gen_id);
             if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6))
                 printf("K(nh):%u, ", fe->fe_key.flow_nh_id);
 
@@ -339,16 +340,16 @@ dump_table(struct flow_table *ft)
                 printf("E:%d, ", fe->fe_ecmp_nh_index);
 
             printf("S(nh):%u, ", fe->fe_src_nh_index);
-            printf(" Statistics:%u/%u", fe->fe_stats.flow_packets,
+            printf(" Stats:%u/%u, ", fe->fe_stats.flow_packets,
                     fe->fe_stats.flow_bytes);
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
                 printf(" Mirror Index :");
                 if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES)
                     printf(" %d", fe->fe_mirror_id);
                 if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
-                    printf(", %d", fe->fe_sec_mirror_id);
+                    printf(", %d, ", fe->fe_sec_mirror_id);
             }
-            printf(" UdpSrcPort %d", fe->fe_udp_src_port);
+            printf(" SPort %d", fe->fe_udp_src_port);
             printf(")");
         }
 
