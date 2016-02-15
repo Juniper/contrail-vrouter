@@ -21,10 +21,6 @@
 #include <rte_malloc.h>
 #include <rte_memcpy.h>
 
-vr_dpdk_uvh_vif_mmap_addr_t vr_dpdk_virtio_uvh_vif_mmap[VR_MAX_INTERFACES];
-extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
-        unsigned short);
-
 void *vr_dpdk_vif_clients[VR_MAX_INTERFACES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 vr_dpdk_virtioq_t vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
@@ -61,6 +57,30 @@ struct dpdk_virtio_writer_params {
     /* virtio TX queue pointer */
     vr_dpdk_virtioq_t *tx_virtioq;
 };
+
+/*
+ * vr_dpdk_virtio_stop - stop the virtio interface.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+int
+vr_dpdk_virtio_stop(unsigned int vif_idx)
+{
+    int i;
+
+    if (vif_idx >= VR_MAX_INTERFACES) {
+        return -1;
+    }
+
+    /* Disable and reset all the virtio queues. */
+    for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
+        vr_dpdk_set_virtq_ready(vif_idx, i, VQ_NOT_READY);
+    }
+    rte_wmb();
+    synchronize_rcu();
+
+    return 0;
+}
 
 static void *
 dpdk_virtio_writer_create(void *params, int socket_id)
@@ -226,58 +246,6 @@ vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
     }
 
     return ret;
-}
-
-
-/*
- * vr_dpdk_virtio_uvh_vif_munmap - Unmaps every region,
- * which has been allocated via Qemu's file descriptor.
- */
-int
-vr_dpdk_virtio_uvh_vif_munmap(vr_dpdk_uvh_vif_mmap_addr_t *const vif_mmap_addrs)
-{
-   uint32_t i = 0;
-   int ret = 0;
-   vr_dpdk_uvh_mmap_addr_t *vif_data_mmap = NULL;
-
-   for (i = 0; i < vif_mmap_addrs->vu_nregions; i++) {
-        if (vif_mmap_addrs->vu_mmap_data[i].unmap_mmap_addr) {
-            vif_data_mmap = &(vif_mmap_addrs->vu_mmap_data[i]);
-            ret = vr_dpdk_virtio_uvh_vif_region_munmap(vif_data_mmap);
-            if (ret) {
-                RTE_LOG(INFO, UVHOST,
-                        "Error unmapping memory region %d: %s (%d)\n",
-                        i, strerror(errno), errno);
-            }
-            memset(vif_data_mmap, 0, sizeof(vr_dpdk_uvh_mmap_addr_t));
-        }
-    }
-    /*
-     * Memleak, when vr_dpdk_virtio_uvh_vif fails.
-     * At this moment there is no solution when munmap() fails.
-     */
-    memset(vif_mmap_addrs, 0, sizeof(vr_dpdk_uvh_vif_mmap_addr_t));
-    return 0;
-}
-
-/*
- * vr_dpdk_virtio_uvh_vif_region_munmap - deallocates specified region
- *
- */
-int
-vr_dpdk_virtio_uvh_vif_region_munmap(vr_dpdk_uvh_mmap_addr_t
-                                     *const vif_data_mmap)
-{
-    uint64_t alignment = vif_data_mmap->unmap_blksz;
-
-    /*
-     * if return value  == -1, munmap(2) failed for a region and set errno.
-     * We can still unmaps allocated memory.
-    */
-    return (munmap((void *)(uintptr_t)
-            RTE_ALIGN_FLOOR(vif_data_mmap->unmap_mmap_addr, alignment),
-            RTE_ALIGN_CEIL(vif_data_mmap->unmap_size, alignment))
-           );
 }
 
 /*
