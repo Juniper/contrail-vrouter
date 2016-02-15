@@ -210,7 +210,6 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
     }
     fe->fe_hold_list = NULL;
     fe->fe_key.flow_key_len = 0;
-    memset(&fe->fe_key, 0, sizeof(fe->fe_key));
 
     vr_flow_reset_mirror(router, fe, fe->fe_hentry.hentry_index);
     fe->fe_ecmp_nh_index = -1;
