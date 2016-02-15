@@ -496,6 +496,8 @@ vr_flow_table_get_free_entry(struct vrouter *router, struct vr_flow *key,
                      VR_FLOW_FLAG_NEW_FLOW);
         }
 
+        fe->fe_gen_id = (fe->fe_gen_id + 1) %
+            (1 << (8 * sizeof(fe->fe_gen_id)));
         *free_index = fe->fe_hentry.hentry_index;
     }
 
@@ -1829,6 +1831,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
                 vr_flow_tcp_rflow_set(router, fe, rfe);
             }
         }
+
+        req->fr_gen_id = fe->fe_gen_id;
     }
 
     vr_flow_udp_src_port(router, fe);
