@@ -1230,9 +1230,24 @@ nh_discard(struct vr_packet *pkt, struct vr_nexthop *nh,
 }
 
 static int
+nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
+{
+    struct vr_ip *iph;
+
+    iph = (struct vr_ip *)pkt_network_header(pkt);
+    if (pkt->vp_type == VP_TYPE_IP) {
+        return iph->ip_saddr;
+    }
+
+    return 0;
+}
+
+static int
 nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
               struct vr_forwarding_md *fmd)
 {
+    uint32_t sip = 0;
+
     struct vr_packet *tmp;
     struct vr_ip *ip;
     struct vr_udp *udp;
@@ -1251,11 +1266,32 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             goto send_fail;
     }
 
-    if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
-                             nh->nh_udp_tun_dport, nh->nh_udp_tun_sip,
-                             nh->nh_udp_tun_dip) == false) {
+    if (nh->nh_family == AF_INET) {
+        if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
+            sip = nh_generate_sip(nh, pkt);
+        }
+
+        if (!sip) {
+            sip = nh->nh_udp_tun_sip;
+        }
+
+        if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
+                    nh->nh_udp_tun_dport, sip,
+                    nh->nh_udp_tun_dip) == false) {
+            goto send_fail;
+        }
+
+        if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
+            goto send_fail;
+
+        ip = (struct vr_ip *)(pkt_data(pkt));
+        udp = (struct vr_udp *)((char *)ip + ip->ip_hl * 4);
+        udp->udp_csum = vr_ip_partial_csum(ip);
+
+    } else {
         goto send_fail;
     }
+
     pkt_set_network_header(pkt, pkt->vp_data);
 
     if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
