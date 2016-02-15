@@ -1239,6 +1239,8 @@ vr_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
 {
     if (pkt->vp_type == VP_TYPE_IP) {
         return vr_inet_flow_is_fat_flow(router, pkt, fe);
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        return vr_inet6_flow_is_fat_flow(router, pkt, fe);
     }
 
     return false;

@@ -408,6 +408,8 @@ extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
        unsigned char *, uint8_t, uint16_t, uint16_t);
 extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);
+extern bool vr_inet6_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
+        struct vr_flow_entry *);
 extern bool vr_inet_flow_allow_new_flow(struct vrouter *, struct vr_packet *);
 
 extern unsigned int vr_reinject_packet(struct vr_packet *,

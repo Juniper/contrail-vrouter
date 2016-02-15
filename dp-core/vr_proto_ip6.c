@@ -151,6 +151,21 @@ vr_inet6_flow_swap(struct vr_flow *key_p)
     return;
 }
 
+bool
+vr_inet6_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_flow_entry *fe)
+{
+    if (!fe->fe_key.flow6_sport || !fe->fe_key.flow6_dport) {
+        if ((fe->fe_key.flow6_proto == VR_IP_PROTO_TCP) ||
+                (fe->fe_key.flow6_proto == VR_IP_PROTO_UDP) ||
+                (fe->fe_key.flow6_proto == VR_IP_PROTO_SCTP)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static int
 vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
