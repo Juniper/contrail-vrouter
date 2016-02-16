@@ -756,9 +756,16 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
                 }
             } else {
                 /* For non-fabric interfaces we always distribute the packets. */
-                vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, &nb_pkts);
-                /* Distribute all the packets. */
-                vr_dpdk_lcore_distribute(lcore, false, rx_queue->q_vif, pkts, nb_pkts);
+                mask_to_distribute = vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif,
+                        pkts, &nb_pkts);
+                if (likely(mask_to_distribute != 0)) {
+                    /* Distribute all the packets. */
+                    vr_dpdk_lcore_distribute(lcore, false, rx_queue->q_vif,
+                            pkts, nb_pkts);
+                } else {
+                    /* No other lcores to distribute, so just route the packets. */
+                    vr_dpdk_lcore_vroute(lcore, rx_queue->q_vif, pkts, nb_pkts);
+                }
             }
         }
     }
