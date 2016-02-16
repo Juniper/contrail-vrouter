@@ -1168,6 +1168,12 @@ dpdk_get_enabled_log_types(int *size)
     return enabled_array;
 }
 
+static void
+dpdk_soft_reset(struct vrouter *router)
+{
+    rcu_barrier();
+}
+
 struct host_os dpdk_host = {
     .hos_printf                     =    dpdk_printf,
     .hos_malloc                     =    dpdk_malloc,
@@ -1220,6 +1226,7 @@ struct host_os dpdk_host = {
     .hos_set_log_type               =    dpdk_set_log_type,
     .hos_get_log_level              =    dpdk_get_log_level,
     .hos_get_enabled_log_types      =    dpdk_get_enabled_log_types,
+    .hos_soft_reset                 =    dpdk_soft_reset,
 };
 
 struct host_os *
@@ -1308,7 +1315,6 @@ vr_dpdk_host_exit(void)
 {
     vr_sandesh_exit();
     vrouter_exit(false);
-    /* no rcu_barrier() in urcu-qsbr */
 
     return;
 }
