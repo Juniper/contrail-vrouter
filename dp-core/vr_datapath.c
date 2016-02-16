@@ -560,6 +560,15 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     if (pkt->vp_type == VP_TYPE_IP6)
         return vif_xconnect(vif, pkt, &fmd);
 
+    /*
+     * On Fabric only ARP packets are specially handled. Rest all BUM
+     * traffic can be cross connected
+     */
+    if ((pkt->vp_type != VP_TYPE_ARP) &&
+            (pkt->vp_flags & VP_FLAG_MULTICAST)) {
+        return vif_xconnect(vif, pkt, &fmd);
+    }
+
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     pkt_pull(pkt, pull_len);
 
