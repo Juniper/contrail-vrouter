@@ -417,6 +417,21 @@ struct vr_ip6 {
     uint8_t         ip6_dst[VR_IP6_ADDRESS_LEN];
 } __attribute__((packed));
 
+#define VR_IP4_MAPPED_IP6_ZERO_BYTES    10
+#define VR_IP4_MAPPED_IP6_ONE_BYTES     2
+
+static inline void
+vr_inet6_generate_ip6(uint8_t *ip6, uint32_t ip)
+{
+    memset(ip6, 0, VR_IP4_MAPPED_IP6_ZERO_BYTES);
+    memset(ip6 + VR_IP4_MAPPED_IP6_ZERO_BYTES, 1,
+            VR_IP4_MAPPED_IP6_ONE_BYTES);
+    memcpy(ip6 + VR_IP4_MAPPED_IP6_ZERO_BYTES + VR_IP4_MAPPED_IP6_ONE_BYTES,
+            &ip, sizeof(ip));
+
+    return;
+}
+
 struct tcphdr;
 
 bool vr_ip_proto_pull(struct vr_ip *);

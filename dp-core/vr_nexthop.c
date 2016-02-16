@@ -407,8 +407,23 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 static bool
 nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
 {
+    uint8_t *sip = NULL;
+    uint8_t sip6[VR_IP6_ADDRESS_LEN];
+
     struct vr_ip6 *ip6;
+    struct vr_ip *ip;
     struct vr_udp *udp;
+
+    if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
+        if (pkt->vp_type == VP_TYPE_IP6) {
+            ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+            sip = ip6->ip6_src;
+        } else if (pkt->vp_type == VP_TYPE_IP) {
+            ip = (struct vr_ip *)pkt_network_header(pkt);
+            vr_inet6_generate_ip6(sip6, ip->ip_saddr);
+            sip = sip6;
+        }
+    }
 
     /* udp Header */
     udp = (struct vr_udp *)pkt_push(pkt, sizeof(struct vr_udp));
@@ -436,7 +451,10 @@ nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
     ip6->ip6_nxt = VR_IP_PROTO_UDP;
     ip6->ip6_hlim = 64;
 
-    memcpy(ip6->ip6_src, nh->nh_udp_tun6_sip, VR_IP6_ADDRESS_LEN);
+    if (!sip)
+        sip = nh->nh_udp_tun6_sip;
+
+    memcpy(ip6->ip6_src, sip, VR_IP6_ADDRESS_LEN);
     memcpy(ip6->ip6_dst, nh->nh_udp_tun6_dip, VR_IP6_ADDRESS_LEN);
 
 
@@ -1278,10 +1296,24 @@ nh_discard(struct vr_packet *pkt, struct vr_nexthop *nh,
 }
 
 static int
+nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
+{
+    struct vr_ip *iph;
+
+    iph = (struct vr_ip *)pkt_network_header(pkt);
+    if (pkt->vp_type == VP_TYPE_IP) {
+        return iph->ip_saddr;
+    }
+
+    return 0;
+}
+
+static int
 nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
               struct vr_forwarding_md *fmd)
 {
     unsigned int head_space;
+    uint32_t sip = 0;
 
     struct vr_packet *tmp;
     struct vr_ip *ip;
@@ -1310,8 +1342,16 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (nh->nh_family == AF_INET) {
+        if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
+            sip = nh_generate_sip(nh, pkt);
+        }
+
+        if (!sip) {
+            sip = nh->nh_udp_tun_sip;
+        }
+
         if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
-                    nh->nh_udp_tun_dport, nh->nh_udp_tun_sip,
+                    nh->nh_udp_tun_dport, sip,
                     nh->nh_udp_tun_dip) == false) {
             goto send_fail;
         }
