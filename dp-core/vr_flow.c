@@ -1187,7 +1187,7 @@ static int
 vr_flow_set(struct vrouter *router, vr_flow_req *req)
 {
     int ret;
-    unsigned int fe_index;
+    unsigned int fe_index = (unsigned int)-1;
 
     struct vr_flow_entry *fe = NULL;
     struct vr_flow_table_info *infop = router->vr_flow_table_info;
@@ -1222,8 +1222,19 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
      */
     if (!fe) {
         fe = vr_add_flow_req(req, &fe_index);
-        if (!fe)
+        if (!fe) {
+            if (fe_index != (unsigned int)-1) {
+                /*
+                 * add flow req failed to allocate an entry due to race
+                 * between agent and datapath, where flow entry at fe_index
+                 * was already created due to packet trap, return EEXIST
+                 * error and allow agent to wait and handle flow add due to
+                 * packet trap
+                 */
+                return -EEXIST;
+            }
             return -ENOSPC;
+        }
 
         infop->vfti_added++;
     } else {
