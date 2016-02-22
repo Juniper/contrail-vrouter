@@ -235,6 +235,9 @@ extern unsigned int vr_flow_hold_limit;
 
 /* Maximum number of HOLD entries in flow table */
 #define VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT 1000
+/* Maximum (per lcore) number of mbufs in fragment assembler. */
+#define VR_DPDK_MAX_FRAGMENT_ELEMENTS     1024ULL
+
 
 /*
  * DPDK LCore IDs

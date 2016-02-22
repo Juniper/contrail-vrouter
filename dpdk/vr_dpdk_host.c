@@ -79,15 +79,23 @@ dpdk_printf(const char *format, ...)
 static void *
 dpdk_malloc(unsigned int size, unsigned int object)
 {
-    vr_malloc_stats(size, object);
-    return rte_malloc(NULL, size, 0);
+    void *mem = rte_malloc(NULL, size, 0);
+    if (likely(mem != NULL)) {
+        vr_malloc_stats(size, object);
+    }
+
+    return mem;
 }
 
 static void *
 dpdk_zalloc(unsigned int size, unsigned int object)
 {
-    vr_malloc_stats(size, object);
-    return rte_zmalloc(NULL, size, 0);
+    void *mem = rte_zmalloc(NULL, size, 0);
+    if (likely(mem != NULL)) {
+        vr_malloc_stats(size, object);
+    }
+
+    return mem;
 }
 
 static void
@@ -1174,6 +1182,29 @@ dpdk_soft_reset(struct vrouter *router)
     rcu_barrier();
 }
 
+static int
+dpdk_is_frag_limit_exceed(void)
+{
+    struct vrouter *router = vrouter_get(0);
+    struct vr_malloc_stats *stats;
+    uint64_t sum = 0;
+    unsigned int cpu;
+
+    if (router->vr_malloc_stats) {
+        for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+            if (router->vr_malloc_stats[cpu]) {
+                stats = &router->vr_malloc_stats[cpu][VR_FRAGMENT_QUEUE_ELEMENT_OBJECT];
+                sum += stats->ms_alloc;
+                sum -= stats->ms_free;
+            }
+        }
+        if (sum > VR_DPDK_MAX_FRAGMENT_ELEMENTS)
+            return 1;
+    }
+
+    return 0;
+}
+
 struct host_os dpdk_host = {
     .hos_printf                     =    dpdk_printf,
     .hos_malloc                     =    dpdk_malloc,
@@ -1227,6 +1258,7 @@ struct host_os dpdk_host = {
     .hos_get_log_level              =    dpdk_get_log_level,
     .hos_get_enabled_log_types      =    dpdk_get_enabled_log_types,
     .hos_soft_reset                 =    dpdk_soft_reset,
+    .hos_is_frag_limit_exceed       =    dpdk_is_frag_limit_exceed,
 };
 
 struct host_os *
