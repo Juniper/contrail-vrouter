@@ -11,6 +11,7 @@
 #define VR_LINUX_ASSEMBLER_BUCKETS              1024
 #define VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE    256
 #define VR_MAX_FRAGMENTS_PER_CPU_QUEUE          256
+#define VR_MAX_FRAGMENT_ELEMENTS_PER_CPU        1024
 #define VR_FRAG_ENQUEUE_ATTEMPTS                3
 
 struct vr_fragment_key {

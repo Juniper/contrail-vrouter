@@ -79,15 +79,23 @@ dpdk_printf(const char *format, ...)
 static void *
 dpdk_malloc(unsigned int size, unsigned int object)
 {
-    vr_malloc_stats(size, object);
-    return rte_malloc(NULL, size, 0);
+    void *mem = rte_malloc(NULL, size, 0);
+    if (likely(mem != NULL)) {
+        vr_malloc_stats(size, object);
+    }
+
+    return mem;
 }
 
 static void *
 dpdk_zalloc(unsigned int size, unsigned int object)
 {
-    vr_malloc_stats(size, object);
-    return rte_zmalloc(NULL, size, 0);
+    void *mem = rte_zmalloc(NULL, size, 0);
+    if (likely(mem != NULL)) {
+        vr_malloc_stats(size, object);
+    }
+
+    return mem;
 }
 
 static void
