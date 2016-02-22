@@ -79,6 +79,14 @@ dpdk_printf(const char *format, ...)
 static void *
 dpdk_malloc(unsigned int size, unsigned int object)
 {
+    if (unlikely(object == VR_FRAGMENT_QUEUE_ELEMENT_OBJECT
+            || object == VR_FRAGMENT_OBJECT)) {
+        if (rte_ring_count(vr_dpdk.rss_mempool->ring) <
+                VR_DPDK_RSS_MEMPOOL_RESERVE) {
+            return NULL;
+        }
+    }
+
     vr_malloc_stats(size, object);
     return rte_malloc(NULL, size, 0);
 }
