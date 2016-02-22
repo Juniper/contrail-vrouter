@@ -388,6 +388,8 @@ vr_fragment_enqueue(struct vrouter *router,
 {
     bool swapped = false;
     unsigned int i;
+    struct vr_malloc_stats *stats;
+    unsigned int cpu;
 
     struct vr_packet_node *pnode;
     struct vr_fragment_queue_element *fqe = NULL, *tail, **tailp;
@@ -398,6 +400,16 @@ vr_fragment_enqueue(struct vrouter *router,
     } else {
         if ((vfq->vfq_length + 1) > VR_MAX_FRAGMENTS_PER_CPU_QUEUE)
             goto fail;
+    }
+
+    /* Limit the total number of fragmented packets per CPU. */
+    cpu = vr_get_cpu();
+    if (router->vr_malloc_stats) {
+        if (router->vr_malloc_stats[cpu]) {
+            stats = &router->vr_malloc_stats[cpu][VR_FRAGMENT_QUEUE_ELEMENT_OBJECT];
+            if (stats->ms_alloc - stats->ms_free > VR_MAX_FRAGMENT_ELEMENTS_PER_CPU)
+                goto fail;
+        }
     }
 
     fqe = vr_malloc(sizeof(*fqe), VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
