@@ -400,6 +400,12 @@ vr_fragment_enqueue(struct vrouter *router,
             goto fail;
     }
 
+    /* Limit the total number of fragmented packets per CPU. */
+    if (vrouter_host->hos_is_frag_limit_exceed &&
+            vrouter_host->hos_is_frag_limit_exceed()) {
+            goto fail;
+    }
+
     fqe = vr_malloc(sizeof(*fqe), VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
     if (!fqe) {
         goto fail;
