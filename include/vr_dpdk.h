@@ -133,6 +133,22 @@ extern unsigned int vr_flow_hold_limit;
 #define VR_DPDK_RSS_MEMPOOL_SZ      32768
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
+/*
+ * The maximum number of mbufs in fragment assembler is:
+ *
+ * VR_MAX_FRAGMENTS_PER_CPU_QUEUE * number_of_CPUs +
+ *      VR_LINUX_ASSEMBLER_BUCKETS * VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE +
+ *      (unlimited) number of elements in each fragment queue
+ *
+ * We use a predefined number of mbufs in DPDK, so the maximum number
+ * of mbufs allowed in the assembler should be somehow limited.
+ *
+ * Since the number of CPUs and mbufs vary, we limit the number of
+ * VR_FRAGMENT_QUEUE_ELEMENT_OBJECT once the number of free mbufs in RSS
+ * mempool gets lower than the reserve.
+ */
+#define VR_DPDK_RSS_MEMPOOL_RESERVE        4096
+
 /* Number of mbufs in FRAG_DIRECT mempool */
 #define VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ     4096
 /* How many objects (mbufs) to keep in per-lcore FRAG_DIRECT mempool cache */
