@@ -199,6 +199,7 @@ struct host_os {
     unsigned int (*hos_get_log_level)(void);
     unsigned int *(*hos_get_enabled_log_types)(int *);
     void (*hos_soft_reset)(struct vrouter *);
+    int (*hos_is_frag_limit_exceeded)(void);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
