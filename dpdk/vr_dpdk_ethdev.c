@@ -726,8 +726,12 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
                         offsetof(struct vr_ip, ip_saddr));
         hash = rte_hash_crc_8byte(*ip_addr_ptr, hash);
 
-        ip_proto = ipv4_hdr->ip_proto;
-        l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER);
+        if (likely(!vr_ip_fragment(ipv4_hdr))) {
+            ip_proto = ipv4_hdr->ip_proto;
+            l4_ptr = (uint32_t *)((uintptr_t)ipv4_hdr + (ipv4_hdr->ip_hl) * IPV4_IHL_MULTIPLIER);
+        } else {
+            ip_proto = 0;
+        }
     } else if (ipv6_hdr != NULL) {
         /**
          * Both source and destination IPv6 addresses are 16-bytes long,
@@ -889,14 +893,16 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             if (unlikely((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0))
                 return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
 
-            udp_port = rte_be_to_cpu_16(udp_hdr->udp_dport);
-            if (likely(vr_mpls_udp_port(udp_port) || vr_vxlan_udp_port(udp_port))) {
-                pull_len += sizeof(struct vr_udp);
-                gre_udp_encap = udp_hdr->udp_dport;
-                /* Go to parsing. */
-            } else {
-                /* UDP from the wire, but not MPLS-over-UDP nor VXLAN. */
-                return 0;
+            if (likely(!vr_ip_fragment(ipv4_hdr))) {
+                udp_port = rte_be_to_cpu_16(udp_hdr->udp_dport);
+                if (likely(vr_mpls_udp_port(udp_port) || vr_vxlan_udp_port(udp_port))) {
+                    pull_len += sizeof(struct vr_udp);
+                    gre_udp_encap = udp_hdr->udp_dport;
+                    /* Go to parsing. */
+                } else {
+                    /* UDP from the wire, but not MPLS-over-UDP nor VXLAN. */
+                    return 0;
+                }
             }
         } else if ((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0) {
             /* Looks like no tunneling, perhaps a packet from a VM. */
