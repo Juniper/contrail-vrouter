@@ -426,6 +426,9 @@ flow_stats(void)
             fe = (struct vr_flow_entry *)((char *)ft->ft_entries +
                                           (i * sizeof(*fe)));
             if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
+                if (fe->fe_flags & VR_FLOW_FLAG_EVICTED) {
+                    continue;
+                }
                 total_entries++;
                 if (fe->fe_action != VR_FLOW_ACTION_HOLD) {
                     active_entries++;
@@ -533,6 +536,9 @@ flow_rate(void)
         for (i = 0; i < ft->ft_num_entries; i++) {
             fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
             if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
+                if (fe->fe_flags & VR_FLOW_FLAG_EVICTED) {
+                    continue;
+                }
                 total_entries++;
                 if (fe->fe_action != VR_FLOW_ACTION_HOLD)
                     active_entries++;
