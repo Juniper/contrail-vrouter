@@ -26,6 +26,7 @@
 #endif
 
 #include "vr_types.h"
+#include "vr_packet.h"
 #include "vr_nexthop.h"
 #include "nl_util.h"
 #include "vr_mpls.h"
@@ -44,8 +45,8 @@ static bool cmd_proxy_set = false;
 static bool cmd_trap_set = false;
 static bool cmd_flood_set = false;
 
-static int cmd_set, dump_set;
-static int family_set, help_set;
+static int cmd_set, dump_set, get_set;
+static int family_set, help_set, vrf_set;
 
 static int cmd_prefix_set;
 static int cmd_dst_mac_set;
@@ -54,6 +55,7 @@ static int cmd_vrf_id = -1, cmd_family_id;
 static int cmd_op = -1;
 
 static int cmd_nh_id = -1;
+static char *cmd_prefix_string, *cmd_plen_string;
 static uint8_t cmd_prefix[16], cmd_src[16];
 static uint32_t cmd_plen = 0;
 static int32_t cmd_label;
@@ -110,7 +112,7 @@ dump_legend(int family)
             printf(", ");
     }
 
-    printf("\n\n");
+    printf("\n");
     return;
 }
 
@@ -127,6 +129,31 @@ family_string_to_id(char *fname)
     return -1;
 }
 
+static void
+address_mask(uint8_t *addr, uint8_t plen, unsigned int family)
+{
+    int i;
+    uint8_t address_bits;
+    uint8_t mask[VR_IP6_ADDRESS_LEN];
+
+    if (family == AF_INET) {
+        address_bits = VR_IP_ADDRESS_LEN * 8;
+    } else {
+        address_bits = VR_IP6_ADDRESS_LEN * 8;
+    }
+
+    memset(mask, 0xFF, sizeof(mask));
+    for (i = address_bits - 1; i >= plen; i--) {
+        mask[i / 8] ^= (1 << (7 - (i % 8)));
+    }
+
+    for (i = 0; i < (address_bits / 8); i++) {
+        addr[i] &= mask[i];
+    }
+
+    return;
+}
+
 void
 vr_route_req_process(void *s_req)
 {
@@ -141,6 +168,8 @@ vr_route_req_process(void *s_req)
         rt_marker_plen = rt->rtr_prefix_len;
 
         if (rt->rtr_prefix_size) {
+            if (cmd_op == SANDESH_OP_GET)
+                address_mask(rt->rtr_prefix, rt->rtr_prefix_len, rt->rtr_family);
             inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, sizeof(addr));
             ret = printf("%s/%-2d", addr, rt->rtr_prefix_len);
         }
@@ -232,6 +261,35 @@ vr_response_process(void *s)
 }
 
 
+static void
+vr_print_rtable_header(unsigned int family, unsigned int vrf)
+{
+    char addr[INET6_ADDRSTRLEN];
+
+    dump_legend(family);
+    switch (family) {
+    case AF_INET:
+    case AF_INET6:
+        printf("vRouter inet%c routing table %d/%d/unicast\n",
+                   (family == AF_INET) ? '4' : '6',
+                    0, cmd_vrf_id);
+        printf("Destination           PPL        Flags        Label         "
+                "Nexthop    Stitched MAC(Index)\n");
+        break;
+
+    case AF_BRIDGE:
+        printf("vRouter bridge table %d/%d\n", 0, cmd_vrf_id);
+        printf("Index       DestMac                  Flags           "
+                "Label/VNID      Nexthop\n");
+        break;
+
+    default:
+        break;
+    }
+
+    return;
+}
+
 static int
 vr_route_op(struct nl_client *cl)
 {
@@ -239,19 +297,12 @@ vr_route_op(struct nl_client *cl)
     bool dump = false;
     unsigned int flags = 0;
     uint8_t *dst_mac = NULL;
+    char addr[INET6_ADDRSTRLEN];
 
-    if (cmd_op == SANDESH_OP_DUMP) {
-        if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            printf("Vrouter inet%c routing table %d/%d/unicast\n",
-                    (cmd_family_id == AF_INET) ? '4' : '6',
-                    0, cmd_vrf_id);
-            dump_legend(cmd_family_id);
-            printf("Destination	      PPL        Flags        Label         Nexthop    Stitched MAC(Index)\n");
-        } else {
+    if (cmd_op == SANDESH_OP_DUMP || cmd_op == SANDESH_OP_GET) {
+        vr_print_rtable_header(cmd_family_id, cmd_vrf_id);
+        if (cmd_family_id == AF_BRIDGE) {
             rt_marker_plen = VR_ETHER_ALEN;
-            printf("Kernel L2 Bridge table %d/%d\n\n", 0, cmd_vrf_id);
-            dump_legend(cmd_family_id);
-            printf("Index       DestMac                  Flags           Label/VNID      Nexthop\n");
         }
     }
 
@@ -285,6 +336,11 @@ op_retry:
         ret = vr_send_route_delete(cl, 0, cmd_vrf_id, cmd_family_id,
                 cmd_prefix, cmd_plen, cmd_nh_id, cmd_label, cmd_dst_mac,
                 cmd_replace_plen, flags);
+        break;
+
+    case SANDESH_OP_GET:
+        ret = vr_send_route_get(cl, 0, cmd_vrf_id, cmd_family_id,
+                cmd_prefix, cmd_plen, cmd_dst_mac);
         break;
 
     default:
@@ -332,6 +388,9 @@ validate_options(void)
 {
     unsigned int set = dump_set + family_set + cmd_set + help_set;
 
+    char addr[INET6_ADDRSTRLEN];
+    struct ether_addr *eth;
+
     if (cmd_op < 0)
         goto usage;
 
@@ -372,6 +431,60 @@ validate_options(void)
 
         break;
 
+    case SANDESH_OP_GET:
+        if (cmd_vrf_id < 0 || !cmd_prefix_string)
+            goto usage;
+
+        switch (cmd_family_id) {
+        case AF_INET:
+        case AF_INET6:
+            if (cmd_family_id == AF_INET) {
+                if (!vr_valid_ipv4_address(cmd_prefix_string))
+                    goto usage;
+            } else {
+                if (!vr_valid_ipv6_address(cmd_prefix_string))
+                    goto usage;
+            }
+
+
+            if (inet_pton(cmd_family_id, cmd_prefix_string, cmd_prefix) != 1) {
+                printf("%s: inet_pton fails for %s\n", __FUNCTION__, cmd_prefix_string);
+                exit(EINVAL);
+            }
+
+            if (!cmd_plen_string)
+                goto usage;
+
+            cmd_plen = strtoul(cmd_plen_string, NULL, 0);
+            address_mask(cmd_prefix, cmd_plen, cmd_family_id);
+            printf("Match %s/%u in vRouter inet%c table %u/%u/unicast\n\n",
+                    inet_ntop(cmd_family_id, &cmd_prefix, addr, sizeof(addr)),
+                    cmd_plen, (cmd_family_id == AF_INET) ? '4' : '6',
+                    0, cmd_vrf_id);
+            break;
+
+        case AF_BRIDGE:
+            eth = ether_aton(cmd_prefix_string);
+            if (!eth) {
+                printf("%s: ether_aton fails on %s\n",
+                        __FUNCTION__, cmd_prefix_string);
+                exit(EINVAL);
+            }
+
+            memcpy(cmd_dst_mac, eth, sizeof(cmd_dst_mac));
+            printf("Match %s in vRouter bridge table %u/%u/unicast\n\n",
+                    ether_ntoa((const struct ether_addr *)cmd_dst_mac),
+                    0, cmd_vrf_id);
+            break;
+
+        default:
+            printf("Address family %d not supported\n", cmd_family_id);
+            exit(EINVAL);
+        }
+
+
+        break;
+
     default:
         goto usage_internal;
     }
@@ -391,6 +504,8 @@ enum opt_flow_index {
     COMMAND_OPT_INDEX,
     DUMP_OPT_INDEX,
     FAMILY_OPT_INDEX,
+    GET_OPT_INDEX,
+    VRF_OPT_INDEX,
     HELP_OPT_INDEX,
     MAX_OPT_INDEX,
 };
@@ -399,6 +514,8 @@ static struct option long_options[] = {
     [COMMAND_OPT_INDEX]   = {"cmd",    no_argument,       &cmd_set,    1},
     [DUMP_OPT_INDEX]      = {"dump",   required_argument, &dump_set,   1},
     [FAMILY_OPT_INDEX]    = {"family", required_argument, &family_set, 1},
+    [GET_OPT_INDEX]       = {"get",    required_argument, &get_set,    1},
+    [VRF_OPT_INDEX]       = {"vrf",    required_argument, &vrf_set,    1},
     [HELP_OPT_INDEX]      = {"help",   no_argument,       &help_set,   1},
     [MAX_OPT_INDEX]       = { NULL,    0,                 0,           0},
 };
@@ -406,7 +523,8 @@ static struct option long_options[] = {
 static void
 Usage(void)
 {
-    printf("Usage:   rt --dump <vrf_id> [--family <inet|bridge>]>\n");
+    printf("Usage:   rt --dump <vrf_id> [--family <inet|inet6|bridge>]>\n");
+    printf("         rt --get <address/plen> --vrf <id> [--family <inet|inet6>]\n");
     printf("         rt --help\n");
     printf("\n");
     printf("--dump   Dumps the routing table corresponding to vrf_id\n");
@@ -421,6 +539,8 @@ static void
 parse_long_opts(int opt_flow_index, char *opt_arg)
 {
     errno = 0;
+    unsigned int arg_len, tok_len;
+
     switch (opt_flow_index) {
     case COMMAND_OPT_INDEX:
         usage_internal();
@@ -439,6 +559,21 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
                 cmd_family_id != AF_BRIDGE &&
                 cmd_family_id != AF_INET6)
             Usage();
+        break;
+
+    case GET_OPT_INDEX:
+        cmd_op = SANDESH_OP_GET;
+        arg_len = strlen(opt_arg);
+        cmd_prefix_string = vr_extract_token(opt_arg, '/');
+        tok_len = strlen(cmd_prefix_string);
+        if (tok_len != arg_len) {
+            cmd_plen_string = vr_extract_token(cmd_prefix_string + tok_len + 1, '\0');
+        }
+
+        break;
+
+    case VRF_OPT_INDEX:
+        cmd_vrf_id = strtoul(opt_arg, NULL, 0);
         break;
 
     case HELP_OPT_INDEX:

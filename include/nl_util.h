@@ -110,6 +110,10 @@ extern void nl_build_attr(struct nl_client *cl, int len, int attr);
 extern int vrouter_get_family_id(struct nl_client *cl);
 extern int get_vrouter_pid(void);
 
+extern char *vr_extract_token(char *, char);
+extern bool vr_valid_ipv6_address(const char *);
+extern bool vr_valid_ipv4_address(const char *);
+
 extern int vr_recvmsg(struct nl_client *cl, bool dump);
 extern int vr_sendmsg(struct nl_client *, void *, char *);
 extern struct nl_client *vr_get_nl_client(unsigned int);
@@ -156,6 +160,8 @@ extern int vr_send_nexthop_add(struct nl_client *, unsigned int,
 
 extern int vr_send_route_dump(struct nl_client *, unsigned int, unsigned int,
         unsigned int, uint8_t *, unsigned int);
+extern int vr_send_route_get(struct nl_client *, unsigned int, unsigned int,
+        unsigned int family, uint8_t *, unsigned int, uint8_t *);
 extern int vr_send_route_delete(struct nl_client *, unsigned int, unsigned int,
         unsigned int family, uint8_t *, unsigned int, unsigned int,
         int, uint8_t *, uint32_t, unsigned ints);

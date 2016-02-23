@@ -270,8 +270,10 @@ bridge_table_get(unsigned int vrf_id, struct vr_route_req *rt)
     struct vr_nexthop *nh;
 
     nh = bridge_table_lookup(vrf_id, rt);
-    if (nh)
+    if (nh) {
         rt->rtr_req.rtr_nh_id = rt->rtr_nh->nh_id;
+        return 0;
+    }
 
     return -ENOENT;
 }

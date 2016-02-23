@@ -119,11 +119,22 @@ vr_route_add(vr_route_req *req)
 int
 vr_route_get(vr_route_req *req)
 {
-    struct vr_route_req vr_req;
-    struct vrouter *router;
     int ret = 0;
     uint32_t rt_prefix[4];
-	struct vr_rtable *rtable;
+    bool mac_mem_free = false;
+
+    struct vr_route_req vr_req;
+    struct vrouter *router;
+	struct vr_rtable *rtable = NULL;
+
+    if (!req->rtr_mac)
+        mac_mem_free = true;
+
+    if ((req->rtr_family != AF_INET) && (req->rtr_family != AF_INET6) &&
+            (req->rtr_family != AF_BRIDGE)) {
+        ret = -EINVAL;
+        goto generate_response;
+    }
 
     vr_req.rtr_req = *req;
 
@@ -140,8 +151,12 @@ vr_route_get(vr_route_req *req)
         ret = -ENOENT;
         goto generate_response;
     } else {
+        if ((req->rtr_family == AF_INET) || (req->rtr_family == AF_INET6)) {
+            rtable = router->vr_inet_rtable;
+        } else if (req->rtr_family == AF_BRIDGE) {
+            rtable = router->vr_bridge_rtable;
+        }
 
-        rtable = router->vr_inet_rtable;
         if (!rtable) {
             ret = -ENOENT;
             goto generate_response;
@@ -152,6 +167,11 @@ vr_route_get(vr_route_req *req)
 
 generate_response:
     vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
+    if (mac_mem_free && vr_req.rtr_req.rtr_mac) {
+        vr_free(vr_req.rtr_req.rtr_mac, VR_ROUTE_REQ_MAC_OBJECT);
+        vr_req.rtr_req.rtr_mac = NULL;
+    }
+
     return ret;
 }
 

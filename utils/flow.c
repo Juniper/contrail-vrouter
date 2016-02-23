@@ -1052,86 +1052,6 @@ validate_options(void)
     return;
 }
 
-static void
-flow_remove_trailing_space(char *addr)
-{
-    unsigned int len = strlen(addr);
-
-    len -= 1;
-    while ((*(addr + len) == ' ') && --len);
-    *(addr + len + 1) = '\0';
-
-    return;
-}
-
-static bool
-valid_ipv6_address(const char *addr)
-{
-    unsigned int i = 0, j = 0, sep_count = 0;
-
-    /* a '*' is treated as a valid address */
-    if (!strncmp(addr, "*", 1) && (strlen(addr) == 1))
-        return true;
-
-    while (*(addr + i)) {
-        if (isalnum(*(addr + i))) {
-            j++;
-        } else if (*(addr + i) == ':') {
-            j = 0;
-            sep_count++;
-        } else {
-            printf("match: \"%s\" is not a valid ipv6 address format\n", addr);
-            return false;
-        }
-
-        if ((j > 4) || (sep_count > 7)) {
-            printf("match: \"%s\" is not a valid ipv6 address format\n", addr);
-            return false;
-        }
-
-        i++;
-    }
-
-    return true;
-}
-
-static bool
-valid_ipv4_address(const char *addr)
-{
-    unsigned int i = 0, j = 0, sep_count = 0;
-
-    /* a '*' is treated as a valid address */
-    if (!strncmp(addr, "*", 1) && (strlen(addr) == 1))
-        return true;
-
-    /* every character should be either a digit or a '.' */
-    while (*(addr + i)) {
-        if (isdigit(*(addr + i))) {
-            j++;
-        } else if (i && (*(addr + i) == '.')) {
-            j = 0;
-            ++sep_count;
-        } else {
-            printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
-            return false;
-        }
-
-        if ((j > 3) || (sep_count > 3)) {
-            printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
-            return false;
-        }
-
-        i++;
-    }
-
-    if (sep_count != 3) {
-        printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
-        return false;
-    }
-
-    return true;
-}
-
 static int
 flow_set_family(unsigned int family, char *addr, const char *port)
 {
@@ -1144,18 +1064,16 @@ flow_set_family(unsigned int family, char *addr, const char *port)
         return -EINVAL;
     }
 
-    flow_remove_trailing_space(addr);
-
     switch (family) {
     case AF_INET:
         mem_size = VR_IP_ADDRESS_LEN;
-        if (!valid_ipv4_address(addr))
+        if (!vr_valid_ipv4_address(addr))
             return -EINVAL;
         break;
 
     case AF_INET6:
         mem_size = VR_IP6_ADDRESS_LEN;
-        if (!valid_ipv6_address(addr))
+        if (!vr_valid_ipv6_address(addr))
             return -EINVAL;
         break;
 
@@ -1279,33 +1197,6 @@ flow_set_tuple(char *ip_port)
     return 0;
 }
 
-static char *
-flow_extract_token(char *string, char token_separator)
-{
-    int ret;
-    unsigned int length;
-
-    char *sep;
-
-    /* skip over leading white spaces */
-    while ((*string == ' ') && string++);
-
-    /* if there is nothing left after the spaces, return */
-    if (!strlen(string)) {
-        return NULL;
-    }
-
-    /* start searching for the token */
-    sep = strchr(string, token_separator);
-    if (sep) {
-        length = sep - string;
-        /* terminate the token with NULL */
-        string[sep - string] = '\0';
-    }
-
-    return string;
-}
-
 static int
 flow_set_ip(char *match_string)
 {
@@ -1315,14 +1206,14 @@ flow_set_ip(char *match_string)
     char *token, *string = match_string;
 
     do {
-        token = flow_extract_token(match_string, ',');
+        token = vr_extract_token(match_string, ',');
         if (token) {
             token_length = strlen(token) + 1;
             /* ...and use it to set the match tuple */
             if (ret = flow_set_tuple(token))
                 return ret;
         } else {
-            token = flow_extract_token(match_string, '&');
+            token = vr_extract_token(match_string, '&');
             if (token) {
                 token_length = strlen(token) + 1;
                 if (ret = flow_set_tuple(token))
@@ -1382,7 +1273,7 @@ flow_set_match(char *match_string)
     char *token, *string = match_string;
 
     do {
-        token = flow_extract_token(match_string, '&');
+        token = vr_extract_token(match_string, '&');
         if (token) {
             token_length = strlen(token) + 1;
             if (!strncmp(token, "proto", strlen("proto"))) {
