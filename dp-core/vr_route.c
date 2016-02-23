@@ -152,6 +152,11 @@ vr_route_get(vr_route_req *req)
 
 generate_response:
     vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
+    if (vr_req.rtr_req.rtr_mac) {
+        vr_free(vr_req.rtr_req.rtr_mac, VR_ROUTE_REQ_MAC_OBJECT);
+        vr_req.rtr_req.rtr_mac = NULL;
+    }
+
     return ret;
 }
 
