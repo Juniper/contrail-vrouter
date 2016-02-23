@@ -95,15 +95,23 @@ lh_printk(const char *format, ...)
 static void *
 lh_malloc(unsigned int size, unsigned int object)
 {
-    vr_malloc_stats(size, object);
-    return kmalloc(size, GFP_ATOMIC);
+    void *mem = kmalloc(size, GFP_ATOMIC);
+    if (mem != NULL) {
+        vr_malloc_stats(size, object);
+    }
+
+    return mem;
 }
 
 static void *
 lh_zalloc(unsigned int size, unsigned int object)
 {
-    vr_malloc_stats(size, object);
-    return kzalloc(size, GFP_ATOMIC);
+    void *mem = kzalloc(size, GFP_ATOMIC);
+    if (mem != NULL) {
+        vr_malloc_stats(size, object);
+    }
+
+    return mem;
 }
 
 static void
