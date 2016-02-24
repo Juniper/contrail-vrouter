@@ -135,6 +135,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_nexthop_req_object);
     printf("Route Table                     %" PRIu64 "\n",
             stats->vms_route_table_object);
+    printf("Route Request MAC object        %" PRIu64 "\n",
+            stats->vms_route_req_mac_object);
     printf("Timer                           %" PRIu64 "\n",
             stats->vms_timer_object);
     printf("Usock                           %" PRIu64 "\n",

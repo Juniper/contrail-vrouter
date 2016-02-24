@@ -891,20 +891,6 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
     struct vr_nexthop *default_nh, *ret_nh;
 
     default_nh = ip4_default_nh;
-
-    /* we do not support any thing other than /32 route lookup */
-    if ((rt->rtr_req.rtr_family == AF_INET) && 
-        (rt->rtr_req.rtr_prefix_len != IP4_PREFIX_LEN)) {
-        rt->rtr_nh = default_nh;
-        return default_nh;
-    }
-
-    if ((rt->rtr_req.rtr_family == AF_INET6) && 
-        (rt->rtr_req.rtr_prefix_len != IP6_PREFIX_LEN)) {
-        rt->rtr_nh = default_nh;
-        return default_nh;
-    }
-
     table = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
     if (!table) {
         rt->rtr_nh = default_nh;
@@ -1012,12 +998,29 @@ static int
 mtrie_get(unsigned int vrf_id, struct vr_route_req *rt)
 {
     struct vr_nexthop *nh;
+    struct vr_route_req breq;
+    vr_route_req *req = &rt->rtr_req;
 
     nh = mtrie_lookup(vrf_id, rt);
     if (nh)
-        rt->rtr_req.rtr_nh_id = nh->nh_id;
+        req->rtr_nh_id = nh->nh_id;
     else
-        rt->rtr_req.rtr_nh_id = -1;
+        req->rtr_nh_id = -1;
+
+    if (req->rtr_index != VR_BE_INVALID_INDEX) {
+        req->rtr_mac = vr_zalloc(VR_ETHER_ALEN, VR_ROUTE_REQ_MAC_OBJECT);
+        req->rtr_mac_size = VR_ETHER_ALEN;
+
+        breq.rtr_req.rtr_mac = req->rtr_mac;
+        breq.rtr_req.rtr_index = req->rtr_index;
+        breq.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        vr_bridge_lookup(req->rtr_vrf_id, &breq);
+
+    } else {
+        req->rtr_mac_size = 0;
+        req->rtr_mac = NULL;
+    }
+
     return 0;
 }
 

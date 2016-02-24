@@ -35,6 +35,114 @@
 /* Suppress NetLink error messages */
 bool vr_ignore_nl_errors = false;
 
+char *
+vr_extract_token(char *string, char token_separator)
+{
+    int ret;
+    unsigned int length;
+
+    char *sep;
+
+    /* skip over leading white spaces */
+    while ((*string == ' ') && string++);
+
+    /* if there is nothing left after the spaces, return */
+    if (!(length = strlen(string))) {
+        return NULL;
+    }
+
+    /* start searching for the token */
+    sep = strchr(string, token_separator);
+    if (sep) {
+        length = sep - string;
+        /* terminate the token with NULL */
+        string[sep - string] = '\0';
+        length = strlen(string);
+    }
+
+    /* remove trailing spaces */
+    length -= 1;
+    while ((*(string + length) == ' ') && --length);
+    *(string + length + 1) = '\0';
+
+    /*
+     * reset the separator to space, since a space at the beginning
+     * will be snipped
+     */
+    if (sep && (((sep - string)) != strlen(string)))
+        string[sep - string] = ' ';
+
+    return string;
+}
+
+bool
+vr_valid_ipv6_address(const char *addr)
+{
+    unsigned int i = 0, j = 0, sep_count = 0;
+
+    /* a '*' is treated as a valid address */
+    if (!strncmp(addr, "*", 1) && (strlen(addr) == 1))
+        return true;
+
+    while (*(addr + i)) {
+        if (isalnum(*(addr + i))) {
+            j++;
+        } else if (*(addr + i) == ':') {
+            j = 0;
+            sep_count++;
+        } else {
+            printf("match: \"%s\" is not a valid ipv6 address format\n", addr);
+            return false;
+        }
+
+        if ((j > 4) || (sep_count > 7)) {
+            printf("match: \"%s\" is not a valid ipv6 address format\n", addr);
+            return false;
+        }
+
+        i++;
+    }
+
+    return true;
+}
+
+bool
+vr_valid_ipv4_address(const char *addr)
+{
+    unsigned int i = 0, j = 0, sep_count = 0;
+
+    /* a '*' is treated as a valid address */
+    if (!strncmp(addr, "*", 1) && (strlen(addr) == 1))
+        return true;
+
+    /* every character should be either a digit or a '.' */
+    while (*(addr + i)) {
+        if (isdigit(*(addr + i))) {
+            j++;
+        } else if (i && (*(addr + i) == '.')) {
+            j = 0;
+            ++sep_count;
+        } else {
+            printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
+            return false;
+        }
+
+        if ((j > 3) || (sep_count > 3)) {
+            printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
+            return false;
+        }
+
+        i++;
+    }
+
+    if (sep_count != 3) {
+        printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
+        return false;
+    }
+
+    return true;
+}
+
 /* send and receive */
 int
 vr_recvmsg(struct nl_client *cl, bool dump)
@@ -597,7 +705,7 @@ vr_send_route_common(struct nl_client *cl, unsigned int op,
     vr_route_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op = SANDESH_OP_ADD;
+    req.h_op = op;
     req.rtr_rid = router_id;
     req.rtr_vrf_id = vrf;
     req.rtr_family = family;
@@ -618,6 +726,15 @@ vr_send_route_common(struct nl_client *cl, unsigned int op,
     req.rtr_nh_id = nh_index;
 
     return vr_sendmsg(cl, &req, "vr_route_req");
+}
+
+int
+vr_send_route_get(struct nl_client *cl,
+        unsigned int router_id, unsigned int vrf, unsigned int family,
+        uint8_t *prefix, unsigned int prefix_len)
+{
+    return vr_send_route_common(cl, SANDESH_OP_GET, router_id, vrf,
+            family, prefix, prefix_len, 0, 0, NULL, 0, 0);
 }
 
 int
