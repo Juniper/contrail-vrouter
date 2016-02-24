@@ -30,6 +30,7 @@
 #include "vr_interface.h"
 #include "vr_nexthop.h"
 #include "vr_route.h"
+#include "vr_bridge.h"
 #include "ini_parser.h"
 
 /* Suppress NetLink error messages */
@@ -710,13 +711,19 @@ vr_send_route_common(struct nl_client *cl, unsigned int op,
     req.rtr_vrf_id = vrf;
     req.rtr_family = family;
 
-    req.rtr_prefix = prefix;
-    req.rtr_prefix_size = RT_IP_ADDR_SIZE(family);
-    req.rtr_prefix_len = prefix_len;
+    if ((family == AF_INET) || (family == AF_INET6)) {
+        req.rtr_prefix = prefix;
+        req.rtr_prefix_size = RT_IP_ADDR_SIZE(family);
+        req.rtr_prefix_len = prefix_len;
+    } else if (family == AF_BRIDGE) {
+        req.rtr_index = VR_BE_INVALID_INDEX;
+    }
+
     if (mac) {
         req.rtr_mac = mac;
         req.rtr_mac_size = VR_ETHER_ALEN;
     }
+
     req.rtr_replace_plen = replace_len;
     req.rtr_label_flags = flags;
     req.rtr_label = label;
@@ -731,10 +738,10 @@ vr_send_route_common(struct nl_client *cl, unsigned int op,
 int
 vr_send_route_get(struct nl_client *cl,
         unsigned int router_id, unsigned int vrf, unsigned int family,
-        uint8_t *prefix, unsigned int prefix_len)
+        uint8_t *prefix, unsigned int prefix_len, uint8_t *mac)
 {
     return vr_send_route_common(cl, SANDESH_OP_GET, router_id, vrf,
-            family, prefix, prefix_len, 0, 0, NULL, 0, 0);
+            family, prefix, prefix_len, 0, 0, mac, 0, 0);
 }
 
 int

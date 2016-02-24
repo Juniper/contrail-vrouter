@@ -26,6 +26,7 @@
 #endif
 
 #include "vr_types.h"
+#include "vr_packet.h"
 #include "vr_nexthop.h"
 #include "nl_util.h"
 #include "vr_mpls.h"
@@ -111,7 +112,7 @@ dump_legend(int family)
             printf(", ");
     }
 
-    printf("\n\n");
+    printf("\n");
     return;
 }
 
@@ -128,6 +129,31 @@ family_string_to_id(char *fname)
     return -1;
 }
 
+static void
+address_mask(uint8_t *addr, uint8_t plen, unsigned int family)
+{
+    int i;
+    uint8_t address_bits;
+    uint8_t mask[VR_IP6_ADDRESS_LEN];
+
+    if (family == AF_INET) {
+        address_bits = VR_IP_ADDRESS_LEN * 8;
+    } else {
+        address_bits = VR_IP6_ADDRESS_LEN * 8;
+    }
+
+    memset(mask, 0xFF, sizeof(mask));
+    for (i = address_bits - 1; i >= plen; i--) {
+        mask[i / 8] ^= (1 << (7 - (i % 8)));
+    }
+
+    for (i = 0; i < (address_bits / 8); i++) {
+        addr[i] &= mask[i];
+    }
+
+    return;
+}
+
 void
 vr_route_req_process(void *s_req)
 {
@@ -142,6 +168,8 @@ vr_route_req_process(void *s_req)
         rt_marker_plen = rt->rtr_prefix_len;
 
         if (rt->rtr_prefix_size) {
+            if (cmd_op == SANDESH_OP_GET)
+                address_mask(rt->rtr_prefix, rt->rtr_prefix_len, rt->rtr_family);
             inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, sizeof(addr));
             ret = printf("%s/%-2d", addr, rt->rtr_prefix_len);
         }
@@ -233,6 +261,35 @@ vr_response_process(void *s)
 }
 
 
+static void
+vr_print_rtable_header(unsigned int family, unsigned int vrf)
+{
+    char addr[INET6_ADDRSTRLEN];
+
+    dump_legend(family);
+    switch (family) {
+    case AF_INET:
+    case AF_INET6:
+        printf("vRouter inet%c routing table %d/%d/unicast\n",
+                   (family == AF_INET) ? '4' : '6',
+                    0, cmd_vrf_id);
+        printf("Destination           PPL        Flags        Label         "
+                "Nexthop    Stitched MAC(Index)\n");
+        break;
+
+    case AF_BRIDGE:
+        printf("vRouter bridge table %d/%d\n", 0, cmd_vrf_id);
+        printf("Index       DestMac                  Flags           "
+                "Label/VNID      Nexthop\n");
+        break;
+
+    default:
+        break;
+    }
+
+    return;
+}
+
 static int
 vr_route_op(struct nl_client *cl)
 {
@@ -242,28 +299,10 @@ vr_route_op(struct nl_client *cl)
     uint8_t *dst_mac = NULL;
     char addr[INET6_ADDRSTRLEN];
 
-    if (cmd_op == SANDESH_OP_DUMP) {
-        if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            printf("Vrouter inet%c routing table %d/%d/unicast\n",
-                    (cmd_family_id == AF_INET) ? '4' : '6',
-                    0, cmd_vrf_id);
-            dump_legend(cmd_family_id);
-            printf("Destination	      PPL        Flags        Label         Nexthop    Stitched MAC(Index)\n");
-        } else {
+    if (cmd_op == SANDESH_OP_DUMP || cmd_op == SANDESH_OP_GET) {
+        vr_print_rtable_header(cmd_family_id, cmd_vrf_id);
+        if (cmd_family_id == AF_BRIDGE) {
             rt_marker_plen = VR_ETHER_ALEN;
-            printf("Kernel L2 Bridge table %d/%d\n\n", 0, cmd_vrf_id);
-            dump_legend(cmd_family_id);
-            printf("Index       DestMac                  Flags           Label/VNID      Nexthop\n");
-        }
-    } else if (cmd_op == SANDESH_OP_GET) {
-        dump_legend(cmd_family_id);
-        if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            printf("Match for %s/%u in inet%c routing table %d/%d/unicast\n\n",
-                    inet_ntop(cmd_family_id, &cmd_prefix, addr, sizeof(addr)),
-                    cmd_plen,
-                    (cmd_family_id == AF_INET) ? '4' : '6',
-                    0, cmd_vrf_id);
-            printf("Destination	      PPL        Flags        Label         Nexthop    Stitched MAC(Index)\n");
         }
     }
 
@@ -300,7 +339,8 @@ op_retry:
         break;
 
     case SANDESH_OP_GET:
-        ret = vr_send_route_get(cl, 0, cmd_vrf_id, cmd_family_id, cmd_prefix, cmd_plen);
+        ret = vr_send_route_get(cl, 0, cmd_vrf_id, cmd_family_id,
+                cmd_prefix, cmd_plen, cmd_dst_mac);
         break;
 
     default:
@@ -347,6 +387,9 @@ static void
 validate_options(void)
 {
     unsigned int set = dump_set + family_set + cmd_set + help_set;
+
+    char addr[INET6_ADDRSTRLEN];
+    struct ether_addr *eth;
 
     if (cmd_op < 0)
         goto usage;
@@ -413,11 +456,26 @@ validate_options(void)
                 goto usage;
 
             cmd_plen = strtoul(cmd_plen_string, NULL, 0);
+            address_mask(cmd_prefix, cmd_plen, cmd_family_id);
+            printf("Match %s/%u in vRouter inet%c table %u/%u/unicast\n\n",
+                    inet_ntop(cmd_family_id, &cmd_prefix, addr, sizeof(addr)),
+                    cmd_plen, (cmd_family_id == AF_INET) ? '4' : '6',
+                    0, cmd_vrf_id);
             break;
 
         case AF_BRIDGE:
-            printf("Address family AF_BRIDGE not supported\n");
-            exit(EINVAL);
+            eth = ether_aton(cmd_prefix_string);
+            if (!eth) {
+                printf("%s: ether_aton fails on %s\n",
+                        __FUNCTION__, cmd_prefix_string);
+                exit(EINVAL);
+            }
+
+            memcpy(cmd_dst_mac, eth, sizeof(cmd_dst_mac));
+            printf("Match %s in vRouter bridge table %u/%u/unicast\n\n",
+                    ether_ntoa((const struct ether_addr *)cmd_dst_mac),
+                    0, cmd_vrf_id);
+            break;
 
         default:
             printf("Address family %d not supported\n", cmd_family_id);

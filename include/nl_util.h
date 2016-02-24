@@ -161,7 +161,7 @@ extern int vr_send_nexthop_add(struct nl_client *, unsigned int,
 extern int vr_send_route_dump(struct nl_client *, unsigned int, unsigned int,
         unsigned int, uint8_t *, unsigned int);
 extern int vr_send_route_get(struct nl_client *, unsigned int, unsigned int,
-        unsigned int family, uint8_t *, unsigned int);
+        unsigned int family, uint8_t *, unsigned int, uint8_t *);
 extern int vr_send_route_delete(struct nl_client *, unsigned int, unsigned int,
         unsigned int family, uint8_t *, unsigned int, unsigned int,
         int, uint8_t *, uint32_t, unsigned ints);
