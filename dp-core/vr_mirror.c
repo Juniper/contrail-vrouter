@@ -368,21 +368,27 @@ int
 vr_mirror(struct vrouter *router, uint8_t mirror_id,
           struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
+    bool reset;
+    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE,
+                 mirror_md_len = 0;
+    unsigned char default_mme[2] = {0xff, 0x0};
+    void *mirror_md;
     unsigned char *buf;
     struct vr_nexthop *nh;
     struct vr_pcap *pcap;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
-    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE;
-    unsigned int mirror_md_len = 0;
-    unsigned char default_mme[2] = {0xff, 0x0};
-    void *mirror_md;
     struct vr_nexthop *pkt_nh;
-    bool reset;
+    struct vr_forwarding_md new_fmd;
 
     mirror = router->vr_mirrors[mirror_id];
     if (!mirror)
         return 0;
+
+    if (fmd) {
+        memcpy(&new_fmd, fmd, sizeof(*fmd));
+        fmd = &new_fmd;
+    }
 
     if (fmd->fmd_flow_index >= 0) {
         mme = (struct vr_mirror_meta_entry *)vr_itable_get(router->vr_mirror_md,
