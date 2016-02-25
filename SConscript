@@ -30,6 +30,10 @@ env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
 env.Append(CPPPATH = ['#tools'])
 env.Append(CPPPATH = ['#tools/sandesh/library/c'])
 
+# Make Sandesh quiet for production
+if 'production' in env['OPT']:
+    DefaultEnvironment().Append(CPPDEFINES='SANDESH_QUIET')
+
 vr_root = './'
 makefile = vr_root + 'Makefile'
 dp_dir = Dir(vr_root).srcnode().abspath + '/'
