@@ -112,12 +112,16 @@ extern unsigned int vr_flow_hold_limit;
 #define VR_DPDK_MAX_BONDS           2
 /* Max size of a single packet */
 #define VR_DPDK_MAX_PACKET_SZ       9160
-/* Number of bytes needed for each mbuf */
+/*
+ * Number of bytes needed for each mbuf.
+ * Due to ixgbe RX buffer floor round, the mbuf size should be at least 10K.
 #define VR_DPDK_MBUF_SZ             (VR_DPDK_MAX_PACKET_SZ      \
                                     + sizeof(struct rte_mbuf)   \
                                     + sizeof(struct vr_packet) \
                                     + RTE_PKTMBUF_HEADROOM)
-/* Size of direc mbuf used for fragmentation. It needs a headroom as it holds
+ */
+#define VR_DPDK_MBUF_SZ             (10 * 1024 + RTE_PKTMBUF_HEADROOM)
+/* Size of direct mbuf used for fragmentation. It needs a headroom as it holds
  * the IP headers of the fragments and we have to prepend an outer (tunnel)
  * header. */
 #define VR_DPDK_FRAG_DIRECT_MBUF_SZ     (sizeof(struct rte_mbuf)    \

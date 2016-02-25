@@ -463,6 +463,17 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     }
 
     /*
+     * We do not support chained mbufs, so the whole packet must fit into
+     * one mbuf.
+     */
+    if (new_mtu > VR_DPDK_MAX_PACKET_SZ) {
+        RTE_LOG(ERR, VROUTER,
+                "Error changing eth device %"PRIu8" MTU: too big (max %d)\n",
+                port_id, VR_DPDK_MAX_PACKET_SZ);
+        return -EINVAL;
+    }
+
+    /*
      * TODO: DPDK bond PMD does not implement mtu_set op, so we need to
      * set the MTU manually for all the slaves.
      */
