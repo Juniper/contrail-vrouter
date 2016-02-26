@@ -381,6 +381,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     struct vr_nexthop *pkt_nh;
     struct vr_forwarding_md new_fmd;
 
+    /* If the packet is already mirrored, dont mirror again */
+    if (pkt->vp_flags & VP_FLAG_FROM_DP)
+        return 0;
+
     mirror = router->vr_mirrors[mirror_id];
     if (!mirror)
         return 0;
