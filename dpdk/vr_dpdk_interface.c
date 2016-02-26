@@ -245,37 +245,45 @@ dpdk_vlan_forwarding_if_add(void)
  * The device is removed with dpdk_fabric_af_packet_if_del().
  */
 static int
-dpdk_af_packet_if_add(struct vr_interface *vif) {
+dpdk_af_packet_if_add(struct vr_interface *vif)
+{
     int ret;
-    char params[VR_INTERFACE_NAME_LEN + 7];
+    char params[VR_DPDK_STR_BUF_SZ];
     char name[VR_INTERFACE_NAME_LEN];
     struct vr_dpdk_ethdev *ethdev;
     uint8_t port_id;
+    int frame_size;
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) af_packet device %s type %d transport %d\n",
-            vif->vif_idx, vif->vif_gen, vif->vif_name, vif->vif_type, vif->vif_transport);
+    RTE_LOG(INFO, VROUTER,
+            "Adding vif %u (gen. %u) af_packet device %s\n",
+            vif->vif_idx, vif->vif_gen, vif->vif_name);
 
-    ret = snprintf(name, VR_INTERFACE_NAME_LEN, "eth_vif_%d", vif->vif_idx);
-    if (ret < 0 || ret > VR_INTERFACE_NAME_LEN) {
-        RTE_LOG(ERR, VROUTER, "Error creating name for AF_PACKET %s\n", name);
+    ret = snprintf(name, sizeof(name), "eth_af_packet_%d", vif->vif_idx);
+    if (ret >= sizeof(name)) {
+        RTE_LOG(ERR, VROUTER,
+                "    error creating name for af_packet device %s\n", name);
         return ret;
     }
 
+    /* Frame size should be a multiple of page size. */
+    frame_size = (VR_DPDK_MAX_PACKET_SZ + getpagesize() - 1) /
+            getpagesize() * getpagesize();
     ret = snprintf(params, sizeof(params),
                     /* TODO: Optional af_packet mmap parameters
-                     *
-                     * "iface=%s,qpairs=%d,blocksz=%d,framesz=%d,framecnt=%d",
-                     * vif->vif_name, 16, 4096, 2048, 512);
+                     * "qpairs=%d,framecnt=%d", 16, 512);
                      */
-                  "iface=%s", vif->vif_name);
-    if (ret < 0 || ret > sizeof(params)) {
-        RTE_LOG(ERR, VROUTER, "Error creating config for AF_PACKET %s\n", name);
+                  "iface=%s,framesz=%d,blocksz=%d",
+                  vif->vif_name, frame_size, frame_size);
+    if (ret >= sizeof(params)) {
+        RTE_LOG(ERR, VROUTER,
+                "    error creating config for af_packet device %s\n", name);
         return ret;
     }
 
-    ret = rte_pmd_af_packet_devinit(name, params);
+    ret = rte_eal_vdev_init(name, params);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "Error initializing AF_PACKET device %s\n", name);
+        RTE_LOG(ERR, VROUTER,
+                "    error initializing af_packet device %s\n", name);
         return ret;
     }
     port_id = (uint8_t)(rte_eth_dev_allocated(name) - rte_eth_devices);
@@ -283,8 +291,8 @@ dpdk_af_packet_if_add(struct vr_interface *vif) {
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
         RTE_LOG(ERR, VROUTER,
-                "Error adding AF_PACKET device: PMD ID %"PRIu8" already added.\n",
-                port_id);
+                "    error adding af_packet device %s: eth device %"PRIu8" already added\n",
+                name, port_id);
         return -EEXIST;
     }
     ethdev->ethdev_port_id = port_id;
@@ -297,7 +305,8 @@ dpdk_af_packet_if_add(struct vr_interface *vif) {
 
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "Error starting eth device %" PRIu8": %s (%d)\n",
+        RTE_LOG(ERR, VROUTER,
+                "    error starting eth device %" PRIu8": %s (%d)\n",
                 port_id, rte_strerror(-ret), -ret);
         return ret;
     }
@@ -410,8 +419,8 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
      * then vif->vif_os will be NULL.
      */
     if (vif->vif_os == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error deleting %s dev %s: already removed\n",
-                vif_is_fabric(vif) ? "eth" : "af_packet", vif->vif_name);
+        RTE_LOG(ERR, VROUTER, "    error deleting %s dev: already removed\n",
+                vif_is_fabric(vif) ? "eth" : "af_packet");
         return -EEXIST;
     }
 
