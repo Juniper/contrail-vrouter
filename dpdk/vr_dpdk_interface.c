@@ -251,29 +251,34 @@ dpdk_af_packet_if_add(struct vr_interface *vif) {
     char name[VR_INTERFACE_NAME_LEN];
     struct vr_dpdk_ethdev *ethdev;
     uint8_t port_id;
+    int frame_size;
 
     RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) af_packet device %s type %d transport %d\n",
             vif->vif_idx, vif->vif_gen, vif->vif_name, vif->vif_type, vif->vif_transport);
 
-    ret = snprintf(name, VR_INTERFACE_NAME_LEN, "eth_vif_%d", vif->vif_idx);
-    if (ret < 0 || ret > VR_INTERFACE_NAME_LEN) {
-        RTE_LOG(ERR, VROUTER, "Error creating name for AF_PACKET %s\n", name);
+    ret = snprintf(name, sizeof(name), "eth_af_packet_%d", vif->vif_idx);
+    if (ret >= sizeof(name)) {
+        RTE_LOG(ERR, VROUTER,
+                "    error creating name for af_packet device %s\n", name);
         return ret;
     }
 
+    /* Frame size should be a multiple of page size. */
+    frame_size = (VR_DPDK_MAX_PACKET_SZ + getpagesize() - 1) /
+            getpagesize() * getpagesize();
     ret = snprintf(params, sizeof(params),
                     /* TODO: Optional af_packet mmap parameters
-                     *
-                     * "iface=%s,qpairs=%d,blocksz=%d,framesz=%d,framecnt=%d",
-                     * vif->vif_name, 16, 4096, 2048, 512);
+                     * "qpairs=%d,framecnt=%d", 16, 512);
                      */
-                  "iface=%s", vif->vif_name);
-    if (ret < 0 || ret > sizeof(params)) {
-        RTE_LOG(ERR, VROUTER, "Error creating config for AF_PACKET %s\n", name);
+                  "iface=%s,framesz=%d,blocksz=%d",
+                  vif->vif_name, frame_size, frame_size);
+    if (ret >= sizeof(params)) {
+        RTE_LOG(ERR, VROUTER,
+                "    error creating config for af_packet device %s\n", name);
         return ret;
     }
 
-    ret = rte_pmd_af_packet_devinit(name, params);
+    ret = rte_eal_vdev_init(name, params);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "Error initializing AF_PACKET device %s\n", name);
         return ret;
