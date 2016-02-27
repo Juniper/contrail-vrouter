@@ -418,7 +418,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
      * and mirror it
      */
     reset = true;
-    if (pkt->vp_if && pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) {
+    if ((fmd->fmd_flow_index >= 0) && pkt->vp_if &&
+            (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)) {
         pkt_nh = pkt->vp_nh;
         if (pkt_nh && (pkt_nh->nh_flags & NH_FLAG_VALID) &&
                     (pkt_nh->nh_type == NH_ENCAP)) {
