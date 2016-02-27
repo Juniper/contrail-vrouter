@@ -407,6 +407,7 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 static bool
 nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
 {
+    unsigned int v4_ip;
     uint8_t *sip = NULL;
     uint8_t sip6[VR_IP6_ADDRESS_LEN];
 
@@ -417,10 +418,19 @@ nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
     if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
         if (pkt->vp_type == VP_TYPE_IP6) {
             ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+
+            if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
+                sip = ip6->ip6_dst;
             sip = ip6->ip6_src;
+
         } else if (pkt->vp_type == VP_TYPE_IP) {
             ip = (struct vr_ip *)pkt_network_header(pkt);
-            vr_inet6_generate_ip6(sip6, ip->ip_saddr);
+
+            v4_ip = ip->ip_saddr;
+            if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
+                v4_ip = ip->ip_daddr;
+
+            vr_inet6_generate_ip6(sip6, v4_ip);
             sip = sip6;
         }
     }
@@ -1302,6 +1312,14 @@ nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
 
     iph = (struct vr_ip *)pkt_network_header(pkt);
     if (pkt->vp_type == VP_TYPE_IP) {
+
+        /*
+         * If the packet is from fabric, it must be destined to a VM on
+         * this compute, so lets use dest ip
+         */
+        if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
+            return iph->ip_daddr;
+
         return iph->ip_saddr;
     }
 
