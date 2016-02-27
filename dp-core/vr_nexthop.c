@@ -1236,6 +1236,14 @@ nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
 
     iph = (struct vr_ip *)pkt_network_header(pkt);
     if (pkt->vp_type == VP_TYPE_IP) {
+
+        /*
+         * If the packet is from fabric, it must be destined to a VM on
+         * this compute, so lets use dest ip
+         */
+        if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
+            return iph->ip_daddr;
+
         return iph->ip_saddr;
     }
 
