@@ -689,7 +689,7 @@ vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
 int
 vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
 {
-    unsigned short *nh_id;
+    unsigned short *nh_id, *vif_id;
     int handled = 1;
 
     if (!vr_gro_process)
@@ -700,8 +700,15 @@ vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
         vr_pfree(pkt, VP_DROP_PUSH);
         return handled;
     }
-
     *nh_id = nh->nh_id;
+
+    vif_id = (unsigned short *)pkt_push(pkt, sizeof(*vif_id));
+    if (!vif_id) {
+        vr_pfree(pkt, VP_DROP_PUSH);
+        return handled;
+    }
+    *vif_id = pkt->vp_if->vif_idx;
+
     handled = vr_gro_process(pkt, nh->nh_dev, (nh->nh_family == AF_BRIDGE));
     return handled;
 }
