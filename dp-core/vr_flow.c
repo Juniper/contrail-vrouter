@@ -806,8 +806,18 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         break;
     }
 
+    /*
+     * Eviction of Flow in vrouter add additional events to vrouter
+     * agent state machine making it complex and unstable, till
+     * agent is handling vrouter eviction appropriately, disabling
+     * eviction from vrouter.
+     * NOTE: Vrouter agent will look at VR_FLOW_TCP_DEAD flag to
+     * clear/evict flow immediately
+     */
+#if 0
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe);
+#endif
 
     return result;
 }
@@ -1557,6 +1567,15 @@ vr_flow_set_req_is_invalid(struct vrouter *router, vr_flow_req *req,
                 goto invalid_req;
             }
         }
+    } else {
+        /*
+         * flow set request received with an index which is
+         * not active anymore, return ENOENT error
+         */
+        if ((req->fr_flags & VR_FLOW_FLAG_ACTIVE) && !(req->fr_index < 0)) {
+            error = -ENOENT;
+            goto invalid_req;
+        }
     }
 
     if (req->fr_flags & VR_FLOW_FLAG_VRFT) {
@@ -1681,7 +1700,7 @@ static int
 vr_flow_set(struct vrouter *router, vr_flow_req *req)
 {
     int ret;
-    unsigned int fe_index;
+    unsigned int fe_index = (unsigned int)-1;
     bool new_flow = false, modified = false;
 
     struct vr_flow_entry *fe = NULL, *rfe = NULL;
@@ -1725,8 +1744,19 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
      */
     if (!fe) {
         fe = vr_add_flow_req(req, &fe_index);
-        if (!fe)
+        if (!fe) {
+            if (fe_index != (unsigned int)-1) {
+                /*
+                 * add flow req failed to allocate an entry due to race
+                 * between agent and datapath, where flow entry at fe_index
+                 * was already created due to packet trap, return EEXIST
+                 * error and allow agent to wait and handle flow add due to
+                 * packet trap
+                 */
+                return -EEXIST;
+            }
             return -ENOSPC;
+        }
 
         new_flow = true;
         infop->vfti_added++;
