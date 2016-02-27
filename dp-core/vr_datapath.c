@@ -569,15 +569,15 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     fmd.fmd_vlan = vlan_id;
     fmd.fmd_dvrf = vrf;
 
+    if (vr_pkt_type(pkt, 0, &fmd) < 0) {
+        vif_drop_pkt(vif, pkt, 1);
+        return 0;
+    }
+
     if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
         mfmd = fmd;
         mfmd.fmd_dvrf = vif->vif_vrf;
         vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd);
-    }
-
-    if (vr_pkt_type(pkt, 0, &fmd) < 0) {
-        vif_drop_pkt(vif, pkt, 1);
-        return 0;
     }
 
     /*
