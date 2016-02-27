@@ -806,8 +806,18 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         break;
     }
 
+    /*
+     * Eviction of Flow in vrouter add additional events to vrouter
+     * agent state machine making it complex and unstable, till
+     * agent is handling vrouter eviction appropriately, disabling
+     * eviction from vrouter.
+     * NOTE: Vrouter agent will look at VR_FLOW_TCP_DEAD flag to
+     * clear/evict flow immediately
+     */
+#if 0
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe);
+#endif
 
     return result;
 }
