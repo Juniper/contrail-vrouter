@@ -67,6 +67,7 @@ int
 vr_dpdk_virtio_stop(unsigned int vif_idx)
 {
     int i;
+    vr_dpdk_virtioq_t *vq;
 
     if (vif_idx >= VR_MAX_INTERFACES) {
         return -1;
@@ -74,10 +75,27 @@ vr_dpdk_virtio_stop(unsigned int vif_idx)
 
     /* Disable and reset all the virtio queues. */
     for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
-        vr_dpdk_set_virtq_ready(vif_idx, i, VQ_NOT_READY);
+        if (i & 1) {
+            vq = &vr_dpdk_virtio_rxqs[vif_idx][i/2];
+        } else {
+            vq = &vr_dpdk_virtio_txqs[vif_idx][i/2];
+        }
+
+        if (vq->vdv_ready_state != VQ_NOT_READY) {
+            vr_dpdk_set_virtq_ready(vif_idx, i, VQ_NOT_READY);
+            rte_wmb();
+            synchronize_rcu();
+            /*
+             * TODO: code duplication to minimize the changes.
+             * See vr_dpdk_virtio_get_vring_base().
+             */
+            vq->vdv_desc = NULL;
+            if (vq->vdv_callfd) {
+                close(vq->vdv_callfd);
+                vq->vdv_callfd = 0;
+            }
+        }
     }
-    rte_wmb();
-    synchronize_rcu();
 
     return 0;
 }
