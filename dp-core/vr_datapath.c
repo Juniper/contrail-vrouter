@@ -340,6 +340,13 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
         if (fmd->fmd_label >= 0)
             return !handled;
 
+        /*
+         * in gro cases, fmd label won't be set. Hence, resort to the
+         * following check to identify whether the packet was tunneled
+         */
+        if (fmd->fmd_dvrf != vif->vif_vrf)
+            return !handled;
+
         /* If fabric: Agent and kernel are interested in it */
         cloned_pkt = vr_pclone(pkt);
         if (cloned_pkt) {
@@ -540,14 +547,15 @@ unsigned int
 vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, unsigned short vlan_id)
 {
-    struct vr_forwarding_md fmd;
+    struct vr_forwarding_md fmd, mfmd;
 
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
     fmd.fmd_dvrf = vrf;
 
     if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
-        fmd.fmd_dvrf = vif->vif_vrf;
+        mfmd = fmd;
+        mfmd.fmd_dvrf = vif->vif_vrf;
         vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
     }
 
