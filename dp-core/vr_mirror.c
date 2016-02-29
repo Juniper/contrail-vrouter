@@ -368,21 +368,31 @@ int
 vr_mirror(struct vrouter *router, uint8_t mirror_id,
           struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
+    bool reset = true;
+    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE,
+                 mirror_md_len = 0;
+    unsigned char default_mme[2] = {0xff, 0x0};
+    void *mirror_md;
     unsigned char *buf;
     struct vr_nexthop *nh;
     struct vr_pcap *pcap;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
-    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE;
-    unsigned int mirror_md_len = 0;
-    unsigned char default_mme[2] = {0xff, 0x0};
-    void *mirror_md;
     struct vr_nexthop *pkt_nh;
-    bool reset;
+    struct vr_forwarding_md new_fmd;
+
+    /* If the packet is already mirrored, dont mirror again */
+    if (pkt->vp_flags & VP_FLAG_FROM_DP)
+        return 0;
 
     mirror = router->vr_mirrors[mirror_id];
     if (!mirror)
         return 0;
+
+    if (fmd) {
+        memcpy(&new_fmd, fmd, sizeof(*fmd));
+        fmd = &new_fmd;
+    }
 
     if (fmd->fmd_flow_index >= 0) {
         mme = (struct vr_mirror_meta_entry *)vr_itable_get(router->vr_mirror_md,
@@ -407,34 +417,36 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
      * header. If not get the processed headers by resetting the packet
      * and mirror it
      */
-    reset = true;
-    if (pkt->vp_if && pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) {
+    if (pkt->vp_if && (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)) {
         pkt_nh = pkt->vp_nh;
         if (pkt_nh && (pkt_nh->nh_flags & NH_FLAG_VALID) &&
                     (pkt_nh->nh_type == NH_ENCAP)) {
 
             reset = false;
-            if (pkt_nh->nh_family == AF_INET)
-                clone_len += pkt_nh->nh_encap_len;
+            if (fmd->fmd_flow_index >= 0) {
+                if (pkt_nh->nh_family == AF_INET)
+                    clone_len += pkt_nh->nh_encap_len;
 
-            if (vr_pcow(pkt, clone_len))
-                goto fail;
+                if (vr_pcow(pkt, clone_len))
+                    goto fail;
+                clone_len = 0;
 
-
-            if (pkt_nh->nh_family == AF_INET) {
-                if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
-                    pkt_nh->nh_data, pkt_nh->nh_encap_len))
-                goto fail;
+                if (pkt_nh->nh_family == AF_INET) {
+                    if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
+                                    pkt_nh->nh_data, pkt_nh->nh_encap_len))
+                        goto fail;
+                }
             }
         }
     }
 
-    if (reset) {
+    if (reset)
         vr_preset(pkt);
+
+    if (clone_len) {
         if (vr_pcow(pkt, clone_len))
             goto fail;
     }
-
 
     pkt->vp_flags |= VP_FLAG_FROM_DP;
     /* Set the GSO and partial checksum flag */

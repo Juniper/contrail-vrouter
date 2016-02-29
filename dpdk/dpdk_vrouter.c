@@ -141,20 +141,9 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
 static int
 dpdk_mempools_create(void)
 {
-    unsigned int rss_mempool_size = VR_DPDK_RSS_MEMPOOL_SZ;
-
-    /*
-     * A smaller mbuf pool results in fewer cache misses. If the number
-     * of forwarding cores is <= 4, use the default size. Otherwise, use
-     * double that size.
-     */
-    if (vr_dpdk.nb_fwd_lcores > 4) {
-        rss_mempool_size = rss_mempool_size * 2;
-    }
-
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool",
-            rss_mempool_size,
+            VR_DPDK_RSS_MEMPOOL_SZ,
             VR_DPDK_MBUF_SZ, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,

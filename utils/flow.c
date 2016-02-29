@@ -1292,6 +1292,354 @@ flow_set_match(char *match_string)
 }
 
 static void
+flow_remove_trailing_space(char *addr)
+{
+    unsigned int len = strlen(addr);
+
+    len -= 1;
+    while ((*(addr + len) == ' ') && --len);
+    *(addr + len + 1) = '\0';
+
+    return;
+}
+
+static bool
+valid_ipv6_address(const char *addr)
+{
+    unsigned int i = 0, j = 0, sep_count = 0;
+
+    /* a '*' is treated as a valid address */
+    if (!strncmp(addr, "*", 1) && (strlen(addr) == 1))
+        return true;
+
+    while (*(addr + i)) {
+        if (isalnum(*(addr + i))) {
+            j++;
+        } else if (*(addr + i) == ':') {
+            j = 0;
+            sep_count++;
+        } else {
+            printf("match: \"%s\" is not a valid ipv6 address format\n", addr);
+            return false;
+        }
+
+        if ((j > 4) || (sep_count > 7)) {
+            printf("match: \"%s\" is not a valid ipv6 address format\n", addr);
+            return false;
+        }
+
+        i++;
+    }
+
+    return true;
+}
+
+static bool
+valid_ipv4_address(const char *addr)
+{
+    unsigned int i = 0, j = 0, sep_count = 0;
+
+    /* a '*' is treated as a valid address */
+    if (!strncmp(addr, "*", 1) && (strlen(addr) == 1))
+        return true;
+
+    /* every character should be either a digit or a '.' */
+    while (*(addr + i)) {
+        if (isdigit(*(addr + i))) {
+            j++;
+        } else if (i && (*(addr + i) == '.')) {
+            j = 0;
+            ++sep_count;
+        } else {
+            printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
+            return false;
+        }
+
+        if ((j > 3) || (sep_count > 3)) {
+            printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
+            return false;
+        }
+
+        i++;
+    }
+
+    if (sep_count != 3) {
+        printf("match: \"%s\" is not a valid ipv4 address format\n", addr);
+        return false;
+    }
+
+    return true;
+}
+
+static int
+flow_set_family(unsigned int family, char *addr, const char *port)
+{
+    uint8_t ip[VR_IP6_ADDRESS_LEN];
+    uint8_t *mem = NULL, mem_size;
+
+    if (match_ip1_set && match_ip2_set && (addr || port)) {
+        printf("match: Why do you specify \"[%s]:%s\" when both ends of "
+                "the flow are already specified\n", addr, port ? port : NULL);
+        return -EINVAL;
+    }
+
+    flow_remove_trailing_space(addr);
+
+    switch (family) {
+    case AF_INET:
+        mem_size = VR_IP_ADDRESS_LEN;
+        if (!valid_ipv4_address(addr))
+            return -EINVAL;
+        break;
+
+    case AF_INET6:
+        mem_size = VR_IP6_ADDRESS_LEN;
+        if (!valid_ipv6_address(addr))
+            return -EINVAL;
+        break;
+
+    default:
+        printf("match: Internal logic failure. Family is not one of inet/inet6\n");
+        return -EINVAL;
+    }
+
+    if (match_family && (match_family != family)) {
+        printf("match: You are trying to match v4 and v6 flow together\n");
+        printf("match: It does not make sense to me at this point of time\n");
+
+        return -EINVAL;
+    }
+
+    if (!match_family) {
+        match_family = family;
+        match_family_size = mem_size;
+    }
+
+    if (strlen(addr) != strlen("*")) {
+        inet_pton(family, addr, ip);
+        mem = malloc(mem_size);
+        if (!mem) {
+            printf("match: Memory Allocation failure. Try again\n");
+            return -ENOMEM;
+        }
+        memcpy(mem, ip, mem_size);
+    }
+
+    if (!match_ip1_set) {
+        match_ip1 = mem;
+        if (port) {
+            if (strncmp(port, "*", 1))
+                match_port1 = strtoul(port, NULL, 0);
+        }
+        match_ip1_set = true;
+    } else if (!match_ip2_set) {
+        match_ip2 = mem;
+        if (port) {
+            if (strncmp(port, "*", 1))
+                match_port2 = strtoul(port, NULL, 0);
+        }
+        match_ip2_set = true;
+    }
+
+    return 0;
+}
+
+/*
+ * Separate out the individual (ip, port) combination
+ *
+ * For ipv4, the flow will be specified as
+ * a.a.a.a:p OR a.a.a.a
+ *
+ * For ipv6, the corresponding format will be
+ * [a:a::a:a]:p OR a:a::a:a
+ */
+static int
+flow_set_tuple(char *ip_port)
+{
+    unsigned int len = strlen(ip_port);
+    unsigned int address_len;
+
+    char *f_colon_sep, *b_colon_sep, *bracket_sep;
+
+    /* for ipv6 addresses starting with '[' */
+    bracket_sep = strchr(ip_port, '[');
+    if (bracket_sep) {
+        /* ...look for closing bracket */
+        bracket_sep = strrchr(ip_port, ']');
+        if (!bracket_sep) {
+            printf("match: No closing ']'\n");
+            return -EINVAL;
+        }
+
+
+        address_len = bracket_sep - ip_port + 1;
+        /* post ']', we should have a ':' and a port number */
+        if (((len - address_len) < 2) ||
+                (ip_port[address_len] != ':')) {
+            printf("match: match string should be in "
+                    "[aa:aa::aa:aa]:p format\n");
+            return -EINVAL;
+        }
+
+        /* replace the ']' with NULL */
+        ip_port[address_len - 1] = '\0';
+        /* the address string is already terminated with NULL */
+        if (flow_set_family(AF_INET6, ip_port + 1, ip_port + address_len + 1))
+            return -EINVAL;
+
+    } else {
+        f_colon_sep = strchr(ip_port, ':');
+        /*
+         * if it is an ipv6 address, we expect to see at least two different
+         * ':'
+         */
+        if (f_colon_sep) {
+            b_colon_sep = strrchr(ip_port, ':');
+            if (b_colon_sep != f_colon_sep) {
+                /* ...hence ipv6 */
+                flow_set_family(AF_INET6, ip_port, NULL);
+            } else {
+                /*
+                 * if they are the same, then it has to be v4 and the
+                 * ':' is a port separator
+                 */
+                ip_port[f_colon_sep - ip_port] = '\0';
+                if (flow_set_family(AF_INET, ip_port,
+                        ip_port + (f_colon_sep - ip_port) + 1))
+                    return -EINVAL;
+            }
+        } else {
+            /* ...and if there are no ':', then the address is an ipv4 one */
+            if (flow_set_family(AF_INET, ip_port, NULL))
+                return -EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+static char *
+flow_extract_token(char *string, char token_separator)
+{
+    int ret;
+    unsigned int length;
+
+    char *sep;
+
+    /* skip over leading white spaces */
+    while ((*string == ' ') && string++);
+
+    /* if there is nothing left after the spaces, return */
+    if (!strlen(string)) {
+        return NULL;
+    }
+
+    /* start searching for the token */
+    sep = strchr(string, token_separator);
+    if (sep) {
+        length = sep - string;
+        /* terminate the token with NULL */
+        string[sep - string] = '\0';
+    }
+
+    return string;
+}
+
+static int
+flow_set_ip(char *match_string)
+{
+    int ret;
+    unsigned int length = strlen(match_string), token_length;
+
+    char *token, *string = match_string;
+
+    do {
+        token = flow_extract_token(match_string, ',');
+        if (token) {
+            token_length = strlen(token) + 1;
+            /* ...and use it to set the match tuple */
+            if (ret = flow_set_tuple(token))
+                return ret;
+        } else {
+            token = flow_extract_token(match_string, '&');
+            if (token) {
+                token_length = strlen(token) + 1;
+                if (ret = flow_set_tuple(token))
+                    return ret;
+            }
+        }
+
+        match_string = token + token_length;
+    } while (!ret && token && ((match_string - string) < length));
+
+    return 0;
+}
+
+static int
+flow_set_vrf(char *string)
+{
+    if (!strlen(string))
+        return -EINVAL;
+
+    errno = 0;
+    match_vrf = strtoul(string, NULL, 0);
+    if (errno)
+        return -errno;
+
+    return 0;
+}
+
+static int
+flow_set_proto(char *string)
+{
+    if (!strlen(string))
+        return -EINVAL;
+
+    if (!strncmp(string, "tcp", strlen("tcp"))) {
+        match_proto = VR_IP_PROTO_TCP;
+    } else if (!strncmp(string, "udp", strlen("udp"))) {
+        match_proto = VR_IP_PROTO_UDP;
+    } else if (!strncmp(string, "icmp6", strlen("icmp6"))) {
+        match_proto =  VR_IP_PROTO_ICMP6;
+    } else if (!strncmp(string, "icmp", strlen("icmp"))) {
+        match_proto = VR_IP_PROTO_ICMP;
+    } else if (!strncmp(string, "sctp", strlen("sctp"))) {
+        match_proto = VR_IP_PROTO_SCTP;
+    } else {
+        printf("Unsupported protocol \"%s\"\n", string);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int
+flow_set_match(char *match_string)
+{
+    int ret = 0;
+    unsigned int length = strlen(match_string), token_length;
+    char *token, *string = match_string;
+
+    do {
+        token = flow_extract_token(match_string, '&');
+        if (token) {
+            token_length = strlen(token) + 1;
+            if (!strncmp(token, "proto", strlen("proto"))) {
+                ret = flow_set_proto(token + strlen("proto") + 1);
+            } else if (!strncmp(token, "vrf", strlen("vrf"))) {
+                ret = flow_set_vrf(token + strlen("vrf") + 1);
+                ret = flow_set_vrf(token + strlen("vrf") + 1);
+            } else {
+                ret = flow_set_ip(token);
+            }
+        }
+        match_string = token + token_length;
+    } while (!ret && token && ((match_string - string) < length));
+
+    return ret;
+}
+
+static void
 parse_long_opts(int opt_flow_index, char *opt_arg)
 {
     errno = 0;
