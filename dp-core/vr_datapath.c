@@ -349,6 +349,13 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
         if (fmd->fmd_label >= 0)
             return !handled;
 
+        /*
+         * in gro cases, fmd label won't be set. Hence, resort to the
+         * following check to identify whether the packet was tunneled
+         */
+        if (fmd->fmd_dvrf != vif->vif_vrf)
+            return !handled;
+
         /* If fabric: Agent and kernel are interested in it */
         cloned_pkt = vr_pclone(pkt);
         if (cloned_pkt) {
