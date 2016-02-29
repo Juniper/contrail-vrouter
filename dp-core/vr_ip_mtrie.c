@@ -874,6 +874,75 @@ generate_response:
 
     return 0;
 }
+
+static struct vr_nexthop *
+__mtrie_lookup(struct vr_route_req *rt, struct ip_bucket *bkt, unsigned int level)
+{
+    unsigned int i, limit, index;
+    unsigned long ptr;
+
+    struct ip_bucket_entry *ent;
+    struct mtrie_bkt_info *ip_bkt_info;
+    struct vr_nexthop *ret_nh = NULL;
+
+    if (!bkt || level >= ip_bkt_get_max_level(rt->rtr_req.rtr_family))
+        return NULL;
+
+    ip_bkt_info = ip_bkt_info_get(rt->rtr_req.rtr_family);
+    index = rt_to_index(rt, level);
+
+    if (rt->rtr_req.rtr_prefix_len > ip_bkt_info[level].bi_pfx_len) {
+        limit = ip_bkt_info[level].bi_size;
+    } else {
+        limit = (1 <<
+                (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len));
+    }
+
+    /*
+     * ideally, we would have just followed the calculated index to the
+     * bottom of the tree and returned. however, what happens when the
+     * bottom of the tree is populated with a more specific route? for
+     * e.g.: we are searching for 1.1.0.0/16, but we also have a more
+     * specific route for 1.1.0.0/24. So, to get around that case, we
+     * need to loop the whole bucket, searching for a prefix length match.
+     *
+     * So what happens if all of the prefixes below have a more specific
+     * route. For e.g.: 1.1.0, 1.1.1, 1.1.2, ... 1.1.255. While there are
+     * no practical applications of such a route, for correctness, in such
+     * a case, we loop around the current bucket: i.e. in this case, we will
+     * loop around the bucket that holds 1.1/16. Maybe 1.2/16 was inherited
+     * from a lesser specific prefix and hence a match.
+     */
+    for (i = 0; i < ip_bkt_info[level].bi_size; i++) {
+        ent = index_to_entry(bkt, (index + i) % ip_bkt_info[level].bi_size);
+        ptr = ent->entry_long_i;
+        if (PTR_IS_NEXTHOP(ptr)) {
+            if (i >= limit) {
+                if (ent->entry_prefix_len >= rt->rtr_req.rtr_prefix_len)
+                    continue;
+            }
+
+            if (ent->entry_prefix_len > rt->rtr_req.rtr_prefix_len)
+                continue;
+
+            rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
+            rt->rtr_req.rtr_label = ent->entry_label;
+            rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
+            rt->rtr_req.rtr_index = ent->entry_bridge_index;
+            ret_nh = PTR_TO_NEXTHOP(ptr);
+            rt->rtr_nh = ret_nh;
+            break;
+        } else {
+            bkt = PTR_TO_BUCKET(ptr);
+            ret_nh = __mtrie_lookup(rt, bkt, level + 1);
+            if (ret_nh)
+                break;
+        }
+    }
+
+    return ret_nh;
+}
+
 /*
  * longest prefix match. go down the tree till you encounter a next-hop.
  * if no nexthop, there is something wrong with the tree which was built.
@@ -883,10 +952,11 @@ generate_response:
 static struct vr_nexthop *
 mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 {
-    unsigned int        level, index;
-    unsigned long       ptr;
-    struct ip_mtrie   *table;
-    struct ip_bucket  *bkt;
+    unsigned int level = 0;
+    unsigned long ptr;
+
+    struct ip_mtrie *table;
+    struct ip_bucket *bkt;
     struct ip_bucket_entry *ent;
     struct vr_nexthop *default_nh, *ret_nh;
 
@@ -898,7 +968,6 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
     }
 
     ent = &table->root;
-
     ptr = ent->entry_long_i;
     if (!ptr) {
         rt->rtr_nh = default_nh;
@@ -921,29 +990,15 @@ mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
         return default_nh;
     }
 
-    for (level = 0; level < ip_bkt_get_max_level(rt->rtr_req.rtr_family); level++) {
-        index = rt_to_index(rt, level);
-        ent = index_to_entry(bkt, index);
-        ptr = ent->entry_long_i;
-        if (PTR_IS_NEXTHOP(ptr)) {
-            rt->rtr_req.rtr_label_flags = ent->entry_label_flags;
-            rt->rtr_req.rtr_label = ent->entry_label;
-            rt->rtr_req.rtr_prefix_len = ent->entry_prefix_len;
-            rt->rtr_req.rtr_index = ent->entry_bridge_index;
-            ret_nh = PTR_TO_NEXTHOP(ptr);
-            rt->rtr_nh = ret_nh;
-            return ret_nh;
-        }
-
-        bkt = PTR_TO_BUCKET(ptr);
-    }
-
-    /* no nexthop; assert */
-    ASSERT(0);
+    ret_nh = __mtrie_lookup(rt, bkt, level);
+    if (!ret_nh)
+        ret_nh = default_nh;
 
     rt->rtr_nh = ret_nh;
-    return NULL;
+
+    return ret_nh;
 }
+
 
 /*
  * adds a route to the corresponding vrf table. returns 0 on

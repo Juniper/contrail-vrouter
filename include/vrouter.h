@@ -267,7 +267,6 @@ struct vrouter {
     unsigned int vr_max_nexthops;
     struct vr_btable *vr_nexthops;
     struct vr_rtable *vr_inet_rtable;
-    struct vr_rtable *vr_inet6_rtable;
     struct vr_rtable *vr_inet_mcast_rtable;
     struct vr_rtable *vr_bridge_rtable;
 
