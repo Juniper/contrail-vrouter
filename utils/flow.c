@@ -49,11 +49,22 @@
 #define MEM_DEV                 "/dev/flow"
 int mem_fd;
 
-static int dvrf_set, mir_set, show_evicted_set, help_set, match_set;
+static int dvrf_set, mir_set, show_evicted_set;
+static int help_set, match_set, get_set;
 static unsigned short dvrf;
 static int list, flow_cmd, mirror = -1;
 static unsigned long flow_index;
 static int rate, stats;
+
+#define FLOW_COMPONENT_NH_COUNT 16
+char src_vif_name[IFNAMSIZ];
+vr_nexthop_req *src_nh, *resp_nh;
+vr_mirror_req *resp_mirror;
+vr_interface_req *src_vif, *resp_vif;
+vr_nexthop_req *component_nh[FLOW_COMPONENT_NH_COUNT];
+vr_nexthop_req *mirror_nh, *mirror1_nh;
+unsigned char addr_string[INET6_ADDRSTRLEN];
+int ecmp_index = -1;
 
 /* match variables */
 static unsigned int match_family, match_family_size;
@@ -84,6 +95,8 @@ struct flow_table {
 struct nl_client *cl;
 vr_flow_req flow_req;
 
+static void __flow_dump_source(vr_nexthop_req *);
+static vr_nexthop_req *flow_get_nexthop(int);
 
 struct vr_flow_entry *
 flow_get(unsigned long flow_index)
@@ -220,6 +233,479 @@ flow_proto_string(unsigned short proto)
     }
 
     return "UNKNOWN";
+}
+
+static void
+flow_print_spaces(void)
+{
+    printf("%20c", ' ');
+    return;
+}
+
+static void
+flow_print_field_name(const char *field)
+{
+    unsigned int printed = 0, i;
+
+    printed = printf("%s:", field);
+    if (printed < 20) {
+        for (i = printed; i < 20; i++)
+            printf(" ");
+    }
+
+    return;
+}
+
+static void
+flow_dump_source_tunnel(void)
+{
+    if (src_nh) {
+        printf("NextHop %u\n", src_nh->nhr_id);
+        flow_print_spaces();
+        printf("From Tunnel Source ");
+        if (src_nh->nhr_family == AF_INET) {
+            printf("%s\n",
+                    inet_ntop(src_nh->nhr_family, &src_nh->nhr_tun_dip,
+                        addr_string, sizeof(addr_string)));
+        } else if (src_nh->nhr_family == AF_INET6) {
+            printf("%s\n",
+                    inet_ntop(src_nh->nhr_family, src_nh->nhr_tun_dip6,
+                        addr_string, sizeof(addr_string)));
+        }
+    }
+
+    if (src_vif) {
+        flow_print_spaces();
+        printf("From Interface %s (vif0/%u)\n",
+                src_vif_name, src_vif->vifr_idx);
+        flow_print_spaces();
+        printf("In VRF %d\n", src_vif->vifr_vrf);
+        flow_print_spaces();
+        printf("tx/rx/E %lu/%lu/%lu\n",
+                src_vif->vifr_opackets, src_vif->vifr_ipackets,
+                src_vif->vifr_ierrors + src_vif->vifr_oerrors);
+    }
+
+    return;
+}
+
+static void
+flow_dump_source_composite(void)
+{
+    unsigned int i;
+
+    if (src_nh) {
+        printf("NextHop %u\n", src_nh->nhr_id);
+        flow_print_spaces();
+        printf("From Composite ");
+        if (src_nh->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
+            printf("ECMP\n");
+            flow_print_spaces();
+            for (i = 0; i < src_nh->nhr_nh_list_size; i++) {
+                if (i >= FLOW_COMPONENT_NH_COUNT)
+                    break;
+
+                printf("%d", src_nh->nhr_nh_list[i]);
+                if (ecmp_index == i)
+                    printf("*");
+                printf(", ");
+            }
+            printf("\n");
+            flow_print_spaces();
+            if (ecmp_index >= 0) {
+                src_nh = flow_get_nexthop(src_nh->nhr_nh_list[ecmp_index]);
+                __flow_dump_source(src_nh);
+            }
+        }
+    }
+
+    return;
+}
+
+static void
+flow_dump_source_encap(void)
+{
+    printf("NextHop %u\n", src_nh->nhr_id);
+    flow_print_spaces();
+    if (src_vif) {
+        printf("From Interface %s (vif0/%u)\n",
+                src_vif_name, src_vif->vifr_idx);
+        flow_print_spaces();
+        printf("In VRF %d\n", src_vif->vifr_vrf);
+        flow_print_spaces();
+        printf("tx/rx/E %lu/%lu/%lu\n",
+                src_vif->vifr_opackets, src_vif->vifr_ipackets,
+                src_vif->vifr_ierrors + src_vif->vifr_oerrors);
+    }
+
+    return;
+}
+
+static void
+__flow_dump_source(vr_nexthop_req *src)
+{
+    if (src) {
+        switch (src->nhr_type) {
+        case NH_ENCAP:
+            flow_dump_source_encap();
+            break;
+
+        case NH_COMPOSITE:
+            flow_dump_source_composite();
+            break;
+
+        case NH_TUNNEL:
+            flow_dump_source_tunnel();
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return;
+}
+
+static void
+flow_dump_source(vr_nexthop_req *src)
+{
+    flow_print_field_name("Expected Source");
+    __flow_dump_source(src);
+
+    return;
+}
+
+static void
+flow_dump_mirror(vr_nexthop_req *req)
+{
+    if (req->nhr_type == NH_TUNNEL) {
+        printf("NextHop %u\n", req->nhr_id);
+        flow_print_spaces();
+        printf("To Destination ");
+        if (req->nhr_family == AF_INET) {
+            printf("%s ", inet_ntop(req->nhr_family, &req->nhr_tun_dip,
+                        addr_string, sizeof(addr_string)));
+        } else if (req->nhr_family == AF_INET6) {
+            printf("%s ", inet_ntop(req->nhr_family, req->nhr_tun_dip6,
+                        addr_string, sizeof(addr_string)));
+        }
+
+        if (req->nhr_vrf < 0)
+            printf("in the same VRF (%d)\n", req->nhr_vrf);
+        else
+            printf("in VRF %d\n", req->nhr_vrf);
+        flow_print_spaces();
+        if (req->nhr_flags & NH_FLAG_TUNNEL_SIP_COPY) {
+            printf("Tunnel Source IP from packet\n");
+        } else {
+            printf("Tunnel Source IP ");
+            if (req->nhr_family == AF_INET) {
+                printf("%s ", inet_ntop(req->nhr_family, &req->nhr_tun_sip,
+                        addr_string, sizeof(addr_string)));
+            } else if (req->nhr_family == AF_INET6) {
+                printf("%s ", inet_ntop(req->nhr_family, req->nhr_tun_sip6,
+                            addr_string, sizeof(addr_string)));
+            }
+        }
+    } else {
+        printf("NextHop %u of type %u", req->nhr_id, req->nhr_type);
+    }
+
+    return;
+}
+
+
+static void
+flow_dump_entry(struct vr_flow_entry *fe)
+{
+    unsigned int j;
+    char in_src[INET6_ADDRSTRLEN], in_dest[INET6_ADDRSTRLEN];
+
+    system("clear");
+    flow_print_field_name("Flow Index");
+    printf("%lu\n", flow_index);
+
+    flow_print_field_name("Flow Generation ID");
+    printf("%u\n", fe->fe_gen_id);
+
+    flow_print_field_name("Reverse Flow Index");
+    if ((fe->fe_flags & VR_RFLOW_VALID) && (fe->fe_rflow >= 0))
+        printf("%u", fe->fe_rflow);
+    else
+        printf("-1");
+    printf("\n");
+
+    if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
+        inet_ntop(VR_FLOW_FAMILY(fe->fe_type), fe->fe_key.flow_ip,
+                in_src, sizeof(in_src));
+        inet_ntop(VR_FLOW_FAMILY(fe->fe_type),
+                &fe->fe_key.flow_ip[VR_IP_ADDR_SIZE(fe->fe_type)],
+                in_dest, sizeof(in_dest));
+    }
+
+    flow_print_field_name("VRF");
+    printf("%d\n", fe->fe_vrf);
+
+    flow_print_field_name("Destination VRF");
+    if (fe->fe_flags & VR_FLOW_FLAG_VRFT) {
+        printf("%d", fe->fe_dvrf);
+    } else {
+        printf("%d", fe->fe_vrf);
+    }
+    printf("\n");
+
+    flow_print_field_name("Flow Source");
+    printf("%s:%-5u\n", in_src, ntohs(fe->fe_key.flow_sport));
+
+    flow_print_field_name("Flow Destination");
+    printf("%s:%-5u\n", in_dest, ntohs(fe->fe_key.flow_dport));
+
+    flow_print_field_name("Flow Protocol");
+    printf("%s\n", flow_proto_string(fe->fe_key.flow_proto));
+
+
+    flow_print_field_name("Flow Action");
+    switch (fe->fe_action) {
+    case VR_FLOW_ACTION_HOLD:
+        printf("HOLD");
+        break;
+
+    case VR_FLOW_ACTION_FORWARD:
+        printf("FORWARD");
+        break;
+
+    case VR_FLOW_ACTION_DROP:
+        printf("DROP\n");
+        flow_print_spaces();
+        printf("%s\n", flow_get_drop_reason(fe->fe_drop_reason));
+        break;
+
+    case VR_FLOW_ACTION_NAT:
+        printf("NAT\n");
+        flow_print_spaces();
+        for (j = 0; j < (sizeof(fe->fe_flags) * 8); j++) {
+            switch ((1 << j) & fe->fe_flags) {
+            case VR_FLOW_FLAG_SNAT:
+                printf("SNAT ");
+                break;
+            case VR_FLOW_FLAG_DNAT:
+                printf("DNAT ");
+                break;
+            case VR_FLOW_FLAG_SPAT:
+                printf("Source Port NAT ");
+                break;
+            case VR_FLOW_FLAG_DPAT:
+                printf("Destination Port NAT ");
+                break;
+            case VR_FLOW_FLAG_LINK_LOCAL:
+                printf("Link Local NAT ");
+            }
+        }
+
+        break;
+
+    default:
+        printf("Unknown");
+        break;
+    }
+    printf("\n");
+
+    flow_print_field_name("Flow Flags");
+    if (fe->fe_flags & VR_FLOW_FLAG_EVICTED)
+        printf("EVICTED ");
+    if (fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
+        printf("EVICT CANDIDATE ");
+    if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
+        printf("NEW ");
+    if (fe->fe_flags & VR_FLOW_FLAG_MODIFIED)
+        printf("MODIFIED ");
+    if (fe->fe_flags & VR_FLOW_FLAG_MIRROR)
+        printf("MIRROR ");
+    printf("\n");
+
+    if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
+        flow_print_field_name("Mirror Index");
+        if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES)
+            printf("%d", fe->fe_mirror_id);
+        if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
+            printf(", %d, ", fe->fe_sec_mirror_id);
+    }
+
+
+    if (fe->fe_key.flow_proto == VR_IP_PROTO_TCP) {
+        flow_print_field_name("TCP FLAGS");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_SYN)
+            printf("SYN ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_SYN_R)
+            printf("SYN(REVERSE) ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED)
+            printf("ESTABLISHED ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED_R)
+            printf("ESTABLISHED(REVERSE) ");
+
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_FIN)
+            printf("FIN ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_FIN_R)
+            printf("FIN(REVERSE) ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_RST)
+            printf("RESET ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_HALF_CLOSE)
+            printf("HALF CLOSED ");
+        if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
+            printf("DEAD ");
+        printf("\n");
+    }
+
+    flow_print_field_name("UDP Source Port");
+    printf("%u\n", fe->fe_udp_src_port);
+
+    flow_print_field_name("Flow Statistics");
+    printf("%u/%u\n", fe->fe_stats.flow_packets, fe->fe_stats.flow_bytes);
+    if (src_nh)
+        flow_dump_source(src_nh);
+
+    if (mirror_nh) {
+        flow_print_field_name("Primary Mirror");
+        flow_dump_mirror(mirror_nh);
+    }
+
+    if (mirror1_nh) {
+        flow_print_field_name("Secondary Mirror");
+        flow_dump_mirror(mirror1_nh);
+    }
+
+    return;
+}
+
+void
+vr_interface_req_process(void *arg)
+{
+    vr_interface_req *req = (vr_interface_req *)arg;
+
+    resp_vif = vr_interface_req_get_copy(req);
+
+    return;
+}
+
+void
+vr_nexthop_req_process(void *arg)
+{
+    vr_nexthop_req *req = (vr_nexthop_req *)arg;
+
+    resp_nh = vr_nexthop_req_get_copy(req);
+
+    return;
+}
+
+static vr_nexthop_req *
+flow_get_nexthop(int id)
+{
+    int ret;
+
+    resp_nh = NULL;
+
+    ret = vr_send_nexthop_get(cl, 0, id);
+    if (ret < 0)
+        return NULL;
+
+    ret = vr_recvmsg(cl, false);
+    if (ret <= 0)
+        return NULL;
+
+    return resp_nh;
+}
+
+static vr_nexthop_req *
+flow_get_mirror_nh(int id)
+{
+    int ret;
+
+    ret = vr_send_mirror_get(cl, 0, id);
+    if (ret < 0)
+        return NULL;
+
+    ret = vr_recvmsg(cl, false);
+    if (ret <= 0)
+        return NULL;
+
+    return flow_get_nexthop(resp_mirror->mirr_nhid);
+}
+
+static vr_interface_req *
+flow_get_vif(int vif_index)
+{
+    int ret;
+
+    ret = vr_send_interface_get(cl, 0, vif_index, -1, 0);
+    if (ret < 0)
+        return NULL;
+
+    ret = vr_recvmsg(cl, false);
+    if (ret <= 0)
+        return NULL;
+
+    return resp_vif;
+}
+
+static void
+flow_get_source(struct vr_flow_entry *fe)
+{
+    int i;
+
+    struct vr_flow_entry *rfe;
+
+    if (fe->fe_src_nh_index >= 0) {
+        src_nh = flow_get_nexthop(fe->fe_src_nh_index);
+        if (src_nh) {
+            switch (src_nh->nhr_type) {
+            case NH_ENCAP:
+            case NH_TUNNEL:
+                src_vif = flow_get_vif(src_nh->nhr_encap_oif_id);
+                if (src_vif->vifr_os_idx > 0)
+                    if_indextoname(src_vif->vifr_os_idx, src_vif_name);
+                break;
+
+            case NH_COMPOSITE:
+                if ((src_nh->nhr_flags & NH_FLAG_COMPOSITE_ECMP)) {
+                    if (fe->fe_flags & VR_RFLOW_VALID) {
+                        rfe = flow_get(fe->fe_rflow);
+                        if (rfe && (rfe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+                            ecmp_index = rfe->fe_ecmp_nh_index;
+                    }
+
+                    if (src_nh->nhr_nh_list) {
+                        for (i = 0; i < src_nh->nhr_nh_list_size; i++) {
+                            if (i >= FLOW_COMPONENT_NH_COUNT)
+                                break;
+
+                            component_nh[i] =
+                                flow_get_nexthop(src_nh->nhr_nh_list[i]);
+                        }
+                    }
+                }
+
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    return;
+}
+
+static void
+flow_get_entry(struct vr_flow_entry *fe)
+{
+    flow_get_source(fe);
+    if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
+        mirror_nh = flow_get_mirror_nh(fe->fe_mirror_id);
+        mirror1_nh = flow_get_mirror_nh(fe->fe_sec_mirror_id);
+    }
+
+    flow_dump_entry(fe);
+    return;
 }
 
 static void
@@ -919,15 +1405,27 @@ flow_table_setup(void)
 }
 
 void
-flow_validate(unsigned long flow_index, char action)
+flow_do_op(unsigned long flow_index, char action)
 {
     struct vr_flow_entry *fe;
 
     memset(&flow_req, 0, sizeof(flow_req));
 
     fe = flow_get(flow_index);
-    if (!fe)
+    if (!fe) {
+        printf("Invalid flow index value %lu\n", flow_index);
         return;
+    }
+
+    if (action == 'g') {
+        if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE)) {
+            printf("Flow index %lu is not active\n", flow_index);
+            return;
+        }
+
+        flow_get_entry(fe);
+        return;
+    }
 
     if ((fe->fe_type != VP_TYPE_IP) && (fe->fe_type != VP_TYPE_IP6))
         return;
@@ -1024,6 +1522,7 @@ Usage(void)
 
 enum opt_flow_index {
     DVRF_OPT_INDEX,
+    GET_OPT_INDEX,
     MIRROR_OPT_INDEX,
     SHOW_EVICTED_OPT_INDEX,
     MATCH_OPT_INDEX,
@@ -1033,6 +1532,7 @@ enum opt_flow_index {
 
 static struct option long_options[] = {
     [DVRF_OPT_INDEX]            = {"dvrf",          required_argument, &dvrf_set,           1},
+    [GET_OPT_INDEX]             = {"get",           required_argument, &get_set,            1},
     [MIRROR_OPT_INDEX]          = {"mirror",        required_argument, &mir_set,            1},
     [SHOW_EVICTED_OPT_INDEX]    = {"show-evicted",  no_argument,       &show_evicted_set,   1},
     [MATCH_OPT_INDEX]           = {"match",         required_argument, &match_set,          1},
@@ -1302,6 +1802,14 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
             Usage();
         break;
 
+    case GET_OPT_INDEX:
+        flow_index = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+
+        flow_cmd = 'g';
+        break;
+
     case MIRROR_OPT_INDEX:
         mirror = strtoul(opt_arg, NULL, 0);
         if (errno)
@@ -1332,10 +1840,11 @@ main(int argc, char *argv[])
     int ret;
     int option_index;
 
-    while ((opt = getopt_long(argc, argv, "d:f:i:lrs",
+    while ((opt = getopt_long(argc, argv, "d:f:g:i:lrs",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
+        case 'g':
         case 'd':
         case 'i':
             flow_cmd = opt;
@@ -1384,7 +1893,7 @@ main(int argc, char *argv[])
             return -1;
         }
 
-        flow_validate(flow_index, flow_cmd);
+        flow_do_op(flow_index, flow_cmd);
     }
 
     return 0;

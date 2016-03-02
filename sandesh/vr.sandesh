@@ -24,6 +24,9 @@ struct sandesh_hdr {
     2:  i32         h_id;
 }
 
+/*
+ * adding a new list element will need a change in vr_util.c
+ */
 buffer sandesh vr_nexthop_req {
     1:  sandesh_op  h_op;
     2:  byte        nhr_type;
