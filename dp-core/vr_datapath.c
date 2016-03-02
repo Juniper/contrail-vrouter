@@ -563,15 +563,16 @@ unsigned int
 vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, unsigned short vlan_id)
 {
-    struct vr_forwarding_md fmd;
+    struct vr_forwarding_md fmd, mfmd;
 
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
     fmd.fmd_dvrf = vrf;
 
     if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
-        fmd.fmd_dvrf = vif->vif_vrf;
-        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &fmd);
+        mfmd = fmd;
+        mfmd.fmd_dvrf = vif->vif_vrf;
+        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd);
     }
 
     if (vr_pkt_type(pkt, 0, &fmd) < 0) {
