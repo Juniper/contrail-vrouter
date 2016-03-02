@@ -760,14 +760,7 @@ cleanup:
             close(vru_cl->vruc_fds_sent[i]);
     }
     if (ret == -1) {
-        /* set VQ_NOT_READY state to vif's queues. */
-        for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES; i++) {
-            vr_dpdk_virtio_rxqs[vru_cl->vruc_idx][i].vdv_ready_state = VQ_NOT_READY;
-            vr_dpdk_virtio_txqs[vru_cl->vruc_idx][i].vdv_ready_state = VQ_NOT_READY;
-        }
-        rte_wmb();
-        synchronize_rcu();
-        /* Unmap guest memory. */
+        /* We set VQ_NOT_READY state and reset the queues in uvhm_client_munmap() */
         uvhm_client_munmap(vru_cl);
     }
     /* clear state for next message from this client. */
