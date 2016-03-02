@@ -113,6 +113,8 @@ extern int get_vrouter_pid(void);
 extern char *vr_extract_token(char *, char);
 extern bool vr_valid_ipv6_address(const char *);
 extern bool vr_valid_ipv4_address(const char *);
+extern bool vr_valid_mac_address(const char *);
+extern char *vr_proto_string(unsigned short);
 
 extern int vr_recvmsg(struct nl_client *cl, bool dump);
 extern int vr_sendmsg(struct nl_client *, void *, char *);
@@ -120,6 +122,9 @@ extern struct nl_client *vr_get_nl_client(unsigned int);
 
 extern int vr_response_common_process(vr_response *, bool *);
 
+extern unsigned long vr_sum_drop_stats(vr_drop_stats_req *);
+extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
+extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
 extern int vr_send_drop_stats_get(struct nl_client *, unsigned int, int);
 
 extern int vr_send_interface_dump(struct nl_client *, unsigned int, int, int);
@@ -129,7 +134,8 @@ extern int vr_send_interface_delete(struct nl_client *, unsigned int,
         char *, int);
 extern int vr_send_interface_add(struct nl_client *, int, char *, int,
         int, int, int, unsigned int, unsigned int, int8_t *, int8_t);
-
+extern vr_interface_req *vr_interface_req_get_copy(vr_interface_req *);
+extern void vr_interface_req_destroy(vr_interface_req *);
 
 extern int vr_send_mem_stats_get(struct nl_client *, unsigned intid);
 
@@ -139,6 +145,8 @@ extern int vr_send_mirror_delete(struct nl_client *,
         unsigned int, unsigned int);
 extern int vr_send_mirror_add(struct nl_client *, unsigned int,
         unsigned int, int, unsigned int);
+extern void vr_mirror_req_destroy(vr_mirror_req *);
+extern vr_mirror_req *vr_mirror_get_req_copy(vr_mirror_req *);
 
 extern int vr_send_mpls_add(struct nl_client *, unsigned int, unsigned int,
         unsigned int);
@@ -146,6 +154,8 @@ extern int vr_send_mpls_get(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_mpls_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_mpls_delete(struct nl_client *, unsigned int, unsigned int);
 
+extern char *vr_nexthop_type_string(vr_nexthop_req *);
+extern bool vr_nexthop_req_has_vif(vr_nexthop_req *);
 extern int vr_send_nexthop_delete(struct nl_client *, unsigned int,
         unsigned int);
 extern int vr_send_nexthop_dump(struct nl_client *, unsigned int, int);
@@ -157,7 +167,11 @@ extern int vr_send_nexthop_encap_tunnel_add(struct nl_client *, unsigned int,
         struct in_addr, struct in_addr, int, int);
 extern int vr_send_nexthop_add(struct nl_client *, unsigned int,
         unsigned int, int, unsigned int, int, int);
+extern vr_nexthop_req *vr_nexthop_req_get_copy(vr_nexthop_req *);
+extern void vr_nexthop_req_destroy(vr_nexthop_req *);
 
+
+extern void address_mask(uint8_t *, uint8_t, unsigned int);
 extern int vr_send_route_dump(struct nl_client *, unsigned int, unsigned int,
         unsigned int, uint8_t *, unsigned int);
 extern int vr_send_route_get(struct nl_client *, unsigned int, unsigned int,
@@ -168,6 +182,8 @@ extern int vr_send_route_delete(struct nl_client *, unsigned int, unsigned int,
 extern int vr_send_route_add(struct nl_client *, unsigned int, unsigned int,
         unsigned int family, uint8_t *, unsigned int, unsigned int,
         int, uint8_t *, uint32_t, unsigned int);
+extern vr_route_req *vr_route_req_get_copy(vr_route_req *);
+extern void vr_route_req_destroy(vr_route_req *);
 
 extern int vr_send_vrf_assign_dump(struct nl_client *, unsigned int,
         unsigned int, int);

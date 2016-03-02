@@ -28,6 +28,7 @@
 #include "vr_message.h"
 #include "vr_genetlink.h"
 #include "vr_interface.h"
+#include "vr_packet.h"
 #include "vr_nexthop.h"
 #include "vr_route.h"
 #include "vr_bridge.h"
@@ -142,6 +143,49 @@ vr_valid_ipv4_address(const char *addr)
     }
 
     return true;
+}
+
+bool
+vr_valid_mac_address(const char *mac)
+{
+    uint8_t null_mac[VR_ETHER_ALEN] = { 0 };
+
+    if (!mac || !memcmp(mac, null_mac, VR_ETHER_ALEN))
+        return false;
+
+    return true;
+}
+
+char *
+vr_proto_string(unsigned short proto)
+{
+    switch (proto) {
+    case VR_IP_PROTO_TCP:
+        return "TCP";
+        break;
+
+    case VR_IP_PROTO_UDP:
+        return "UDP";
+        break;
+
+    case VR_IP_PROTO_ICMP:
+        return "ICMP";
+        break;
+
+    case VR_IP_PROTO_SCTP:
+        return "SCTP";
+        break;
+
+    case VR_IP_PROTO_ICMP6:
+        return "ICMPv6";
+        break;
+
+
+    default:
+        return "UNKNOWN";
+    }
+
+    return "UNKNOWN";
 }
 
 /* send and receive */
@@ -271,6 +315,88 @@ vr_response_common_process(vr_response *resp, bool *dump_pending)
 }
 
 /* dropstats start */
+unsigned long
+vr_sum_drop_stats(vr_drop_stats_req *req)
+{
+    unsigned long sum = 0;
+
+    sum += req->vds_discard;
+    sum += req->vds_pull;
+    sum += req->vds_invalid_if;
+    sum += req->vds_arp_no_where_to_go;
+    sum += req->vds_garp_from_vm;
+    sum += req->vds_invalid_arp;
+    sum += req->vds_trap_no_if;
+    sum += req->vds_nowhere_to_go;
+    sum += req->vds_flow_queue_limit_exceeded;
+    sum += req->vds_flow_no_memory;
+    sum += req->vds_flow_invalid_protocol;
+    sum += req->vds_flow_nat_no_rflow;
+    sum += req->vds_flow_action_drop;
+    sum += req->vds_flow_action_invalid;
+    sum += req->vds_flow_unusable;
+    sum += req->vds_flow_table_full;
+    sum += req->vds_interface_tx_discard;
+    sum += req->vds_interface_drop;
+    sum += req->vds_duplicated;
+    sum += req->vds_push;
+    sum += req->vds_ttl_exceeded;
+    sum += req->vds_invalid_nh;
+    sum += req->vds_invalid_label;
+    sum += req->vds_invalid_protocol;
+    sum += req->vds_interface_rx_discard;
+    sum += req->vds_invalid_mcast_source;
+    sum += req->vds_head_alloc_fail;
+    sum += req->vds_head_space_reserve_fail;
+    sum += req->vds_pcow_fail;
+    sum += req->vds_mcast_df_bit;
+    sum += req->vds_mcast_clone_fail;
+    sum += req->vds_composite_invalid_interface;
+    sum += req->vds_rewrite_fail;
+    sum += req->vds_misc;
+    sum += req->vds_invalid_packet;
+    sum += req->vds_cksum_err;
+    sum += req->vds_clone_fail;
+    sum += req->vds_no_fmd;
+    sum += req->vds_cloned_original;
+    sum += req->vds_invalid_vnid;
+    sum += req->vds_frag_err;
+    sum += req->vds_invalid_source;
+    sum += req->vds_arp_no_route;
+    sum += req->vds_l2_no_route;
+    sum += req->vds_arp_reply_no_route;
+    sum += req->vds_vlan_fwd_tx;
+    sum += req->vds_vlan_fwd_enq;
+
+    return sum;
+}
+
+void
+vr_drop_stats_req_destroy(vr_drop_stats_req *req)
+{
+    if (!req)
+        return;
+
+    free(req);
+    return;
+}
+
+vr_drop_stats_req *
+vr_drop_stats_req_get_copy(vr_drop_stats_req *src)
+{
+    vr_drop_stats_req *dst;
+
+    if (!src)
+        return NULL;
+
+    dst = malloc(sizeof(*dst));
+    if (!dst)
+        return NULL;
+
+    *dst = *src;
+    return dst;
+}
+
 int
 vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
         int core)
@@ -287,6 +413,131 @@ vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
 /* dropstats end */
 
 /* Interface start */
+void
+vr_interface_req_destroy(vr_interface_req *req)
+{
+    if (!req)
+        return;
+
+    if (req->vifr_name) {
+        free(req->vifr_name);
+        req->vifr_name = NULL;
+    }
+
+    if (req->vifr_queue_ierrors_to_lcore_size &&
+            req->vifr_queue_ierrors_to_lcore) {
+        free(req->vifr_queue_ierrors_to_lcore);
+        req->vifr_queue_ierrors_to_lcore = NULL;
+        req->vifr_queue_ierrors_to_lcore_size = 0;
+    }
+
+
+    if (req->vifr_mac && req->vifr_mac_size) {
+        free(req->vifr_mac);
+        req->vifr_mac = NULL;
+        req->vifr_mac_size = 0;
+    }
+
+    if (req->vifr_src_mac && req->vifr_src_mac_size) {
+        free(req->vifr_src_mac);
+        req->vifr_src_mac = NULL;
+        req->vifr_src_mac_size = 0;
+    }
+
+    if (req->vifr_fat_flow_protocol_port_size &&
+            req->vifr_fat_flow_protocol_port) {
+        free(req->vifr_fat_flow_protocol_port);
+        req->vifr_fat_flow_protocol_port = NULL;
+        req->vifr_fat_flow_protocol_port_size = 0;
+    }
+
+    free(req);
+    return;
+}
+
+
+vr_interface_req *
+vr_interface_req_get_copy(vr_interface_req *src)
+{
+    vr_interface_req *dst;
+
+    dst = malloc(sizeof(*dst));
+    if (!dst)
+        return NULL;
+
+    *dst = *src;
+    dst->vifr_name = NULL;
+    dst->vifr_queue_ierrors_to_lcore_size = 0;
+    dst->vifr_queue_ierrors_to_lcore = NULL;
+    dst->vifr_mac_size = 0;
+    dst->vifr_mac = NULL;
+    dst->vifr_src_mac_size = 0;
+    dst->vifr_src_mac = NULL;
+    dst->vifr_fat_flow_protocol_port_size = 0;
+    dst->vifr_fat_flow_protocol_port = NULL;
+
+    if (src->vifr_name) {
+        dst->vifr_name = malloc(strlen(src->vifr_name) + 1);
+        if (!dst->vifr_name)
+            goto free_vif;
+        memcpy(dst->vifr_name, src->vifr_name, strlen(src->vifr_name) + 1);
+    }
+
+    if (src->vifr_queue_ierrors_to_lcore_size &&
+            src->vifr_queue_ierrors_to_lcore) {
+        dst->vifr_queue_ierrors_to_lcore =
+            malloc(src->vifr_queue_ierrors_to_lcore_size * sizeof(uint64_t));
+        if (!dst->vifr_queue_ierrors_to_lcore)
+            goto free_vif;
+
+        memcpy(dst->vifr_queue_ierrors_to_lcore,
+                src->vifr_queue_ierrors_to_lcore,
+                src->vifr_queue_ierrors_to_lcore_size);
+        dst->vifr_queue_ierrors_to_lcore_size =
+            src->vifr_queue_ierrors_to_lcore_size;
+    }
+
+    if (src->vifr_mac && src->vifr_mac_size) {
+        dst->vifr_mac = malloc(src->vifr_mac_size);
+        if (!dst->vifr_mac)
+            goto free_vif;
+
+        memcpy(dst->vifr_mac, src->vifr_mac, src->vifr_mac_size);
+        dst->vifr_mac_size = src->vifr_mac_size;
+    }
+
+    if (src->vifr_src_mac && src->vifr_src_mac_size) {
+        dst->vifr_src_mac = malloc(src->vifr_src_mac_size);
+        if (!dst->vifr_src_mac)
+            goto free_vif;
+
+        memcpy(dst->vifr_src_mac, src->vifr_src_mac, src->vifr_src_mac_size);
+        dst->vifr_src_mac_size = src->vifr_src_mac_size;
+    }
+
+
+    if (src->vifr_fat_flow_protocol_port_size &&
+            src->vifr_fat_flow_protocol_port) {
+        dst->vifr_fat_flow_protocol_port =
+            malloc(src->vifr_fat_flow_protocol_port_size * sizeof(uint32_t));
+        if (!dst->vifr_fat_flow_protocol_port)
+            goto free_vif;
+
+        memcpy(dst->vifr_fat_flow_protocol_port,
+                src->vifr_fat_flow_protocol_port,
+                src->vifr_fat_flow_protocol_port_size);
+        dst->vifr_fat_flow_protocol_port_size =
+            src->vifr_fat_flow_protocol_port_size;
+    }
+
+    return dst;
+
+free_vif:
+    vr_interface_req_destroy(dst);
+    dst = NULL;
+    return NULL;
+}
+
 int
 vr_send_interface_dump(struct nl_client *cl, unsigned int router_id,
         int marker, int core)
@@ -386,6 +637,34 @@ vr_send_mem_stats_get(struct nl_client *cl, unsigned int router_id)
 }
 
 /* mirror start */
+void
+vr_mirror_req_destroy(vr_mirror_req *req)
+{
+    if (!req)
+        return;
+
+    free(req);
+
+    return;
+}
+
+vr_mirror_req *
+vr_mirror_req_get_copy(vr_mirror_req *req)
+{
+    vr_mirror_req *dst;
+
+    if (!req)
+        return NULL;
+
+    dst = malloc(sizeof(*req));
+    if (!dst)
+        return NULL;
+
+    *dst = *req;
+
+    return dst;
+}
+
 int
 vr_send_mirror_dump(struct nl_client *cl, unsigned int router_id,
         int marker)
@@ -497,6 +776,192 @@ vr_send_mpls_add(struct nl_client *cl, unsigned int router_id,
     req.mr_nhid = nh_index;
 
     return vr_sendmsg(cl, &req, "vr_mpls_req");
+}
+
+char *
+vr_nexthop_type_string(vr_nexthop_req *nh)
+{
+    switch (nh->nhr_type) {
+    case NH_DEAD:
+        return "DEAD";
+        break;
+
+    case NH_RCV:
+        return "RECEIVE";
+        break;
+
+    case NH_ENCAP:
+        return "ENCAP";
+        break;
+
+    case NH_TUNNEL:
+        return "TUNNEL";
+        break;
+
+    case NH_RESOLVE:
+        return "RESOLVE";
+        break;
+
+    case NH_DISCARD:
+        return "DISCARD";
+        break;
+
+    case NH_COMPOSITE:
+        return "COMPOSITE";
+        break;
+
+    case NH_VRF_TRANSLATE:
+        return "VRF_TRANSLATE";
+        break;
+
+    case NH_L2_RCV:
+        return "L2_RECEIVE";
+        break;
+
+     default:
+        return "NONE";
+    }
+
+    return "NONE";
+}
+
+
+bool
+vr_nexthop_req_has_vif(vr_nexthop_req *req)
+{
+    switch (req->nhr_type) {
+    case NH_ENCAP:
+    case NH_TUNNEL:
+    case NH_RCV:
+    case NH_L2_RCV:
+        return true;
+        break;
+
+    case NH_COMPOSITE:
+    default:
+        return false;
+        break;
+    }
+
+    return false;
+}
+
+void
+vr_nexthop_req_destroy(vr_nexthop_req *req)
+{
+    if (!req)
+        return;
+
+    if (req->nhr_encap_size && req->nhr_encap) {
+        free(req->nhr_encap);
+        req->nhr_encap = NULL;
+        req->nhr_encap_size = 0;
+    }
+
+    if (req->nhr_nh_list_size && req->nhr_nh_list) {
+        free(req->nhr_nh_list);
+        req->nhr_nh_list = NULL;
+        req->nhr_nh_list_size = 0;
+    }
+
+    if (req->nhr_label_list_size && req->nhr_label_list) {
+        free(req->nhr_label_list);
+        req->nhr_label_list = NULL;
+        req->nhr_label_list_size = 0;
+    }
+
+    if (req->nhr_tun_sip6_size && req->nhr_tun_sip6) {
+        free(req->nhr_tun_sip6);
+        req->nhr_tun_sip6 = NULL;
+        req->nhr_tun_sip6_size = 0;
+    }
+
+    if (req->nhr_tun_dip6_size && req->nhr_tun_dip6) {
+        free(req->nhr_tun_dip6);
+        req->nhr_tun_dip6 = NULL;
+        req->nhr_tun_dip6_size = 0;
+    }
+
+    free(req);
+
+    return;
+}
+
+vr_nexthop_req *
+vr_nexthop_req_get_copy(vr_nexthop_req *src)
+{
+    vr_nexthop_req *dst;
+
+    dst = calloc(sizeof(vr_nexthop_req), 1);
+    if (!dst)
+        return NULL;
+
+    /* first copy the in-built members */
+    *dst = *src;
+
+    dst->nhr_encap = NULL;
+    dst->nhr_encap_size = 0;
+    dst->nhr_nh_list = NULL;
+    dst->nhr_nh_list_size = 0;
+    dst->nhr_label_list = NULL;
+    dst->nhr_label_list_size = 0;
+    dst->nhr_tun_sip6 = NULL;
+    dst->nhr_tun_sip6_size = 0;
+    dst->nhr_tun_dip6 = NULL;
+    dst->nhr_tun_dip6_size = 0;
+
+    /* ...and then the list elements */
+    if (src->nhr_encap_size && src->nhr_encap) {
+        dst->nhr_encap = malloc(src->nhr_encap_size);
+        if (!dst->nhr_encap)
+            goto free_nh;
+        memcpy(dst->nhr_encap, src->nhr_encap, src->nhr_encap_size);
+        dst->nhr_encap_size = src->nhr_encap_size;
+    }
+
+    /* component nexthop list */
+    if (src->nhr_nh_list_size && src->nhr_nh_list) {
+        dst->nhr_nh_list = malloc(src->nhr_nh_list_size * sizeof(uint32_t));
+        if (!src->nhr_nh_list)
+            goto free_nh;
+        memcpy(dst->nhr_nh_list, src->nhr_nh_list,
+                src->nhr_nh_list_size * sizeof(uint32_t));
+        dst->nhr_nh_list_size = src->nhr_nh_list_size;
+    }
+
+    /* label list */
+    if (src->nhr_label_list_size && src->nhr_label_list) {
+        dst->nhr_label_list = malloc(src->nhr_label_list_size * sizeof(uint32_t));
+        if (!src->nhr_label_list)
+            goto free_nh;
+        memcpy(dst->nhr_label_list, src->nhr_label_list,
+                src->nhr_label_list_size * sizeof(uint32_t));
+        dst->nhr_label_list_size = src->nhr_label_list_size;
+    }
+
+    /* ipv6 tunnel source */
+    if (src->nhr_tun_sip6_size && src->nhr_tun_sip6) {
+        dst->nhr_tun_sip6 = malloc(src->nhr_tun_sip6_size);
+        if (!src->nhr_tun_sip6)
+            goto free_nh;
+        memcpy(dst->nhr_tun_sip6, src->nhr_tun_sip6, src->nhr_tun_sip6_size);
+        dst->nhr_tun_sip6_size = src->nhr_tun_sip6_size;
+    }
+
+    /* ipv6 tunnel destination */
+    if (src->nhr_tun_dip6_size && src->nhr_tun_dip6) {
+        dst->nhr_tun_dip6 = malloc(src->nhr_tun_dip6_size);
+        if (!src->nhr_tun_dip6)
+            goto free_nh;
+        memcpy(dst->nhr_tun_dip6, src->nhr_tun_dip6, src->nhr_tun_dip6_size);
+        dst->nhr_tun_dip6_size = src->nhr_tun_dip6_size;
+    }
+
+    return dst;
+
+free_nh:
+    vr_nexthop_req_destroy(dst);
+    return NULL;
 }
 
 int
@@ -667,6 +1132,94 @@ vr_send_nexthop_add(struct nl_client *cl, unsigned int router_id,
     req.nhr_encap_oif_id = vif_index;
 
     return vr_sendmsg(cl, &req, "vr_nexthop_req");
+}
+
+void
+vr_route_req_destroy(vr_route_req *req)
+{
+    if (!req)
+        return;
+
+    if (req->rtr_prefix_size && req->rtr_prefix) {
+        free(req->rtr_prefix);
+        req->rtr_prefix = NULL;
+        req->rtr_prefix_size = 0;
+    }
+
+    if (req->rtr_mac_size && req->rtr_mac) {
+        free(req->rtr_mac);
+        req->rtr_mac = NULL;
+        req->rtr_mac_size = 0;
+    }
+
+    free(req);
+    return;
+}
+
+void
+address_mask(uint8_t *addr, uint8_t plen, unsigned int family)
+{
+   int i;
+    uint8_t address_bits;
+    uint8_t mask[VR_IP6_ADDRESS_LEN];
+
+    if (family == AF_INET) {
+        address_bits = VR_IP_ADDRESS_LEN * 8;
+    } else {
+        address_bits = VR_IP6_ADDRESS_LEN * 8;
+    }
+
+    memset(mask, 0xFF, sizeof(mask));
+    for (i = address_bits - 1; i >= plen; i--) {
+        mask[i / 8] ^= (1 << (7 - (i % 8)));
+    }
+
+    for (i = 0; i < (address_bits / 8); i++) {
+        addr[i] &= mask[i];
+    }
+
+    return;
+}
+
+vr_route_req *
+vr_route_req_get_copy(vr_route_req *src)
+{
+    vr_route_req *dst;
+
+    dst = malloc(sizeof(*dst));
+    if (!dst)
+        return NULL;
+
+    *dst = *src;
+
+    dst->rtr_prefix_size = 0;
+    dst->rtr_prefix = NULL;
+
+    dst->rtr_marker_size = 0;
+    dst->rtr_marker = NULL;
+
+    dst->rtr_mac_size = 0;
+    dst->rtr_mac = NULL;
+
+    if (src->rtr_prefix_size && src->rtr_prefix) {
+        dst->rtr_prefix = malloc(src->rtr_prefix_size);
+        if (!dst->rtr_prefix)
+            goto free_rtr_req;
+        memcpy(dst->rtr_prefix, src->rtr_prefix, src->rtr_prefix_size);
+    }
+
+    if (src->rtr_mac_size && src->rtr_mac) {
+        dst->rtr_mac = malloc(src->rtr_mac_size);
+        if (!dst->rtr_mac)
+            goto free_rtr_req;
+        memcpy(dst->rtr_mac, src->rtr_mac, src->rtr_mac_size);
+    }
+
+    return dst;
+
+free_rtr_req:
+    vr_route_req_destroy(dst);
+    return NULL;
 }
 
 int

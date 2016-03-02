@@ -24,6 +24,9 @@ struct sandesh_hdr {
     2:  i32         h_id;
 }
 
+/*
+ * adding a new list element will need a change in vr_util.c
+ */
 buffer sandesh vr_nexthop_req {
     1:  sandesh_op  h_op;
     2:  byte        nhr_type;
@@ -331,6 +334,7 @@ buffer sandesh vr_mem_stats_req {
    60:  i64             vms_interface_fat_flow_config_object;
 }
 
+/* any new addition needs update to vr_util.c & flow.c */
 buffer sandesh vr_drop_stats_req {
     1:  sandesh_op      h_op;
     2:  u32             vds_core;

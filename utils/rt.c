@@ -129,31 +129,6 @@ family_string_to_id(char *fname)
     return -1;
 }
 
-static void
-address_mask(uint8_t *addr, uint8_t plen, unsigned int family)
-{
-    int i;
-    uint8_t address_bits;
-    uint8_t mask[VR_IP6_ADDRESS_LEN];
-
-    if (family == AF_INET) {
-        address_bits = VR_IP_ADDRESS_LEN * 8;
-    } else {
-        address_bits = VR_IP6_ADDRESS_LEN * 8;
-    }
-
-    memset(mask, 0xFF, sizeof(mask));
-    for (i = address_bits - 1; i >= plen; i--) {
-        mask[i / 8] ^= (1 << (7 - (i % 8)));
-    }
-
-    for (i = 0; i < (address_bits / 8); i++) {
-        addr[i] &= mask[i];
-    }
-
-    return;
-}
-
 void
 vr_route_req_process(void *s_req)
 {
