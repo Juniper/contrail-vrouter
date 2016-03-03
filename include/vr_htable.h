@@ -32,6 +32,7 @@ vr_htable_t vr_htable_attach(struct vrouter *, unsigned int, void *,
         unsigned int , get_hentry_key);
 
 unsigned int vr_htable_oflow_entries(vr_htable_t);
+unsigned int vr_htable_total_used_entries(vr_htable_t);
 void vr_htable_delete(vr_htable_t );
 vr_hentry_t *vr_htable_find_hentry(vr_htable_t , void *, unsigned int);
 int vr_htable_find_duplicate_hentry_index(vr_htable_t , vr_hentry_t *);

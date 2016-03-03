@@ -282,6 +282,12 @@ vr_flow_table_oflow_entries(struct vrouter *router)
 {
     return vr_htable_oflow_entries(router->vr_flow_table);
 }
+
+static unsigned int
+vr_flow_table_total_used_entries(struct vrouter *router)
+{
+    return vr_htable_total_used_entries(router->vr_flow_table);
+}
 /*
  * this is used by the mmap code. mmap sees the whole flow table
  * (including the overflow table) as one large table. so, given
@@ -1995,6 +2001,8 @@ vr_flow_req_process(void *s_req)
 
         resp->fr_created = hold_count;
         resp->fr_oflow_entries = vr_flow_table_oflow_entries(router);
+        resp->fr_used_entries =
+            vr_flow_table_total_used_entries(router);
 
         object = VR_FLOW_INFO_OBJECT_ID;
         break;

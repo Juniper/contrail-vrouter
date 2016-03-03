@@ -77,6 +77,7 @@ struct flow_table {
     unsigned int ft_hold_oflows;
     unsigned int ft_hold_stat_count;
     unsigned int ft_oflow_entries;
+    unsigned int ft_total_used_entries;
     u_int32_t ft_hold_stat[128];
     char flow_table_path[256];
 } main_table;
@@ -236,9 +237,12 @@ dump_table(struct flow_table *ft)
 
     printf("Flow table(size %lu, entries %u)\n\n", ft->ft_span,
             ft->ft_num_entries);
-    printf("Entries: Created %lu Added %lu Processed %lu Used Overflow entries %u\n",
+
+    printf("Entries: Total in use %u Created %lu Added %lu Processed %lu"
+            " Used Overflow entries %u\n", ft->ft_total_used_entries,
             ft->ft_created, ft->ft_added, ft->ft_processed,
             ft->ft_oflow_entries);
+
     printf("(Created Flows/CPU: ");
     for (i = 0; i < ft->ft_hold_stat_count; i++) {
         printf("%u", ft->ft_hold_stat[i]);
@@ -798,6 +802,7 @@ flow_table_map(vr_flow_req *req)
     ft->ft_added = req->fr_added;
     ft->ft_cpus = req->fr_cpus;
     ft->ft_oflow_entries = req->fr_oflow_entries;
+    ft->ft_total_used_entries = req->fr_used_entries;
 
     if (req->fr_hold_stat && req->fr_hold_stat_size) {
         ft->ft_hold_stat_count = req->fr_hold_stat_size;
