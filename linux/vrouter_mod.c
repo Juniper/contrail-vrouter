@@ -538,11 +538,7 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
 
     data_off = pkt->vp_data - (skb->data - skb->head);
 
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
     old_off = skb->network_header;
-#else
-    old_off = skb->network_header - skb->head;
-#endif
     if (skb_cow(skb, head_room)) 
         return -ENOMEM;
     /* Now manipulate the offsets as data pointers are modified */
@@ -556,11 +552,7 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
      * pkt->vp_len is untouched, as it is going to be same
      * before and after cow
      */
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
     new_off = skb->network_header;
-#else
-    new_off = skb->network_header - skb->head;
-#endif
     pkt->vp_network_h += new_off - old_off;
     pkt->vp_inner_network_h += new_off - old_off;
 
@@ -616,12 +608,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         if ((pkt_get_network_header_off(pkt) + hdr_len) >
                 pkt->vp_tail) {
             /* We dont handle if tails are different */
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
             if (pkt->vp_tail != skb->tail)
-#else
-            if (pkt->vp_tail != (skb->tail - skb->head))
-                goto error;
-#endif
             /*
              * pull_len has to be +ve here and hence additional check is not
              * needed
