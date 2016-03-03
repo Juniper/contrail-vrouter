@@ -95,11 +95,13 @@ vr_htable_put_free_oentry(struct vr_htable *table, vr_hentry_t *ent)
 
     vr_hentry_t *tmp;
 
-    if (!table || !ent)
+    if (!table || !ent || ent->hentry_index < table->ht_hentries)
         return;
 
     if (ent->hentry_flags & VR_HENTRY_FLAG_IN_FREE_LIST)
         return;
+
+    ent->hentry_flags |= VR_HENTRY_FLAG_IN_FREE_LIST;
 
     tmp = NULL;
     do {
@@ -113,7 +115,6 @@ vr_htable_put_free_oentry(struct vr_htable *table, vr_hentry_t *ent)
         if (__sync_bool_compare_and_swap(&table->ht_free_oentry_head,
                                                             tmp, ent)) {
             (void)__sync_sub_and_fetch(&table->ht_used_oentries, 1);
-            ent->hentry_flags |= VR_HENTRY_FLAG_IN_FREE_LIST;
             return;
         }
 
@@ -160,23 +161,22 @@ vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
 }
 
 static void
-vr_htable_hentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
+vr_htable_oentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
 {
-    if (!table || !ent)
+    if (!table || !ent || (ent->hentry_index < table->ht_hentries))
         return;
 
-    ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
-
-    if (ent->hentry_index >= table->ht_hentries) {
-        ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
-        vr_htable_put_free_oentry(table, ent);
-    }
-
+    /* Clear all the flags except free list */
     ent->hentry_flags &= VR_HENTRY_FLAG_IN_FREE_LIST;
+    ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
+    ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
+    ent->hentry_next = NULL;
+
+    vr_htable_put_free_oentry(table, ent);
 }
 
 static void
-__vr_htable_hentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
+__vr_htable_oentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
 {
     vr_hentry_t *prev, *head_ent;
 
@@ -205,7 +205,7 @@ __vr_htable_hentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
             }
         }
 
-        vr_htable_hentry_invalidate(table, ent);
+        vr_htable_oentry_invalidate(table, ent);
     }
 
     return;
@@ -224,7 +224,7 @@ vr_htable_hentry_defer_delete(struct vrouter *router, void *arg)
 
     ent = __vr_htable_get_hentry_by_index((vr_htable_t)table,
                                         defer_data->hd_index);
-    vr_htable_hentry_invalidate(table, ent);
+    vr_htable_oentry_invalidate(table, ent);
 
     return;
 }
@@ -318,7 +318,7 @@ vr_htable_hentry_scheduled_delete(void *arg)
                          vr_htable_hentry_defer_delete, (void *)defer_data);
                 }
             } else {
-                vr_htable_hentry_invalidate(table, ent);
+                vr_htable_oentry_invalidate(table, ent);
                 ent = next;
                 continue;
             }
@@ -345,17 +345,17 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
         return;
 
-    if (ent->hentry_index < table->ht_hentries) {
-        vr_htable_hentry_invalidate(table, ent);
+    /* Mark it as Invalid */
+    ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
+
+    if (ent->hentry_index < table->ht_hentries)
         return;
-    }
 
     if (vr_not_ready) {
-        __vr_htable_hentry_invalidate(table, ent);
+        __vr_htable_oentry_invalidate(table, ent);
         return;
     }
 
-    ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
     ent->hentry_flags |= VR_HENTRY_FLAG_DELETE_MARKED;
 
     head_ent = __vr_htable_get_hentry_by_index(htable, ent->hentry_bucket_index);
