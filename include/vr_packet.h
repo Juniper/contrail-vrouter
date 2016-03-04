@@ -613,6 +613,13 @@ struct vr_udp {
     unsigned short udp_csum;
 } __attribute__((packed));
 
+struct vr_sctp {
+    unsigned short sctp_sport;
+    unsigned short sctp_dport;
+    unsigned int sctp_vtag;
+    unsigned int sctp_csum;
+} __attribute__((packed));
+
 #define VR_ICMP_TYPE_ECHO_REPLY     0
 #define VR_ICMP_TYPE_DEST_UNREACH   3
 #define VR_ICMP_TYPE_ECHO           8

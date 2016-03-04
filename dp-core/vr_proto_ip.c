@@ -99,6 +99,7 @@ vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
     struct vr_ip *ip;
     struct vr_tcp *tcp;
     struct vr_udp *udp;
+    struct vr_sctp *sctp;
     unsigned int csum;
     unsigned short *csump;
 
@@ -111,6 +112,9 @@ vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
     } else if (ip->ip_proto == VR_IP_PROTO_UDP) {
         udp = (struct vr_udp *)((unsigned char *)ip + ip->ip_hl * 4);
         csump = &udp->udp_csum;
+    } else if (ip->ip_proto == VR_IP_PROTO_SCTP) {
+        sctp = (struct vr_sctp *)((unsigned char *)ip + ip->ip_hl * 4);
+        csump = &sctp->sctp_csum;
     } else {
         return;
     }
@@ -585,7 +589,8 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                       !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
 
                     if ((ip->ip_proto == VR_IP_PROTO_UDP) ||
-                        (ip->ip_proto == VR_IP_PROTO_TCP)) {
+                        (ip->ip_proto == VR_IP_PROTO_TCP) ||
+                        (ip->ip_proto == VR_IP_PROTO_SCTP)) {
 
                         if (vr_ip_transport_header_valid(ip)) {
                             l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
@@ -897,7 +902,8 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         }
 
     } else if ((ip->ip_proto == VR_IP_PROTO_TCP) ||
-            (ip->ip_proto == VR_IP_PROTO_UDP))  {
+            (ip->ip_proto == VR_IP_PROTO_UDP) ||
+            (ip->ip_proto == VR_IP_PROTO_SCTP))  {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
     } else {

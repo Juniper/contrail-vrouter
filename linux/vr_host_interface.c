@@ -920,6 +920,7 @@ linux_ip_proto_pull(struct iphdr *iph)
 
     if ((proto == VR_IP_PROTO_TCP) ||
             (proto == VR_IP_PROTO_UDP) ||
+            (proto == VR_IP_PROTO_SCTP) ||
             (proto == VR_IP_PROTO_ICMP)) {
         return true;
     }
@@ -934,6 +935,7 @@ linux_ipv6_proto_pull(struct ipv6hdr *ip6h)
 
     if ((proto == VR_IP_PROTO_TCP) ||
             (proto == VR_IP_PROTO_UDP) ||
+            (proto == VR_IP_PROTO_SCTP) ||
             (proto == VR_IP_PROTO_ICMP6)) {
         return true;
     }
@@ -1001,6 +1003,10 @@ linux_pull_outer_headers(struct sk_buff *skb)
     if (thdr && pull && (iph || ip6h)) {
         if (ip_proto == VR_IP_PROTO_TCP) {
             offset += sizeof(struct vr_tcp);
+            if (!pskb_may_pull(skb, offset))
+                goto pull_fail;
+        } else if (ip_proto == VR_IP_PROTO_SCTP) {
+            offset += sizeof(struct vr_sctp);
             if (!pskb_may_pull(skb, offset))
                 goto pull_fail;
         } else {
