@@ -585,7 +585,8 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                       !(pkt->vp_flags & (VP_FLAG_TO_ME | VP_FLAG_FROM_DP))) {
 
                     if ((ip->ip_proto == VR_IP_PROTO_UDP) ||
-                        (ip->ip_proto == VR_IP_PROTO_TCP)) {
+                        (ip->ip_proto == VR_IP_PROTO_TCP) ||
+                        (ip->ip_proto == VR_IP_PROTO_SCTP)) {
 
                         if (vr_ip_transport_header_valid(ip)) {
                             l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
@@ -897,7 +898,8 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         }
 
     } else if ((ip->ip_proto == VR_IP_PROTO_TCP) ||
-            (ip->ip_proto == VR_IP_PROTO_UDP))  {
+            (ip->ip_proto == VR_IP_PROTO_UDP) ||
+            (ip->ip_proto == VR_IP_PROTO_SCTP))  {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
     } else {

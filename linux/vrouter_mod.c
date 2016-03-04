@@ -1183,6 +1183,8 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
             } else if ((ip_proto == VR_IP_PROTO_ICMP) ||
                        (ip_proto == VR_IP_PROTO_ICMP6)) {
                 pull_len += sizeof(struct icmphdr);
+            } else if (ip_proto == VR_IP_PROTO_SCTP) {
+                pull_len += sizeof(struct vr_sctp);
             }
 
             if (frag_size < pull_len) {
@@ -1631,6 +1633,8 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
             } else if ((ip_proto == VR_IP_PROTO_ICMP) ||
                        (ip_proto == VR_IP_PROTO_ICMP6)) {
                 pull_len += sizeof(struct icmphdr);
+            } else if (ip_proto == VR_IP_PROTO_SCTP) {
+                pull_len += sizeof(struct vr_sctp);
             }
 
             if (frag_size < pull_len) {
@@ -2067,6 +2071,8 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             } else if ((l4_proto == VR_IP_PROTO_ICMP) ||
                     (l4_proto == VR_IP_PROTO_ICMP6)) {
                 pull_len += sizeof(struct icmphdr);
+            } else if (l4_proto == VR_IP_PROTO_SCTP) {
+                pull_len += sizeof(struct vr_sctp);
             }
 
             if (!pskb_may_pull(skb, pull_len))
