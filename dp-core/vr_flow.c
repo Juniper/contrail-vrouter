@@ -1567,6 +1567,15 @@ vr_flow_set_req_is_invalid(struct vrouter *router, vr_flow_req *req,
                 goto invalid_req;
             }
         }
+    } else {
+        /*
+         * flow set request received with an index which is
+         * not active anymore, return ENOENT error
+         */
+        if ((req->fr_flags & VR_FLOW_FLAG_ACTIVE) && !(req->fr_index < 0)) {
+            error = -ENOENT;
+            goto invalid_req;
+        }
     }
 
     if (req->fr_flags & VR_FLOW_FLAG_VRFT) {
