@@ -231,6 +231,7 @@ vr_sendmsg(struct nl_client *cl, void *request,
     int ret, error, attr_len;
 
     /* nlmsg header */
+    cl->cl_buf_offset = 0;
     ret = nl_build_nlh(cl, cl->cl_genl_family_id, NLM_F_REQUEST);
     if (ret)
         return ret;
