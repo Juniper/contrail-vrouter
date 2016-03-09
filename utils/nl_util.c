@@ -25,10 +25,13 @@
 #include <stdint.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include "vr_types.h"
 #include "nl_util.h"
 #include "vr_genetlink.h"
 #include "vr_os.h"
+
+#include "vr_dpdk_usocket.h"
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
 #define GENL_ID_VROUTER         (NLMSG_MIN_TYPE + 0x10)
@@ -480,9 +483,7 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
         cl->cl_sa_len = sizeof(*sa);
 
         return bind(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
-    }
-
-    if (cl->cl_socket_domain == AF_INET) {
+    } else if (cl->cl_socket_domain == AF_INET) {
         struct in_addr address;
         struct sockaddr_in *sa = malloc(sizeof(struct sockaddr_in));
         if (!sa)
@@ -495,6 +496,20 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
         sa->sin_port = htons(port);
         cl->cl_sa = (struct sockaddr *)sa;
         cl->cl_sa_len = sizeof(*sa);
+
+        return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+    } else if (cl->cl_socket_domain == AF_UNIX) {
+        struct sockaddr_un *sun = malloc(sizeof(struct sockaddr_un));
+        if (!sun)
+            return -1;
+
+        memset(sun, 0, sizeof(*sun));
+        sun->sun_family = cl->cl_socket_domain;
+        memset(sun->sun_path, 0, sizeof(sun->sun_path));
+        strncpy(sun->sun_path, VR_NETLINK_UNIX_FILE, sizeof(sun->sun_path) - 1);
+
+        cl->cl_sa = (struct sockaddr *)sun;
+        cl->cl_sa_len = sizeof(*sun);
 
         return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
     }
@@ -588,8 +603,10 @@ nl_sendmsg(struct nl_client *cl)
 
     memset(&msg, 0, sizeof(msg));
 #if defined (__linux__)
-    msg.msg_name = cl->cl_sa;
-    msg.msg_namelen = cl->cl_sa_len;
+    if (cl->cl_socket_domain == AF_INET) {
+        msg.msg_name = cl->cl_sa;
+        msg.msg_namelen = cl->cl_sa_len;
+    }
 #endif
 
     iov.iov_base = (void *)(cl->cl_buf);

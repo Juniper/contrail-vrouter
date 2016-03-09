@@ -123,7 +123,7 @@ error_return:
  * is when one has created an event usocket. An event usocket by itself cannot
  * do anything useful in the context of dpdk vrouter application. Hence it needs
  * to be bound to the parent socket that does something useful, in this case
- * the packet socket. Another example is that of netlink socket. when thexi
+ * the packet socket. Another example is that of netlink socket. when the
  * netlink socket accepts new connection and the new connected socket has to be
  * polled, in which case we will need to bind it to the parent socket poll list
  */
@@ -237,7 +237,6 @@ error_return:
 
     return parent->usock_error;
 }
-
 
 static void
 usock_unbind(struct vr_usocket *child)
@@ -405,7 +404,6 @@ usock_netlink_write_responses(struct vr_usocket *usockp)
     return;
 }
 
-
 static int
 usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
 {
@@ -560,8 +558,22 @@ usock_read_init(struct vr_usocket *usockp)
     switch (usockp->usock_proto) {
     case NETLINK:
         if (usockp->usock_parent) {
-            usockp->usock_read_len = NLMSG_HDRLEN;
-            usockp->usock_state = READING_HEADER;
+            if (usockp->usock_type == UNIX) {
+                /**
+                 * For Unix Domain Sockets we read the whole message at once,
+                 * to the pre-allocated buffer.
+                 */
+                usockp->usock_read_len = USOCK_RX_BUF_LEN;
+                usockp->usock_state = READING_DATA;
+            } else {
+                /**
+                 * For Internet Sockets we read the Netlink header to the
+                 * pre-allocated buffer. Then we allocate buffer of the length
+                 * of message payload, that we know from the header.
+                 */
+                usockp->usock_read_len = NLMSG_HDRLEN;
+                usockp->usock_state = READING_HEADER;
+            }
         }
         break;
 
@@ -651,7 +663,14 @@ retry_read:
     usockp->usock_read_offset = offset;
 
     if (proto == NETLINK) {
-        if (usockp->usock_state == READING_HEADER) {
+        if (usockp->usock_type == UNIX) {
+            /* We got the whole message at once, so reading is finished. */
+            usockp->usock_read_len = usockp->usock_read_offset;
+        } else if (usockp->usock_state == READING_HEADER) {
+            /**
+             * usock_type == TCP. usock_type == UNIX
+             * will never be in a READING_HEADER state.
+             */
             if (usockp->usock_read_offset == usockp->usock_read_len) {
                 usockp->usock_state = READING_DATA;
                 nlh = (struct nlmsghdr *)(usockp->usock_rx_buf);
@@ -682,7 +701,6 @@ retry_read:
     return ret;
 }
 
-
 static struct vr_usocket *
 usock_alloc(unsigned short proto, unsigned short type)
 {
@@ -699,8 +717,6 @@ usock_alloc(unsigned short proto, unsigned short type)
 
     RTE_SET_USED(child);
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
-                pthread_self(), proto, type);
     switch (type) {
     case TCP:
         domain = AF_INET;
@@ -708,6 +724,10 @@ usock_alloc(unsigned short proto, unsigned short type)
         break;
 
     case UNIX:
+        domain = AF_UNIX;
+        sock_type = SOCK_STREAM;
+        break;
+
     case RAW:
         domain = AF_UNIX;
         sock_type = SOCK_DGRAM;
@@ -872,19 +892,24 @@ valid_usock(int proto, int type)
 {
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
             pthread_self(), proto, type);
-    if ((proto != PACKET) &&
-            (proto != NETLINK) &&
-            (proto != EVENT))
-        return -EINVAL;
 
-    if (((proto == PACKET) || (proto == EVENT)) && (type != RAW)) {
-        return -EINVAL;
-    } else {
-        if (type != TCP && type != UNIX)
-            return -EINVAL;
+    switch (proto) {
+    case NETLINK:
+        if (type == TCP || type == UNIX)
+            return true;
+        break;
+
+    case PACKET:
+    case EVENT:
+        if (type == RAW)
+            return true;
+        break;
+
+    default:
+        return false;
     }
 
-    return true;
+    return false;
 }
 
 void
@@ -950,8 +975,6 @@ vr_usocket_message_write(struct vr_usocket *usockp,
 
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
-    if ((usockp->usock_proto != NETLINK) && (usockp->usock_type != TCP))
-        return -EINVAL;
 
     if (usockp->usock_tx_buf || !vr_queue_empty(&usockp->usock_nl_responses)) {
         vr_queue_enqueue(&usockp->usock_nl_responses,
@@ -991,8 +1014,8 @@ vr_usocket_read(struct vr_usocket *usockp)
     case READING_FAULTY_DATA:
         ret = __usock_read(usockp);
         if (ret < 0) {
-            RTE_LOG(DEBUG, USOCK, "%s[%lx]: read error FD %d\n", __func__, pthread_self(),
-                        usockp->usock_fd);
+            RTE_LOG(DEBUG, USOCK, "%s[%lx]: read error FD %d\n", __func__,
+                pthread_self(), usockp->usock_fd);
             usock_close(usockp);
             return ret;
         }
@@ -1194,7 +1217,6 @@ usock_write(struct vr_usocket *usockp)
     return 0;
 }
 
-
 /*
  * start io on socket
  */
@@ -1295,4 +1317,3 @@ return_from_io:
 
     return ret;
 }
-

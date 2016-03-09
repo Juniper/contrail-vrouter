@@ -172,10 +172,11 @@ int
 get_domain()
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
-    if (platform &&
-       (strcmp(platform, PLATFORM_DPDK) == 0 ||
-        strcmp(platform, PLATFORM_NIC) == 0)) {
-        return AF_INET;
+    if (platform) {
+        if (strcmp(platform, PLATFORM_DPDK) == 0)
+            return AF_UNIX;
+        else if (strcmp(platform, PLATFORM_NIC) == 0)
+            return AF_INET;
     }
     return AF_NETLINK;
 }
