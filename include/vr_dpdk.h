@@ -111,7 +111,7 @@ extern unsigned int vr_flow_hold_limit;
 /* Maximum number of bond interfaces per lcore */
 #define VR_DPDK_MAX_BONDS           2
 /* Max size of a single packet */
-#define VR_DPDK_MAX_PACKET_SZ       9160
+#define VR_DPDK_MAX_PACKET_SZ       9 * 1024
 /* Number of bytes needed for each mbuf */
 #define VR_DPDK_MBUF_SZ             (VR_DPDK_MAX_PACKET_SZ      \
                                     + sizeof(struct rte_mbuf)   \
