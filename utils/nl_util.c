@@ -385,11 +385,23 @@ nl_get_buf_len(struct nl_client *cl)
 }
 
 void
+nl_update_attr_len(struct nl_client *cl, int len)
+{
+    struct nlattr *nla;
+
+    nla = (struct nlattr *)cl->cl_attr;
+    nla->nla_len += len;
+    cl->cl_buf_offset += len;
+    return;
+}
+
+void
 nl_build_attr(struct nl_client *cl, int len, int attr)
 {
     struct nlattr *nla;
 
     nla = (struct nlattr *)(cl->cl_buf + cl->cl_buf_offset);
+    cl->cl_attr = (uint8_t *)nla;
     nla->nla_len = NLA_HDRLEN + (len);
     nla->nla_type = attr;
 
