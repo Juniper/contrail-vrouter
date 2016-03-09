@@ -131,10 +131,17 @@ static int
 sandesh_proto_decode(char *buf, unsigned int len,
         int (*cb)(void *, unsigned int, void *), void *cb_arg)
 {
-    int ret = 0;
+    int ret = 0, decoded, processed = 0;
 
-    return sandesh_decode((unsigned char *)buf, len,
-            vr_find_sandesh_info, &ret);
+    while (processed < len) {
+        decoded = sandesh_decode((unsigned char *)buf, len,
+                vr_find_sandesh_info, &ret);
+        if (decoded < 0)
+            return decoded;
+        processed += decoded;
+    }
+
+    return 0;
 }
 
 static struct vr_mproto sandesh_mproto = {

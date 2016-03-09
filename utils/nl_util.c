@@ -371,11 +371,23 @@ nl_get_buf_len(struct nl_client *cl)
 }
 
 void
+nl_update_attr_len(struct nl_client *cl, int len)
+{
+    struct nlattr *nla;
+
+    nla = (struct nlattr *)cl->cl_attr;
+    nla->nla_len += len;
+    cl->cl_buf_offset += len;
+    return;
+}
+
+void
 nl_build_attr(struct nl_client *cl, int len, int attr)
 {
     struct nlattr *nla;
 
     nla = (struct nlattr *)(cl->cl_buf + cl->cl_buf_offset);
+    cl->cl_attr = (uint8_t *)nla;
     nla->nla_len = NLA_HDRLEN + (len);
     nla->nla_type = attr;
 
@@ -387,7 +399,7 @@ nl_build_attr(struct nl_client *cl, int len, int attr)
 int
 nl_build_nlh(struct nl_client *cl, uint32_t type, uint32_t flags)
 {
-    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf);
+    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf + cl->cl_buf_offset);
 
     if (cl->cl_buf_offset + NLMSG_HDRLEN > cl->cl_buf_len)
         return -ENOMEM;
@@ -398,7 +410,7 @@ nl_build_nlh(struct nl_client *cl, uint32_t type, uint32_t flags)
     nlh->nlmsg_seq = cl->cl_seq++;
     nlh->nlmsg_pid = cl->cl_id;
 
-    cl->cl_buf_offset = NLMSG_HDRLEN;
+    cl->cl_buf_offset += NLMSG_HDRLEN;
 
     return 0;
 }
