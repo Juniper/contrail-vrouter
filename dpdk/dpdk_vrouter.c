@@ -534,7 +534,7 @@ dpdk_argv_update(void)
         io_core_mask_str,
         VR_DPDK_PACKET_LCORE_ID, VR_DPDK_FWD_LCORE_ID - 1, system_cpus_count - 1,
         fwd_core_mask_str)
-            == sizeof(lcores_string)) {
+            >= sizeof(lcores_string)) {
         return -1;
     }
     /* Append lcores option. */
