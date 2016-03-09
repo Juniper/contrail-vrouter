@@ -1397,12 +1397,11 @@ dpdk_lcore_fwd_loop(void)
             }
 
             rcu_quiescent_state();
-            if (unlikely(lcore->lcore_nb_rx_queues == 0)) {
-                /* no queues to poll -> sleep a bit */
-                rcu_thread_offline();
-                usleep(VR_DPDK_SLEEP_NO_QUEUES_US);
-                rcu_thread_online();
-            }
+
+            /*
+             * Forwarding lcore might get packets from another lcore,
+             * so it never sleeps.
+             */
 
             /* handle an IPC command */
             if (unlikely(vr_dpdk_lcore_cmd_handle(lcore)))
