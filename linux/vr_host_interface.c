@@ -569,7 +569,12 @@ linux_get_rxq(struct sk_buff *skb, u16 *rxq, unsigned int curr_cpu,
      * Clear the bits corresponding to the current core and its hyperthreads
      * in the node CPU mask.
      */
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4,2,0))
     cpumask_andnot(&noht_cpumask, node_cpumask, cpu_sibling_mask(curr_cpu));
+#else
+    cpumask_andnot(&noht_cpumask, node_cpumask,
+                   topology_sibling_cpumask(curr_cpu));
+#endif
 
     /*
      * If the previous CPU is specified, clear the bits corresponding to
@@ -577,7 +582,11 @@ linux_get_rxq(struct sk_buff *skb, u16 *rxq, unsigned int curr_cpu,
      */
     if (prev_cpu && (prev_cpu <= nr_cpu_ids)) {
         cpumask_andnot(&noht_cpumask, &noht_cpumask,
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4,2,0))
                        cpu_sibling_mask(prev_cpu-1));
+#else
+                       topology_sibling_cpumask(prev_cpu-1));
+#endif
     }
 
     num_cpus = cpumask_weight(&noht_cpumask);
