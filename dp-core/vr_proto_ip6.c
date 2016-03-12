@@ -173,6 +173,7 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
         struct vr_flow *flow_p)
 {
+    int ret = 0;
     unsigned short *t_hdr, sport, dport;
     unsigned short nh_id;
 
@@ -183,10 +184,19 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
     if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
         icmph = (struct vr_icmp *)t_hdr;
         if (vr_icmp6_error(icmph)) {
-            vr_inet6_form_flow(router, vrf, pkt, vlan,
-                    (struct vr_ip6 *)(icmph + 1), flow_p);
-            vr_inet6_flow_swap(flow_p);
-            return 0;
+            if ((unsigned char *)ip6 == pkt_network_header(pkt)) {
+                ret = vr_inet6_form_flow(router, vrf, pkt, vlan,
+                        (struct vr_ip6 *)(icmph + 1), flow_p);
+                if (ret)
+                    return ret;
+
+                vr_inet6_flow_swap(flow_p);
+            } else {
+                return -1;
+            }
+
+            sport = flow_p->flow6_sport;
+            dport = flow_p->flow6_dport;
         } else if ((icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REQ) ||
             (icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REPLY)) {
             sport = icmph->icmp_eid;
