@@ -870,6 +870,8 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip *ip,
         struct vr_flow *flow_p)
 {
+    int ret = 0;
+
     unsigned short *t_hdr, sport, dport;
     unsigned short nh_id;
 
@@ -881,10 +883,17 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
     if (ip->ip_proto == VR_IP_PROTO_ICMP) {
         icmph = (struct vr_icmp *)t_hdr;
         if (vr_icmp_error(icmph)) {
+            /* we will generate a flow only for the first icmp error */
             if ((unsigned char *)ip == pkt_network_header(pkt)) {
-                vr_inet_proto_flow(router, vrf, pkt, vlan,
+                ret = vr_inet_proto_flow(router, vrf, pkt, vlan,
                         (struct vr_ip *)(icmph + 1), flow_p);
+                if (ret)
+                    return ret;
+
                 vr_inet_flow_swap(flow_p);
+            } else {
+                /* for icmp error for icmp error, we will drop the packet */
+                return -1;
             }
 
             return 0;
@@ -1014,7 +1023,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
             vr_enqueue_to_assembler(router, pkt, fmd);
         } else {
             /* unlikely to be hit. you can safely discount misc drops here */
-            vr_pfree(pkt, VP_DROP_FRAGMENTS);
+            vr_pfree(pkt, VP_DROP_MISC);
         }
         return FLOW_CONSUMED;
     }
