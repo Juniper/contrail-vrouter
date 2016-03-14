@@ -754,9 +754,11 @@ vr_inet_flow_swap(struct vr_flow *key_p)
     unsigned short port;
     unsigned int ipaddr;
 
-    port = key_p->flow4_sport;
-    key_p->flow4_sport = key_p->flow4_dport;
-    key_p->flow4_dport = port;
+    if (key_p->flow4_proto != VR_IP_PROTO_ICMP) {
+        port = key_p->flow4_sport;
+        key_p->flow4_sport = key_p->flow4_dport;
+        key_p->flow4_dport = port;
+    }
 
     ipaddr = key_p->flow4_sip;
     key_p->flow4_sip = key_p->flow4_dip;
