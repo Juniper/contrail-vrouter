@@ -218,7 +218,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
         /* ttl = --ip6->ip6_hlim */
         ttl = ip6->ip6_hlim;
         pkt->vp_type = VP_TYPE_IP6;
-    } else {
+    } else if (vr_ip_is_ip4(ip)) {
         family = AF_INET;
         if (!ip->ip_ttl) {
             vr_pfree(pkt, VP_DROP_TTL_EXCEEDED);
@@ -227,6 +227,9 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
 
         ttl = vr_ip_decrement_ttl(ip);
         pkt->vp_type = VP_TYPE_IP;
+    } else {
+        vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
+        return 0;
     }
  
     pkt->vp_ttl = ttl;
