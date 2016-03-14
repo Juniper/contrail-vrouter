@@ -538,7 +538,8 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
 
     data_off = pkt->vp_data - (skb->data - skb->head);
 
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)) || \
+    defined(NET_SKBUF_DATA_USES_OFFSET)
     old_off = skb->network_header;
 #else
     old_off = skb->network_header - skb->head;
@@ -556,7 +557,8 @@ lh_pcow(struct vr_packet *pkt, unsigned short head_room)
      * pkt->vp_len is untouched, as it is going to be same
      * before and after cow
      */
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)) || \
+    defined(NET_SKBUF_DATA_USES_OFFSET)
     new_off = skb->network_header;
 #else
     new_off = skb->network_header - skb->head;
