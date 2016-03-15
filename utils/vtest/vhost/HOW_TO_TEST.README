@@ -1,0 +1,21 @@
+
+#Testing without agent
+# you must disable agent and stuff and manually start everything
+
+service supervisor-vrouter stop
+taskset 0x7 /usr/bin/contrail-vrouter-dpdk --no-daemon --socket-mem 1024
+
+#If you didnt set some option you must do it manually example is below
+
+#addresses of uvhost are hardcoded in source code
+vif --add vm1 --mac "de:ad:be:ef:00:01" --type virtual --transport pmd --vrf 0 --id 1
+vif --add vm2 --mac "de:ad:be:ef:00:02" --type virtual --transport pmd --vrf 0 --id 2
+vif -l
+
+nh --create 21 --oif 1 --type 2 --smac "de:ad:be:ef:00:02" --dmac "de:ad:be:ef:00:01" --vrf 0 --el2
+nh --create 12 --oif 2 --type 2 --smac "de:ad:be:ef:00:01" --dmac "de:ad:be:ef:00:02" --vrf 0 --el2
+nh --list
+
+rt -c -n 12 -e "de:ad:be:ef:00:01" -f 1 -v 0
+rt -c -n 21 -e "de:ad:be:ef:00:02" -f 1 -v 0
+rt --dump -0 --family bridge
