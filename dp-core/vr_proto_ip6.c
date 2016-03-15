@@ -140,9 +140,11 @@ vr_inet6_flow_swap(struct vr_flow *key_p)
     unsigned short port;
     uint8_t ip6_addr[VR_IP6_ADDRESS_LEN];
 
-    port = key_p->flow6_sport;
-    key_p->flow6_sport = key_p->flow6_dport;
-    key_p->flow6_dport = port;
+    if (key_p->flow6_proto != VR_IP_PROTO_ICMP6) {
+        port = key_p->flow6_sport;
+        key_p->flow6_sport = key_p->flow6_dport;
+        key_p->flow6_dport = port;
+    }
 
     memcpy(ip6_addr, key_p->flow6_sip, VR_IP6_ADDRESS_LEN);
     memcpy(key_p->flow6_sip, key_p->flow6_dip, VR_IP6_ADDRESS_LEN);
