@@ -166,6 +166,10 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
         case NH_FLAG_UNKNOWN_UC_FLOOD:
             strcat(ptr, "Unicast Flood, ");
             break;
+
+        case NH_FLAG_TUNNEL_SIP_COPY:
+            strcat(ptr, "Copy SIP, ");
+            break;
         }
     }
     return ptr;
