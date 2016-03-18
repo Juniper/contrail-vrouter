@@ -24,19 +24,20 @@ typedef u64 netdev_features_t;
  *
  * #define skb_get_rxhash skb_get_hash
  */
-#if (((LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,11)) && \
-                           !(defined(skb_get_rxhash))) || \
-                           (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7)))
+#if ((LINUX_VERSION_CODE > KERNEL_VERSION(2,6,32)) && \
+            (LINUX_VERSION_CODE < KERNEL_VERSION(3,13,11)))
+#if (!defined(RHEL_MAJOR) || (RHEL_MAJOR < 7))
 static inline __u32
-skb_get_rxhash(struct sk_buff *skb)
+skb_get_hash(struct sk_buff *skb)
 {
-    return skb_get_hash(skb);
+    return skb_get_rxhash(skb);
 }
+#endif
 #endif
 
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 static inline __u32
-skb_get_rxhash(struct sk_buff *skb)
+skb_get_hash(struct sk_buff *skb)
 {
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)

@@ -365,13 +365,13 @@ lh_phead_len(struct vr_packet *pkt)
 }
 
 static void
-lh_get_time(unsigned int *sec, unsigned int *nsec)
+lh_get_time(unsigned long *sec, unsigned long *usec)
 {
-    struct timespec t;
+    struct timeval t;
 
-    getnstimeofday(&t);
+    do_gettimeofday(&t);
     *sec = t.tv_sec;
-    *nsec = t.tv_nsec;
+    *usec = t.tv_usec;
 
     return;
 }

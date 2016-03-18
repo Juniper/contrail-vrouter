@@ -205,16 +205,16 @@ vr_lib_pfrag_len(struct vr_packet *pkt)
 }
 
 static void
-vr_lib_get_time(unsigned int *sec, unsigned int *nsec)
+vr_lib_get_time(unsigned long *sec, unsigned long *usec)
 {
     struct timeval tv;
 
-    *sec = *nsec = 0;
+    *sec = *usec = 0;
     if (gettimeofday(&tv, NULL) < 0)
         return;
 
     *sec = tv.tv_sec;
-    *nsec = tv.tv_usec * 1000;
+    *usec = tv.tv_usec;
 
     return;
 }

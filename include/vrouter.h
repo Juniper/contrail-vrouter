@@ -164,7 +164,7 @@ struct host_os {
     void (*hos_defer)(struct vrouter *, vr_defer_cb, void *);
     void *(*hos_get_defer_data)(unsigned int);
     void (*hos_put_defer_data)(void *);
-    void (*hos_get_time)(unsigned int*, unsigned int *);
+    void (*hos_get_time)(unsigned long *, unsigned long *);
     void (*hos_get_mono_time)(unsigned int*, unsigned int *);
     int (*hos_create_timer)(struct vr_timer *);
     void (*hos_delete_timer)(struct vr_timer *);
