@@ -868,6 +868,8 @@ vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
             ta.vfta_stats = fe->fe_stats;
         }
 
+        ta.vfta_gen_id = fe->fe_gen_id;
+
         break;
     }
 
