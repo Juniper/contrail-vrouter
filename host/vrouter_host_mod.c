@@ -205,7 +205,7 @@ vr_lib_pfrag_len(struct vr_packet *pkt)
 }
 
 static void
-vr_lib_get_time(unsigned int *sec, unsigned int *nsec)
+vr_lib_get_time(unsigned long *sec, unsigned long *nsec)
 {
     struct timeval tv;
 

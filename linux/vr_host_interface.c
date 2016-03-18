@@ -583,7 +583,7 @@ linux_get_rxq(struct sk_buff *skb, u16 *rxq, unsigned int curr_cpu,
     num_cpus = cpumask_weight(&noht_cpumask);
 
     if (num_cpus) {
-        rxhash = skb_get_rxhash(skb);
+        rxhash = skb_get_hash(skb);
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32)) 
         next_cpu = ((u32)rxhash * num_cpus) >> 16;
 #else
@@ -1600,12 +1600,14 @@ linux_if_tx_csum_offload(struct net_device *dev)
         return 1;
     }
 
+#ifndef RHEL_MAJOR
     if (dev->dev.parent) {
         driver_name = dev_driver_string(dev->dev.parent);
         if (driver_name && (!strncmp(driver_name, "ixgbe", 6))) {
             return 1;
         }
     }
+#endif
 
     return 0;
 }
