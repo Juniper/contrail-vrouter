@@ -207,6 +207,7 @@ lh_palloc_head(struct vr_packet *pkt, unsigned int size)
 
     npkt->vp_ttl = pkt->vp_ttl;
     npkt->vp_flags = pkt->vp_flags;
+    npkt->vp_type = pkt->vp_type;
 
     skb_frag_list_init(skb_head);
     skb_frag_add_head(skb_head, skb);

@@ -1302,6 +1302,13 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
      */
     pkt_set_inner_network_header(pkt, pkt->vp_data);
 
+    if (pkt->vp_type == VP_TYPE_IP6)
+        pkt->vp_type = VP_TYPE_IP6OIP;
+    else if (pkt->vp_type == VP_TYPE_IP)
+        pkt->vp_type = VP_TYPE_IPOIP;
+    else
+        pkt->vp_type = VP_TYPE_IP;
+
     /*
      * Calculate the partial checksum for udp header
      */
@@ -1374,6 +1381,12 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto send_fail;
 
     pkt_set_network_header(pkt, pkt->vp_data);
+
+    if (pkt->vp_type == VP_TYPE_IPOIP)
+        pkt->vp_type = VP_TYPE_IP;
+    else if (pkt->vp_type == VP_TYPE_IP6OIP)
+        pkt->vp_type = VP_TYPE_IP6;
+
     /*
      * Change the packet type
      */
@@ -1511,6 +1524,11 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
 
+
+    if (pkt->vp_type == VP_TYPE_IPOIP)
+        pkt->vp_type = VP_TYPE_IP;
+    else if (pkt->vp_type == VP_TYPE_IP6OIP)
+        pkt->vp_type = VP_TYPE_IP6;
 
     /*
      * Change the packet type
@@ -1660,6 +1678,12 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto send_fail;
     }
     pkt_set_network_header(pkt, pkt->vp_data);
+
+    if (pkt->vp_type == VP_TYPE_IPOIP)
+        pkt->vp_type = VP_TYPE_IP;
+    else if (pkt->vp_type == VP_TYPE_IP6OIP)
+        pkt->vp_type = VP_TYPE_IP6;
+
     if (pkt->vp_type == VP_TYPE_IP6)
         pkt->vp_type = VP_TYPE_IP6OIP;
     else  if (pkt->vp_type == VP_TYPE_IP)
