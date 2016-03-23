@@ -487,6 +487,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
             hdr->hdr_cmd_param_3 = htonl(fta->vfta_stats.flow_packets);
             hdr->hdr_cmd_param_4 = htonl((fta->vfta_stats.flow_bytes_oflow |
                         (fta->vfta_stats.flow_packets_oflow << 16)));
+            hdr->hdr_cmd_param_5 = fta->vfta_gen_id;
         }
         break;
 

@@ -369,6 +369,7 @@ struct vr_flow_trap_arg {
     unsigned int vfta_index;
     unsigned int vfta_nh_index;
     struct vr_flow_stats vfta_stats;
+    uint8_t vfta_gen_id;
 };
 
 typedef enum {
