@@ -337,8 +337,12 @@ vrouter_exit(bool soft_reset)
         if (modules[i].shut)
             modules[i].shut(&router);
 
-    /* After all the modules are shut: Vrouter is really not ready */
+    /* Mark that vrouter is no more ready as shut is already done */
     vr_not_ready = true;
+
+    /* Flush the previous ashynchronous events, before init */
+    if (vr_soft_reset)
+        vr_soft_reset(&router);
 
     for (i = VR_NUM_MODULES - 1; i >= 0; --i) {
         modules[i].exit(&router, soft_reset);
