@@ -374,11 +374,11 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     unsigned char default_mme[2] = {0xff, 0x0};
     void *mirror_md;
     unsigned char *buf;
-    struct vr_nexthop *nh;
+    struct vr_nexthop *nh, *pkt_nh;
     struct vr_pcap *pcap;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
-    struct vr_nexthop *pkt_nh;
+    struct vr_forwarding_md new_fmd;
 
     /* If the packet is already mirrored, dont mirror again */
     if (pkt->vp_flags & VP_FLAG_FROM_DP)
@@ -387,6 +387,11 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     mirror = router->vr_mirrors[mirror_id];
     if (!mirror)
         return 0;
+
+    if (fmd) {
+        memcpy(&new_fmd, fmd, sizeof(*fmd));
+        fmd = &new_fmd;
+    }
 
     if (fmd->fmd_flow_index >= 0) {
         mme = (struct vr_mirror_meta_entry *)vr_itable_get(router->vr_mirror_md,
