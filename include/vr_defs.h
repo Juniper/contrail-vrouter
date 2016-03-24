@@ -64,6 +64,8 @@ struct agent_hdr {
     unsigned int hdr_cmd_param_2;
     unsigned int hdr_cmd_param_3;
     unsigned int hdr_cmd_param_4;
+    uint8_t hdr_cmd_param_5;
+    uint8_t hdr_cmd_param_5_pack[3];
 } __attribute__((packed));
 
 #define CMD_PARAM_PACKET_CTRL       0x1
