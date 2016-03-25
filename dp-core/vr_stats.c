@@ -331,6 +331,7 @@ vr_malloc_stats_exit(struct vrouter *router)
     }
 
     vr_free(router->vr_malloc_stats, VR_MALLOC_OBJECT);
+    router->vr_malloc_stats = NULL;
 
     return;
 }
@@ -451,8 +452,8 @@ vr_stats_exit(struct vrouter *router, bool soft_reset)
         return;
     }
 
-    vr_malloc_stats_exit(router);
     vr_pkt_drop_stats_exit(router);
+    vr_malloc_stats_exit(router);
     return;
 }
 
