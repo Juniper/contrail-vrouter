@@ -119,7 +119,7 @@ dpdk_dbdf_to_pci(unsigned int dbdf,
 {
     address->domain = (dbdf >> 16);
     address->bus = (dbdf >> 8) & 0xff;
-    address->devid = (dbdf & 0xf8);
+    address->devid = (dbdf >> 3) & 0x1f;
     address->function = (dbdf & 0x7);
 
     return;
