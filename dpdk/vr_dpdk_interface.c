@@ -168,6 +168,7 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
 {
     struct ether_addr mac_addr;
     struct rte_eth_dev_info dev_info;
+    int ret;
 
     vif->vif_os = (void *)ethdev;
 
@@ -187,14 +188,34 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
         vif->vif_flags &= ~VIF_FLAG_VLAN_OFFLOAD;
     }
 
-    memset(&mac_addr, 0, sizeof(mac_addr));
     /*
-     * do not want to overwrite what agent had sent. set only if
-     * the address has null
+     * Do not want to overwrite what agent had sent.
+     * Set only if the address is null.
      */
-    if (!memcmp(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN)) {
+    memset(&mac_addr, 0, sizeof(mac_addr));
+    if (memcmp(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN) == 0) {
         rte_eth_macaddr_get(ethdev->ethdev_port_id, &mac_addr);
         memcpy(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN);
+    } else {
+        /*
+         * On some hardware (e100e, virtual functions, etc) the MAC is random,
+         * so we check if vif and NIC MACs are match and set the NIC MAC.
+         */
+        rte_eth_macaddr_get(ethdev->ethdev_port_id, &mac_addr);
+        if (memcmp(vif->vif_mac, mac_addr.addr_bytes, ETHER_ADDR_LEN) != 0) {
+            /* No match, so set vif MAC to NIC. */
+            ret = rte_eth_dev_default_mac_addr_set(ethdev->ethdev_port_id,
+                    (struct ether_addr *)vif->vif_mac);
+            if (ret == 0) {
+                RTE_LOG(INFO, VROUTER, "    eth dev %s now use vif MAC "
+                        MAC_FORMAT "\n",
+                        vif->vif_name, MAC_VALUE(vif->vif_mac));
+            } else {
+                RTE_LOG(ERR, VROUTER, "    error setting vif MAC to eth dev %s: "
+                        "%s (%d)\n",
+                        vif->vif_name, rte_strerror(-ret), -ret);
+            }
+        }
     }
 }
 
@@ -319,10 +340,11 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     struct ether_addr mac_addr;
 
     memset(&pci_address, 0, sizeof(pci_address));
+    memset(&mac_addr, 0, sizeof(mac_addr));
     if (vif->vif_flags & VIF_FLAG_PMD) {
         if (vif->vif_os_idx >= rte_eth_dev_count()) {
-            RTE_LOG(ERR, VROUTER, "Invalid PMD device index %u"
-                    " (must be less than %u)\n",
+            RTE_LOG(ERR, VROUTER, "Error adding vif %u eth device %s: invalid PMD %u"
+                    " (must be less than %u)\n", vif->vif_idx, vif->vif_name,
                     vif->vif_os_idx, (unsigned)rte_eth_dev_count());
             return -ENOENT;
         }
@@ -332,6 +354,12 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         dpdk_find_pci_addr_by_port(&pci_address, port_id);
         vif->vif_os_idx = dpdk_pci_to_dbdf(&pci_address);
         */
+
+        rte_eth_macaddr_get(port_id, &mac_addr);
+        RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) eth device %" PRIu8
+                " (PMD) MAC " MAC_FORMAT " (vif MAC "MAC_FORMAT")\n",
+            vif->vif_idx, vif->vif_gen, port_id,
+            MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
     } else {
         dpdk_dbdf_to_pci(vif->vif_os_idx, &pci_address);
         port_id = dpdk_find_port_id_by_pci_addr(&pci_address);
@@ -343,16 +371,15 @@ dpdk_fabric_if_add(struct vr_interface *vif)
                     pci_address.devid, pci_address.function);
             return -ENOENT;
         }
+
+        rte_eth_macaddr_get(port_id, &mac_addr);
+        RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) eth device %" PRIu8
+                " PCI " PCI_PRI_FMT " MAC " MAC_FORMAT " (vif MAC "MAC_FORMAT")\n",
+                vif->vif_idx, vif->vif_gen, port_id,
+                pci_address.domain, pci_address.bus,
+                pci_address.devid, pci_address.function,
+                MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
     }
-
-    memset(&mac_addr, 0, sizeof(mac_addr));
-    rte_eth_macaddr_get(port_id, &mac_addr);
-
-    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) eth device %" PRIu8 " PCI " PCI_PRI_FMT
-        " MAC " MAC_FORMAT "\n",
-        vif->vif_idx, vif->vif_gen, port_id, pci_address.domain, pci_address.bus,
-        pci_address.devid, pci_address.function,
-        MAC_VALUE(mac_addr.addr_bytes));
 
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
@@ -476,8 +503,9 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     rte_eth_macaddr_get(port_id, &mac_addr);
 
     RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) KNI device %s at eth device %" PRIu8
-                " MAC " MAC_FORMAT "\n",
-                vif->vif_idx, vif->vif_gen, vif->vif_name, port_id, MAC_VALUE(mac_addr.addr_bytes));
+                " MAC " MAC_FORMAT " (vif MAC " MAC_FORMAT ")\n",
+                vif->vif_idx, vif->vif_gen, vif->vif_name, port_id,
+                MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
 
     /*
      * KNI does not support bond interfaces and generate random MACs,
