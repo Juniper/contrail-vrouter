@@ -1775,9 +1775,12 @@ pkt_gro_dev_setup(struct net_device *dev)
      * undergoing GRO at the moment. In our case, each VM wil have
      * unique nexthop id  associated with it, so we can use nexthop id
      * as the MAC header to combine packets destined for the same vif.
+     * In addition to nh id, we need to keep the context of receiving
+     * inteface, post gro, for packet processing. So vif id inaddition
+     * to nh id is used as L2 header
      */
 
-    dev->hard_header_len = sizeof(unsigned short);
+    dev->hard_header_len = 2 * sizeof(unsigned short);
 
     dev->type = ARPHRD_VOID;
     dev->netdev_ops = &pkt_gro_dev_ops;
@@ -1791,7 +1794,7 @@ static void
 pkt_l2_gro_dev_setup(struct net_device *dev)
 {
     pkt_gro_dev_setup(dev);
-    dev->hard_header_len = sizeof(unsigned short) + VR_ETHER_HLEN;
+    dev->hard_header_len = 2 * sizeof(unsigned short) + VR_ETHER_HLEN;
     return;
 }
 
@@ -1990,7 +1993,7 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
 static rx_handler_result_t 
 pkt_gro_dev_rx_handler(struct sk_buff **pskb)
 {
-    unsigned short nh_id, drop_reason;
+    unsigned short nh_id, vif_id, drop_reason;
     struct vr_nexthop *nh;
     struct vr_interface *vif;
     struct vr_interface *gro_vif;
@@ -2009,7 +2012,8 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
         goto drop;
     }
 #else
-    nh_id = *((unsigned short *) skb_mac_header(skb));
+    vif_id = *((unsigned short *)skb_mac_header(skb));
+    nh_id = *((unsigned short *)(skb_mac_header(skb) + sizeof(vif_id)));
 #endif
 
 
@@ -2039,6 +2043,11 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
      * since vif was not available when we did linux_get_packet, set vif
      * manually here
      */
+    vif = __vrouter_get_interface(router, vif_id);
+    if (!vif) {
+        drop_reason = VP_DROP_INVALID_IF;
+        goto drop;
+    }
     pkt->vp_if = vif;
 
     vr_init_forwarding_md(&fmd);
