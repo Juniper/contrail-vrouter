@@ -494,7 +494,7 @@ vhost_dellink(struct net_device *dev, struct list_head *head)
 
     vp = netdev_priv(dev);
     if (vp) {
-        if (vp->vp_db_index >= 0)
+        if (vhost_priv_db && vp->vp_db_index >= 0)
             vhost_priv_db[vp->vp_db_index] = NULL;
 
         vp->vp_db_index = -1;
@@ -566,8 +566,10 @@ void
 vhost_exit(void)
 {
     vhost_netlink_exit();
-    if (vhost_priv_db)
+    if (vhost_priv_db) {
         kfree(vhost_priv_db);
+        vhost_priv_db = NULL;
+    }
 
     return;
 }
