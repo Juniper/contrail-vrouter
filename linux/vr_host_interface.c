@@ -2334,8 +2334,8 @@ vr_host_vif_init(struct vrouter *router)
 void
 vr_host_interface_exit(void)
 {
-    vhost_exit();
     unregister_netdevice_notifier(&host_if_nb);
+    vhost_exit();
     linux_pkt_dev_free();
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
