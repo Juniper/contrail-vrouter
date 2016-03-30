@@ -500,8 +500,10 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
                 (ip_bkt_info[level].bi_pfx_len - ip_bkt_info[level].bi_bits)) &&
                 (rt->rtr_req.rtr_prefix_len <= ip_bkt_info[level].bi_pfx_len)) {
             fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+            index &= ~(fin - 1);
         } else {
             fin = ip_bkt_info[level].bi_size;
+            index = 0;
         }
 
          fin += index;
@@ -510,15 +512,18 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
 
          for (i = index; i < fin; i++) {
             tmp_ent = index_to_entry(bkt, i);
-            if (ENTRY_IS_NEXTHOP(tmp_ent) &&
-                            (tmp_ent->entry_prefix_len == rt->rtr_req.rtr_prefix_len)) {
-                set_entry_to_nh(tmp_ent, rt->rtr_nh);
+            if (tmp_ent->entry_prefix_len == rt->rtr_req.rtr_prefix_len) {
                 tmp_ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
                 tmp_ent->entry_label = rt->rtr_req.rtr_label;
                 tmp_ent->entry_prefix_len = rt->rtr_req.rtr_replace_plen;
-                tmp_ent->entry_bridge_index = rt->rtr_req.rtr_index;
-            } else
-                __mtrie_delete(rt, tmp_ent, level + 1);
+
+                if (ENTRY_IS_NEXTHOP(tmp_ent)) {
+                    set_entry_to_nh(tmp_ent, rt->rtr_nh);
+                    tmp_ent->entry_bridge_index = rt->rtr_req.rtr_index;
+                } else {
+                    __mtrie_delete(rt, tmp_ent, level + 1);
+                }
+            }
         }
     }
 
