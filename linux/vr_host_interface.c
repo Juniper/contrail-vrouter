@@ -858,6 +858,12 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 }
             }
         }
+    } else {
+        network_off = pkt_get_network_header_off(pkt);
+        if (network_off) {
+            skb_set_network_header(skb, (network_off - skb_headroom(skb)));
+            skb_reset_mac_len(skb);
+        }
     }
 
     linux_xmit_segment(vif, skb, pkt->vp_type); 
