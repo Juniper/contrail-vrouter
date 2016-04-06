@@ -348,6 +348,8 @@ flow_get_drop_reason(uint8_t drop_code)
         return "RevSG";
     case VR_FLOW_DR_REVERSE_OUT_SG:
         return "RevOutSG";
+    case VR_FLOW_DR_SAME_FLOW_RFLOW_KEY:
+        return "SameFlowRflowKey";
     default:
         break;
     }
