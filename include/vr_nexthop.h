@@ -80,6 +80,7 @@ struct vr_nexthop {
      * nexthops
      */
     uint8_t         nh_family;
+    uint16_t        nh_data_size;
     uint32_t        nh_flags;
     int             nh_vrf;
     unsigned int    nh_id;
@@ -115,12 +116,13 @@ struct vr_nexthop {
 
          struct {
             unsigned short cnt;
+            unsigned short ecmp_cnt;
             struct vr_component_nh *component;
+            struct vr_component_nh *ecmp_active;
          } nh_composite;
 
     } nh_u;
 
-    uint16_t            nh_data_size;
     struct vrouter      *nh_router;
     int                 (*nh_validate_src)(struct vr_packet *,
                                            struct vr_nexthop *,
@@ -156,6 +158,9 @@ struct vr_nexthop {
 
 #define nh_component_cnt        nh_u.nh_composite.cnt
 #define nh_component_nh         nh_u.nh_composite.component
+#define nh_component_ecmp_cnt   nh_u.nh_composite.ecmp_cnt
+#define nh_component_ecmp       nh_u.nh_composite.ecmp_active
+
 
 static inline bool
 vr_nexthop_is_vcp(struct vr_nexthop *nh)

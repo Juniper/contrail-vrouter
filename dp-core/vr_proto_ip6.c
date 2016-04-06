@@ -168,7 +168,7 @@ vr_inet6_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
     return false;
 }
 
-static int
+int
 vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
         struct vr_flow *flow_p)
