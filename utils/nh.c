@@ -611,7 +611,10 @@ validate_options(void)
             cmd_usage();
 
         flags |= NH_FLAG_VALID;
-        if (!opt_set(TYPE_OPT_IND) && !opt_set(VRF_OPT_IND))
+        if (!opt_set(TYPE_OPT_IND))
+            cmd_usage();
+
+         if(!opt_set(VRF_OPT_IND))
             cmd_usage();
 
         if (opt_set(MC_OPT_IND))
@@ -690,14 +693,19 @@ validate_options(void)
             if (opt_set(CEN_OPT_IND))
                 flags |= NH_FLAG_COMPOSITE_ENCAP;
 
-            if (opt_set(CEVPN_OPT_IND))
+            if (opt_set(CEVPN_OPT_IND)) {
                 flags |= NH_FLAG_COMPOSITE_EVPN;
 
-            if (opt_set(TOR_OPT_IND))
+                if (!opt_set(LBL_OPT_IND))
+                    cmd_usage();
+            }
+
+            if (opt_set(TOR_OPT_IND)) {
                 flags |= NH_FLAG_COMPOSITE_TOR;
 
-            if (!opt_set(LBL_OPT_IND))
-                cmd_usage();
+                if (!opt_set(LBL_OPT_IND))
+                    cmd_usage();
+            }
 
             if (memcmp(opt, zero_opt, sizeof(opt)))
                 cmd_usage();
