@@ -39,7 +39,7 @@ static struct rte_eth_conf ethdev_conf = {
         .hw_vlan_strip      = 0, /* Disable VLAN strip (might be enabled with --vlan argument) */
         .hw_vlan_extend     = 0, /* Disable Extended VLAN */
         .jumbo_frame        = 0, /* Disable Jumbo Frame Receipt */
-        .hw_strip_crc       = 0, /* Disable CRC stripping by hardware */
+        .hw_strip_crc       = 1, /* Enable CRC stripping by hardware */
         .enable_scatter     = 0, /* Disable scatter packets rx handler */
     },
     .rx_adv_conf = {
@@ -336,6 +336,12 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
     ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
         vr_dpdk.nb_fwd_lcores + (VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID)),
         VR_DPDK_MAX_NB_TX_QUEUES);
+
+    /* Check if we have dedicated an lcore for SR-IOV VF IO. */
+    if (vr_dpdk.vf_lcore_id) {
+        ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_tx_queues = 1;
+    }
+
     ethdev->ethdev_nb_rss_queues = RTE_MIN(RTE_MIN(ethdev->ethdev_nb_rx_queues,
         vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_RSS_QUEUES);
     ethdev->ethdev_reta_size = RTE_MIN(dev_info.reta_size,

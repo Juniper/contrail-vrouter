@@ -575,6 +575,34 @@ version_print(void)
     RTE_LOG(INFO, VROUTER, "vRouter/DPDK version: %s\n", ContrailBuildInfo);
 }
 
+/*
+ * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
+ */
+static void
+dpdk_check_sriov_vf(void)
+{
+    int i;
+    struct rte_eth_dev_info dev_info;
+
+    for (i = 0; i < rte_eth_dev_count(); i++)
+    {
+        rte_eth_dev_info_get(i, &dev_info);
+        if (strncmp(dev_info.driver_name, VR_DPDK_VF_PMD_NAME,
+                sizeof(VR_DPDK_VF_PMD_NAME)) == 0) {
+            RTE_LOG(INFO, VROUTER, "Eth device %" PRIu8
+                    " is a SR-IOV virtual function\n", i);
+            /* Dedicate the first forwarding lcore to VF RX/TX. */
+            if (dev_info.max_tx_queues < vr_dpdk.nb_fwd_lcores) {
+                vr_dpdk.vf_lcore_id = VR_DPDK_FWD_LCORE_ID;
+                RTE_LOG(INFO, VROUTER,
+                        "    lcore %u is dedicated for SR-IOV virtual function IO\n",
+                        VR_DPDK_FWD_LCORE_ID);
+                break;
+            }
+        }
+    }
+}
+
 /* Init DPDK EAL */
 static int
 dpdk_init(void)
@@ -629,6 +657,9 @@ dpdk_init(void)
 
     /* init timer subsystem */
     rte_timer_subsystem_init();
+
+    /* Check if any of eth devices is a SR-IOV virtual function. */
+    dpdk_check_sriov_vf();
 
     /* Init the interface configuration mutex
      * ATM we use it just to synchronize access between the NetLink interface
