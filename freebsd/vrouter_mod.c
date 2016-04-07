@@ -371,14 +371,14 @@ fh_set_defer_data(void *data)
 }
 
 static void
-fh_get_time(unsigned int *sec, unsigned int *nsec)
+fh_get_time(unsigned long *sec, unsigned long *usec)
 {
 	struct timespec tsp;
 
 	nanotime(&tsp);
 
 	*sec = tsp.tv_sec;
-	*nsec = tsp.tv_nsec;
+	*usec = tsp.tv_nsec / 1000;
 
 	return;
 }

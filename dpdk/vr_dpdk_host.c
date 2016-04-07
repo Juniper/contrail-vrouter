@@ -472,16 +472,16 @@ dpdk_delete_timer(struct vr_timer *vtimer)
 }
 
 static void
-dpdk_get_time(unsigned int *sec, unsigned int *nsec)
+dpdk_get_time(unsigned long *sec, unsigned long *usec)
 {
     struct timespec ts;
 
-    *sec = *nsec = 0;
+    *sec = *usec = 0;
     if (-1 == clock_gettime(CLOCK_REALTIME, &ts))
         return;
 
     *sec = ts.tv_sec;
-    *nsec = ts.tv_nsec;
+    *usec = ts.tv_nsec / 1000;
 
     return;
 }

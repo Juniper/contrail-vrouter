@@ -372,6 +372,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE,
                  mirror_md_len = 0;
     unsigned char default_mme[2] = {0xff, 0x0};
+    unsigned long sec, usec;
+
     void *mirror_md;
     unsigned char *buf;
     struct vr_nexthop *nh, *pkt_nh;
@@ -468,11 +470,13 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         pcap->pcap_incl_len = captured_len;
         pcap->pcap_orig_len = captured_len;
 
-        /* Get the time stamp in seconds and nanoseconds*/
-        vr_get_time(&pcap->pcap_ts_sec, &pcap->pcap_ts_usec);
+        vr_get_time(&sec, &usec);
+
+        pcap->pcap_ts_sec = sec;
+        pcap->pcap_ts_usec = usec;
+
         pcap->pcap_ts_sec = htonl(pcap->pcap_ts_sec);
-        /* Convert nanoseconds to usec */
-        pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec/1000);
+        pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec);
     }
 
     if (nh->nh_vrf >= 0)
