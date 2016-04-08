@@ -90,6 +90,10 @@
 #define VIF_FLAG_UNKNOWN_UC_FLOOD   0x10000
 #define VIF_FLAG_VLAN_OFFLOAD       0x20000
 
+/* vrouter capabilities mask (cannot be changed by agent) */
+#define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
+                         VIF_FLAG_VLAN_OFFLOAD)
+
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
 
