@@ -810,19 +810,8 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         break;
     }
 
-    /*
-     * Eviction of Flow in vrouter add additional events to vrouter
-     * agent state machine making it complex and unstable, till
-     * agent is handling vrouter eviction appropriately, disabling
-     * eviction from vrouter.
-     * NOTE: Vrouter agent will look at VR_FLOW_TCP_DEAD flag to
-     * clear/evict flow immediately
-     * TODO(prabhjot): need to re-enable, after stablizing agent
-     */
-#if 0
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe, index);
-#endif
 
     return result;
 }
@@ -1590,13 +1579,21 @@ vr_flow_set_req_is_invalid(struct vrouter *router, vr_flow_req *req,
 
     if (fe) {
         if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
+            if ((uint8_t)req->fr_gen_id != fe->fe_gen_id) {
+                error = -EBADF;
+                goto invalid_req;
+            }
             if (memcmp(req->fr_flow_ip, fe->fe_key.flow_ip, 
                        2 * VR_IP_ADDR_SIZE(fe->fe_type)) ||
                     (unsigned short)req->fr_flow_sport != fe->fe_key.flow_sport ||
                     (unsigned short)req->fr_flow_dport != fe->fe_key.flow_dport||
                     (unsigned short)req->fr_flow_nh_id != fe->fe_key.flow_nh_id ||
                     (unsigned char)req->fr_flow_proto != fe->fe_key.flow_proto) {
-                error = -EBADF;
+                /*
+                 * when gen id is same flow keys should not mis-match
+                 * send EFAULT if such incident happens
+                 */
+                error = -EFAULT;
                 goto invalid_req;
             }
         }
