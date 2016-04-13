@@ -427,5 +427,9 @@ void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
 fat_flow_port_mask_t vr_flow_fat_flow_lookup(struct vrouter *,
         struct vr_packet *, uint16_t, uint16_t, uint16_t);
+unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);
+unsigned int vr_flow_table_used_total_entries(struct vrouter *);
+
+
 
 #endif /* __VR_FLOW_H__ */
