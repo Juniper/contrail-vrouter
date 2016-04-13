@@ -271,6 +271,10 @@ buffer sandesh vrouter_ops {
    27: i32          vo_udp_coff;
    28: i32          vo_flow_hold_limit;
    29: i32          vo_mudp;
+   30: u32          vo_flow_used_entries;
+   31: u32          vo_flow_used_oentries;
+   32: u32          vo_bridge_used_entries;
+   33: u32          vo_bridge_used_oentries;
 }
 
 buffer sandesh vr_mem_stats_req {

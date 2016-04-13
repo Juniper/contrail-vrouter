@@ -354,6 +354,18 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_log_type_enable =
         vr_get_enabled_log_types(&resp->vo_log_type_enable_size);
 
+
+    /* Used entries */
+    resp->vo_flow_used_entries =
+        vr_flow_table_used_total_entries(router);
+    resp->vo_flow_used_oentries =
+       vr_flow_table_used_oflow_entries(router);
+
+    resp->vo_bridge_used_entries =
+        vr_bridge_table_used_total_entries(router);
+    resp->vo_bridge_used_oentries =
+        vr_bridge_table_used_oflow_entries(router);
+
     req = resp;
 generate_response:
     if (ret)

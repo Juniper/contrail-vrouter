@@ -31,6 +31,7 @@ struct vr_htable {
     get_hentry_key ht_get_key;
     vr_hentry_t *ht_free_oentry_head;
     unsigned int ht_used_oentries;
+    unsigned int ht_used_entries;
 };
 
 struct vr_hentry_delete_data {
@@ -345,6 +346,8 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
         return;
 
+    (void)__sync_sub_and_fetch(&table->ht_used_entries, 1);
+
     /* Mark it as Invalid */
     ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
 
@@ -408,6 +411,7 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
                         (ent->hentry_flags & ~VR_HENTRY_FLAG_VALID),
                         VR_HENTRY_FLAG_VALID)) {
                 ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
+                (void)__sync_add_and_fetch(&table->ht_used_entries, 1);
                 return ent;
             }
         }
@@ -444,6 +448,7 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
                  * pointer should still do the right thing
                  */
                 ent->hentry_next_index = ent->hentry_next->hentry_index;
+                (void)__sync_add_and_fetch(&table->ht_used_entries, 1);
                 return o_ent;
             }
         } while (1);
@@ -579,12 +584,23 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
 }
 
 unsigned int
-vr_htable_oflow_entries(vr_htable_t htable)
+vr_htable_used_oflow_entries(vr_htable_t htable)
 {
     struct vr_htable *table = (struct vr_htable *)htable;
 
     if (table)
         return table->ht_used_oentries;
+
+    return 0;
+}
+
+unsigned int
+vr_htable_used_total_entries(vr_htable_t htable)
+{
+    struct vr_htable *table = (struct vr_htable *)htable;
+
+    if (table)
+        return table->ht_used_entries;
 
     return 0;
 }

@@ -263,6 +263,22 @@ vr_bridge_route_flags(unsigned int vrf_id, unsigned char *mac)
     return 0;
 }
 
+unsigned int
+vr_bridge_table_used_total_entries(struct vrouter *router)
+{
+    if (vn_rtable)
+        return vr_htable_used_total_entries(vn_rtable);
+
+    return 0;
+}
+
+unsigned int
+vr_bridge_table_used_oflow_entries(struct vrouter *router)
+{
+    if (vn_rtable)
+        return vr_htable_used_oflow_entries(vn_rtable);
+    return 0;
+}
 
 static int
 bridge_table_get(unsigned int vrf_id, struct vr_route_req *rt)

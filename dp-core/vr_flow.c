@@ -278,10 +278,16 @@ vr_flow_table_size(struct vrouter *router)
     return vr_htable_size(router->vr_flow_table);
 }
 
-static unsigned int
-vr_flow_table_oflow_entries(struct vrouter *router)
+unsigned int
+vr_flow_table_used_oflow_entries(struct vrouter *router)
 {
-    return vr_htable_oflow_entries(router->vr_flow_table);
+    return vr_htable_used_oflow_entries(router->vr_flow_table);
+}
+
+unsigned int
+vr_flow_table_used_total_entries(struct vrouter *router)
+{
+    return vr_htable_used_total_entries(router->vr_flow_table);
 }
 /*
  * this is used by the mmap code. mmap sees the whole flow table
@@ -2063,7 +2069,7 @@ vr_flow_req_process(void *s_req)
         }
 
         resp->fr_created = hold_count;
-        resp->fr_oflow_entries = vr_flow_table_oflow_entries(router);
+        resp->fr_oflow_entries = vr_flow_table_used_oflow_entries(router);
 
         object = VR_FLOW_INFO_OBJECT_ID;
         break;
