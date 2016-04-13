@@ -350,6 +350,8 @@ flow_get_drop_reason(uint8_t drop_code)
         return "RevOutSG";
     case VR_FLOW_DR_SAME_FLOW_RFLOW_KEY:
         return "SameFlowRflowKey";
+    case VR_FLOW_DR_NO_MIRROR_ENTRY:
+        return "NoMirrorentry";
     default:
         break;
     }
