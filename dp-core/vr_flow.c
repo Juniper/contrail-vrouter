@@ -1725,6 +1725,38 @@ vr_flow_udp_src_port (struct vrouter *router, struct vr_flow_entry *fe)
     fe->fe_udp_src_port = port + VR_MUDP_PORT_RANGE_START;
 }
 
+static void
+vr_flow_update_link_local_port(struct vrouter *router, vr_flow_req *req,
+        struct vr_flow_entry *fe)
+{
+    bool set_port = false;
+
+    if (!req || !fe)
+        return;
+
+    if (fe->fe_type != VP_TYPE_IP)
+        return;
+
+    if (req->fr_flags & VR_FLOW_FLAG_LINK_LOCAL) {
+        if (!(fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL))
+            set_port = true;
+    } else if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL) {
+        vr_clear_link_local_port(router, AF_INET, fe->fe_key.flow_proto,
+                                            ntohs(fe->fe_key.flow_dport));
+    }
+
+    if (req->fr_flags & VR_FLOW_BGP_SERVICE) {
+        if (!(fe->fe_flags & VR_FLOW_BGP_SERVICE))
+            set_port = true;
+    }
+
+    if (set_port) {
+        vr_set_link_local_port(router, AF_INET, fe->fe_key.flow_proto,
+                                            ntohs(fe->fe_key.flow_dport));
+    }
+
+    return;
+}
 
 /* command from agent */
 static int
@@ -1817,19 +1849,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (req->fr_flags & VR_FLOW_FLAG_VRFT)
         fe->fe_dvrf = req->fr_flow_dvrf;
 
-    if (fe->fe_type == VP_TYPE_IP) {
-        if (req->fr_flags & VR_FLOW_FLAG_LINK_LOCAL) {
-            if (!(fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL))
-                vr_set_link_local_port(router, AF_INET,
-                        fe->fe_key.flow_proto,
-                        ntohs(fe->fe_key.flow_dport));
-        } else {
-            if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL)
-                vr_clear_link_local_port(router, AF_INET,
-                        fe->fe_key.flow_proto,
-                        ntohs(fe->fe_key.flow_dport));
-        }
-    }
+    vr_flow_update_link_local_port(router, req, fe);
 
     fe->fe_ecmp_nh_index = req->fr_ecmp_nh_index;
     fe->fe_src_nh_index = req->fr_src_nh_index;

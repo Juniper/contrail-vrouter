@@ -53,6 +53,8 @@ typedef enum {
 #define VR_FLOW_FLAG_TRAP_ECMP      0x20
 #define VR_FLOW_FLAG_TRAP_MASK      (VR_FLOW_FLAG_TRAP_ECMP)
 
+#define VR_FLOW_BGP_SERVICE         0x40
+
 /* Flow Action Reason code */
 #define VR_FLOW_DR_UNKNOWN              0x00
 #define VR_FLOW_DR_UNAVIALABLE_INTF     0x01
