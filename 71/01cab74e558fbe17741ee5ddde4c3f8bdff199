@@ -1,0 +1,9 @@
+Approved+1: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Code-Review+1: Édouard Thuleau <ethuleau@juniper.net>
+Code-Review+2: Raja Sivaramakrishnan <raja@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Wed, 13 Apr 2016 11:58:51 -0700
+Reviewed-on: https://review.opencontrail.org/19263
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/R3.0
