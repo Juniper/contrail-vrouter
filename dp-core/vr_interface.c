@@ -962,7 +962,10 @@ eth_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif_mode_xconnect(vif))
         return MR_XCONNECT;
 
-    if (fmd->fmd_label >= 0)
+    /*
+     * If there is a label or if the vrf is different, it is meant for VM's
+     */
+    if ((fmd->fmd_label >= 0) || (fmd->fmd_dvrf != vif->vif_vrf))
         return vm_mac_request(vif, pkt, fmd, dmac);
 
     if (pkt->vp_type == VP_TYPE_ARP) {
