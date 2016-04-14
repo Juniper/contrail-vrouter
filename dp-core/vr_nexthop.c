@@ -80,6 +80,13 @@ vrouter_free_nexthop(struct vr_nexthop *nh)
             vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
             nh->nh_component_nh = NULL;
         }
+
+        if (nh->nh_component_ecmp) {
+            nh->nh_component_ecmp_cnt = 0;
+            vr_free(nh->nh_component_ecmp, VR_NEXTHOP_COMPONENT_OBJECT);
+            nh->nh_component_ecmp = NULL;
+        }
+
     } else if ((nh->nh_type == NH_TUNNEL) &&
             (nh->nh_flags & NH_FLAG_TUNNEL_UDP) &&
             (nh->nh_family == AF_INET6)) {
@@ -584,6 +591,47 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_SOURCE_VALID;
 }
 
+static struct vr_nexthop *
+nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
+        struct vr_forwarding_md *fmd)
+{
+    int ret;
+    unsigned int hash, hash_ecmp, count;
+
+    struct vr_flow flow;
+    struct vr_ip6 *ip6;
+    struct vr_nexthop *cnh = NULL;
+    struct vr_component_nh *cnhp = nh->nh_component_nh;
+    struct vr_component_nh *cnhp_ecmp = nh->nh_component_ecmp;
+
+    if (!(count = nh->nh_component_cnt))
+        return NULL;
+
+    if (pkt->vp_type == VP_TYPE_IP) {
+        ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, &flow);
+        if (ret < 0)
+            return NULL;
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+        ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
+                fmd->fmd_vlan, ip6, &flow);
+        if (ret < 0)
+            return NULL;
+    } else {
+        return NULL;
+    }
+
+    hash = hash_ecmp = vr_hash(&flow, flow.flow_key_len, 0);
+    hash %= count;
+    cnh = cnhp[hash].cnh;
+    if (!cnh && nh->nh_component_ecmp_cnt) {
+        hash_ecmp %= nh->nh_component_ecmp_cnt;
+        cnh = cnhp_ecmp[hash_ecmp].cnh;
+    }
+
+    return cnh;
+}
+
 static int
 nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
                   struct vr_forwarding_md *fmd)
@@ -600,12 +648,20 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!fmd || fmd->fmd_ecmp_nh_index >= (short)nh->nh_component_cnt)
         goto drop;
 
-    if (fmd->fmd_ecmp_nh_index >= 0)
+    if (fmd->fmd_ecmp_nh_index >= 0) {
         member_nh = nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh;
+    } else if (fmd->fmd_flow_index < 0) {
+        member_nh = nh_composite_ecmp_select_nh(pkt, nh, fmd);
+    }
 
     if (!member_nh) {
-        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
-        return 0;
+        if (fmd->fmd_flow_index < 0) {
+            vr_pfree(pkt, VP_DROP_INVALID_NH);
+            return 0;
+        } else {
+            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
+            return 0;
+        }
     }
 
     vr_forwarding_md_set_label(fmd,
@@ -2150,7 +2206,7 @@ nh_composite_mcast_validate(struct vr_nexthop *nh, vr_nexthop_req *req)
 static int
 nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
-    unsigned int i;
+    unsigned int i, j = 0, active = 0;
     struct vr_nexthop *tmp_nh;
 
     nh->nh_validate_src = NULL;
@@ -2163,6 +2219,11 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
         nh->nh_component_nh = NULL;
         nh->nh_component_cnt = 0;
+
+        if (nh->nh_component_ecmp) {
+            vr_free(nh->nh_component_ecmp, VR_NEXTHOP_COMPONENT_OBJECT);
+            nh->nh_component_ecmp = NULL;
+        }
     }
 
     if (req->nhr_nh_list_size != req->nhr_label_list_size)
@@ -2181,6 +2242,8 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid,
                                                     req->nhr_nh_list[i]);
         nh->nh_component_nh[i].cnh_label = req->nhr_label_list[i];
+        if (nh->nh_component_nh[i].cnh)
+            active++;
     }
     nh->nh_component_cnt = req->nhr_nh_list_size;
 
@@ -2194,6 +2257,21 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
         nh->nh_reach_nh = nh_composite_ecmp;
         nh->nh_validate_src = nh_composite_ecmp_validate_src;
+        if (active) {
+            nh->nh_component_ecmp = vr_zalloc(active *
+                    sizeof(struct vr_component_nh), VR_NEXTHOP_COMPONENT_OBJECT);
+            if (!nh->nh_component_ecmp) {
+                goto error;
+            }
+
+            for (i = 0; i < req->nhr_nh_list_size; i++) {
+                if (nh->nh_component_nh[i].cnh) {
+                    memcpy(&nh->nh_component_ecmp[j++], &nh->nh_component_nh[i],
+                            sizeof(struct vr_component_nh));
+                }
+            }
+            nh->nh_component_ecmp_cnt = j;
+        }
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_FABRIC) {
         nh->nh_reach_nh = nh_composite_fabric;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_EVPN) {
@@ -2215,6 +2293,11 @@ error:
         }
 
         vr_free(nh->nh_component_nh, VR_NEXTHOP_COMPONENT_OBJECT);
+        if (nh->nh_component_ecmp) {
+            vr_free(nh->nh_component_ecmp, VR_NEXTHOP_COMPONENT_OBJECT);
+            nh->nh_component_ecmp = NULL;
+        }
+
         nh->nh_component_nh = NULL;
         nh->nh_component_cnt = 0;
     }

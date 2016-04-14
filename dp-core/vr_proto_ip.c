@@ -949,6 +949,26 @@ vr_inet_should_trap(struct vr_packet *pkt, struct vr_flow *flow_p)
     return false;
 }
 
+int
+vr_inet_get_flow_key(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, struct vr_flow *flow)
+{
+    int ret;
+    struct vr_ip *ip;
+
+    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow);
+    if (ret < 0)
+        return ret;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (vr_ip_fragment_head(ip)) {
+        vr_fragment_add(router, fmd->fmd_dvrf, ip, flow->flow4_sport,
+                flow->flow4_dport);
+    }
+
+    return 0;
+}
+
 flow_result_t
 vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
                     struct vr_forwarding_md *fmd)

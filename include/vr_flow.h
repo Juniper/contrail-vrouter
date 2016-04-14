@@ -382,6 +382,7 @@ typedef enum {
 
 struct vr_packet;
 struct vrouter;
+struct vr_ip6;
 
 extern int vr_flow_init(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);
@@ -401,6 +402,8 @@ flow_result_t vr_inet_flow_lookup(struct vrouter *, struct vr_packet *,
                                   struct vr_forwarding_md *);
 flow_result_t vr_inet6_flow_lookup(struct vrouter *, struct vr_packet *,
                                   struct vr_forwarding_md *);
+int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
+        uint16_t, struct vr_ip6 *, struct vr_flow *);
 
 unsigned short
 vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan);
@@ -415,6 +418,8 @@ extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
 extern bool vr_inet6_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);
 extern bool vr_inet_flow_allow_new_flow(struct vrouter *, struct vr_packet *);
+extern int vr_inet_get_flow_key(struct vrouter *, struct vr_packet *,
+        struct vr_forwarding_md *, struct vr_flow *);
 
 extern unsigned int vr_reinject_packet(struct vr_packet *,
         struct vr_forwarding_md *);
