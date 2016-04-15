@@ -1203,13 +1203,12 @@ flow_dump_table(struct flow_table *ft)
                     continue;
                 }
 
+                smatch = dmatch = false;
                 if (match_ip1_set) {
                     smatch = flow_match_source(fe, match_ip1, match_port1);
                     if (!smatch) {
                         dmatch = flow_match_dest(fe, match_ip1, match_port1);
                     }
-                } else {
-                    smatch = dmatch = false;
                 }
 
                 if (match_ip2_set) {
@@ -1232,6 +1231,12 @@ flow_dump_table(struct flow_table *ft)
 
                 if (!smatch && !dmatch)
                     continue;
+
+                if (match_ip1_set && match_ip2_set) {
+                    if (!smatch || !dmatch) {
+                        continue;
+                    }
+                }
             }
 
 
