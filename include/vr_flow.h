@@ -74,6 +74,7 @@ typedef enum {
 #define VR_FLOW_DR_REVERSE_SG           0x11
 #define VR_FLOW_DR_REVERSE_OUT_SG       0x12
 #define VR_FLOW_DR_SAME_FLOW_RFLOW_KEY  0x13
+#define VR_FLOW_DR_NO_MIRROR_ENTRY      0x14
 
 #define VR_IP6_ADDRESS_LEN               16
 
