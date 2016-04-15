@@ -512,12 +512,15 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
             (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ);
         for (i = 0; i < nb_pkts; i++) {
-            if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) > 0)
+            if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) >= 0)
                 stats->vis_port_opackets++;
             else {
                 stats->vis_port_oerrors++;
-                RTE_LOG(ERR, USOCK, "%s: sending mbuf %d of %d to agent socket"
-                        " failed (%d).\n", __func__, i + 1, nb_pkts, errno);
+                if (errno != EAGAIN) {
+                    RTE_LOG(DEBUG, USOCK,
+                            "%s: Error writing mbuf to packet socket: %s (%d)\n",
+                            __func__, rte_strerror(errno), errno);
+                }
             }
 
             rte_pktmbuf_free(mbuf_arr[i]);
