@@ -220,7 +220,7 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
     fe->fe_tcp_flags = 0;
     fe->fe_flags &=
         (VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_EVICTED |
-         VR_FLOW_FLAG_NEW_FLOW);
+         VR_FLOW_FLAG_NEW_FLOW | VR_FLOW_FLAG_DELETE_MARKED);
 
     return;
 }
@@ -253,7 +253,8 @@ vr_flow_get_key(vr_htable_t flow_table, vr_hentry_t *entry,
     struct vr_flow_entry *fe = CONTAINER_OF(fe_hentry,
                              struct vr_flow_entry, entry);
 
-    if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+    if ((fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED) ||
+                    !(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
         return NULL;
 
     if (key_len)
@@ -1578,6 +1579,11 @@ vr_flow_set_req_is_invalid(struct vrouter *router, vr_flow_req *req,
     struct vr_flow_entry *rfe;
 
     if (fe) {
+
+        /* If Delete marked, dont allow any other change */
+        if (fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED)
+            return -EINVAL;
+
         if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6)) {
             if ((uint8_t)req->fr_gen_id != fe->fe_gen_id) {
                 error = -EBADF;
@@ -1680,6 +1686,9 @@ static int
 vr_flow_delete(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
 {
+    /* Delete Mark it */
+    fe->fe_flags |= VR_FLOW_FLAG_DELETE_MARKED;
+
     if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL)
         vr_clear_link_local_port(router, AF_INET, fe->fe_key.flow_proto,
                                    ntohs(fe->fe_key.flow_dport));

@@ -12,7 +12,7 @@
 #define VR_FLOW_ACTION_DROP         0x0
 #define VR_FLOW_ACTION_HOLD         0x1
 #define VR_FLOW_ACTION_FORWARD      0x2
-#define VR_FLOW_ACTION_NAT          0x4
+#define VR_FLOW_ACTION_NAT          0x3
 
 typedef enum {
     FLOW_HELD,
@@ -52,6 +52,9 @@ typedef enum {
 /* for TRAP */
 #define VR_FLOW_FLAG_TRAP_ECMP      0x20
 #define VR_FLOW_FLAG_TRAP_MASK      (VR_FLOW_FLAG_TRAP_ECMP)
+
+
+#define VR_FLOW_FLAG_DELETE_MARKED  0x40
 
 /* Flow Action Reason code */
 #define VR_FLOW_DR_UNKNOWN              0x00
