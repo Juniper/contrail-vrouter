@@ -42,7 +42,8 @@ vr_dpdk_lcore_least_used_get(void)
 
     /* never use master lcore */
     RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-        if (lcore_id < VR_DPDK_FWD_LCORE_ID)
+        if (lcore_id < VR_DPDK_FWD_LCORE_ID ||
+                lcore_id == vr_dpdk.vf_lcore_id)
             continue;
         lcore = vr_dpdk.lcores[lcore_id];
 
@@ -207,6 +208,10 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
         RTE_LOG(ERR, VROUTER, "    error getting the least used lcore ID\n");
         return -EFAULT;
     }
+
+    /* Check if we have dedicated an lcore for SR-IOV VF IO. */
+    if (vif_is_fabric(vif) && vr_dpdk.vf_lcore_id)
+        least_used_id = vr_dpdk.vf_lcore_id;
 
     /* init TX queues starting with the least used lcore */
     lcore_id = least_used_id;
@@ -777,12 +782,12 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
  * dpdk_lcore_rxqs_distribute - receive packets from RX queues and
  * distribute them among forwarding lcores.
  *
- * The function is used by IO lcores.
+ * The function is used by IO and SR-IOV virtual function dedicated lcores.
  *
  * Returns total number of received packets.
  */
 static uint64_t
-dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore)
+dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore, const bool io_core)
 {
     uint64_t total_pkts = 0;
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
@@ -803,7 +808,7 @@ dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore)
             /* (Re)calculate hashes and strip VLAN tags. */
             vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, &nb_pkts);
             /* Distribute all the packets. */
-            vr_dpdk_lcore_distribute(lcore, true, rx_queue->q_vif, pkts, nb_pkts);
+            vr_dpdk_lcore_distribute(lcore, io_core, rx_queue->q_vif, pkts, nb_pkts);
         }
     }
 
@@ -920,7 +925,7 @@ dpdk_lcore_io_rxtx(struct vr_dpdk_lcore *lcore)
 {
     uint64_t total_pkts = 0;
 
-    total_pkts += dpdk_lcore_rxqs_distribute(lcore);
+    total_pkts += dpdk_lcore_rxqs_distribute(lcore, true);
 
     /* make a short pause if no single packet received */
     if (unlikely(total_pkts == 0)) {
@@ -935,14 +940,78 @@ dpdk_lcore_io_rxtx(struct vr_dpdk_lcore *lcore)
     }
 }
 
+/*
+ * dpdk_lcore_vlan_fwd - forward VLAN packets with unmatching tag.
+ */
+static void
+dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
+{
+    struct vr_dpdk_queue* tx_queue;
+    struct vrouter* router = vrouter_get(0);
+    struct rte_mbuf* pkts[VR_DPDK_RX_BURST_SZ];
+    unsigned nb_pkts, i;
+
+    /*
+     * Receive packets from VLAN interface and send them to the wire.
+     * Those packets will not be seen in vifdump on the physical vif.
+     */
+    if (router->vr_eth_if) {
+        tx_queue = &lcore->lcore_tx_queues[router->vr_eth_if->vif_idx];
+        if (tx_queue->txq_ops.f_tx) {
+            nb_pkts = rte_kni_rx_burst(vr_dpdk.vlan_kni, pkts,
+                    VR_DPDK_RX_BURST_SZ);
+            for (i = 0; i < nb_pkts; i++)
+                tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, pkts[i]);
+        }
+    }
+    /* Get packets from VLAN ring and forward them to kernel. */
+    nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.vlan_ring, (void**) &pkts,
+            VR_DPDK_RX_BURST_SZ);
+    i = rte_kni_tx_burst(vr_dpdk.vlan_kni, pkts, nb_pkts);
+    for (; i < nb_pkts; i++)
+        vr_dpdk_pfree(pkts[i], VP_DROP_VLAN_FWD_TX);
+}
+
+/*
+ * dpdk_lcore_io_rxtx - SR-IOV VF IO lcore RX/TX
+ */
+static inline void
+dpdk_lcore_sriov_rxtx(struct vr_dpdk_lcore *lcore)
+{
+    uint64_t total_pkts = 0;
+
+    /* Distribute all packets to other lcores. */
+    total_pkts += dpdk_lcore_rxqs_distribute(lcore, false);
+    /* Push TX rings. */
+    total_pkts += dpdk_lcore_tx_rings_push(lcore);
+
+    /* Make a short pause if no single packet received. */
+    if (unlikely(total_pkts == 0)) {
+        rcu_thread_offline();
+#if VR_DPDK_SLEEP_NO_PACKETS_US > 0
+        usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
+#endif
+#if VR_DPDK_YIELD_NO_PACKETS > 0
+        sched_yield();
+#endif
+        rcu_thread_online();
+    }
+
+    /*
+     * Forward VLAN packets with unmatching tag.
+     * This is done only by the first forwarding lcore.
+     */
+    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID
+            && vr_dpdk.vlan_ring) {
+        dpdk_lcore_vlan_fwd(lcore);
+    }
+}
+
 /* Forwarding lcore RX/TX */
 static inline void
 dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
 {
-    uint64_t nb_tx, i, total_pkts = 0;
-    struct vrouter *router;
-    struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
-    struct vr_dpdk_queue *tx_queue;
+    uint64_t total_pkts = 0;
 
     /*
      * TODO: skip RX queues with no packets to read
@@ -980,27 +1049,7 @@ dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID
             && lcore == vr_dpdk.lcores[VR_DPDK_FWD_LCORE_ID]
             && vr_dpdk.vlan_ring) {
-        /*
-         * Receive packets from VLAN interface and send them to the wire.
-         * Those packets will not be seen in vifdump on the physical vif.
-         */
-        router = vrouter_get(0);
-        if (router->vr_eth_if) {
-            tx_queue = &lcore->lcore_tx_queues[router->vr_eth_if->vif_idx];
-            if (tx_queue->txq_ops.f_tx) {
-                total_pkts = rte_kni_rx_burst(vr_dpdk.vlan_kni, pkts,
-                    VR_DPDK_RX_BURST_SZ);
-                for (i = 0; i < total_pkts; i++)
-                    tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, pkts[i]);
-            }
-        }
-
-        /* Get packets from VLAN ring and forward them to kernel. */
-        total_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.vlan_ring,
-            (void **)&pkts, VR_DPDK_RX_BURST_SZ);
-        nb_tx = rte_kni_tx_burst(vr_dpdk.vlan_kni, pkts, total_pkts);
-        for( ; nb_tx < total_pkts; nb_tx++)
-            vr_dpdk_pfree(pkts[nb_tx], VP_DROP_VLAN_FWD_TX);
+        dpdk_lcore_vlan_fwd(lcore);
     }
 }
 
@@ -1051,25 +1100,61 @@ dpdk_lcore_dst_lcores_stringify(struct vr_dpdk_lcore *lcore)
 }
 
 /*
+ * dpdk_lcore_fwd_dsts_init - init forwarding lcore destinations for MPLSoGRE.
+ */
+static void
+dpdk_lcore_fwd_dsts_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
+{
+    int i;
+
+    /* Init table of lcores to distribute packets to. */
+    if (vr_dpdk.vf_lcore_id) {
+        /* We have an lcore dedicated to SR-IOV virtual function IO. */
+        if (lcore_id == vr_dpdk.vf_lcore_id) {
+            lcore->lcore_nb_dst_lcores = vr_dpdk.nb_fwd_lcores - 1;
+            for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
+                lcore->lcore_dst_lcore_idxs[i] = i + 1;
+            }
+        } else {
+            /* Do not distribute and to itself and to the SR-IOV VF IO. */
+            lcore->lcore_nb_dst_lcores = vr_dpdk.nb_fwd_lcores - 2;
+            for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
+                lcore->lcore_dst_lcore_idxs[i] = i + 1;
+                if (lcore->lcore_dst_lcore_idxs[i] >=
+                        lcore_id - VR_DPDK_FWD_LCORE_ID)
+                    lcore->lcore_dst_lcore_idxs[i]++;
+            }
+        }
+    } else {
+        /* No dedicated lcore, so do a normal distribution. */
+        lcore->lcore_nb_dst_lcores = vr_dpdk.nb_fwd_lcores - 1;
+        for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
+            lcore->lcore_dst_lcore_idxs[i] = i;
+            if (lcore->lcore_dst_lcore_idxs[i] >=
+                    lcore_id - VR_DPDK_FWD_LCORE_ID)
+                lcore->lcore_dst_lcore_idxs[i]++;
+        }
+    }
+
+    if (lcore_id == vr_dpdk.vf_lcore_id) {
+        RTE_LOG(INFO, VROUTER, "Lcore %u: distributing all packets to [%s]\n",
+                lcore_id, dpdk_lcore_dst_lcores_stringify(lcore));
+    } else {
+        RTE_LOG(INFO, VROUTER,
+                "Lcore %u: distributing MPLSoGRE packets to [%s]\n", lcore_id,
+                dpdk_lcore_dst_lcores_stringify(lcore));
+    }
+}
+
+/*
  * dpdk_lcore_fwd_init - init forwarding lcore context.
  * Returns 0 on success, -errno otherwise.
  */
 static int
 dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
 {
-    int i;
-
-    /* Init table of lcores to distribute packets to. */
-    lcore->lcore_nb_dst_lcores = vr_dpdk.nb_fwd_lcores - 1;
-    for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
-        lcore->lcore_dst_lcore_idxs[i] = i;
-        if (lcore->lcore_dst_lcore_idxs[i] >= lcore_id - VR_DPDK_FWD_LCORE_ID)
-            lcore->lcore_dst_lcore_idxs[i]++;
-    }
-    RTE_LOG(INFO, VROUTER,
-        "Lcore %u: distributing MPLSoGRE packets to [%s]\n",
-        lcore_id, dpdk_lcore_dst_lcores_stringify(lcore));
-
+    /* Init destinations for hashed packets (i.e. MPLSoGRE). */
+    dpdk_lcore_fwd_dsts_init(lcore_id, lcore);
 
     /*
      * Allocate multi-producer single-consumer RX ring.
@@ -1350,8 +1435,11 @@ dpdk_lcore_fwd_loop(void)
         lcore->lcore_fwd_loops = cur_cycles;
 #endif
 
-        /* run forwarding lcore RX/TX cycle */
-        dpdk_lcore_fwd_rxtx(lcore);
+        /* Run forwarding lcore or SR-IOV VF RX/TX cycle. */
+        if (lcore_id == vr_dpdk.vf_lcore_id)
+            dpdk_lcore_sriov_rxtx(lcore);
+        else
+            dpdk_lcore_fwd_rxtx(lcore);
 
         /* IP fragment assembler timers */
 #if VR_DPDK_USE_TIMER
