@@ -792,7 +792,7 @@ dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore, const bool io_core)
     uint64_t total_pkts = 0;
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ];
     struct vr_dpdk_queue *rx_queue;
-    uint32_t nb_pkts;
+    uint32_t nb_pkts, i;
 
     /* for all hardware RX queues */
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
@@ -804,6 +804,23 @@ dpdk_lcore_rxqs_distribute(struct vr_dpdk_lcore *lcore, const bool io_core)
             rte_prefetch0(rx_queue->q_vif);
 
             total_pkts += nb_pkts;
+
+            /*
+             * Force hash recalculation in software.
+             * On my setup Intel 82599 NIC hash just src/dst IPs for
+             * UDP traffic, not the src/dst ports. So MPLSoUDP packets
+             * always have the same RSS hash, hence the SR-IOV IO lcore
+             * distribute all the MPLSoUDP packets to just one
+             * forwarding lcore.
+             *
+             * The issue could be fixed by enabling UDP port hashing on host:
+             *     ethtool -U <physical function> rx-flow-hash udp4 sdfn
+             *
+             * Alternatively we can force vRouter to recalculate the hashes.
+             */
+            for (i = 0; i < nb_pkts; i++) {
+                pkts[i]->ol_flags &= ~PKT_RX_RSS_HASH;
+            }
 
             /* (Re)calculate hashes and strip VLAN tags. */
             vr_dpdk_ethdev_rx_emulate(rx_queue->q_vif, pkts, &nb_pkts);
