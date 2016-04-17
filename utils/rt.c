@@ -47,6 +47,7 @@ static bool cmd_flood_set = false;
 
 static int cmd_set, dump_set, get_set;
 static int family_set, help_set, vrf_set;
+static int cust_flags;
 
 static int cmd_prefix_set;
 static int cmd_dst_mac_set;
@@ -156,7 +157,7 @@ vr_route_req_process(void *s_req)
         for (i = 0; i < 8; i++)
             printf(" ");
 
-        bzero(flags, sizeof(flags));
+        memset(flags, 0, sizeof(flags));
         if (rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
             strcat(flags, "L");
         if (rt->rtr_label_flags & VR_RT_ARP_PROXY_FLAG)
@@ -298,7 +299,7 @@ op_retry:
     case SANDESH_OP_ADD:
         ret = vr_send_route_add(cl, 0, cmd_vrf_id, cmd_family_id,
                 cmd_prefix, cmd_plen, cmd_nh_id, cmd_label, dst_mac,
-                cmd_replace_plen, flags);
+                cmd_replace_plen, flags | cust_flags);
         break;
 
     case SANDESH_OP_DUMP:
@@ -353,8 +354,20 @@ usage_internal()
            "       e <mac address in : format>\n"
            "       T <trap ARP requests to Agent for this route>\n"
            "       r <replacement route prefix length for delete>\n"
-           "       v <vrfid>\n");
-
+           "       v <vrfid>\n"
+           "       x <custom flag in hexa> \n"
+           "                               \n"
+           "           for inet(6) routes: \n"
+           "          VR_RT_LABEL_VALID_FLAG      0x1\n"
+           "          VR_RT_ARP_PROXY_FLAG        0x2\n"
+           "          VR_RT_ARP_TRAP_FLAG         0x4\n"
+           "          VR_RT_ARP_FLOOD_FLAG        0x8\n"
+           "\n"
+           "           for bridge routes:  \n"
+           "          VR_BE_VALID_FLAG            0x01\n"
+           "          VR_BE_LABEL_VALID_FLAG      0x02\n"
+           "          VR_BE_FLOOD_DHCP_FLAG       0x04\n"
+           "\n");
     exit(1);
 }
 
@@ -486,13 +499,13 @@ enum opt_flow_index {
 };
 
 static struct option long_options[] = {
-    [COMMAND_OPT_INDEX]   = {"cmd",    no_argument,       &cmd_set,    1},
-    [DUMP_OPT_INDEX]      = {"dump",   required_argument, &dump_set,   1},
-    [FAMILY_OPT_INDEX]    = {"family", required_argument, &family_set, 1},
-    [GET_OPT_INDEX]       = {"get",    required_argument, &get_set,    1},
-    [VRF_OPT_INDEX]       = {"vrf",    required_argument, &vrf_set,    1},
-    [HELP_OPT_INDEX]      = {"help",   no_argument,       &help_set,   1},
-    [MAX_OPT_INDEX]       = { NULL,    0,                 0,           0},
+    [COMMAND_OPT_INDEX]       = {"cmd",    no_argument,       &cmd_set,    1},
+    [DUMP_OPT_INDEX]          = {"dump",   required_argument, &dump_set,   1},
+    [FAMILY_OPT_INDEX]        = {"family", required_argument, &family_set, 1},
+    [GET_OPT_INDEX]           = {"get",    required_argument, &get_set,    1},
+    [VRF_OPT_INDEX]           = {"vrf",    required_argument, &vrf_set,    1},
+    [HELP_OPT_INDEX]          = {"help",   no_argument,       &help_set,   1},
+    [MAX_OPT_INDEX]           = { NULL,    0,                 0,           0},
 };
 
 static void
@@ -571,7 +584,7 @@ main(int argc, char *argv[])
     cmd_label = -1;
     cmd_family_id = AF_INET;
 
-    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:F",
+    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:Fx:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':
@@ -663,6 +676,9 @@ main(int argc, char *argv[])
                 cmd_trap_set = true;
                 break;
 
+            case 'x':
+                cust_flags = strtoul(optarg, NULL, 16);
+                break;
             case 0:
                 parse_long_opts(option_index, optarg);
                 break;
