@@ -507,6 +507,8 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
     if (unlikely(usockp->usock_parent->usock_vif == NULL))
         return;
 
+    rcu_thread_offline();
+
     stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
@@ -523,6 +525,8 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
             rte_pktmbuf_free(mbuf_arr[i]);
         }
     } while (nb_pkts > 0);
+
+    rcu_thread_online();
 }
 
 static int
