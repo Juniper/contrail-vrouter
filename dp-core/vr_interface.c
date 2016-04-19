@@ -1820,6 +1820,7 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf)
         memcpy(req->vifr_mac, intf->vif_mac,
                 MINIMUM(req->vifr_mac_size, sizeof(intf->vif_mac)));
     req->vifr_ip = intf->vif_ip;
+    req->vifr_mir_id = intf->vif_mirror_id;
 
     req->vifr_ref_cnt = intf->vif_users;
 
