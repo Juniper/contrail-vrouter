@@ -323,9 +323,14 @@ vr_interface_req_process(void *s)
             vr_get_if_type_string(req->vifr_type),
             MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
     vr_interface_print_head_space();
-    printf("Vrf:%d Flags:%s MTU:%d Ref:%d\n", req->vifr_vrf,
+    printf("Vrf:%d Flags:%s MTU:%d Ref:%d", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
             req->vifr_mtu, req->vifr_ref_cnt);
+    if (req->vifr_flags & (VIF_FLAG_MIRROR_TX | VIF_FLAG_MIRROR_RX)) {
+        printf(" Mirror index %d\n", req->vifr_mir_id);
+    } else {
+        printf("\n");
+    }
     vr_interface_print_head_space();
     printf("RX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_ipackets,
@@ -334,6 +339,7 @@ vr_interface_req_process(void *s)
     printf("TX packets:%" PRId64 "  bytes:%" PRId64 " errors:%" PRId64 "\n",
             req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors);
+
     if (req->vifr_fat_flow_protocol_port_size) {
         vr_interface_print_head_space();
         printed = 0;
