@@ -312,13 +312,19 @@ print_vrouter_parameters(vrouter_ops *req)
         "    NIC cksum offload for outer UDP hdr  %d\n"
         "    Flow hold limit:                     %u\n"
         "    MPLS over UDP globally               %d\n"
+        "    Used Flow entries                    %u\n"
+        "    Used Over Flow entries               %u\n"
+        "    Used Bridge entries                  %u\n"
+        "    Used Over Flow bridge entries        %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
         req->vo_from_vm_mss_adj, req->vo_to_vm_mss_adj,
         req->vo_perfr1, req->vo_perfr2, req->vo_perfr3, req->vo_perfp,
         req->vo_perfq1, req->vo_perfq2, req->vo_perfq3,
-        req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp
+        req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp,
+        req->vo_flow_used_entries, req->vo_flow_used_oentries,
+        req->vo_bridge_used_entries, req->vo_bridge_used_oentries
     );
 
     return;
