@@ -388,3 +388,9 @@ buffer sandesh vr_drop_stats_req {
     50: i64             vds_vlan_fwd_tx;
     51: i64             vds_vlan_fwd_enq;
 }
+
+buffer sandesh vr_nat_port_req {
+    1: sandesh_op h_op;
+    2: i32        npr_id;
+    3: byte       npr_proto;
+}
