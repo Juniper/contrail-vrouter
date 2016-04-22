@@ -39,10 +39,9 @@ struct vr_bridge_entry {
 } __attribute__((packed));
 
 #define VR_DEF_BRIDGE_ENTRIES          (256 * 1024)
-#define VR_DEF_BRIDGE_OENTRIES         (4 * 1024)
 
 unsigned int vr_bridge_entries = VR_DEF_BRIDGE_ENTRIES;
-unsigned int vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
+unsigned int vr_bridge_oentries = 0;
 static vr_htable_t vn_rtable;
 char vr_bcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
@@ -393,6 +392,9 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     /* If table already exists, dont create again */
     if (rtable->algo_data)
         return 0;
+
+    if (!vr_bridge_oentries)
+        vr_bridge_oentries = ((vr_bridge_entries / 5) + 1023) & ~1023;
 
     rtable->algo_data = vr_htable_create(vrouter_get(0), vr_bridge_entries,
                 vr_bridge_oentries, sizeof(struct vr_bridge_entry),
