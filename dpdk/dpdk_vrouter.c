@@ -955,7 +955,7 @@ parse_long_opts(int opt_flow_index, char *optarg)
     case BRIDGE_OENTRIES_OPT_INDEX:
         vr_bridge_oentries = (unsigned int)strtoul(optarg, NULL, 0);
         if (errno != 0) {
-            vr_bridge_oentries = VR_DEF_BRIDGE_OENTRIES;
+            vr_bridge_oentries = ((vr_bridge_entries / 5) + 1023) & ~1023;
         }
         break;
 
@@ -969,7 +969,10 @@ parse_long_opts(int opt_flow_index, char *optarg)
     case OFLOW_ENTRIES_OPT_INDEX:
         vr_oflow_entries = (unsigned int)strtoul(optarg, NULL, 0);
         if (errno != 0) {
-            vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
+            /* vr_flow_entries would be either VR_DEF_FLOW_ENTRIES or
+             * user value
+             */
+            vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
         }
         break;
 

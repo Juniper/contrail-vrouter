@@ -26,7 +26,7 @@
 #define VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT 4096
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
-unsigned int vr_oflow_entries = VR_DEF_OFLOW_ENTRIES;
+unsigned int vr_oflow_entries = 0;
 
 /*
  * host can provide its own memory . Point in case is the DPDK. In DPDK,
@@ -2212,6 +2212,13 @@ static int
 vr_flow_table_init(struct vrouter *router)
 {
     if (!router->vr_flow_table) {
+
+        /*
+         * Overflow entries is 20% of the main flow table
+         * adjusted to next 1k
+         */
+        if (!vr_oflow_entries)
+            vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
 
         router->vr_flow_table = vr_htable_attach(router, vr_flow_entries,
                 vr_flow_table, vr_oflow_entries, vr_oflow_table,
