@@ -8,7 +8,6 @@
 #include "vrouter.h"
 
 #define VR_DEF_BRIDGE_ENTRIES          (256 * 1024)
-#define VR_DEF_BRIDGE_OENTRIES         (4 * 1024)
 
 #define VR_MAC_COPY(dst, src) { \
     ((uint16_t *)(dst))[0] = ((uint16_t *)(src))[0]; \

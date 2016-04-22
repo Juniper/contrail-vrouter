@@ -353,9 +353,7 @@ struct vr_flow_entry {
 
 #define VR_DNS_SERVER_PORT  htons(53)
 
-#define VR_DEF_FLOW_ENTRIES         (512 * 1024)
-
-#define VR_DEF_OFLOW_ENTRIES        (8 * 1024)
+#define VR_DEF_FLOW_ENTRIES   (512 * 1024)
 
 extern unsigned int vr_flow_entries, vr_oflow_entries;
 
