@@ -311,6 +311,7 @@ struct vr_dummy_flow_entry {
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
     uint8_t fe_type;
+    uint8_t fe_ttl;
     unsigned short fe_udp_src_port;
 } __attribute__((packed));
 
@@ -337,6 +338,7 @@ struct vr_flow_entry {
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
     uint8_t fe_type;
+    uint8_t fe_ttl;
     unsigned short fe_udp_src_port;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
