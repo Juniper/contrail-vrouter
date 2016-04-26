@@ -1838,6 +1838,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         fe->fe_action = req->fr_action;
     }
 
+    fe->fe_ttl = req->fr_ttl;
+
     if (fe->fe_action == VR_FLOW_ACTION_DROP)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
 

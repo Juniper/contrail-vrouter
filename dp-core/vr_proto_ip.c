@@ -684,6 +684,9 @@ vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
 
     ip_inc = inc;
 
+    if (fe->fe_ttl)
+        vr_incremental_diff(ip->ip_ttl, fe->fe_ttl, &ip_inc);
+
     if (vr_ip_transport_header_valid(ip)) {
         t_sport = (unsigned short *)((unsigned char *)ip +
                 (ip->ip_hl * 4));
