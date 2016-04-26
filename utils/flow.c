@@ -534,6 +534,7 @@ dump_table(struct flow_table *ft)
                     printf(", %d, ", fe->fe_sec_mirror_id);
             }
             printf(" SPort %d", fe->fe_udp_src_port);
+            printf(" Ttl %d", fe->fe_ttl);
             printf(")");
         }
 
