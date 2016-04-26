@@ -452,7 +452,7 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     struct vrouter *router = vrouter_get(0);
     struct vr_interface *vif;
     int i, ret;
-    uint8_t ethdev_port_id, slave_port_id;
+    uint8_t slave_port_id;
     struct vr_dpdk_ethdev *ethdev = NULL;
 
     if (port_id >= rte_eth_dev_count()) {
@@ -505,19 +505,15 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     for (i = 0; i < router->vr_max_interfaces; i++) {
         vif = __vrouter_get_interface(router, i);
         if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
-            ethdev_port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->
-                        ethdev_port_id);
-            if (ethdev_port_id == port_id) {
-                /* Ethernet header size */
-                new_mtu += sizeof(struct vr_eth);
-                if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
-                    /* 802.1q header size */
-                    new_mtu += sizeof(uint32_t);
-                }
-                vif->vif_mtu = new_mtu;
-                if (vif->vif_bridge)
-                    vif->vif_bridge->vif_mtu = new_mtu;
-            }
+           /* Ethernet header size */
+           new_mtu += sizeof(struct vr_eth);
+           if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+               /* 802.1q header size */
+               new_mtu += sizeof(uint32_t);
+           }
+           vif->vif_mtu = new_mtu;
+           if (vif->vif_bridge)
+               vif->vif_bridge->vif_mtu = new_mtu;
         }
     }
 
