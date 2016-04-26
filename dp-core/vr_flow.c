@@ -418,7 +418,7 @@ vr_flow_table_lookup(struct vr_flow *key, uint16_t type,
     for (i = 0; i < bucket_size; i++) {
         flow_e = (struct vr_flow_entry *)vr_btable_get(table,
                 (hash + i) % table_size);
-        if (flow_e &&
+        if (flow_e && (!(flow_e->fe_flags & VR_FLOW_FLAG_DELETE_MARKED)) &&
                 (flow_e->fe_flags & VR_FLOW_FLAG_ACTIVE) &&
                 (flow_e->fe_type == type)) {
             if (!memcmp(&flow_e->fe_key, key, key->key_len)) {
@@ -1066,6 +1066,11 @@ vr_flow_req_is_invalid(struct vrouter *router, vr_flow_req *req,
     struct vr_flow_entry *rfe;
 
     if (fe) {
+
+        /* If Delete marked, dont allow any other change */
+        if (fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED)
+            return -EINVAL;
+
         if (fe->fe_type == VP_TYPE_IP) {
             if ((unsigned int)req->fr_flow_sip != fe->fe_key.flow4_sip ||
                     (unsigned int)req->fr_flow_dip != fe->fe_key.flow4_dip ||
@@ -1129,6 +1134,10 @@ static int
 vr_flow_delete(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
 {
+
+    /* Delete Mark */
+    fe->fe_flags |= VR_FLOW_FLAG_DELETE_MARKED;
+
     if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL)
         vr_clear_link_local_port(router, AF_INET, fe->fe_key.flow4_proto,
                                    ntohs(fe->fe_key.flow4_dport));

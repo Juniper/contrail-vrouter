@@ -136,7 +136,7 @@ dump_legend(void)
     printf("N=NAT(S=SNAT, D=DNAT, Ps=SPAT, Pd=DPAT, ");
     printf("L=Link Local Port)\n");
 
-    printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
+    printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop M=DeleteMarked\n");
     printf("\n");
 
     return;
@@ -245,6 +245,11 @@ dump_table(struct flow_table *ft)
 
             default:
                 action = 'U';
+            }
+
+            if (fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED) {
+                flag_string[fi++] = 'M';
+                need_flag_print = 1;
             }
 
             printf("\t(");
