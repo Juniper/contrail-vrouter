@@ -162,6 +162,31 @@ dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, uint8_t port_id)
     rte_memcpy(addr, &rte_eth_devices[port_id].pci_dev->addr, sizeof(struct rte_pci_addr));
 }
 
+static inline void
+dpdk_set_hw_vlan_strip(uint32_t port_id, struct vr_interface *vif)
+{
+    uint32_t i;
+    uint8_t *port_id_ptr;
+    int port_num = 0;
+    struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
+
+    port_id_ptr = (ethdev->ethdev_nb_slaves == -1)?
+                   &ethdev->ethdev_port_id:ethdev->ethdev_slaves;
+
+    do {
+        for (i=0; i< rte_eth_devices[*port_id_ptr].data->nb_rx_queues; i++)
+        {
+            if (vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) {
+                rte_eth_dev_set_vlan_strip_on_queue(*port_id_ptr, i, 1);
+            } else {
+                rte_eth_dev_set_vlan_strip_on_queue(*port_id_ptr, i, 0);
+            }
+        }
+        port_num++;
+        port_id_ptr++;
+    } while (port_num < ethdev->ethdev_nb_slaves);
+}
+
 void
 dpdk_vif_attach_ethdev(struct vr_interface *vif,
         struct vr_dpdk_ethdev *ethdev)
@@ -423,6 +448,9 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     if (ret < 0)
         return ret;
 #endif
+
+    /* Set hardware VLAN stripping */
+    dpdk_set_hw_vlan_strip(port_id, vif);
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),

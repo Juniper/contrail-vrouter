@@ -1702,7 +1702,8 @@ del_fail:
 static void
 vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
 {
-    vif->vif_flags = req->vifr_flags;
+    vif->vif_flags = (vif->vif_flags & VIF_VR_CAP_MASK) |
+                     (req->vifr_flags & ~VIF_VR_CAP_MASK);
 
     /*
      * If both L3 and L2 are disabled, enabled L3 with fallback bridging
@@ -1711,6 +1712,7 @@ vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
     if (!(vif->vif_flags & (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED))) {
         vif->vif_flags |= (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED);
     }
+
     return;
 }
 

@@ -662,10 +662,6 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
 
     dpdk_ethdev_info_update(ethdev);
 
-    /* enable hardware vlan stripping */
-    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
-        ethdev_conf.rxmode.hw_vlan_strip = 1;
-    }
     ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
         ethdev->ethdev_nb_tx_queues, &ethdev_conf);
     if (ret < 0) {
