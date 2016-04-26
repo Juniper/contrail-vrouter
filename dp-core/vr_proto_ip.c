@@ -78,17 +78,11 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_packet *pkt)
 static inline unsigned char
 vr_ip_decrement_ttl(struct vr_ip *ip)
 {
-    unsigned int diff = 0xfffe;
-    unsigned int csum;
+    unsigned int diff = 0;
 
-    csum = (~ip->ip_csum) & 0xffff;
-    csum += diff;
-    csum = (csum >> 16) + (csum & 0xffff);
-    if (csum >> 16)
-        csum = (csum & 0xffff) + 1;
-
+    vr_incremental_diff(ip->ip_ttl, ip->ip_ttl - 1, &diff);
     --ip->ip_ttl;
-    ip->ip_csum = ~(csum & 0xffff);
+     vr_ip_incremental_csum(ip, diff);
 
     return ip->ip_ttl;
 }
@@ -626,7 +620,7 @@ vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
                  struct vr_forwarding_md *fmd)
 {
     bool hdr_update = false;
-    unsigned int ip_inc, inc = 0;
+    unsigned int ip_inc, ip_ttl_inc, inc = 0;
     unsigned short *t_sport, *t_dport;
 
     struct vrouter *router = pkt->vp_if->vif_router;
@@ -683,6 +677,13 @@ vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
     }
 
     ip_inc = inc;
+
+    if (fe->fe_ttl) {
+        ip_ttl_inc = inc;
+        vr_incremental_diff(ip->ip_ttl, fe->fe_ttl, &ip_ttl_inc);
+        vr_ip_incremental_csum(ip, ip_ttl_inc);
+        ip->ip_ttl = fe->fe_ttl;
+    }
 
     if (vr_ip_transport_header_valid(ip)) {
         t_sport = (unsigned short *)((unsigned char *)ip +

@@ -185,6 +185,7 @@ buffer sandesh vr_flow_req {
    35: u32          fr_flow_stats_oflow;
    36: i32          fr_oflow_entries;
    37: byte         fr_gen_id;
+   38: byte         fr_ttl;
 }
 
 buffer sandesh vr_vrf_assign_req {
