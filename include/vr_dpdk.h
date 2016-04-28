@@ -237,8 +237,11 @@ extern unsigned int vr_flow_hold_limit;
 #define VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT 1000
 /* Maximum number of mbufs in fragment assembler. */
 #define VR_DPDK_MAX_FRAGMENT_ELEMENTS     1024ULL
-/* SR-IOV virtual function PMD name. */
-#define VR_DPDK_VF_PMD_NAME "rte_ixgbevf_pmd"
+/*
+ * SR-IOV virtual function PMD name suffix.
+ * Note: only rte_ixgbevf_pmd was tested.
+ */
+#define VR_DPDK_VF_PMD_SFX "vf_pmd"
 
 /*
  * DPDK LCore IDs
