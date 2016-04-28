@@ -572,20 +572,22 @@ dpdk_check_sriov_vf(void)
 {
     int i;
     struct rte_eth_dev_info dev_info;
+    size_t soff;
 
     for (i = 0; i < rte_eth_dev_count(); i++)
     {
         rte_eth_dev_info_get(i, &dev_info);
-        if (strncmp(dev_info.driver_name, VR_DPDK_VF_PMD_NAME,
-                sizeof(VR_DPDK_VF_PMD_NAME)) == 0) {
-            RTE_LOG(INFO, VROUTER, "Eth device %" PRIu8
-                    " is a SR-IOV virtual function\n", i);
+        /* Check PMD name suffix to detect SR-IOV virtual function. */
+        soff = strlen(dev_info.driver_name) - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
+        if (soff > 0 &&
+                strncmp(dev_info.driver_name + soff, VR_DPDK_VF_PMD_SFX,
+                sizeof(VR_DPDK_VF_PMD_SFX)) == 0) {
             /* Dedicate the first forwarding lcore to VF RX/TX. */
             if (dev_info.max_tx_queues < vr_dpdk.nb_fwd_lcores) {
                 vr_dpdk.vf_lcore_id = VR_DPDK_FWD_LCORE_ID;
                 RTE_LOG(INFO, VROUTER,
-                        "    lcore %u is dedicated for SR-IOV virtual function IO\n",
-                        VR_DPDK_FWD_LCORE_ID);
+                        "%s: Lcore %d: SR-IOV virtual function IO for eth device %d (%s)\n",
+                        __func__, VR_DPDK_FWD_LCORE_ID, i, dev_info.driver_name);
                 break;
             }
         }
