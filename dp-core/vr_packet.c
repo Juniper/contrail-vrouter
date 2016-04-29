@@ -70,7 +70,7 @@ vr_ip6_proto_pull(struct vr_ip6 *ip6h)
  */
 int
 vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
-                      struct tcphdr **tcphp, unsigned int frag_size,
+                      void **thp, unsigned int frag_size,
                       void (do_tcp_mss_adj)(struct tcphdr *, unsigned short,
                                           unsigned char),
                       unsigned int *hlenp,
@@ -115,6 +115,9 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
 
         if (thdr_valid) {
             tcph_pull_len = pull_len;
+            if (thp)
+                *thp = (char *)iph + hlen;
+
             if (ip_proto == VR_IP_PROTO_TCP) {
                 pull_len += sizeof(struct vr_tcp);
             } else if (ip_proto == VR_IP_PROTO_UDP) {
@@ -252,8 +255,6 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
         *th_csump = th_csum;
     if (tcph_pull_lenp)
         *tcph_pull_lenp = tcph_pull_len;
-    if (tcphp)
-        *tcphp = (struct tcphdr *)tcph;
     *pull_lenp = pull_len;
 
     return 0;

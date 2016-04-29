@@ -342,7 +342,7 @@ linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
 
 static int
 linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
-        unsigned short type)
+        unsigned short type, int diag)
 {
     int err = -ENOMEM;
     struct vr_ip *iph, *i_iph = NULL;
@@ -400,7 +400,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
             goto exit_xmit;
         }
 
-        if (vr_udp_coff) {
+        if (vr_udp_coff && !diag) {
             skb_set_network_header(seg, ethlen);
             iph->ip_csum = 0;
 
@@ -417,6 +417,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
             udph->check = ~csum_tcpudp_magic(iph->ip_saddr, iph->ip_daddr,
                                              htons(udph->len),
                                              IPPROTO_UDP, 0);
+
         } else {
             /*
              * If we are encapsulating a L3/L2 packet in UDP, set the UDP
@@ -461,7 +462,7 @@ linux_xmit_segments(struct vr_interface *vif, struct sk_buff *segs,
     do {
         nskb = segs->next;
         segs->next = NULL;
-        if ((err = linux_xmit_segment(vif, segs, type)))
+        if ((err = linux_xmit_segment(vif, segs, type, 0)))
             break;
         segs = nskb;
     } while (segs);
@@ -875,7 +876,8 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         }
     }
 
-    linux_xmit_segment(vif, skb, pkt->vp_type); 
+    linux_xmit_segment(vif, skb, pkt->vp_type,
+            (pkt->vp_flags & VP_FLAG_DIAG));
 
     return 0;
 }
