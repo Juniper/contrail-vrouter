@@ -518,7 +518,7 @@ bool vr_ip_proto_pull(struct vr_ip *);
 bool vr_ip6_proto_pull(struct vr_ip6 *);
 
 int vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
-            struct tcphdr **tcphp, unsigned int frag_size,
+            void **thp, unsigned int frag_size,
             void (do_tcp_mss_adj)(struct tcphdr *, unsigned short, unsigned char),
             unsigned int *hlenp, unsigned short *th_csump, unsigned int *tcph_pull_lenp,
             unsigned int *pull_lenp);
