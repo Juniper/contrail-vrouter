@@ -1567,6 +1567,8 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
 
     if (lcore_id == 0) {
         /* use lcore 0 to store global device counters */
+        stats->vis_dev_ibytes = eth_stats.ibytes;
+        stats->vis_dev_ipackets = eth_stats.ipackets;
         stats->vis_dev_ierrors = eth_stats.ierrors;
         stats->vis_dev_inombufs = eth_stats.rx_nombuf;
         stats->vis_dev_oerrors = eth_stats.oerrors;
