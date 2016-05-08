@@ -262,6 +262,8 @@ vrouter_ops_destroy(vrouter_ops *req)
         req->vo_build_info = NULL;
     }
 
+    vr_free(req, VR_VROUTER_REQ_OBJECT);
+
     return;
 }
 
