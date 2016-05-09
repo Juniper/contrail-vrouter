@@ -1,7 +1,7 @@
 EXAMPLE = example_vhost_net_app
 EXAMPLE_SRC = ./example/example.c
 EXAMPLE_NAME = example_vhost_net_app
-EXAMPLE_CFLAGS += -std=gnu99 -Wall -L./lib/ -ljnprvnet -lrt -lpcap
+EXAMPLE_CFLAGS += -std=gnu99 -Wall -g -L./lib/ -ljnprvnet -lrt -lpcap
 
 LIB = contrail_vhost_net
 LIB_NAME = libjnprvnet.a
