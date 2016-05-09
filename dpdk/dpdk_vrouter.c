@@ -43,6 +43,8 @@ enum vr_opt_index {
     VLAN_TCI_OPT_INDEX,
 #define VLAN_NAME_OPT           "vlan_fwd_intf_name"
     VLAN_NAME_OPT_INDEX,
+#define VTEST_VLAN_OPT          "vtest_vlan"
+    VTEST_VLAN_OPT_INDEX,
 #define VDEV_OPT                "vdev"
     VDEV_OPT_INDEX,
 #define BRIDGE_ENTRIES_OPT      "vr_bridge_entries"
@@ -792,6 +794,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VLAN_NAME_OPT_INDEX]           =   {VLAN_NAME_OPT,         required_argument,
                                                     NULL,                   0},
+    [VTEST_VLAN_OPT_INDEX]          =   {VTEST_VLAN_OPT,        no_argument,
+                                                    NULL,                   0},
     [VDEV_OPT_INDEX]                =   {VDEV_OPT,              required_argument,
                                                     NULL,                   0},
     [BRIDGE_ENTRIES_OPT_INDEX]      =   {BRIDGE_ENTRIES_OPT,    required_argument,
@@ -831,6 +835,11 @@ Usage(void)
         "\n"
         "    --"VLAN_TCI_OPT" TCI             VLAN tag control information to use\n"
         "    --"VLAN_NAME_OPT" NAME  VLAN forwarding interface name\n"
+        "    --"VTEST_VLAN_OPT"     For unittest app (vtest): \n"
+        "                           Options skips dpdk_vlan_forwarding_if_add process \n"
+        "                           and emulates physical interface, vlan, behaviour: \n"
+        "                           Adds vlan tag, to TX interface (dpdk_if_tx) \n"
+        "                           based on parameter: "VLAN_TCI_OPT"\n"
         "\n"
         "    --"BRIDGE_ENTRIES_OPT" NUM   Bridge table limit\n"
         "    --"BRIDGE_OENTRIES_OPT" NUM  Bridge table overflow limit\n"
@@ -876,6 +885,9 @@ parse_long_opts(int opt_flow_index, char *optarg)
         }
         break;
 
+    case VTEST_VLAN_OPT_INDEX:
+        vr_dpdk.vtest_vlan = 1;
+        break;
     /*
      * VLAN packets with unmatching tag will be forwarded to the kernel using
      * an interface with name defined here.
@@ -1055,7 +1067,7 @@ main(int argc, char *argv[])
     }
 
     /* Create VLAN forwarding interface if needed. */
-    if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+    if ((vr_dpdk.vlan_tag != VLAN_ID_INVALID) && !vr_dpdk.vtest_vlan) {
         dpdk_vlan_forwarding_if_add();
         /* vRouter can start without the forwarding if, so ignore any errors. */
     }

@@ -449,6 +449,9 @@ struct vr_dpdk_global {
     rte_atomic16_t stop_flag;
     /* VLAN tag */
     uint16_t vlan_tag;
+    /* We are use it in unittest application (vtest) for vlan
+     * adding workaround for virtual interfaces. */
+    uint16_t vtest_vlan;
     /* Number of forwarding lcores */
     uint16_t nb_fwd_lcores;
     /* Number of IO lcores */

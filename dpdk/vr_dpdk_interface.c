@@ -1205,8 +1205,13 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * VLAN tag is adjustable by user with a command line --vlan_tci parameter:
      * see dpdk_vrouter.c. If vRouter is not supposed to work in VLAN
      * (parameter was not specified), packets should not be tagged.
+     *
+     * --vtest_vlan parameter changes behaviour - vRouter inject packets for
+     *  non fabric interfaces too (Emulates physical interface for some vlan test cases).
+     *
      */
-    if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif))) {
+    if ((unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif))
+         || vr_dpdk.vtest_vlan)) {
         m->vlan_tci = vr_dpdk.vlan_tag;
         if (unlikely((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0)) {
             /* Software VLAN TCI insert. */
