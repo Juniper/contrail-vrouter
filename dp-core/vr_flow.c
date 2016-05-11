@@ -679,7 +679,9 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe)
                     /* no modification. hence...*/
                     rfe = NULL;
                 } else {
-                    if ((rfe->fe_rflow == index) || (rfe->fe_rflow < 0)) {
+                    /* we do not want hold flows to be evicted, just yet */
+                    if (((rfe->fe_rflow == index) || (rfe->fe_rflow < 0)) &&
+                            (rfe->fe_action != VR_FLOW_ACTION_HOLD)) {
                         evict_forward_flow = __vr_flow_mark_evict(router, rfe);
                     }
                 }
