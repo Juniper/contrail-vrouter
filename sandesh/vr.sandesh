@@ -261,7 +261,7 @@ buffer sandesh vr_drop_stats_req {
     31: i64             vds_pcow_fail;
     32: i64             vds_flood;
     33: i64             vds_mcast_clone_fail;
-    34: i64             vds_composite_invalid_interface;
+    34: i64             vds_no_memory;
     35: i64             vds_rewrite_fail;
     36: i64             vds_misc;
     37: i64             vds_invalid_packet;
@@ -275,5 +275,5 @@ buffer sandesh vr_drop_stats_req {
     45: i64             vds_mcast_df_bit;
     46: i64             vds_arp_no_route;
     47: i64             vds_l2_no_route;
-    48: i64             vds_arp_reply_no_route;
+    48: i64             vds_fragment_queue_fail;
 }

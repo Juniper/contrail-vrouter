@@ -94,14 +94,22 @@
 struct vr_timer *vr_assembler_table_scan_timer;
 
 static inline void
+__fragment_key(struct vr_fragment_key *key, unsigned short vrf, uint32_t sip,
+        uint32_t dip, uint16_t id)
+{
+    key->fk_sip = sip;
+    key->fk_dip = dip;
+    key->fk_id = id;
+    key->fk_vrf = vrf;
+
+    return;
+}
+
+static inline void
 fragment_key(struct vr_fragment_key *key, unsigned short vrf,
         struct vr_ip *iph)
 {
-    key->fk_sip = iph->ip_saddr;
-    key->fk_dip = iph->ip_daddr;
-    key->fk_id = iph->ip_id;
-    key->fk_vrf = vrf;
-
+    __fragment_key(key, vrf, iph->ip_saddr, iph->ip_daddr, iph->ip_id);
     return;
 }
 
@@ -246,29 +254,61 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
     return 0;
 }
 
+static void
+vr_fragment_flush_queue_element(struct vr_fragment_queue_element *vfqe)
+{
+    struct vrouter *router;
+    struct vr_packet *pkt;
+
+    struct vr_forwarding_md fmd;
+    struct vr_packet_node *pnode;
+
+    if (!vfqe)
+        goto exit_flush;
+
+    router = vfqe->fqe_router;
+    pnode = &vfqe->fqe_pnode;
+    pkt = pnode->pl_packet;
+    if (!pkt)
+        goto exit_flush;
+
+    vr_init_forwarding_md(&fmd);
+    fmd.fmd_vlan = pnode->pl_vlan;
+    fmd.fmd_dvrf = pnode->pl_vrf;
+    vr_flow_flush_pnode(router, pnode, NULL, &fmd);
+
+exit_flush:
+    vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
+    return;
+}
+
 int
 vr_fragment_assembler(struct vr_fragment **head_p,
         struct vr_fragment_queue_element *vfqe)
 {
     int ret = 0;
-    unsigned int sec, nsec, list_length = 0, drop_reason = VP_DROP_FRAGMENTS;
-    bool found = false;
+    unsigned int sec, nsec, list_length = 0, drop_reason;
+    bool found = false, frag_head = false;
 
     struct vrouter *router;
     struct vr_ip *ip;
-    struct vr_flow flow;
     struct vr_packet *pkt;
     struct vr_packet_node *pnode;
-    struct vr_fragment *frag, **prev = NULL;
+    struct vr_fragment *frag, *frag_flow, **prev = NULL;
     struct vr_fragment_queue_element *fqe;
     struct vr_fragment_key vfk;
-    struct vr_forwarding_md fmd;
 
 
     router = vfqe->fqe_router;
-    pkt = vfqe->fqe_pnode.pl_packet;
+    pnode = &vfqe->fqe_pnode;
+    pkt = pnode->pl_packet;
     ip = (struct vr_ip *)pkt_network_header(pkt);
-    fragment_key(&vfk, vfqe->fqe_pnode.pl_vrf, ip);
+
+    if (pnode->pl_flags & PN_FLAG_FRAGMENT_HEAD)
+        frag_head = true;
+
+    __fragment_key(&vfk, pnode->pl_vrf, pnode->pl_inner_src_ip,
+            pnode->pl_inner_dst_ip, ip->ip_id);
 
     frag = *head_p;
     prev = head_p;
@@ -283,26 +323,35 @@ vr_fragment_assembler(struct vr_fragment **head_p,
         frag = frag->f_next;
     }
 
+    if (!frag_head) {
+        frag_flow = vr_fragment_get(router, pnode->pl_vrf, ip);
+        if (frag_flow) {
+            vr_fragment_flush_queue_element(vfqe);
+            return 0;
+        }
+    }
+
     if (!found) {
-        if (vr_ip_fragment_head(ip) ||
-                (list_length > VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE))
+        if (frag_head) {
+            drop_reason = VP_DROP_CLONED_ORIGINAL;
             goto exit_assembly;
+        }
+
+        if (list_length > VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE) {
+            drop_reason = VP_DROP_FRAGMENT_QUEUE_FAIL;
+            goto exit_assembly;
+        }
 
         frag = vr_zalloc(sizeof(*frag));
         if (!frag) {
             ret = -ENOMEM;
+            drop_reason = VP_DROP_NO_MEMORY;
             goto exit_assembly;
         }
 
         memcpy(&frag->f_key, &vfk, sizeof(vfk));
         frag->f_port_info_valid = false;
     }
-
-    if (vr_ip_fragment_tail(ip)) {
-        frag->f_expected = ((ntohs(ip->ip_frag_off) & 0x1FFF) * 8) +
-            ntohs(ip->ip_len) - (ip->ip_hl * 4) ;
-    }
-    frag->f_received += (ntohs(ip->ip_len) - (ip->ip_hl * 4));
 
     vr_get_mono_time(&sec, &nsec);
     frag->f_time = sec;
@@ -312,21 +361,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
         *head_p = frag;
     }
 
-    if (vr_ip_transport_header_valid(ip)) {
-        ret = vr_inet_form_flow(router, vfqe->fqe_pnode.pl_vrf,
-                vfqe->fqe_pnode.pl_packet, vfqe->fqe_pnode.pl_vlan, &flow);
-
-        if (ret) {
-            fragment_free_frag(frag);
-            goto exit_assembly;
-        }
-
-        frag->f_sport = flow.flow4_sport;
-        frag->f_dport = flow.flow4_dport;
-        frag->f_port_info_valid = true;
-    }
-
-    if (!vr_ip_fragment_head(ip)) {
+    if (!frag_head) {
         vfqe->fqe_next = NULL;
         fqe = frag->f_qe;
         if (!fqe) {
@@ -343,19 +378,15 @@ vr_fragment_assembler(struct vr_fragment **head_p,
             fqe->fqe_next = vfqe;
         }
     } else {
+        frag->f_port_info_valid = true;
         vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
     }
 
 
     if (frag->f_port_info_valid) {
         while ((fqe = frag->f_qe)) {
-            vr_init_forwarding_md(&fmd);
-            pnode = &fqe->fqe_pnode;
-            fmd.fmd_vlan = pnode->pl_vlan;
-            fmd.fmd_dvrf = pnode->pl_vrf;
-            vr_flow_flush_pnode(router, pnode, NULL, &fmd);
             frag->f_qe = fqe->fqe_next;
-            vr_fragment_queue_element_free(fqe, VP_DROP_CLONED_ORIGINAL);
+            vr_fragment_flush_queue_element(fqe);
         }
 
         fragment_unlink_frag(prev, frag);
@@ -370,15 +401,25 @@ exit_assembly:
 }
 
 uint32_t
+__vr_fragment_get_hash(unsigned int vrf, uint32_t sip,
+        uint32_t dip, struct vr_packet *pkt)
+{
+    struct vr_fragment_key vfk;
+    struct vr_ip *ip;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    __fragment_key(&vfk, vrf, sip, dip, ip->ip_id);
+
+    return vr_hash(&vfk, sizeof(vfk), 0);
+}
+
+uint32_t
 vr_fragment_get_hash(unsigned int vrf, struct vr_packet *pkt)
 {
     struct vr_ip *ip;
-    struct vr_fragment_key vfk;
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
-    fragment_key(&vfk, vrf, ip);
-
-    return vr_hash(&vfk, sizeof(vfk), 0);
+    return __vr_fragment_get_hash(vrf, ip->ip_saddr, ip->ip_daddr, pkt);
 }
 
 int
@@ -411,6 +452,7 @@ vr_fragment_enqueue(struct vrouter *router,
 
     pnode = &fqe->fqe_pnode;
     vr_flow_fill_pnode(pnode, pkt, fmd);
+
     /*
      * we are actually competing with an existing assembler work that must
      * be in the process of dequeueing the list from the per-cpu queue.
@@ -430,10 +472,10 @@ vr_fragment_enqueue(struct vrouter *router,
                 vfq->vfq_length = 1;
             break;
         } else {
+            vfq->vfq_length--;
             if (i == (VR_FRAG_ENQUEUE_ATTEMPTS - 1)) {
                 goto fail;
             }
-            vfq->vfq_length--;
         }
     }
 
