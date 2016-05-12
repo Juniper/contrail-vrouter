@@ -142,10 +142,14 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_mcast_df_bit);
     printf("ARP No Route                  %" PRIu64 "\n",
             stats->vds_arp_no_route);
-    printf("ARP Reply No Route            %" PRIu64 "\n",
-            stats->vds_arp_reply_no_route);
     printf("No L2 Route                   %" PRIu64 "\n",
             stats->vds_l2_no_route);
+
+    printf("Memory Failures               %" PRIu64 "\n",
+            stats->vds_no_memory);
+    printf("Fragment Queueing Failures    %" PRIu64 "\n",
+            stats->vds_fragment_queue_fail);
+
     printf("\n");
     return;
 }

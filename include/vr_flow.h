@@ -166,10 +166,13 @@ struct vr_flow_stats {
 
 #define PN_FLAG_LABEL_IS_VXLAN_ID   0x1
 #define PN_FLAG_TO_ME               0x2
+#define PN_FLAG_FRAGMENT_HEAD       0x4
 
 struct vr_packet_node {
     struct vr_packet *pl_packet;
     uint32_t pl_outer_src_ip;
+    uint32_t pl_inner_src_ip;
+    uint32_t pl_inner_dst_ip;
     uint32_t pl_label;
     uint32_t pl_vif_idx;
     uint32_t pl_flags;
