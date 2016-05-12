@@ -50,8 +50,7 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_pcow_fail += stats->vds_pcow_fail;
     response->vds_mcast_df_bit += stats->vds_mcast_df_bit;
     response->vds_mcast_clone_fail += stats->vds_mcast_clone_fail;
-    response->vds_composite_invalid_interface +=
-        stats->vds_composite_invalid_interface;
+    response->vds_no_memory += stats->vds_no_memory;
     response->vds_rewrite_fail += stats->vds_rewrite_fail;
     response->vds_misc += stats->vds_misc;
     response->vds_invalid_packet += stats->vds_invalid_packet;
@@ -64,7 +63,7 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_invalid_source += stats->vds_invalid_source;
     response->vds_arp_no_route += stats->vds_arp_no_route;
     response->vds_l2_no_route += stats->vds_l2_no_route;
-    response->vds_arp_reply_no_route += stats->vds_arp_reply_no_route;
+    response->vds_fragment_queue_fail += stats->vds_fragment_queue_fail;
     response->vds_vlan_fwd_tx += stats->vds_vlan_fwd_tx;
     response->vds_vlan_fwd_enq += stats->vds_vlan_fwd_enq;
 

@@ -351,7 +351,7 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_pcow_fail;
     sum += req->vds_mcast_df_bit;
     sum += req->vds_mcast_clone_fail;
-    sum += req->vds_composite_invalid_interface;
+    sum += req->vds_no_memory;
     sum += req->vds_rewrite_fail;
     sum += req->vds_misc;
     sum += req->vds_invalid_packet;
@@ -364,7 +364,7 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_invalid_source;
     sum += req->vds_arp_no_route;
     sum += req->vds_l2_no_route;
-    sum += req->vds_arp_reply_no_route;
+    sum += req->vds_fragment_queue_fail;
     sum += req->vds_vlan_fwd_tx;
     sum += req->vds_vlan_fwd_enq;
 
