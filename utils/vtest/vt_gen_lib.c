@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <vr_types.h>
 #include <vt_gen_lib.h>
@@ -27,6 +28,28 @@ vt_gen_skip_space(unsigned char *string)
         return string;
 
     while ((i < len) && isspace(string[i])) {
+        i++;
+    }
+
+    if (i == len)
+        return NULL;
+
+    return &string[i];
+}
+
+unsigned char *
+vt_gen_skip_char(unsigned char *string, unsigned char c)
+{
+    unsigned int i = 0, len;
+
+    if (!string)
+        return string;
+
+    len = strlen(string);
+    if (!len)
+        return string;
+
+    while ((i < len) && string[i] == c) {
         i++;
     }
 
@@ -165,8 +188,10 @@ vt_gen_list(unsigned char *list, unsigned int type, unsigned int *list_size)
 {
     unsigned int i = 0, j = 0, type_size;
     unsigned int string_size;
-    unsigned char *local_list = list, *end;
+    unsigned char *local_list = list;
+    unsigned char *end;
     char *tmp;
+    char *is_colon = NULL;
 
     unsigned char *store;
     uint8_t  *store_b;
@@ -202,18 +227,35 @@ vt_gen_list(unsigned char *list, unsigned int type, unsigned int *list_size)
     string_size = strlen(list);
     end = list + string_size;
 
-    while (1) {
-        local_list = vt_gen_skip_space(local_list);
-        if (!local_list)
-            break;
+    is_colon = strchr(list, ':');
 
-        j++;
+    if (!is_colon){
+        while (1) {
+            local_list = vt_gen_skip_space(local_list);
+            if (!strlen(local_list))
+                break;
 
-        local_list = vt_gen_reach_space(local_list);
-        if (!local_list)
-            break;
+            j++;
+
+            local_list = vt_gen_reach_space(local_list);
+            if (!local_list)
+                break;
+        }
+    } else {
+
+        while (1) {
+            local_list = vt_gen_skip_char(local_list, ':');
+            if (!strlen(local_list))
+                break;
+
+            j++;
+
+            local_list = vt_gen_reach_char(local_list, ':');
+            if (!local_list)
+                break;
+        }
+
     }
-
 
     store = calloc(j, type_size);
     if (!store)
@@ -230,7 +272,12 @@ vt_gen_list(unsigned char *list, unsigned int type, unsigned int *list_size)
     for (i = 0; i < j; i++) {
         switch (type) {
         case GEN_TYPE_U8:
-            store_b[i] = strtoul(local_list, &tmp, 0);
+            if (is_colon) {
+                store_b[i] = strtoul(local_list, &tmp, 16);
+            } else {
+                store_b[i] = strtoul(local_list, &tmp, 0);
+            }
+
             break;
 
         case GEN_TYPE_U16:
@@ -252,7 +299,12 @@ vt_gen_list(unsigned char *list, unsigned int type, unsigned int *list_size)
         }
 
         local_list = tmp;
-        local_list = vt_gen_reach_space(local_list);
+        if(!is_colon) {
+            local_list = vt_gen_reach_space(local_list);
+        } else {
+            local_list = vt_gen_skip_char(local_list, ':');
+        }
+
         if (!local_list)
             break;
     }
