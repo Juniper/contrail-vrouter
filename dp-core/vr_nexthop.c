@@ -2024,7 +2024,8 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (pkt->vp_flags & VP_FLAG_GRO) {
-        if (vif_is_virtual(vif)) {
+        if (vif_is_virtual(vif) && (!(vif->vif_flags &
+                        VIF_FLAG_MIRROR_TX))) {
             if (vr_gro_input(pkt, nh)) {
                 if (stats)
                     stats->vrf_gros++;
@@ -2109,7 +2110,8 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
-    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif)) {
+    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif) &&
+            (!(vif->vif_flags & VIF_FLAG_MIRROR_TX))) {
         if (vr_gro_input(pkt, nh))
             return 0;
     }
