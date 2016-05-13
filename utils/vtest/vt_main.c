@@ -19,8 +19,17 @@
 #include <libxml/parser.h>
 
 #include <vtest.h>
+#include <vt_main.h>
+#include <vt_message.h>
+#include <vt_packet.h>
+#include <vt_process_xml.h>
 
-static int vt_test_name(xmlNodePtr, struct vtest *);
+
+#include <net/if.h>
+#include <nl_util.h>
+
+extern struct expect_vrouter expect_msg;
+extern struct return_vrouter return_msg;
 
 struct vtest_module vt_modules[] = {
     {   .vt_name        =   "test_name",
@@ -30,139 +39,59 @@ struct vtest_module vt_modules[] = {
         .vt_name        =   "message",
         .vt_node        =   vt_message,
     },
+    {
+        .vt_name        =   "packet",
+        .vt_node        =   vt_packet,
+    },
 };
 
-#define VTEST_NUM_MODULES   sizeof(vt_modules) / sizeof(vt_modules[0])
 
-void
-vt_error(unsigned char *module, struct vtest *test, int ret)
-{
-    test->vtest_return = ret;
-    test->vtest_break = true;
-    test->vtest_error_module = malloc(strlen(module) + 1);
-    if (!test->vtest_error_module) {
-        printf("(Unrelated)Internal metadata allocation failure\n");
-        return;
-    }
-    strcpy(test->vtest_error_module, module);
+static void
+vt_dealloc_test(struct vtest *test) {
 
-    return;
-}
+    vt_safe_free(test->vtest_name);
+    vt_safe_free(test->vtest_error_module);
+    int i = 0;
 
-static int
-vt_test_name(xmlNodePtr node, struct vtest *test)
-{
-    xmlNodePtr child;
-
-    child = node->xmlChildrenNode;
-    if (!child || !child->content || !strlen(child->content))
-        return;
-
-    printf("Running \"%s\"\n", (char *)child->content);
-
-    return 0;
-}
-
-static int
-vt_process_node(xmlNodePtr node, struct vtest *test)
-{
-    unsigned int i;
-
-    struct vtest_module *vt;
-
-    for (i = 0; i < VTEST_NUM_MODULES; i++) {
-        if (!strncmp((char *)node->name, vt_modules[i].vt_name,
-                    strlen(vt_modules[i].vt_name))) {
-            return vt_modules[i].vt_node(node, test);
-        }
+    for (i = -1; i < test->message_ptr_num; ++i) {
+        vt_safe_free(test->messages.data[i].mem);
+        vt_safe_free(test->messages.data[i].xml_data.element_expect_ptr);
     }
 
-    if (i == VTEST_NUM_MODULES) {
-        printf("Unrecognized node %s in xml\n", node->name);
-        return EINVAL;
-    }
-
-    return 0;
-}
-
-static int
-vt_tree_traverse(xmlNodePtr node, struct vtest *test)
-{
-    int ret;
-    xmlNodePtr child;
-
-    while (node) {
-        if (node->type == XML_ELEMENT_NODE) {
-            ret = vt_process_node(node, test);
-            if (ret)
-                return ret;
-        }
-
-        node = node->next;
+    for(i = -1; i <= test->messages.expect_vrouter_msg->expected_ptr_num; ++i) {
+        vt_safe_free(test->messages.expect_vrouter_msg->mem_expected_msg[i]);
     }
 
     return;
-}
-
-static int
-vt_parse_file(char *file, struct vtest *test)
-{
-    xmlDocPtr doc;
-    xmlNodePtr node;
-
-    doc = xmlParseFile(file);
-    if (!doc) {
-        printf("xmlParseFile %s failed\n", file);
-        return EINVAL;
-    }
-
-    node = xmlDocGetRootElement(doc);
-    if (!node) {
-        printf("NULL Root Element\n");
-        return EINVAL;
-    }
-
-    vt_tree_traverse(node->xmlChildrenNode, test);
-
-    return 0;
 }
 
 static int
 vt_init(struct vtest *test)
 {
-    int error;
 
-    memset(test, 0, sizeof(*test));
+    memset(test, 0, sizeof(struct vtest));
+    memset(&expect_msg, 0, sizeof(expect_msg));
+    memset(&return_msg, 0, sizeof(return_msg));
 
-    test->vtest_return = 0;
-    test->vtest_iteration = 0;
-    test->vtest_break = 0;
+    test->messages.expect_vrouter_msg = &expect_msg;
+    test->messages.return_vrouter_msg = &return_msg;
+    test->message_ptr_num = -1;
+
+    expect_msg.expected_ptr_num = test->message_ptr_num;
+    return_msg.returned_ptr_num = test->message_ptr_num;
+
     test->vtest_name = calloc(VT_MAX_TEST_NAME_LEN, 1);
     if (!test->vtest_name) {
-        error = ENOMEM;
-        goto error;
+        return E_MAIN_ERR_ALLOC;
     }
 
     test->vtest_error_module = calloc(VT_MAX_TEST_MODULE_NAME_LEN, 1);
     if (!test->vtest_error_module) {
-        error = ENOMEM;
-        goto error;
+        return E_MAIN_ERR_ALLOC;
     }
 
-    return 0;
+    return E_MAIN_OK;
 
-error:
-    if (test->vtest_name) {
-        free(test->vtest_name);
-        test->vtest_name = NULL;
-    }
-
-    if (test->vtest_error_module) {
-        free(test->vtest_error_module);
-        test->vtest_error_module = NULL;
-    }
-
-    return error;
 }
 
 static void
@@ -179,36 +108,63 @@ main(int argc, char *argv[])
     int ret;
     unsigned int i;
     char *xml_file;
+    unsigned int sock_proto = VR_NETLINK_PROTO_DEFAULT;
 
     struct stat stat_buf;
     struct vtest vtest;
 
     if (argc != 2) {
         vt_Usage();
-        return EINVAL;
+        return E_MAIN_ERR_FARG;
     }
 
     xml_file = argv[1];
     ret = stat(xml_file, &stat_buf);
     if (ret) {
         perror(xml_file);
-        return errno;
+        return E_MAIN_ERR_XML;
+    }
+    ret = vt_init(&vtest);
+    if (ret != E_MAIN_OK) {
+        return ret;
     }
 
-    vt_init(&vtest);
+    vtest.vrouter_cl = vr_get_nl_client(sock_proto);
+    if (!vtest.vrouter_cl) {
+        fprintf(stderr, "Error registering NetLink client: %s (%d)\n",
+                strerror(errno), errno);
+        return E_MAIN_ERR_SOCK;
+    }
 
     for (i = 0; i < VTEST_NUM_MODULES; i++) {
         if (vt_modules[i].vt_init) {
             ret = vt_modules[i].vt_init();
-            if (ret) {
-                printf("%s: %s init failed\n", VT_PROG_NAME,
+            if (ret != E_MAIN_OK) {
+                fprintf(stderr, "%s: %s init failed\n", VT_PROG_NAME,
                         vt_modules[i].vt_name);
-                return ret;
+                return E_MAIN_ERR;
             }
         }
     }
 
     vt_parse_file(xml_file, &vtest);
 
-    return 0;
+    nl_free_client(vtest.vrouter_cl);
+    vt_dealloc_test(&vtest);
+
+    if (vtest.vtest_return != E_MAIN_TEST_PASS) {
+        fprintf(stderr, "Test failed\n");
+        return EXIT_FAILURE;//E_MAIN_TEST_FAIL;
+
+    } else if (vtest.vtest_return == E_MAIN_TEST_PASS) {
+        fprintf(stdout, "Test passed\n");
+        return EXIT_SUCCESS;//E_MAIN_TEST_PASS;
+
+    } else {
+        fprintf(stderr, "something is wrong\n");
+        return -42;
+    }
+
+    return EXIT_SUCCESS;
 }
+
