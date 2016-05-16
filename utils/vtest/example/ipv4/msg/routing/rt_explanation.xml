@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<test>
+    <test_name>Adds interfaces nexthops and routes </test_name>
+    <message>
+        <vr_interface_req>
+            <h_op>Add</h_op>
+            <vifr_type>3</vifr_type>
+            <vifr_idx>1</vifr_idx>
+            <vifr_name>1</vifr_name>
+            <vifr_transport>2</vifr_transport>
+            <vifr_vrf>0</vifr_vrf>
+            <vifr_mac>de:ad:be:ef:00:02</vifr_mac>
+            <vifr_mtu>1514</vifr_mtu>
+        </vr_interface_req>
+        <return>0</return>
+    </message>
+     <message>
+        <vr_interface_req>
+            <h_op>Add</h_op>
+            <vifr_type>3</vifr_type>
+            <vifr_idx>2</vifr_idx>
+            <vifr_transport>2</vifr_transport>
+            <vifr_name>2</vifr_name>
+            <vifr_vrf>0</vifr_vrf>
+            <vifr_mac>de:ad:be:ef:00:01</vifr_mac>
+            <vifr_mtu>1514</vifr_mtu>
+        </vr_interface_req>
+        <return>0</return>
+    </message>       
+     <message>
+        <vr_nexthop_req>
+            <h_op>Add</h_op>
+            <nhr_type>2</nhr_type>
+            <nhr_id>21</nhr_id>
+            <nhr_encap_oif_id>1</nhr_encap_oif_id>
+            <nhr_encap>de:ad:be:ef:00:02:de:ad:be:ef:00:01:08:00</nhr_encap>
+            <nhr_vrf>0</nhr_vrf>
+            <nhr_flags>5</nhr_flags>
+        </vr_nexthop_req>
+        <return>0</return>
+    </message>
+     <message>
+        <vr_nexthop_req>
+            <h_op>Add</h_op>
+            <nhr_type>2</nhr_type>
+            <nhr_id>12</nhr_id>
+            <nhr_encap_oif_id>2</nhr_encap_oif_id>
+            <nhr_encap>de:ad:be:ef:00:01:de:ad:be:ef:00:02:08:00</nhr_encap>
+            <nhr_vrf>0</nhr_vrf>
+            <nhr_flags>5</nhr_flags>
+        </vr_nexthop_req>
+        <return>0</return>
+    </message>
+    <message>
+        <vr_route_req>
+            <h_op>Add</h_op>
+
+<!--
+            AF_INET = 2
+            AF_INET6 = 10
+            AF_BRIDGE = 7
+
+-->
+            <rtr_family>7</rtr_family>
+            <rtr_nh_id>12</rtr_nh_id>
+            <rtr_mac>de:ad:be:ef:00:01</rtr_mac>
+            <rtr_vrf_id>0</rtr_vrf_id>
+        </vr_route_req>
+        <return>0</return>
+    </message>
+    <message>
+        <vr_route_req>
+            <h_op>Add</h_op>
+            <rtr_family>7</rtr_family>
+            <rtr_nh_id>21</rtr_nh_id>
+            <rtr_mac>de:ad:be:ef:00:02</rtr_mac>
+            <rtr_vrf_id>0</rtr_vrf_id>
+        </vr_route_req>
+        <return>0</return>
+    </message>
+
+</test>
+

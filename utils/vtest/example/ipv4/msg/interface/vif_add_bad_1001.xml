@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<test>
+    <test_name>Interface test - adding 1 interface incorrect mac address value</test_name>
+    <message>
+        <vr_interface_req>
+            <h_op>Add</h_op>
+            <vifr_type>3</vifr_type>
+            <vifr_idx>1</vifr_idx>
+            <vifr_name>1</vifr_name>
+            <vifr_transport>2</vifr_transport>
+            <vifr_vrf>0</vifr_vrf>
+            <vifr_mac>de:ad:be:ef:00</vifr_mac>
+            <vifr_mtu>1518</vifr_mtu>
+        </vr_interface_req>
+        <return>-22</return>
+    </message>
+</test>
+
