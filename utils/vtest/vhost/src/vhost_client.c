@@ -476,7 +476,6 @@ vhost_client_poll_client_rx(void *context, void *dst_buf, size_t *dst_buf_len) {
     VHOST_CLIENT_VRING vq_id = VHOST_CLIENT_VRING_IDX_RX;
     VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
 
-
     if (!context || !dst_buf ) {
         return map_ret_val_virt_queue_2_vhost_net(E_VIRT_QUEUE_ERR_FARG);
     }
@@ -492,6 +491,7 @@ vhost_client_poll_client_rx(void *context, void *dst_buf, size_t *dst_buf_len) {
     //TODO: Burst
     virt_queue_put_rx_virt_queue(vhost_client->virtq_control,
             vq_id, ETH_MAX_MTU);
+
 
     return map_ret_val_virt_queue_2_vhost_net(virt_queue_ret_val);
 }
