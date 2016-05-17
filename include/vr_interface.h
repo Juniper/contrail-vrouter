@@ -9,6 +9,7 @@
 #include "vr_defs.h"
 #include "vr_types.h"
 #include "vr_htable.h"
+#include "vr_qos.h"
 #include "vr_flow.h"
 
 /*
@@ -262,6 +263,7 @@ struct vr_interface {
     unsigned char vif_name[VR_INTERFACE_NAME_LEN];
     unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
+    int16_t vif_qos_map_index;
 };
 
 struct vr_interface_settings {

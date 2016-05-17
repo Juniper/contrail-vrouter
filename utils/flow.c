@@ -36,6 +36,7 @@
 #endif
 
 #include "vr_types.h"
+#include "vr_qos.h"
 #include "vr_flow.h"
 #include "vr_mirror.h"
 #include "vr_genetlink.h"
@@ -1387,6 +1388,7 @@ flow_dump_table(struct flow_table *ft)
             if (fe->fe_ecmp_nh_index >= 0)
                 printf("E:%d, ", fe->fe_ecmp_nh_index);
 
+            printf("QOS:%d, ", fe->fe_qos_id);
             printf("S(nh):%u, ", fe->fe_src_nh_index);
             printf(" Stats:%u/%u, ", fe->fe_stats.flow_packets,
                     fe->fe_stats.flow_bytes);

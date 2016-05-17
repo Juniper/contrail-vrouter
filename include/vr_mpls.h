@@ -7,6 +7,7 @@
 #define __VR_MPLS_H__
 
 #define VR_MPLS_LABEL_SHIFT         12
+#define VR_MPLS_EXP_QOS_SHIFT       9
 #define VR_MPLS_HDR_LEN             4
 #define VR_MAX_UCAST_LABELS         1024
 #define VR_DEF_LABELS               5120

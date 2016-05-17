@@ -297,12 +297,13 @@ int
 vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
+    int ttl, l2_offset = 0;
     unsigned int label;
     unsigned short drop_reason;
+
     struct vr_nexthop *nh;
     struct vr_ip *ip;
     struct vr_forwarding_md c_fmd;
-    int ttl, l2_offset = 0;
 
     if (!fmd) {
         vr_init_forwarding_md(&c_fmd);

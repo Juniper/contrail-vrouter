@@ -149,6 +149,10 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_usock_iovec_object);
     printf("Vrouter Request                 %" PRIu64 "\n",
             stats->vms_vrouter_req_object);
+    printf("QOS Map Objects                 %" PRIu64 "\n",
+            stats->vms_qos_map_object);
+    printf("Forwarding Class Objects        %" PRIu64 "\n",
+            stats->vms_fc_object);
     return;
 }
 

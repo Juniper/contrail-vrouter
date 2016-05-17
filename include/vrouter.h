@@ -12,6 +12,7 @@ extern "C" {
 
 #include "sandesh.h"
 #include "vr_types.h"
+#include "vr_qos.h"
 #include "vr_flow.h"
 #include "vr_nexthop.h"
 #include "vr_route.h"
@@ -102,6 +103,8 @@ enum vr_malloc_objects_t {
     VR_USOCK_IOVEC_OBJECT,
     VR_VROUTER_REQ_OBJECT,
     VR_BITMAP_OBJECT,
+    VR_QOS_MAP_OBJECT,
+    VR_FC_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 
@@ -293,6 +296,9 @@ struct vrouter {
 
     uint16_t vr_link_local_ports_size;
     unsigned char *vr_link_local_ports;
+
+    struct vr_forwarding_class **vr_qos_map;
+    struct vr_forwarding_class *vr_fc_table;
 
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;

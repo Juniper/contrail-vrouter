@@ -291,6 +291,9 @@ vr_ip6_input(struct vrouter *router, struct vr_packet *pkt,
     unsigned short *t_hdr, sport, dport;
 
     ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+    if (fmd->fmd_dscp < 0)
+        fmd->fmd_dscp = vr_inet6_get_tos(ip6);
+
     t_hdr = (unsigned short *)((char *)ip6 + sizeof(struct vr_ip6));
 
     if (!pkt_pull(pkt, sizeof(struct vr_ip6))) {

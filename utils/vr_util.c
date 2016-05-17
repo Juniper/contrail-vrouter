@@ -1535,3 +1535,154 @@ vr_send_vxlan_add(struct nl_client *cl, unsigned int router_id,
     return vr_sendmsg(cl, &req, "vr_vxlan_req");
 }
 
+int
+vr_send_fc_map_get(struct nl_client *cl, unsigned int router_id,
+        uint8_t fc_map_id)
+{
+    vr_fc_map_req req;
+    int16_t id = fc_map_id;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_GET;
+    req.fmr_rid = router_id;
+    req.fmr_id = &id;
+    req.fmr_id_size = 1;
+
+    return vr_sendmsg(cl, &req, "vr_fc_map_req");
+}
+
+int
+vr_send_fc_map_dump(struct nl_client *cl, unsigned int router_id,
+        int marker)
+{
+    vr_fc_map_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_DUMP;
+    req.fmr_rid = router_id;
+    req.fmr_marker = marker;
+
+    return vr_sendmsg(cl, &req, "vr_fc_map_req");
+}
+
+int
+vr_send_fc_map_delete(struct nl_client *cl, unsigned int router_id,
+        uint8_t fc_id)
+{
+    vr_fc_map_req req;
+    int16_t id = fc_id;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_DELETE;
+    req.fmr_rid = router_id;
+    req.fmr_id = &id;
+    req.fmr_id_size = 1;
+
+    return vr_sendmsg(cl, &req, "vr_fc_map_req");
+}
+
+int
+vr_send_fc_map_add(struct nl_client *cl, unsigned int router_id,
+        int16_t *fc_id, uint8_t fc_id_size,
+        uint8_t *dscp, uint8_t *mpls_qos, uint8_t *dotonep, uint8_t *queue)
+{
+    vr_fc_map_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.fmr_rid = router_id;
+
+    req.fmr_id = fc_id;
+    req.fmr_id_size = fc_id_size;
+    req.fmr_dscp = dscp;
+    req.fmr_dscp_size = fc_id_size;
+    req.fmr_mpls_qos = mpls_qos;
+    req.fmr_mpls_qos_size = fc_id_size;
+    req.fmr_dotonep = dotonep;
+    req.fmr_dotonep_size = fc_id_size;
+    req.fmr_queue_id = queue;
+    req.fmr_queue_id_size = fc_id_size;
+
+    return vr_sendmsg(cl, &req, "vr_fc_map_req");
+}
+
+int
+vr_send_qos_map_get(struct nl_client *cl, unsigned int router_id,
+        unsigned int qos_map_id)
+{
+    vr_qos_map_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_GET;
+    req.qmr_rid = router_id;
+    req.qmr_id = qos_map_id;
+
+    return vr_sendmsg(cl, &req, "vr_qos_map_req");
+}
+
+
+int
+vr_send_qos_map_dump(struct nl_client *cl, unsigned int router_id,
+        int marker)
+{
+    vr_qos_map_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_DUMP;
+    req.qmr_rid = router_id;
+    req.qmr_marker = marker;
+
+    return vr_sendmsg(cl, &req, "vr_qos_map_req");
+}
+
+int
+vr_send_qos_map_delete(struct nl_client *cl, unsigned int router_id,
+        unsigned int qos_map_id)
+{
+    vr_qos_map_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_DELETE;
+    req.qmr_rid = router_id;
+    req.qmr_id = qos_map_id;
+
+    return vr_sendmsg(cl, &req, "vr_qos_map_req");
+}
+
+int
+vr_send_qos_map_add(struct nl_client *cl, unsigned int router_id,
+        unsigned int qos_id,
+        uint8_t *dscp, uint8_t num_dscp, uint8_t *dscp_fc_id,
+        uint8_t *mpls_qos, uint8_t num_mpls_qos, uint8_t *mpls_qos_fc_id,
+        uint8_t *dotonep, uint8_t num_dotonep, uint8_t *dotonep_fc_id)
+{
+    vr_qos_map_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_ADD;
+    req.qmr_rid = router_id;
+    req.qmr_id = qos_id;
+
+    if (num_dscp) {
+        req.qmr_dscp = dscp;
+        req.qmr_dscp_size = num_dscp;
+        req.qmr_dscp_fc_id = dscp_fc_id;
+        req.qmr_dscp_fc_id_size = num_dscp;
+    }
+
+    if (num_mpls_qos) {
+        req.qmr_mpls_qos = mpls_qos;
+        req.qmr_mpls_qos_size = num_mpls_qos;
+        req.qmr_mpls_qos_fc_id = mpls_qos_fc_id;
+        req.qmr_mpls_qos_fc_id_size = num_mpls_qos;
+    }
+
+    if (num_dotonep) {
+        req.qmr_dotonep = dotonep;
+        req.qmr_dotonep_size = num_dotonep;
+        req.qmr_dotonep_fc_id = dotonep_fc_id;
+        req.qmr_dotonep_fc_id_size = num_dotonep;
+    }
+
+    return vr_sendmsg(cl, &req, "vr_qos_map_req");
+}
+

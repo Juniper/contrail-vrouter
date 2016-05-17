@@ -7,6 +7,7 @@
 #define __VR_PACKET_H__
 
 #include "vr_defs.h"
+#include "vr_qos.h"
 #include "vr_flow.h"
 #include "vrouter.h"
 
@@ -76,6 +77,7 @@
 #define VP_FLAG_GSO             (1 << 7)
 /* Diagnostic packet */
 #define VP_FLAG_DIAG            (1 << 8)
+#define VP_FLAG_GROED           (1 << 9)
 
 /*
  * possible 256 values of what a packet can be. currently, this value is
@@ -250,6 +252,9 @@ struct vr_packet {
     unsigned char vp_cpu;
     unsigned char vp_type;
     unsigned char vp_ttl;
+    unsigned char vp_queue;
+    unsigned char vp_priority:4,
+                  vp_notused:4;
 };
 
 
@@ -364,6 +369,62 @@ struct vr_ip {
     unsigned int ip_daddr;
 } __attribute__((packed));
 
+static inline void
+vr_incremental_diff(unsigned int oldval, unsigned int newval,
+        unsigned int *diff)
+{
+    unsigned int tmp;
+
+    tmp = ~oldval + newval;
+    if (tmp < newval)
+        tmp += 1;
+
+    *diff += tmp;
+    if (*diff < tmp)
+        *diff += 1;
+
+    return;
+}
+
+static inline void
+vr_ip_incremental_csum(struct vr_ip *ip, unsigned int diff)
+{
+    unsigned int csum;
+
+    diff &= 0xffff;
+    csum = ~(ip->ip_csum) & 0xffff;
+    csum += diff;
+    csum = (csum >> 16) + (csum & 0xffff);
+    if (csum >> 16)
+        csum = (csum & 0xffff) + 1;
+
+    ip->ip_csum = (~csum & 0xffff);
+    return;
+}
+
+static inline uint8_t
+vr_inet_get_tos(struct vr_ip *iph)
+{
+    return iph->ip_tos & 0x3F;
+}
+
+static inline void
+vr_inet_set_tos(struct vr_ip *iph, uint8_t tos)
+{
+    unsigned int diff = 0;
+
+    if (iph->ip_tos == tos)
+        return;
+
+    vr_incremental_diff(iph->ip_tos, tos, &diff);
+    diff <<= 8;
+    iph->ip_tos = tos;
+    vr_ip_incremental_csum(iph, diff);
+
+    return;
+}
+
+
 #define SOURCE_LINK_LAYER_ADDRESS_OPTION    1
 #define TARGET_LINK_LAYER_ADDRESS_OPTION    2
 
@@ -419,6 +480,21 @@ struct vr_ip6 {
 
 #define VR_IP4_MAPPED_IP6_ZERO_BYTES    10
 #define VR_IP4_MAPPED_IP6_ONE_BYTES     2
+
+static inline uint8_t
+vr_inet6_get_tos(struct vr_ip6 *ip6h)
+{
+    return (((ip6h->ip6_priority_h << 4) | (ip6h->ip6_priority_l)) & 0x3F);
+}
+
+static inline void
+vr_inet6_set_tos(struct vr_ip6 *ip6h, uint8_t tos)
+{
+    ip6h->ip6_priority_h = (tos >> 4) & 0x3;
+    ip6h->ip6_priority_l = (tos & 0xF);
+
+    return;
+}
 
 static inline void
 vr_inet6_generate_ip6(uint8_t *ip6, uint32_t ip)
@@ -610,22 +686,6 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
     return true;
 }
 
-static inline void
-vr_incremental_diff(unsigned int oldval, unsigned int newval,
-        unsigned int *diff)
-{
-    unsigned int tmp;
-
-    tmp = ~oldval + newval;
-    if (tmp < newval)
-        tmp += 1;
-
-    *diff += tmp;
-    if (*diff < tmp)
-        *diff += 1;
-
-    return;
-}
 
 #define VR_TCP_FLAG_FIN         0x0001
 #define VR_TCP_FLAG_SYN         0x0002
@@ -825,6 +885,8 @@ struct vr_forwarding_md {
     uint8_t fmd_to_me;
     uint8_t fmd_src;
     uint8_t fmd_flags;
+    int8_t fmd_dscp;
+    int8_t fmd_queue;
 };
 
 static inline void
@@ -841,6 +903,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_to_me = 0;
     fmd->fmd_src = 0;
     fmd->fmd_flags = 0;
+    fmd->fmd_dscp = -1;
     return;
 }
 

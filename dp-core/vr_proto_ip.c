@@ -78,17 +78,11 @@ vr_inet_src_lookup(unsigned short vrf, struct vr_packet *pkt)
 static inline unsigned char
 vr_ip_decrement_ttl(struct vr_ip *ip)
 {
-    unsigned int diff = 0xfffe;
-    unsigned int csum;
+    unsigned int diff = 0;
 
-    csum = (~ip->ip_csum) & 0xffff;
-    csum += diff;
-    csum = (csum >> 16) + (csum & 0xffff);
-    if (csum >> 16)
-        csum = (csum & 0xffff) + 1;
-
+    vr_incremental_diff(ip->ip_ttl, ip->ip_ttl - 1, &diff);
     --ip->ip_ttl;
-    ip->ip_csum = ~(csum & 0xffff);
+    vr_ip_incremental_csum(ip, diff);
 
     return ip->ip_ttl;
 }
@@ -496,17 +490,21 @@ int
 vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    struct vr_ip *ip;
-    struct vr_interface *vif = NULL;
-    unsigned char *l2_hdr;
     unsigned int hlen;
     unsigned short drop_reason, l4_port = 0;
     int ret = 0, unhandled = 1;
+
+    struct vr_ip *ip;
+    unsigned char *l2_hdr;
     struct vr_fragment *frag;
+    struct vr_interface *vif = NULL;
+    struct vr_forwarding_class_qos *qos;
 
     ip = (struct vr_ip *)pkt_data(pkt);
     hlen = ip->ip_hl * 4;
     pkt_pull(pkt, hlen);
+
+    qos = vr_qos_get_forwarding_class(router, pkt, fmd);
 
     /*
      * this is a check to make sure that packets were indeed destined to
@@ -586,6 +584,12 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
             }
         }
 
+        if (qos) {
+            vr_inet_set_tos(ip, qos->vfcq_dscp);
+            pkt->vp_queue = qos->vfcq_queue_id + 1;
+            pkt->vp_priority = qos->vfcq_dotonep_qos;
+        }
+
         if (!vif && !(vif = pkt->vp_if->vif_bridge) &&
                                 !(vif = router->vr_host_if)) {
             drop_reason = VP_DROP_TRAP_NO_IF;
@@ -637,7 +641,7 @@ vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
     if (fe->fe_rflow < 0)
         goto drop;
 
-    rfe = vr_get_flow_entry(router, fe->fe_rflow);
+    rfe = vr_flow_get_entry(router, fe->fe_rflow);
     if (!rfe)
         goto drop;
 
@@ -1128,6 +1132,9 @@ vr_ip_input(struct vrouter *router, struct vr_packet *pkt,
     if (pkt->vp_flags & VP_FLAG_TO_ME)
         return vr_ip_rcv(router, pkt, fmd);
     
+    if (fmd->fmd_dscp < 0)
+        fmd->fmd_dscp = vr_inet_get_tos(ip);
+
     if (!vr_flow_forward(router, pkt, fmd))
         return 0;
 

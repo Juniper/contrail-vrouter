@@ -72,6 +72,15 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_mem_stats_req),
         .obj_type_string        =       "vr_mem_stats_req",
     },
+    [VR_QOS_MAP_OBJECT_ID]     =   {
+        .obj_len                =       4 * sizeof(vr_qos_map_req),
+        .obj_get_size           =       vr_qos_map_req_get_size,
+        .obj_type_string        =       "vr_qos_map_req",
+    },
+    [VR_FC_MAP_OBJECT_ID]     =   {
+        .obj_len                =       4 * sizeof(vr_fc_map_req),
+        .obj_type_string        =       "vr_fc_map_req",
+    },
 };
 
 static unsigned int
