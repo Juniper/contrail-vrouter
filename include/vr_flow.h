@@ -231,7 +231,8 @@ struct vr_packet_node {
     uint32_t pl_inner_dst_ip;
     uint32_t pl_label;
     uint32_t pl_vif_idx;
-    uint32_t pl_flags;
+    uint16_t pl_flags;
+    int16_t pl_dscp;
     uint32_t pl_vrf;
     int32_t pl_vlan;
 };
@@ -297,7 +298,8 @@ struct vr_flow_queue {
 
 struct vr_dummy_flow_entry {
     vr_hentry_t fe_hentry;
-    uint8_t fe_hentry_packing[3];
+    uint8_t fe_pack_hentry;
+    int16_t fe_qos_id;
     struct vr_flow fe_key;
     uint8_t fe_gen_id;
     uint16_t fe_tcp_flags;
@@ -323,7 +325,8 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     vr_hentry_t fe_hentry;
-    uint8_t fe_hentry_packing[3];
+    uint8_t fe_pack_hentry;
+    int16_t fe_qos_id;
     struct vr_flow fe_key;
     uint8_t fe_gen_id;
     uint16_t fe_tcp_flags;
@@ -401,7 +404,7 @@ void *vr_flow_get_va(struct vrouter *, uint64_t);
 
 unsigned int vr_flow_table_size(struct vrouter *);
 
-struct vr_flow_entry *vr_get_flow_entry(struct vrouter *, int);
+struct vr_flow_entry *vr_flow_get_entry(struct vrouter *, int);
 flow_result_t vr_flow_lookup(struct vrouter *, struct vr_flow *,
                              struct vr_packet *, struct vr_forwarding_md *);
 
@@ -412,8 +415,7 @@ flow_result_t vr_inet6_flow_lookup(struct vrouter *, struct vr_packet *,
 int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
         uint16_t, struct vr_ip6 *, struct vr_flow *);
 
-unsigned short
-vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan);
+extern unsigned short vr_inet_flow_nexthop(struct vr_packet *, unsigned short);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
@@ -440,5 +442,7 @@ void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
 fat_flow_port_mask_t vr_flow_fat_flow_lookup(struct vrouter *,
         struct vr_packet *, uint16_t, uint16_t, uint16_t);
+extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
+        struct vr_forwarding_md *);
 
 #endif /* __VR_FLOW_H__ */

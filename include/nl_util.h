@@ -204,6 +204,17 @@ extern int vr_send_vxlan_get(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_vxlan_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_vxlan_delete(struct nl_client *, unsigned int, unsigned int);
 
+extern int vr_send_qos_map_get(struct nl_client *, unsigned int, unsigned int);
+extern int vr_send_qos_map_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_qos_map_add(struct nl_client *, unsigned int, unsigned int,
+        uint8_t *, uint8_t, uint8_t *, uint8_t *, uint8_t,
+        uint8_t *, uint8_t *, uint8_t, uint8_t *);
+
+extern int vr_send_fc_map_get(struct nl_client *, unsigned int, uint8_t);
+extern int vr_send_fc_map_dump(struct nl_client *, unsigned int, int);
+extern int vr_send_fc_map_add(struct nl_client *, unsigned int, int16_t *,
+        uint8_t, uint8_t *, uint8_t *, uint8_t *, uint8_t *);
+
 
 
 #ifdef __cplusplus

@@ -676,7 +676,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
 
         if (fmd && fmd->fmd_flow_index >= 0) {
-            fentry = vr_get_flow_entry(router, fmd->fmd_flow_index);
+            fentry = vr_flow_get_entry(router, fmd->fmd_flow_index);
             if (fentry) {
                 lh_reset_skb_fields(pkt);
                 return fentry->fe_udp_src_port;

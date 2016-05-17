@@ -194,6 +194,9 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     skb->len = pkt_len(pkt);
     skb_set_tail_pointer(skb, pkt_head_len(pkt));
 
+    skb->queue_mapping = pkt->vp_queue;
+    skb->priority = pkt->vp_priority;
+
     if (!dev) {
         vif_drop_pkt(vif, pkt, false);
         goto exit_rx;
@@ -789,6 +792,8 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
     skb_reset_mac_header(skb);
+    skb->queue_mapping = pkt->vp_queue;
+    skb->priority = pkt->vp_priority;
 
     /*
      * Set the network header and trasport header of skb only if the type is
@@ -915,6 +920,8 @@ linux_get_packet(struct sk_buff *skb, struct vr_interface *vif)
 
     pkt->vp_ttl = 64;
     pkt->vp_type = VP_TYPE_NULL;
+    pkt->vp_queue = 0;
+    pkt->vp_priority = 0;
 
     return pkt;
 
@@ -2050,6 +2057,8 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     pkt = linux_get_packet(skb, NULL);
     if (!pkt)
         return RX_HANDLER_CONSUMED;
+
+    pkt->vp_flags |= VP_FLAG_GROED;
 
     /*
      * since vif was not available when we did linux_get_packet, set vif

@@ -461,6 +461,16 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         }
     }
 
+    if (fmd->fmd_dscp < 0) {
+        if (pkt->vp_type == VP_TYPE_IP) {
+            fmd->fmd_dscp =
+                vr_inet_get_tos((struct vr_ip *)pkt_network_header(pkt));
+        } else if (pkt->vp_type == VP_TYPE_IP6) {
+            fmd->fmd_dscp =
+                vr_inet6_get_tos((struct vr_ip6 *)pkt_network_header(pkt));
+        }
+    }
+
     /* Do the bridge lookup for the packets not meant for "me" */
     if (!fmd->fmd_to_me) {
 
