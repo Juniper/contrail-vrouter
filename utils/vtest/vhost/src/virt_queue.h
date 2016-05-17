@@ -21,7 +21,7 @@
 
 /* Maximal ethernet MTU + sizeof(virtio_net_hdr) */
 #define VIRTQ_DESC_BUFF_SIZE (ETH_MAX_MTU + sizeof(struct virtio_net_hdr))
-#define ETH_MAX_MTU (1514)
+#define ETH_MAX_MTU (10000)
 
 
 typedef enum virtq_desc_flags {
