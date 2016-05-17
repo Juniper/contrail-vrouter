@@ -335,8 +335,10 @@ nh_l3_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
 
 
 static int
-nh_push_mpls_header(struct vr_packet *pkt, unsigned int label)
+nh_push_mpls_header(struct vr_packet *pkt, unsigned int label,
+        struct vr_forwarding_class_qos *qos)
 {
+    uint32_t exp_qos = 0;
     unsigned int *lbl;
     unsigned int ttl;
 
@@ -351,7 +353,13 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label)
         ttl = 64;
     }
 
-    *lbl = htonl((label << VR_MPLS_LABEL_SHIFT) | VR_MPLS_STACK_BIT | ttl);
+    if (qos) {
+        exp_qos = qos->vfcq_mpls_qos;
+        exp_qos <<= VR_MPLS_EXP_QOS_SHIFT;
+    }
+
+    *lbl = htonl((label << VR_MPLS_LABEL_SHIFT) | exp_qos |
+            VR_MPLS_STACK_BIT | ttl);
 
     return 0;
 }
@@ -362,8 +370,8 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label)
  */
 static bool
 nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
-                     unsigned short dport, unsigned int sip,
-                     unsigned int dip)
+        unsigned short dport, unsigned int sip,
+        unsigned int dip, struct vr_forwarding_class_qos *qos)
 {
     struct vr_ip *ip;
     struct vr_udp *udp;
@@ -387,7 +395,12 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 
     ip->ip_version = 4;
     ip->ip_hl = 5;
-    ip->ip_tos = 0;
+    if (qos) {
+        ip->ip_tos = qos->vfcq_dscp;
+        pkt->vp_queue = qos->vfcq_queue_id + 1;
+    } else {
+        ip->ip_tos = 0;
+    }
     ip->ip_id = htons(vr_generate_unique_ip_id());
     ip->ip_frag_off = 0;
 
@@ -479,12 +492,14 @@ nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
 }
 
 static bool
-nh_vxlan_tunnel_helper(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
-                       unsigned int sip, unsigned int dip)
+nh_vxlan_tunnel_helper(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, unsigned int sip, unsigned int dip)
 {
     unsigned short udp_src_port = VR_VXLAN_UDP_SRC_PORT;
+
     struct vr_vxlan *vxlanh;
     struct vr_packet *tmp_pkt;
+    struct vr_forwarding_class_qos *qos;
 
     if (pkt_head_space(pkt) < VR_VXLAN_HDR_LEN) {
         tmp_pkt = vr_pexpand_head(pkt, VR_VXLAN_HDR_LEN - pkt_head_space(pkt));
@@ -514,8 +529,9 @@ nh_vxlan_tunnel_helper(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     vxlanh->vxlan_vnid = htonl(fmd->fmd_label << VR_VXLAN_VNID_SHIFT);
     vxlanh->vxlan_flags = htonl(VR_VXLAN_IBIT);
 
+    qos = vr_qos_get_forwarding_class(router, pkt, fmd);
     return nh_udp_tunnel_helper(pkt, htons(udp_src_port),
-                             htons(VR_VXLAN_UDP_DST_PORT), sip, dip);
+            htons(VR_VXLAN_UDP_DST_PORT), sip, dip, qos);
 }
 
 static struct vr_packet *
@@ -1323,7 +1339,8 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
              */
             vr_forwarding_md_set_label(fmd, label, VR_LABEL_TYPE_UNKNOWN);
             fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
-            if (nh_vxlan_tunnel_helper(new_pkt, fmd, sip, sip) == false) {
+            if (nh_vxlan_tunnel_helper(nh->nh_router, new_pkt,
+                        fmd, sip, sip) == false) {
                 vr_pfree(new_pkt, VP_DROP_PUSH);
                 break;
             }
@@ -1394,6 +1411,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_ip6 *ip6;
     struct vr_udp *udp;
     struct vr_vrf_stats *stats;
+    struct vr_forwarding_class_qos *qos;
 
     if (!fmd)
         goto send_fail;
@@ -1424,9 +1442,10 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             sip = nh->nh_udp_tun_sip;
         }
 
+        qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
         if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
                     nh->nh_udp_tun_dport, sip,
-                    nh->nh_udp_tun_dip) == false) {
+                    nh->nh_udp_tun_dip, qos) == false) {
             goto send_fail;
         }
 
@@ -1525,8 +1544,8 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
-    if (nh_vxlan_tunnel_helper(pkt, fmd, nh->nh_udp_tun_sip,
-                                            nh->nh_udp_tun_dip) == false)
+    if (nh_vxlan_tunnel_helper(nh->nh_router, pkt, fmd, nh->nh_udp_tun_sip,
+                nh->nh_udp_tun_dip) == false)
         goto send_fail;
 
     pkt_set_network_header(pkt, pkt->vp_data);
@@ -1589,12 +1608,14 @@ static int
 nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                    struct vr_forwarding_md *fmd)
 {
-    unsigned char *tun_encap;
-    struct vr_interface *vif;
-    struct vr_vrf_stats *stats;
     unsigned int tun_sip, tun_dip, overhead_len, mudp_head_space;
     uint16_t tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT;
     unsigned short reason = VP_DROP_PUSH;
+
+    unsigned char *tun_encap;
+    struct vr_forwarding_class_qos *qos;
+    struct vr_interface *vif;
+    struct vr_vrf_stats *stats;
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
 
@@ -1665,7 +1686,8 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt = tmp_pkt;
     }
 
-    if (nh_push_mpls_header(pkt, fmd->fmd_label) < 0)
+    qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos) < 0)
         goto send_fail;
 
     if (vr_perfs)
@@ -1689,7 +1711,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port),
                              htons(VR_MPLS_OVER_UDP_DST_PORT),
-                             tun_sip, tun_dip) == false) {
+                             tun_sip, tun_dip, qos) == false) {
         goto send_fail;
     }
 
@@ -1727,12 +1749,14 @@ static int
 nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
               struct vr_forwarding_md *fmd)
 {
-    unsigned int id;
     int overhead_len, gre_head_space;
     unsigned short drop_reason = VP_DROP_INVALID_NH;
+    unsigned int id;
+
+    unsigned char *tun_encap;
+    struct vr_forwarding_class_qos *qos;
     struct vr_gre *gre_hdr;
     struct vr_ip *ip;
-    unsigned char *tun_encap;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
     struct vr_packet *tmp_pkt;
@@ -1809,7 +1833,8 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt = tmp_pkt;
     }
 
-    if (nh_push_mpls_header(pkt, fmd->fmd_label) < 0)
+    qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos) < 0)
         goto send_fail;
 
     gre_hdr = (struct vr_gre *)pkt_push(pkt, sizeof(struct vr_gre));
@@ -1842,7 +1867,13 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     ip->ip_version = 4;
     ip->ip_hl = 5;
-    ip->ip_tos = 0;
+    if (qos) {
+        ip->ip_tos = qos->vfcq_dscp;
+        pkt->vp_queue = qos->vfcq_queue_id + 1;
+    } else {
+        ip->ip_tos = 0;
+    }
+
     ip->ip_id = id;
     ip->ip_frag_off = 0;
 
@@ -1958,6 +1989,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 {
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
+    struct vr_forwarding_class_qos *qos;
 
     /* No GRO for multicast and user packets */
     if ((pkt->vp_flags & VP_FLAG_MULTICAST) ||
@@ -1965,14 +1997,29 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags &= ~VP_FLAG_GRO;
 
     vif = nh->nh_dev;
-
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
 
-    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif)) {
-        if (vr_gro_input(pkt, nh)) {
-            if (stats)
-                stats->vrf_gros++;
-            return 0;
+    if (!(pkt->vp_flags & VP_FLAG_GROED)) {
+        qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+        if (qos) {
+            if (pkt->vp_type == VP_TYPE_IP) {
+                vr_inet_set_tos((struct vr_ip *)pkt_network_header(pkt),
+                        qos->vfcq_dscp);
+            } else if (pkt->vp_type == VP_TYPE_IP6) {
+                vr_inet6_set_tos((struct vr_ip6 *)pkt_network_header(pkt),
+                        qos->vfcq_dscp);
+            }
+            pkt->vp_queue = qos->vfcq_queue_id + 1;
+        }
+    }
+
+    if (pkt->vp_flags & VP_FLAG_GRO) {
+        if (vif_is_virtual(vif)) {
+            if (vr_gro_input(pkt, nh)) {
+                if (stats)
+                    stats->vrf_gros++;
+                return 0;
+            }
         }
     }
 
@@ -1998,19 +2045,31 @@ static int
 nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
                     struct vr_forwarding_md *fmd)
 {
+    unsigned short *proto_p;
+
+    struct vr_ip *ip;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
-    struct vr_ip *ip;
-    unsigned short *proto_p;
+    struct vr_forwarding_class_qos *qos = NULL;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
 
     vif = nh->nh_dev;
+    if (!(pkt->vp_flags & VP_FLAG_GROED)) {
+        qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+        if (qos)
+            pkt->vp_queue = qos->vfcq_queue_id;
+    }
+
     ip = (struct vr_ip *)pkt_network_header(pkt);
     if (vr_ip_is_ip6(ip)) {
         pkt->vp_type = VP_TYPE_IP6;
+        if (qos)
+            vr_inet6_set_tos((struct vr_ip6 *)ip, qos->vfcq_dscp);
     } else if (vr_ip_is_ip4(ip)) {
         pkt->vp_type = VP_TYPE_IP;
+        if (qos)
+            vr_inet_set_tos(ip, qos->vfcq_dscp);
     } else {
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
         return 0;

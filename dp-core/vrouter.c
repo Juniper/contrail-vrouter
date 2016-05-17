@@ -22,6 +22,7 @@
 #include <vr_packet.h>
 #include <vr_mirror.h>
 #include <vr_vxlan.h>
+#include <vr_qos.h>
 
 static struct vrouter router;
 struct host_os *vrouter_host;
@@ -95,6 +96,12 @@ static struct vr_module modules[] = {
         .init           =       vr_vxlan_init,
         .exit           =       vr_vxlan_exit,
     },
+    {
+        .mod_name       =       "QOS",
+        .init           =       vr_qos_init,
+        .exit           =       vr_qos_exit,
+    },
+
 
 };
 

@@ -69,9 +69,12 @@ vrouter = env.Program(target = 'vrouter', source = vrouter_sources)
 vrmemstats_sources = ['vrmemstats.c']
 vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
 
+qosmap_sources = ['qosmap.c']
+qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats,
-             vxlan, vrouter, vrmemstats]
+             vxlan, vrouter, vrmemstats, qosmap]
 
 scripts  = ['vifdump']
 env.Default(binaries)

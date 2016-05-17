@@ -105,7 +105,8 @@ buffer sandesh vr_interface_req {
     49: i32         vifr_bridge_idx;
     50: i16         vifr_ovlan_id;
     51: byte        vifr_transport;
-    52: list<i32>    vifr_fat_flow_protocol_port;
+    52: list<i32>   vifr_fat_flow_protocol_port;
+    53: i16         vifr_qos_map_index;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -188,6 +189,7 @@ buffer sandesh vr_flow_req {
    35: u32          fr_flow_stats_oflow;
    36: i32          fr_oflow_entries;
    37: byte         fr_gen_id;
+   38: i16          fr_qos_id;
 }
 
 buffer sandesh vr_vrf_assign_req {
@@ -332,6 +334,8 @@ buffer sandesh vr_mem_stats_req {
    58:  i64             vms_usock_iovec_object;
    59:  i64             vms_vrouter_req_object;
    60:  i64             vms_interface_fat_flow_config_object;
+   61:  i64             vms_qos_map_object;
+   62:  i64             vms_fc_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */
@@ -387,4 +391,28 @@ buffer sandesh vr_drop_stats_req {
     49: i64             vds_arp_reply_no_route;
     50: i64             vds_vlan_fwd_tx;
     51: i64             vds_vlan_fwd_enq;
+}
+
+buffer sandesh vr_qos_map_req {
+    1: sandesh_op       h_op;
+    2: u16              qmr_rid;
+    3: u16              qmr_id;
+    4: list<byte>       qmr_dscp;
+    5: list<byte>       qmr_dscp_fc_id;
+    6: list<byte>       qmr_mpls_qos;
+    7: list<byte>       qmr_mpls_qos_fc_id;
+    8: list<byte>       qmr_dotonep;
+    9: list<byte>       qmr_dotonep_fc_id;
+   10: i16              qmr_marker;
+}
+
+buffer sandesh vr_fc_map_req {
+    1: sandesh_op       h_op;
+    2: u16              fmr_rid;
+    3: list<i16>        fmr_id;
+    4: list<byte>       fmr_dscp;
+    5: list<byte>       fmr_mpls_qos;
+    6: list<byte>       fmr_dotonep;
+    7: list<byte>       fmr_queue_id;
+    8: i16              fmr_marker;
 }

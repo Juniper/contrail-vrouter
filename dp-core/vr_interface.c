@@ -1745,6 +1745,7 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
         vif->vif_mtu = req->vifr_mtu;
 
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
+    vif->vif_qos_map_index = req->vifr_qos_map_index;
 
     if ((ret = vif_fat_flow_add(vif, req)))
         return ret;
@@ -1835,6 +1836,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         vif->vif_os_idx = 0;
     vif->vif_rid = req->vifr_rid;
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
+    vif->vif_qos_map_index = req->vifr_qos_map_index;
 
     if (req->vifr_mac) {
         if (req->vifr_mac_size != sizeof(vif->vif_mac)) {
@@ -2068,6 +2070,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         }
     }
 
+    req->vifr_qos_map_index = intf->vif_qos_map_index;
     return;
 }
 

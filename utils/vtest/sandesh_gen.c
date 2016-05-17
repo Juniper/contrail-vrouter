@@ -439,7 +439,8 @@ gen(FILE *fp)
                 gen_write(fp_expect, nesting + 4, "strtoul(node->content, NULL, 0)");
                 gen_write(fp_expect, 0, ");\n");
 
-            } else if (!strncmp(type, "i16", strlen("i16"))) {
+            } else if ((!strncmp(type, "i16", strlen("i16"))) ||
+                    (!strncmp(type, "u16", strlen("u16")))) {
                 gen_write(ofp, 0, "strtoul(node->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_short_compare(");
