@@ -55,6 +55,8 @@ struct vr_fragment *vr_fragment_get(struct vrouter *, unsigned short,
 int vr_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
                 unsigned short, unsigned short);
 void vr_fragment_del(struct vr_fragment *);
+uint32_t __vr_fragment_get_hash(unsigned int, unsigned int,
+        unsigned int, struct vr_packet *);
 uint32_t vr_fragment_get_hash(unsigned int, struct vr_packet *);
 int vr_fragment_assembler(struct vr_fragment **,
         struct vr_fragment_queue_element *);
