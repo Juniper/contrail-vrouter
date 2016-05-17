@@ -474,6 +474,7 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
         RTE_LOG(INFO, VROUTER, "Changing bond eth device %" PRIu8 " MTU\n",
                 ethdev->ethdev_port_id);
 
+        rte_eth_devices[ethdev->ethdev_port_id].data->mtu = new_mtu;
         for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
             slave_port_id = ethdev->ethdev_slaves[i];
             RTE_LOG(INFO, VROUTER,
