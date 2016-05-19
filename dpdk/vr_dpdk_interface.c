@@ -174,7 +174,11 @@ dpdk_set_hw_vlan_filter_strip(uint32_t port_id, struct vr_interface *vif)
                    &ethdev->ethdev_port_id:ethdev->ethdev_slaves;
 
     do {
-        if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+        /*
+         * TODO: vf_lcore_id check for SR-IOV VF should be a per-interface
+         * check to handle the case where a bond has a VF and a PF in it.
+         */
+        if ((vr_dpdk.vlan_tag != VLAN_ID_INVALID) && vr_dpdk.vf_lcore_id) {
             ret = rte_eth_dev_set_vlan_offload(*port_id_ptr, ETH_VLAN_FILTER_OFFLOAD);
             if (ret) {
                 RTE_LOG(INFO, VROUTER, "Error %d enabling vlan offload on port %d\n",
