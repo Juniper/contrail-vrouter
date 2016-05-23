@@ -352,6 +352,8 @@ enum vr_dpdk_lcore_cmd {
     VR_DPDK_LCORE_TX_RM_CMD,
     /* Call RCU callback */
     VR_DPDK_LCORE_RCU_CMD,
+    /* Queue disable/enable command */
+    VR_DPDK_LCORE_QUEUE_SET_CMD,
 };
 
 struct vr_dpdk_lcore {

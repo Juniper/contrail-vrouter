@@ -1334,6 +1334,10 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
         ret = -1;
         /* do not reset stop command, so we can break nested loops */
         break;
+    case VR_DPDK_LCORE_QUEUE_SET_CMD:
+        vr_dpdk_virtio_tx_queue_set((void *)cmd_arg);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
+        break;
     }
 
     return ret;
