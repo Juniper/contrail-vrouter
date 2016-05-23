@@ -122,22 +122,27 @@ vt_post_process_message(struct vtest *test) {
 
         ret = vt_send_vRouter_msg(test);
         if (!(ret > 0)) {
+            fprintf(stderr, "Send message, failed\n");
             return E_PROCESS_XML_ERR_MSG_SEND;
         }
 
         ret = vt_recv_vRouter_msg(test);
         if (!(ret > 0)) {
+            fprintf(stderr, "Receive message, failed\n");
             return E_PROCESS_XML_ERR_MSG_RECV;
         }
 
         ret =  vt_check_return_val(test);
         if (ret != E_PROCESS_XML_OK) {
+            fprintf(stderr, "Message has different return value, failed\n");
             return E_PROCESS_XML_ERR;
         }
 
         /* If expect element is in <message> file. */
         ret = vt_post_process_message_expect(test);
         if (ret != E_PROCESS_XML_OK) {
+            fprintf(stderr, "Expected message has different value then returned, failed\n");
+
             return ret;
         }
     }
@@ -196,11 +201,13 @@ vt_process_node(xmlNodePtr node, struct vtest *test)
                     strlen(vt_modules[i].vt_name) + 1)) {
             ret = vt_modules[i].vt_node(node, test);
             if (ret != E_MESSAGE_OK) {
+                fprintf(stderr, "process node %s failed\n", node->name);
                 return ret;
             }
 
             ret = vt_post_process_node(node, test);
             if (ret != E_PROCESS_XML_OK) {
+                fprintf(stderr, "process node %s failed\n", node->name);
                 return ret;
             }
 
@@ -229,6 +236,8 @@ vt_tree_traverse(xmlNodePtr node, struct vtest *test)
         if (node->type == XML_ELEMENT_NODE) {
             ret = vt_process_node(node, test);
             if (ret != E_PROCESS_XML_OK) {
+                fprintf(stderr ,"Tree traverse error\n");
+
                 return ret;
             }
             else {

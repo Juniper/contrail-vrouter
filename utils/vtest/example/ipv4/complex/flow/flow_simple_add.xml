@@ -43,19 +43,7 @@
         </vr_nexthop_req>
         <return>0</return>
     </message>
-<!--
-    <message>
-        <vr_route_req>
-            <h_op>Add</h_op>
-            <rtr_family>7</rtr_family>
-            <rtr_nh_id>12</rtr_nh_id>
-            <rtr_mac>de:ad:be:ef:00:01</rtr_mac>
-            <rtr_vrf_id>0</rtr_vrf_id>
-        </vr_route_req>
-        <return>0</return>
-    </message>
--->
-<!-- L3 route -->
+
     <message>
         <vr_route_req>
             <h_op>Add</h_op>
@@ -71,6 +59,7 @@
     <message>
         <vr_flow_req>
             <fr_op>flow_set</fr_op>
+            <!-- IP src and IP dst -->
             <fr_flow_ip>1:1:1:1:2:2:2:2</fr_flow_ip>
             <fr_family>2</fr_family>
             <fr_index>-1</fr_index>

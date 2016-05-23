@@ -22,6 +22,9 @@
 #include "vt_packet.h"
 
 
+/*
+ * Parse XML structure and set structures packet and packet interface (vtest.h)
+ */
 int
 vt_packet(xmlNodePtr node, struct vtest *test)
 {
@@ -75,9 +78,9 @@ vt_packet(xmlNodePtr node, struct vtest *test)
                     continue;
                 }
                 if (l_node_interface->children && l_node_interface->children->content) {
-
                     (test->packet_rx[test->packet.rx_client_num].vif_id =
                      strtoul(l_node_interface->children->content, NULL, 0));
+                    //for multicast purpose 1:M, multicast is not implemented
                     test->packet.rx_client_num += 1;
                     break;
                 }
