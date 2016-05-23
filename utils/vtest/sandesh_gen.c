@@ -566,21 +566,7 @@ gen(FILE *fp)
     gen_write(fp_message, 1, "},\n");
     gen_write(fp_message_hdr, 0, "extern void *");
     gen_write(fp_message_hdr, 0, "vt_return_node(xmlNodePtr, struct vtest *);\n");
-/*
-    gen_write(fp_message, 1, "{\n");
-    gen_write(fp_message, 2, ".vmm_name");
-    gen_write(fp_message, 2, "=");
-    gen_write(fp_message, 2, "\"expect\",\n");
-    gen_write(fp_message, 2, ".vmm_node");
-    gen_write(fp_message, 2, "=");
-    gen_write(fp_message, 2, "vt_expect_node,\n");
-    gen_write(fp_message, 2, ".vmm_size");
-    gen_write(fp_message, 2, "=");
-    gen_write(fp_message, 2, "0,\n");
-    gen_write(fp_message, 1, "},\n");
-    //gen_write(fp_message_hdr, 0, "extern void *");
-    //gen_write(fp_message_hdr, 0, "vt_expect_node(xmlNodePtr, struct vtest *);\n");
-*/
+
     gen_write(fp_message, 0, "};\n\n");
     gen_write(fp_message, 0,
             "unsigned int vt_message_modules_num = \n");

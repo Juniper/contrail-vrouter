@@ -56,6 +56,7 @@
         <message>
         <vr_flow_req>
             <fr_op>flow_set</fr_op>
+            <!-- IP src and IP dst -->
             <fr_flow_ip>1:1:1:1:2:2:2:2</fr_flow_ip>
             <fr_family>2</fr_family>
             <fr_index>-1</fr_index>

@@ -17,17 +17,6 @@
             </vr_interface_req>
         </expect>
     </message>
-<!--
-    <packet>
-        <pcap_file>deadbeef.pcap</pcap_file>
-        <pcap_reference_file>deadbeef.pcap</pcap_reference_file>
-        <tx_interface>
-            <vif_index>1</vif_index>
-        </tx_interface>
-        <rx_interface>
-            <vif_index>2</vif_index>
-        </rx_interface>
-    </packet>
--->
+
 </test>
 
