@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<test>
+    <test_name>OH MY FLOW !</test_name>
+    <message>
+        <vr_flow_req>
+            <fr_op>flow_set</fr_op>
+            <fr_flow_ip>1:1:1:1:2:2:2:2</fr_flow_ip>
+            <fr_family>2</fr_family>
+            <fr_index>-1</fr_index>
+            <fr_flags>1</fr_flags>
+            <fr_flow_proto>17</fr_flow_proto>
+            <fr_flow_sport>31</fr_flow_sport>
+            <fr_flow_nh_id>0</fr_flow_nh_id>
+            <fr_action>2</fr_action>
+            <fr_flow_dport>31</fr_flow_dport>
+        </vr_flow_req>
+        <return>0</return>
+    </message>
+</test>
