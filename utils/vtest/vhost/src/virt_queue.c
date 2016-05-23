@@ -277,10 +277,6 @@ virt_queue_put_tx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_
     return E_VIRT_QUEUE_OK;
 }
 
-/* Copy data from src_buf to desc,
- * currently only single buffer is supported
- *      => src_buf_len MUST NOT be greater than desc[x].len
- */
 int
 virt_queue_put_rx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_VRING vq_id,
         size_t src_buf_len) {
@@ -296,7 +292,6 @@ virt_queue_put_rx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_
     if (!virtq_control) {
         return E_VIRT_QUEUE_ERR_FARG;
     }
-
 
     used = virtq_control[vq_id]->virtq.used;
     avail = virtq_control[vq_id]->virtq.avail;
@@ -320,7 +315,6 @@ virt_queue_put_rx_virt_queue(struct virtq_control **virtq_control, VHOST_CLIENT_
 
     avail->ring[avail->idx % num] = last_avail_idx;
     avail->idx++;
-
 
     return E_VIRT_QUEUE_OK;
 }

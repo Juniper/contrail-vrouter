@@ -31,7 +31,6 @@ static int client_init_socket(Client *client);
 static int client_vhost_ioctl_set_recv_msg(VhostUserRequest request, void *req_ptr, VhostUserMsg *msg);
 static int client_vhost_ioctl_recv_fds_handler(struct cmsghdr *cmsgh, int *fds, size_t *fd_num);
 static int client_vhost_ioctl_send_fds(VhostUserMsg *msg, int fd, int *fds, size_t fd_num);
-static int client_vhost_ioctl_recv_fds(int fd, VhostUserMsg *msg, int *fds, size_t *fd_num);
 static int client_vhost_ioctl_set_send_msg(Client *client, VhostUserRequest request,
                          void *req_ptr, VhostUserMsg *msg, int *fd, size_t *fd_num);
 
@@ -218,11 +217,7 @@ client_vhost_ioctl(Client *client, VhostUserRequest request, void *req_ptr) {
             return E_CLIENT_ERR_VIOCTL;
         }
 
-        ret_val = client_vhost_ioctl_recv_fds(cl->socket, &message, fds, &fd_num);
 
-        if (ret_val != E_CLIENT_OK) {
-            return ret_val;
-        }
     }
 
     return E_CLIENT_OK;
@@ -401,77 +396,4 @@ client_vhost_ioctl_send_fds(VhostUserMsg *msg, int fd, int *fds, size_t fd_num) 
 
     return E_CLIENT_OK;
 }
-
-static int
-client_vhost_ioctl_recv_fds(int fd, VhostUserMsg *msg, int *fds, size_t *fd_num) {
-
-    struct  msghdr msgh;
-    struct iovec iov;
-    struct cmsghdr *cmsgh = NULL;
-    char controlbuf[CMSG_SPACE(sizeof(int) * (*fd_num))];
-    VhostUserMsg *const message = msg;
-    int *const l_fds = fds;
-    size_t *const l_fd_num = fd_num;
-    int ret = 0;
-
-    if (!msg || !fds || !fd_num) {
-
-        return E_CLIENT_ERR_FARG;
-    }
-
-    memset(controlbuf, 0, sizeof(controlbuf));
-    memset(&msgh, 0, sizeof(struct msghdr));
-    memset(&iov, 0, sizeof(struct iovec));
-
-    msgh.msg_name = NULL;
-    msgh.msg_namelen = 0;
-
-    msgh.msg_iov = &iov;
-    msgh.msg_iovlen = 1;
-    msgh.msg_control = controlbuf;
-    msgh.msg_controllen = sizeof(controlbuf);
-
-    iov.iov_base = (void *) message;
-    iov.iov_len = VHOST_USER_HDR_SIZE;
-
-    ret = recvmsg(fd, &msgh, 0);
-
-    if ((ret > 0 && msgh.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) || ret < 0 ) {
-       return E_CLIENT_ERR_IOCTL_REPLY;
-    }
-
-    cmsgh = CMSG_FIRSTHDR(&msgh);
-    if (cmsgh && cmsgh->cmsg_len > 0 && cmsgh->cmsg_level == SOL_SOCKET &&
-            cmsgh->cmsg_type == SCM_RIGHTS) {
-
-        client_vhost_ioctl_recv_fds_handler(cmsgh, l_fds, l_fd_num);
-
-    }
-
-    read(fd, ((char*)msg) + ret, message->size);
-    return E_CLIENT_OK;
-}
-
-int
-client_vhost_ioctl_recv_fds_handler(struct cmsghdr *cmsgh, int *fds, size_t *fd_num) {
-
-    struct cmsghdr *const l_cmsgh = cmsgh;
-    int *const l_fds = fds;
-    size_t *const l_fd_num = fd_num;
-    size_t fd_size = 0;
-
-    if (!cmsgh || !fds || !fd_num) {
-        return E_CLIENT_ERR_FARG;
-    }
-
-    if (*fd_num * sizeof(int) >= l_cmsgh->cmsg_len - CMSG_LEN(0)) {
-       fd_size = l_cmsgh->cmsg_len - CMSG_LEN(0);
-       *l_fd_num = fd_size / sizeof(int);
-       memcpy(l_fds, CMSG_DATA(l_cmsgh), fd_size);
-    }
-
-    return E_CLIENT_OK;
-}
-
-
 
