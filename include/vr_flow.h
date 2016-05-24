@@ -34,7 +34,8 @@ typedef enum {
 
 #define VR_FLOW_FLAG_DP_FLAGS           (VR_FLOW_FLAG_EVICT_CANDIDATE |\
                                             VR_FLOW_FLAG_EVICTED |\
-                                            VR_FLOW_FLAG_NEW_FLOW)
+                                            VR_FLOW_FLAG_NEW_FLOW |\
+                                            VR_FLOW_FLAG_MODIFIED)
 
 #define VR_FLOW_FLAG_DP_BITS(fe)        (((fe)->fe_flags) &\
                                             (VR_FLOW_FLAG_DP_FLAGS))

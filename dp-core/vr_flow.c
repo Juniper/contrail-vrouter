@@ -343,7 +343,8 @@ vr_flow_start_modify(struct vrouter *router, struct vr_flow_entry *fe)
     unsigned short flags;
 
     flags = fe->fe_flags;
-    if (!(flags & (VR_FLOW_FLAG_MODIFIED | VR_FLOW_FLAG_EVICTED))) {
+    if (!(flags & (VR_FLOW_FLAG_MODIFIED | VR_FLOW_FLAG_EVICTED |
+                    VR_FLOW_FLAG_NEW_FLOW))) {
         if (__sync_bool_compare_and_swap(&fe->fe_flags, flags,
                     flags | VR_FLOW_FLAG_MODIFIED)) {
             return true;
