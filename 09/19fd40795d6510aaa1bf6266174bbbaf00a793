@@ -1,0 +1,9 @@
+Approved+1: opencontrail-admin <ci-admin@opencontrail.org>
+Code-Review+2: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Tue, 24 May 2016 17:16:06 -0700
+Reviewed-on: https://review.opencontrail.org/20566
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/R3.0
