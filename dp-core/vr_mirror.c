@@ -411,6 +411,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
 
     clone_len += mirror_md_len;
     nh = mirror->mir_nh;
+    pkt->vp_flags &= ~VP_FLAG_GRO;
     pkt = vr_pclone(pkt);
     if (!pkt)
         return 0;
