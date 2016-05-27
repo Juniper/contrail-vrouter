@@ -358,7 +358,6 @@ struct vrouter {
     unsigned int vr_max_vrfs;
     unsigned int vr_max_mirror_indices;
     struct vr_mirror_entry **vr_mirrors;
-    vr_itable_t vr_mirror_md;
     vr_itable_t vr_vxlan_table;
 
     vr_htable_t vr_fragment_table;
