@@ -278,5 +278,8 @@ int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
+int vr_flow_update_ecmp_index(struct vrouter *, unsigned int,
+                                        struct vr_forwarding_md *);
+
 
 #endif /* __VR_FLOW_H__ */
