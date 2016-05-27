@@ -23,7 +23,7 @@
 
 #define VR_NUM_OFLOW_TABLES         1
 
-#define VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT 4096
+#define VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT 8192
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = 0;
