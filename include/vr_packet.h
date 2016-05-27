@@ -627,6 +627,23 @@ vr_incremental_diff(unsigned int oldval, unsigned int newval,
     return;
 }
 
+static inline void
+vr_ip_incremental_csum(struct vr_ip *ip, unsigned int diff)
+{
+    unsigned int csum;
+
+    diff &= 0xffff;
+    csum = ~(ip->ip_csum) & 0xffff;
+    csum += diff;
+    csum = (csum >> 16) + (csum & 0xffff);
+    if (csum >> 16)
+        csum = (csum & 0xffff) + 1;
+
+    ip->ip_csum = (~csum & 0xffff);
+    return;
+}
+
+
 #define VR_TCP_FLAG_FIN         0x0001
 #define VR_TCP_FLAG_SYN         0x0002
 #define VR_TCP_FLAG_RST         0x0004
