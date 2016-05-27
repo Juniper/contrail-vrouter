@@ -777,6 +777,8 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         struct vr_forwarding_md *fmd)
 {
     int valid_src;
+    unsigned int ip_inc_diff_cksum = 0;
+    struct vr_ip *ip;
 
     flow_result_t result;
 
@@ -857,6 +859,22 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         result = FLOW_CONSUMED;
         break;
     }
+
+    if (result == FLOW_FORWARD) {
+        if (pkt->vp_type == VP_TYPE_IP) {
+            ip = (struct vr_ip *)pkt_network_header(pkt);
+            if (ip) {
+                if (fe->fe_ttl) {
+                    vr_incremental_diff(ip->ip_ttl, fe->fe_ttl, &ip_inc_diff_cksum);
+                    ip->ip_ttl = fe->fe_ttl;
+
+                    if (ip_inc_diff_cksum)
+                        vr_ip_incremental_csum(ip, ip_inc_diff_cksum);
+                }
+            }
+        }
+    }
+
 
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe, index);
@@ -1948,6 +1966,10 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     } else {
         fe->fe_action = req->fr_action;
     }
+
+    //fe->fe_ttl = req->fr_ttl;
+    fe->fe_ttl = 59;
+
 
     if (fe->fe_action == VR_FLOW_ACTION_DROP)
         fe->fe_drop_reason = (uint8_t)req->fr_drop_reason;
