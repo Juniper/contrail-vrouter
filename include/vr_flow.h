@@ -359,6 +359,7 @@ struct vr_dummy_flow_entry {
     uint8_t fe_type;
     unsigned short fe_udp_src_port;
     uint32_t fe_src_info;
+    struct vr_mirror_meta_entry *fe_mme;;
 } __attribute__packed__close__;
 
 #define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
@@ -394,6 +395,7 @@ struct vr_flow_entry {
      * component NH as this source
      */
     uint32_t fe_src_info;
+    struct vr_mirror_meta_entry *fe_mme;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__packed__close__;
 
