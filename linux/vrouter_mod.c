@@ -922,18 +922,18 @@ lh_reset_skb_fields(struct vr_packet *pkt)
  * lh_csum_verify_fast - faster version of skb_checksum which avoids a call
  * to kmap_atomic/kunmap_atomic as we already have a pointer obtained
  * from an earlier call to kmap_atomic. This function can only be used if
- * the skb has a TCP segment contained entirely in a single frag. Returns 0
+ * the skb has a TCP/UDP segment contained entirely in a single frag. Returns 0
  * if checksum is ok, non-zero otherwise.
  */
 static int
-lh_csum_verify_fast(struct vr_ip *iph, struct tcphdr *tcph,
-                    unsigned int tcp_size)
+lh_csum_verify_fast(struct vr_ip *iph, void *transport_hdr, unsigned
+        char proto, unsigned int size)
 {
     __wsum csum;
 
     csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
-                              tcp_size, IPPROTO_TCP, 0);
-    if (csum_fold(csum_partial(tcph, tcp_size, csum))) {
+                              size, proto, 0);
+    if (csum_fold(csum_partial(transport_hdr, size, csum))) {
         return -1;
     }
 
@@ -949,7 +949,7 @@ lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
 {
     skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
                                    ntohs(iph->ip_len) - (iph->ip_hl * 4), 
-                                   IPPROTO_TCP, 0);
+                                   iph->ip_proto, 0);
     if (__skb_checksum_complete(skb)) {
         return -1;
     }
@@ -1049,14 +1049,14 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
     unsigned char *va = NULL;
     skb_frag_t *frag;
     unsigned int frag_size, pull_len, hdr_len, skb_pull_len, tcp_size;
-    unsigned int  tcph_pull_len = 0, hlen = 0;
+    unsigned int  th_pull_len = 0, hlen = 0;
     struct vr_ip *iph = NULL;
     struct vr_ip6 *ip6h = NULL;
     struct vr_udp *udph;
-    struct tcphdr *tcph = NULL;
     int pkt_type = 0;
     struct vr_ip *outer_iph = NULL;
     unsigned short th_csum = 0;
+    void *th = NULL;
     int helper_ret, parse_ret;
 
     pkt_headlen = pkt_head_len(pkt);
@@ -1103,10 +1103,10 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
     }
 
     parse_ret = vr_ip_transport_parse(iph, ip6h,
-                      &tcph, frag_size,
+                      &th, frag_size,
                       NULL, &hlen,
                       &th_csum,
-                      &tcph_pull_len,
+                      &th_pull_len,
                       &pull_len);
     if (parse_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
@@ -1138,13 +1138,9 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
 
             skb_pull(skb, skb_pull_len);
             outer_iph = (struct vr_ip *)pkt_network_header(pkt);
-            if (lh_csum_verify_udp(skb, outer_iph)) {
-                if (th_csum == VR_DIAG_CSUM) {
-                    vr_pkt_set_diag(pkt);
-                } else {
-                    goto cksum_err;
-                }
-            }
+            if (lh_csum_verify_udp(skb, outer_iph))
+                goto cksum_err;
+
             /*
              * Restore the skb back to its original state. This is required as
              * packets that get trapped to the agent assume that the skb is
@@ -1154,17 +1150,19 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
         }
     } else {
         /*
-         * Verify inner packet checksum if it is TCP as we only do GRO for TCP
-         * (and GRO requires that checksum has been verified). For all other
-         * protocols, we will let the guest verify the checksum.
+         * We require checksum to be validated for TCP for GRO purpose
+         * and in case of UDP for DIAG purpose. Rest all packets can
+         * have the checksum validated in VM
          */
         if (!ip6h && iph && (!vr_ip_fragment(iph))) {
-            if (iph->ip_proto == VR_IP_PROTO_TCP) {
+            if (((iph->ip_proto == VR_IP_PROTO_UDP) && th_csum == VR_DIAG_CSUM)
+                 || (iph->ip_proto == VR_IP_PROTO_TCP)) {
+
                 lh_handle_checksum_complete_skb(skb);
 
                 if (skb_shinfo(skb)->nr_frags == 1) {
                     tcp_size = ntohs(iph->ip_len) - hlen;
-                    if (lh_csum_verify_fast(iph, tcph, tcp_size)) {
+                    if (lh_csum_verify_fast(iph, th, iph->ip_proto, tcp_size)) {
                         if (th_csum == VR_DIAG_CSUM) {
                             vr_pkt_set_diag(pkt);
                         } else {
@@ -1173,10 +1171,10 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                     }
                 } else {
                     /*
-                     * Pull to the start of the TCP header
+                     * Pull to the start of the transport header
                      */
                     skb_pull_len = (pkt_data(pkt) - skb->data) +
-                                   pkt_headlen + tcph_pull_len;
+                                   pkt_headlen + th_pull_len;
 
                     skb_pull(skb, skb_pull_len);
                     if (lh_csum_verify(skb, iph)) {
@@ -1195,18 +1193,8 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
                      */
                     skb_push(skb, skb_pull_len);
                 }
-
                 skb->ip_summed = CHECKSUM_UNNECESSARY;
             } else {
-                /*
-                 * If outer UDP header had checksum of 0 and the inner packet
-                 * is not TCP, set ip_summed to indicate that checksum
-                 * verification is required.
-                 */
-                if (th_csum == VR_DIAG_CSUM) {
-                    vr_pkt_set_diag(pkt);
-                }
-
                 skb->ip_summed &= (~CHECKSUM_UNNECESSARY);
             }
         }
@@ -1266,11 +1254,11 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
     unsigned char *va = NULL;
     skb_frag_t *frag;
     unsigned int frag_size, pull_len, hlen = 0, tcp_size, skb_pull_len,
-                 tcph_pull_len = 0;
+                 th_pull_len = 0;
     unsigned short th_csum = 0;
     struct vr_ip *iph  = NULL;
     struct vr_ip6 *ip6h  = NULL;
-    struct tcphdr *tcph = NULL;
+    void *th = NULL;
     int pkt_type = 0, helper_ret, parse_ret;
 
     pkt_headlen = pkt_head_len(pkt);
@@ -1375,10 +1363,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
     }
 
     parse_ret = vr_ip_transport_parse(iph, ip6h,
-                      &tcph, frag_size,
+                      &th, frag_size,
                       NULL, &hlen,
                       &th_csum,
-                      &tcph_pull_len,
+                      &th_pull_len,
                       &pull_len);
     if (parse_ret == PKT_RET_SLOW_PATH) {
         goto slow_path;
@@ -1408,14 +1396,17 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
      * GRE. If the outer header is UDP, we will always verify the checksum
      * of the outer packet and this covers the inner packet too.
      */
+
     if (!skb_csum_unnecessary(skb)) {
         if (!ip6h && iph && !vr_ip_fragment(iph)) {
-            if (iph->ip_proto == VR_IP_PROTO_TCP) {
+            if ((th_csum == VR_DIAG_CSUM && (iph->ip_proto == VR_IP_PROTO_UDP))
+                    || (iph->ip_proto == VR_IP_PROTO_TCP)) {
+
                 lh_handle_checksum_complete_skb(skb);
 
                 if (skb_shinfo(skb)->nr_frags == 1) {
                     tcp_size = ntohs(iph->ip_len) - hlen;
-                    if (lh_csum_verify_fast(iph, tcph, tcp_size)) {
+                    if (lh_csum_verify_fast(iph, th, iph->ip_proto, tcp_size)) {
                         if (th_csum == VR_DIAG_CSUM) {
                             vr_pkt_set_diag(pkt);
                         } else {
@@ -1424,10 +1415,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                     }
                 } else {
                     /*
-                     * Pull to the start of the TCP header
+                     * Pull to the start of the transport header
                      */
                     skb_pull_len = (pkt_data(pkt) - skb->data) +
-                        pkt_headlen + tcph_pull_len;
+                        pkt_headlen + th_pull_len;
 
                     skb_pull(skb, skb_pull_len);
                     if (lh_csum_verify(skb, iph)) {
@@ -1446,12 +1437,10 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                 }
 
                 skb->ip_summed = CHECKSUM_UNNECESSARY;
-            } else if (th_csum == VR_DIAG_CSUM) {
-                vr_pkt_set_diag(pkt);
+            } else {
+                skb->ip_summed &= ~CHECKSUM_UNNECESSARY;
             }
         }
-    } else if (th_csum == VR_DIAG_CSUM) {
-        vr_pkt_set_diag(pkt);
     }
 
     if (pkt_type != PKT_MPLS_TUNNEL_L3 && skb->ip_summed ==
@@ -1563,7 +1552,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
     unsigned short icmp_pl_ip_proto;
     struct tcphdr *tcph = NULL;
     struct vr_icmp *icmph = NULL;
-    unsigned int tcpoff, skb_pull_len;
+    unsigned int toff, skb_pull_len;
     bool thdr_valid = false, mpls_pkt = true, outer_cksum_validate;
     uint32_t label, control_data;
     struct vr_eth *eth = NULL;
@@ -1932,11 +1921,12 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                  }
              } else {
                  if (!ip6h && !vr_ip_fragment(iph)) {
-                     if (iph->ip_proto == VR_IP_PROTO_TCP) {
+                     if (((th_csum == VR_DIAG_CSUM) && iph->ip_proto == VR_IP_PROTO_UDP)
+                         || (iph->ip_proto == VR_IP_PROTO_TCP)) {
                          lh_handle_checksum_complete_skb(skb);
-                         tcpoff = (char *)tcph - (char *) skb->data;
+                         toff = (char *)((char *)iph +  (iph->ip_hl * 4)) - (char *) skb->data;
 
-                         skb_pull(skb, tcpoff);
+                         skb_pull(skb, toff);
                          if (lh_csum_verify(skb, iph)) {
                              if (th_csum == VR_DIAG_CSUM) {
                                  vr_pkt_set_diag(pkt);
@@ -1945,17 +1935,15 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                              }
                          }
 
-                         skb_push(skb, tcpoff);
-                         if (vr_to_vm_mss_adj) {
-                             lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
-                         }
-                     } else if (th_csum == VR_DIAG_CSUM) {
-                         vr_pkt_set_diag(pkt);
+                         skb->ip_summed = CHECKSUM_UNNECESSARY;
+
+                         skb_push(skb, toff);
+                     }
+                     if ((iph->ip_proto == VR_IP_PROTO_TCP) && vr_to_vm_mss_adj) {
+                         lh_adjust_tcp_mss(tcph, skb, vrouter_overlay_len, sizeof(struct vr_ip));
                      }
                  }
              }
-         } else if (th_csum == VR_DIAG_CSUM) {
-             vr_pkt_set_diag(pkt);
          }
     }
 
