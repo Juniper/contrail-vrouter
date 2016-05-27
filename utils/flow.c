@@ -1405,6 +1405,7 @@ flow_dump_table(struct flow_table *ft)
                     printf(", %d, ", fe->fe_sec_mirror_id);
             }
             printf(" SPort %d", fe->fe_udp_src_port);
+            printf(" TTL %d", fe->fe_ttl);
             printf(")");
         }
 
