@@ -548,18 +548,64 @@ vr_flow_set_forwarding_md(struct vrouter *router, struct vr_flow_entry *fe,
     return;
 }
 
+static int
+vr_rflow_update_ecmp_index(struct vrouter *router, struct vr_flow_entry *fe,
+        unsigned int new_ecmp_index, struct vr_forwarding_md *fmd)
+{
+    struct vr_flow_entry *rfe;
+
+    if (new_ecmp_index == -1)
+        return -1;
+
+    rfe = vr_get_flow_entry(router, fe->fe_rflow);
+    if ((!rfe) || (rfe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED))
+        return -1;
+
+    rfe->fe_ecmp_nh_index = new_ecmp_index;
+    vr_printf("Vrouter: Changing the Ecmp flow index from %d to %d in RPF\n",
+            fmd->fmd_ecmp_src_nh_index, new_ecmp_index);
+
+    fmd->fmd_ecmp_src_nh_index = new_ecmp_index;
+
+    return 0;
+}
+
+int
+vr_flow_update_ecmp_index(struct vrouter *router,
+            unsigned int new_ecmp_index, struct vr_forwarding_md *fmd)
+{
+    struct vr_flow_entry *fe;
+
+    if (new_ecmp_index == -1)
+        return -1;
+
+    fe = vr_get_flow_entry(router, fmd->fmd_flow_index);
+    if ((!fe) || (fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED))
+        return -1;
+
+    /* If RPF verification is manipulating this flow, let it succeed */
+    if (__sync_bool_compare_and_swap(&fe->fe_ecmp_nh_index,
+                    fmd->fmd_ecmp_nh_index, new_ecmp_index)) {
+        vr_printf("Vrouter: Changing the Ecmp flow index from %d to %d from NH \n",
+            fmd->fmd_ecmp_nh_index, new_ecmp_index);
+    }
+
+    fmd->fmd_ecmp_nh_index = fe->fe_ecmp_nh_index;
+
+    return 0;
+}
+
 static flow_result_t
 vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    int valid_src;
+    int valid_src, modified_index = -1;
 
     flow_result_t result;
 
     struct vr_forwarding_md mirror_fmd;
     struct vr_nexthop *src_nh;
-    struct vr_packet *pkt_clone;
 
     fmd->fmd_dvrf = fe->fe_vrf;
     /*
@@ -575,23 +621,18 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     }
 
     if (src_nh->nh_validate_src) {
-        valid_src = src_nh->nh_validate_src(pkt, src_nh, fmd, NULL);
+        valid_src = src_nh->nh_validate_src(pkt, src_nh, fmd, &modified_index);
         if (valid_src == NH_SOURCE_INVALID) {
             vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
             return FLOW_CONSUMED;
         }
 
         if (valid_src == NH_SOURCE_MISMATCH) {
-            pkt_clone = vr_pclone(pkt);
-            if (pkt_clone) {
-                vr_preset(pkt_clone);
-                if (vr_pcow(pkt_clone, sizeof(struct vr_eth) +
-                            sizeof(struct agent_hdr))) {
-                    vr_pfree(pkt_clone, VP_DROP_PCOW_FAIL);
-                } else {
-                    vr_trap(pkt_clone, fmd->fmd_dvrf,
-                            AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
-                }
+            valid_src = vr_rflow_update_ecmp_index(router, fe,
+                                                    modified_index, fmd);
+            if (valid_src == -1) {
+                vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
+                return FLOW_CONSUMED;
             }
         }
     }
@@ -1275,7 +1316,14 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         }
     }
 
-    fe->fe_ecmp_nh_index = req->fr_ecmp_nh_index;
+    /*
+     * Accept the Ecmp nexthop index from Agent only when setting the
+     * flow for the first time
+     */
+    if (fe->fe_ecmp_nh_index == -1)
+        (void)__sync_bool_compare_and_swap(&fe->fe_ecmp_nh_index, -1,
+                req->fr_ecmp_nh_index);
+
     fe->fe_src_nh_index = req->fr_src_nh_index;
 
     if ((req->fr_action == VR_FLOW_ACTION_HOLD) &&
