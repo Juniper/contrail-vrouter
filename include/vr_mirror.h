@@ -37,10 +37,12 @@ extern int vr_mirror(struct vrouter *, uint8_t, struct vr_packet *,
         struct vr_forwarding_md *);
 extern struct vr_mirror_entry *vrouter_get_mirror(unsigned int, unsigned int);
 extern int vrouter_put_mirror(struct vrouter *, unsigned int);
-extern int vr_mirror_meta_entry_set(struct vrouter *, unsigned int,
-        unsigned int, unsigned short,
-        void *, unsigned int,
-        unsigned short);
-extern void vr_mirror_meta_entry_del(struct vrouter *, unsigned int);
+extern struct vr_mirror_meta_entry *
+        vr_mirror_meta_entry_set(struct vrouter *, unsigned int,
+                    unsigned int, unsigned short,
+                    void *, unsigned int,
+                    unsigned short);
+extern void vr_mirror_meta_entry_del(struct vrouter *,
+                                struct vr_mirror_meta_entry *);
 
 #endif /* __VR_MIRROR_H__ */

@@ -180,7 +180,10 @@ vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe,
         fe->fe_mirror_id = VR_MAX_MIRROR_INDICES;
         vrouter_put_mirror(router, fe->fe_sec_mirror_id);
         fe->fe_sec_mirror_id = VR_MAX_MIRROR_INDICES;
-        vr_mirror_meta_entry_del(router, index);
+        if (fe->fe_mme) {
+            vr_mirror_meta_entry_del(router, fe->fe_mme);
+            fe->fe_mme = NULL;
+        }
     }
     fe->fe_flags &= ~VR_FLOW_FLAG_MIRROR;
     fe->fe_mirror_id = VR_MAX_MIRROR_INDICES;
@@ -1584,11 +1587,17 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
         }
     }
 
-    if (req->fr_pcap_meta_data_size && req->fr_pcap_meta_data)
-        vr_mirror_meta_entry_set(router, req->fr_index,
+    if (req->fr_pcap_meta_data_size && req->fr_pcap_meta_data) {
+        if (fe->fe_mme) {
+            vr_mirror_meta_entry_del(router, fe->fe_mme);
+            fe->fe_mme = NULL;
+        }
+
+        fe->fe_mme = vr_mirror_meta_entry_set(router, req->fr_index,
                 req->fr_mir_sip, req->fr_mir_sport,
                 req->fr_pcap_meta_data, req->fr_pcap_meta_data_size,
                 req->fr_mir_vrf);
+    }
 
     return;
 }
