@@ -362,5 +362,7 @@ void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
 fat_flow_port_mask_t vr_flow_fat_flow_lookup(struct vrouter *,
         struct vr_packet *, uint16_t, uint16_t, uint16_t);
+int vr_flow_update_ecmp_index(struct vrouter *, unsigned int,
+                                        struct vr_forwarding_md *);
 
 #endif /* __VR_FLOW_H__ */
