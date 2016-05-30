@@ -561,6 +561,8 @@ void
 vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
+    struct vr_ip *ip = (struct vr_ip *)pkt_inner_network_header(pkt);
+
     /*
      * we cannot cache nexthop here. to cache, we need to hold reference
      * to the nexthop. to hold a reference, we will have to hold a lock,
@@ -572,7 +574,9 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
      */
     pkt->vp_nh = NULL;
 
+    pnode->pl_flags = 0;
     pnode->pl_vif_idx = pkt->vp_if->vif_idx;
+
     if (fmd) {
         pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
         pnode->pl_label = fmd->fmd_label;
@@ -581,6 +585,22 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
         if (fmd->fmd_to_me)
             pnode->pl_flags |= PN_FLAG_TO_ME;
     }
+
+    if (ip && vr_ip_is_ip4(ip)) {
+        /*
+         * Source IP & Dest IP can change while the packet is in the queue
+         * (NAT). For e.g.: when the cloned head of a fragment is enqueued
+         * to the assembler and subsequently dequeued by the assembler, the
+         * original packet might have undergone a NAT, resulting in wrong
+         * hash and thus a wrong search for other fragments of the packet.
+         * Hence, store them here for others interested in the original IPs
+         */
+        pnode->pl_inner_src_ip = ip->ip_saddr;
+        pnode->pl_inner_dst_ip = ip->ip_daddr;
+        if (vr_ip_fragment_head(ip))
+            pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+    }
+
     pnode->pl_vrf = fmd->fmd_dvrf;
     pnode->pl_vlan = fmd->fmd_vlan;
 
