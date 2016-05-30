@@ -8,13 +8,19 @@ Multicast is not supported.
 Agent test cases are not supported.
 Generator makes mem leak, when generator parses string, then allocs mem...
 Does not support burst/batch virtio communication (only one free desc).
-
+ -> Framentation/refragramentation will not work.
 
 General:
 
 No formal XML Schema.
 vif name must be same as vif id.
 Needs rewrite generator -> rewrite old Anand's code.
+For some messages you need fill some "interesting" data.
+      for example:
+      when you want send a nh message (tunnel type)
+      you must fill xml element value to integer = (inet_pton("1.1.1.1"))
+
+      In generator/parser are lot of bugs like this  ^. 
 
 
 
@@ -35,7 +41,7 @@ BUILDING INTEGRATION
 --------------------
 
 For vtest purpose you don't have to load any kernel modules like rte or igb_uio to run vRouter.
-If you have compiled vRouter you can test it.onaly,
+If you have compiled vRouter you can test it.
 
 
 !!! IMPORTANT !!!

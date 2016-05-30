@@ -184,7 +184,7 @@ run_pcap_test(struct vtest *test) {
         }
     }
 
-    ret = clean_vtest_struct_packet(test);
+    clean_vtest_struct_packet(test);
 
     return ret;
 }
