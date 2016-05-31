@@ -157,7 +157,7 @@
 #define VP_DROP_PCOW_FAIL                   28
 #define VP_DROP_MCAST_DF_BIT                29
 #define VP_DROP_MCAST_CLONE_FAIL            30
-/* #define VP_DROP_COMPOSITE_INVALID_INTERFACE 31 - UNUSED */
+#define VP_DROP_NO_MEMORY                   31
 #define VP_DROP_REWRITE_FAIL                32
 #define VP_DROP_MISC                        33
 #define VP_DROP_INVALID_PACKET              34
@@ -170,7 +170,7 @@
 #define VP_DROP_INVALID_SOURCE              41
 #define VP_DROP_ARP_NO_ROUTE                42
 #define VP_DROP_L2_NO_ROUTE                 43
-#define VP_DROP_ARP_REPLY_NO_ROUTE          44
+#define VP_DROP_FRAGMENT_QUEUE_FAIL         44
 #define VP_DROP_MAX                         45
 
 
@@ -206,7 +206,7 @@ struct vr_drop_stats {
     uint64_t vds_pcow_fail;
     uint64_t vds_mcast_df_bit;
     uint64_t vds_mcast_clone_fail;
-    uint64_t vds_composite_invalid_interface;
+    uint64_t vds_no_memory;
     uint64_t vds_rewrite_fail;
     uint64_t vds_misc;
     uint64_t vds_invalid_packet;
@@ -219,8 +219,7 @@ struct vr_drop_stats {
     uint64_t vds_invalid_source;
     uint64_t vds_arp_no_route;
     uint64_t vds_l2_no_route;
-    uint64_t vds_arp_reply_no_route;
-
+    uint64_t vds_fragment_queue_fail;
 };
 
 /*
@@ -844,6 +843,15 @@ pkt_get_inner_network_header_off(struct vr_packet *pkt)
 {
     return pkt->vp_inner_network_h;
 
+}
+
+static inline unsigned char *
+pkt_inner_network_header(struct vr_packet *pkt)
+{
+    if (pkt->vp_inner_network_h < pkt->vp_end)
+        return pkt->vp_head + pkt->vp_inner_network_h;
+
+    return NULL;
 }
 
 static inline void
