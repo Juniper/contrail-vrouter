@@ -1231,7 +1231,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     }
 
     if (flow_e->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
-        return FLOW_DROP;
+        return FLOW_EVICT_DROP;
 
     vr_flow_set_forwarding_md(router, flow_e, fe_index, fmd);
     vr_flow_tcp_digest(router, flow_e, pkt, fmd);
@@ -1252,6 +1252,10 @@ __vr_flow_forward(flow_result_t result, struct vr_packet *pkt,
 
     case FLOW_TRAP:
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_L3_PROTOCOLS, NULL);
+        break;
+
+    case FLOW_EVICT_DROP:
+        vr_pfree(pkt, VP_DROP_FLOW_EVICT);
         break;
 
     case FLOW_HELD:

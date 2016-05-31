@@ -20,6 +20,7 @@ typedef enum {
     FLOW_DROP,
     FLOW_TRAP,
     FLOW_CONSUMED,
+    FLOW_EVICT_DROP,
 } flow_result_t;
 
 #define VR_FLOW_FLAG_ACTIVE             0x0001
