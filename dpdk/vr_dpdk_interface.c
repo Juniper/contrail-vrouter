@@ -1585,6 +1585,8 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
         stats->vis_dev_ipackets = eth_stats.ipackets;
         stats->vis_dev_ierrors = eth_stats.ierrors;
         stats->vis_dev_inombufs = eth_stats.rx_nombuf;
+        stats->vis_dev_obytes = eth_stats.obytes;
+        stats->vis_dev_opackets = eth_stats.opackets;
         stats->vis_dev_oerrors = eth_stats.oerrors;
     }
 }
