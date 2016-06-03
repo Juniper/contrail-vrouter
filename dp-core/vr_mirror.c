@@ -297,12 +297,12 @@ vr_mirror_meta_destructor(struct vrouter *router, void *arg)
 }
 
 static void
-vr_mirror_meta_entry_destroy(unsigned int index, void *arg)
+vr_mirror_meta_entry_destroy(struct vrouter *router,
+                            struct vr_mirror_meta_entry *me)
 {
-    struct vr_mirror_meta_entry *me = (struct vr_mirror_meta_entry *)arg;
     struct vr_defer_data *defer;
 
-    if (me && me != VR_ITABLE_ERR_PTR) {
+    if (me) {
         if (!vr_not_ready) {
             defer = vr_get_defer_data(sizeof(*defer));
             if (!defer) {
@@ -312,29 +312,31 @@ vr_mirror_meta_entry_destroy(unsigned int index, void *arg)
             }
             defer->vdd_data = (void *)me;
             vr_defer(me->mirror_router, vr_mirror_meta_destructor, (void *)defer);
+        } else {
+            vr_mirror_meta_destroy(me);
         }
     }
 
     return;
 }
 
-int
+struct vr_mirror_meta_entry *
 vr_mirror_meta_entry_set(struct vrouter *router, unsigned int index,
                          unsigned int mir_sip, unsigned short mir_sport,
                          void *meta_data, unsigned int meta_data_len,
                          unsigned short mirror_vrf)
 {
     char *buf;
-    struct vr_mirror_meta_entry *me, *me_old;
+    struct vr_mirror_meta_entry *me;
 
     me = vr_malloc(sizeof(*me), VR_MIRROR_META_OBJECT);
     if (!me)
-        return -ENOMEM;
+        return NULL;
 
     buf = vr_malloc(meta_data_len, VR_MIRROR_META_OBJECT);
     if (!buf) {
         vr_free(me, VR_MIRROR_META_OBJECT);
-        return -ENOMEM;
+        return NULL;
     }
 
     memcpy(buf, meta_data, meta_data_len);
@@ -345,23 +347,29 @@ vr_mirror_meta_entry_set(struct vrouter *router, unsigned int index,
     me->mirror_sport = mir_sport;
     me->mirror_vrf = mirror_vrf;
 
-    me_old = vr_itable_set(router->vr_mirror_md, index, me);
-    if (me_old && me_old != VR_ITABLE_ERR_PTR)
-        vr_mirror_meta_entry_destroy(index, (void *)me_old);
-
-    return 0;
+    return me;
 }
 
 void
-vr_mirror_meta_entry_del(struct vrouter *router, unsigned int index)
+vr_mirror_meta_entry_del(struct vrouter *router,
+                    struct vr_mirror_meta_entry *me)
 {
-    struct vr_mirror_meta_entry *me;
-
-    me = vr_itable_del(router->vr_mirror_md, index);
     if (me)
-        vr_mirror_meta_entry_destroy(index, (void *)me);
+        vr_mirror_meta_entry_destroy(router, (void *)me);
 
     return;
+}
+
+static struct vr_mirror_meta_entry *
+vr_mirror_meta_entry_get(struct vrouter *router, unsigned int flow_index)
+{
+    struct vr_flow_entry *fe;
+
+    fe = vr_get_flow_entry(router, flow_index);
+    if (fe)
+        return fe->fe_mme;
+
+    return NULL;
 }
 
 int
@@ -397,8 +405,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     }
 
     if (fmd->fmd_flow_index >= 0) {
-        mme = (struct vr_mirror_meta_entry *)vr_itable_get(router->vr_mirror_md,
-                                                           fmd->fmd_flow_index);
+        mme = vr_mirror_meta_entry_get(router, fmd->fmd_flow_index);
         if (!mme)
             return 0;
         mirror_md_len = mme->mirror_md_len;
@@ -502,12 +509,6 @@ vr_mirror_exit(struct vrouter *router, bool soft_reset)
             if (router->vr_mirrors[i])
                 vrouter_put_mirror(router, i);
 
-    if (router->vr_mirror_md) {
-        vr_itable_delete(router->vr_mirror_md,
-                vr_mirror_meta_entry_destroy);
-        router->vr_mirror_md = NULL;
-    }
-
     if (!soft_reset) {
         vr_free(router->vr_mirrors, VR_MIRROR_TABLE_OBJECT);
         router->vr_mirrors = NULL;
@@ -520,7 +521,6 @@ vr_mirror_exit(struct vrouter *router, bool soft_reset)
 int
 vr_mirror_init(struct vrouter *router)
 {
-    int ret = 0;
     unsigned int size;
 
     if (!router->vr_mirrors) {
@@ -531,27 +531,7 @@ vr_mirror_init(struct vrouter *router)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, size);
     }
 
-    if (!router->vr_mirror_md) {
-        router->vr_mirror_md = vr_itable_create(32, 4, 8, 8, 8, 8);
-        if (!router->vr_mirror_md && (ret = -ENOMEM)) {
-            vr_module_error(ret, __FUNCTION__, __LINE__, 0);
-            goto cleanup;
-        }
-    }
-
     return 0;
 
-cleanup:
-    if (router->vr_mirrors) {
-        vr_free(router->vr_mirrors, VR_MIRROR_TABLE_OBJECT);
-        router->vr_mirrors = NULL;
-    }
-
-    if (router->vr_mirror_md) {
-        vr_itable_delete(router->vr_mirror_md, vr_mirror_meta_entry_destroy);
-        router->vr_mirror_md = NULL;
-    }
-
-    return ret;
 }
 
