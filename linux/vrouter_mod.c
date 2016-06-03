@@ -1788,29 +1788,10 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                         pull_len += sizeof(struct vr_tcp);
                     else if (icmp_pl_ip_proto == VR_IP_PROTO_UDP)
                         pull_len += sizeof(struct vr_udp);
+                    else if (icmp_pl_ip_proto == VR_IP_PROTO_SCTP)
+                        pull_len += sizeof(struct vr_sctp);
                     else
                         pull_len += sizeof(struct vr_icmp);
-
-                    if (skb->len >= pull_len) {
-                        if (pskb_may_pull(skb, pull_len)) {
-                            iph = (struct vr_ip *)(skb->head + hoff);
-                            icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
-                            icmp_pl_iph = (struct vr_ip *)(icmph + 1);
-                            if (icmp_pl_ip_proto == VR_IP_PROTO_TCP) {
-                                th_csum = ((struct vr_tcp *)
-                                        ((unsigned char *)icmp_pl_iph +
-                                         icmp_pl_iph->ip_hl * 4))->tcp_csum;
-                            } else if (icmp_pl_ip_proto == VR_IP_PROTO_UDP) {
-                                th_csum = ((struct vr_udp *)
-                                        ((unsigned char *)icmp_pl_iph +
-                                         icmp_pl_iph->ip_hl * 4))->udp_csum;
-                            } else if (icmp_pl_ip_proto == VR_IP_PROTO_ICMP) {
-                                th_csum = ((struct vr_icmp *)
-                                        ((unsigned char *)icmp_pl_iph +
-                                         icmp_pl_iph->ip_hl * 4))->icmp_csum;
-                            }
-                        }
-                    }
 
                     iph = (struct vr_ip *)(skb->head + hoff);
                 }
@@ -1819,6 +1800,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                         ((unsigned char *)iph + hlen))->check;
             } else if (ip6h && (l4_proto == VR_IP_PROTO_ICMP6)) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
+                th_csum = icmph->icmp_csum;
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                     /* ICMP options size for neighbor solicit is 24 bytes */
                     pull_len += 24;
@@ -1851,29 +1833,10 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                         pull_len += sizeof(struct vr_tcp);
                     else if (icmp_pl_ip_proto == VR_IP_PROTO_UDP)
                         pull_len += sizeof(struct vr_udp);
+                    else if (icmp_pl_ip_proto == VR_IP_PROTO_SCTP)
+                        pull_len += sizeof(struct vr_sctp);
                     else
                         pull_len += sizeof(struct vr_icmp);
-
-                    if (skb->len >= pull_len) {
-                        if (pskb_may_pull(skb, pull_len)) {
-                            ip6h = (struct vr_ip6 *)(skb->head + hoff);
-                            icmph = (struct vr_icmp *)((unsigned char *)iph + hlen);
-                            icmp_pl_ip6h = (struct vr_ip6 *)(icmph + 1);
-                            if (icmp_pl_ip_proto == VR_IP_PROTO_TCP) {
-                                th_csum = ((struct vr_tcp *)
-                                        ((unsigned char *)icmp_pl_ip6h +
-                                         sizeof(struct vr_ip6)))->tcp_csum;
-                            } else if (icmp_pl_ip_proto == VR_IP_PROTO_UDP) {
-                                th_csum = ((struct vr_udp *)
-                                        ((unsigned char *)icmp_pl_ip6h +
-                                         sizeof(struct vr_ip6)))->udp_csum;
-                            } else if (icmp_pl_ip_proto == VR_IP_PROTO_ICMP) {
-                                th_csum = ((struct vr_icmp *)
-                                        ((unsigned char *)icmp_pl_iph +
-                                         sizeof(struct vr_ip6)))->icmp_csum;
-                            }
-                        }
-                    }
                 }
 
                 ip6h = (struct vr_ip6 *) (skb->head + hoff);
