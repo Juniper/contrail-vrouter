@@ -129,8 +129,8 @@ extern unsigned int vr_flow_hold_limit;
 /* How many packets to read/write from/to queue in one go */
 #define VR_DPDK_RX_BURST_SZ         32
 #define VR_DPDK_TX_BURST_SZ         32
-/* Number of mbufs in RSS mempool */
-#define VR_DPDK_RSS_MEMPOOL_SZ      16384 
+/* Default mempool size */
+#define VR_DEF_MEMPOOL_SZ     (16 * 1024)
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
 /* Number of mbufs in FRAG_DIRECT mempool */
