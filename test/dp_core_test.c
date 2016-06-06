@@ -25,7 +25,7 @@ extern unsigned int vr_oflow_entries;
 
 unsigned int allocated = 0;
 
-void *alloc_for_test(unsigned int size) {
+void *alloc_for_test(unsigned int size, unsigned int obj) {
     void *ptr;
 
     ptr = malloc(size);
@@ -34,7 +34,7 @@ void *alloc_for_test(unsigned int size) {
     return ptr;
 }
 
-void free_for_test(void *ptr) {
+void free_for_test(void *ptr, unsigned int obj) {
     free(ptr);
     allocated--;
 }
