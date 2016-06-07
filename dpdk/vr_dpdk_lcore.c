@@ -650,7 +650,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
          */
         if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID &&
                 vif_is_fabric(vif))) {
-            if (mbuf->vlan_tci != vr_dpdk.vlan_tag) {
+            if ((mbuf->vlan_tci & 0xFFF) != vr_dpdk.vlan_tag) {
                 if (vr_dpdk.vlan_ring == NULL || rte_vlan_insert(&mbuf)) {
                     vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
                     continue;
