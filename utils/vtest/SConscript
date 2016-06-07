@@ -15,7 +15,7 @@ system_header_path = GetOption('system-header-path')
 if system_header_path:
     env.Append(CPPPATH = system_header_path + '/include/')
 
-env.Append(CPPPATH = ['./include', build_dir, '/usr/include/libxml2'])
+env.Append(CPPPATH = ['./include', build_dir, '/usr/include/libxml2', build_root+'/../include'])
 xml_cpppath = os.popen('xml2-config --cflags | sed \'s/\-I//g\'').read()
 #env.Append(CPPPATH = xml_cpppath)
 
@@ -33,8 +33,7 @@ env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh', './vhost/lib/'])
-env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'jnprvnet', 'xml2', 'pcap', 'rt' ])
-
+env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'jnprvnet', 'xml2', 'pcap', 'rt', 'nl-3', 'nl-genl-3' ])
 
 sandesh_gen = env.Program('sandesh_gen.c')
 
@@ -55,6 +54,7 @@ vtest_src = [
             ]
 
 
+env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
 vtest = env.Program('vtest', vtest_src)
 env.Requires(vtest, sandesh_gen_output)
 
