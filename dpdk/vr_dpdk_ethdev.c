@@ -583,6 +583,7 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
 {
     int i, slave_port_id;
     int port_id = ethdev->ethdev_port_id;
+    uint16_t mtu = 0;
     struct rte_pci_addr *pci_addr;
     struct ether_addr bond_mac, mac_addr;
     struct ether_addr lacp_mac = { .addr_bytes = {0x01, 0x80, 0xc2, 0, 0, 0x02} };
@@ -601,6 +602,10 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
         /* log out and configure bond members */
         for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
             slave_port_id = ethdev->ethdev_slaves[i];
+            if (!rte_eth_devices[port_id].data->mtu) {
+                rte_eth_dev_get_mtu(slave_port_id, &mtu);
+                rte_eth_devices[port_id].data->mtu = mtu;
+            }
             memset(&mac_addr, 0, sizeof(mac_addr));
             rte_eth_macaddr_get(slave_port_id, &mac_addr);
             pci_addr = &rte_eth_devices[slave_port_id].pci_dev->addr;
