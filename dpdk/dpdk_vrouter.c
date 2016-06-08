@@ -39,6 +39,8 @@ enum vr_opt_index {
     HELP_OPT_INDEX,
 #define VERSION_OPT             "version"
     VERSION_OPT_INDEX,
+#define MEMPOOL_SIZE_OPT        "vr_mempool_sz"
+    MEMPOOL_SIZE_OPT_INDEX,
 #define VLAN_TCI_OPT            "vlan_tci"
     VLAN_TCI_OPT_INDEX,
 #define VLAN_NAME_OPT           "vlan_fwd_intf_name"
@@ -76,6 +78,7 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 
 static int no_daemon_set;
+unsigned int vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
 extern char *ContrailBuildInfo;
 
 /* Global vRouter/DPDK structure */
@@ -145,7 +148,7 @@ dpdk_mempools_create(void)
 {
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool",
-            VR_DPDK_RSS_MEMPOOL_SZ,
+            vr_mempool_sz,
             VR_DPDK_MBUF_SZ, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
@@ -790,6 +793,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VERSION_OPT_INDEX]             =   {VERSION_OPT,           no_argument,
                                                     NULL,                   0},
+    [MEMPOOL_SIZE_OPT_INDEX]        =   {MEMPOOL_SIZE_OPT,      required_argument,
+                                                    NULL,                   0},
     [VLAN_TCI_OPT_INDEX]            =   {VLAN_TCI_OPT,          required_argument,
                                                     NULL,                   0},
     [VLAN_NAME_OPT_INDEX]           =   {VLAN_NAME_OPT,         required_argument,
@@ -861,6 +866,12 @@ parse_long_opts(int opt_flow_index, char *optarg)
         exit(0);
         break;
 
+    case MEMPOOL_SIZE_OPT_INDEX:
+        vr_mempool_sz = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
+        }
+        break;
     /*
      * If VLAN tag is set, vRouter will expect tagged packets. The tag
      * will be stripped by NIC or in vr_dpdk_ethdev_rx_emulate() and
