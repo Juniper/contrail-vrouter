@@ -617,7 +617,7 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
 
             /* try to add bond mac and LACP multicast MACs */
             if (rte_eth_dev_mac_addr_add(slave_port_id, &bond_mac, 0) == 0
-                && rte_eth_dev_mac_addr_add(slave_port_id, &lacp_mac, 0) == 0) {
+                && rte_eth_dev_set_mc_addr_list(slave_port_id, &lacp_mac, 1) == 0) {
                 /* disable the promisc mode enabled by default */
                 rte_eth_promiscuous_disable(ethdev->ethdev_port_id);
                 RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
