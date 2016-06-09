@@ -1,7 +1,10 @@
+BUILD_ROOT = ${PWD}/../../../../build
 EXAMPLE = example_vhost_net_app
 EXAMPLE_SRC = ./example/example.c
 EXAMPLE_NAME = example_vhost_net_app
-EXAMPLE_CFLAGS += -std=gnu99 -Wall -g -L./lib/ -ljnprvnet -lrt -lpcap
+EXAMPLE_CFLAGS += -std=gnu99 -Wall -g -L./lib/ -L${BUILD_ROOT}/lib -ljnprvnet -lrt -lpcap -lnl-3 -lnl-genl-3
+INCLS = -I${PWD}/../../../../build/include
+EXAMPLE_CFLAGS += ${INCLS}
 
 LIB = contrail_vhost_net
 LIB_NAME = libjnprvnet.a
@@ -24,6 +27,7 @@ $(LIB): $(LIB_C_SRCS)
 		$(CC) -c $(LIB_C_SRCS) $(LIB_CFLAGS)
 		mv *.o ./src
 		ar -rcs $(LIB_NAME) $(LIB_OBJS)
+		mkdir -p ./lib
 		mv $(LIB_NAME) ./lib
 
 clean:  lib_clean example_clean src_clean
