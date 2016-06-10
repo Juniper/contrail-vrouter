@@ -971,6 +971,21 @@ static struct option long_options[] = {
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
+
+/* Safer than raw strtoul call that can segment fault with NULL strings.
+   sets errno if any addtional errors are detected.*/
+static unsigned long 
+safer_strtoul(const char *nptr, char **endptr, int base)
+{
+    if (nptr == NULL) {
+        errno = EINVAL;
+        return 0;
+    } else {
+        return strtoul(nptr, endptr, base);
+    }
+}
+
+
 static void
 parse_long_opts(int option_index, char *opt_arg)
 {
@@ -993,7 +1008,7 @@ parse_long_opts(int option_index, char *opt_arg)
             break;
 
         case VRF_OPT_INDEX:
-            vrf_id = strtoul(opt_arg, NULL, 0);
+            vrf_id = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
@@ -1006,27 +1021,27 @@ parse_long_opts(int option_index, char *opt_arg)
 
         case DELETE_OPT_INDEX:
             vr_op = SANDESH_OP_DELETE;
-            vr_ifindex = strtoul(opt_arg, NULL, 0);
+            vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case GET_OPT_INDEX:
             vr_op = SANDESH_OP_GET;
-            vr_ifindex = strtoul(opt_arg, NULL, 0);
+            vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case VIF_OPT_INDEX:
             /* we carry monitored vif index in OS index field */
-            if_kindex = strtoul(opt_arg, NULL, 0);
+            if_kindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case VINDEX_OPT_INDEX:
-            vif_index = strtoul(opt_arg, NULL, 0);
+            vif_index = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
@@ -1075,14 +1090,14 @@ parse_long_opts(int option_index, char *opt_arg)
 
         case SET_OPT_INDEX:
             vr_op = SANDESH_OP_ADD;
-            vr_ifindex = strtoul(opt_arg, NULL, 0);
+            vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case VLAN_OPT_INDEX:
             vr_ifflags |= VIF_FLAG_SERVICE_IF;
-            vlan_id = strtoul(opt_arg, NULL, 0);
+            vlan_id = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
