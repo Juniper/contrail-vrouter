@@ -586,7 +586,9 @@ dpdk_check_sriov_vf(void)
                 strncmp(dev_info.driver_name + soff, VR_DPDK_VF_PMD_SFX,
                 sizeof(VR_DPDK_VF_PMD_SFX)) == 0) {
             /* Dedicate the first forwarding lcore to VF RX/TX. */
-            if (dev_info.max_tx_queues < vr_dpdk.nb_fwd_lcores) {
+            if (dev_info.max_tx_queues < vr_dpdk.nb_fwd_lcores
+                    /* We also need 2 TX queues for Netlink and Packet lcores. */
+                    + VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID) {
                 vr_dpdk.vf_lcore_id = VR_DPDK_FWD_LCORE_ID;
                 RTE_LOG(INFO, VROUTER,
                         "%s: Lcore %d: SR-IOV virtual function IO for eth device %d (%s)\n",
