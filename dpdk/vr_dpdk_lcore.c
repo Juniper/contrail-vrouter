@@ -141,11 +141,13 @@ dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
 /* Remove RX queue from a lcore
  * The function is called by each forwaring lcore
  */
-static void
+void
 dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
-                            struct vr_dpdk_queue *rx_queue)
+                           struct vr_dpdk_queue *rx_queue,
+                           bool clear_f_rx)
 {
-    rx_queue->rxq_ops.f_rx = NULL;
+    if (clear_f_rx)
+        rx_queue->rxq_ops.f_rx = NULL;
     SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
         q_next);
 
@@ -289,9 +291,16 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
                     if (rx_queue == NULL)
                         return -EFAULT;
 
-                    /* add the queue to the lcore */
                     lcore = vr_dpdk.lcores[lcore_id];
-                    dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head, rx_queue);
+
+                    /*
+                     * For virtio interfaces, add the queue to the lcore only
+                     * for queue 0. The rest will be added by QEMU with
+                     * VHOST_USER_SET_VRING_ENABLE message.
+                     */
+                    if (!vif_is_virtual(vif) || queue_id == 0)
+                        dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head,
+                                             rx_queue);
 
                     /* next queue */
                     queue_id++;
@@ -1313,7 +1322,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
         rx_queue = &lcore->lcore_rx_queues[vif_idx];
         if (rx_queue->q_queue_h) {
             /* remove the queue from the lcore */
-            dpdk_lcore_rx_queue_remove(lcore, rx_queue);
+            dpdk_lcore_rx_queue_remove(lcore, rx_queue, true);
         }
         lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
@@ -1333,6 +1342,14 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     case VR_DPDK_LCORE_STOP_CMD:
         ret = -1;
         /* do not reset stop command, so we can break nested loops */
+        break;
+    case VR_DPDK_LCORE_TX_QUEUE_SET_CMD:
+        vr_dpdk_virtio_tx_queue_set((void *)cmd_arg);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
+        break;
+    case VR_DPDK_LCORE_RX_QUEUE_SET_CMD:
+        vr_dpdk_virtio_rx_queue_set((void *)cmd_arg);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     }
 

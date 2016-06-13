@@ -273,7 +273,7 @@ vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
 uint16_t
 vr_dpdk_virtio_nrxqs(struct vr_interface *vif)
 {
-    return VR_DPDK_VIRTIO_MAX_QUEUES;
+    return vr_dpdk.nb_fwd_lcores;
 }
 
 /*
@@ -283,8 +283,10 @@ vr_dpdk_virtio_nrxqs(struct vr_interface *vif)
 uint16_t
 vr_dpdk_virtio_ntxqs(struct vr_interface *vif)
 {
-    return VR_DPDK_VIRTIO_MAX_QUEUES;
+    return vr_dpdk.nb_fwd_lcores;
 }
+
+static unsigned int vif_rx_queue_lcore[VR_MAX_INTERFACES][VR_MAX_INTERFACES];
 
 /*
  * dpdk_virtio_rx_queue_release - releases a virtio RX queue.
@@ -358,6 +360,9 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_virtio_rx_queue_release;
 
+    /* save the lcore serving the queue for later enabling/disabling */
+    vif_rx_queue_lcore[vif_idx][queue_id] = lcore_id;
+
     return rx_queue;
 }
 
@@ -422,7 +427,12 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 
     /* create the queue */
     struct dpdk_virtio_writer_params writer_params = {
-        .tx_virtioq = &vr_dpdk_virtio_txqs[vif_idx][queue_id],
+        /*
+         * Always initialize each lcore's tx_queue with virtio queue number 0.
+         * If there are more queues, they will be enabled later via
+         * VHOST_USER_SET_VRING_ENABLE message.
+         */
+        .tx_virtioq = &vr_dpdk_virtio_txqs[vif_idx][0],
     };
     tx_queue->q_queue_h = tx_queue->txq_ops.f_create(&writer_params, socket_id);
     if (tx_queue->q_queue_h == NULL) {
@@ -435,6 +445,251 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     tx_queue_params->qp_release_op = &dpdk_virtio_tx_queue_release;
 
     return tx_queue;
+}
+
+struct dpdk_virtio_tx_queue_set_params {
+    unsigned int vif_id;
+    unsigned int vif_gen;
+    unsigned int queue_id;
+};
+
+static unsigned int vif_lcore_tx_queue[VR_MAX_INTERFACES][VR_MAX_CPUS];
+static unsigned int vif_tx_queues_enabled[VR_MAX_INTERFACES];
+
+/*
+ * Enable or disable given queue for a vif.
+ *
+ * In current vRouter design, every lcore that can send packets has to have a
+ * TX queue available for every existing vif. It is because we do not know
+ * which lcore wil eventually send the packet, and thus each has to have a
+ * queue to use.
+ *
+ * If VM requests more than one virtio queue, then we distribute them among the
+ * forwarding lcores as evenly as possible.
+ *
+ * The entire process (this function, which sends commands to other lcores and
+ * then vr_dpdk_virtio_tx_queue_set(), which is called from the destination
+ * lcores' main loop) works fine as long as the QEMU enables/disables each
+ * queues in ascending order. For example, if the maximal number of queues is
+ * 4, and inside a VM ethtool -L eth0 combined 2 is issued, the QEMU will send
+ * the following messages:
+ * 1. Enable queue 0.
+ * 2. Enable queue 1.
+ * 3. Disable queue 2.
+ * 4. Disable queue 3.
+ *
+ * TODO: Remove the above assumption as there is no guarantee that QEMU will
+ * always work as described.
+ */
+void
+vr_dpdk_virtio_tx_queue_enable_disable(unsigned int vif_id,
+                                       unsigned int queue_id,
+                                       bool enable)
+{
+    unsigned int lcore_id;
+    unsigned int starting_lcore;
+    struct dpdk_virtio_tx_queue_set_params *arg;
+    unsigned int qid;
+    struct vr_interface *vif;
+    unsigned int queue_num;
+
+    /*
+     * TODO: Do not we have a race here? What if vif is deleted (by another
+     * lcore, since this function is called on uvhost lcore) after the check
+     * below?
+     */
+    vif = __vrouter_get_interface(vrouter_get(0), vif_id);
+    if (!vif)
+        return;
+
+    /* If command is 'disable', we enable all lower numbered queues */
+    if (!enable)
+        queue_num = queue_id - 1;
+    else
+        queue_num = queue_id;
+
+    /* There is nothing to do if queues are already enabled */
+    if (queue_num <= vif_tx_queues_enabled[vif_id]) {
+        return;
+    }
+
+    /*
+     * Each lcore that does tx has to have a queue assigned for every
+     * interface. We assign queue 0 for pkt and netlink lcores. All
+     * other queues (including queue 0) are distributed among forwarding
+     * lcores.
+     */
+    if (queue_id == 0)
+        starting_lcore = VR_DPDK_PACKET_LCORE_ID;
+    else
+        starting_lcore = VR_DPDK_FWD_LCORE_ID;
+
+    for (lcore_id = starting_lcore, qid = 0; lcore_id < vr_dpdk.nb_fwd_lcores +
+            VR_DPDK_FWD_LCORE_ID; ++lcore_id) {
+
+        /*
+         * Send cmd to destination lcore only if it has different queue enabled
+         * curently.
+         */
+        if (vif_lcore_tx_queue[vif_id][lcore_id - VR_DPDK_PACKET_LCORE_ID] !=
+                qid) {
+            vif_lcore_tx_queue[vif_id][lcore_id - VR_DPDK_PACKET_LCORE_ID] =
+                    qid;
+
+            arg = rte_malloc("virtio_tx_queue_set", sizeof(*arg), 0);
+
+            arg->vif_id = vif_id;
+            arg->queue_id = qid;
+            arg->vif_gen = vif->vif_gen;
+
+            vr_dpdk_lcore_cmd_post(lcore_id, VR_DPDK_LCORE_TX_QUEUE_SET_CMD,
+                                   (uint64_t)arg);
+        }
+
+        ++qid;
+        qid %= queue_num + 1;
+    }
+
+    /* Save current number of TX queues enabled for vif */
+    vif_tx_queues_enabled[vif_id] = queue_num;
+}
+
+/*
+ * Assign given virtio queue to vRouter's dpdk (per lcore) tx queue.
+ *
+ * The assignment is done by setting correct virtio queue pointer in the
+ * lcore's tx queue handler.
+ *
+ * This function is called only from the main loops of the lcores that have TX
+ * queues (packet lcore, netlink lcore, forwarding lcores).
+ */
+void
+vr_dpdk_virtio_tx_queue_set(void *arg)
+{
+    struct dpdk_virtio_tx_queue_set_params *p = arg;
+    struct vr_dpdk_queue *tx_queue;
+    struct dpdk_virtio_writer *port;
+    struct vr_dpdk_lcore *lcore;
+    struct vr_interface *vif;
+
+    /* Check if vif is still valid */
+    vif = __vrouter_get_interface(vrouter_get(0), p->vif_id);
+    if (!vif || vif->vif_gen != p->vif_gen) {
+        rte_free(arg);
+        return;
+    }
+
+    lcore = vr_dpdk.lcores[rte_lcore_id()];
+    tx_queue = &lcore->lcore_tx_queues[p->vif_id];
+    port = (struct dpdk_virtio_writer *)tx_queue->q_queue_h;
+
+    /* Assign new queue to the lcore's tx_queue handler */
+    port->tx_virtioq = &vr_dpdk_virtio_txqs[p->vif_id][p->queue_id];
+
+    /*
+     * Each tx_queue has to have a f_flush method, but we do not need to crash
+     * in other case.
+     */
+    if (tx_queue->txq_ops.f_flush)
+        tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+    else
+        RTE_LOG(ERR, VROUTER, "%s: Flush function for tx_queue(%p) unavailable\n",
+                __func__, tx_queue);
+
+    rte_free(arg);
+}
+
+struct dpdk_virtio_rx_queue_set_params {
+    bool enable;
+    unsigned int vif_id;
+    unsigned int vif_gen;
+    unsigned int queue_id;
+};
+
+
+void
+dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
+                     struct vr_dpdk_queue *queue);
+void
+dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
+                           struct vr_dpdk_queue *rx_queue,
+                           bool clear_f_rx);
+
+/*
+ * Called on uvhost lcore only.
+ */
+void
+vr_dpdk_virtio_rx_queue_enable_disable(unsigned int vif_id,
+                                       unsigned int queue_id,
+                                       bool enable)
+{
+    struct dpdk_virtio_rx_queue_set_params *arg;
+    struct vr_interface *vif;
+
+    /*
+     * TODO: Do not we have a race here? What if vif is deleted (by another
+     * lcore, since this function is called on uvhost lcore) after the check
+     * below?
+     */
+    vif = __vrouter_get_interface(vrouter_get(0), vif_id);
+    if (!vif)
+        return;
+
+    /*
+     * Ignore requests for queue number 0. It has already been added to lcore's
+     * list of queues and can never be disabled (qemu never sends the 'disable'
+     * command for queue 0). Doing otherwise would result in double adding the
+     * virtio queue to lcore's list of rx queues.
+     */
+    if (queue_id == 0)
+        return;
+
+    arg = rte_malloc("virtio_rx_queue_set", sizeof(*arg), 0);
+
+    arg->vif_id = vif_id;
+    arg->vif_gen = vif->vif_gen;
+    arg->queue_id = queue_id;
+    arg->enable = enable;
+
+    vr_dpdk_lcore_cmd_post(VR_DPDK_NETLINK_LCORE_ID,
+                           VR_DPDK_LCORE_RX_QUEUE_SET_CMD, (uint64_t)arg);
+}
+
+/*
+ * Called only on netlink lcore.
+ */
+void
+vr_dpdk_virtio_rx_queue_set(void *arg)
+{
+    struct dpdk_virtio_rx_queue_set_params *p = arg;
+    struct vr_interface *vif;
+    struct vr_dpdk_queue *rx_queue;
+    struct vr_dpdk_lcore *lcore;
+    unsigned int lcore_id;
+
+    /* Check if vif is still valid */
+    vif = __vrouter_get_interface(vrouter_get(0), p->vif_id);
+    if (!vif || vif->vif_gen != p->vif_gen) {
+        rte_free(arg);
+        return;
+    }
+
+    if (p->enable) {
+        lcore_id = vr_dpdk_lcore_least_used_get();
+        vif_rx_queue_lcore[p->vif_id][p->queue_id] = lcore_id;
+        lcore = vr_dpdk.lcores[lcore_id];
+        rx_queue = &lcore->lcore_rx_queues[p->vif_id];
+
+        dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head, rx_queue);
+    } else {
+        lcore_id = vif_rx_queue_lcore[p->vif_id][p->queue_id];
+        lcore = vr_dpdk.lcores[lcore_id];
+        rx_queue = &lcore->lcore_rx_queues[p->vif_id];
+
+        dpdk_lcore_rx_queue_remove(lcore, rx_queue, false);
+    }
+
+    rte_free(arg);
 }
 
 /*
