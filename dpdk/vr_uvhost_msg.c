@@ -211,6 +211,10 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
     vru_cl->vruc_msg.u64 = (1ULL << VIRTIO_NET_F_CTRL_VQ) |
                            (1ULL << VIRTIO_NET_F_CSUM) |
                            (1ULL << VIRTIO_NET_F_GUEST_CSUM) |
+                           (1ULL << VIRTIO_NET_F_GUEST_TSO4) |
+                           (1ULL << VIRTIO_NET_F_HOST_TSO4) |
+                           (1ULL << VIRTIO_NET_F_GUEST_UFO) |
+                           (1ULL << VIRTIO_NET_F_HOST_UFO) |
                            (1ULL << VHOST_F_LOG_ALL);
     vr_uvhost_log("    GET FEATURES: returns 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);

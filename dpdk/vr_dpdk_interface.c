@@ -18,6 +18,7 @@
 #include "vr_dpdk_netlink.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
+#include "vr_dpdk_offloads.h"
 
 #include <rte_errno.h>
 #include <rte_ethdev.h>
@@ -866,6 +867,51 @@ dpdk_ipv4_sw_iphdr_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     iph->ip_csum = vr_ip_csum(iph);
 }
 
+/**
+ * Process the IPv4 UDP or TCP checksum in a **chained** mbuf.
+ *
+ * The IPv4 header should not contains options. The IP and layer 4
+ * checksum must be set to 0 in the packet by the caller.
+ *
+ * @param ipv4_hdr
+ *   The pointer to the contiguous IPv4 header.
+ * @param l4_hdr
+ *   The pointer to the beginning of the L4 header.
+ * @return
+ *   The complemented checksum to set in the IP packet.
+ */
+
+inline uint16_t
+dpdk_ipv4_udptcp_cksum(struct rte_mbuf *m, const struct ipv4_hdr *ipv4_hdr, uint8_t *l4_hdr)
+{
+	uint32_t cksum = 0;
+	uint32_t l4_len;
+	uint32_t data_len = 0, rem_len = 0;
+    uint8_t *data_ptr = NULL;
+
+	l4_len = rte_be_to_cpu_16(ipv4_hdr->total_length) -
+		sizeof(struct ipv4_hdr);
+
+    do {
+        data_ptr = likely(!!data_ptr)? rte_pktmbuf_mtod(m, uint8_t*):l4_hdr; 
+        data_len = likely(!!data_len)? rte_pktmbuf_data_len(m):rte_pktmbuf_mtod(m, uint8_t*) +
+                                                             rte_pktmbuf_data_len(m) - l4_hdr ; 
+        if (rem_len + data_len > l4_len)
+            data_len = l4_len - rem_len;
+        cksum += rte_raw_cksum(data_ptr, data_len);  
+        rem_len += data_len;
+        m = m->next;
+    } while (m && rem_len < l4_len);
+
+	cksum += rte_ipv4_phdr_cksum(ipv4_hdr, 0);
+	cksum = ((cksum & 0xffff0000) >> 16) + (cksum & 0xffff);
+	cksum = (~cksum) & 0xffff;
+	if (cksum == 0)
+		cksum = 0xffff;
+
+    return cksum;
+}
+
 static inline void
 dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
@@ -874,6 +920,7 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     unsigned char iph_len = 0, iph_proto = 0;
     struct vr_udp *udph;
     struct vr_tcp *tcph;
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
 
     RTE_VERIFY(0 < offset);
 
@@ -895,14 +942,14 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
         udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
         udph->udp_csum = 0;
         if (iph)
-            udph->udp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, udph);
+            udph->udp_csum = dpdk_ipv4_udptcp_cksum(m, (struct ipv4_hdr *)iph, (uint8_t*)udph);
         else if (ip6h)
             udph->udp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, udph);
     } else if (iph_proto == VR_IP_PROTO_TCP) {
         tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
         tcph->tcp_csum = 0;
         if (iph)
-            tcph->tcp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, tcph);
+            tcph->tcp_csum = dpdk_ipv4_udptcp_cksum(m, (struct ipv4_hdr *)iph, (uint8_t*)tcph);
         else if (ip6h)
             tcph->tcp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, tcph);
     }
@@ -975,6 +1022,47 @@ dpdk_get_ether_header_len(const void *data)
         return sizeof(struct ether_hdr);
 }
 
+static void
+dpdk_adjust_outer_header(struct rte_mbuf *m, uint16_t outer_header_len, 
+                         unsigned char *original_header_ptr, bool do_outer_ip_csum)
+{
+    /* Inner header operations */
+    struct vr_ip *inner_ip = rte_pktmbuf_mtod(m, struct vr_ip *);
+    
+    /* Outer header operations */
+    char *outer_header_ptr = rte_pktmbuf_prepend(m, outer_header_len);
+    if (original_header_ptr) {
+        rte_memcpy(outer_header_ptr, original_header_ptr, outer_header_len);
+    }
+    
+    uint16_t eth_hlen = dpdk_get_ether_header_len(outer_header_ptr);
+    struct vr_ip *outer_ip = (struct vr_ip *)(outer_header_ptr + eth_hlen);
+    outer_ip->ip_len = rte_cpu_to_be_16(rte_pktmbuf_pkt_len(m) - eth_hlen);
+    
+    /* Copy inner IP id to outer. Currently, the Agent diagnostics depends
+     * on that. */
+    outer_ip->ip_id = inner_ip->ip_id;
+    
+    /* Adjust UDP length to match IP frament size */
+    if (outer_ip->ip_proto == VR_IP_PROTO_UDP) {
+        unsigned header_len = outer_ip->ip_hl * 4;
+        struct vr_udp *udp = (struct vr_udp *)((char *)outer_ip +
+                header_len);
+        udp->udp_length = rte_cpu_to_be_16(
+                rte_be_to_cpu_16(outer_ip->ip_len) - header_len);
+    }
+    
+    /* If it is necessary to calculate (in software) IP header checksum.
+     * TODO: This would not be needed if:
+     * 1. We would support mbuf chains. The functions that calculate the
+     * checksums, which uses vr_pkt struct could be used after fragmentation
+     * 2. We would rewrite the checksumming functions to use mbufs and not
+     * the vr_pkt struct, and use them after fragmentation. */
+    if (do_outer_ip_csum) {
+        outer_ip->ip_csum = vr_ip_csum(outer_ip);
+    }
+}
+
 /**
  * Fragment the input packet
  *
@@ -1020,7 +1108,7 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
     pool_direct = vr_dpdk.frag_direct_mempool;
     pool_indirect = vr_dpdk.frag_indirect_mempool;
 
-    /* Fragment with the maximum size of (MTU - outer_header_length) to leave a
+    /* Fragment with the maximum size of (MTU - outer_header_len) to leave a
      * space for the header prepended later. In addition DPDK requires that the
      * (max frag size - IP header) length is a multiple of 8, therefore the
      * calculations below. */
@@ -1035,49 +1123,66 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
 
     /* Adjust outer and inner IP headers for each fragmented packets */
     for (i = 0; i < number_of_packets; ++i) {
+        struct vr_ip *inner_ip;
         m = mbuf_out[i];
-
-        /* Inner header operations */
-        struct vr_ip *inner_ip = rte_pktmbuf_mtod(m, struct vr_ip *);
+        inner_ip = rte_pktmbuf_mtod(m, struct vr_ip *);
+        /* Calculate checksum */
         inner_ip->ip_csum = 0;
         inner_ip->ip_csum = vr_ip_csum(inner_ip);
-
-        /* Outer header operations */
-        char *outer_header_ptr = rte_pktmbuf_prepend(m, outer_header_len);
-        rte_memcpy(outer_header_ptr, original_header_ptr, outer_header_len);
-
-        uint16_t eth_hlen = dpdk_get_ether_header_len(outer_header_ptr);
-        struct vr_ip *outer_ip = (struct vr_ip *)(outer_header_ptr + eth_hlen);
-        outer_ip->ip_len = rte_cpu_to_be_16(rte_pktmbuf_pkt_len(m) - eth_hlen);
+        dpdk_adjust_outer_header(m, outer_header_len, original_header_ptr, do_outer_ip_csum);
         m->l2_len = mbuf_in->l2_len;
         m->l3_len = mbuf_in->l3_len;
-
-        /* Copy inner IP id to outer. Currently, the Agent diagnostics depends
-         * on that. */
-        outer_ip->ip_id = inner_ip->ip_id;
-
-        /* Adjust UDP length to match IP frament size */
-        if (outer_ip->ip_proto == VR_IP_PROTO_UDP) {
-            unsigned header_len = outer_ip->ip_hl * 4;
-            struct vr_udp *udp = (struct vr_udp *)((char *)outer_ip +
-                    header_len);
-            udp->udp_length = rte_cpu_to_be_16(
-                    rte_be_to_cpu_16(outer_ip->ip_len) - header_len);
-        }
-
-        /* If it is necessary to calculate (in software) IP header checksum.
-         * TODO: This would not be needed if:
-         * 1. We would support mbuf chains. The functions that calculate the
-         * checksums, which uses vr_pkt struct could be used after fragmentation
-         * 2. We would rewrite the checksumming functions to use mbufs and not
-         * the vr_pkt struct, and use them after fragmentation. */
-        if (do_outer_ip_csum) {
-            outer_ip->ip_csum = vr_ip_csum(outer_ip);
-            m->ol_flags &= ~PKT_TX_IP_CKSUM;
-        }
+        m->vlan_tci = mbuf_in->vlan_tci;
+        m->ol_flags = mbuf_in->ol_flags;
     }
 
     return number_of_packets;
+}
+
+static int
+dpdk_segment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in, 
+                  struct rte_mbuf **mbuf_out, const unsigned short out_num, 
+                  const unsigned short mss_size, bool do_outer_ip_csum)
+{
+    struct rte_mbuf *m;
+    struct dpdk_gso_state state;
+    struct rte_mempool *pool_direct, *pool_indirect;
+    int number_of_packets = 0, i;
+    uint16_t outer_header_len;
+    
+    outer_header_len = pkt_get_inner_network_header_off(pkt) -
+            pkt_head_space(pkt);
+
+    dpdk_gso_init_state(&state, mbuf_in, outer_header_len, 
+                                                  0, do_outer_ip_csum);
+
+    pool_direct = vr_dpdk.frag_direct_mempool;
+    pool_indirect = vr_dpdk.frag_indirect_mempool;
+    
+    number_of_packets = dpdk_gso_segment_ip_tcp(mbuf_in, &state, mbuf_out, 
+                              out_num, mss_size, pool_direct, pool_indirect);
+    if (number_of_packets < 0)
+        return number_of_packets;
+
+    /* Adjust outer and inner IP headers for each fragmented packets */
+    for (i = 0; i < number_of_packets; i++)
+    {
+        m = mbuf_out[i];
+        /* Get into the inner IP header */
+        rte_pktmbuf_adj(m, outer_header_len);
+        dpdk_adjust_outer_header(m, outer_header_len, NULL, do_outer_ip_csum);
+    }
+
+    return number_of_packets;
+}
+
+static int
+dpdk_pkt_is_gso(struct rte_mbuf *m)
+{
+    /* This is only for TCP4/TCP6 */
+    /* UDP frag offload goes through the regular dpdk_fragment_packet() path */
+    /* TODO: Support for TCP6 */
+    return (m->ol_flags & PKT_RX_GSO_TCP4); 
 }
 
 /* TX packet callback */
@@ -1093,7 +1198,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct rte_mbuf *p_copy;
     struct vr_interface_stats *stats;
     int ret;
-    struct rte_mbuf *mbufs_out[VR_DPDK_FRAG_MAX_IP_FRAGS];
+    struct rte_mbuf *mbufs_out[VR_DPDK_FRAG_MAX_IP_SEGS];
     int num_of_frags = 1;
     int i;
     bool will_fragment;
@@ -1105,9 +1210,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     /* reset mbuf data pointer and length */
     m->data_off = pkt_head_space(pkt);
+    m->pkt_len = pkt_len(pkt);
     m->data_len = pkt_head_len(pkt);
-    /* TODO: we do not support mbuf chains */
-    m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
@@ -1158,33 +1262,36 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * This is not elegant and need to be addressed.
      * See dpdk/app/test-pmd/csumonly.c for more checksum examples
      */
-    if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
-        /* if NIC supports checksum offload */
-        if (likely((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) &&
-                   !will_fragment))
-            /* Can not do hardware checksumming for fragmented packets */
-            dpdk_hw_checksum(pkt);
-        else {
-            dpdk_sw_checksum(pkt, will_fragment);
-
-            /* We could not calculate the inner checkums in hardware, but we
-             * still can do outer header in hardware. */
-            if (unlikely(will_fragment &&
-                        (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
+    if (!(will_fragment && unlikely(dpdk_pkt_is_gso(m)) && vr_pkt_type_is_overlay(pkt->vp_type))){
+        if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
+            /* if NIC supports checksum offload */
+            if (likely((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) &&
+                       !will_fragment))
+                /* Can not do hardware checksumming for fragmented packets */
+                dpdk_hw_checksum(pkt);
+            else {
+                dpdk_sw_checksum(pkt, will_fragment);
+                m->ol_flags &= ~(PKT_TX_L4_MASK);
+        
+                /* We could not calculate the inner checkums in hardware, but we
+                 * still can do outer header in hardware. */
+                if (unlikely(will_fragment &&
+                            (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
+                    dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+            }
+        
+        } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
+            /* If NIC supports checksum offload.
+             * Inner checksum is already done. Compute outer IPv4 checksum,
+             * set UDP length, and zero UDP checksum.
+             */
+            if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
                 dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
-        }
-
-    } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
-        /* If NIC supports checksum offload.
-         * Inner checksum is already done. Compute outer IPv4 checksum,
-         * set UDP length, and zero UDP checksum.
-         */
-        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
-            dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
-
-        } else if (likely(!will_fragment)) {
-            /* if wont fragment it later */
-            dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
+        
+            } else if (likely(!will_fragment)) {
+                /* if wont fragment it later */
+                dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
+            }
         }
     }
 
@@ -1225,9 +1332,20 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (unlikely(will_fragment)) {
+    if (will_fragment && unlikely(dpdk_pkt_is_gso(m)) && vr_pkt_type_is_overlay(pkt->vp_type)) {
+        num_of_frags = dpdk_segment_packet(pkt, m, mbufs_out,
+                VR_DPDK_FRAG_MAX_IP_SEGS, vif->vif_mtu, //m->tso_segsz, 
+                (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD));
+        if (num_of_frags < 0) {
+            RTE_LOG(DEBUG, VROUTER, "%s: error %d during GSO of an "
+                    "IP packet for interface %s on lcore %u\n", __func__,
+                    num_of_frags, vif->vif_name, lcore_id);
+            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            return -1;
+        }
+    } else if (unlikely(will_fragment)) {
         num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out,
-                VR_DPDK_FRAG_MAX_IP_FRAGS, vif->vif_mtu,
+                VR_DPDK_FRAG_MAX_IP_SEGS, vif->vif_mtu,
                 !(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD), lcore_id);
         if (num_of_frags < 0) {
             RTE_LOG(DEBUG, VROUTER, "%s: error %d during fragmentation of an "

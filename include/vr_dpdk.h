@@ -29,6 +29,7 @@
 
 #include <rte_config.h>
 #include <rte_port.h>
+#include <rte_ip.h>
 #include <rte_port_ring.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
@@ -121,7 +122,7 @@ extern unsigned int vr_flow_hold_limit;
  * the IP headers of the fragments and we have to prepend an outer (tunnel)
  * header. */
 #define VR_DPDK_FRAG_DIRECT_MBUF_SZ     (sizeof(struct rte_mbuf)    \
-                                         + RTE_PKTMBUF_HEADROOM)
+                                         + 2*RTE_PKTMBUF_HEADROOM)
 /* Size of indirect mbufs used for fragmentation. These mbufs holds only a
  * pointer to the data in other mbufs, thus they don't need any additional
  * buffer size. */
@@ -200,7 +201,8 @@ extern unsigned int vr_flow_hold_limit;
 /* Maximum number of fragments allowed after IP fragmentation. Set to 7 to
  * allow for standard jumbo frame size (9000 / 1500 = 6) + 1 additional segment
  * for outer headers. */
-#define VR_DPDK_FRAG_MAX_IP_FRAGS   7
+#define VR_DPDK_FRAG_MAX_IP_FRAGS   8
+#define VR_DPDK_FRAG_MAX_IP_SEGS    128 
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 /*
  * Use IO lcores:
@@ -773,5 +775,6 @@ void dpdk_fragment_assembler_exit(void);
 int dpdk_fragment_assembler_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd);
 void dpdk_fragment_assembler_table_scan(void *);
-
+uint16_t
+dpdk_ipv4_udptcp_cksum(struct rte_mbuf *m, const struct ipv4_hdr *ipv4_hdr, uint8_t *l4_hdr);
 #endif /*_VR_DPDK_H_ */

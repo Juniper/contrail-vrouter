@@ -965,8 +965,9 @@ out:
 static unsigned int
 dpdk_pgso_size(struct vr_packet *pkt)
 {
-    /* TODO: not implemented */
-    return 0;
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
+
+    return m->tso_segsz;
 }
 
 static void
@@ -1224,7 +1225,7 @@ struct host_os dpdk_host = {
     .hos_pfrag_len                  =    dpdk_pfrag_len,
     .hos_phead_len                  =    dpdk_phead_len,
     .hos_pset_data                  =    dpdk_pset_data,
-    .hos_pgso_size                  =    dpdk_pgso_size, /* not implemented, returns 0 */
+    .hos_pgso_size                  =    dpdk_pgso_size,
 
     .hos_get_cpu                    =    dpdk_get_cpu,
     .hos_schedule_work              =    dpdk_schedule_work,

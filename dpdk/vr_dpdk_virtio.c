@@ -478,6 +478,32 @@ vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
 #endif
 
 /*
+ * dpdk_virtio_create_chained_mbuf - Create a chained mbuf and copy the data pointed 
+ * to by pkt_addr of len pkt_len
+ */
+static int
+dpdk_virtio_create_chained_mbuf(struct rte_mbuf *mbuf, char* pkt_addr, uint32_t pkt_len)
+{
+    char *tail_addr, *append_addr = pkt_addr;
+    uint32_t append_len = pkt_len;
+
+    while((tail_addr = rte_pktmbuf_append(mbuf, append_len)) == NULL) {
+        uint32_t pkt_tailroom = rte_pktmbuf_tailroom(rte_pktmbuf_lastseg(mbuf));
+        tail_addr = rte_pktmbuf_append(mbuf, pkt_tailroom);
+        if (unlikely(tail_addr == NULL)) {
+            return -1;
+        }
+        rte_memcpy(tail_addr, append_addr, pkt_tailroom);
+        append_len -= pkt_tailroom;
+        append_addr += pkt_tailroom;
+        rte_pktmbuf_lastseg(mbuf)->next = rte_pktmbuf_alloc(vr_dpdk.rss_mempool); 
+        mbuf->nb_segs += 1;
+    }
+    rte_memcpy(tail_addr, append_addr, append_len);
+    return 0;
+}
+
+/*
  * dpdk_virtio_from_vm_rx - receive packets from a virtio client so that
  * the packets can be handed to vrouter for forwarding. the virtio client is
  * usually a VM.
@@ -551,6 +577,12 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 
         if (((struct virtio_net_hdr *)pkt_addr)->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM)
                 mbuf->ol_flags |= PKT_RX_IP_CKSUM_BAD;
+        if (((struct virtio_net_hdr *)pkt_addr)->gso_type == VIRTIO_NET_HDR_GSO_TCPV4)
+                mbuf->ol_flags |= PKT_RX_GSO_TCP4;
+        else if (((struct virtio_net_hdr *)pkt_addr)->gso_type == VIRTIO_NET_HDR_GSO_UDP)
+                mbuf->ol_flags |= PKT_RX_GSO_UDP;
+        if (mbuf->ol_flags & (PKT_RX_GSO_TCP4 | PKT_RX_GSO_UDP))
+            mbuf->tso_segsz = ((struct virtio_net_hdr *)pkt_addr)->gso_size; 
 
         /* Skip virtio_net_hdr as we don't support mergeable receive buffers. */
         if (likely(desc->flags & VRING_DESC_F_NEXT &&
@@ -570,16 +602,20 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 
         tail_addr = rte_pktmbuf_append(mbuf, pkt_len);
         /* Check we ready to copy the data. */
-        if (unlikely(desc->addr == 0 || pkt_addr == NULL ||
-                tail_addr == NULL)) {
+        if (unlikely(desc->addr == 0 || pkt_addr == NULL)) {
             goto free_mbuf;
+        } else if (unlikely(tail_addr == NULL)) {
+            /* If insufficient tailroom, create a chained mbuf and copy the data */
+            if (unlikely(dpdk_virtio_create_chained_mbuf(mbuf, pkt_addr, pkt_len) < 0)) {
+                goto free_mbuf;
+            }
+        } else {
+            /* No chaining - Just Copy first descriptor data. */
+            rte_memcpy(tail_addr, pkt_addr, pkt_len);
         }
-        /* Copy first descriptor data. */
-        rte_memcpy(tail_addr, pkt_addr, pkt_len);
 
         /*
-         * Gather mbuf from several virtio buffers. We do not support mbuf
-         * chains, so all virtio buffers should fit into one mbuf.
+         * Gather mbuf from several virtio buffers.
          */
         while (unlikely(desc->flags & VRING_DESC_F_NEXT)) {
             desc = &vq->vdv_desc[desc->next];
@@ -587,12 +623,17 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
             pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
             tail_addr = rte_pktmbuf_append(mbuf, pkt_len);
             /* Check we ready to copy the data. */
-            if (unlikely(desc->addr == 0 || pkt_addr == NULL ||
-                    tail_addr == NULL)) {
+            if (unlikely(desc->addr == 0 || pkt_addr == NULL)) {
                 goto free_mbuf;
+            } else if (unlikely(tail_addr == NULL)) {
+                /* If insufficient tailroom, create a chained mbuf and copy the data */
+                if (unlikely(dpdk_virtio_create_chained_mbuf(mbuf, pkt_addr, pkt_len) < 0)) {
+                    goto free_mbuf;
+                }
+            } else {
+                /* No chaining - Just append next descriptor(s) data. */
+                rte_memcpy(tail_addr, pkt_addr, pkt_len);
             }
-            /* Append next descriptor(s) data. */
-            rte_memcpy(tail_addr, pkt_addr, pkt_len);
         }
 
         pkts[nb_pkts] = mbuf;
