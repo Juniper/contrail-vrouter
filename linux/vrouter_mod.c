@@ -1788,6 +1788,8 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                         pull_len += sizeof(struct vr_tcp);
                     else if (icmp_pl_ip_proto == VR_IP_PROTO_UDP)
                         pull_len += sizeof(struct vr_udp);
+                    else if (icmp_pl_ip_proto == VR_IP_PROTO_SCTP)
+                         pull_len += sizeof(struct vr_sctp);
                     else
                         pull_len += sizeof(struct vr_icmp);
 
@@ -1851,6 +1853,8 @@ lh_pull_inner_headers(struct vr_packet *pkt,
                         pull_len += sizeof(struct vr_tcp);
                     else if (icmp_pl_ip_proto == VR_IP_PROTO_UDP)
                         pull_len += sizeof(struct vr_udp);
+                    else if (icmp_pl_ip_proto == VR_IP_PROTO_SCTP)
+                        pull_len += sizeof(struct vr_sctp);
                     else
                         pull_len += sizeof(struct vr_icmp);
 

@@ -42,9 +42,8 @@ vr_ip_proto_pull(struct vr_ip *iph)
 {
     unsigned char proto = iph->ip_proto;
 
-    if ((proto == VR_IP_PROTO_TCP) ||
-            (proto == VR_IP_PROTO_UDP) ||
-            (proto == VR_IP_PROTO_ICMP)) {
+    if ((proto == VR_IP_PROTO_TCP) || (proto == VR_IP_PROTO_UDP) ||
+        (proto == VR_IP_PROTO_ICMP) || (proto == VR_IP_PROTO_SCTP)) {
         return true;
     }
 
@@ -56,9 +55,8 @@ vr_ip6_proto_pull(struct vr_ip6 *ip6h)
 {
     unsigned char proto = ip6h->ip6_nxt;
 
-   if ((proto == VR_IP_PROTO_TCP) ||
-            (proto == VR_IP_PROTO_UDP) ||
-            (proto == VR_IP_PROTO_ICMP6)) {
+   if ((proto == VR_IP_PROTO_TCP) || (proto == VR_IP_PROTO_UDP) ||
+       (proto == VR_IP_PROTO_ICMP6) || (proto == VR_IP_PROTO_SCTP)) {
         return true;
     }
 
@@ -180,6 +178,8 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                             pull_len += sizeof(struct vr_tcp);
                         else if (icmp_pl_iph->ip_proto == VR_IP_PROTO_UDP)
                             pull_len += sizeof(struct vr_udp);
+                        else if (icmp_pl_iph->ip_proto == VR_IP_PROTO_SCTP)
+                            pull_len += sizeof(struct vr_sctp);
                         else
                             pull_len += sizeof(struct vr_icmp);
 
@@ -221,6 +221,8 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
                             pull_len += sizeof(struct vr_tcp);
                         else if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_UDP)
                             pull_len += sizeof(struct vr_udp);
+                        else if (icmp_pl_ip6h->ip6_nxt == VR_IP_PROTO_SCTP)
+                            pull_len += sizeof(struct vr_sctp);
                         else
                             pull_len += sizeof(struct vr_icmp);
 
