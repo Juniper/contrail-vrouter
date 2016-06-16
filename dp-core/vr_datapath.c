@@ -700,8 +700,25 @@ vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
     memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
     new_eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
     vlan_tag = (unsigned short *)(new_eth + 1);
-    *vlan_tag = htons(vlan_id);
+    *vlan_tag = htons((pkt->vp_priority << VR_VLAN_PRIORITY_SHIFT) | vlan_id);
     return 0;
+}
+
+void
+vr_vlan_set_priority(struct vr_packet *pkt)
+{
+    struct vr_eth *eth;
+    struct vr_vlan_hdr *vlan;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN)) {
+        vlan = (struct vr_vlan_hdr *)(eth + 1);
+        vlan->vlan_tag |= htons((pkt->vp_priority << VR_VLAN_PRIORITY_SHIFT));
+    } else {
+        vr_tag_pkt(pkt, 0);
+    }
+
+    return;
 }
 
 int

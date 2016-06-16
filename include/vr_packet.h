@@ -278,6 +278,7 @@ struct vr_eth {
 
 #define VLAN_ID_INVALID         0xFFFF
 #define VLAN_ID_MAX             0xFFFF
+#define VR_VLAN_PRIORITY_SHIFT  13
 
 struct vr_vlan_hdr {
     unsigned short vlan_tag;

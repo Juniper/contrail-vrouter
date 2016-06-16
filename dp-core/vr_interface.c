@@ -757,6 +757,7 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     int ret = 0;
+
     struct vr_interface *pvif;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
@@ -766,14 +767,17 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     fmd->fmd_vlan = vif->vif_vlan_id;
-    if (vif_is_vlan(vif) && vif->vif_ovlan_id) {
-        fmd->fmd_vlan = vif->vif_ovlan_id;
-        if (vr_tag_pkt(pkt, vif->vif_ovlan_id)) {
-            goto drop;
+    if (vif_is_vlan(vif)) {
+        if (vif->vif_ovlan_id) {
+            fmd->fmd_vlan = vif->vif_ovlan_id;
+            if (vr_tag_pkt(pkt, vif->vif_ovlan_id)) {
+                goto drop;
+            }
+            vr_pset_data(pkt, pkt->vp_data);
+        } else {
+            vr_vlan_set_priority(pkt);
         }
-        vr_pset_data(pkt, pkt->vp_data);
     }
-
 
     pvif = vif->vif_parent;
     if (!pvif)
