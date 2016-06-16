@@ -444,5 +444,8 @@ fat_flow_port_mask_t vr_flow_fat_flow_lookup(struct vrouter *,
         struct vr_packet *, uint16_t, uint16_t, uint16_t);
 extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
+unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);
+unsigned int vr_flow_table_used_total_entries(struct vrouter *);
+
 
 #endif /* __VR_FLOW_H__ */
