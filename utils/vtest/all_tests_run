@@ -1,0 +1,243 @@
+#!/bin/sh
+##
+## Run All vRouter/DPDK Tests
+##
+## To run this script:
+##  1. Create /etc/contrail/contrail-vrouter-agent.conf with platform=dpdk
+##  2. Install fackechroot
+##  3. Run scons vrouter
+##
+
+## Taskset to run vRouter/DPDK.
+TASKSET="taskset 0x1"
+## vRouter/DPDK binary name.
+VROUTER="vrouter/dpdk/contrail-vrouter-dpdk"
+## vRouter/DPDK command line arguments.
+VROUTER_DEF_ARGS="--no-daemon --no-huge --vr_packet_sz 2048"
+## vRouter config file.
+RTE_CONFIGS="/var/run/.rte_config /home/${USER}/.rte_config"
+## vTest binary name.
+VTEST="vrouter/utils/vtest/vtest"
+## vRouter/DPDK sockets directory
+VROUTER_SOCKETS="/var/run/vrouter"
+## Agent configuration file.
+AGENT_CONF="/etc/contrail/contrail-vrouter-agent.conf"
+## NetLink TCP port to check if vRouter is started.
+DPDK_NETLINK_TCP_PORT=20914
+
+## Global vRouter/DPDK process ID.
+VROUTER_PID=""
+## Global vRouter/DPDK startup timeout.
+VROUTER_TIMEOUT="5"
+## Global build directory.
+BUILD_DIR="../../../build/debug"
+## Global XML dir.
+XML_DIR="tests"
+## Global log file.
+LOG_FILE=""
+
+PASSED_TESTS=""
+PASSED_COUNT=0
+FAILED_TESTS=""
+FAILED_COUNT=0
+SKIPPED_TESTS=""
+SKIPPED_COUNT=0
+
+usage () {
+    echo "Run All vRouter/DPDK Tests"
+    echo "Usage:"
+    echo "    ${0##*/} [-b <build dir>] [-x <XML dir>] [-l <log file>]" \
+            "[-t <timeout>]"
+    echo "    -b     directory with binary files"
+    echo "           default: ${BUILD_DIR}"
+    echo "    -x     directory with XML test files"
+    echo "           default: ${XML_DIR}"
+    echo "    -l     log file to append (disabled by default)"
+    echo "    -t     vRouter/DPDK startup timeout"
+    echo "           default: ${VROUTER_TIMEOUT} sec"
+    echo "Example:"
+    echo "    ${0##*/} -b build/debug -x tests"
+
+    exit 1
+}
+
+log () {
+    if [ -f "${LOG_FILE}" ]; then
+        echo "$(date +'%Y-%m-%d %H:%M:%S') ${*}" \
+            | tee -a "${LOG_FILE}"
+    else
+        echo "$(date +'%Y-%m-%d %H:%M:%S') ${*}"
+    fi
+}
+
+test_log () {
+    log "$(printf '%-60s %s' ${1} ${2})"
+}
+
+all_skip () {
+    vrouter_kill
+    log "[${0##*/}] Skipping all the tests..."
+
+    exit 0
+}
+
+vrouter_run () {
+    for _conf in ${RTE_CONFIGS}; do
+        rm -f "${_conf}"
+    done
+
+    export FAKECHROOT_AF_UNIX_PATH="${BUILD_DIR}"
+    rm -rdf "${BUILD_DIR}${VROUTER_SOCKETS}"
+    mkdir -p "${BUILD_DIR}${VROUTER_SOCKETS}"
+    if [ -f "${LOG_FILE}" ]; then
+        fakechroot chroot "/" sh -c \
+            "cd $(pwd) && ${TASKSET} ${BUILD_DIR}/${VROUTER} ${VROUTER_DEF_ARGS} >> ${LOG_FILE}" &
+    else
+        fakechroot chroot "/" sh -c \
+            "cd $(pwd) && ${TASKSET} ${BUILD_DIR}/${VROUTER} ${VROUTER_DEF_ARGS}" &
+    fi
+    VROUTER_PID="${!}"
+
+    ## Wait for vRouter to start...
+    _count=1
+    sleep 1
+    while ! lsof -ni:${DPDK_NETLINK_TCP_PORT} -sTCP:LISTEN > /dev/null; do
+        _count=$((${_count} + 1))
+        if [ ${_count} -gt ${VROUTER_TIMEOUT} ]; then
+            log "Error waiting for vRouter to start"
+            log "Try to increase the timeout (configured: ${VROUTER_TIMEOUT} sec)"
+            log "For more details see ${LOG_FILE}"
+            all_skip
+        fi
+        log "Waiting for vRouter to start..."
+        sleep 1
+    done
+}
+
+vrouter_kill () {
+    ## We need to kill the VROUTER_PID and all the children
+    _children="${VROUTER_PID}"
+    _pids_to_kill=""
+    while [ -n "${_children}" ]; do
+        _pids_to_kill="${_pids_to_kill} ${_children}"
+        _new_children=""
+        for _pid in ${_children}; do
+            _new_children="${_new_children} $(pgrep -P ${_pid})"
+        done
+        _children="${_new_children## }"
+    done
+
+    if [ -n "${_pids_to_kill}" ]; then
+        kill -KILL ${_pids_to_kill}
+    fi
+
+    VROUTER_PID=""
+}
+
+run_all () {
+    ## If there are files in the command line -- just run those
+    if [ -n "${*}" ]; then
+        _all_tests="${*}"
+    else
+        _all_tests=$(find ${XML_DIR} -name '*.xml' -type f)
+    fi
+    for _test in ${_all_tests}; do
+        local _name="${_test}"
+
+        if [ "${#_name}" -gt 60 ]; then
+            _name="..."$(echo "${_name}" | rev | cut -c -57 | rev)
+        fi
+        log "===> ${_name}"
+        vrouter_run
+
+        export FAKECHROOT_AF_UNIX_PATH="${BUILD_DIR}"
+        fakechroot chroot "/" \
+            sh -c "cd $(pwd) && ${BUILD_DIR}/${VTEST} ${_test}"
+        case "${?}" in
+        0)
+            test_log "${_name}" "PASS"
+            PASSED_TESTS="${PASSED_TESTS}\n${_test}"
+            PASSED_COUNT=$((${PASSED_COUNT} + 1))
+            ;;
+        1)
+            test_log "${_name}" "FAIL"
+            FAILED_TESTS="${FAILED_TESTS}\n${_test}"
+            FAILED_COUNT=$((${FAILED_COUNT} + 1))
+            ;;
+        *)
+            test_log "${_name}" "SKIP"
+            SKIPPED_TESTS="${SKIPPED_TESTS}\n${_test}"
+            SKIPPED_COUNT=$((${SKIPPED_COUNT} + 1))
+            ;;
+        esac
+
+        vrouter_kill
+    done
+}
+
+env_check () {
+    ## Check the fakechroot is installed
+    if ! which fakechroot > /dev/null; then
+        log "No fakechroot installed."
+        all_skip
+    fi
+
+    ## Check the Agent configuration file is available.
+    if ! [ -f "${AGENT_CONF}" ]; then
+        log "No ${AGENT_CONF} found."
+        all_skip
+    fi
+
+    ## Check the Agent configuration file is for DPDK platform.
+    if ! cat "${AGENT_CONF}" | grep "platform.*=.*dpdk" > /dev/null; then
+        log "No \"platform=dpdk\" found in ${AGENT_CONF##*/}."
+        all_skip
+    fi
+
+    ## Check if vRouter/DPDK binary is available.
+    if ! [ -x "${BUILD_DIR}/${VROUTER}" ]; then
+        log "No vRouter/DPDK binary found ${BUILD_DIR}/${VROUTER}"
+        all_skip
+    fi
+
+    ## Check if vtest binary is available.
+    if ! [ -x "${BUILD_DIR}/${VTEST}" ]; then
+        log "No vTest binary found ${BUILD_DIR}/${VTEST}"
+        all_skip
+    fi
+}
+
+while getopts "b:x:t:l:h" opt; do
+    case "${opt}" in
+        "b") BUILD_DIR="${OPTARG}";;
+        "x") XML_DIR="${OPTARG}";;
+        "l") LOG_FILE="${OPTARG}";;
+        "t") VROUTER_TIMEOUT="${OPTARG}";;
+        "h" | "\?") usage;;
+    esac
+done
+shift $((${OPTIND} - 1))
+
+if [ -n "${LOG_FILE}" ]; then
+    touch "${LOG_FILE}"
+fi
+
+log "[${0##*/}] Running all vRouter/DPDK tests..."
+
+killall -9 "${VROUTER##*/}"
+env_check
+run_all "${*}"
+
+_total=$((${PASSED_COUNT} + ${FAILED_COUNT} + ${SKIPPED_COUNT}))
+if [ -n "${PASSED_TESTS}" ]; then
+    log "${PASSED_COUNT}/${_total} tests PASSED:${PASSED_TESTS}"
+fi
+if [ -n "${SKIPPED_TESTS}" ]; then
+    log "${SKIPPED_COUNT}/${_total} tests SKIPPED:${SKIPPED_TESTS}"
+fi
+if [ -n "${FAILED_TESTS}" ]; then
+    log "${FAILED_COUNT}/${_total} tests FAILED:${FAILED_TESTS}"
+    exit 1
+fi
+
+log "[${0##*/}] Done."
