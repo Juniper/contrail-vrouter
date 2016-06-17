@@ -38,7 +38,7 @@ env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'jnprvnet', 'xml2', 
 sandesh_gen = env.Program('sandesh_gen.c')
 
 sandesh_gen_cmd = build_root + '/vrouter/utils/vtest/sandesh_gen' + ' ' + sandesh_file
-sandesh_gen_output = env.Command('sandesh_gen_output', None,
+sandesh_gen_output = env.Command('sandesh_gen_output', sandesh_gen,
         sandesh_gen_cmd, chdir=build_dir)
 
 vtest_src = [
