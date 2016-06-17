@@ -40,6 +40,7 @@ typedef struct vr_uvh_client {
     unsigned int vruc_idx;
     unsigned int vruc_nrxqs;
     unsigned int vruc_ntxqs;
+    unsigned int vruc_vif_gen;
     pthread_t vruc_owner;
 } vr_uvh_client_t;
 

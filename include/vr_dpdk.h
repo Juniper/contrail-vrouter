@@ -306,6 +306,8 @@ struct vr_dpdk_queue {
     };
     /* Queue handler */
     void *q_queue_h;
+    /* Enabled/disabled (whether polled by lcores) */
+    bool enabled;
     /* Pointer to vRouter interface */
     struct vr_interface *q_vif;
 };
@@ -352,6 +354,16 @@ enum vr_dpdk_lcore_cmd {
     VR_DPDK_LCORE_TX_RM_CMD,
     /* Call RCU callback */
     VR_DPDK_LCORE_RCU_CMD,
+    /* TX queue disable/enable command */
+    VR_DPDK_LCORE_TX_QUEUE_SET_CMD,
+    /* RX queue disable/enable command */
+    VR_DPDK_LCORE_RX_QUEUE_SET_CMD,
+};
+
+struct vr_dpdk_lcore_rx_queue_remove_arg {
+    unsigned int vif_id;
+    bool clear_f_rx;
+    bool free_arg;
 };
 
 struct vr_dpdk_lcore {

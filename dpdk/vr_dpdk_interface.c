@@ -58,8 +58,8 @@ dpdk_virtual_if_add(struct vr_interface *vif)
      *
      * Check dp-core/vf_interface.c:eth_drv_add() for reference.
      */
-    return vr_netlink_uvhost_vif_add(vif->vif_name, vif->vif_idx,
-                                    nrxqs, ntxqs);
+    return vr_netlink_uvhost_vif_add(vif->vif_name, vif->vif_idx, vif->vif_gen,
+                                     nrxqs, ntxqs);
 }
 
 /*

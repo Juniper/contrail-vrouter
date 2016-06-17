@@ -100,6 +100,10 @@ dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
     /* write barrier */
     rte_wmb();
 
+    /* do not add queue twice */
+    if (queue->enabled)
+        return;
+
     /* add queue to the list */
     if (SLIST_EMPTY(q_head)) {
         /* insert first queue */
@@ -120,6 +124,7 @@ dpdk_lcore_queue_add(unsigned lcore_id, struct vr_dpdk_q_slist *q_head,
             SLIST_INSERT_AFTER(prev_queue, queue, q_next);
     }
 
+    queue->enabled = true;
     /* increase the number of RX queues */
     if (q_head == &lcore->lcore_rx_head)
         lcore->lcore_nb_rx_queues++;
@@ -141,17 +146,24 @@ dpdk_lcore_tx_queue_remove(struct vr_dpdk_lcore *lcore,
 /* Remove RX queue from a lcore
  * The function is called by each forwaring lcore
  */
-static void
+void
 dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
-                            struct vr_dpdk_queue *rx_queue)
+                           struct vr_dpdk_queue *rx_queue,
+                           bool clear_f_rx)
 {
-    rx_queue->rxq_ops.f_rx = NULL;
-    SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
-        q_next);
+    if (clear_f_rx)
+        rx_queue->rxq_ops.f_rx = NULL;
 
-    /* decrease the number of RX queues */
-    lcore->lcore_nb_rx_queues--;
-    RTE_VERIFY(lcore->lcore_nb_rx_queues <= VR_MAX_INTERFACES);
+    /* do not delete queue twice */
+    if (rx_queue->enabled) {
+        SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
+            q_next);
+        rx_queue->enabled = false;
+
+        /* decrease the number of RX queues */
+        lcore->lcore_nb_rx_queues--;
+        RTE_VERIFY(lcore->lcore_nb_rx_queues <= VR_MAX_INTERFACES);
+    }
 }
 
 /* Schedule an MPLS label queue */
@@ -289,9 +301,16 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
                     if (rx_queue == NULL)
                         return -EFAULT;
 
-                    /* add the queue to the lcore */
                     lcore = vr_dpdk.lcores[lcore_id];
-                    dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head, rx_queue);
+
+                    /*
+                     * For virtio interfaces, add the queue to the lcore only
+                     * for queue 0. The rest will be added by QEMU with
+                     * VHOST_USER_SET_VRING_ENABLE message.
+                     */
+                    if (!vif_is_virtual(vif) || queue_id == 0)
+                        dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head,
+                                             rx_queue);
 
                     /* next queue */
                     queue_id++;
@@ -420,13 +439,21 @@ dpdk_lcore_rxtx_release_all(struct vr_interface *vif)
 void
 vr_dpdk_lcore_if_unschedule(struct vr_interface *vif)
 {
+    struct vr_dpdk_lcore_rx_queue_remove_arg *arg;
+
     /* Remove RX queues first */
-    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_RX_RM_CMD,
-                        (uint32_t)vif->vif_idx);
+    arg = rte_malloc("lcore_rx_queue_rm_cmd", sizeof(*arg), 0);
+    arg->vif_id = vif->vif_idx;
+    arg->clear_f_rx = true;
+    arg->free_arg = false; /* can not free an all fwd lcores the same arg */
+    vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_RX_RM_CMD, (uint64_t)arg);
+
     /* Flush and remove TX queues */
     vr_dpdk_lcore_cmd_post_all(VR_DPDK_LCORE_TX_RM_CMD,
                         (uint32_t)vif->vif_idx);
     dpdk_lcore_cmd_wait_all();
+    /* now arg can be freed */
+    rte_free(arg);
 
     /* release RX and TX queues */
     dpdk_lcore_rxtx_release_all(vif);
@@ -1302,6 +1329,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     unsigned vif_idx;
     struct vr_dpdk_queue *rx_queue;
     struct vr_dpdk_queue *tx_queue;
+    struct vr_dpdk_lcore_rx_queue_remove_arg *rxq_rm_arg;
 
     if (likely(cmd == VR_DPDK_LCORE_NO_CMD
         || cmd == VR_DPDK_LCORE_IN_PROGRESS_CMD))
@@ -1309,12 +1337,15 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
 
     switch (cmd) {
     case VR_DPDK_LCORE_RX_RM_CMD:
-        vif_idx = (unsigned)cmd_arg;
+        rxq_rm_arg = (struct vr_dpdk_lcore_rx_queue_remove_arg *)cmd_arg;
+        vif_idx = rxq_rm_arg->vif_id;
         rx_queue = &lcore->lcore_rx_queues[vif_idx];
         if (rx_queue->q_queue_h) {
             /* remove the queue from the lcore */
-            dpdk_lcore_rx_queue_remove(lcore, rx_queue);
+            dpdk_lcore_rx_queue_remove(lcore, rx_queue, rxq_rm_arg->clear_f_rx);
         }
+        if (rxq_rm_arg->free_arg)
+            rte_free(rxq_rm_arg);
         lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     case VR_DPDK_LCORE_TX_RM_CMD:
@@ -1333,6 +1364,14 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     case VR_DPDK_LCORE_STOP_CMD:
         ret = -1;
         /* do not reset stop command, so we can break nested loops */
+        break;
+    case VR_DPDK_LCORE_TX_QUEUE_SET_CMD:
+        vr_dpdk_virtio_tx_queue_set((void *)cmd_arg);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
+        break;
+    case VR_DPDK_LCORE_RX_QUEUE_SET_CMD:
+        vr_dpdk_virtio_rx_queue_set((void *)cmd_arg);
+        lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
     }
 

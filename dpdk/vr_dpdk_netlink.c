@@ -186,7 +186,8 @@ vr_netlink_uvhost_vif_del(unsigned int vif_idx)
  */
 int
 vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
-                          unsigned int vif_nrxqs, unsigned int vif_ntxqs)
+                          unsigned int vif_gen, unsigned int vif_nrxqs,
+                          unsigned int vif_ntxqs)
 {
     vrnu_msg_t msg;
 
@@ -197,6 +198,7 @@ vr_netlink_uvhost_vif_add(char *vif_name, unsigned int vif_idx,
     msg.vrnum_vif_add.vrnu_vif_idx = vif_idx;
     msg.vrnum_vif_add.vrnu_vif_nrxqs = vif_nrxqs;
     msg.vrnum_vif_add.vrnu_vif_ntxqs = vif_ntxqs;
+    msg.vrnum_vif_add.vrnu_vif_gen = vif_gen;
 
     /*
      * This is a blocking send.

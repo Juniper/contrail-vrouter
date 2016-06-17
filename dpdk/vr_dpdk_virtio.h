@@ -19,7 +19,7 @@
 /*
  * Maximum number of queues per virtio device
  */
-#define VR_DPDK_VIRTIO_MAX_QUEUES 1
+#define VR_DPDK_VIRTIO_MAX_QUEUES 16
 
 
 typedef enum vq_ready_state {
@@ -58,6 +58,20 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
 struct vr_dpdk_queue *
 vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
                              unsigned int queue_id);
+void
+vr_dpdk_virtio_tx_queue_enable_disable(unsigned int vif_id,
+                                       unsigned int vif_gen,
+                                       unsigned int queue_id,
+                                       bool enable);
+void
+vr_dpdk_virtio_rx_queue_enable_disable(unsigned int vif_id,
+                                       unsigned int vif_gen,
+                                       unsigned int queue_id,
+                                       bool enable);
+void
+vr_dpdk_virtio_tx_queue_set(void *arg);
+void
+vr_dpdk_virtio_rx_queue_set(void *arg);
 int vr_dpdk_virtio_set_vring_base(unsigned int vif_idx, unsigned int vring_idx,
                                    unsigned int vring_base);
 int vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,

@@ -29,6 +29,7 @@ typedef struct vrnu_vif_add {
     unsigned int vrnu_vif_idx;
     unsigned int vrnu_vif_nrxqs;
     unsigned int vrnu_vif_ntxqs;
+    unsigned int vrnu_vif_gen;
 } vrnu_vif_add_t;
 
 typedef struct vrnu_vif_del {
