@@ -355,7 +355,7 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
     }
 
     /* Frame size should be a multiple of page size. */
-    frame_size = (VR_DPDK_MAX_PACKET_SZ + getpagesize() - 1) /
+    frame_size = (vr_packet_sz + getpagesize() - 1) /
             getpagesize() * getpagesize();
     ret = snprintf(params, sizeof(params),
                     /* TODO: Optional af_packet mmap parameters
@@ -1523,7 +1523,7 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
  * For bonded interfaces, this API is not available, so instead use xstats from
  * it's individual slave interfaces
  */
-static void 
+static void
 vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
 {
     /*
@@ -1535,7 +1535,7 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
     uint8_t *port_id_ptr;
     int port_num = 0;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
-    port_id_ptr = (ethdev->ethdev_nb_slaves == -1)? 
+    port_id_ptr = (ethdev->ethdev_nb_slaves == -1)?
                    &ethdev->ethdev_port_id:ethdev->ethdev_slaves;
     do {
         struct rte_eth_xstats *eth_xstats = NULL;

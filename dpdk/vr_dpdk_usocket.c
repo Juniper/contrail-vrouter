@@ -693,7 +693,7 @@ usock_alloc(unsigned short proto, unsigned short type)
 {
     int sock_fd = -1, domain, ret;
     /* socket TX buffer size = (hold flow table entries * size of jumbo frame) */
-    int setsocksndbuff = vr_flow_hold_limit * VR_DPDK_MAX_PACKET_SZ;
+    int setsocksndbuff = vr_flow_hold_limit * vr_packet_sz;
     int getsocksndbuff;
     socklen_t getsocksndbufflen = sizeof(getsocksndbuff);
     int error = 0, flags;

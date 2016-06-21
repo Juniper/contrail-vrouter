@@ -35,6 +35,8 @@ extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 extern int dpdk_vlan_forwarding_if_add(void);
 extern unsigned int vr_flow_hold_limit;
+extern int no_huge_set;
+extern unsigned vr_packet_sz;
 
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.
@@ -110,11 +112,10 @@ extern unsigned int vr_flow_hold_limit;
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
 /* Maximum number of bond interfaces per lcore */
 #define VR_DPDK_MAX_BONDS           2
-/* Max size of a single packet */
-#define VR_DPDK_MAX_PACKET_SZ       9 * 1024
-/* Number of bytes needed for each mbuf */
-#define VR_DPDK_MBUF_SZ             (VR_DPDK_MAX_PACKET_SZ      \
-                                    + sizeof(struct rte_mbuf)   \
+/* Max size of a single packet used by default */
+#define VR_DEF_MAX_PACKET_SZ        (9 * 1024)
+/* Number of bytes needed for each mbuf header */
+#define VR_DPDK_MBUF_HDR_SZ         (sizeof(struct rte_mbuf)   \
                                     + sizeof(struct vr_packet) \
                                     + RTE_PKTMBUF_HEADROOM)
 /* Size of direc mbuf used for fragmentation. It needs a headroom as it holds
@@ -154,7 +155,7 @@ extern unsigned int vr_flow_hold_limit;
 /* Number of mbufs in lcore RX ring (we retry in case enqueue fails) */
 #define VR_DPDK_RX_RING_SZ          1024
 /* Number of retries to enqueue packets */
-#define VR_DPDK_RETRY_NUM           1 
+#define VR_DPDK_RETRY_NUM           1
 /* Delay between retries */
 #define VR_DPDK_RETRY_US            15
 /* Use timer to measure flushes (slower, but should improve latency) */

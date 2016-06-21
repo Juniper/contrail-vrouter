@@ -35,12 +35,16 @@
 enum vr_opt_index {
 #define NO_DAEMON_OPT           "no-daemon"
     NO_DAEMON_OPT_INDEX,
+#define NO_HUGE_OPT             "no-huge"
+    NO_HUGE_OPT_INDEX,
 #define HELP_OPT                "help"
     HELP_OPT_INDEX,
 #define VERSION_OPT             "version"
     VERSION_OPT_INDEX,
 #define MEMPOOL_SIZE_OPT        "vr_mempool_sz"
     MEMPOOL_SIZE_OPT_INDEX,
+#define PACKET_SIZE_OPT         "vr_packet_sz"
+    PACKET_SIZE_OPT_INDEX,
 #define VLAN_TCI_OPT            "vlan_tci"
     VLAN_TCI_OPT_INDEX,
 #define VLAN_NAME_OPT           "vlan_fwd_intf_name"
@@ -78,7 +82,9 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 
 static int no_daemon_set;
+int no_huge_set;
 unsigned int vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
+unsigned int vr_packet_sz = VR_DEF_MAX_PACKET_SZ;
 extern char *ContrailBuildInfo;
 
 /* Global vRouter/DPDK structure */
@@ -149,7 +155,7 @@ dpdk_mempools_create(void)
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool",
             vr_mempool_sz,
-            VR_DPDK_MBUF_SZ, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
+            VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
             rte_socket_id(), 0);
@@ -195,7 +201,7 @@ dpdk_mempools_create(void)
             return -ENOMEM;
         }
         vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
-                VR_DPDK_VM_MEMPOOL_SZ, VR_DPDK_MBUF_SZ, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
+                VR_DPDK_VM_MEMPOOL_SZ, VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
                 sizeof(struct rte_pktmbuf_pool_private),
                 vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                 rte_socket_id(), 0);
@@ -535,6 +541,10 @@ dpdk_argv_update(void)
     if (dpdk_argv_append("--"LCORES_OPT, lcores_string) != 0)
         return -1;
 
+    /* Append no huge option. */
+    if (no_huge_set && dpdk_argv_append("--"NO_HUGE_OPT, NULL) != 0)
+        return -1;
+
     /* print out configuration */
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
         RTE_LOG(INFO, VROUTER, "Using VLAN TCI: %" PRIu16 "\n", vr_dpdk.vlan_tag);
@@ -553,11 +563,21 @@ dpdk_argv_update(void)
                 vr_nexthops);
     RTE_LOG(INFO, VROUTER, "VRF tables limit:            %" PRIu32 "\n",
                 vr_vrfs);
+    RTE_LOG(INFO, VROUTER, "Packet pool size:            %" PRIu32 "\n",
+                vr_mempool_sz);
+    RTE_LOG(INFO, VROUTER, "Maximum packet size:         %" PRIu32 "\n",
+                vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < RTE_DIM(dpdk_argv) - 1; i += 2) {
         if (dpdk_argv[i] == NULL)
             break;
-        RTE_LOG(INFO, VROUTER, " %12s  \"%s\"\n", dpdk_argv[i], dpdk_argv[i + 1]);
+        if (dpdk_argv[i + 1] == NULL) {
+            RTE_LOG(INFO, VROUTER, " %12s\n", dpdk_argv[i]);
+            i--;
+        } else {
+            RTE_LOG(INFO, VROUTER, " %12s  \"%s\"\n",
+                dpdk_argv[i], dpdk_argv[i + 1]);
+        }
     }
 
     return i;
@@ -618,7 +638,7 @@ dpdk_init(void)
 
     ret = dpdk_argv_update();
     if (ret == -1) {
-        RTE_LOG(ERR, VROUTER, "Error updating lcores arguments\n");
+        RTE_LOG(ERR, VROUTER, "Error updating EAL arguments\n");
         return -1;
     }
 
@@ -634,7 +654,7 @@ dpdk_init(void)
     rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
 
     /* set default log level to INFO */
-    rte_set_log_level(RTE_LOG_INFO);
+    // rte_set_log_level(RTE_LOG_INFO);
 
     ret = dpdk_mempools_create();
     if (ret < 0)
@@ -791,11 +811,15 @@ vr_dpdk_exit_trigger(void)
 static struct option long_options[] = {
     [NO_DAEMON_OPT_INDEX]           =   {NO_DAEMON_OPT,         no_argument,
                                                     &no_daemon_set,         1},
+    [NO_HUGE_OPT_INDEX]             =   {NO_HUGE_OPT,           no_argument,
+                                                    &no_huge_set,           1},
     [HELP_OPT_INDEX]                =   {HELP_OPT,              no_argument,
                                                     NULL,                   0},
     [VERSION_OPT_INDEX]             =   {VERSION_OPT,           no_argument,
                                                     NULL,                   0},
     [MEMPOOL_SIZE_OPT_INDEX]        =   {MEMPOOL_SIZE_OPT,      required_argument,
+                                                    NULL,                   0},
+    [PACKET_SIZE_OPT_INDEX]         =   {PACKET_SIZE_OPT,       required_argument,
                                                     NULL,                   0},
     [VLAN_TCI_OPT_INDEX]            =   {VLAN_TCI_OPT,          required_argument,
                                                     NULL,                   0},
@@ -831,6 +855,7 @@ Usage(void)
     printf(
         "Usage: contrail-vrouter-dpdk [options]\n"
         "    --"NO_DAEMON_OPT"  Do not demonize the vRouter\n"
+        "    --"NO_HUGE_OPT"    Use malloc instead of hugetlbfs\n"
         "    --"HELP_OPT"       This help\n"
         "    --"VERSION_OPT"    Display build information\n"
         "\n"
@@ -850,6 +875,8 @@ Usage(void)
         "    --"MPLS_LABELS_OPT" NUM      MPLS table limit\n"
         "    --"NEXTHOPS_OPT" NUM         Nexthop table limit\n"
         "    --"VRFS_OPT" NUM             VRF tables limit\n"
+        "    --"MEMPOOL_SIZE_OPT" NUM       Main packet pool size\n"
+        "    --"PACKET_SIZE_OPT" NUM        Maximum packet size\n"
         );
 
     exit(1);
@@ -861,6 +888,7 @@ parse_long_opts(int opt_flow_index, char *optarg)
     errno = 0;
     switch (opt_flow_index) {
     case NO_DAEMON_OPT_INDEX:
+    case NO_HUGE_OPT_INDEX:
         break;
 
     case VERSION_OPT_INDEX:
@@ -874,6 +902,14 @@ parse_long_opts(int opt_flow_index, char *optarg)
             vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
         }
         break;
+
+    case PACKET_SIZE_OPT_INDEX:
+        vr_packet_sz = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_packet_sz = VR_DEF_MAX_PACKET_SZ;
+        }
+        break;
+
     /*
      * If VLAN tag is set, vRouter will expect tagged packets. The tag
      * will be stripped by NIC or in vr_dpdk_ethdev_rx_emulate() and
@@ -961,7 +997,7 @@ parse_long_opts(int opt_flow_index, char *optarg)
     case SOCKET_MEM_OPT_INDEX:
         /* Remove -m option if present. */
         dpdk_argv_remove("-m");
-        dpdk_argv_append("--"SOCKET_MEM_OPT, optarg);
+        // dpdk_argv_append("--"SOCKET_MEM_OPT, optarg);
         break;
 
     case HELP_OPT_INDEX:

@@ -847,6 +847,9 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         continue;
 
     free_mbuf:
+        DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p DROP desc->addr %p "
+            "pkt_addr %p tail_addr %p len %d\n",
+            __func__, vq, desc->addr, pkt_addr, tail_addr, pkt_len);
         DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(p, 1);
         rte_pktmbuf_free(mbuf);
     }
