@@ -150,6 +150,9 @@ vr_dpdk_flow_mem_init(void)
         return ret;
     }
 
+    if (!vr_oflow_entries)
+        vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
+
     flow_table_size = VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE;
 
     for (i = 0; i < HPI_MAX; i++) {
