@@ -600,7 +600,7 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     kni_conf.addr = dev_info.pci_dev->addr;
     kni_conf.id = dev_info.pci_dev->id;
     kni_conf.group_id = port_id;
-    kni_conf.mbuf_size = VR_DPDK_MAX_PACKET_SZ;
+    kni_conf.mbuf_size = vr_packet_sz;
     /*
      * Due to DPDK commit 41a6ebd, now to prevent packet reordering in KNI
      * we have to bind KNI kernel thread to a first online unused CPU.

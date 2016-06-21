@@ -161,8 +161,8 @@ main(int argc, char *argv[])
         return EXIT_SUCCESS;//E_MAIN_TEST_PASS;
 
     } else {
-        fprintf(stderr, "something is wrong\n");
-        return -42;
+        fprintf(stderr, "Test skipped\n");
+        return 2;
     }
 
     return EXIT_SUCCESS;

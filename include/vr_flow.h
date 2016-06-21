@@ -420,7 +420,7 @@ extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
        unsigned char *, uint8_t, uint16_t, uint16_t);
-extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short, 
+extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
        unsigned char *, uint8_t, uint16_t, uint16_t);
 extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);

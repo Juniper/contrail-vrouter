@@ -135,53 +135,67 @@ int
 vr_dpdk_flow_mem_init(void)
 {
     int ret, i, fd;
-    unsigned int num_sizes;
     size_t size, flow_table_size;
     struct vr_hugepage_info *hpi;
     char *file_name, *touse_file_name = NULL;
     struct stat f_stat;
-
-    RTE_SET_USED(num_sizes);
-
-    ret = vr_hugepage_info_init();
-    if (ret < 0) {
-        RTE_LOG(ERR, VROUTER, "Error initializing hugepage info: %s (%d)\n",
-            rte_strerror(-ret), -ret);
-        return ret;
-    }
 
     if (!vr_oflow_entries)
         vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
 
     flow_table_size = VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE;
 
-    for (i = 0; i < HPI_MAX; i++) {
-        hpi = &vr_hugepage_md[i];
-        if (!hpi->mnt)
-            continue;
-        file_name = malloc(strlen(hpi->mnt) + strlen("/flow") + 1);
-        sprintf(file_name, "%s/flow", hpi->mnt);
-        if (stat(file_name, &f_stat)) {
-            if (!touse_file_name) {
-                size = hpi->size;
-                if (size >= flow_table_size) {
-                    touse_file_name = file_name;
-                } else {
-                    free(file_name);
+    if (no_huge_set) {
+        touse_file_name = "flow";
+    } else {
+        ret = vr_hugepage_info_init();
+        if (ret < 0) {
+            RTE_LOG(ERR, VROUTER, "Error initializing hugepage info: %s (%d)\n",
+                rte_strerror(-ret), -ret);
+            return ret;
+        }
+
+        for (i = 0; i < HPI_MAX; i++) {
+            hpi = &vr_hugepage_md[i];
+            if (!hpi->mnt)
+                continue;
+            file_name = malloc(strlen(hpi->mnt) + strlen("/flow") + 1);
+            sprintf(file_name, "%s/flow", hpi->mnt);
+            if (stat(file_name, &f_stat) == -1) {
+                if (!touse_file_name) {
+                    size = hpi->size;
+                    if (size >= flow_table_size) {
+                        touse_file_name = file_name;
+                    } else {
+                        free(file_name);
+                    }
                 }
+            } else {
+                free(touse_file_name);
+                touse_file_name = file_name;
+                break;
             }
-        } else {
-            touse_file_name = file_name;
-            break;
         }
     }
 
     if (touse_file_name) {
-        fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        if (no_huge_set) {
+            fd = shm_open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        } else {
+            fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        }
         if (fd == -1) {
             RTE_LOG(ERR, VROUTER, "Error opening file %s: %s (%d)\n",
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
+        }
+        if (no_huge_set){
+            ret = ftruncate(fd, flow_table_size);
+            if (ret == -1) {
+                RTE_LOG(ERR, VROUTER, "Error truncating file %s: %s (%d)\n",
+                    touse_file_name, rte_strerror(errno), errno);
+                return -errno;
+            }
         }
         vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
