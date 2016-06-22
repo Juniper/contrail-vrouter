@@ -617,6 +617,7 @@ flow_sum_drops_stats(vr_drop_stats_req *req)
     sum += req->vds_flow_action_invalid;
     sum += req->vds_flow_unusable;
     sum += req->vds_flow_table_full;
+    sum += req->vds_drop_new_flow;
 
     return sum;
 }

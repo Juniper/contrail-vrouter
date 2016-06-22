@@ -1194,6 +1194,27 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
 }
 
 static inline bool
+vr_flow_intf_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
+{
+    struct vr_interface *vif_l = NULL;
+
+    if (vif_is_virtual(pkt->vp_if)) {
+        vif_l = pkt->vp_if;
+    } else if (vif_is_fabric(pkt->vp_if)) {
+        struct vr_nexthop *nh = pkt->vp_nh;
+        if ((nh != NULL) && (nh->nh_flags & NH_FLAG_VALID)) {
+            vif_l = nh->nh_dev;
+        }
+    }
+
+    if (vif_l) {
+        return !(vif_is_drop_new_flows(vif_l));
+    }
+
+    return true;
+}
+
+static inline bool
 vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
 {
     bool allow;
@@ -1225,6 +1246,14 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 
     flow_e = vr_find_flow(router, key, pkt->vp_type,  &fe_index);
     if (!flow_e) {
+        /*
+         * Check if interface allows creation of new flows
+         */
+        if (!vr_flow_intf_allow_new_flow(router, pkt)) {
+            vr_pfree(pkt, VP_DROP_NEW_FLOWS);
+            return FLOW_CONSUMED;
+        }
+
         if (pkt->vp_nh &&
             (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY))
             return FLOW_FORWARD;

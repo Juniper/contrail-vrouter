@@ -367,6 +367,7 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_fragment_queue_fail;
     sum += req->vds_vlan_fwd_tx;
     sum += req->vds_vlan_fwd_enq;
+    sum += req->vds_drop_new_flow;
 
     return sum;
 }
