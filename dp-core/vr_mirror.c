@@ -390,10 +390,14 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     if (!mirror)
         return 0;
 
+    /* in almost all the cases, fmd should be set */
     if (fmd) {
         memcpy(&new_fmd, fmd, sizeof(*fmd));
-        fmd = &new_fmd;
+        new_fmd.fmd_ecmp_nh_index = -1;
+    } else {
+        vr_init_forwarding_md(&new_fmd);
     }
+    fmd = &new_fmd;
 
     if (fmd->fmd_flow_index >= 0) {
         mme = (struct vr_mirror_meta_entry *)vr_itable_get(router->vr_mirror_md,
@@ -481,6 +485,12 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
 
     if (nh->nh_vrf >= 0)
         fmd->fmd_dvrf = nh->nh_vrf;
+
+    /*
+     * we are now in the mirroring context and there isn't a flow for this
+     * mirror packet. hence, set the flow index to -1.
+     */
+    fmd->fmd_flow_index = -1;
 
     nh_output(pkt, nh, fmd);
     return 0;
