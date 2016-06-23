@@ -111,9 +111,10 @@ dpdk_packet_socket_init(void)
 {
     void *event_sock = NULL;
     int err;
+    void *packet_transport;
 
-    vr_dpdk.packet_transport = (void *)vr_usocket(PACKET, RAW);
-    if (!vr_dpdk.packet_transport)
+    packet_transport = (void *)vr_usocket(PACKET, RAW);
+    if (!packet_transport)
         return -1;
 
     if (!vr_dpdk.packet_ring) {
@@ -136,12 +137,13 @@ dpdk_packet_socket_init(void)
         goto error;
     }
 
-    if (vr_usocket_bind_usockets(vr_dpdk.packet_transport,
+    if (vr_usocket_bind_usockets(packet_transport,
                 event_sock)) {
         RTE_LOG(ERR, VROUTER, "    error binding packet event\n");
         goto error;
     }
     vr_dpdk.packet_event_sock = event_sock;
+    vr_dpdk.packet_transport = packet_transport;
 
     return 0;
 
@@ -149,7 +151,7 @@ error:
     err = errno;
     if (event_sock)
         vr_usocket_close(event_sock);
-    vr_usocket_close(vr_dpdk.packet_transport);
+    vr_usocket_close(packet_transport);
     vr_dpdk.packet_transport = NULL;
     errno = err;
 

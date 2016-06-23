@@ -163,9 +163,9 @@ dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, uint8_t port_id)
 }
 
 static inline void
-dpdk_set_hw_vlan_strip(uint32_t port_id, struct vr_interface *vif)
+dpdk_set_addr_vlan_filter_strip(uint32_t port_id, struct vr_interface *vif)
 {
-    uint32_t i;
+    uint32_t i, ret;
     uint8_t *port_id_ptr;
     int port_num = 0;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
@@ -174,6 +174,49 @@ dpdk_set_hw_vlan_strip(uint32_t port_id, struct vr_interface *vif)
                    &ethdev->ethdev_port_id:ethdev->ethdev_slaves;
 
     do {
+        /*
+         * TODO: vf_lcore_id check for SR-IOV VF should be a per-interface
+         * check to handle the case where a bond has a VF and a PF in it.
+         */
+
+        /*
+         * Set the MAC address of slave interfaces. Doing it from the bond driver in
+         * DPDK doesn't seem to work on SR-IOV VFs.
+         */
+        if ((ethdev->ethdev_nb_slaves != -1) && vr_dpdk.vf_lcore_id) {
+            ret = rte_eth_dev_default_mac_addr_set(*port_id_ptr,
+                    (struct ether_addr *)vif->vif_mac);
+            if (ret == 0) {
+                RTE_LOG(INFO, VROUTER, "Bond slave port %d now uses vif MAC "
+                        MAC_FORMAT "\n",
+                        *port_id_ptr, MAC_VALUE(vif->vif_mac));
+            } else {
+                RTE_LOG(ERR, VROUTER, "Error setting vif MAC to bond slave port %d: "
+                        "%s (%d)\n",
+                        *port_id_ptr, rte_strerror(-ret), -ret);
+            }
+        }
+
+        if ((vr_dpdk.vlan_tag != VLAN_ID_INVALID) && vr_dpdk.vf_lcore_id) {
+            ret = rte_eth_dev_set_vlan_offload(*port_id_ptr, ETH_VLAN_FILTER_OFFLOAD);
+            if (ret) {
+                RTE_LOG(INFO, VROUTER, "Error %d enabling vlan offload on port %d\n",
+                        ret, *port_id_ptr);
+            } else {
+                RTE_LOG(INFO, VROUTER, "Enabled vlan offload on port %d\n",
+                        *port_id_ptr);
+            }
+
+            ret = rte_eth_dev_vlan_filter(*port_id_ptr, vr_dpdk.vlan_tag, 1);
+            if (ret) {
+                RTE_LOG(INFO, VROUTER, "Error %d enabling vlan %d on port %d\n",  
+                        ret, vr_dpdk.vlan_tag, *port_id_ptr);
+            } else {
+                RTE_LOG(INFO, VROUTER, "Enabled vlan %d on port %d\n",
+                        vr_dpdk.vlan_tag, *port_id_ptr);
+            }
+        }
+
         for (i=0; i< rte_eth_devices[*port_id_ptr].data->nb_rx_queues; i++)
         {
             if (vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) {
@@ -450,7 +493,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 #endif
 
     /* Set hardware VLAN stripping */
-    dpdk_set_hw_vlan_strip(port_id, vif);
+    dpdk_set_addr_vlan_filter_strip(port_id, vif);
 
     /* schedule RX/TX queues */
     return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
