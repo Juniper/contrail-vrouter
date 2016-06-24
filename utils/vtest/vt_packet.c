@@ -21,6 +21,35 @@
 
 #include "vt_packet.h"
 
+/**
+ * vt_file_name_assign - assign relative file name by concatinating
+ * test file directory and relative PCAP file name.
+ */
+void
+vt_fname_assign(struct vtest *test, char *fname, char *rel_name)
+{
+    size_t i, l;
+
+    if (rel_name[0] == '/') {
+        strncpy(fname, rel_name, PATH_MAX - 1);
+    } else {
+        /* Copy current test directory. */
+        l = strlen(test->file_name);
+        if (l > PATH_MAX)
+            l = PATH_MAX;
+        for (i = l; i > 0; i--) {
+            if (test->file_name[i] == '/')
+                break;
+        }
+        strncpy(fname, test->file_name, i);
+        fname[i] = '/'; fname[i + 1] = '\0';
+
+        /* Append relative file name. */
+        strncat(fname, rel_name, PATH_MAX - i - 1);
+    }
+
+    return;
+}
 
 /*
  * Parse XML structure and set structures packet and packet interface (vtest.h)
@@ -40,14 +69,15 @@ vt_packet(xmlNodePtr node, struct vtest *test)
         if (!strncmp(node->name, "pcap_input_file", strlen(node->name))) {
             if (node->children && node->children->content) {
                 if (node->children && node->children->content) {
-                    strncpy(test->packet.pcap_file, node->children->content, PATH_MAX);
+                    vt_fname_assign(test,
+                        test->packet.pcap_file, node->children->content);
                 }
             }
 
         } else if (!strncmp(node->name, "pcap_expected_file", strlen(node->name))) {
             if (node->children && node->children->content) {
-                strncpy(test->packet.pcap_ref_file, node->children->content, PATH_MAX);
-
+                vt_fname_assign(test,
+                    test->packet.pcap_ref_file, node->children->content);
             }
         } else if (!strncmp(node->name, "tx_interface", strlen(node->name))) {
 
@@ -109,15 +139,18 @@ pcap_compare(char *pcap_file_1, char *pcap_file_2) {
     int end_pcap_2 = 0;
     char errbuf_2[PCAP_ERRBUF_SIZE] = {0};
 
+    printf("Comparing reference file with %s...\n", pcap_file_2);
     pcap_t *p_1 = pcap_open_offline(pcap_file_1, errbuf_1);
     if (!p_1) {
-        fprintf(stderr, "%s \n", errbuf_1);
+        fprintf(stderr, "%s(): Error opening pcap reference file: %s\n",
+            __func__, errbuf_1);
         return E_PACKET_PCAP_SETUP_TEST_ERR;
     }
 
     pcap_t *p_2 = pcap_open_offline(pcap_file_2, errbuf_2);
     if (!p_2) {
-        fprintf(stderr, "%s \n", errbuf_2);
+        fprintf(stderr, "%s(): Error opening pcap destination file: %s\n",
+            __func__, errbuf_2);
         return E_PACKET_PCAP_SETUP_TEST_ERR;
     }
 
@@ -132,6 +165,8 @@ pcap_compare(char *pcap_file_1, char *pcap_file_2) {
         }
 
         if (end_pcap_1 != end_pcap_2) {
+            fprintf(stderr, "%s(): Error comparing pcap files: different number of packets\n",
+                __func__);
             return E_PACKET_PCAP_FAIL_ERR;
 
         } else if (end_pcap_1 && end_pcap_2) {
@@ -139,12 +174,15 @@ pcap_compare(char *pcap_file_1, char *pcap_file_2) {
         }
         if (pkt_header_1->len == pkt_header_2->len) {
             if (memcmp((u_char *) pkt_data_1, (u_char *) pkt_data_2, pkt_header_1->len)) {
+                fprintf(stderr, "%s(): Error comparing pcap files: packet data is different\n",
+                    __func__);
                 return E_PACKET_PCAP_FAIL_ERR;
             }
 
         } else {
+            fprintf(stderr, "%s(): Error comparing pcap files: packet len is different\n",
+                __func__);
             return E_PACKET_PCAP_FAIL_ERR;
-
         }
 
     }
@@ -174,13 +212,15 @@ run_pcap_test(struct vtest *test) {
 
     ret = tx_rx_pcap_test(test);
 
-    if (strlen(test->packet.pcap_ref_file)) {
+    if (ret != E_PACKET_OK) {
+        test->vtest_return = E_MAIN_TEST_FAIL;
+    } else if (strlen(test->packet.pcap_ref_file)) {
         ret = pcap_compare(test->packet.pcap_ref_file, test->packet.pcap_dest_file);
 
         if (ret != E_PACKET_PCAP_OK) {
             test->vtest_return = E_MAIN_TEST_FAIL;
         } else {
-             test->vtest_return = E_MAIN_TEST_PASS;
+            test->vtest_return = E_MAIN_TEST_PASS;
         }
     }
 
@@ -238,16 +278,21 @@ tx_rx_pcap_test(struct vtest *test) {
     memset(&tx_rx_handler.errbuf, 0, sizeof(char) * PCAP_ERRBUF_SIZE);
     tx_rx_handler.p =  pcap_open_offline(test->packet.pcap_file, tx_rx_handler.errbuf);
     if (!tx_rx_handler.p) {
+        fprintf(stderr, "%s(): Error opening pcap offline: %s\n",
+            __func__, tx_rx_handler.errbuf);
         return E_PACKET_PCAP_SETUP_TEST_ERR;
     }
 
     tx_rx_handler.pd = pcap_open_dead(DLT_EN10MB, 1 << 16);
     if (!tx_rx_handler.pd) {
+        fprintf(stderr, "%s(): Error opening pcap dead\n", __func__);
         return E_PACKET_PCAP_SETUP_TEST_ERR;
     }
 
     tx_rx_handler.dumper = pcap_dump_open(tx_rx_handler.pd, pcap_dest);
     if (!tx_rx_handler.dumper) {
+        fprintf(stderr, "%s(): Error opening pcap dump: %s\n",
+            __func__, pcap_geterr(tx_rx_handler.pd));
         return E_PACKET_PCAP_SETUP_TEST_ERR;
     }
 

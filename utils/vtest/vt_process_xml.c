@@ -19,6 +19,7 @@
 #include <nl_util.h>
 
 extern struct vtest_module vt_modules[];
+#define SKIP_TEST_PFX "SKIP"
 
 int
 vt_test_name(xmlNodePtr node, struct vtest *test)
@@ -33,7 +34,14 @@ vt_test_name(xmlNodePtr node, struct vtest *test)
         return E_MAIN_ERR_FARG;
     }
 
-    printf("Running \"%s\"\n", (char *)child->content);
+    if (strncmp(child->content, SKIP_TEST_PFX,
+        sizeof(SKIP_TEST_PFX) - 1) == 0) {
+        printf("Skipping %s...\n", (char *)child->content +
+            sizeof(SKIP_TEST_PFX) + 1);
+        return E_MAIN_SKIP;
+    } else {
+        printf("Running %s...\n", (char *)child->content);
+    }
 
     return E_PROCESS_XML_OK;
 }
@@ -201,13 +209,15 @@ vt_process_node(xmlNodePtr node, struct vtest *test)
                     strlen(vt_modules[i].vt_name) + 1)) {
             ret = vt_modules[i].vt_node(node, test);
             if (ret != E_MESSAGE_OK) {
-                fprintf(stderr, "process node %s failed\n", node->name);
+                fprintf(stderr, "%s(): Error processing node %s\n",
+                    __func__, node->name);
                 return ret;
             }
 
             ret = vt_post_process_node(node, test);
             if (ret != E_PROCESS_XML_OK) {
-                fprintf(stderr, "process node %s failed\n", node->name);
+                fprintf(stderr, "%s(): Error post-processing node %s\n",
+                    __func__, node->name);
                 return ret;
             }
 
@@ -236,7 +246,8 @@ vt_tree_traverse(xmlNodePtr node, struct vtest *test)
         if (node->type == XML_ELEMENT_NODE) {
             ret = vt_process_node(node, test);
             if (ret != E_PROCESS_XML_OK) {
-                fprintf(stderr ,"Tree traverse error\n");
+                fprintf(stderr ,"%s(): Tree traverse error %d\n",
+                    __func__, ret);
 
                 return ret;
             }
@@ -260,13 +271,14 @@ vt_parse_file(char *file, struct vtest *test)
 
     doc = xmlParseFile(file);
     if (!doc) {
-        fprintf(stderr ,"xmlParseFile %s failed\n", file);
+        fprintf(stderr ,"%s(): Error parsing XML file %s\n", __func__, file);
         return E_PROCESS_XML_ERR;
     }
+    test->file_name = file;
 
     node = xmlDocGetRootElement(doc);
     if (!node) {
-        fprintf(stderr ,"NULL Root Element\n");
+        fprintf(stderr ,"%s(): Error getting root element\n", __func__);
         return E_PROCESS_XML_ERR;
     }
 

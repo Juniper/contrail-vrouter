@@ -83,6 +83,7 @@ struct vtest {
     struct packet packet;
     /* vRouter socket -> for message sending */
     struct nl_client *vrouter_cl;
+    char *file_name;
 };
 
 struct vtest_module {

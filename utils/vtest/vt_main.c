@@ -152,7 +152,7 @@ main(int argc, char *argv[])
     nl_free_client(vtest.vrouter_cl);
     vt_dealloc_test(&vtest);
 
-    if (vtest.vtest_return != E_MAIN_TEST_PASS) {
+    if (vtest.vtest_return == E_MAIN_TEST_FAIL) {
         fprintf(stderr, "Test failed\n");
         return EXIT_FAILURE;//E_MAIN_TEST_FAIL;
 
@@ -162,7 +162,7 @@ main(int argc, char *argv[])
 
     } else {
         fprintf(stderr, "Test skipped\n");
-        return 2;
+        return EXIT_SUCCESS;
     }
 
     return EXIT_SUCCESS;

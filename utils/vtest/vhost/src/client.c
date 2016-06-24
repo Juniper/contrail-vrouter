@@ -13,6 +13,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include <sys/socket.h>
@@ -41,6 +42,8 @@ client_init_Client(Client *client, const char *path) {
     CLIENT_H_RET_VAL client_ret_val = E_CLIENT_OK;
 
     if (!client || !path) {
+        fprintf(stderr, "%s(): Error initializing client: no client\n",
+            __func__);
         return E_CLIENT_ERR_FARG;
     }
 
@@ -71,6 +74,8 @@ client_init_path(Client *client, const char *path) {
     char *basename_path = NULL;
 
     if (!client || !path || strlen(path) == 0 || strlen(path) > (UNIX_PATH_MAX - 1)) {
+        fprintf(stderr, "%s(): Error initializing client path: no client\n",
+            __func__);
         return E_CLIENT_ERR_FARG;
     }
    basename_path = basename((char *)path);
@@ -87,12 +92,15 @@ static int
 client_init_socket(Client *client) {
 
     if (!client) {
+        fprintf(stderr, "%s(): Error initializing client socket: no client\n",
+            __func__);
         return E_CLIENT_ERR_FARG;
     }
 
     client->socket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (client->socket == -1) {
-
+        fprintf(stderr, "%s(): Error creating socket: %s (%d)\n",
+            __func__, strerror(errno), errno);
         return E_CLIENT_ERR_SOCK;
     }
     return E_CLIENT_OK;
@@ -106,14 +114,12 @@ client_connect_socket(Client *client) {
     size_t addrlen = 0;
     struct stat unix_socket_stat;
     if (!client->socket || strlen(client->socket_path) == 0) {
+        fprintf(stderr, "%s(): Error connecting socket: no socket\n",
+            __func__);
         return E_CLIENT_ERR_FARG;
     }
 
-    if (!(stat(client->socket_path, &unix_socket_stat) == 0
-                && S_ISSOCK(unix_socket_stat.st_mode))) {
-
-        return E_CLIENT_ERR_CONN;
-    }
+    /* The fakechroot(1) utility does not support stat() syscals. */
 
     memset(&unix_socket, 0, sizeof(struct sockaddr_un));
 
@@ -122,7 +128,8 @@ client_connect_socket(Client *client) {
     addrlen = strlen(unix_socket.sun_path) + sizeof(AF_UNIX);
 
     if (connect(client->socket, (struct sockaddr *)&unix_socket, addrlen)  == -1) {
-
+        fprintf(stderr, "%s(): Error connecting socket: %s (%d)\n",
+            __func__, strerror(errno), errno);
         return E_CLIENT_ERR_CONN;
     }
 
