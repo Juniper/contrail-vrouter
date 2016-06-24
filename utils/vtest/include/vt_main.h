@@ -28,7 +28,8 @@ typedef enum {
     E_MAIN_ERR_FARG,
     E_MAIN_ERR,
     E_MAIN_ERR_ALLOC,
-    E_MAIN_ERR_SOCK
+    E_MAIN_ERR_SOCK,
+    E_MAIN_SKIP
 
 } VT_MAIN_RET_VAL;
 

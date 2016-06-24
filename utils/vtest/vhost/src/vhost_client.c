@@ -8,6 +8,7 @@
  */
 
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,18 +35,24 @@ static int
 vhost_client_alloc_Vhost_Client(Vhost_Client **vhost_client) {
 
     if (!vhost_client) {
+        fprintf(stderr, "%s(): Error allocating vhost client: no vhost client\n",
+            __func__);
         return E_VHOST_CLIENT_ERR_FARG;
     }
 
 
     *vhost_client = (Vhost_Client *) calloc(1, sizeof(Vhost_Client));
      if(!*vhost_client) {
+        fprintf(stderr, "%s(): Error allocating vhost client: %s (%d)\n",
+            __func__, strerror(errno), errno);
          return  E_VHOST_CLIENT_ERR_ALLOC;
      }
 
      for (size_t i = 0; i < VHOST_CLIENT_VRING_MAX_VRINGS; i++) {
          (*vhost_client)->virtq_control[i] = calloc(1, sizeof(virtq_control));
          if ((*vhost_client)->virtq_control[i] == NULL) {
+            fprintf(stderr, "%s(): Error allocating control queue: %s (%d)\n",
+                __func__, strerror(errno), errno);
             return E_VHOST_CLIENT_ERR_ALLOC;
          }
      }
@@ -71,6 +78,8 @@ vhost_client_init_Vhost_Client(Vhost_Client *vhost_client) {
     Vhost_Client *const vhost_cl = vhost_client;
 
     if (!vhost_client) {
+        fprintf(stderr, "%s(): Error initializing vhost client: no vhost client\n",
+            __func__);
         return E_VHOST_CLIENT_ERR_FARG;
     }
 
@@ -91,6 +100,8 @@ vhost_client_set_mem_Vhost_Client(Vhost_Client *vhost_client) {
     VIRT_QUEUE_H_RET_VAL ret_val = E_VIRT_QUEUE_OK;
 
     if (!vhost_client) {
+        fprintf(stderr, "%s(): Error setting vhost client memory: no vhost client\n",
+            __func__);
         return E_VHOST_CLIENT_ERR_FARG;
     }
 
@@ -199,6 +210,8 @@ vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *vhost_client_
     VIRT_QUEUE_H_RET_VAL virt_queue_ret_val = E_VIRT_QUEUE_OK;
 
     if (!vhost_cl || !strlen(vhost_client_path)) {
+        fprintf(stderr, "%s(): Error running vhost client: no vhost client\n",
+            __func__);
         return E_VHOST_CLIENT_ERR_FARG;
     }
 
@@ -219,11 +232,15 @@ vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *vhost_client_
 
     vhost_client_ret_val = vhost_client_init_control_communication(l_vhost_client);
     if (vhost_client_ret_val != E_VHOST_CLIENT_OK) {
+        fprintf(stderr, "%s(): Error running vhost client: error initializing control communication\n",
+            __func__);
         return E_VHOST_CLIENT_ERR_INIT_COMMUNICATION;
     }
 
     virt_queue_ret_val = virt_queue_map_uvhost_virtq_2_virtq_control(l_vhost_client);
     if (virt_queue_ret_val != E_VIRT_QUEUE_OK) {
+        fprintf(stderr, "%s(): Error running vhost client: error mapping queues\n",
+            __func__);
         return E_VHOST_CLIENT_ERR_MAP_VIRTQ;
     }
 
@@ -318,6 +335,8 @@ map_ret_val_vhost_client_2_vhost_net(VHOST_CLIENT_H_RET_VAL vhost_client_ret_val
             break;
 
         default:
+            fprintf(stderr, "%s(): Error converting error: unknown error %d\n",
+                __func__, vhost_client_ret_val);
             return E_VHOST_NET_ERR_UNK;
             break;
     };
@@ -331,6 +350,8 @@ init_vhost_net(vhost_net **client,  const char *vhost_client_path ) {
     VHOST_CLIENT_H_RET_VAL vhost_client_ret_val = E_VHOST_CLIENT_OK;
 
     if (!client || !vhost_client_path || !strlen(vhost_client_path)) {
+        fprintf(stderr, "%s(): Error initializing vhost net: no client path\n",
+            __func__);
         return E_VHOST_NET_ERR_FARG;
     }
 
@@ -344,6 +365,8 @@ init_vhost_net(vhost_net **client,  const char *vhost_client_path ) {
 
     (*client) = calloc(1, sizeof(vhost_net));
     if(!(*client)) {
+        fprintf(stderr, "%s(): Error initializing vhost net: %s (%d)\n",
+            __func__, strerror(errno), errno);
         return E_VHOST_NET_ERR_ALLOC;
     }
 
