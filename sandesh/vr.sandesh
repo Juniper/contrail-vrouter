@@ -383,7 +383,7 @@ buffer sandesh vr_drop_stats_req {
     37: i64             vds_misc;
     38: i64             vds_invalid_packet;
     39: i64             vds_cksum_err;
-    40: i64             vds_clone_fail;
+    40: i64             vds_drop_new_flow;
     41: i64             vds_no_fmd;
     42: i64             vds_cloned_original;
     43: i64             vds_invalid_vnid;

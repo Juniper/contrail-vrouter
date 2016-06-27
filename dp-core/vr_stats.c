@@ -55,7 +55,7 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_misc += stats->vds_misc;
     response->vds_invalid_packet += stats->vds_invalid_packet;
     response->vds_cksum_err += stats->vds_cksum_err;
-    response->vds_clone_fail += stats->vds_clone_fail;
+    response->vds_drop_new_flow += stats->vds_drop_new_flow;
     response->vds_no_fmd += stats->vds_no_fmd;
     response->vds_cloned_original += stats->vds_cloned_original;
     response->vds_invalid_vnid += stats->vds_invalid_vnid;

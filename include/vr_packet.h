@@ -169,7 +169,7 @@
 #define VP_DROP_MISC                        33
 #define VP_DROP_INVALID_PACKET              34
 #define VP_DROP_CKSUM_ERR                   35
-/* #define VP_DROP_CLONE_FAIL               36 - UNUSED */
+#define VP_DROP_NEW_FLOWS                   36
 #define VP_DROP_NO_FMD                      37
 #define VP_DROP_CLONED_ORIGINAL             38
 #define VP_DROP_INVALID_VNID                39
@@ -220,7 +220,7 @@ struct vr_drop_stats {
     uint64_t vds_misc;
     uint64_t vds_invalid_packet;
     uint64_t vds_cksum_err;
-    uint64_t vds_clone_fail;
+    uint64_t vds_drop_new_flow;
     uint64_t vds_no_fmd;
     uint64_t vds_cloned_original;
     uint64_t vds_invalid_vnid;

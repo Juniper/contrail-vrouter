@@ -356,7 +356,7 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_misc;
     sum += req->vds_invalid_packet;
     sum += req->vds_cksum_err;
-    sum += req->vds_clone_fail;
+    sum += req->vds_drop_new_flow;
     sum += req->vds_no_fmd;
     sum += req->vds_cloned_original;
     sum += req->vds_invalid_vnid;
