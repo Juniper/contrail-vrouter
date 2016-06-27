@@ -1194,23 +1194,50 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
 }
 
 static inline bool
-vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt)
+vr_flow_vif_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
+                           unsigned short *drop_reason)
 {
-    bool allow;
+    struct vr_interface *vif_l = NULL;
+    struct vr_nexthop *nh = NULL;
+
+    if (vif_is_virtual(pkt->vp_if)) {
+        vif_l = pkt->vp_if;
+    } else if (vif_is_fabric(pkt->vp_if)) {
+        nh = pkt->vp_nh;
+        if ((nh != NULL) && (nh->nh_flags & NH_FLAG_VALID)) {
+            vif_l = nh->nh_dev;
+        }
+    }
+
+    if (vif_l && vif_drop_new_flows(vif_l)) {
+        *drop_reason = VP_DROP_NEW_FLOWS;
+        return false;
+    }
+
+    return true;
+}
+
+static inline bool
+vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
+                       unsigned short *drop_reason)
+{
+    *drop_reason = VP_DROP_FLOW_UNUSABLE;
 
     if (pkt->vp_type == VP_TYPE_IP) {
-        allow = vr_inet_flow_allow_new_flow(router, pkt);
-        if (!allow)
-            return allow;
+        if (!vr_inet_flow_allow_new_flow(router, pkt)) {
+            *drop_reason = VP_DROP_FLOW_UNUSABLE;
+            return false;
+        }
     }
 
     if ((vr_flow_hold_limit) &&
             (vr_flow_table_hold_count(router) >
              vr_flow_hold_limit)) {
+        *drop_reason = VP_DROP_FLOW_UNUSABLE;
         return false;
     }
 
-    return true;
+    return vr_flow_vif_allow_new_flow(router, pkt, drop_reason);
 }
 
 flow_result_t
@@ -1219,6 +1246,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 {
     unsigned int fe_index;
     struct vr_flow_entry *flow_e;
+    unsigned short drop_reason = 0;
 
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
@@ -1229,8 +1257,8 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
             (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY))
             return FLOW_FORWARD;
 
-        if (!vr_flow_allow_new_flow(router, pkt)) {
-            vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
+        if (!vr_flow_allow_new_flow(router, pkt, &drop_reason)) {
+            vr_pfree(pkt, drop_reason);
             return FLOW_CONSUMED;
         }
 

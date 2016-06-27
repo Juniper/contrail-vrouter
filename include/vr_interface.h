@@ -43,6 +43,8 @@
                                         (vif->vif_type == VIF_TYPE_GATEWAY))
 #define vif_is_service(vif)         (vif->vif_flags & VIF_FLAG_SERVICE_IF)
 
+#define vif_drop_new_flows(vif)     (vif->vif_flags & VIF_FLAG_DROP_NEW_FLOWS)
+
 #define vif_needs_dev(vif)          ((vif->vif_type != VIF_TYPE_VIRTUAL_VLAN))
 
 /* DPDK definitions */
@@ -90,6 +92,11 @@
 #define VIF_FLAG_MONITORED          0x8000
 #define VIF_FLAG_UNKNOWN_UC_FLOOD   0x10000
 #define VIF_FLAG_VLAN_OFFLOAD       0x20000
+/*
+ * The interface is marked to drop new incoming flows
+ * marked by vrouter agent to enforce flow-limit
+ */
+#define VIF_FLAG_DROP_NEW_FLOWS     0x40000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \

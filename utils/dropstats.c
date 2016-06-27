@@ -75,6 +75,8 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_flow_invalid_protocol);
     printf("Flow Queue Limit Exceeded     %" PRIu64 "\n",
             stats->vds_flow_queue_limit_exceeded);
+    printf("New Flow Drops                %" PRIu64 "\n",
+            stats->vds_drop_new_flow);
     printf("\n");
 
     printf("Discards                      %" PRIu64 "\n",

@@ -180,7 +180,8 @@
 #define VP_DROP_FRAGMENT_QUEUE_FAIL         44
 #define VP_DROP_VLAN_FWD_TX                 45
 #define VP_DROP_VLAN_FWD_ENQ                46
-#define VP_DROP_MAX                         47
+#define VP_DROP_NEW_FLOWS                   47
+#define VP_DROP_MAX                         48
 
 
 struct vr_drop_stats {
@@ -231,6 +232,7 @@ struct vr_drop_stats {
     uint64_t vds_fragment_queue_fail;
     uint64_t vds_vlan_fwd_tx;
     uint64_t vds_vlan_fwd_enq;
+    uint64_t vds_drop_new_flow;
 
 };
 
