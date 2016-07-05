@@ -743,16 +743,19 @@ vr_qos_get_forwarding_class(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     uint8_t tos;
-    int16_t qos_id;
+    int16_t qos_id = -1;
     unsigned int fc_id;
 
     struct vr_interface *vif;
     struct vr_forwarding_class *fc_p;
 
+    vif = pkt->vp_if;
+
     if (fmd->fmd_flow_index >= 0) {
         qos_id = vr_flow_get_qos(router, pkt, fmd);
-    } else {
-        vif = pkt->vp_if;
+    }
+
+    if (qos_id < 0) {
         qos_id = vif->vif_qos_map_index;
     }
 
