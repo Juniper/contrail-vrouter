@@ -1,0 +1,10 @@
+Approved+1: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Approved+1: Divakar Dharanalakota <ddivakar@juniper.net>
+Code-Review+2: Divakar Dharanalakota <ddivakar@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Thu, 07 Jul 2016 03:00:10 -0700
+Reviewed-on: https://review.opencontrail.org/21206
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/master
