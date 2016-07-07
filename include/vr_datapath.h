@@ -38,6 +38,7 @@ extern uint16_t vr_icmp6_checksum(struct vr_ip6 *, struct vr_icmp *);
 
 int vr_untag_pkt(struct vr_packet *);
 int vr_tag_pkt(struct vr_packet *, unsigned short);
+void vr_vlan_set_priority(struct vr_packet *);
 int vr_pkt_type(struct vr_packet *, unsigned short, struct vr_forwarding_md *);
 
 int vr_trap(struct vr_packet *, unsigned short, unsigned short, void *);
