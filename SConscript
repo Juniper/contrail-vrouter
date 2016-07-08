@@ -168,7 +168,7 @@ if sys.platform != 'darwin':
 
     for sdir in subdirs:
         env.SConscript(sdir + '/SConscript',
-                       exports=' '.join(exports),
+                       exports = exports,
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
