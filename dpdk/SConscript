@@ -23,8 +23,9 @@ env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
 env.Append(LIBS = ['rt', 'dl', 'pthread', 'urcu-qsbr'])
 env.Append(LINKFLAGS = env['DPDK_LINKFLAGS'])
 
-dpdk_vrouter = env.Program('contrail-vrouter-dpdk', Glob('*.c'))
-env.Requires(dpdk_vrouter, dpdk_lib)
+dpdk_objs = env.Object(Glob('*.c'))
+dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_objs)
+env.Requires(dpdk_objs, dpdk_lib)
 
 # to make sure that all are built when you do 'scons' @ the top level
 env.Default(dpdk_vrouter)
