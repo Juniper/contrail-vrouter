@@ -350,7 +350,7 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     /* Update ICMP header and options */
     icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD;
-    icmph->icmp_eid = htons(0x4000);
+    icmph->icmp_eid = htons(0xc000);
 
     /* length in units of 8 octets */
     nopt->vno_type = TARGET_LINK_LAYER_ADDRESS_OPTION;
