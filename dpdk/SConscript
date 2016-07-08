@@ -58,8 +58,9 @@ dpdk_vrouter_src = [ 'dpdk_vrouter.c',
                      'vr_uvhost_client.c'
                    ]
 
-dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_vrouter_src)
-env.Requires(dpdk_vrouter, dpdk_lib)
+dpdk_vrouter_objs = env.Object(dpdk_vrouter_src)
+dpdk_vrouter = env.Program('contrail-vrouter-dpdk', dpdk_vrouter_objs)
+env.Requires(dpdk_vrouter_objs, dpdk_lib)
 
 if GetOption('clean'):
     os.system('cd ' + make_dir + ';' + make_cmd + ' clean')
