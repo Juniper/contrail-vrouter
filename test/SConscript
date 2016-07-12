@@ -18,8 +18,12 @@ env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 
 
 test_dep_srcs = ['common_test.c']
 
-dp_core_test = VRouterEnv.MakeTestCmd(env, 'dp_core_test', vrouter_suite, test_dep_srcs)
+# dp_core_test = VRouterEnv.MakeTestCmd(env, 'dp_core_test', vrouter_suite, test_dep_srcs)
 
 test = env.TestSuite('vrouter-test', vrouter_suite)
 env.Alias('vrouter:test', test)
 Return('vrouter_suite')
+
+# Local Variables:
+# mode: python
+# End:
