@@ -1,0 +1,8 @@
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Code-Review+2: ted ghose <rintu@hotmail.com>
+Approved+1: Karl Klashinsky <klash@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Thu, 14 Jul 2016 11:37:34 -0700
+Reviewed-on: https://review.opencontrail.org/21922
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/R2.20
