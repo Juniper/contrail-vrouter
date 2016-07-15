@@ -6,6 +6,7 @@ import subprocess
 import sys
 import os
 import copy
+import re
 
 AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
           help='Linux kernel source directory for vrouter.ko')
@@ -53,6 +54,38 @@ if sys.platform.startswith('freebsd'):
     make_dir = make_dir + '/freebsd'
     env['ENV']['MAKEOBJDIR'] = make_dir
 
+# XXX Temporary/transitional support for Ubuntu14.04.4 w/ kernel v4.*
+#
+# The logic here has to handle two different invocation models:
+# default 'scons' build model; and build via packager.py build. The
+# first is typical for unit-test builds.
+#
+# The second comes via:
+# - common/debian/Makefile in contrail-packaging, which invokes:
+# - debian/contrail/debian/rules.modules in contrail-packages
+# This approach always uses --kernel-dir, which works for vrouter, but
+# libdpdk still defaults to installed version and thus will fail.
+#
+default_kernel_ver = shellCommand("uname -r").strip()
+kernel_build_dir = None
+if re.search('^4\.', default_kernel_ver):
+    print "Warn: kernel version %s not supported for vrouter and dpdk" % default_kernel_ver
+    kernel_build_dir = '/lib/modules/3.13.0-85-generic/build'
+    if os.path.isdir(kernel_build_dir):
+        default_kernel_ver = "3.13.0-85-generic"
+        print "info: vrouter and dpdk will be built against kernel version %s" % default_kernel_ver
+    else:
+        print "*** Error: Cannot find kernel v3.13.0-85, build of vrouter will likely fail"
+        kernel_build_dir = '/lib/modules/%s/build' % default_kernel_ver
+
+kernel_dir = GetOption('kernel-dir')
+if kernel_dir:
+    kern_version = shellCommand('cat %s/include/config/kernel.release' % kernel_dir)
+else:
+    kern_version = default_kernel_ver
+    if kernel_build_dir: kernel_dir = kernel_build_dir
+kern_version = kern_version.strip()
+
 if sys.platform != 'darwin':
 
     install_root = GetOption('install_root')
@@ -76,13 +109,12 @@ if sys.platform != 'darwin':
 
     for sdir in  subdirs:
         env.SConscript(sdir + '/SConscript',
-                       exports='VRouterEnv',
+                       exports=['VRouterEnv','kernel_build_dir'],
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
     make_cmd = 'cd ' + make_dir + ' && make'
-    if GetOption('kernel-dir'):
-        make_cmd += ' KERNELDIR=' + GetOption('kernel-dir')
+    if kernel_dir: make_cmd += ' KERNELDIR=' + kernel_dir
     make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
     make_cmd += ' SANDESH_SRC_ROOT=' + '../build/kbuild/'
     make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#tools/').abspath
@@ -118,13 +150,6 @@ if sys.platform != 'darwin':
     if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
         os.system(make_cmd + ' clean')
 
-    if GetOption('kernel-dir'):
-        kern_version = shellCommand(
-            'cat %s/include/config/kernel.release' % GetOption('kernel-dir'))
-    else:
-        kern_version = shellCommand('uname -r')
-
-    kern_version = kern_version.strip()
     libmod_dir = install_root
     libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
     env.Alias('build-kmodule', env.Install(libmod_dir, kern))
