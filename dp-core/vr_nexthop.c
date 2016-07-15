@@ -1916,7 +1916,6 @@ int
 nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
-    struct vr_nexthop *src_nh = NULL;
     bool need_flow_lookup = false;
 
     if (!pkt->vp_ttl) {
@@ -1950,13 +1949,6 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
              if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
                  need_flow_lookup = true;
-             } else if ((nh->nh_family == AF_INET) &&
-                     (!(nh->nh_flags & NH_FLAG_VNID))) {
-                 src_nh = vr_inet_src_lookup(fmd->fmd_dvrf, pkt);
-                 if (src_nh && src_nh->nh_type == NH_COMPOSITE &&
-                            src_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP) {
-                     need_flow_lookup = true;
-                 }
              }
 
              if (need_flow_lookup) {
