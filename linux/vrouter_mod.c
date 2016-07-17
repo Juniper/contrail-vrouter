@@ -224,7 +224,9 @@ lh_palloc_head(struct vr_packet *pkt, unsigned int size)
     npkt->vp_type = pkt->vp_type;
 
     skb_frag_list_init(skb_head);
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4,4,0))
     skb_frag_add_head(skb_head, skb);
+#endif
     skb_head->len += skb->len;
     skb_head->data_len = skb->len;
     skb_head->protocol = skb->protocol;
