@@ -866,6 +866,7 @@ Usage(void)
         "                         (ex: --"SOCKET_MEM_OPT" 256,256)\n"
         "\n"
         "    --"VLAN_TCI_OPT" TCI             VLAN tag control information to use\n"
+        "                                     It may be a value between 0 and 4095\n"
         "    --"VLAN_NAME_OPT" NAME  VLAN forwarding interface name\n"
         "\n"
         "    --"BRIDGE_ENTRIES_OPT" NUM   Bridge table limit\n"
@@ -923,10 +924,12 @@ parse_long_opts(int opt_flow_index, char *optarg)
      * vr_dpdk_lcore_vroute(), dpdk_vlan_forwarding_if_add().
      */
     case VLAN_TCI_OPT_INDEX:
-        vr_dpdk.vlan_tag = (uint16_t)strtol(optarg, NULL, 0);
+        vr_dpdk.vlan_tag = (uint16_t)strtoul(optarg, NULL, 0);
         if (errno != 0) {
             vr_dpdk.vlan_tag = VLAN_ID_INVALID;
         }
+        if (vr_dpdk.vlan_tag > 4095)
+            Usage();
         break;
 
     case VTEST_VLAN_OPT_INDEX:

@@ -690,8 +690,8 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
             } else {
                 /* Clear the VLAN flag for the case when the received packet
                  * belongs to vRouter's VLAN. This resembles the kernel vRouter
-                 * behaviour, in which case a separate vlanX interface (that
-                 * the vRouter is binded to) strips the tag and vRouter gets
+                 * behavior, in which case a separate vlanX interface (that
+                 * the vRouter is bound to) strips the tag and vRouter gets
                  * clean ethernet frames from fabric interface. If we did not
                  * do this, the VLAN tag would be passed to dp-core processing
                  * and vhost connectivity would be corrupted. */

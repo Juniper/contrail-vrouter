@@ -1249,13 +1249,14 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * see dpdk_vrouter.c. If vRouter is not supposed to work in VLAN
      * (parameter was not specified), packets should not be tagged.
      *
-     * --vtest_vlan parameter changes behaviour - vRouter inject packets for
+     * --vtest_vlan parameter changes behavior - vRouter injects packets for
      *  non fabric interfaces too (Emulates physical interface for some vlan test cases).
      *
      */
-    if ((unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif))
-         || vr_dpdk.vtest_vlan)) {
-        m->vlan_tci = vr_dpdk.vlan_tag;
+    if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vif_is_fabric(vif)) ||
+                    vr_dpdk.vtest_vlan) {
+        /* set 3 PCP bits and 12 VLAN ID bits */
+        m->vlan_tci = (pkt->vp_priority << 13 | vr_dpdk.vlan_tag);
         if (unlikely((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0)) {
             /* Software VLAN TCI insert. */
             if (unlikely(pkt_push(pkt, sizeof(struct vlan_hdr)) == NULL)) {
