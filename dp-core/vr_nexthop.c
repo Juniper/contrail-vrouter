@@ -612,7 +612,7 @@ static struct vr_nexthop *
 nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
 {
-    int ret;
+    int ret, ecmp_index;
     unsigned int hash, hash_ecmp, count;
 
     struct vr_flow flow;
@@ -640,11 +640,18 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     hash = hash_ecmp = vr_hash(&flow, flow.flow_key_len, 0);
     hash %= count;
-    cnh = cnhp[hash].cnh;
-    if (!cnh && nh->nh_component_ecmp_cnt) {
-        hash_ecmp %= nh->nh_component_ecmp_cnt;
-        cnh = cnhp_ecmp[hash_ecmp].cnh;
+    ecmp_index = hash;
+    cnh = cnhp[ecmp_index].cnh;
+    if (!cnh) {
+        if (nh->nh_component_ecmp_cnt) {
+            hash_ecmp %= nh->nh_component_ecmp_cnt;
+            ecmp_index = hash_ecmp;
+            cnh = cnhp_ecmp[ecmp_index].cnh;
+        }
     }
+
+    if (cnh)
+        fmd->fmd_ecmp_nh_index = ecmp_index;
 
     return cnh;
 }
