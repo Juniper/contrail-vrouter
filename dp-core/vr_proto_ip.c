@@ -868,8 +868,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
                 return -1;
             }
 
-            sport = flow_p->flow4_sport;
-            dport = flow_p->flow4_dport;
+            return 0;
         } else if (vr_icmp_echo(icmph)) {
             sport = icmph->icmp_eid;
             dport = VR_ICMP_TYPE_ECHO_REPLY;
