@@ -612,14 +612,13 @@ static struct vr_nexthop *
 nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
 {
-    int ret;
+    int ret, ecmp_index;
     unsigned int hash, hash_ecmp, count;
 
     struct vr_flow flow;
     struct vr_ip6 *ip6;
     struct vr_nexthop *cnh = NULL;
     struct vr_component_nh *cnhp = nh->nh_component_nh;
-    struct vr_component_nh *cnhp_ecmp = nh->nh_component_ecmp;
 
     if (!(count = nh->nh_component_cnt))
         return NULL;
@@ -640,11 +639,19 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     hash = hash_ecmp = vr_hash(&flow, flow.flow_key_len, 0);
     hash %= count;
+    ecmp_index = cnhp[hash].cnh_ecmp_index;
     cnh = cnhp[hash].cnh;
-    if (!cnh && nh->nh_component_ecmp_cnt) {
-        hash_ecmp %= nh->nh_component_ecmp_cnt;
-        cnh = cnhp_ecmp[hash_ecmp].cnh;
+    if (!cnh) {
+        if (nh->nh_component_ecmp_cnt) {
+            cnhp = nh->nh_component_ecmp;
+            hash_ecmp %= nh->nh_component_ecmp_cnt;
+            ecmp_index = cnhp[hash_ecmp].cnh_ecmp_index;
+            cnh = cnhp[hash_ecmp].cnh;
+        }
     }
+
+    if (cnh)
+        fmd->fmd_ecmp_nh_index = ecmp_index;
 
     return cnh;
 }
@@ -2294,12 +2301,20 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     if (!nh->nh_component_nh) {
         return -ENOMEM;
     }
+
     for (i = 0; i < req->nhr_nh_list_size; i++) {
         nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid,
                                                     req->nhr_nh_list[i]);
         nh->nh_component_nh[i].cnh_label = req->nhr_label_list[i];
         if (nh->nh_component_nh[i].cnh)
             active++;
+
+        if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
+            nh->nh_component_nh[i].cnh_ecmp_index = i;
+        } else {
+            nh->nh_component_nh[i].cnh_ecmp_index = -1;
+        }
+
     }
     nh->nh_component_cnt = req->nhr_nh_list_size;
 
@@ -2324,6 +2339,8 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
                 if (nh->nh_component_nh[i].cnh) {
                     memcpy(&nh->nh_component_ecmp[j++], &nh->nh_component_nh[i],
                             sizeof(struct vr_component_nh));
+                    /* this happens implicitly */
+                    /* nh->nh_component_ecmp[j++].cnh_ecmp_index = i */
                 }
             }
             nh->nh_component_ecmp_cnt = j;
