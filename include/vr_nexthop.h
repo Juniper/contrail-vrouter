@@ -70,6 +70,7 @@ struct vr_forwarding_md;
 
 struct vr_component_nh {
     int cnh_label;
+    int cnh_ecmp_index;
     struct vr_nexthop *cnh;
 };
 
