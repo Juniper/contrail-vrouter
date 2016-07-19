@@ -80,4 +80,13 @@ struct vr_list_head {
         struct vr_list_node *node_p;
 };
 
+/*
+ * ECMP hash fields for routes pointing to ECMP composite NH
+ */
+#define ECMP_HASH_FIELD_SOURCE_IP           0x00001
+#define ECMP_HASH_FIELD_DESTINATION_IP      0x00002
+#define ECMP_HASH_FIELD_PROTOCOL            0x00004
+#define ECMP_HASH_FIELD_SOURCE_PORT         0x00008
+#define ECMP_HASH_FIELD_DESTINATION_PORT    0x00010
+
 #endif /* __VR_DEFS_H__ */

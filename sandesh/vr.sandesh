@@ -131,6 +131,7 @@ buffer sandesh vr_route_req {
    12:  list<byte>  rtr_mac;
    13:  i32         rtr_replace_plen;
    14:  i32         rtr_index;
+   15:  byte        rtr_ecmp_hash_fields;
 }
 
 buffer sandesh vr_mpls_req {
