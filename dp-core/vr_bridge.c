@@ -478,15 +478,20 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             vr_pfree(pkt, VP_DROP_PULL);
             return 0;
         }
-    }
 
-    if (fmd->fmd_dscp < 0) {
-        if (pkt->vp_type == VP_TYPE_IP) {
-            fmd->fmd_dscp =
-                vr_inet_get_tos((struct vr_ip *)pkt_network_header(pkt));
-        } else if (pkt->vp_type == VP_TYPE_IP6) {
-            fmd->fmd_dscp =
-                vr_inet6_get_tos((struct vr_ip6 *)pkt_network_header(pkt));
+        if (fmd->fmd_dscp < 0) {
+            if (pkt->vp_type == VP_TYPE_IP) {
+                fmd->fmd_dscp =
+                    vr_inet_get_tos((struct vr_ip *)pkt_network_header(pkt));
+            } else if (pkt->vp_type == VP_TYPE_IP6) {
+                fmd->fmd_dscp =
+                    vr_inet6_get_tos((struct vr_ip6 *)pkt_network_header(pkt));
+            }
+        }
+
+    } else {
+        if (fmd->fmd_dotonep < 0) {
+            fmd->fmd_dotonep = vr_vlan_get_tos(pkt_data(pkt));
         }
     }
 

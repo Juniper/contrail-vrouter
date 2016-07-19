@@ -793,8 +793,9 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
     skb_reset_mac_header(skb);
-    skb->queue_mapping = pkt->vp_queue;
-    skb->priority = pkt->vp_priority;
+    /* skb->queue_mapping = pkt->vp_queue; */
+    if (pkt->vp_priority != VP_PRIORITY_INVALID)
+        skb->priority = pkt->vp_priority;
 
     /*
      * Set the network header and trasport header of skb only if the type is
@@ -923,7 +924,7 @@ linux_get_packet(struct sk_buff *skb, struct vr_interface *vif)
     pkt->vp_ttl = 64;
     pkt->vp_type = VP_TYPE_NULL;
     pkt->vp_queue = 0;
-    pkt->vp_priority = 0;
+    pkt->vp_priority = VP_PRIORITY_INVALID;
 
     return pkt;
 

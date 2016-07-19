@@ -742,7 +742,7 @@ struct vr_forwarding_class_qos *
 vr_qos_get_forwarding_class(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    uint8_t tos;
+    int8_t tos;
     int16_t qos_id = -1;
     unsigned int fc_id;
 
@@ -764,7 +764,14 @@ vr_qos_get_forwarding_class(struct vrouter *router, struct vr_packet *pkt,
         if (!fc_p)
             return NULL;
 
-        tos = fmd->fmd_dscp;
+        if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6) {
+            tos = fmd->fmd_dscp;
+        } else {
+            tos = fmd->fmd_dotonep;
+            if (tos >= 0)
+                tos += VR_DSCP_QOS_ENTRIES + VR_MPLS_QOS_ENTRIES;
+        }
+
         if (tos >= 0) {
             fc_id = fc_p[tos].vfc_id;
             fc_p = vr_fc_map_get_fc(router, fc_id);

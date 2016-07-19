@@ -234,7 +234,8 @@ struct vr_packet_node {
     uint32_t pl_label;
     uint32_t pl_vif_idx;
     uint16_t pl_flags;
-    int16_t pl_dscp;
+    int8_t pl_dscp;
+    int8_t pl_dotonep;
     uint32_t pl_vrf;
     int32_t pl_vlan;
 };
