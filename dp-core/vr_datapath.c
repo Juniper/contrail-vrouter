@@ -561,6 +561,10 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
     fmd.fmd_dvrf = vrf;
+    if (pkt->vp_priority != VP_PRIORITY_INVALID) {
+        fmd.fmd_dotonep = pkt->vp_priority;
+        pkt->vp_priority = VP_PRIORITY_INVALID;
+    }
 
     if (vr_pkt_type(pkt, 0, &fmd) < 0) {
         vif_drop_pkt(vif, pkt, 1);
@@ -686,6 +690,7 @@ vr_untag_pkt(struct vr_packet *pkt)
 int
 vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
 {
+    uint8_t priority = 0;
     struct vr_eth *new_eth, *eth;
     unsigned short *vlan_tag;
 
@@ -700,7 +705,10 @@ vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
     memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
     new_eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
     vlan_tag = (unsigned short *)(new_eth + 1);
-    *vlan_tag = htons((pkt->vp_priority << VR_VLAN_PRIORITY_SHIFT) | vlan_id);
+    if (pkt->vp_priority != VP_PRIORITY_INVALID)
+        priority = pkt->vp_priority;
+
+    *vlan_tag = htons((priority << VR_VLAN_PRIORITY_SHIFT) | vlan_id);
     return 0;
 }
 
@@ -713,9 +721,10 @@ vr_vlan_set_priority(struct vr_packet *pkt)
     eth = (struct vr_eth *)pkt_data(pkt);
     if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN)) {
         vlan = (struct vr_vlan_hdr *)(eth + 1);
-        vlan->vlan_tag |= htons((pkt->vp_priority << VR_VLAN_PRIORITY_SHIFT));
-    } else {
-        vr_tag_pkt(pkt, 0);
+        if (pkt->vp_priority != VP_PRIORITY_INVALID) {
+            vlan->vlan_tag |=
+                htons((pkt->vp_priority << VR_VLAN_PRIORITY_SHIFT));
+        }
     }
 
     return;
