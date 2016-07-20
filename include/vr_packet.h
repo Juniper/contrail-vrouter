@@ -329,11 +329,12 @@ vr_grat_arp(struct vr_arp *sarp)
     return false;
 }
 
-#define VR_IP_DF    (0x1 << 14)
-#define VR_IP_MF    (0x1 << 13)
-#define VR_IP_FRAG_OFFSET_MASK (VR_IP_MF - 1)
+#define VR_IP_DF                (0x1 << 14)
+#define VR_IP_MF                (0x1 << 13)
+#define VR_IP_FRAG_OFFSET_MASK  (VR_IP_MF - 1)
+#define VR_IP_DSCP(val)         ((val) << 2)
 
-#define VR_IP_ADDRESS_LEN   4
+#define VR_IP_ADDRESS_LEN       4
 
 struct vr_ip {
 #if defined(__KERNEL__) && defined(__linux__)
@@ -408,7 +409,7 @@ vr_ip_incremental_csum(struct vr_ip *ip, unsigned int diff)
 static inline uint8_t
 vr_inet_get_tos(struct vr_ip *iph)
 {
-    return iph->ip_tos & 0x3F;
+    return (iph->ip_tos & 0xFC) >> 2;
 }
 
 static inline void

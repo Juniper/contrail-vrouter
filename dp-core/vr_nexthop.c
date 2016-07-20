@@ -396,7 +396,7 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
     ip->ip_version = 4;
     ip->ip_hl = 5;
     if (qos) {
-        ip->ip_tos = qos->vfcq_dscp;
+        ip->ip_tos = VR_IP_DSCP(qos->vfcq_dscp);
         pkt->vp_queue = qos->vfcq_queue_id + 1;
         pkt->vp_priority = qos->vfcq_dotonep_qos;
     } else {
@@ -1869,7 +1869,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     ip->ip_version = 4;
     ip->ip_hl = 5;
     if (qos) {
-        ip->ip_tos = qos->vfcq_dscp;
+        ip->ip_tos = VR_IP_DSCP(qos->vfcq_dscp);
         pkt->vp_queue = qos->vfcq_queue_id + 1;
         pkt->vp_priority = qos->vfcq_dotonep_qos;
     } else {
@@ -1998,7 +1998,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (qos) {
             if (pkt->vp_type == VP_TYPE_IP) {
                 vr_inet_set_tos((struct vr_ip *)pkt_network_header(pkt),
-                        qos->vfcq_dscp);
+                        VR_IP_DSCP(qos->vfcq_dscp));
             } else if (pkt->vp_type == VP_TYPE_IP6) {
                 vr_inet6_set_tos((struct vr_ip6 *)pkt_network_header(pkt),
                         qos->vfcq_dscp);
@@ -2066,7 +2066,7 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
     } else if (vr_ip_is_ip4(ip)) {
         pkt->vp_type = VP_TYPE_IP;
         if (qos)
-            vr_inet_set_tos(ip, qos->vfcq_dscp);
+            vr_inet_set_tos(ip, VR_IP_DSCP(qos->vfcq_dscp));
     } else {
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
         return 0;
