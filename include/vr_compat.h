@@ -112,6 +112,17 @@ static inline void skb_frag_size_sub(skb_frag_t *frag, int delta)
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
+#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
+           (RHEL_MAJOR == 6) && (RHEL_MINOR >= 7)))
+#define LINUX_RX_HANDLER_DEFINED 0
+#else
+#define LINUX_RX_HANDLER_DEFINED 1
+#endif
+#else
+#define LINUX_RX_HANDLER_DEFINED 1
+#endif
+
+#if (LINUX_RX_HANDLER_DEFINED == 0)
 enum rx_handler_result {
     RX_HANDLER_CONSUMED,
     RX_HANDLER_ANOTHER,
@@ -120,6 +131,29 @@ enum rx_handler_result {
 };
 
 typedef enum rx_handler_result rx_handler_result_t;
+
+#else
+
+static inline void *vr_get_rx_handler_data(struct net_device *dev)
+{
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+    return rcu_dereference(netdev_extended(dev)->rx_handler_data);
+#else
+    return rcu_dereference(dev->rx_handler_data);
+#endif
+}
+
+static inline void *vr_get_rx_handler(struct net_device *dev)
+{
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+    return rcu_dereference(netdev_extended(dev)->rx_handler);
+#else
+    return rcu_dereference(dev->rx_handler);
+#endif
+}
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 
 #define VLAN_CFI_MASK       0x1000
 #define VLAN_TAG_PRESENT    VLAN_CFI_MASK

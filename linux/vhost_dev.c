@@ -21,6 +21,7 @@
 #include "vr_interface.h"
 #include "vrouter.h"
 #include "vhost.h"
+#include "vr_compat.h"
 
 /*
  * When agent dies, cross connect logic would need the list of vhost
@@ -34,7 +35,7 @@ extern struct vr_interface vr_reset_interface;
 
 extern int linux_to_vr(struct vr_interface *, struct sk_buff *);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
 extern rx_handler_result_t linux_rx_handler(struct sk_buff **);
 #endif
 
@@ -113,7 +114,7 @@ vhost_dev_set_mac_address(struct net_device *dev, void *addr)
     return 0;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
 /*
  * this handler comes into play only for a brief moment: when the agent resets
  * vrouter, a process in which all the vifs are removed, this rx handler is
@@ -126,7 +127,7 @@ vhost_rx_handler(struct sk_buff **pskb)
     struct net_device *vdev;
     struct sk_buff *skb = *pskb;
 
-    vdev = rcu_dereference(skb->dev->rx_handler_data);
+    vdev = vr_get_rx_handler_data(skb->dev);
     if (!vdev) {
         kfree_skb(*pskb);
         return RX_HANDLER_CONSUMED;
@@ -149,8 +150,8 @@ vhost_rx_handler(struct sk_buff **pskb)
 void
 vhost_del_tap_phys(struct net_device *pdev)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
-    if (rcu_dereference(pdev->rx_handler) == vhost_rx_handler)
+#if (LINUX_RX_HANDLER_DEFINED == 1)
+    if (vr_get_rx_handler(pdev) == vhost_rx_handler)
         netdev_rx_handler_unregister(pdev);
 #else
     vr_set_vif_ptr(pdev, NULL);
@@ -182,16 +183,16 @@ vhost_tap_phys(struct net_device *vdev, struct net_device *pdev)
     if (vp->vp_vifp)
         goto exit_tap_phys;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
     /*
      * it can so happen (unlikely) that vhost is deleted from vrouter
      * before the physical, in which case we will have to unregister
      * the rx handler in physical and install the vhost_rx_handler
      */
-    if (rcu_dereference(pdev->rx_handler) == linux_rx_handler)
+    if (vr_get_rx_handler(pdev) == linux_rx_handler)
         netdev_rx_handler_unregister(pdev);
 
-    if (!rcu_dereference(pdev->rx_handler))
+    if (!vr_get_rx_handler(pdev))
         netdev_rx_handler_register(pdev, vhost_rx_handler, (void *)vdev);
 
 #else

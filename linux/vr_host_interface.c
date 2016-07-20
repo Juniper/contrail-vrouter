@@ -50,7 +50,7 @@ static int linux_xmit_segments(struct vr_interface *, struct sk_buff *,
         unsigned short);
 static rx_handler_result_t pkt_rps_dev_rx_handler(struct sk_buff **pskb);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
 extern rx_handler_result_t vhost_rx_handler(struct sk_buff **);
 #else
 struct vr_interface vr_reset_interface;
@@ -1054,7 +1054,7 @@ pull_fail:
     return -1;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
 rx_handler_result_t
 linux_rx_handler(struct sk_buff **pskb)
 {
@@ -1085,7 +1085,7 @@ linux_rx_handler(struct sk_buff **pskb)
                   ((vr_rps_t *)skb->cb)->vif_idx);
         if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL) && vif->vif_os) {
             dev = (struct net_device *)vif->vif_os;
-            if (!dev || (vif != rcu_dereference(dev->rx_handler_data)))
+            if (!dev || (vif != vr_get_rx_handler_data(dev)))
                 goto error;
             rpsdev = 1;
         } else {
@@ -1093,7 +1093,7 @@ linux_rx_handler(struct sk_buff **pskb)
         }
     }
 
-    vif = rcu_dereference(dev->rx_handler_data);
+    vif = vr_get_rx_handler_data(dev);
 
     if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
         return RX_HANDLER_PASS;
@@ -1446,7 +1446,7 @@ vr_interface_ovs_hook(struct sk_buff *skb)
  * whether 'rtnl' was indeed locked before trying to acquire the lock
  * and unlock iff we locked it in the first place.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
 static int
 linux_if_del_tap(struct vr_interface *vif)
 {
@@ -1459,7 +1459,7 @@ linux_if_del_tap(struct vr_interface *vif)
     if (!dev)
         return -EINVAL;
 
-    if (rcu_dereference(dev->rx_handler) == linux_rx_handler)
+    if (vr_get_rx_handler(dev) == linux_rx_handler)
         netdev_rx_handler_unregister(dev);
 
     return 0;
@@ -1490,7 +1490,7 @@ linux_if_del_tap(struct vr_interface *vif)
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
 static int
 linux_if_add_tap(struct vr_interface *vif)
 {
@@ -1508,7 +1508,7 @@ linux_if_add_tap(struct vr_interface *vif)
 
     if ((vif->vif_type == VIF_TYPE_PHYSICAL) &&
             (vif->vif_flags & VIF_FLAG_VHOST_PHYS)) {
-        if (rcu_dereference(dev->rx_handler) == vhost_rx_handler) {
+        if (vr_get_rx_handler(dev) == vhost_rx_handler) {
             netdev_rx_handler_unregister(dev);
         }
     }
@@ -1741,7 +1741,7 @@ linux_pkt_dev_free_helper(struct net_device **dev)
 static void
 linux_pkt_dev_free(void)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 0)
     if (pkt_gro_dev) {
         vr_set_vif_ptr(pkt_gro_dev, NULL);
     }
@@ -1851,7 +1851,7 @@ linux_pkt_dev_init(char *name, void (*setup)(struct net_device *),
     if ((err = register_netdevice(pdev))) {
         vr_module_error(err, __FUNCTION__, __LINE__, 0);
     } else {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 1)
         if ((err = netdev_rx_handler_register(pdev,
                                               handler, NULL))) {
             vr_module_error(err, __FUNCTION__, __LINE__, 0);
@@ -2107,7 +2107,7 @@ pkt_rps_dev_rx_handler(struct sk_buff **pskb)
     bool l2_pkt = true;
 
     if (vr_perfr3) {
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
+#if (LINUX_RX_HANDLER_DEFINED == 0)
         ASSERT(0);
 #else
         return linux_rx_handler(&skb);
@@ -2344,7 +2344,7 @@ vr_host_interface_exit(void)
     vhost_exit();
     linux_pkt_dev_free();
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 0)
     if (vr_use_linux_br) {
         br_handle_frame_hook = NULL;
     } else {
@@ -2401,7 +2401,7 @@ vr_host_interface_init(void)
     if (ret)
         return NULL;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
+#if (LINUX_RX_HANDLER_DEFINED == 0)
     if (vr_use_linux_br) {
         br_handle_frame_hook = vr_interface_bridge_hook;
     } else {
