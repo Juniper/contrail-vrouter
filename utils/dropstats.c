@@ -77,6 +77,8 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_flow_queue_limit_exceeded);
     printf("New Flow Drops                %" PRIu64 "\n",
             stats->vds_drop_new_flow);
+    printf("Flow Unusable (Eviction)      %" PRIu64 "\n",
+            stats->vds_flow_evict);
     printf("\n");
 
     printf("Discards                      %" PRIu64 "\n",

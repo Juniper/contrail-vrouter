@@ -34,6 +34,7 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_flow_action_drop += stats->vds_flow_action_drop;
     response->vds_flow_action_invalid += stats->vds_flow_action_invalid;
     response->vds_flow_unusable += stats->vds_flow_unusable;
+    response->vds_flow_evict += stats->vds_flow_evict;
     response->vds_flow_table_full += stats->vds_flow_table_full;
     response->vds_interface_tx_discard += stats->vds_interface_tx_discard;
     response->vds_interface_drop += stats->vds_interface_drop;
