@@ -708,7 +708,7 @@ vr_send_mirror_delete(struct nl_client *cl, unsigned int router_id,
 int
 vr_send_mirror_add(struct nl_client *cl, unsigned int router_id,
         unsigned int mirror_index, int mirror_nh_index,
-        unsigned int mirror_flags)
+        unsigned int mirror_flags, int vni_id)
 {
     vr_mirror_req req;
 
@@ -719,6 +719,7 @@ vr_send_mirror_add(struct nl_client *cl, unsigned int router_id,
     req.mirr_index = mirror_index;
     req.mirr_nhid = mirror_nh_index;
     req.mirr_flags = mirror_flags;
+    req.mirr_vni = vni_id;
 
     return vr_sendmsg(cl, &req, "vr_mirror_req");
 }

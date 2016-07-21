@@ -144,7 +144,7 @@ extern int vr_send_mirror_get(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_mirror_delete(struct nl_client *,
         unsigned int, unsigned int);
 extern int vr_send_mirror_add(struct nl_client *, unsigned int,
-        unsigned int, int, unsigned int);
+        unsigned int, int, unsigned int, int);
 extern void vr_mirror_req_destroy(vr_mirror_req *);
 extern vr_mirror_req *vr_mirror_get_req_copy(vr_mirror_req *);
 

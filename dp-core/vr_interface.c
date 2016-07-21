@@ -1110,7 +1110,8 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif->vif_flags & VIF_FLAG_MIRROR_TX) {
         vr_init_forwarding_md(&m_fmd);
         m_fmd.fmd_dvrf = vif->vif_vrf;
-        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &m_fmd);
+        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &m_fmd,
+                MIRROR_TYPE_PORT_TX);
     }
 
     ret = hif_ops->hif_tx(vif, pkt);
