@@ -574,7 +574,8 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     if (vif->vif_flags & VIF_FLAG_MIRROR_RX) {
         mfmd = fmd;
         mfmd.fmd_dvrf = vif->vif_vrf;
-        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd);
+        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd,
+                MIRROR_TYPE_PORT_RX);
     }
 
 

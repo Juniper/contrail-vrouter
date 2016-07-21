@@ -149,7 +149,7 @@ buffer sandesh vr_mirror_req {
     5: i32          mirr_users;
     6: i32          mirr_flags;
     7: i32          mirr_marker;
-    8: u32          mirr_vni;
+    8: i32          mirr_vni;
 }
 
 buffer sandesh vr_flow_req {

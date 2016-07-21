@@ -29,31 +29,34 @@ static int dump_marker = -1;
 
 static int create_set, delete_set, dump_set;
 static int get_set, nh_set, mirror_set;
-static int pcap_set, help_set, cmd_set;
+static int dynamic_set, help_set, cmd_set, vni_set;
 static int mirror_op = -1, mirror_nh;
-static int mirror_index = -1, mirror_flags;
+static int mirror_index = -1, mirror_flags, vni_id = -1;
 
 void
 vr_mirror_req_process(void *s_req)
 {
-   vr_mirror_req *req = (vr_mirror_req *)s_req;
-   char flags[12];
+    vr_mirror_req *req = (vr_mirror_req *)s_req;
+    char flags[12];
 
 
-   memset(flags, 0, sizeof(flags));
-   if (req->mirr_flags & VR_MIRROR_PCAP)
-       strcat(flags, "P");
-   if (req->mirr_flags & VR_MIRROR_FLAG_MARKED_DELETE)
-       strcat(flags, "Md");
+    memset(flags, 0, sizeof(flags));
+    if (req->mirr_flags & VR_MIRROR_FLAG_DYNAMIC)
+        strcat(flags, "D");
+    if (req->mirr_flags & VR_MIRROR_FLAG_MARKED_DELETE)
+        strcat(flags, "Md");
 
-   printf("%5d    %7d", req->mirr_index, req->mirr_nhid);
-   printf("    %4s", flags);
-   printf("    %10u\n", req->mirr_users);
+    printf("%5d    %7d", req->mirr_index, req->mirr_nhid);
+    printf("    %4s", flags);
+    printf("    %7u", req->mirr_users);
+    if (req->mirr_vni != -1)
+        printf("    %7d", req->mirr_vni);
+    printf("\n");
 
-   if (mirror_op == SANDESH_OP_DUMP)
-       dump_marker = req->mirr_index;
+    if (mirror_op == SANDESH_OP_DUMP)
+        dump_marker = req->mirr_index;
 
-   return;
+    return;
 }
 
 void
@@ -73,7 +76,7 @@ op_retry:
     switch (mirror_op) {
     case SANDESH_OP_ADD:
         ret = vr_send_mirror_add(cl, 0, mirror_index,
-                mirror_nh, mirror_flags);
+                mirror_nh, mirror_flags, vni_id);
         break;
 
     case SANDESH_OP_DELETE:
@@ -115,7 +118,8 @@ enum opt_mirror_index {
     GET_OPT_INDEX,
     HELP_OPT_INDEX,
     NEXTHOP_OPT_INDEX,
-    PCAP_OPT_INDEX,
+    DYNAMIC_OPT_INDEX,
+    VNI_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -127,14 +131,15 @@ static struct option long_options[] = {
     [GET_OPT_INDEX]         =       {"get",     required_argument,  &get_set,       1},
     [HELP_OPT_INDEX]        =       {"help",    no_argument,        &help_set,      1},
     [NEXTHOP_OPT_INDEX]     =       {"nh",      required_argument,  &nh_set,        1},
-    [PCAP_OPT_INDEX]        =       {"pcap",    no_argument,        &pcap_set,      1},
+    [DYNAMIC_OPT_INDEX]     =       {"dyn",     no_argument,        &dynamic_set,   1},
+    [VNI_OPT_INDEX]         =       {"vni",     required_argument,  &vni_set,       1},
     [MAX_OPT_INDEX]         =       { NULL,     0,                  0,              0},
 };
 
 static void
 usage_internal()
 {
-    printf("Usage:      mirror --create <index> --nh <nh index> <--pcap>\n");
+    printf("Usage:      mirror --create <index> --nh <nh index> --vni <vxlan id> --dyn\n");
     printf("            mirror --delete <index>\n");
     printf("\n");
     printf("--create    Create a mirror entry for <index> with nexthop set to <nh index>\n");
@@ -203,8 +208,14 @@ parse_long_opts(int opt_index, char *opt_arg)
             usage_internal();
         break;
 
-    case PCAP_OPT_INDEX:
-        mirror_flags = VR_MIRROR_PCAP;
+    case DYNAMIC_OPT_INDEX:
+        mirror_flags = VR_MIRROR_FLAG_DYNAMIC;
+        break;
+
+    case VNI_OPT_INDEX:
+        vni_id = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            usage_internal();
         break;
 
     default:
@@ -300,8 +311,9 @@ int main(int argc, char *argv[])
     if ((mirror_op == SANDESH_OP_DUMP) ||
             (mirror_op == SANDESH_OP_GET)) {
         printf("Mirror Table\n\n");
-        printf("Index    NextHop    Flags    References\n");
-        printf("---------------------------------------\n");
+        printf("Flags:D=Dynamic Mirroring, Dm:Delete Marked\n\n");
+        printf("Index    NextHop    Flags    References      VNI\n");
+        printf("------------------------------------------------\n");
     }
 
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
