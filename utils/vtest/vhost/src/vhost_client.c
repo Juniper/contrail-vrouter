@@ -510,12 +510,10 @@ vhost_client_poll_client_rx(void *context, void *dst_buf, size_t *dst_buf_len) {
             (uint64_t *)dst_buf, dst_buf_len);
     if (virt_queue_ret_val == E_VIRT_QUEUE_OK) {
         virt_queue_process_used_rx_virt_queue(vhost_client->virtq_control, vq_id);
+        //TODO: Burst
+        virt_queue_put_rx_virt_queue(vhost_client->virtq_control,
+                vq_id, ETH_MAX_MTU);
     }
-
-    //TODO: Burst
-    virt_queue_put_rx_virt_queue(vhost_client->virtq_control,
-            vq_id, ETH_MAX_MTU);
-
 
     return map_ret_val_virt_queue_2_vhost_net(virt_queue_ret_val);
 }

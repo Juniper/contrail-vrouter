@@ -1,6 +1,2 @@
-
-The physical_vlan tests, expected pcaps are encapsulated to vlan 5.
-
-
-taskset 0x1 /usr/bin/contrail-vrouter-dpdk --no-daemon --socket-mem 1024 --vlan_tci 5 --vtest_vlan
-
+Packets in expected pcaps of physical_vlan* tests are tagged with VLAN 5.
+Corresponding .conf files override vRouter startup parameters to make it work in VLAN.

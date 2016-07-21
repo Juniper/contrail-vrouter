@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <test>
-    <test_name>SKIP: (unstable) MPLSoGRE - bridge</test_name>
+    <test_name>MPLSoGRE - bridge</test_name>
     <message>
         <vr_interface_req>
             <h_op>Add</h_op>

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <test>
-    <test_name>SKIP: (unstable) Communication between "VMs"</test_name>
+    <test_name>Communication between "VMs"</test_name>
     <message>
         <vr_interface_req>
             <h_op>Add</h_op>

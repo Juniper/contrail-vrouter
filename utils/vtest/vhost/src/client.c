@@ -107,6 +107,8 @@ client_connect_socket(Client *client) {
     struct sockaddr_un unix_socket;
     size_t addrlen = 0;
     struct stat unix_socket_stat;
+    unsigned int connect_retry = 0;
+
     if (!client->socket || strlen(client->socket_path) == 0) {
         fprintf(stderr, "%s(): Error connecting socket: no socket\n",
             __func__);
@@ -121,10 +123,18 @@ client_connect_socket(Client *client) {
     strncpy(unix_socket.sun_path, client->socket_path, sizeof(unix_socket.sun_path) - 1);
     addrlen = strlen(unix_socket.sun_path) + sizeof(AF_UNIX);
 
-    if (connect(client->socket, (struct sockaddr *)&unix_socket, addrlen)  == -1) {
-        fprintf(stderr, "%s(): Error connecting socket: %s (%d)\n",
-            __func__, strerror(errno), errno);
-        return E_CLIENT_ERR_CONN;
+    /**
+     * Sometimes we try to connect before vRouter creates socket.
+     * Try to connect couple of times before failing.
+     */
+
+    while (connect(client->socket, (struct sockaddr *)&unix_socket, addrlen)  == -1) {
+        sleep(3);
+        if (++connect_retry > 10) {
+            fprintf(stderr, "%s(): Error connecting socket: %s (%d)\n",
+                __func__, strerror(errno), errno);
+            return E_CLIENT_ERR_CONN;
+        }
     }
 
     return E_CLIENT_OK;
