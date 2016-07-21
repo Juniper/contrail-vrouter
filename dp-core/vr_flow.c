@@ -828,12 +828,14 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES) {
             mirror_fmd = *fmd;
             mirror_fmd.fmd_ecmp_nh_index = -1;
-            vr_mirror(router, fe->fe_mirror_id, pkt, &mirror_fmd);
+            vr_mirror(router, fe->fe_mirror_id, pkt, &mirror_fmd,
+                    MIRROR_TYPE_ACL);
         }
         if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES) {
             mirror_fmd = *fmd;
             mirror_fmd.fmd_ecmp_nh_index = -1;
-            vr_mirror(router, fe->fe_sec_mirror_id, pkt, &mirror_fmd);
+            vr_mirror(router, fe->fe_sec_mirror_id, pkt, &mirror_fmd,
+                    MIRROR_TYPE_ACL);
         }
     }
 
