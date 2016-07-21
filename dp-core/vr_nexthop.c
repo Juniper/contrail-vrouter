@@ -664,7 +664,6 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_nexthop *member_nh = NULL;
     struct vr_vrf_stats *stats;
 
-    pkt->vp_type = VP_TYPE_IP;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_ecmp_composites++;
