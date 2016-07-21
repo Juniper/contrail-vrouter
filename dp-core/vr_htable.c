@@ -650,15 +650,12 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
 
     if (!entry_size || !entries || !get_entry_key)
         return NULL;
-    /* Ceil to near upper number, which is dividable by VR_HENTRIES_PER_BUCKET. */
-    entries = ((entries + VR_HENTRIES_PER_BUCKET -1) / VR_HENTRIES_PER_BUCKET)
-               * VR_HENTRIES_PER_BUCKET;
 
     if (!bucket_size)
         bucket_size = VR_HENTRIES_PER_BUCKET;
 
-    if (entries % bucket_size)
-        entries = (entries + bucket_size) & ~bucket_size;
+    /* Ceil to near upper number, which is dividable by bucket_size */
+    entries = ((entries + bucket_size -1) / bucket_size) * bucket_size;
 
     table = vr_zalloc(sizeof(struct vr_htable), VR_HTABLE_OBJECT);
     if (!table) {
