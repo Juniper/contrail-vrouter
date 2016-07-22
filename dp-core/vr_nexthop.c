@@ -1998,20 +1998,27 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags &= ~VP_FLAG_GRO;
 
     vif = nh->nh_dev;
+    if (!vif) {
+        vr_pfree(pkt, VP_DROP_INVALID_IF);
+        return 0;
+    }
+
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
 
-    if (!(pkt->vp_flags & VP_FLAG_GROED)) {
-        qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-        if (qos) {
-            if (pkt->vp_type == VP_TYPE_IP) {
-                vr_inet_set_tos((struct vr_ip *)pkt_network_header(pkt),
-                        VR_IP_DSCP(qos->vfcq_dscp));
-            } else if (pkt->vp_type == VP_TYPE_IP6) {
-                vr_inet6_set_tos((struct vr_ip6 *)pkt_network_header(pkt),
-                        qos->vfcq_dscp);
+    if (vif_is_fabric(vif)) {
+        if (!(pkt->vp_flags & VP_FLAG_GROED)) {
+            qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+            if (qos) {
+                if (pkt->vp_type == VP_TYPE_IP) {
+                    vr_inet_set_tos((struct vr_ip *)pkt_network_header(pkt),
+                            VR_IP_DSCP(qos->vfcq_dscp));
+                } else if (pkt->vp_type == VP_TYPE_IP6) {
+                    vr_inet6_set_tos((struct vr_ip6 *)pkt_network_header(pkt),
+                            qos->vfcq_dscp);
+                }
+                pkt->vp_queue = qos->vfcq_queue_id + 1;
+                pkt->vp_priority = qos->vfcq_dotonep_qos;
             }
-            pkt->vp_queue = qos->vfcq_queue_id + 1;
-            pkt->vp_priority = qos->vfcq_dotonep_qos;
         }
     }
 
@@ -2057,11 +2064,18 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
 
     vif = nh->nh_dev;
-    if (!(pkt->vp_flags & VP_FLAG_GROED)) {
-        qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-        if (qos) {
-            pkt->vp_queue = qos->vfcq_queue_id;
-            pkt->vp_priority = qos->vfcq_dotonep_qos;
+    if (!vif) {
+        vr_pfree(pkt, VP_DROP_INVALID_IF);
+        return 0;
+    }
+
+    if (vif_is_fabric(vif)) {
+        if (!(pkt->vp_flags & VP_FLAG_GROED)) {
+            qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+            if (qos) {
+                pkt->vp_queue = qos->vfcq_queue_id;
+                pkt->vp_priority = qos->vfcq_dotonep_qos;
+            }
         }
     }
 
