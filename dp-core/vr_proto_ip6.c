@@ -195,8 +195,7 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
                 return -1;
             }
 
-            sport = flow_p->flow6_sport;
-            dport = flow_p->flow6_dport;
+            return 0;
         } else if ((icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REQ) ||
             (icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REPLY)) {
             sport = icmph->icmp_eid;
