@@ -358,8 +358,6 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     memcpy(ip6->ip6_dst, ip6->ip6_src, sizeof(ip6->ip6_src));
     memcpy(ip6->ip6_src, &icmph->icmp_data, sizeof(ip6->ip6_src));
-    /* Mimic a different source ip */
-    ip6->ip6_src[15] = 0xFF;
 
     /* Update ICMP header and options */
     icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD;
