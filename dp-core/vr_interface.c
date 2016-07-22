@@ -733,12 +733,17 @@ static int
 vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id __attribute__((unused)))
 {
+    int8_t tos;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
     pkt->vp_if = vif;
 
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
+
+    tos = vr_vlan_get_tos(pkt_data(pkt));
+    if (tos >= 0)
+        pkt->vp_priority = tos;
 
     if (vr_untag_pkt(pkt)) {
         stats->vis_ierrors++;

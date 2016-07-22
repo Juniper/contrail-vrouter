@@ -602,6 +602,7 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
     }
 
     pnode->pl_dscp = fmd->fmd_dscp;
+    pnode->pl_dotonep = fmd->fmd_dotonep;
     pnode->pl_vrf = fmd->fmd_dvrf;
     pnode->pl_vlan = fmd->fmd_vlan;
 
@@ -1405,6 +1406,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
         return -EINVAL;
 
     fmd->fmd_dscp = pnode->pl_dscp;
+    fmd->fmd_dotonep = pnode->pl_dotonep;
     pnode->pl_packet = NULL;
     /*
      * this is only a security check and not a catch all check. one note

@@ -261,6 +261,8 @@ struct vr_packet {
 };
 
 
+#define VP_PRIORITY_INVALID 0xF
+
 extern void pkt_reset(struct vr_packet *);
 extern struct vr_packet *pkt_copy(struct vr_packet *, unsigned short,
         unsigned short);
@@ -288,6 +290,7 @@ struct vr_vlan_hdr {
     unsigned short vlan_proto;
 } __attribute__((packed));
 
+
 #define VR_ARP_HW_LEN           6
 #define VR_ARP_OP_REQUEST       1
 #define VR_ARP_OP_REPLY         2
@@ -298,6 +301,19 @@ struct vr_vlan_hdr {
 #define VR_ETH_PROTO_VLAN       0x8100
 
 #define VR_DIAG_CSUM         0xffff
+
+static inline int8_t
+vr_vlan_get_tos(uint8_t *eth_data)
+{
+    struct vr_eth *eth = (struct vr_eth *)eth_data;
+    struct vr_vlan_hdr *vlan;
+
+    if (ntohs(eth->eth_proto) != VR_ETH_PROTO_VLAN)
+        return -1;
+
+    vlan = (struct vr_vlan_hdr *)(eth + 1);
+    return (ntohs(vlan->vlan_tag) >> VR_VLAN_PRIORITY_SHIFT);
+}
 
 #ifdef arp_op
 #undef arp_op
@@ -421,8 +437,7 @@ vr_inet_set_tos(struct vr_ip *iph, uint8_t tos)
     if (iph->ip_tos == tos)
         return;
 
-    vr_incremental_diff(iph->ip_tos, tos, &diff);
-    diff <<= 8;
+    vr_incremental_diff(iph->ip_tos << 8, tos << 8, &diff);
     iph->ip_tos = tos;
     vr_ip_incremental_csum(iph, diff);
 
@@ -891,6 +906,7 @@ struct vr_forwarding_md {
     uint8_t fmd_src;
     uint8_t fmd_flags;
     int8_t fmd_dscp;
+    int8_t fmd_dotonep;
     int8_t fmd_queue;
 };
 
@@ -909,6 +925,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_src = 0;
     fmd->fmd_flags = 0;
     fmd->fmd_dscp = -1;
+    fmd->fmd_dotonep = -1;
     return;
 }
 
