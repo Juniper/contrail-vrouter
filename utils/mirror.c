@@ -40,15 +40,15 @@ vr_mirror_req_process(void *s_req)
    char flags[12];
 
 
-   memset(flags, 0, sizeof(flags));
-   if (req->mirr_flags & VR_MIRROR_PCAP)
-       strcat(flags, "P");
-   if (req->mirr_flags & VR_MIRROR_FLAG_MARKED_DELETE)
-       strcat(flags, "Md");
+    memset(flags, 0, sizeof(flags));
+    if (req->mirr_flags & VR_MIRROR_FLAG_DYNAMIC)
+        strcat(flags, "D");
 
-   printf("%5d    %7d", req->mirr_index, req->mirr_nhid);
-   printf("    %4s", flags);
-   printf("    %10u\n", req->mirr_users);
+    printf("%5d    %7d", req->mirr_index, req->mirr_nhid);
+    printf("    %4s", flags);
+    if (req->mirr_vni != -1)
+        printf("    %7d", req->mirr_vni);
+    printf("\n");
 
    if (mirror_op == SANDESH_OP_DUMP)
        dump_marker = req->mirr_index;
@@ -300,8 +300,9 @@ int main(int argc, char *argv[])
     if ((mirror_op == SANDESH_OP_DUMP) ||
             (mirror_op == SANDESH_OP_GET)) {
         printf("Mirror Table\n\n");
-        printf("Index    NextHop    Flags    References\n");
-        printf("---------------------------------------\n");
+        printf("Flags:D=Dynamic Mirroring \n\n");
+        printf("Index    NextHop    Flags    VNI\n");
+        printf("------------------------------------------------\n");
     }
 
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
