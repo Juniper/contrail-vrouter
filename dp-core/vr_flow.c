@@ -176,9 +176,7 @@ vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe,
                                                             unsigned int index)
 {
     if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
-        vrouter_put_mirror(router, fe->fe_mirror_id);
         fe->fe_mirror_id = VR_MAX_MIRROR_INDICES;
-        vrouter_put_mirror(router, fe->fe_sec_mirror_id);
         fe->fe_sec_mirror_id = VR_MAX_MIRROR_INDICES;
         vr_mirror_meta_entry_del(router, index);
     }
@@ -1576,7 +1574,6 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
 
     if (fe->fe_mirror_id != req->fr_mir_id) {
         if (fe->fe_mirror_id < router->vr_max_mirror_indices) {
-            vrouter_put_mirror(router, fe->fe_mirror_id);
             fe->fe_mirror_id = router->vr_max_mirror_indices;
         }
 
@@ -1595,7 +1592,6 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
 
     if (fe->fe_sec_mirror_id != req->fr_sec_mir_id) {
         if (fe->fe_sec_mirror_id < router->vr_max_mirror_indices) {
-            vrouter_put_mirror(router, fe->fe_sec_mirror_id);
             fe->fe_sec_mirror_id = router->vr_max_mirror_indices;
         }
 

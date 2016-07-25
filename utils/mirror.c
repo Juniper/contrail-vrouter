@@ -43,12 +43,9 @@ vr_mirror_req_process(void *s_req)
     memset(flags, 0, sizeof(flags));
     if (req->mirr_flags & VR_MIRROR_FLAG_DYNAMIC)
         strcat(flags, "D");
-    if (req->mirr_flags & VR_MIRROR_FLAG_MARKED_DELETE)
-        strcat(flags, "Md");
 
     printf("%5d    %7d", req->mirr_index, req->mirr_nhid);
     printf("    %4s", flags);
-    printf("    %7u", req->mirr_users);
     if (req->mirr_vni != -1)
         printf("    %7d", req->mirr_vni);
     printf("\n");
@@ -311,8 +308,8 @@ int main(int argc, char *argv[])
     if ((mirror_op == SANDESH_OP_DUMP) ||
             (mirror_op == SANDESH_OP_GET)) {
         printf("Mirror Table\n\n");
-        printf("Flags:D=Dynamic Mirroring, Dm:Delete Marked\n\n");
-        printf("Index    NextHop    Flags    References      VNI\n");
+        printf("Flags:D=Dynamic Mirroring \n\n");
+        printf("Index    NextHop    Flags    VNI\n");
         printf("------------------------------------------------\n");
     }
 

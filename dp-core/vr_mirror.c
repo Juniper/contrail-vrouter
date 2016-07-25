@@ -10,11 +10,8 @@
 #include "vr_message.h"
 #include "vr_mirror.h"
 
-int vr_mirror_add(vr_mirror_req *);
-int vr_mirror_del(vr_mirror_req *);
-
-static struct vr_mirror_entry *
-__vrouter_get_mirror(unsigned int rid, unsigned int index)
+struct vr_mirror_entry *
+vrouter_get_mirror(unsigned int rid, unsigned int index)
 {
     struct vrouter *router = vrouter_get(rid);
 
@@ -24,22 +21,22 @@ __vrouter_get_mirror(unsigned int rid, unsigned int index)
     return router->vr_mirrors[index];
 }
 
-struct vr_mirror_entry *
-vrouter_get_mirror(unsigned int rid, unsigned int index)
+static void
+vr_mirror_defer_delete(struct vrouter *router, void *arg)
 {
-    struct vr_mirror_entry *mirror;
+    struct vr_defer_data *defer = (struct vr_defer_data *)arg;
 
-    mirror = __vrouter_get_mirror(rid, index);
-    if (mirror)
-        mirror->mir_users++;
+    vr_free(defer->vdd_data, VR_MIRROR_OBJECT);
 
-    return mirror;
+    return;
 }
 
 int
-vrouter_put_mirror(struct vrouter *router, unsigned int index)
+__vr_mirror_del(struct vrouter *router, unsigned int index)
 {
+    struct vr_nexthop *nh;
     struct vr_mirror_entry *mirror;
+    struct vr_defer_data *defer;
 
     if (index >= router->vr_max_mirror_indices)
         return -EINVAL;
@@ -48,83 +45,48 @@ vrouter_put_mirror(struct vrouter *router, unsigned int index)
     if (!mirror)
         return -EINVAL;
 
-    if (!--mirror->mir_users) {
-        router->vr_mirrors[index] = NULL;
+    nh = mirror->mir_nh;
+    router->vr_mirrors[index] = NULL;
+    mirror->mir_nh = NULL;
 
-        if (!vr_not_ready)
+    if (!vr_not_ready) {
+        defer = vr_get_defer_data(sizeof(*defer));
+        if (defer) {
+            defer->vdd_data = (void *)mirror;
+            vr_defer(router, vr_mirror_defer_delete, (void *)defer);
+        } else {
             vr_delay_op();
-
-        vrouter_put_nexthop(mirror->mir_nh);
+            vr_free(mirror, VR_MIRROR_OBJECT);
+        }
+    } else {
         vr_free(mirror, VR_MIRROR_OBJECT);
     }
+    vrouter_put_nexthop(nh);
 
     return 0;
 }
 
-
 int
 vr_mirror_del(vr_mirror_req *req)
 {
-    int ret = 0;
+    int ret = -EINVAL;
     struct vrouter *router;
-    struct vr_mirror_entry *mirror;
-    struct vr_nexthop *nh;
 
     router = vrouter_get(req->mirr_rid);
-    if (!router) {
-        ret = -EINVAL;
-        goto generate_resp;
-    }
+    if (router)
+        ret = __vr_mirror_del(router, req->mirr_index);
 
-    mirror = __vrouter_get_mirror(req->mirr_rid, req->mirr_index);
-    if (!mirror) {
-        ret = -EINVAL;
-        goto generate_resp;
-    }
-
-    mirror->mir_flags |= VR_MIRROR_FLAG_MARKED_DELETE;
-    nh = mirror->mir_nh;
-    mirror->mir_nh = vrouter_get_nexthop(req->mirr_rid, NH_DISCARD_ID);
-    /* release the old nexthop */
-    vrouter_put_nexthop(nh);
-
-    /* ...and finally try to release the mirror entry */
-    vrouter_put_mirror(router, req->mirr_index);
-
-generate_resp:
     vr_send_response(ret);
 
     return ret;
 }
 
-static int
-vr_mirror_change(struct vr_mirror_entry *mirror, vr_mirror_req *req,
-        struct vr_nexthop *nh_new)
-{
-    struct vr_nexthop *nh_old = mirror->mir_nh;
-
-    if (mirror->mir_flags & VR_MIRROR_FLAG_MARKED_DELETE)
-        mirror->mir_users++;
-
-    mirror->mir_flags = req->mirr_flags;
-    mirror->mir_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
-    mirror->mir_rid = req->mirr_rid;
-    mirror->mir_vni = req->mirr_vni;
-    if (nh_old != nh_new) {
-        mirror->mir_nh = nh_new;
-        if (nh_old)
-            vrouter_put_nexthop(nh_old);
-    }
-
-    return 0;
-}
-
 int
 vr_mirror_add(vr_mirror_req *req)
 {
-    struct vrouter *router;
-    struct vr_nexthop *nh;
     int ret = 0;
+    struct vrouter *router;
+    struct vr_nexthop *nh, *old_nh = NULL;
     struct vr_mirror_entry *mirror;
 
     router = vrouter_get(req->mirr_rid);
@@ -138,21 +100,32 @@ vr_mirror_add(vr_mirror_req *req)
         goto generate_resp;
     }
 
-    req->mirr_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
-
     nh = vrouter_get_nexthop(req->mirr_rid, req->mirr_nhid);
     if (!nh) {
         ret = -EINVAL;
         goto generate_resp;
     }
 
-    mirror = __vrouter_get_mirror(req->mirr_rid, req->mirr_index);
+    mirror = router->vr_mirrors[req->mirr_index];
     if (!mirror) {
         mirror = vr_zalloc(sizeof(*mirror), VR_MIRROR_OBJECT);
-        mirror->mir_users++;
+        if (!mirror) {
+            ret = -ENOMEM;
+            vrouter_put_nexthop(nh);
+            goto generate_resp;
+        }
+    } else {
+        old_nh = mirror->mir_nh;
     }
-    ret = vr_mirror_change(mirror, req, nh);
+
+    mirror->mir_nh = nh;
+    mirror->mir_rid = req->mirr_rid;
+    mirror->mir_flags = req->mirr_flags;
+    mirror->mir_vni = req->mirr_vni;
     router->vr_mirrors[req->mirr_index] = mirror;
+
+    if (old_nh)
+        vrouter_put_nexthop(old_nh);
 
 generate_resp:
     vr_send_response(ret);
@@ -169,7 +142,6 @@ vr_mirror_make_req(vr_mirror_req *req, struct vr_mirror_entry *mirror,
     if (mirror->mir_nh)
         req->mirr_nhid = mirror->mir_nh->nh_id;
 
-    req->mirr_users = mirror->mir_users;
     req->mirr_flags = mirror->mir_flags;
     req->mirr_rid = mirror->mir_rid;
     req->mirr_vni = mirror->mir_vni;
@@ -226,11 +198,10 @@ vr_mirror_get(vr_mirror_req *req)
             (unsigned int)req->mirr_index >= router->vr_max_mirror_indices) {
         ret = -ENODEV;
     } else {
-        mirror = __vrouter_get_mirror(req->mirr_rid, req->mirr_index);
+        mirror = router->vr_mirrors[req->mirr_index];
         if (!mirror)
             ret = -ENOENT;
     }
-
 
     if (mirror) {
         vr_mirror_make_req(req, mirror, req->mirr_index);
@@ -541,7 +512,7 @@ vr_mirror_exit(struct vrouter *router, bool soft_reset)
     if (router->vr_mirrors)
         for (i = 0; i < router->vr_max_mirror_indices; i++)
             if (router->vr_mirrors[i])
-                vrouter_put_mirror(router, i);
+                __vr_mirror_del(router, i);
 
     if (router->vr_mirror_md) {
         vr_itable_delete(router->vr_mirror_md,
