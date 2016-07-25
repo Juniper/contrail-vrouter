@@ -5,8 +5,8 @@
 #define __VR_MIRROR_H__
 
 #define VR_MAX_MIRROR_INDICES           255
-#define VR_MIRROR_FLAG_MARKED_DELETE    0x1
-#define VR_MIRROR_FLAG_DYNAMIC          0x2
+
+#define VR_MIRROR_FLAG_DYNAMIC          0x1
 
 
 struct vrouter;
@@ -29,10 +29,9 @@ typedef enum {
 
 
 struct vr_mirror_entry {
-    unsigned int mir_users:20;
-    unsigned int mir_flags:12;
     unsigned int mir_rid;
     int mir_vni;
+    unsigned int mir_flags;
     struct vr_nexthop *mir_nh;
 };
 
