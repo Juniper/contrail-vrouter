@@ -10,28 +10,69 @@
 #include <machine/stdarg.h>
 #endif
 
+#define VR_ITABLE_VALUE(p) ((unsigned long)(p))
+
+struct vr_itbl_data {
+    unsigned int itbld_ref_cnt;
+    unsigned int itbld_ac_cnt;
+    uint8_t itbld_data[0];
+};
+
 struct vr_itbl {
     unsigned int stride_cnt;
     unsigned int index_len;
     unsigned int *stride_len;
     unsigned int *stride_shift;
-    void **data;
+    struct vr_itbl_data *data;
 };
 
 void vr_print_table_struct(vr_itable_t);
 
-static int
-vr_stride_empty(void **ptr, unsigned int cnt)
+static inline int
+vr_stride_mem_size(struct vr_itbl *table, int stride_num)
 {
-    unsigned int i;
-    for (i = 0; i < cnt; i++) {
-        if (ptr[i] != NULL) {
-            return 0;
-        }
-    }
+    int size  = table->stride_len[stride_num] * sizeof(void *);
 
-    return 1;
+    size += (2 * sizeof(unsigned int));
+
+    return size;
 }
+
+static inline struct vr_itbl_data *
+vr_itbld_from_ptr(struct vr_itbl_data *ptr)
+{
+    return (struct vr_itbl_data *)((unsigned long)ptr & (~0x3)); 
+}
+
+static void
+vr_itbl_free_cb(struct vrouter *router, void *data)
+{
+    struct vr_defer_data *vdd = (struct vr_defer_data *)data;
+
+    if (!vdd)
+        return; 
+
+    vr_free(vdd->vdd_data, VR_ITABLE_OBJECT);
+
+    return; 
+}
+
+
+static int
+vr_itable_defer(void *ptr)
+{
+    struct vr_defer_data *defer;
+
+    defer = vr_get_defer_data(sizeof(*defer));
+    if (!defer)
+        return -ENOMEM;
+
+    defer->vdd_data = ptr;
+    vr_defer(vrouter_get(0), vr_itbl_free_cb, (void *)defer);
+
+    return 0; 
+}
+
 
 /* Default print function */
 static int
@@ -55,52 +96,61 @@ get_page_shift(void)
 }
 #endif
 
-
-
 static int
 __vr_itable_del(struct vr_itbl *table, unsigned int index,
-                        void **ptr, unsigned int cnt, void **old)
+                        struct vr_itbl_data **tbldp, unsigned int cnt, void **old)
 {
     unsigned int id;
+    struct vr_itbl_data *tbld;
+    void **ptr, *tmp;
+    
+    tbld = vr_itbld_from_ptr(*tbldp);
+
+    if (!tbld || (cnt > (table->stride_cnt - 1)))
+        return 0;
+
+    ptr = (void **)tbld->itbld_data;
+    id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1);
 
     if (cnt == table->stride_cnt-1) {
-        id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1);
         *old = ptr[id];
 
-        /*
-         * IF an entry exists to delete, mark it null. If the whole
-         * stride is null, delete the stride itself
-         */
-        if (*old) {
-            ptr[id] = NULL;
-            if (vr_stride_empty(ptr, table->stride_len[cnt]) == 1) {
-                vr_free(ptr, VR_ITABLE_OBJECT);
-                return 1;
-            }
+        if (!(*old))
+            return 0;
+
+        ptr[id] = NULL;
+    
+    } else {
+        tmp = vr_itbld_from_ptr(ptr[id]);
+
+        if (!__vr_itable_del(table, index, (struct vr_itbl_data **)(ptr+id),
+                                                            (cnt+1), old)) {
+            return 0;
         }
-        return 0;
+
+        if (!__sync_bool_compare_and_swap((ptr + id),
+                    (VR_ITABLE_VALUE(tmp)  | 0x2), NULL)) {
+            return 0;
+        }
+
+        if (!vr_not_ready)
+            vr_itable_defer(tmp);
+        else
+            vr_free(tmp, VR_ITABLE_OBJECT);
     }
 
-    if ((cnt < (table->stride_cnt - 1)) && ptr) {
-        id = (index >> table->stride_shift[cnt]) & (table->stride_len[cnt] - 1);
-        if (ptr[id] && __vr_itable_del(table, index, (void **)(ptr[id]),
-                                            (cnt+1), old) == 1) {
-
-            /*
-             * If a later stride is deleted, check for the
-             * earliter stride as well
-             */
-            ptr[id] = NULL;
-            if (vr_stride_empty(ptr, table->stride_len[cnt]) == 1) {
-                vr_free(ptr, VR_ITABLE_OBJECT);
-
-                /* If the stride deleted is first, mark the head null */
-                if (cnt == 0) {
-                    table->data = NULL;
-                }
-                return 1;
+    if (!__sync_sub_and_fetch(&tbld->itbld_ref_cnt, 1)) {
+        tmp = vr_itbld_from_ptr(tbld);
+        if (__sync_bool_compare_and_swap(tbldp, tbld,
+                            (VR_ITABLE_VALUE(tbld) | 0x2))) {
+            if (!cnt) {
+                *tbldp = NULL;
+                if (!vr_not_ready)
+                    vr_itable_defer(tmp);
+                else
+                    vr_free(tmp, VR_ITABLE_OBJECT);
             }
-
+            return 1;
         }
     }
 
@@ -108,15 +158,22 @@ __vr_itable_del(struct vr_itbl *table, unsigned int index,
 }
 
 static int
-__vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
-        unsigned int cnt, unsigned int index, unsigned int marker, void *udata)
+__vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func,
+        struct vr_itbl_data *tbld, unsigned int cnt, unsigned int index,
+        unsigned int marker, void *udata)
 {
     unsigned int i, j;
     int res = 1;
+    void **ptr;
+    struct vr_itbl_data *tmp;
 
-    if (!ptr || cnt >= table->stride_cnt) {
+    tbld = vr_itbld_from_ptr(tbld);
+
+    if (!tbld || cnt >= table->stride_cnt) {
         return res;
     }
+
+    ptr = (void **)tbld->itbld_data;
 
     if (cnt == table->stride_cnt - 1) {
         /* Last stride. Contains the elements */
@@ -138,9 +195,12 @@ __vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
 
     for (i = 0; i < table->stride_len[cnt]; i++) {
 
-        /* Rectursively call all strides */
-        if (ptr[i]) {
-            res = __vr_itable_dump(table, func, (void **)ptr[i], (cnt + 1),
+        if (VR_ITABLE_VALUE(ptr[i]) & 0x2)
+            continue;
+
+        tmp = vr_itbld_from_ptr(ptr[i]);
+        if (tmp) {
+            res = __vr_itable_dump(table, func, tmp, (cnt + 1),
                     (index | (i << table->stride_shift[cnt])), marker, udata);
 
             /* No more traversal if upper stride stopped it */
@@ -155,9 +215,17 @@ __vr_itable_dump(struct vr_itbl *table, vr_itable_trav_cb_t func, void **ptr,
 
 static void
 __vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
-                        void **ptr, unsigned int cnt, unsigned int index)
+                        struct vr_itbl_data *tbld, unsigned int cnt, unsigned int index)
 {
     unsigned int i, j;
+    void **ptr;
+    struct vr_itbl_data *tmp;
+
+    if (!tbld)
+        return;
+
+    tbld = vr_itbld_from_ptr(tbld);
+    ptr = (void **)tbld->itbld_data;
 
     if (!ptr || cnt >= table->stride_cnt) {
         return;
@@ -177,19 +245,18 @@ __vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
             }
         }
 
-        /* All stride entries are delete invoked. Delete the stride now */
-        vr_free(ptr, VR_ITABLE_OBJECT);
         return;
     }
 
     for (i = 0; i < table->stride_len[cnt]; i++) {
-        if (ptr[i]) {
-            __vr_itable_exit(table, func, (void **)ptr[i], (cnt + 1),
+        tmp = vr_itbld_from_ptr(ptr[i]);
+        if (tmp) {
+            __vr_itable_exit(table, func, tmp, (cnt + 1),
                     (index | (i << table->stride_shift[cnt])));
 
             /* Upper strides are deleted. Delete the current */
-            ptr[i] = NULL;
             vr_free(ptr[i], VR_ITABLE_OBJECT);
+            ptr[i] = NULL;
         }
     }
 
@@ -227,7 +294,6 @@ vr_itable_trav(vr_itable_t t, vr_itable_trav_cb_t func,
                                      unsigned int marker, void *udata)
 {
     struct vr_itbl *table = (struct vr_itbl *) t;
-    void **ptr = table->data;
 
     if (!table) {
         return 0;
@@ -238,7 +304,7 @@ vr_itable_trav(vr_itable_t t, vr_itable_trav_cb_t func,
         func = print_ind;
     }
 
-    return __vr_itable_dump(table, func, ptr, 0, 0, marker, udata);
+    return __vr_itable_dump(table, func, table->data, 0, 0, marker, udata);
 }
 
 void *
@@ -251,7 +317,9 @@ vr_itable_del(vr_itable_t t, unsigned int index)
         return NULL;
     }
 
-    __vr_itable_del(table, index, table->data, 0, &old);
+    __vr_itable_del(table, index, &table->data, 0, &old);
+    if (vr_itable_get(t, index))
+        vr_printf("Vrouter: Itable Del 0x%x  is not deleted\n", index);
 
     /* Return the deleted value */
     return old;
@@ -260,22 +328,29 @@ vr_itable_del(vr_itable_t t, unsigned int index)
 void *
 vr_itable_get(vr_itable_t t, unsigned int index)
 {
-    void **ptr;
+    unsigned int i, id;
     struct vr_itbl *table = (struct vr_itbl *)t;
-    unsigned int i;
-    unsigned int id;
+    struct vr_itbl_data *tbld;
+    void **ptr;
 
     if (!table) {
         return NULL;
     }
 
     /* Go till last stride as long as data exists */
-    for (i = 0, ptr = table->data; (i < table->stride_cnt) && ptr; i++) {
+    for (i = 0, tbld = table->data; i < table->stride_cnt; i++) {
+
+        if ((!tbld) || (VR_ITABLE_VALUE(tbld) & 0x2))
+            return NULL;
+
+        tbld = vr_itbld_from_ptr(tbld);
+
         id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
-        ptr = (void **)(ptr[id]);
+        ptr = (void **)tbld->itbld_data;
+        tbld = ptr[id];
     }
 
-    return (void *)ptr;
+    return tbld;
 }
 
 /*
@@ -287,11 +362,10 @@ vr_itable_get(vr_itable_t t, unsigned int index)
 void *
 vr_itable_set(vr_itable_t t, unsigned int index, void *data)
 {
+    unsigned int id = 0, i, ret;
+    void *old, **ptr = NULL;
     struct vr_itbl *table = (struct vr_itbl *)t;
-    unsigned int id;
-    void **ptr;
-    void *old;
-    unsigned int i;
+    struct vr_itbl_data **tbldp, *prev_tbld, *tbld = NULL, *cmp_tbld, **ac_tbld[16];
 
     if (!table) {
         return VR_ITABLE_ERR_PTR;
@@ -303,36 +377,89 @@ vr_itable_set(vr_itable_t t, unsigned int index, void *data)
                 index, table->index_len);
     }
 
-    if (!table->data) {
-        table->data = vr_zalloc(table->stride_len[0] * sizeof(void *),
-                VR_ITABLE_OBJECT);
-        if (!table->data) {
-            return VR_ITABLE_ERR_PTR;
-        }
-    }
-    ptr = table->data;
+    tbldp = &table->data;
+    prev_tbld = NULL;
 
-    for (i = 0; i < table->stride_cnt - 1; i++) {
+    for (i = 0; i < table->stride_cnt; i++) {
         id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
 
-        if (!ptr[id]) {
-            ptr[id] = vr_zalloc(table->stride_len[i + 1] * sizeof(void *),
-                    VR_ITABLE_OBJECT);
-            /* To fix: We might return with some empty strides */
-            if (!ptr[id]) {
-                return VR_ITABLE_ERR_PTR;
+        do {
+
+           cmp_tbld = *tbldp;
+
+            if (!cmp_tbld || (VR_ITABLE_VALUE(cmp_tbld) & 0x2)) {
+
+                if (cmp_tbld)
+                    prev_tbld = NULL;
+
+                tbld= vr_zalloc(vr_stride_mem_size(table, i), VR_ITABLE_OBJECT);
+                if (!tbld)
+                    return VR_ITABLE_ERR_PTR;
+
+                /* If some one else allocates the data, free ours */
+                ret = __sync_bool_compare_and_swap(tbldp, cmp_tbld, tbld);
+                cmp_tbld = *tbldp;
+                if (ret) {
+                    if (prev_tbld) {
+                        (void)__sync_add_and_fetch(&prev_tbld->itbld_ref_cnt, 1);
+                    }
+
+                } else {
+                    vr_free(tbld, VR_ITABLE_OBJECT);
+                    if (!cmp_tbld)
+                        continue;
+                }
             }
+
+            tbld = vr_itbld_from_ptr(cmp_tbld);
+
+            (void)__sync_add_and_fetch(&tbld->itbld_ac_cnt, 1);
+            ret = __sync_bool_compare_and_swap(tbldp, tbld,
+                                    (VR_ITABLE_VALUE(tbld)| 0x1));
+            cmp_tbld = *tbldp;
+            ac_tbld[i] = tbldp;
+
+            if (!ret) {
+                if (VR_ITABLE_VALUE(cmp_tbld) & 0x2) {
+                    (void)__sync_sub_and_fetch(&tbld->itbld_ac_cnt, 1);
+                }
+            }
+
+        } while ((!cmp_tbld) || (VR_ITABLE_VALUE(cmp_tbld) & 0x2));
+
+        if (!(VR_ITABLE_VALUE(cmp_tbld) & 0x1)) {
+            vr_printf("Vrouter: Itable Set no modify flag set");
         }
 
-        ptr = (void **)ptr[id];
+        tbld = vr_itbld_from_ptr(cmp_tbld);
+        ptr = (void **)(tbld->itbld_data);
+        prev_tbld = tbld;
+        tbldp = (struct vr_itbl_data **)(ptr + id);
     }
 
     /* Store the data in the last stride */
-    id = (index >> table->stride_shift[i]) & (table->stride_len[i] - 1);
-
-    /* Return the old data */
     old = ptr[id];
     ptr[id] = data;
+
+    if (!old)
+        (void)__sync_add_and_fetch(&tbld->itbld_ref_cnt, 1);
+
+    for (i = table->stride_cnt; i; i--) {
+        tbld = *(ac_tbld[i-1]);
+        tbld = vr_itbld_from_ptr(tbld);
+        if (!__sync_sub_and_fetch(&tbld->itbld_ac_cnt, 1)) {
+            (void)__sync_bool_compare_and_swap(ac_tbld[i-1],
+                    (VR_ITABLE_VALUE(tbld) | 0x1),
+                    (VR_ITABLE_VALUE(tbld) | (tbld->itbld_ac_cnt != 0)));
+        }
+    }
+
+    void *junk;
+    junk = vr_itable_get(t, index);
+    if (junk != data)
+        vr_printf("Vrouter: Itable set 0x%x does not match data %p retrieved %p\n", index, data, junk);
+
+    /* Return the old data */
     return old;
 }
 
