@@ -5,6 +5,7 @@
  * All rights reserved
  */
 
+#include <getopt.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -24,9 +25,21 @@
 #include <vt_packet.h>
 #include <vt_process_xml.h>
 
+#include <vr_dpdk_usocket.h>
 
 #include <net/if.h>
 #include <nl_util.h>
+
+/* vTest command-line options. */
+enum vr_opt_index {
+#define HELP_OPT                "help"
+    HELP_OPT_INDEX,
+#define SOCKET_DIR_OPT          "vr_socket_dir"
+    SOCKET_DIR_OPT_INDEX,
+#define NETLINK_PORT_OPT        "vr_netlink_port"
+    NETLINK_PORT_OPT_INDEX,
+    MAX_OPT_INDEX
+};
 
 extern struct expect_vrouter expect_msg;
 extern struct return_vrouter return_msg;
@@ -97,31 +110,82 @@ vt_init(struct vtest *test)
 static void
 vt_Usage(void)
 {
-    printf("Usage: %s <test xml description file>\n",
-            VT_PROG_NAME);
-    return;
+    printf(
+        "Usage: "VT_PROG_NAME" [options] <XML-file with test definition>\n"
+        "    --"HELP_OPT"       This help\n"
+        "\n"
+        "    --"SOCKET_DIR_OPT" DIR        Socket directory to use\n"
+        "    --"NETLINK_PORT_OPT" PORT     Netlink TCP port to use\n"
+        );
+
+    exit(1);
 }
+
+static void
+parse_long_opts(int opt_flow_index, char *optarg)
+{
+    errno = 0;
+
+    switch (opt_flow_index) {
+    case SOCKET_DIR_OPT_INDEX:
+    vr_socket_dir = optarg;
+        break;
+
+    case NETLINK_PORT_OPT_INDEX:
+        vr_netlink_port = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_netlink_port = VR_DEF_NETLINK_PORT;
+        }
+        break;
+
+    case HELP_OPT_INDEX:
+    default:
+        vt_Usage();
+    }
+}
+
+static struct option long_options[] = {
+    [HELP_OPT_INDEX]                =   {HELP_OPT,              no_argument,
+                                                    NULL,                   0},
+    [SOCKET_DIR_OPT_INDEX]          =   {SOCKET_DIR_OPT,        required_argument,
+                                                    NULL,                   0},
+    [NETLINK_PORT_OPT_INDEX]        =   {NETLINK_PORT_OPT,      required_argument,
+                                                    NULL,                   0},
+    [MAX_OPT_INDEX]                 =   {NULL,                  0,
+                                                    NULL,                   0},
+};
 
 int
 main(int argc, char *argv[])
 {
-    int ret;
+    int ret, opt, option_index;
     unsigned int i;
     char *xml_file;
-    unsigned int sock_proto = VR_NETLINK_PROTO_DEFAULT;
 
     struct stat stat_buf;
     struct vtest vtest;
 
-    if (argc != 2) {
-        vt_Usage();
-        return E_MAIN_ERR_FARG;
-    }
+    while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
+            >= 0) {
+        switch (opt) {
+        case 0:
+            parse_long_opts(option_index, optarg);
+            break;
 
-    xml_file = argv[1];
+        case '?':
+        default:
+            fprintf(stderr, "Invalid option %s\n", argv[optind - 1]);
+            vt_Usage();
+        }
+    }
+    if (optind >= argc) {
+        vt_Usage();
+    }
+    xml_file = argv[optind];
+
     ret = stat(xml_file, &stat_buf);
     if (ret) {
-        perror(xml_file);
+        fprintf(stderr, "%s: File not found: %s\n", __func__, xml_file);
         return E_MAIN_ERR_XML;
     }
     ret = vt_init(&vtest);
@@ -129,7 +193,7 @@ main(int argc, char *argv[])
         return ret;
     }
 
-    vtest.vrouter_cl = vr_get_nl_client(sock_proto);
+    vtest.vrouter_cl = vr_get_nl_client(VR_NETLINK_PROTO_TEST);
     if (!vtest.vrouter_cl) {
         fprintf(stderr, "Error registering NetLink client: %s (%d)\n",
                 strerror(errno), errno);
@@ -153,15 +217,12 @@ main(int argc, char *argv[])
     vt_dealloc_test(&vtest);
 
     if (vtest.vtest_return == E_MAIN_TEST_FAIL) {
-        fprintf(stderr, "Test failed\n");
         return EXIT_FAILURE;//E_MAIN_TEST_FAIL;
 
     } else if (vtest.vtest_return == E_MAIN_TEST_PASS) {
-        fprintf(stdout, "Test passed\n");
         return EXIT_SUCCESS;//E_MAIN_TEST_PASS;
 
     } else {
-        fprintf(stderr, "Test skipped\n");
         return 2;
     }
 

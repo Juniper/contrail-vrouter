@@ -15,6 +15,7 @@
 #include <stdlib.h>
 
 #include "ini_parser.h"
+#include "nl_util.h"
 
 #define BUF_LENGTH 256
 
@@ -199,7 +200,7 @@ get_port()
     if (platform &&
         (strcmp(platform, PLATFORM_DPDK) == 0 ||
          strcmp(platform, PLATFORM_NIC) == 0)) {
-        return 20914;
+        return vr_netlink_port;
     }
     return 0;
 }

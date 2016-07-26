@@ -18,9 +18,11 @@
 #define _GNU_SOURCE
 
 #include "vr_dpdk.h"
+#include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
 #include "vr_bridge.h"
+#include "nl_util.h"
 
 #include <getopt.h>
 #include <signal.h>
@@ -67,6 +69,10 @@ enum vr_opt_index {
     NEXTHOPS_OPT_INDEX,
 #define VRFS_OPT                "vr_vrfs"
     VRFS_OPT_INDEX,
+#define SOCKET_DIR_OPT          "vr_socket_dir"
+    SOCKET_DIR_OPT_INDEX,
+#define NETLINK_PORT_OPT        "vr_netlink_port"
+    NETLINK_PORT_OPT_INDEX,
 #define SOCKET_MEM_OPT          "socket-mem"
     SOCKET_MEM_OPT_INDEX,
 #define LCORES_OPT              "lcores"
@@ -843,6 +849,10 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VRFS_OPT_INDEX]                =   {VRFS_OPT,              required_argument,
                                                     NULL,                   0},
+    [SOCKET_DIR_OPT_INDEX]          =   {SOCKET_DIR_OPT,        required_argument,
+                                                    NULL,                   0},
+    [NETLINK_PORT_OPT_INDEX]        =   {NETLINK_PORT_OPT,      required_argument,
+                                                    NULL,                   0},
     [SOCKET_MEM_OPT_INDEX]          =   {SOCKET_MEM_OPT,        required_argument,
                                                     NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
@@ -856,6 +866,7 @@ Usage(void)
         "Usage: contrail-vrouter-dpdk [options]\n"
         "    --"NO_DAEMON_OPT"  Do not demonize the vRouter\n"
         "    --"NO_HUGE_OPT"    Use malloc instead of hugetlbfs\n"
+        "    --"VTEST_VLAN_OPT" Enable vTest workaround for virtual interfaces\n"
         "    --"HELP_OPT"       This help\n"
         "    --"VERSION_OPT"    Display build information\n"
         "\n"
@@ -868,6 +879,8 @@ Usage(void)
         "    --"VLAN_TCI_OPT" TCI             VLAN tag control information to use\n"
         "                               It may be a value between 0 and 4095\n"
         "    --"VLAN_NAME_OPT" NAME  VLAN forwarding interface name\n"
+        "    --"SOCKET_DIR_OPT" DIR        Socket directory to use\n"
+        "    --"NETLINK_PORT_OPT" PORT     Netlink TCP port to use\n"
         "\n"
         "    --"BRIDGE_ENTRIES_OPT" NUM   Bridge table limit\n"
         "    --"BRIDGE_OENTRIES_OPT" NUM  Bridge table overflow limit\n"
@@ -887,6 +900,7 @@ static void
 parse_long_opts(int opt_flow_index, char *optarg)
 {
     errno = 0;
+
     switch (opt_flow_index) {
     case NO_DAEMON_OPT_INDEX:
     case NO_HUGE_OPT_INDEX:
@@ -997,6 +1011,17 @@ parse_long_opts(int opt_flow_index, char *optarg)
         vr_vrfs = (unsigned int)strtoul(optarg, NULL, 0);
         if (errno != 0) {
             vr_vrfs = VR_DEF_VRFS;
+        }
+        break;
+
+    case SOCKET_DIR_OPT_INDEX:
+    vr_socket_dir = optarg;
+        break;
+
+    case NETLINK_PORT_OPT_INDEX:
+        vr_netlink_port = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_netlink_port = VR_DEF_NETLINK_PORT;
         }
         break;
 
