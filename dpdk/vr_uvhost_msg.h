@@ -15,7 +15,7 @@
  * user space vhost thread
  */
 
-#define VR_UVH_VIF_PREFIX VR_SOCKET_DIR"/uvh_vif_"
+#define VR_UVH_VIF_PFX "uvh_vif_"
 #define VHOST_USER_VERSION 1
 
 typedef enum vrnu_msg_type {

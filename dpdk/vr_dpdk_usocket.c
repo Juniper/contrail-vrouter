@@ -6,6 +6,7 @@
  * All rights reserved
  */
 
+#include "nl_util.h"
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_message.h"
@@ -34,6 +35,10 @@ static int vr_usocket_connect(struct vr_usocket *);
 static int vr_usocket_bind(struct vr_usocket *);
 static int usock_write(struct vr_usocket *);
 static int usock_read_init(struct vr_usocket *);
+
+static char vr_packet_unix_file[VR_UNIX_PATH_MAX];
+char *vr_socket_dir = VR_DEF_SOCKET_DIR;
+uint16_t vr_netlink_port = VR_DEF_NETLINK_PORT;
 
 /*
  * mark the error in socket for somebody to process/see
@@ -303,8 +308,8 @@ usock_close(struct vr_usocket *usockp)
 
     if (usockp->usock_proto == PACKET) {
         RTE_LOG(DEBUG, USOCK, "%s[%lx]: unlinking %s\n", __func__,
-            pthread_self(), VR_PACKET_UNIX_FILE);
-        unlink(VR_PACKET_UNIX_FILE);
+            pthread_self(), vr_packet_unix_file);
+        unlink(vr_packet_unix_file);
     }
 
     usockp->usock_io_in_progress = 0;
@@ -1029,7 +1034,9 @@ vr_usocket_connect(struct vr_usocket *usockp)
 
     sun.sun_family = AF_UNIX;
     memset(sun.sun_path, 0, sizeof(sun.sun_path));
-    strncpy(sun.sun_path, VR_PACKET_AGENT_UNIX_FILE, sizeof(sun.sun_path) - 1);
+    strncpy(sun.sun_path, vr_socket_dir, sizeof(sun.sun_path) - 1);
+    strncat(sun.sun_path, "/"VR_PACKET_AGENT_UNIX_NAME, sizeof(sun.sun_path)
+        - strlen(sun.sun_path) - 1);
 
 #ifdef VR_DPDK_USOCK_DUMP
     RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d retry connecting\n", __func__,
@@ -1083,7 +1090,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
     switch (usockp->usock_type) {
     case TCP:
         sin.sin_family = AF_INET;
-        sin.sin_port = rte_cpu_to_be_16(VR_NETLINK_TCP_PORT);
+        sin.sin_port = rte_cpu_to_be_16(vr_netlink_port);
         sin.sin_addr.s_addr = INADDR_ANY;
         addr = (struct sockaddr *)&sin;
         addrlen = sizeof(sin);
@@ -1094,11 +1101,14 @@ vr_usocket_bind(struct vr_usocket *usockp)
     case UNIX:
         sun.sun_family = AF_UNIX;
         memset(sun.sun_path, 0, sizeof(sun.sun_path));
-        strncpy(sun.sun_path, VR_NETLINK_UNIX_FILE, sizeof(sun.sun_path) - 1);
+        strncpy(sun.sun_path, vr_socket_dir, sizeof(sun.sun_path) - 1);
+        strncat(sun.sun_path, "/"VR_NETLINK_UNIX_NAME, sizeof(sun.sun_path)
+            - strlen(sun.sun_path) - 1);
+
         addr = (struct sockaddr *)&sun;
         addrlen = sizeof(sun);
         server = true;
-        mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+        mkdir(vr_socket_dir, VR_DEF_SOCKET_DIR_MODE);
         unlink(sun.sun_path);
 
         break;
@@ -1106,11 +1116,16 @@ vr_usocket_bind(struct vr_usocket *usockp)
     case RAW:
         sun.sun_family = AF_UNIX;
         memset(sun.sun_path, 0, sizeof(sun.sun_path));
-        strncpy(sun.sun_path, VR_PACKET_UNIX_FILE, sizeof(sun.sun_path) - 1);
+        strncpy(vr_packet_unix_file, vr_socket_dir, sizeof(vr_packet_unix_file)
+            - 1);
+        strncat(vr_packet_unix_file, "/"VR_PACKET_UNIX_NAME,
+            sizeof(vr_packet_unix_file) - strlen(vr_packet_unix_file) - 1);
+        strncpy(sun.sun_path, vr_packet_unix_file, sizeof(sun.sun_path) - 1);
+
         addr = (struct sockaddr *)&sun;
         addrlen = sizeof(sun);
         server = false;
-        mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+        mkdir(vr_socket_dir, VR_DEF_SOCKET_DIR_MODE);
         unlink(sun.sun_path);
 
         break;

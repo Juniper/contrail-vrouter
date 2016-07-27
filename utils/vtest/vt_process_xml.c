@@ -208,6 +208,10 @@ vt_process_node(xmlNodePtr node, struct vtest *test)
         if (!strncmp((char *)node->name, vt_modules[i].vt_name,
                     strlen(vt_modules[i].vt_name) + 1)) {
             ret = vt_modules[i].vt_node(node, test);
+
+            if (ret == E_MAIN_SKIP)
+                return ret;
+
             if (ret != E_MESSAGE_OK) {
                 fprintf(stderr, "%s(): Error processing node %s\n",
                     __func__, node->name);
@@ -245,6 +249,10 @@ vt_tree_traverse(xmlNodePtr node, struct vtest *test)
     while (node) {
         if (node->type == XML_ELEMENT_NODE) {
             ret = vt_process_node(node, test);
+            if (ret == E_MAIN_SKIP) {
+                return ret;
+            }
+
             if (ret != E_PROCESS_XML_OK) {
                 fprintf(stderr ,"%s(): Tree traverse error %d\n",
                     __func__, ret);
