@@ -55,6 +55,9 @@ enum rt_type{
 #define VR_BE_LABEL_VALID_FLAG           0x02
 #define VR_BE_FLOOD_DHCP_FLAG            0x04
 
+#define AGENT_PKT_HEAD_SPACE (sizeof(struct vr_eth) + \
+                sizeof(struct agent_hdr))
+
 struct agent_hdr {
     unsigned short hdr_ifindex;
     unsigned short hdr_vrf;
