@@ -16,7 +16,7 @@
 /* FDs First initialization value
  *
  * The value is set, cause to be sure, that FD is not opened and/or
- * the function shm_open does not returns an error.
+ * the function open does not returns an error.
  *
  */
 #define CLIENT_INIT_FD_VAL (-2)

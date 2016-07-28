@@ -8,6 +8,7 @@
 #define __VR_DPDK_USOCKET_H__
 
 #include "vr_queue.h"
+#include "nl_util.h"
 #include <pthread.h>
 
 /*
@@ -130,11 +131,9 @@ int vr_usocket_write(struct vr_usocket *usockp, unsigned char *buf,
     unsigned int len);
 int vr_usocket_eventfd_write(struct vr_usocket *usockp);
 
-#define VR_NETLINK_TCP_PORT         20914
-#define VR_SOCKET_DIR               "/var/run/vrouter"
-#define VR_SOCKET_DIR_MODE          (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
-#define VR_NETLINK_UNIX_FILE        VR_SOCKET_DIR"/dpdk_netlink"
-#define VR_PACKET_UNIX_FILE         VR_SOCKET_DIR"/dpdk_pkt0"
-#define VR_PACKET_AGENT_UNIX_FILE   VR_SOCKET_DIR"/agent_pkt0"
+#define VR_DEF_SOCKET_DIR_MODE      (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
+#define VR_NETLINK_UNIX_NAME        "dpdk_netlink"
+#define VR_PACKET_UNIX_NAME         "dpdk_pkt0"
+#define VR_PACKET_AGENT_UNIX_NAME   "agent_pkt0"
 
 #endif /* __VR_DPDK_USOCKET_H__ */

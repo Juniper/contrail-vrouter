@@ -69,21 +69,15 @@ client_init_Client(Client *client, const char *path) {
 
 
 static int
-client_init_path(Client *client, const char *path) {
-
-    char *basename_path = NULL;
-
+client_init_path(Client *client, const char *path)
+{
     if (!client || !path || strlen(path) == 0 || strlen(path) > (UNIX_PATH_MAX - 1)) {
         fprintf(stderr, "%s(): Error initializing client path: no client\n",
             __func__);
         return E_CLIENT_ERR_FARG;
     }
-   basename_path = basename((char *)path);
-
-   strncpy(client->socket_path, path, strlen(path));
-
-   strncpy(client->sh_mem_path, basename_path, strlen(basename_path));
-
+   strncpy(client->socket_path, path, sizeof(client->socket_path));
+   strncpy(client->sh_mem_path, path, sizeof(client->sh_mem_path));
 
    return E_CLIENT_OK;
 }
