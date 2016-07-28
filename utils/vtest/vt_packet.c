@@ -9,6 +9,7 @@
 #include <libxml/parser.h>
 
 #include <vtest.h>
+#include <nl_util.h>
 #include "include/vt_packet.h"
 #include <vt_main.h>
 #include <vt_gen_message_modules.h>
@@ -18,6 +19,7 @@
 #include <vr_message.h>
 #include <vr_packet.h>
 #include <vr_interface.h>
+#include <vr_dpdk_usocket.h>
 
 #include "vt_packet.h"
 
@@ -256,9 +258,10 @@ tx_rx_pcap_test(struct vtest *test) {
     char src_vif_ctrl_sock[UNIX_PATH_MAX] = {0};
     char dst_vif_ctrl_sock[UNIX_PATH_MAX] = {0};
 
-
-    snprintf(src_vif_ctrl_sock, UNIX_PATH_MAX, "/var/run/vrouter/uvh_vif_%d", test->packet_tx.vif_id);
-    snprintf(dst_vif_ctrl_sock, UNIX_PATH_MAX, "/var/run/vrouter/uvh_vif_%d", test->packet_rx[0].vif_id);
+    snprintf(src_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
+        vr_socket_dir, test->packet_tx.vif_id);
+    snprintf(dst_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
+        vr_socket_dir, test->packet_rx[0].vif_id);
 
 
     struct tx_rx_handler tx_rx_handler;

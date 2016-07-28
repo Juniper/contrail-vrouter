@@ -105,9 +105,11 @@ vr_uvhost_start(void *arg)
 
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_UNIX;
-    strncpy(sun.sun_path, VR_UVH_NL_SOCK, sizeof(sun.sun_path) - 1);
+    strncpy(sun.sun_path, vr_socket_dir, sizeof(sun.sun_path) - 1);
+    strncat(sun.sun_path, "/"VR_UVH_NL_SOCK_NAME, sizeof(sun.sun_path)
+        - strlen(sun.sun_path) - 1);
 
-    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+    mkdir(vr_socket_dir, VR_DEF_SOCKET_DIR_MODE);
     unlink(sun.sun_path);
     ret = bind(s, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
@@ -125,7 +127,7 @@ vr_uvhost_start(void *arg)
     vr_uvhost_fds_init();
 
     if (vr_uvhost_add_fd(vr_dpdk.uvhost_event_fd, UVH_FD_READ, NULL, NULL)) {
-        vr_uvhost_log("    error adding server event FD %d\n", 
+        vr_uvhost_log("    error adding server event FD %d\n",
                       vr_dpdk.uvhost_event_fd);
         goto error;
     }
