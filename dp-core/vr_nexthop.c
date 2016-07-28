@@ -773,12 +773,17 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         unsigned int pkt_src, bool *flood_to_vms)
 {
     int handled = 1;
+    bool flood = false;
     unsigned short trap, rt_flags, drop_reason, pull_len  = 0;
+
     l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
+
     struct vr_eth *eth;
     struct vr_arp *sarp;
     struct vr_nexthop *src_nh;
     struct vr_ip6 *ip6;
+
+    struct vr_packet *pkt_c = NULL;
 
     /*
      * The vlan tagged packets are meant to be handled only by VM's
@@ -836,7 +841,7 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
         /*
          * If packet is identified as known packet, we always trap
-         * it to Agentm with the exception of DHCP. DHCP can be flooded
+         * it to agent with the exception of DHCP. DHCP can be flooded
          * depending on the configuration on VMI or L2 route flags
          */
         if (l4_type != L4_TYPE_UNKNOWN) {
@@ -849,12 +854,27 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                     trap = false;
             } else if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
                 trap = false;
+            } else if (l4_type == L4_TYPE_NEIGHBOUR_ADVERTISEMENT) {
+                flood = true;
             }
 
+            if (trap && flood) {
+                pkt_c = nh_mcast_clone(pkt, AGENT_PKT_HEAD_SPACE);
+                if (!pkt_c) {
+                    trap = false;
+                }
+            }
 
             if (trap) {
-                vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                return handled;
+                if (flood) {
+                    vr_trap(pkt_c, fmd->fmd_dvrf,
+                            AGENT_TRAP_L3_PROTOCOLS, NULL);
+                    goto unhandled;
+                } else {
+                    vr_trap(pkt, fmd->fmd_dvrf,
+                            AGENT_TRAP_L3_PROTOCOLS, NULL);
+                    return handled;
+                }
             }
         }
     }

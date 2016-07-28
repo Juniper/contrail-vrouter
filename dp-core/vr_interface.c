@@ -231,10 +231,6 @@ free_pkt:
     return 0;
 }
 
-/* agent driver */
-#define AGENT_PKT_HEAD_SPACE (sizeof(struct vr_eth) + \
-        sizeof(struct agent_hdr))
-
 static unsigned char *
 agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
