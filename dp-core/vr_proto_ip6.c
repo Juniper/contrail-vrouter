@@ -562,6 +562,8 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
                 return L4_TYPE_ROUTER_SOLICITATION;
             if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL))
                 return L4_TYPE_NEIGHBOUR_SOLICITATION;
+            if (icmph && (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_AD))
+                return L4_TYPE_NEIGHBOUR_ADVERTISEMENT;
         }
 
         if (ip6->ip6_nxt == VR_IP_PROTO_UDP) {
