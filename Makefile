@@ -41,7 +41,6 @@ SANDESH_BINS := $(SANDESH_SRC_ROOT)/sandesh/gen-c/vr_types.o
 SANDESH_LIB_BINS := $(SANDESH_SRC_ROOT)sandesh/library/c/sandesh.o
 SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/protocol/thrift_protocol.o
 SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/protocol/thrift_binary_protocol.o
-SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_transport.o
 SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_memory_buffer.o
 SANDESH_LIB_BINS += $(SANDESH_SRC_ROOT)sandesh/library/c/transport/thrift_fake_transport.o
 

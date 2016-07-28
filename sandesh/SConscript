@@ -27,7 +27,6 @@ sandesh_transport_sources = [
                     '#tools/sandesh/library/c/transport/thrift_fake_transport.c',
                     '#tools/sandesh/library/c/transport/thrift_memory_buffer.c',
                     '#tools/sandesh/library/c/transport/thrift_memory_buffer.h',
-                    '#tools/sandesh/library/c/transport/thrift_transport.c',
                     '#tools/sandesh/library/c/transport/thrift_transport.h',
                  ]
 
