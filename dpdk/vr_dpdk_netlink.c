@@ -5,6 +5,7 @@
  * All rights reserved
  */
 
+#include "nl_util.h"
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_message.h"
@@ -246,9 +247,11 @@ vr_nl_uvhost_connect(void)
 
     memset(&nl_sun, 0, sizeof(nl_sun));
     nl_sun.sun_family = AF_UNIX;
-    strncpy(nl_sun.sun_path, VR_NL_UVH_SOCK, sizeof(nl_sun.sun_path) - 1);
+    strncpy(nl_sun.sun_path, vr_socket_dir, sizeof(nl_sun.sun_path) - 1);
+    strncat(nl_sun.sun_path, "/"VR_NL_UVH_SOCK_NAME, sizeof(nl_sun.sun_path)
+        - strlen(nl_sun.sun_path) - 1);
 
-    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+    mkdir(vr_socket_dir, VR_DEF_SOCKET_DIR_MODE);
     unlink(nl_sun.sun_path);
     ret = bind(s, (struct sockaddr *) &nl_sun, sizeof(nl_sun));
     if (ret == -1) {
@@ -263,7 +266,10 @@ vr_nl_uvhost_connect(void)
      */
     memset(&uvh_sun, 0, sizeof(uvh_sun));
     uvh_sun.sun_family = AF_UNIX;
-    strncpy(uvh_sun.sun_path, VR_UVH_NL_SOCK, sizeof(uvh_sun.sun_path) - 1);
+    strncpy(uvh_sun.sun_path, vr_socket_dir, sizeof(uvh_sun.sun_path) - 1);
+    strncat(uvh_sun.sun_path, "/"VR_UVH_NL_SOCK_NAME, sizeof(uvh_sun.sun_path)
+        - strlen(uvh_sun.sun_path) - 1);
+
     ret = vr_dpdk_retry_connect(s, (struct sockaddr *) &uvh_sun, sizeof(uvh_sun));
     if (ret == -1) {
         RTE_LOG(ERR, VROUTER, "    error connecting uvhost socket FD %d to %s:"
