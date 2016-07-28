@@ -130,7 +130,7 @@ vr_response_process(void *sresp)
     vr_response *resp = (vr_response *)sresp;
 
     if (resp->resp_code < 0)
-        printf("%s\n", strerror(-resp->resp_code));
+        printf("%s: %s\n", __func__, strerror(-resp->resp_code));
 
     return;
 }

@@ -758,7 +758,7 @@ vhost_create(void)
     if ((ret = nl_recvmsg(cl)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp && resp->nl_op)
-            printf("%s\n", strerror(resp->nl_op));
+            printf("%s: %s\n", __func__, strerror(resp->nl_op));
     }
 #elif defined(__FreeBSD__)
     struct ifreq ifr = { 0 };

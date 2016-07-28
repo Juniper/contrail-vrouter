@@ -7,10 +7,13 @@
 
 #include "vr_dpdk.h"
 #include "vr_btable.h"
+#include "nl_util.h"
 
-#include <fcntl.h>
+#include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <rte_errno.h>
 
@@ -139,6 +142,7 @@ vr_dpdk_flow_mem_init(void)
     struct vr_hugepage_info *hpi;
     char *file_name, *touse_file_name = NULL;
     struct stat f_stat;
+    char shm_file[VR_UNIX_PATH_MAX];
 
     if (!vr_oflow_entries)
         vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
@@ -146,7 +150,13 @@ vr_dpdk_flow_mem_init(void)
     flow_table_size = VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE;
 
     if (no_huge_set) {
-        touse_file_name = "flow";
+        /* Create a shared memory under the socket directory. */
+        ret = snprintf(shm_file, sizeof(shm_file), "%s/flow.shmem", vr_socket_dir);
+        if (ret >= sizeof(shm_file)) {
+            RTE_LOG(ERR, VROUTER, "Error creating shared memory file\n");
+            return -ENOMEM;
+        }
+        touse_file_name = shm_file;
     } else {
         ret = vr_hugepage_info_init();
         if (ret < 0) {
@@ -179,13 +189,9 @@ vr_dpdk_flow_mem_init(void)
     }
 
     if (touse_file_name) {
-        if (no_huge_set) {
-            fd = shm_open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-        } else {
-            fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-        }
+        fd = open(touse_file_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         if (fd == -1) {
-            RTE_LOG(ERR, VROUTER, "Error opening file %s: %s (%d)\n",
+            RTE_LOG(ERR, VROUTER, "Error opening file \"%s\": %s (%d)\n",
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }

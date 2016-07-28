@@ -51,6 +51,7 @@ vtest_src = [
                 'vt_gen_sandesh_expect.c',
                 'vt_sandesh_response.c',
                 'vt_process_xml.c',
+                'vhost/lib/libjnprvnet.a'
             ]
 
 

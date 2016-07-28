@@ -34,7 +34,7 @@ sh_mem_init_fd(const char* file_path, int *fd) {
     * Access permissions for shared memory is set to:
     *   rw-|---|---|
     */
-    ret_fd = shm_open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+    ret_fd = open(file_path, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
     if (ret_fd < 0 ) {
         fprintf(stderr, "%s(): Error initing shared memory: %s (%d)\n",
             __func__, strerror(errno), errno);
@@ -56,7 +56,7 @@ sh_mem_unlink(const char *path) {
         return E_SH_MEM_ERR_FARG;
     }
 
-    ret = shm_unlink(path);
+    ret = unlink(path);
     if (ret != 0 )
         return E_SH_MEM_ERR_SHM_UNLINK;
 

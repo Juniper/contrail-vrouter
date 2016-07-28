@@ -10,8 +10,13 @@
 extern "C" {
 #endif
 
+#include <net/if.h> /* For IFNAMSIZ */
+#include <stdbool.h> /* For bool */
 #include "vr_utils.h"
 #include "vr_response.h"
+
+#define VR_DEF_NETLINK_PORT         20914
+#define VR_DEF_SOCKET_DIR           "/var/run/vrouter"
 
 #define NL_RESP_DEFAULT_SIZE        512
 #define NL_MSG_DEFAULT_SIZE         4096
@@ -21,7 +26,8 @@ extern "C" {
 #define NL_MSG_TYPE_GEN_CTRL        2
 #define NL_MSG_TYPE_FMLY            3
 
-#define VR_NETLINK_PROTO_DEFAULT    0xFFFFFFFF
+#define VR_NETLINK_PROTO_DEFAULT    -1
+#define VR_NETLINK_PROTO_TEST       -2
 
 struct nl_response {
     uint8_t *nl_data;
@@ -73,6 +79,9 @@ struct genl_ctrl_message {
 
 /* Suppress NetLink error messages */
 extern bool vr_ignore_nl_errors;
+extern char *vr_socket_dir;
+extern uint16_t vr_netlink_port;
+
 
 extern struct nl_client *nl_register_client(void);
 extern void nl_free_client(struct nl_client *cl);
@@ -120,7 +129,7 @@ extern char *vr_proto_string(unsigned short);
 
 extern int vr_recvmsg(struct nl_client *cl, bool dump);
 extern int vr_sendmsg(struct nl_client *, void *, char *);
-extern struct nl_client *vr_get_nl_client(unsigned int);
+extern struct nl_client *vr_get_nl_client(int);
 
 extern int vr_response_common_process(vr_response *, bool *);
 

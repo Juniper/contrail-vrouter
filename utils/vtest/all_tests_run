@@ -2,10 +2,7 @@
 ##
 ## Run All vRouter/DPDK Tests
 ##
-## To run this script:
-##  1. Create /etc/contrail/contrail-vrouter-agent.conf with platform=dpdk
-##  2. Install fackechroot
-##  3. Run scons vrouter
+## To run this script just run: scons vrouter
 ##
 
 ## Taskset to run vRouter/DPDK.
@@ -18,12 +15,10 @@ VROUTER_DEF_ARGS="--no-daemon --no-huge --vr_packet_sz 2048"
 RTE_CONFIGS="/var/run/.rte_config /home/${USER}/.rte_config"
 ## vTest binary name.
 VTEST="vrouter/utils/vtest/vtest"
-## vRouter/DPDK sockets directory
+## vRouter/DPDK sockets subdirectory
 VROUTER_SOCKETS="/var/run/vrouter"
-## Agent configuration file.
-AGENT_CONF="/etc/contrail/contrail-vrouter-agent.conf"
 ## NetLink TCP port to check if vRouter is started.
-DPDK_NETLINK_TCP_PORT=20914
+DPDK_NETLINK_PORT="20914"
 
 ## Global vRouter/DPDK process ID.
 VROUTER_PID=""
@@ -83,25 +78,26 @@ all_skip () {
 
 vrouter_run () {
     for _conf in ${RTE_CONFIGS}; do
-        rm -f "${_conf}"
+        rm -f "${_conf}" 2> /dev/null
     done
 
-    export FAKECHROOT_AF_UNIX_PATH="${BUILD_DIR}"
-    rm -rdf "${BUILD_DIR}${VROUTER_SOCKETS}"
-    mkdir -p "${BUILD_DIR}${VROUTER_SOCKETS}"
     if [ -f "${LOG_FILE}" ]; then
-        fakechroot chroot "/" sh -c \
-            "cd $(pwd) && ${TASKSET} ${BUILD_DIR}/${VROUTER} ${VROUTER_DEF_ARGS} >> ${LOG_FILE}" &
+        ${TASKSET} "${BUILD_DIR}/${VROUTER}" ${VROUTER_DEF_ARGS} \
+            --vr_socket_dir "${BUILD_DIR}${VROUTER_SOCKETS}" \
+            --vr_netlink_port "${DPDK_NETLINK_PORT}" \
+            >> ${LOG_FILE} &
     else
-        fakechroot chroot "/" sh -c \
-            "cd $(pwd) && ${TASKSET} ${BUILD_DIR}/${VROUTER} ${VROUTER_DEF_ARGS}" &
+        ${TASKSET} "${BUILD_DIR}/${VROUTER}" ${VROUTER_DEF_ARGS} \
+            --vr_socket_dir "${BUILD_DIR}${VROUTER_SOCKETS}" \
+            --vr_netlink_port "${DPDK_NETLINK_PORT}" \
+            &
     fi
     VROUTER_PID="${!}"
 
     ## Wait for vRouter to start...
     _count=1
     sleep 1
-    while ! lsof -ni:${DPDK_NETLINK_TCP_PORT} -sTCP:LISTEN > /dev/null; do
+    while ! lsof -ni:${DPDK_NETLINK_PORT} -sTCP:LISTEN > /dev/null; do
         _count=$((${_count} + 1))
         if [ ${_count} -gt ${VROUTER_TIMEOUT} ]; then
             log "Error waiting for vRouter to start"
@@ -144,15 +140,16 @@ run_all () {
     for _test in ${_all_tests}; do
         local _name="${_test}"
 
-        if [ "${#_name}" -gt 60 ]; then
-            _name="..."$(echo "${_name}" | rev | cut -c -57 | rev)
+        if [ "${#_name}" -gt 50 ]; then
+            _name="..."$(echo "${_name}" | rev | cut -c -50 | rev)
         fi
         log "===> ${_name}"
         vrouter_run
 
-        export FAKECHROOT_AF_UNIX_PATH="${BUILD_DIR}"
-        fakechroot chroot "/" \
-            sh -c "cd $(pwd) && ${BUILD_DIR}/${VTEST} ${_test}"
+        "${BUILD_DIR}/${VTEST}" \
+            --vr_socket_dir "${BUILD_DIR}${VROUTER_SOCKETS}" \
+            --vr_netlink_port "${DPDK_NETLINK_PORT}" \
+            "${_test}"
         case "${?}" in
         0)
             test_log "${_name}" "PASS"
@@ -176,24 +173,6 @@ run_all () {
 }
 
 env_check () {
-    ## Check the fakechroot is installed
-    if ! which fakechroot > /dev/null; then
-        log "No fakechroot installed."
-        all_skip
-    fi
-
-    ## Check the Agent configuration file is available.
-    if ! [ -f "${AGENT_CONF}" ]; then
-        log "No ${AGENT_CONF} found."
-        all_skip
-    fi
-
-    ## Check the Agent configuration file is for DPDK platform.
-    if ! cat "${AGENT_CONF}" | grep "platform.*=.*dpdk" > /dev/null; then
-        log "No \"platform=dpdk\" found in ${AGENT_CONF##*/}."
-        all_skip
-    fi
-
     ## Check if vRouter/DPDK binary is available.
     if ! [ -x "${BUILD_DIR}/${VROUTER}" ]; then
         log "No vRouter/DPDK binary found ${BUILD_DIR}/${VROUTER}"
@@ -218,13 +197,24 @@ while getopts "b:x:t:l:h" opt; do
 done
 shift $((${OPTIND} - 1))
 
+## Create socket directory.
+mkdir -p "${BUILD_DIR}${VROUTER_SOCKETS}"
+
+## Rundomize NetLink port.
+DPDK_NETLINK_PORT=$((${DPDK_NETLINK_PORT} + ($$ % ${DPDK_NETLINK_PORT})))
+## Make sure the NetLink port is unused.
+while lsof -ni:${DPDK_NETLINK_PORT} -sTCP:LISTEN > /dev/null; do
+    DPDK_NETLINK_PORT=$((${DPDK_NETLINK_PORT} + 1))
+done
+
 if [ -n "${LOG_FILE}" ]; then
     touch "${LOG_FILE}"
 fi
 
 log "[${0##*/}] Running all vRouter/DPDK tests..."
 
-killall -9 "${VROUTER##*/}"
+## Running killall as root kills other users instances
+#killall -9 "${VROUTER##*/}"
 env_check
 run_all "${*}"
 
@@ -241,3 +231,4 @@ if [ -n "${FAILED_TESTS}" ]; then
 fi
 
 log "[${0##*/}] Done."
+exit 0
