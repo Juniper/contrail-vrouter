@@ -706,6 +706,14 @@ dpdk_exit(void)
         }
     }
 
+    RTE_LOG(INFO, VROUTER, "Releasing TAP devices...\n");
+    for (i = 0; i < VR_DPDK_MAX_TAP_INTERFACES; i++) {
+        if (vr_dpdk.tapdevs[i].tapdev_fd > 0) {
+            close(vr_dpdk.tapdevs[i].tapdev_fd);
+            vr_dpdk.tapdevs[i].tapdev_fd = 0;
+        }
+    }
+
     RTE_LOG(INFO, VROUTER, "Closing eth devices...\n");
     for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
         if (vr_dpdk.ethdevs[i].ethdev_ptr != NULL) {
