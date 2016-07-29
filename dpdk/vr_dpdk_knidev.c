@@ -573,13 +573,23 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     struct rte_kni *kni;
     struct rte_config *rte_conf = rte_eal_get_configuration();
 
-    if (!vr_dpdk.kni_inited) {
-        /*
-         * If the host does not support KNIs (i.e. RedHat), we'll get
-         * a panic here.
-         */
-        rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
-        vr_dpdk.kni_inited = true;
+    /* Probe KNI. */
+    if (vr_dpdk.kni_state == 0) {
+        /* Check if the KNI is available. */
+        if (access("/dev/kni", R_OK | W_OK)) {
+            vr_dpdk.kni_state = -1;
+        } else {
+            RTE_LOG(INFO, VROUTER,
+                "    initializing KNI with %d maximum interfaces\n",
+                VR_DPDK_MAX_KNI_INTERFACES);
+            rte_kni_init(VR_DPDK_MAX_KNI_INTERFACES);
+            vr_dpdk.kni_state = 1;
+        }
+    }
+
+    if (vr_dpdk.kni_state == -1) {
+        RTE_LOG(INFO, VROUTER, "    KNI is not available\n");
+        return -ENOTSUP;
     }
 
     /* Check if port is valid. */
@@ -632,7 +642,7 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     /* allocate KNI device */
     kni = rte_kni_alloc(vr_dpdk.rss_mempool, &kni_conf, &kni_ops);
     if (kni == NULL) {
-        RTE_LOG(ERR, VROUTER, "    error allocation KNI device %s"
+        RTE_LOG(ERR, VROUTER, "    error allocating KNI device %s"
             " at eth device %" PRIu8 "\n", vif->vif_name, port_id);
         return -ENOMEM;
     }
@@ -661,6 +671,9 @@ vr_dpdk_knidev_release(struct vr_interface *vif)
 {
     int i;
     struct rte_kni *kni = vif->vif_os;
+
+    RTE_LOG(INFO, VROUTER, "    releasing vif %u KNI device %s\n",
+            vif->vif_idx, vif->vif_name);
 
     vif->vif_os = NULL;
 
