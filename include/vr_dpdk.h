@@ -180,6 +180,8 @@ extern unsigned vr_packet_sz;
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
 #define VR_DPDK_SLEEP_NO_PACKETS_US 0
 #define VR_DPDK_YIELD_NO_PACKETS    1
+/* Sleep (in US) no packets received on any TAP devs (use 0 to disable) */
+#define VR_DPDK_TAPDEV_SLEEP_NO_PACKETS_US 500
 /* Timers handling periodicity in US */
 #define VR_DPDK_SLEEP_TIMER_US      100
 /* KNI handling periodicity in US */
@@ -194,6 +196,8 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_RETRY_CONNECT_SECS  64
 /* Maximum number of KNI devices (vhost0 + monitoring) */
 #define VR_DPDK_MAX_KNI_INTERFACES  5
+/* Maximum number of TAP devices (vhost0 + monitoring) */
+#define VR_DPDK_MAX_TAP_INTERFACES  5
 /* String buffer size (for logs and EAL arguments) */
 #define VR_DPDK_STR_BUF_SZ          512
 /* Log timestamp format */
@@ -248,7 +252,7 @@ extern unsigned vr_packet_sz;
  * DPDK LCore IDs
  */
 enum {
-    VR_DPDK_KNI_LCORE_ID = 0,
+    VR_DPDK_KNITAP_LCORE_ID = 0,
     VR_DPDK_TIMER_LCORE_ID,
     VR_DPDK_UVHOST_LCORE_ID,
     /*
@@ -451,6 +455,18 @@ struct vr_dpdk_ethdev {
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
 };
 
+/* Tapdev configuration. */
+struct vr_dpdk_tapdev {
+    /* Tapdev file descriptor. */
+    volatile int tapdev_fd;
+    /* RX ring. */
+    struct rte_ring *tapdev_rx_ring;
+    /* TX ring. */
+    struct rte_ring *tapdev_tx_ring;
+    /* Pointer to vif. */
+    struct vr_interface *tapdev_vif;
+};
+
 struct vr_dpdk_global {
     /**********************************************************************/
     /* Frequently used fields */
@@ -507,16 +523,23 @@ struct vr_dpdk_global {
     uint16_t monitorings[VR_MAX_INTERFACES] __rte_cache_aligned;
     /* Table of ethdevs */
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS] __rte_cache_aligned;
+    /* Table of tapdevs. */
+    struct vr_dpdk_tapdev tapdevs[VR_DPDK_MAX_TAP_INTERFACES] __rte_cache_aligned;
     /* VLAN forwarding interface name */
     char vlan_name[VR_INTERFACE_NAME_LEN];
     /* VLAN forwarding interface ring */
     struct rte_ring *vlan_ring;
-    /* VLAN forwarding KNI handler */
-    struct rte_kni *vlan_kni;
+    /* VLAN forwarding device pointer. */
+    void *vlan_dev;
     /* Dedicated IO lcore for SR-IOV VF. */
     unsigned vf_lcore_id;
-    /* KNI module inited global flag */
-    bool kni_inited;
+    /*
+     * KNI global state flag:
+     *  0 - initial state
+     *  1 - KNI is enabled
+     * -1 - KNI is not available, so TAP interfaces are used instead
+     */
+    int kni_state;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
@@ -670,6 +693,30 @@ static inline int vr_dpdk_if_lock()
 /* Unlock interface operations */
 static inline int vr_dpdk_if_unlock()
 { return pthread_mutex_unlock(&vr_dpdk.if_lock); }
+
+/*
+ * vr_dpdk_tapdev.c
+ */
+/* Init TAP device. */
+int vr_dpdk_tapdev_init(struct vr_interface *vif);
+/* Release TAP device. */
+int vr_dpdk_tapdev_release(struct vr_interface *vif);
+/* Init TAP RX queue. */
+struct vr_dpdk_queue *
+vr_dpdk_tapdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
+    unsigned queue_id);
+/* Init TAP TX queue. */
+struct vr_dpdk_queue *
+vr_dpdk_tapdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
+    unsigned queue_id);
+/* RX/TX to/from all the TAP devices. */
+uint64_t vr_dpdk_tapdev_rxtx(void);
+/* RX a burst of packets from the TAP device. */
+unsigned vr_dpdk_tapdev_rx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
+        unsigned num);
+/* TX a burst of packets to the TAP device. */
+unsigned vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
+        unsigned num);
 
 /*
  * vr_dpdk_knidev.c
