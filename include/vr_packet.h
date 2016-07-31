@@ -412,7 +412,12 @@ vr_ip_incremental_csum(struct vr_ip *ip, unsigned int diff)
 {
     unsigned int csum;
 
-    diff &= 0xffff;
+    diff = (diff >> 16) + (diff & 0xffff);
+    if (diff >> 16) {
+        diff &= 0xffff;
+        diff += 1;
+    }
+
     csum = ~(ip->ip_csum) & 0xffff;
     csum += diff;
     csum = (csum >> 16) + (csum & 0xffff);
@@ -705,6 +710,7 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
 
     return true;
 }
+
 
 
 #define VR_TCP_FLAG_FIN         0x0001
