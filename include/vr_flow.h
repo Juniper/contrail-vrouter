@@ -447,6 +447,7 @@ extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
 unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);
 unsigned int vr_flow_table_used_total_entries(struct vrouter *);
-
+int vr_flow_update_ecmp_index(struct vrouter *, struct vr_flow_entry *,
+        unsigned int, struct vr_forwarding_md *);
 
 #endif /* __VR_FLOW_H__ */
