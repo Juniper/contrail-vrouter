@@ -371,7 +371,7 @@ flow_dump_legend(void)
     printf("L=Link Local Port)\n");
 
     printf(" Other:K(nh)=Key_Nexthop, S(nh)=RPF_Nexthop\n");
-    printf(" Flags:E=Evicted, Ec=Evict Candidate, N=New Flow, M=Modified Dm=Delete Marked\n");
+    printf(" Flags:E=Evicted, Ec=Evict Candidate, N=New Flow, M=Modified Dm=Delete Marked Rt= Route Lookup\n");
     printf("TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established, D=Dead\n");
     printf("\n");
 
@@ -1362,6 +1362,8 @@ flow_dump_table(struct flow_table *ft)
                 printf("M");
             if (fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED)
                 printf("Dm");
+            if (fe->fe_flags & VR_FLOW_FLAG_ROUTE_LOOKUP)
+                printf("Rt");
 
             printf(", ");
             if (fe->fe_key.flow4_proto == VR_IP_PROTO_TCP) {

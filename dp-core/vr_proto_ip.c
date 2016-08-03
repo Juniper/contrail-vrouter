@@ -709,6 +709,7 @@ vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
 
     if ((fe->fe_flags & VR_FLOW_FLAG_VRFT) && pkt->vp_nh &&
             ((pkt->vp_nh->nh_vrf != fmd->fmd_dvrf) ||
+             (fe->fe_flags & VR_FLOW_FLAG_ROUTE_LOOKUP) ||
              (pkt->vp_nh->nh_flags & NH_FLAG_ROUTE_LOOKUP))) {
         /* only if pkt->vp_nh was set before... */
         pkt->vp_nh = vr_inet_ip_lookup(fmd->fmd_dvrf, ip->ip_daddr);
