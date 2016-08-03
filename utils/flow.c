@@ -1933,7 +1933,8 @@ void run_perf(void) {
     int i = 0;
     for (i = 0; i < perf; i++) {
         flow_req.fr_action = VR_FLOW_ACTION_HOLD;
-        flow_req.fr_flow_dport = htons(i);
+        flow_req.fr_flow_sport = htons(sport + (i / 65535));
+        flow_req.fr_flow_dport = htons(i % 65535);
         flow_make_flow_req_perf(&flow_req);
     }
 
@@ -1959,8 +1960,11 @@ void run_perf(void) {
     printf("Created %d HOLD entries in %d msec\n", perf, diff_ms);
 
     int flow_index[perf];
-    for (i = 0; i < perf; i++)
+    int flow_genid[perf];
+    for (i = 0; i < perf; i++) {
         flow_index[i] = -1;
+        flow_genid[i] = 0;
+    }
     struct flow_table *ft = &main_table;
     for (i = 0; i < ft->ft_num_entries; i++) {
         fe = flow_get(i);
@@ -1969,7 +1973,15 @@ void run_perf(void) {
         if (fe->fe_key.flow4_proto != proto)
             continue;
 
-        flow_index[ntohs(fe->fe_key.flow4_dport)] = i;
+        int index = (ntohs(fe->fe_key.flow4_sport) - sport) * 65535 +
+            ntohs(fe->fe_key.flow4_dport);
+        if (index > 2000000) {
+            printf("Error index %d sport %x dport %x\n", index,
+                   fe->fe_key.flow4_sport, fe->fe_key.flow4_dport);
+        }
+
+        flow_index[index] = i;
+        flow_genid[index] = fe->fe_gen_id;
     }
 
     gettimeofday(&last_time, NULL);
@@ -1977,8 +1989,8 @@ void run_perf(void) {
     for (i = 0; i < perf; i++) {
         memcpy(flow_req.fr_flow_ip, (uint8_t *)&dip, sizeof(dip));
         memcpy(flow_req.fr_flow_ip + 4, (uint8_t *)&sip, sizeof(sip));
-        flow_req.fr_flow_sport = htons(i);
-        flow_req.fr_flow_dport = htons(sport);
+        flow_req.fr_flow_sport = htons(i % 65535);
+        flow_req.fr_flow_dport = htons(sport + (i / 65535));
         flow_req.fr_index = -1;
         flow_req.fr_action = VR_FLOW_ACTION_FORWARD;
         more = true;
@@ -1986,10 +1998,11 @@ void run_perf(void) {
 
         memcpy(flow_req.fr_flow_ip, (uint8_t *)&sip, sizeof(sip));
         memcpy(flow_req.fr_flow_ip + 4, (uint8_t *)&dip, sizeof(dip));
-        flow_req.fr_flow_sport = htons(sport);
-        flow_req.fr_flow_dport = htons(i);
+        flow_req.fr_flow_sport = htons(sport + (i / 65535));
+        flow_req.fr_flow_dport = htons(i % 65535);
         flow_req.fr_index = flow_index[i];
         flow_req.fr_action = VR_FLOW_ACTION_FORWARD;
+        flow_req.fr_gen_id = flow_genid[i];
         if (i == (perf - 1)) {
             more = false;
         }
@@ -2018,13 +2031,6 @@ void run_perf(void) {
             perf, perf, diff_ms);
 
     free(flow_req.fr_flow_ip);
-
-    for (i = 0; i < ft->ft_num_entries; i++) {
-        fe = flow_get(i);
-        if (fe->fe_type != VP_TYPE_IP)
-            continue;
-        flow_do_op(i, 'i');
-    }
 }
 
 void run_flush(void) {
@@ -2063,26 +2069,32 @@ Usage(void)
     printf("           [--show-evicted]\n");
     printf("           [-r]\n");
     printf("           [-s]\n");
+    printf("           [-p flow_count]\n");
+    printf("           [-b bunch_count]\n");
+    printf("           [-F]\n");
     printf("\n");
 
-    printf("-f <flow_index> Set forward action for flow at flow_index <flow_index>\n");
-    printf("-d <flow_index> Set drop action for flow at flow_index <flow_index>\n");
-    printf("-i <flow_index> Invalidate flow at flow_index <flow_index>\n");
-    printf("--get           Get and print flow entry in a particular index\n");
-    printf("                e.g.: --get <flow_index>\n");
-    printf("--mirror        Mirror index to mirror to\n");
-    printf("--match         Match criteria separated by a '&'; IP:PORT separated by a ','\n");
-    printf("                e.g.: --match 1.1.1.1:20\n");
-    printf("                      --match \"1.1.1.1:20,2.2.2.2:22\"\n");
-    printf("                      --match \"[fe80::225:90ff:fec3:afa]:22\"\n");
-    printf("                      --match \"10.204.217.10:56910 & vrf 0 & proto tcp\"\n");
-    printf("                      --match \"10.204.217.10:56910,169.254.0.3:22 & vrf 0 & proto tcp\"\n");
-    printf("                              proto {tcp, udp, icmp, icmp6, sctp}\n");
-    printf("-l              List flows\n");
-    printf("--show-evicted  Show evicted flows too\n");
-    printf("-r              Start dumping flow setup rate\n");
-    printf("-s              Start dumping flow stats\n");
-    printf("--help          Print this help\n");
+    printf("-f <flow_index>  Set forward action for flow at flow_index <flow_index>\n");
+    printf("-d <flow_index>  Set drop action for flow at flow_index <flow_index>\n");
+    printf("-i <flow_index>  Invalidate flow at flow_index <flow_index>\n");
+    printf("-p <flow_count>  Profile time to add/delete flow entries\n");
+    printf("-b <bunch_count> Bunch flow messages in one netlink message\n");
+    printf("-F               Flush all the flows\n");
+    printf("--get            Get and print flow entry in a particular index\n");
+    printf("                 e.g.: --get <flow_index>\n");
+    printf("--mirror         Mirror index to mirror to\n");
+    printf("--match          Match criteria separated by a '&'; IP:PORT separated by a ','\n");
+    printf("                 e.g.: --match 1.1.1.1:20\n");
+    printf("                       --match \"1.1.1.1:20,2.2.2.2:22\"\n");
+    printf("                       --match \"[fe80::225:90ff:fec3:afa]:22\"\n");
+    printf("                       --match \"10.204.217.10:56910 & vrf 0 & proto tcp\"\n");
+    printf("                       --match \"10.204.217.10:56910,169.254.0.3:22 & vrf 0 & proto tcp\"\n");
+    printf("                               proto {tcp, udp, icmp, icmp6, sctp}\n");
+    printf("-l               List flows\n");
+    printf("--show-evicted   Show evicted flows too\n");
+    printf("-r               Start dumping flow setup rate\n");
+    printf("-s               Start dumping flow stats\n");
+    printf("--help           Print this help\n");
 
     exit(-EINVAL);
 }
