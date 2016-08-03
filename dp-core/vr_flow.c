@@ -865,7 +865,7 @@ vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
 
     vr_preset(npkt);
 
-    switch (fe->fe_flags & VR_FLOW_FLAG_TRAP_MASK) {
+    switch (fe->fe_flags) {
     default:
         /*
          * agent needs a method to identify new flows from existing flows.
