@@ -51,9 +51,8 @@ typedef enum {
 #define VR_FLOW_FLAG_NAT_MASK       (VR_FLOW_FLAG_SNAT | VR_FLOW_FLAG_SPAT | \
         VR_FLOW_FLAG_DNAT | VR_FLOW_FLAG_DPAT)
 
-/* for TRAP */
-#define VR_FLOW_FLAG_TRAP_ECMP      0x20
-#define VR_FLOW_FLAG_TRAP_MASK      (VR_FLOW_FLAG_TRAP_ECMP)
+/* Flow flags to enforce route lookup after policy */
+#define VR_FLOW_FLAG_ROUTE_LOOKUP   0x20
 
 #define VR_FLOW_FLAG_DELETE_MARKED  0x40
 #define VR_FLOW_BGP_SERVICE         0x80
