@@ -271,6 +271,8 @@ struct vr_interface {
     unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
     int16_t vif_qos_map_index;
+    unsigned short vif_mirror_md_len;
+    unsigned char *vif_mirror_md;
 };
 
 struct vr_interface_settings {

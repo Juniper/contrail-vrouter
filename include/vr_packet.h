@@ -826,13 +826,6 @@ struct vr_vxlan {
 
 #define VR_VXLAN_IBIT               0x08000000
 #define VR_VXLAN_RABIT              0x01000000
-#define VR_UDP_HEAD_SPACE           62 /* eth + Ip + iP + udp */
-#define VR_UDP6_HEAD_SPACE          82 /* eth + Ip + iP6 + udp */
-
-/* Mirror packet can be either MPLSoGre or MPLSoUDP. Lets calculate the
- * highest for head space */
-#define VR_MIRROR_PKT_HEAD_SPACE    (VR_UDP_HEAD_SPACE + sizeof(struct vr_pcap) + \
-                                     VR_MPLS_HDR_LEN + sizeof(struct vr_udp))
 
 /*
  * Mcast packet adds the following before replicating

@@ -103,14 +103,18 @@ vr_mirror_change(struct vr_mirror_entry *mirror, vr_mirror_req *req,
 {
     struct vr_nexthop *nh_old = mirror->mir_nh;
 
-    if (mirror->mir_flags & VR_MIRROR_FLAG_MARKED_DELETE) {
-        mirror->mir_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
+    if (mirror->mir_flags & VR_MIRROR_FLAG_MARKED_DELETE)
         mirror->mir_users++;
-    }
 
-    mirror->mir_flags |= req->mirr_flags;
-    mirror->mir_nh = nh_new;
-    vrouter_put_nexthop(nh_old);
+    mirror->mir_flags = req->mirr_flags;
+    mirror->mir_flags &= ~VR_MIRROR_FLAG_MARKED_DELETE;
+    mirror->mir_rid = req->mirr_rid;
+    mirror->mir_vni = req->mirr_vni;
+    if (nh_old != nh_new) {
+        mirror->mir_nh = nh_new;
+        if (nh_old)
+            vrouter_put_nexthop(nh_old);
+    }
 
     return 0;
 }
@@ -143,16 +147,12 @@ vr_mirror_add(vr_mirror_req *req)
     }
 
     mirror = __vrouter_get_mirror(req->mirr_rid, req->mirr_index);
-    if (mirror) {
-        vr_mirror_change(mirror, req, nh);
-    } else {
+    if (!mirror) {
         mirror = vr_zalloc(sizeof(*mirror), VR_MIRROR_OBJECT);
         mirror->mir_users++;
-        mirror->mir_nh = nh;
-        mirror->mir_rid = req->mirr_rid;
-        mirror->mir_flags = req->mirr_flags;
-        router->vr_mirrors[req->mirr_index] = mirror;
     }
+    ret = vr_mirror_change(mirror, req, nh);
+    router->vr_mirrors[req->mirr_index] = mirror;
 
 generate_resp:
     vr_send_response(ret);
@@ -172,6 +172,7 @@ vr_mirror_make_req(vr_mirror_req *req, struct vr_mirror_entry *mirror,
     req->mirr_users = mirror->mir_users;
     req->mirr_flags = mirror->mir_flags;
     req->mirr_rid = mirror->mir_rid;
+    req->mirr_vni = mirror->mir_vni;
     return;
 }
 
@@ -365,25 +366,26 @@ vr_mirror_meta_entry_del(struct vrouter *router, unsigned int index)
 }
 
 int
-vr_mirror(struct vrouter *router, uint8_t mirror_id,
-          struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
+            struct vr_forwarding_md *fmd, mirror_type_t mtype)
 {
     bool reset = true;
-    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE,
-                 mirror_md_len = 0;
-    unsigned char default_mme[2] = {0xff, 0x0};
+    unsigned int captured_len, clone_len = 0, mirror_md_len = 0;
     unsigned long sec, usec;
-
     void *mirror_md;
     unsigned char *buf;
     struct vr_nexthop *nh, *pkt_nh;
     struct vr_pcap *pcap;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
+    unsigned char default_mme[2] = {0xff, 0x0};
     struct vr_forwarding_md new_fmd;
 
     /* If the packet is already mirrored, dont mirror again */
     if (pkt->vp_flags & VP_FLAG_FROM_DP)
+        return 0;
+
+    if (mtype <= MIRROR_TYPE_UNKNOWN || mtype >= MIRROR_TYPE_MAX)
         return 0;
 
     mirror = router->vr_mirrors[mirror_id];
@@ -399,48 +401,84 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     }
     fmd = &new_fmd;
 
-    if (fmd->fmd_flow_index >= 0) {
-        mme = (struct vr_mirror_meta_entry *)vr_itable_get(router->vr_mirror_md,
-                                                           fmd->fmd_flow_index);
-        if (!mme)
-            return 0;
-        mirror_md_len = mme->mirror_md_len;
-        mirror_md = mme->mirror_md;
-        fmd->fmd_dvrf = mme->mirror_vrf;
-    } else {
-        mirror_md_len = sizeof(default_mme);
-        mirror_md = default_mme;
-    }
-
-    clone_len += mirror_md_len;
     nh = mirror->mir_nh;
+    if (!nh || !(nh->nh_flags & NH_FLAG_VALID))
+        return 0;
+
     pkt = vr_pclone(pkt);
     if (!pkt)
         return 0;
 
-    /* If packet is from fabric, mirror it by adding the required L2
-     * header. If not get the processed headers by resetting the packet
-     * and mirror it
-     */
-    if (pkt->vp_if && (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)) {
-        pkt_nh = pkt->vp_nh;
-        if (pkt_nh && (pkt_nh->nh_flags & NH_FLAG_VALID) &&
-                    (pkt_nh->nh_type == NH_ENCAP)) {
+    /* Mark as mirrored */
+    pkt->vp_flags |= VP_FLAG_FROM_DP;
 
-            reset = false;
+    /* Set the GSO and partial checksum flag */
+    pkt->vp_flags |= (VP_FLAG_FLOW_SET | VP_FLAG_GSO);
+    pkt->vp_flags &= ~VP_FLAG_GRO;
+
+    if (mirror->mir_flags & VR_MIRROR_FLAG_DYNAMIC) {
+
+        clone_len += sizeof(struct vr_pcap);
+
+        if (mtype == MIRROR_TYPE_ACL) {
             if (fmd->fmd_flow_index >= 0) {
-                if (pkt_nh->nh_family == AF_INET)
-                    clone_len += pkt_nh->nh_encap_len;
+                mme = (struct vr_mirror_meta_entry *)
+                    vr_itable_get(router->vr_mirror_md, fmd->fmd_flow_index);
+                if (mme) {
+                    mirror_md_len = mme->mirror_md_len;
+                    mirror_md = mme->mirror_md;
+                }
+            }
+        } else if (mtype == MIRROR_TYPE_PORT_RX) {
+            if (!pkt->vp_if)
+                goto fail;
+
+            mirror_md_len = pkt->vp_if->vif_mirror_md_len;
+            mirror_md = pkt->vp_if->vif_mirror_md;
+        } else {
+            if (!pkt->vp_nh || !pkt->vp_nh->nh_dev)
+             goto fail;
+
+            mirror_md_len = pkt->vp_nh->nh_dev->vif_mirror_md_len;
+            mirror_md = pkt->vp_nh->nh_dev->vif_mirror_md;
+        }
+
+        if (!mirror_md_len) {
+            mirror_md = default_mme;
+            mirror_md_len = sizeof(default_mme);
+        }
+
+        clone_len += mirror_md_len;
+        clone_len += VR_MIRROR_PKT_HEAD_SPACE;
+    } else {
+        clone_len += VR_VXLAN_HDR_LEN;
+        fmd->fmd_label = mirror->mir_vni;
+    }
+
+    if (pkt->vp_if && (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)) {
+        /* No need to mirror the Tunnel headers. So packet cant be reset */
+        reset = false;
+
+        /* Identify whether the packet currently has L2 header. If not a
+         * port mirroring, we need to add the extra L2 header
+         */
+        if (mtype == MIRROR_TYPE_ACL) {
+
+            pkt_nh = pkt->vp_nh;
+            if (pkt_nh && (pkt_nh->nh_flags & NH_FLAG_VALID) &&
+                        (pkt_nh->nh_type == NH_ENCAP) &&
+                        (pkt_nh->nh_family == AF_INET)) {
+
+                clone_len += pkt_nh->nh_encap_len;
+
 
                 if (vr_pcow(pkt, clone_len))
                     goto fail;
                 clone_len = 0;
 
-                if (pkt_nh->nh_family == AF_INET) {
-                    if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
+                if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
                                     pkt_nh->nh_data, pkt_nh->nh_encap_len))
                         goto fail;
-                }
             }
         }
     }
@@ -453,19 +491,14 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
             goto fail;
     }
 
-    pkt->vp_flags |= VP_FLAG_FROM_DP;
-    /* Set the GSO and partial checksum flag */
-    pkt->vp_flags |= (VP_FLAG_FLOW_SET | VP_FLAG_GSO | VP_FLAG_CSUM_PARTIAL);
-    pkt->vp_flags &= ~VP_FLAG_GRO;
-    buf = pkt_push(pkt, mirror_md_len);
-    if (!buf)
-        goto fail;
-
     captured_len = htonl(pkt_len(pkt));
-    if (mirror_md_len)
+    if (mirror_md_len) {
+
+        buf = pkt_push(pkt, mirror_md_len);
+        if (!buf)
+            goto fail;
         memcpy(buf, mirror_md, mirror_md_len);
 
-    if (mirror->mir_flags & VR_MIRROR_PCAP) {
         /* Add the pcap header */
         pcap = (struct vr_pcap *)pkt_push(pkt, sizeof(struct vr_pcap));
         if (!pcap)

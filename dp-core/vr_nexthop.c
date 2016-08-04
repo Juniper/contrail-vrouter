@@ -1423,21 +1423,21 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!fmd)
         goto send_fail;
 
+    head_space = sizeof(struct vr_udp) + VR_ETHER_HLEN;
+
     if (nh->nh_family == AF_INET)
-        head_space = VR_UDP_HEAD_SPACE;
+        head_space += sizeof(struct vr_ip);
     else if (nh->nh_family == AF_INET6)
-        head_space = VR_UDP6_HEAD_SPACE;
+        head_space += sizeof(struct vr_ip6);
     else
         goto send_fail;
 
     if (pkt_head_space(pkt) < head_space) {
-        tmp = vr_palloc_head(pkt, head_space);
-        if (!tmp)
+        tmp = vr_pexpand_head(pkt, head_space - pkt_head_space(pkt));
+        if (!tmp) {
             goto send_fail;
-
+        }
         pkt = tmp;
-        if (!pkt_reserve_head_space(pkt, head_space))
-            goto send_fail;
     }
 
     if (nh->nh_family == AF_INET) {
@@ -1462,6 +1462,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         ip = (struct vr_ip *)(pkt_data(pkt));
         udp = (struct vr_udp *)((char *)ip + ip->ip_hl * 4);
         udp->udp_csum = vr_ip_partial_csum(ip);
+        pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
     } else if (nh->nh_family == AF_INET6) {
         if (nh_udp_tunnel6_helper(pkt, nh) == false) {
@@ -1471,6 +1472,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         ip6 = (struct vr_ip6 *)(pkt_data(pkt));
         udp = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
         udp->udp_csum = vr_ip6_partial_csum(ip6);
+        pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
     }
 
 
