@@ -236,7 +236,6 @@ if sys.platform != 'darwin':
         'sandesh.c',
         'transport/thrift_fake_transport.c',
         'transport/thrift_memory_buffer.c',
-        'transport/thrift_transport.c',
         ]
     for src in sandesh_lib:
         dirname = os.path.dirname(src)
