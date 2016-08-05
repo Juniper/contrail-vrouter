@@ -1859,7 +1859,8 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          * target VM's server from an ECMP-ed service chain.
          */
          if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
-             if (nh->nh_flags & NH_FLAG_POLICY_ENABLED) {
+             if (nh->nh_flags & (NH_FLAG_POLICY_ENABLED |
+                         NH_FLAG_RELAXED_POLICY)) {
                  need_flow_lookup = true;
              } else if ((nh->nh_family == AF_INET) &&
                      (!(nh->nh_flags & NH_FLAG_VNID))) {
