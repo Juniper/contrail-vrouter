@@ -1976,7 +1976,7 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
          */
          if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
              if (nh->nh_flags & (NH_FLAG_POLICY_ENABLED |
-                         NH_FLAG_RELAXED_POLICY)) {
+                         NH_FLAG_FLOW_LOOKUP)) {
                  need_flow_lookup = true;
              }
 

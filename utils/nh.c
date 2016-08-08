@@ -106,6 +106,10 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
             strcat(ptr, "Policy(R), ");
             break;
 
+        case NH_FLAG_FLOW_LOOKUP:
+            strcat(ptr, "Flow Lookup, ");
+            break;
+
         case NH_FLAG_TUNNEL_GRE:
             if (type == NH_TUNNEL)
                 strcat(ptr, "MPLSoGRE, ");

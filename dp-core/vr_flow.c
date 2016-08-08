@@ -1278,7 +1278,8 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     flow_e = vr_find_flow(router, key, pkt->vp_type,  &fe_index);
     if (!flow_e) {
         if (pkt->vp_nh &&
-            (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY))
+            (pkt->vp_nh->nh_flags &
+             (NH_FLAG_RELAXED_POLICY | NH_FLAG_FLOW_LOOKUP)))
             return FLOW_FORWARD;
 
         if (!vr_flow_allow_new_flow(router, pkt, &drop_reason)) {
