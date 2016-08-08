@@ -59,6 +59,7 @@ enum nexthop_type {
 #define NH_FLAG_ROUTE_LOOKUP                0x10000
 #define NH_FLAG_UNKNOWN_UC_FLOOD            0x20000
 #define NH_FLAG_TUNNEL_SIP_COPY             0x40000
+#define NH_FLAG_FLOW_LOOKUP                 0x80000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
