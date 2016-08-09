@@ -10,8 +10,8 @@
 
 typedef void (*vr_uvh_exit_callback_t)(void);
 
-#define VR_UVH_NL_SOCK VR_SOCKET_DIR"/vr_uvh_nl"
-#define VR_NL_UVH_SOCK VR_SOCKET_DIR"/vr_nl_uvh"
+#define VR_UVH_NL_SOCK_NAME "vr_uvh_nl"
+#define VR_NL_UVH_SOCK_NAME "vr_nl_uvh"
 
 int vr_uvhost_init(pthread_t *th, vr_uvh_exit_callback_t exit_fn);
 void *vr_uvhost_start(void *arg);

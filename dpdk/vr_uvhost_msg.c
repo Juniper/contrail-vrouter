@@ -24,7 +24,8 @@
 #include <rte_hexdump.h>
 
 typedef int (*vr_uvh_msg_handler_fn)(vr_uvh_client_t *vru_cl);
-#define uvhm_client_name(vru_cl) (vru_cl->vruc_path + strlen(VR_UVH_VIF_PREFIX))
+#define uvhm_client_name(vru_cl) (vru_cl->vruc_path + strlen(vr_socket_dir) \
+    + sizeof(VR_UVH_VIF_PFX) - 1)
 
 /*
  * Prototypes for user space vhost message handlers
@@ -992,12 +993,14 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
                             msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
 
     memset(&sun, 0, sizeof(sun));
-    strncpy(sun.sun_path, VR_UVH_VIF_PREFIX, sizeof(sun.sun_path) - 1);
+    sun.sun_family = AF_UNIX;
+    strncpy(sun.sun_path, vr_socket_dir, sizeof(sun.sun_path) - 1);
+    strncat(sun.sun_path, "/"VR_UVH_VIF_PFX, sizeof(sun.sun_path)
+        - strlen(sun.sun_path) - 1);
     strncat(sun.sun_path, msg->vrnu_vif_name,
         sizeof(sun.sun_path) - strlen(sun.sun_path) - 1);
-    sun.sun_family = AF_UNIX;
 
-    mkdir(VR_SOCKET_DIR, VR_SOCKET_DIR_MODE);
+    mkdir(vr_socket_dir, VR_DEF_SOCKET_DIR_MODE);
     unlink(sun.sun_path);
 
     /*

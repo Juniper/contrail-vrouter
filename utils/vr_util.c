@@ -4,6 +4,8 @@
  * Copyright (c) 2015, Juniper Networks, Inc.
  * All rights reserved
  */
+
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -36,6 +38,8 @@
 
 /* Suppress NetLink error messages */
 bool vr_ignore_nl_errors = false;
+char *vr_socket_dir = VR_DEF_SOCKET_DIR;
+uint16_t vr_netlink_port = VR_DEF_NETLINK_PORT;
 
 char *
 vr_extract_token(char *string, char token_separator)
@@ -255,15 +259,28 @@ vr_sendmsg(struct nl_client *cl, void *request,
 }
 
 struct nl_client *
-vr_get_nl_client(unsigned int proto)
+vr_get_nl_client(int proto)
 {
     int ret;
-    unsigned int sock_proto = proto;
+    int sock_proto = proto;
     struct nl_client *cl;
 
     cl = nl_register_client();
     if (!cl)
         return NULL;
+
+    /* Do not use ini file if we are in a test mode. */
+    if (proto == VR_NETLINK_PROTO_TEST) {
+        ret = nl_socket(cl, AF_INET, SOCK_STREAM, 0);
+        if (ret <= 0)
+            goto fail;
+
+        ret = nl_connect(cl, get_ip(), vr_netlink_port);
+        if (ret < 0)
+            goto fail;
+
+        return cl;
+    }
 
     parse_ini_file();
 

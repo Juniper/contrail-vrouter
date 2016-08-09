@@ -107,7 +107,8 @@ vhost_client_set_mem_Vhost_Client(Vhost_Client *vhost_client) {
 
     for (size_t i = 0; i < vhost_cl->mem.nregions; i++) {
 
-        snprintf(fd_path_buff, UNIX_PATH_MAX, "%s.%d", vhost_cl->client.sh_mem_path, (int)i);
+        snprintf(fd_path_buff, UNIX_PATH_MAX, "%s.%d.shmem",
+            vhost_cl->client.sh_mem_path, (int)i);
 
         ret = sh_mem_init_fd(fd_path_buff,
                 (vhost_cl->client.sh_mem_fds + i));
@@ -126,7 +127,7 @@ vhost_client_set_mem_Vhost_Client(Vhost_Client *vhost_client) {
         vhost_cl->mem.regions[i].memory_size = vhost_cl->page_size;
         vhost_cl->mem.regions[i].mmap_offset = 0;
 
-        memset(fd_path_buff, 0, sizeof(char) * UNIX_PATH_MAX);
+        memset(fd_path_buff, 0, sizeof(fd_path_buff));
     }
 
     ret_val = virt_queue_map_all_mem_reqion_virtq(vhost_cl->sh_mem_virtq_table,
@@ -168,13 +169,13 @@ vhost_client_unset_sh_mem_Vhost_Client(Vhost_Client *vhost_client) {
     }
 
     for (size_t i = 0; i < vhost_client->mem.nregions; i++) {
-        snprintf(fd_path_buff, UNIX_PATH_MAX, "%s.%d", vhost_cl->client.sh_mem_path, (int)i);
+        snprintf(fd_path_buff, UNIX_PATH_MAX, "%s.%d.shmem", vhost_cl->client.sh_mem_path, (int)i);
 
         sh_mem_unmmap((void *)vhost_cl->mem.regions[i].guest_phys_addr,
                 vhost_cl->mem.regions[i].memory_size);
         sh_mem_unlink(fd_path_buff);
 
-        memset(fd_path_buff, 0, sizeof(char) * UNIX_PATH_MAX);
+        memset(fd_path_buff, 0, sizeof(fd_path_buff));
     }
 
     return E_VHOST_CLIENT_OK;
