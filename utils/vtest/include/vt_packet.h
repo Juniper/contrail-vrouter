@@ -11,6 +11,8 @@
 #include <vtest.h>
 #include "../vhost/src/vhost_net.h"
 
+#define READ_TRY_MAX 1U << 31
+
 typedef enum {
     S_START = 0,
     S_LOAD_PACKET,

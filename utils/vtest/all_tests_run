@@ -77,17 +77,23 @@ all_skip () {
 }
 
 vrouter_run () {
+    if [ -z "${1}" ]; then
+        local vr_args="${VROUTER_DEF_ARGS}"
+    else
+        local vr_args="${1}"
+    fi
+
     for _conf in ${RTE_CONFIGS}; do
         rm -f "${_conf}" 2> /dev/null
     done
 
     if [ -f "${LOG_FILE}" ]; then
-        ${TASKSET} "${BUILD_DIR}/${VROUTER}" ${VROUTER_DEF_ARGS} \
+        ${TASKSET} "${BUILD_DIR}/${VROUTER}" ${vr_args} \
             --vr_socket_dir "${BUILD_DIR}${VROUTER_SOCKETS}" \
             --vr_netlink_port "${DPDK_NETLINK_PORT}" \
             >> ${LOG_FILE} &
     else
-        ${TASKSET} "${BUILD_DIR}/${VROUTER}" ${VROUTER_DEF_ARGS} \
+        ${TASKSET} "${BUILD_DIR}/${VROUTER}" ${vr_args} \
             --vr_socket_dir "${BUILD_DIR}${VROUTER_SOCKETS}" \
             --vr_netlink_port "${DPDK_NETLINK_PORT}" \
             &
@@ -144,7 +150,19 @@ run_all () {
             _name="..."$(echo "${_name}" | rev | cut -c -50 | rev)
         fi
         log "===> ${_name}"
-        vrouter_run
+
+        ## Test may contain additional vRouter startup parameters.
+        ## Source corresponding .conf file, if present, and override
+        ## default parameters.
+        local _test_conf=$(echo ${_test} | sed 's/.xml/.conf/g')
+        unset VROUTER_ARGS
+        if [ -f "${_test_conf}" ]; then
+            log "     config file ${_test_conf}"
+            . ${_test_conf}
+        fi
+
+        ## VROUTER_ARGS is either sourced from _test_conf, or is empty
+        vrouter_run "${VROUTER_ARGS}"
 
         "${BUILD_DIR}/${VTEST}" \
             --vr_socket_dir "${BUILD_DIR}${VROUTER_SOCKETS}" \
