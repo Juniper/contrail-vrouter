@@ -187,6 +187,59 @@ nh_print_newline_header(void)
     return;
 }
 
+static int
+vr_nh_op(struct nl_client *cl, int command, int type, uint32_t nh_id,
+        uint32_t if_id, uint32_t vrf_id, int8_t *dst, int8_t  *src,
+        struct in_addr sip, struct in_addr dip, uint32_t flags)
+{
+    int ret;
+    bool dump = false;
+
+op_retry:
+    switch (command) {
+    case SANDESH_OP_ADD:
+        if ((type == NH_ENCAP) || (type == NH_TUNNEL)) {
+            ret = vr_send_nexthop_encap_tunnel_add(cl, 0, type, nh_id,
+                    flags, vrf_id, if_id, src, dst, sip, dip, sport, dport);
+        } else if (type == NH_COMPOSITE) {
+            ret = vr_send_nexthop_composite_add(cl, 0, nh_id, flags, vrf_id,
+                    comp_nh_ind, comp_nh, lbl);
+        } else {
+            ret = vr_send_nexthop_add(cl, 0, type, nh_id, flags, vrf_id, if_id);
+        }
+
+        break;
+
+    case SANDESH_OP_DELETE:
+        ret = vr_send_nexthop_delete(cl, 0, nh_id);
+        break;
+
+    case SANDESH_OP_DUMP:
+        dump = true;
+        ret = vr_send_nexthop_dump(cl, 0, dump_marker);
+        break;
+
+    case SANDESH_OP_GET:
+        ret = vr_send_nexthop_get(cl, 0, nh_id);
+        break;
+
+    default:
+        ret = -EINVAL;
+    }
+
+    if (ret < 0)
+        return ret;
+
+    ret = vr_recvmsg(cl, dump);
+    if (ret <= 0)
+        return ret;
+
+    if (dump_pending)
+        goto op_retry;
+
+    return 0;
+}
+
 void
 vr_nexthop_req_process(void *s_req)
 {
@@ -285,6 +338,12 @@ vr_nexthop_req_process(void *s_req)
     }
 
     printf("\n\n");
+    if (req->nhr_type == NH_COMPOSITE && command == SANDESH_OP_GET) {
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+            vr_nh_op(cl, command, type, req->nhr_nh_list[i], if_id, vrf_id,
+                     dst_mac, src_mac, sip, dip, flags);
+        }
+    }
 }
 
 void
@@ -292,59 +351,6 @@ vr_response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
-}
-
-static int
-vr_nh_op(struct nl_client *cl, int command, int type, uint32_t nh_id,
-        uint32_t if_id, uint32_t vrf_id, int8_t *dst, int8_t  *src,
-        struct in_addr sip, struct in_addr dip, uint32_t flags)
-{
-    int ret;
-    bool dump = false;
-
-op_retry:
-    switch (command) {
-    case SANDESH_OP_ADD:
-        if ((type == NH_ENCAP) || (type == NH_TUNNEL)) {
-            ret = vr_send_nexthop_encap_tunnel_add(cl, 0, type, nh_id,
-                    flags, vrf_id, if_id, src, dst, sip, dip, sport, dport);
-        } else if (type == NH_COMPOSITE) {
-            ret = vr_send_nexthop_composite_add(cl, 0, nh_id, flags, vrf_id,
-                    comp_nh_ind, comp_nh, lbl);
-        } else {
-            ret = vr_send_nexthop_add(cl, 0, type, nh_id, flags, vrf_id, if_id);
-        }
-
-        break;
-
-    case SANDESH_OP_DELETE:
-        ret = vr_send_nexthop_delete(cl, 0, nh_id);
-        break;
-
-    case SANDESH_OP_DUMP:
-        dump = true;
-        ret = vr_send_nexthop_dump(cl, 0, dump_marker);
-        break;
-
-    case SANDESH_OP_GET:
-        ret = vr_send_nexthop_get(cl, 0, nh_id);
-        break;
-
-    default:
-        ret = -EINVAL;
-    }
-
-    if (ret < 0)
-        return ret;
-
-    ret = vr_recvmsg(cl, dump);
-    if (ret <= 0)
-        return ret;
-
-    if (dump_pending)
-        goto op_retry;
-
-    return 0;
 }
 
 void
