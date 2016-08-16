@@ -41,6 +41,11 @@ static int comp_nh_ind = 0, lbl_ind = 0;
 static struct in_addr sip, dip;
 static struct nl_client *cl;
 
+static int
+vr_nh_op(struct nl_client *cl, int command, int type, uint32_t nh_id,
+        uint32_t if_id, uint32_t vrf_id, int8_t *dst, int8_t  *src,
+        struct in_addr sip, struct in_addr dip, uint32_t flags);
+
 char *
 nh_type(uint32_t type)
 {
@@ -285,6 +290,12 @@ vr_nexthop_req_process(void *s_req)
     }
 
     printf("\n\n");
+    if (req->nhr_type == NH_COMPOSITE && command == SANDESH_OP_GET) {
+        for (i = 0; i < req->nhr_nh_list_size; i++) {
+            vr_nh_op(cl, command, type, req->nhr_nh_list[i], if_id, vrf_id,
+                     dst_mac, src_mac, sip, dip, flags);
+        }
+    }
 }
 
 void
