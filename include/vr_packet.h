@@ -473,15 +473,15 @@ struct vr_ip6_pseudo {
 struct vr_ip6 {
 #ifdef __KERNEL__
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-    uint8_t         ip6_priority_l:4,
-                    ip6_version:4;
     uint8_t         ip6_priority_h:4,
-                    ip6_flow_l:4;
+                    ip6_version:4;
+    uint8_t         ip6_flow_l:4,
+                    ip6_priority_l:4;
 #elif defined(__BIG_ENDIAN_BITFIELD)
     uint8_t         ip6_version:4,
-                    ip6_priority_l:4;
-    uint8_t         ip6_flow_l:4,
-                    ip6_prioirty_h:4;
+                    ip6_priority_h:4;
+    uint8_t         ip6_priority_l:4,
+                    ip6_flow_l:4;
 #endif
 #else
 #if (__BYTE_ORDER == __LITTLE_ENDIAN)
@@ -510,14 +510,14 @@ struct vr_ip6 {
 static inline uint8_t
 vr_inet6_get_tos(struct vr_ip6 *ip6h)
 {
-    return (((ip6h->ip6_priority_h << 4) | (ip6h->ip6_priority_l)) & 0x3F);
+    return ((((ip6h->ip6_priority_h << 4) | (ip6h->ip6_priority_l)) >> 2) & 0x3F);
 }
 
 static inline void
 vr_inet6_set_tos(struct vr_ip6 *ip6h, uint8_t tos)
 {
-    ip6h->ip6_priority_h = (tos >> 4) & 0x3;
-    ip6h->ip6_priority_l = (tos & 0xF);
+    ip6h->ip6_priority_h = ((tos << 2) >> 4);
+    ip6h->ip6_priority_l = ((tos << 2) & 0xF);
 
     return;
 }
