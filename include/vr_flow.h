@@ -301,7 +301,7 @@ struct vr_flow_queue {
 
 struct vr_dummy_flow_entry {
     vr_hentry_t fe_hentry;
-    uint8_t fe_pack_hentry;
+    uint8_t fe_ttl;
     int16_t fe_qos_id;
     struct vr_flow fe_key;
     uint8_t fe_gen_id;
@@ -328,7 +328,7 @@ struct vr_dummy_flow_entry {
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
     vr_hentry_t fe_hentry;
-    uint8_t fe_pack_hentry;
+    uint8_t fe_ttl;
     int16_t fe_qos_id;
     struct vr_flow fe_key;
     uint8_t fe_gen_id;
