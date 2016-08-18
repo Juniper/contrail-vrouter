@@ -167,7 +167,7 @@ vif_bridge_deinit(struct vr_interface *vif)
     if (!vif || !vif->vif_btable)
         return;
 
-    vr_htable_trav(vif->vif_btable, 0, vif_bridge_free, NULL);
+    vr_htable_reset(vif->vif_btable, vif_bridge_free, NULL);
     vr_htable_delete(vif->vif_btable);
     vif->vif_btable = NULL;
 

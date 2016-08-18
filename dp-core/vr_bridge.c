@@ -427,7 +427,7 @@ bridge_table_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs,
     if (!vn_rtable)
         return;
 
-    vr_htable_trav(vn_rtable, 0, bridge_table_entry_free, NULL);
+    vr_htable_reset(vn_rtable, bridge_table_entry_free, NULL);
 
     if (!soft_reset) {
         vr_htable_delete(vn_rtable);
