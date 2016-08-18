@@ -304,22 +304,6 @@ vr_flow_get_va(struct vrouter *router, uint64_t offset)
     return vr_htable_get_address(router->vr_flow_table, offset);
 }
 
-static struct vr_flow_entry *
-__vr_get_flow_entry(struct vrouter *router, int index)
-{
-    struct vr_flow_entry *fe;
-
-    if (index < 0)
-        return NULL;
-
-    fe = (struct vr_flow_entry *)
-            __vr_htable_get_hentry_by_index(router->vr_flow_table, index);
-    if (fe && (fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
-        return fe;
-
-    return NULL;
-}
-
 struct vr_flow_entry *
 vr_get_flow_entry(struct vrouter *router, int index)
 {
@@ -2145,31 +2129,37 @@ vr_flow_table_destroy(struct vrouter *router)
 }
 
 static void
-vr_flow_table_reset(struct vrouter *router)
+vr_flow_invalidate_entry(vr_htable_t htable, vr_hentry_t *ent,
+                                unsigned int index, void *data)
 {
-    unsigned int start, end, i;
     struct vr_flow_entry *fe;
     struct vr_forwarding_md fmd;
     struct vr_flow_md flmd;
+    struct vrouter *router = (struct vrouter *)data;
 
-    start = end = 0;
-    end = vr_flow_entries + vr_oflow_entries;
+    if (!ent || !data)
+        return;
 
-    if (end) {
-        flmd.flmd_defer_data = NULL;
-        vr_init_forwarding_md(&fmd);
-        for (i = start; i < end; i++) {
-            fe = __vr_get_flow_entry(router, i);
-            if (fe) {
-                flmd.flmd_index = i;
-                flmd.flmd_flags = fe->fe_flags;
-                fe->fe_action = VR_FLOW_ACTION_DROP;
-                vr_flush_entry(router, fe, &flmd, &fmd);
-                vr_flow_reset_entry(router, fe);
-            }
-        }
-    }
+    fe = CONTAINER_OF(fe_hentry, struct vr_flow_entry, ent);
+    if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+        return;
 
+    flmd.flmd_defer_data = NULL;
+    flmd.flmd_index = index;
+    flmd.flmd_flags = fe->fe_flags;
+
+    vr_init_forwarding_md(&fmd);
+
+    fe->fe_action = VR_FLOW_ACTION_DROP;
+    vr_flush_entry(router, fe, &flmd, &fmd);
+    vr_flow_reset_entry(router, fe);
+}
+
+static void
+vr_flow_table_reset(struct vrouter *router)
+{
+    vr_htable_reset(router->vr_flow_table,
+            vr_flow_invalidate_entry, router);
     vr_flow_table_info_reset(router);
 
     return;
