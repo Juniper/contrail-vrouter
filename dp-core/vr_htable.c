@@ -36,6 +36,7 @@ struct vr_htable {
 struct vr_hentry_delete_data {
     struct vr_htable *hd_table;
     unsigned int hd_index;
+    unsigned short hd_count;
     unsigned short hd_scheduled;
 };
 
@@ -176,43 +177,6 @@ vr_htable_oentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
 }
 
 static void
-__vr_htable_oentry_invalidate(struct vr_htable *table, vr_hentry_t *ent)
-{
-    vr_hentry_t *prev, *head_ent;
-
-    if (!table || !ent)
-        return;
-
-    if (ent->hentry_flags & VR_HENTRY_FLAG_IN_FREE_LIST)
-        return;
-
-    if (ent->hentry_index >= table->ht_hentries) {
-        head_ent = __vr_htable_get_hentry_by_index((vr_htable_t)table,
-                                            ent->hentry_bucket_index);
-        for (prev = head_ent; prev; prev = prev->hentry_next) {
-            if (prev->hentry_next == ent) {
-
-                prev->hentry_next = ent->hentry_next;
-
-                if (prev->hentry_next) {
-                    prev->hentry_next_index =
-                        ent->hentry_next->hentry_index;
-                } else {
-                    prev->hentry_next_index = VR_INVALID_HENTRY_INDEX;
-                }
-
-                break;
-            }
-        }
-
-        vr_htable_oentry_invalidate(table, ent);
-    }
-
-    return;
-}
-
-
-static void
 vr_htable_hentry_defer_delete(struct vrouter *router, void *arg)
 {
     vr_hentry_t *ent;
@@ -247,13 +211,15 @@ vr_htable_hentry_scheduled_delete(void *arg)
     if (!head_ent)
         return;
 
+    (void)__sync_bool_compare_and_swap(&delete_data->hd_scheduled, 1, 0);
+
     /*
      * We attempt to delete only those many entries that have been
      * delete marked. If some new entries are delete marked while
      * processing these, they will get scheduled in new work item
      */
-    count = __sync_fetch_and_sub(&delete_data->hd_scheduled,
-            delete_data->hd_scheduled);
+    count = delete_data->hd_count;
+    (void)__sync_sub_and_fetch(&delete_data->hd_count, count);
 
     prev = head_ent;
     ent = head_ent->hentry_next;
@@ -335,6 +301,47 @@ vr_htable_hentry_scheduled_delete(void *arg)
 }
 
 void
+vr_htable_reset(vr_htable_t htable, htable_trav_cb cb, void *data)
+{
+    unsigned int i;
+    vr_hentry_t *ent, *next;
+    struct vr_htable *table = (struct vr_htable *)htable;
+
+    if (!table || !cb)
+        return;
+
+    for (i = 0; i < table->ht_hentries + table->ht_oentries; i++) {
+        ent = __vr_htable_get_hentry_by_index(htable, i);
+
+        cb(htable, ent, i, data);
+
+        if (ent->hentry_flags & VR_HENTRY_FLAG_VALID)
+            ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
+
+        if ((i < table->ht_hentries) && ent->hentry_next) {
+            next = ent->hentry_next;
+            ent->hentry_next = NULL;
+            ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
+            ent = next;
+
+            while (ent) {
+                next = ent->hentry_next;
+
+                if (ent->hentry_flags & VR_HENTRY_FLAG_VALID)
+                    ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
+
+                vr_htable_oentry_invalidate(table, ent);
+
+                ent = next;
+            }
+        }
+    }
+
+    return;
+}
+
+
+void
 vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
 {
     unsigned int cpu_num, delete_index;
@@ -351,10 +358,8 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     if (ent->hentry_index < table->ht_hentries)
         return;
 
-    if (vr_not_ready) {
-        __vr_htable_oentry_invalidate(table, ent);
+    if (vr_not_ready)
         return;
-    }
 
     ent->hentry_flags |= VR_HENTRY_FLAG_DELETE_MARKED;
 
@@ -362,8 +367,10 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     delete_index = head_ent->hentry_index / table->ht_bucket_size;
     delete_data = vr_btable_get(table->ht_dtable, delete_index);
 
+    (void)__sync_add_and_fetch(&delete_data->hd_count, 1);
+
     /* Schedule the deltion only if it is not already scheduled */
-    if (__sync_add_and_fetch(&delete_data->hd_scheduled, 1) == 1) {
+    if (__sync_bool_compare_and_swap(&delete_data->hd_scheduled, 0, 1)) {
 
         delete_data->hd_table = (struct vr_htable *)htable;
         delete_data->hd_index = head_ent->hentry_index;
