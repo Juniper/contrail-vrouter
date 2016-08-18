@@ -60,7 +60,7 @@ static char *cmd_prefix_string, *cmd_plen_string;
 static uint8_t cmd_prefix[16], cmd_src[16];
 static uint32_t cmd_plen = 0;
 static int32_t cmd_label;
-static uint32_t cmd_replace_plen = 100;
+static uint32_t cmd_replace_plen = 0xFFFFFFFF;
 static char cmd_dst_mac[6];
 static bool dump_pending;
 
@@ -394,8 +394,11 @@ validate_options(void)
 
     case SANDESH_OP_DELETE:
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
-            if ((cmd_replace_plen < 0 ||
-                ( cmd_replace_plen > (RT_IP_ADDR_SIZE(cmd_family_id)*4)))) {
+
+            if (cmd_replace_plen == 0xFFFFFFFF)
+                goto usage_internal;
+
+            if (cmd_replace_plen > (RT_IP_ADDR_SIZE(cmd_family_id) * 8)) {
                 goto usage_internal;
             }
 
