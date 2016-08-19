@@ -209,7 +209,7 @@ dpdk_set_addr_vlan_filter_strip(uint32_t port_id, struct vr_interface *vif)
 
             ret = rte_eth_dev_vlan_filter(*port_id_ptr, vr_dpdk.vlan_tag, 1);
             if (ret) {
-                RTE_LOG(INFO, VROUTER, "Error %d enabling vlan %d on port %d\n",  
+                RTE_LOG(INFO, VROUTER, "Error %d enabling vlan %d on port %d\n",
                         ret, vr_dpdk.vlan_tag, *port_id_ptr);
             } else {
                 RTE_LOG(INFO, VROUTER, "Enabled vlan %d on port %d\n",
@@ -304,14 +304,22 @@ dpdk_vlan_forwarding_if_add(void)
     RTE_LOG(INFO, VROUTER, "Adding VLAN forwarding interface %s\n",
         vr_dpdk.vlan_name);
 
+    /* Probe KNI. */
     ret = vr_dpdk_knidev_init(0, &vlan_fwd_intf);
+    if (ret == -ENOTSUP) {
+        /* Try TAP instead. */
+        ret = vr_dpdk_tapdev_init(&vlan_fwd_intf);
+    }
+
     if (ret != 0) {
-        RTE_LOG(ERR, VROUTER, "Error initializing KNI for VLAN forwarding interface\n");
+        RTE_LOG(ERR, VROUTER,
+            "Error initializing KNI for VLAN forwarding interface: %s (%d)\n",
+            rte_strerror(-ret), -ret);
         return ret;
     }
 
-    /* Save KNI handler needed to send packets to the interface. */
-    vr_dpdk.vlan_kni = (struct rte_kni *)vlan_fwd_intf.vif_os;
+    /* Save device pointer needed to send packets to the interface. */
+    vr_dpdk.vlan_dev = vlan_fwd_intf.vif_os;
 
     /*
      * Allocate a multi-producer single-consumer ring - a buffer for packets
@@ -321,8 +329,11 @@ dpdk_vlan_forwarding_if_add(void)
         vr_dpdk.vlan_name, VR_DPDK_TX_RING_SZ, RING_F_SC_DEQ);
     if (!vr_dpdk.vlan_ring) {
         RTE_LOG(ERR, VROUTER, "Error allocating ring for VLAN forwarding interface\n");
-        vr_dpdk.vlan_kni = NULL;
-        vr_dpdk_knidev_release(&vlan_fwd_intf);
+        vr_dpdk.vlan_dev = NULL;
+        if (vr_dpdk.kni_state > 0)
+            vr_dpdk_knidev_release(&vlan_fwd_intf);
+        else
+            vr_dpdk_tapdev_release(&vlan_fwd_intf);
         return -1;
     }
 
@@ -562,6 +573,7 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     int ret;
     struct ether_addr mac_addr;
     struct vr_dpdk_ethdev *ethdev;
+    uint16_t nb_txqs;
 
     /*
      * The Agent passes xconnect fabric interface in cross_connect_idx,
@@ -571,18 +583,18 @@ dpdk_vhost_if_add(struct vr_interface *vif)
      */
     ethdev = (struct vr_dpdk_ethdev *)(vif->vif_bridge->vif_os);
     if (ethdev == NULL) {
-        RTE_LOG(ERR, VROUTER, "Error adding vif %u KNI device %s:"
+        RTE_LOG(ERR, VROUTER, "Error adding vif %u device %s:"
             " bridge vif %u ethdev is not initialized\n",
                 vif->vif_idx, vif->vif_name, vif->vif_bridge->vif_idx);
         return -ENOENT;
     }
     port_id = ethdev->ethdev_port_id;
 
-    /* get interface MAC address */
+    /* Get interface MAC address. */
     memset(&mac_addr, 0, sizeof(mac_addr));
     rte_eth_macaddr_get(port_id, &mac_addr);
 
-    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) KNI device %s at eth device %" PRIu8
+    RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) device %s at eth device %" PRIu8
                 " MAC " MAC_FORMAT " (vif MAC " MAC_FORMAT ")\n",
                 vif->vif_idx, vif->vif_gen, vif->vif_name, port_id,
                 MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
@@ -601,27 +613,50 @@ dpdk_vhost_if_add(struct vr_interface *vif)
                 port_id, MAC_VALUE(mac_addr.addr_bytes));
     }
 
-    /* init KNI */
+    /* Probe KNI. */
     ret = vr_dpdk_knidev_init(port_id, vif);
-    if (ret != 0)
-        return ret;
+    switch (ret) {
+    case 0:
+        ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+                1, &vr_dpdk_kni_rx_queue_init,
+                1, &vr_dpdk_kni_tx_queue_init);
+        break;
+    case -ENOTSUP:
+        /* Try TAP instead. */
+        ret = vr_dpdk_tapdev_init(vif);
+        if (ret != 0)
+            return ret;
 
-    return vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-            1, &vr_dpdk_kni_rx_queue_init,
-            1, &vr_dpdk_kni_tx_queue_init);
+        /* We use few single-producer rings, so we assign TX queue to each lcore */
+        nb_txqs = (uint16_t)-1;
+
+        /* Schedule the TAP interface with 1 RX queue and unlimited TX queues. */
+        ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+                1, &vr_dpdk_tapdev_rx_queue_init,
+                nb_txqs, &vr_dpdk_tapdev_tx_queue_init);
+        break;
+    default:
+        /* Other KNI error. */
+        return ret;
+    }
+
+    return ret;
 }
 
 /* Delete vhost interface */
 static int
 dpdk_vhost_if_del(struct vr_interface *vif)
 {
-    RTE_LOG(INFO, VROUTER, "Deleting vif %u KNI device %s\n",
+    RTE_LOG(INFO, VROUTER, "Deleting vif %u device %s\n",
                 vif->vif_idx, vif->vif_name);
 
     vr_dpdk_lcore_if_unschedule(vif);
 
-    /* release KNI */
-    return vr_dpdk_knidev_release(vif);
+    /* Release KNI or TAP device. */
+    if (vr_dpdk.kni_state > 0)
+        return vr_dpdk_knidev_release(vif);
+    else
+        return vr_dpdk_tapdev_release(vif);
 }
 
 /* Start interface monitoring */
@@ -678,8 +713,9 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     unsigned short monitored_vif_id = vif->vif_os_idx;
     struct vr_interface *monitored_vif;
     struct vrouter *router = vrouter_get(vif->vif_rid);
+    uint16_t nb_txqs;
 
-    RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u (gen. %u) KNI device %s"
+    RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u (gen. %u) device %s"
                 " to monitor vif %u\n",
                 vif->vif_idx, vif->vif_gen, vif->vif_name, monitored_vif_id);
 
@@ -702,21 +738,42 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
      * So we might only get into an issue if we have no eth devices at all
      * or we have few eth ports and don't want to use the first one.
      */
+
+    /* Probe KNI. */
     ret = vr_dpdk_knidev_init(0, vif);
-    if (ret != 0)
+    switch (ret) {
+    case 0:
+        /* Write-only interface. */
+        ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+                0, NULL,
+                1, &vr_dpdk_kni_tx_queue_init);
+        break;
+    case -ENOTSUP:
+        /* Try TAP instead. */
+        ret = vr_dpdk_tapdev_init(vif);
+        if (ret != 0)
+            return ret;
+
+        /* We use few single-producer rings, so we assign TX queue to each lcore */
+        nb_txqs = (uint16_t)-1;
+
+        /* Schedule the TAP interface with 1 RX queue and unlimited TX queues. */
+        /* Write-only interface. */
+        ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
+                0, NULL,
+                nb_txqs, &vr_dpdk_tapdev_tx_queue_init);
+        break;
+    default:
+        /* Other KNI error. */
         return ret;
+    }
 
-    /* write-only interface */
-    ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
-            0, NULL,
-            1, &vr_dpdk_kni_tx_queue_init);
-    if (ret != 0)
-        return ret;
+    if (ret == 0) {
+        /* Start monitoring. */
+        dpdk_monitoring_start(monitored_vif, vif);
+    }
 
-    /* start monitoring */
-    dpdk_monitoring_start(monitored_vif, vif);
-
-    return 0;
+    return ret;
 }
 
 /* Delete monitoring interface */
@@ -726,7 +783,7 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
     unsigned short monitored_vif_id = vif->vif_os_idx;
     struct vr_interface *monitored_vif;
 
-    RTE_LOG(INFO, VROUTER, "Deleting monitoring vif %u KNI device"
+    RTE_LOG(INFO, VROUTER, "Deleting monitoring vif %u device"
                 " to monitor vif %u\n",
                 vif->vif_idx, monitored_vif_id);
 
@@ -743,8 +800,11 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
 
     vr_dpdk_lcore_if_unschedule(vif);
 
-    /* release KNI */
-    return vr_dpdk_knidev_release(vif);
+    /* Release KNI or TAP device. */
+    if (vr_dpdk.kni_state > 0)
+        return vr_dpdk_knidev_release(vif);
+    else
+        return vr_dpdk_tapdev_release(vif);
 }
 
 /* Add agent interface */
