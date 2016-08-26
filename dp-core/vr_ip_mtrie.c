@@ -329,16 +329,21 @@ add_to_tree(struct ip_bucket_entry *ent, int level, struct vr_route_req *rt)
 
     for (i = 0; i < ip_bkt_info[level].bi_size; i++) {
         ent = index_to_entry(bkt, i);
-        if (!ENTRY_IS_NEXTHOP(ent))
-            add_to_tree(ent, level, rt);
-        else if (ent->entry_prefix_len <= rt->rtr_req.rtr_prefix_len) {
-            /* a less specific entry, which needs to be replaced */
-            set_entry_to_nh(ent, rt->rtr_nh);
+
+        if (ent->entry_prefix_len <= rt->rtr_req.rtr_prefix_len) {
             ent->entry_prefix_len = rt->rtr_req.rtr_prefix_len;
-            ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
-            ent->entry_label = rt->rtr_req.rtr_label;
-            ent->entry_bridge_index = rt->rtr_req.rtr_index;
+
+            if (ENTRY_IS_NEXTHOP(ent)) {
+                /* a less specific entry, which needs to be replaced */
+                set_entry_to_nh(ent, rt->rtr_nh);
+                ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
+                ent->entry_label = rt->rtr_req.rtr_label;
+                ent->entry_bridge_index = rt->rtr_req.rtr_index;
+            }
         }
+
+        if (ENTRY_IS_BUCKET(ent))
+            add_to_tree(ent, level, rt);
     }
 
     return;
@@ -434,29 +439,35 @@ __mtrie_add(struct ip_mtrie *mtrie, struct vr_route_req *rt)
             }
 
 
-             /* 
-              * Run through the loop 'fin' times only
-              * If fin is 0, it actually means 256 ('char' overflow), so run the
-              * loop 256 times
-              */
              for (i = index; i <= (ip_bkt_info[level].bi_size-1); i++) {
                 ent = index_to_entry(bkt, i);
+
+                if (ent->entry_prefix_len <= rt->rtr_req.rtr_prefix_len) {
+                    ent->entry_prefix_len = rt->rtr_req.rtr_prefix_len;
+
+                    if (ENTRY_IS_NEXTHOP(ent)) {
+                        /* a less specific entry, which needs to be replaced */
+                        set_entry_to_nh(ent, rt->rtr_nh);
+                        ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
+                        ent->entry_label = rt->rtr_req.rtr_label;
+                        ent->entry_bridge_index = rt->rtr_req.rtr_index;
+                    }
+                }
+
                 if (ENTRY_IS_BUCKET(ent))
                     add_to_tree(ent, level, rt);
-                else if (ent->entry_prefix_len <= rt->rtr_req.rtr_prefix_len) {
-                    /* a less specific entry, which needs to be replaced */
-                    set_entry_to_nh(ent, rt->rtr_nh);
-                    ent->entry_prefix_len = rt->rtr_req.rtr_prefix_len;
-                    ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
-                    ent->entry_label = rt->rtr_req.rtr_label;
-                    ent->entry_bridge_index = rt->rtr_req.rtr_index;
-                }
+
+                /*
+                 * Run through the loop 'fin' times only
+                 * If fin is 0, it actually means 256 ('char' overflow), so run the
+                 * loop 256 times
+                 */
                 if (fin) {
-                    /* Repeat the loop 'fin' times only */
                     fin--;
                     if (fin == 0)
                         break;
                 } 
+
                 /* 
                  * Bailout at the last index, 
                  * the below check takes care of overflow 
@@ -513,6 +524,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
 
          for (i = index; i < fin; i++) {
             tmp_ent = index_to_entry(bkt, i);
+
             if (tmp_ent->entry_prefix_len == rt->rtr_req.rtr_prefix_len) {
                 tmp_ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
                 tmp_ent->entry_label = rt->rtr_req.rtr_label;
@@ -530,15 +542,8 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
 
     /* check if current bucket neds to be deleted */
     for (i = 1; i < ip_bkt_info[level].bi_size; i++) {
-        if ((bkt->bkt_data[i].entry_long_i == bkt->bkt_data[0].entry_long_i) &&
-                (bkt->bkt_data[i].entry_label_flags ==
-                    bkt->bkt_data[0].entry_label_flags) &&
-                (bkt->bkt_data[i].entry_label ==
-                    bkt->bkt_data[0].entry_label) &&
-                (bkt->bkt_data[i].entry_prefix_len ==
-                    bkt->bkt_data[0].entry_prefix_len)) {
-            continue;
-        } else
+        if (memcmp(bkt->bkt_data + i, bkt->bkt_data,
+                        sizeof(struct ip_bucket_entry)))
             return 0;
     }
 
@@ -754,6 +759,9 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
             return -ENOENT;
         rt->rtr_req.rtr_index = lreq.rtr_req.rtr_index;
     }
+
+    if (!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG))
+        rt->rtr_req.rtr_label = -1;
 
     __mtrie_delete(rt, &rtable->root, 0);
     vrouter_put_nexthop(rt->rtr_nh);
@@ -1045,6 +1053,9 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
         rt->rtr_req.rtr_index = tmp_req.rtr_req.rtr_index;
     }
 
+    if (!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG))
+        rt->rtr_req.rtr_label = -1;
+
     ret = __mtrie_add(mtrie, rt);
     vrouter_put_nexthop(rt->rtr_nh);
     return ret;
@@ -1100,6 +1111,7 @@ mtrie_alloc_vrf(unsigned int vrf_id, unsigned int family)
         mtrie->root.entry_bridge_index =  VR_BE_INVALID_INDEX;
         mtrie_table = vn_rtable[index];
         mtrie_table[vrf_id] = mtrie;
+        mtrie->root.entry_label = -1;
     }
 
     return mtrie;
