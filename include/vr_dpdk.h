@@ -531,6 +531,8 @@ struct vr_dpdk_global {
     struct rte_ring *vlan_ring;
     /* VLAN forwarding device pointer. */
     void *vlan_dev;
+    /* VLAN forwarding interface vif. */
+    struct vr_interface *vlan_vif;
     /* Dedicated IO lcore for SR-IOV VF. */
     unsigned vf_lcore_id;
     /*
@@ -714,8 +716,14 @@ uint64_t vr_dpdk_tapdev_rxtx(void);
 /* RX a burst of packets from the TAP device. */
 unsigned vr_dpdk_tapdev_rx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
         unsigned num);
+/* Dequeue a burst of packets from the TAP device. */
+unsigned vr_dpdk_tapdev_dequeue_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
+        unsigned num);
 /* TX a burst of packets to the TAP device. */
 unsigned vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
+        unsigned num);
+/* Enqueue a burst of packets to the TAP device. */
+unsigned vr_dpdk_tapdev_enqueue_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
         unsigned num);
 
 /*

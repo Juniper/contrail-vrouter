@@ -343,6 +343,29 @@ vr_dpdk_tapdev_rx_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
 }
 
 /*
+ * vr_dpdk_tapdev_dequeue_burst - dequeue a burst of packets from the TAP device.
+ *
+ * Returns number of actual packets dequeued, or 0 otherwise.
+ */
+unsigned
+vr_dpdk_tapdev_dequeue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
+    unsigned num)
+{
+    int fd;
+
+    fd = tapdev->tapdev_fd;
+    if (unlikely(fd <= 0))
+        return 0;
+
+    /* Try to RX from the TAP. */
+    if (likely(tapdev->tapdev_rx_ring != NULL)) {
+        return rte_ring_sc_dequeue_burst(tapdev->tapdev_rx_ring,
+                (void **)mbufs, num);
+    }
+    return 0;
+}
+
+/*
  * vr_dpdk_tapdev_tx_burst - TX a burst of packets to the TAP device.
  *
  * Returns number of actual packets sent, or 0 otherwise.
@@ -385,6 +408,30 @@ vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
     }
 
    return ret;
+}
+
+/*
+ * vr_dpdk_tapdev_enqueue_burst - enqueue a burst of packets to the TAP device.
+ *
+ * Returns number of actual packets enqueued, or 0 otherwise.
+ */
+unsigned
+vr_dpdk_tapdev_enqueue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
+        unsigned num)
+{
+    int fd;
+    unsigned lcore_id = rte_lcore_id();
+
+    fd = tapdev->tapdev_fd;
+    if (unlikely(fd <= 0))
+        return 0;
+
+    if (likely(tapdev->tapdev_tx_rings[lcore_id] != NULL)) {
+        return rte_ring_sp_enqueue_burst(tapdev->tapdev_tx_rings[lcore_id],
+            (void **)mbufs, num);
+    }
+
+   return 0;
 }
 
 /*

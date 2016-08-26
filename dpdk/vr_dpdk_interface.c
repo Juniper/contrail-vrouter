@@ -295,31 +295,45 @@ int
 dpdk_vlan_forwarding_if_add(void)
 {
     int ret;
-    struct vr_interface vlan_fwd_intf;
-
-    strncpy((char *)vlan_fwd_intf.vif_name, vr_dpdk.vlan_name,
-        sizeof(vlan_fwd_intf.vif_name));
-    vlan_fwd_intf.vif_type = VIF_TYPE_VLAN;
 
     RTE_LOG(INFO, VROUTER, "Adding VLAN forwarding interface %s\n",
         vr_dpdk.vlan_name);
 
+    /* Allocate vlan vif. */
+    vr_dpdk.vlan_vif = vr_zalloc(sizeof(struct vr_interface),
+        VR_INTERFACE_OBJECT);
+    if (!vr_dpdk.vlan_vif) {
+        RTE_LOG(ERR, VROUTER, "Error allocating interface object\n");
+        return -ENOMEM;
+    }
+
+    vr_dpdk.vlan_vif->vif_stats = vr_zalloc(vr_num_cpus *
+            sizeof(struct vr_interface_stats), VR_INTERFACE_STATS_OBJECT);
+    if (!vr_dpdk.vlan_vif->vif_stats) {
+        RTE_LOG(ERR, VROUTER, "Error allocating interface stats object\n");
+        return -ENOMEM;
+    }
+
+    strncpy((char *)vr_dpdk.vlan_vif->vif_name, vr_dpdk.vlan_name,
+        sizeof(vr_dpdk.vlan_vif->vif_name));
+    vr_dpdk.vlan_vif->vif_type = VIF_TYPE_VLAN;
+
     /* Probe KNI. */
-    ret = vr_dpdk_knidev_init(0, &vlan_fwd_intf);
+    ret = vr_dpdk_knidev_init(0, vr_dpdk.vlan_vif);
     if (ret == -ENOTSUP) {
         /* Try TAP instead. */
-        ret = vr_dpdk_tapdev_init(&vlan_fwd_intf);
+        ret = vr_dpdk_tapdev_init(vr_dpdk.vlan_vif);
     }
 
     if (ret != 0) {
         RTE_LOG(ERR, VROUTER,
-            "Error initializing KNI for VLAN forwarding interface: %s (%d)\n",
+            "Error initializing device for VLAN forwarding interface: %s (%d)\n",
             rte_strerror(-ret), -ret);
         return ret;
     }
 
     /* Save device pointer needed to send packets to the interface. */
-    vr_dpdk.vlan_dev = vlan_fwd_intf.vif_os;
+    vr_dpdk.vlan_dev = vr_dpdk.vlan_vif->vif_os;
 
     /*
      * Allocate a multi-producer single-consumer ring - a buffer for packets
@@ -331,9 +345,9 @@ dpdk_vlan_forwarding_if_add(void)
         RTE_LOG(ERR, VROUTER, "Error allocating ring for VLAN forwarding interface\n");
         vr_dpdk.vlan_dev = NULL;
         if (vr_dpdk.kni_state > 0)
-            vr_dpdk_knidev_release(&vlan_fwd_intf);
+            vr_dpdk_knidev_release(vr_dpdk.vlan_vif);
         else
-            vr_dpdk_tapdev_release(&vlan_fwd_intf);
+            vr_dpdk_tapdev_release(vr_dpdk.vlan_vif);
         return -1;
     }
 
