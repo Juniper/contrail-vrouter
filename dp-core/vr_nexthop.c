@@ -563,15 +563,16 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
                                struct vr_forwarding_md *fmd, void *ret_data)
 {
     int i;
-    struct vr_nexthop *cnh;
+    struct vr_nexthop *cnh = NULL;
 
     /* the first few checks are straight forward */
-    if (!fmd || (uint8_t)fmd->fmd_ecmp_src_nh_index >= nh->nh_component_cnt)
+    if (!fmd)
         return NH_SOURCE_INVALID;
 
-    cnh = nh->nh_component_nh[fmd->fmd_ecmp_src_nh_index].cnh;
-    if (cnh && !cnh->nh_validate_src)
-        return NH_SOURCE_INVALID;
+    if ((fmd->fmd_ecmp_src_nh_index >= 0) &&
+            (fmd->fmd_ecmp_src_nh_index < nh->nh_component_cnt)) {
+        cnh = nh->nh_component_nh[fmd->fmd_ecmp_src_nh_index].cnh;
+    }
 
     /*
      * when the 'supposed' source goes down, cnh is null, in which
@@ -579,8 +580,8 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
      * the same logic if the component validate source returns invalid
      * source, which could mean that source has moved
      */
-    if (!cnh || (NH_SOURCE_INVALID ==
-                 cnh->nh_validate_src(pkt, cnh, fmd, NULL))) {
+    if (!cnh || (!cnh->nh_validate_src) ||
+            (NH_SOURCE_INVALID == cnh->nh_validate_src(pkt, cnh, fmd, NULL))) {
         for (i = 0; i < nh->nh_component_cnt; i++) {
             if (i == fmd->fmd_ecmp_src_nh_index)
                 continue;
@@ -596,8 +597,12 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
              * return mismatch
              */
             if ((NH_SOURCE_VALID ==
-                 cnh->nh_validate_src(pkt, cnh, fmd, NULL)))
+                 cnh->nh_validate_src(pkt, cnh, fmd, NULL))) {
+                if (ret_data) {
+                    *(unsigned int *)ret_data = i;
+                }
                 return NH_SOURCE_MISMATCH;
+            }
         }
 
         /* if everything else fails, source is indeed invalid */
@@ -608,36 +613,47 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_SOURCE_VALID;
 }
 
-static struct vr_nexthop *
+static int
 nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
 {
-    int ret, ecmp_index;
+    int ret = -1, ecmp_index;
     unsigned int hash, hash_ecmp, count;
 
-    struct vr_flow flow;
+    struct vr_flow flow, *flowp = &flow;
+    struct vr_flow_entry *fe = NULL;
     struct vr_ip6 *ip6;
     struct vr_nexthop *cnh = NULL;
     struct vr_component_nh *cnhp = nh->nh_component_nh;
 
-    if (!(count = nh->nh_component_cnt))
-        return NULL;
+    if (!nh || !fmd || (!nh->nh_component_cnt))
+        return ret;
 
-    if (pkt->vp_type == VP_TYPE_IP) {
-        ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, &flow);
-        if (ret < 0)
-            return NULL;
-    } else if (pkt->vp_type == VP_TYPE_IP6) {
-        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-        ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
-                fmd->fmd_vlan, ip6, &flow);
-        if (ret < 0)
-            return NULL;
-    } else {
-        return NULL;
+    count = nh->nh_component_cnt;
+
+    if (fmd->fmd_flow_index >= 0) {
+        fe = vr_flow_get_entry(nh->nh_router, fmd->fmd_flow_index);
+        if (fe)
+            flowp = &fe->fe_key;
     }
 
-    hash = hash_ecmp = vr_hash(&flow, flow.flow_key_len, 0);
+    if (!fe) {
+        if (pkt->vp_type == VP_TYPE_IP) {
+            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp);
+            if (ret < 0)
+                return ret;
+        } else if (pkt->vp_type == VP_TYPE_IP6) {
+            ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+            ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
+                                                fmd->fmd_vlan, ip6, flowp);
+            if (ret < 0)
+                return ret;
+        } else {
+            return ret;
+        }
+    }
+
+    hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
     hash %= count;
     ecmp_index = cnhp[hash].cnh_ecmp_index;
     cnh = cnhp[hash].cnh;
@@ -646,21 +662,24 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
             cnhp = nh->nh_component_ecmp;
             hash_ecmp %= nh->nh_component_ecmp_cnt;
             ecmp_index = cnhp[hash_ecmp].cnh_ecmp_index;
-            cnh = cnhp[hash_ecmp].cnh;
+            if (!(cnh = cnhp[hash_ecmp].cnh))
+                return -1;
         }
     }
 
-    if (cnh)
-        fmd->fmd_ecmp_nh_index = ecmp_index;
+    if (fe)
+        return vr_flow_update_ecmp_index(nh->nh_router, fe, ecmp_index, fmd);
 
-    return cnh;
+    fmd->fmd_ecmp_nh_index = ecmp_index;
+
+    return 0;
 }
 
 static int
 nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
                   struct vr_forwarding_md *fmd)
 {
-    int ret = 0;
+    int ret = 0, drop_reason = VP_DROP_INVALID_NH;
     struct vr_nexthop *member_nh = NULL;
     struct vr_vrf_stats *stats;
 
@@ -668,23 +687,24 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (stats)
         stats->vrf_ecmp_composites++;
 
-    if (!fmd || fmd->fmd_ecmp_nh_index >= (short)nh->nh_component_cnt)
+    if (!fmd) {
+        drop_reason = VP_DROP_NO_FMD;
         goto drop;
+    }
 
-    if (fmd->fmd_ecmp_nh_index >= 0) {
+    if ((fmd->fmd_ecmp_nh_index >= 0) &&
+            (fmd->fmd_ecmp_nh_index < nh->nh_component_cnt)) {
         member_nh = nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh;
-    } else if (fmd->fmd_flow_index < 0) {
-        member_nh = nh_composite_ecmp_select_nh(pkt, nh, fmd);
     }
 
     if (!member_nh) {
-        if (fmd->fmd_flow_index < 0) {
-            vr_pfree(pkt, VP_DROP_INVALID_NH);
-            return 0;
-        } else {
-            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
-            return 0;
-        }
+        ret = nh_composite_ecmp_select_nh(pkt, nh, fmd);
+        if (ret)
+            goto drop;
+
+        member_nh = nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh;
+        if (!member_nh)
+            goto drop;
     }
 
     vr_forwarding_md_set_label(fmd,
@@ -693,7 +713,7 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
     return nh_output(pkt, member_nh, fmd);
 
 drop:
-    vr_pfree(pkt, VP_DROP_NO_FMD);
+    vr_pfree(pkt, drop_reason);
     return ret;
 }
 
