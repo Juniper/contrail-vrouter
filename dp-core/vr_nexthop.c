@@ -281,13 +281,15 @@ static int
 nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
-    struct vr_vrf_stats *stats;
+    unsigned char eth_dmac[VR_ETHER_ALEN], *data;
     int pull_len, handled = 0;
+    struct vr_vrf_stats *stats;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_l2_receives++;
 
+    data = pkt_data(pkt);
     fmd->fmd_to_me = 1;
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (pkt_pull(pkt, pull_len) < 0) {
@@ -307,7 +309,8 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
     } else if (pkt->vp_type == VP_TYPE_IP) {
         handled = vr_l3_input(pkt, fmd);
     } else if (pkt->vp_type == VP_TYPE_ARP) {
-        handled = vr_arp_input(pkt, fmd);
+        VR_MAC_COPY(eth_dmac, data);
+        handled = vr_arp_input(pkt, fmd, eth_dmac);
     }
 
     if (!handled)
@@ -774,6 +777,7 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 {
     int handled = 1;
     bool flood = false;
+    unsigned char eth_dmac[VR_ETHER_ALEN];
     unsigned short trap, rt_flags, drop_reason, pull_len  = 0;
 
     l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
@@ -800,7 +804,8 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     }
 
     if (pkt->vp_type == VP_TYPE_ARP) {
-        handled = vr_arp_input(pkt, fmd);
+        VR_MAC_COPY(eth_dmac, eth->eth_dmac);
+        handled = vr_arp_input(pkt, fmd, eth_dmac);
         if (handled)
             return handled;
 

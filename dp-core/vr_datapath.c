@@ -20,14 +20,18 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         struct vr_route_req *rt, unsigned char *dmac)
 {
     bool from_fabric, stitched, flood;
-    bool to_gateway, no_proxy, to_vcp;
+    bool to_gateway, no_proxy, to_vcp, ecmp_src;
 
     unsigned char *resp_mac;
     struct vr_nexthop *nh = NULL;
     struct vr_interface *vif = pkt->vp_if;
     struct vr_vrf_stats *stats;
 
-    from_fabric = stitched = flood = to_gateway = to_vcp = no_proxy = false;
+    from_fabric = stitched = flood = false;
+    to_gateway = to_vcp = no_proxy = ecmp_src = false;
+
+    vr_printf("Vrouter: get_proxy_mac %x:%x:%x:%x:%x:%x\n", dmac[0],
+            dmac[1], dmac[2], dmac[3], dmac[4], dmac[5]);
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     /* here we will not check for stats, but will check before use */
@@ -65,11 +69,12 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
     }
 
-     /* If ECMP source, we force routing */
-     if (fmd->fmd_ecmp_src_nh_index != -1) {
-         resp_mac = vif->vif_mac;
-         fmd->fmd_ecmp_src_nh_index = -1;
-     }
+    /* If ECMP source, we force routing */
+    if (fmd->fmd_ecmp_src_nh_index != -1) {
+        resp_mac = vif->vif_mac;
+        fmd->fmd_ecmp_src_nh_index = -1;
+        ecmp_src = true;
+    }
 
 
     /*
@@ -87,6 +92,38 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
      * . arp request from the uplink port of a vcp
      */
     if (from_fabric) {
+        if (ecmp_src) {
+
+            /*
+             * If a Multicast ARP request, it is not answered on Fabric
+             * side
+             */
+            if (IS_MAC_BMCAST(dmac))
+                return MR_DROP;
+
+            /*
+             * If unicast and not stiched, we do not have enough
+             * information what to respond. We can not even flood,
+             * probably because this need to be answered with Vrouter
+             * Mac in source Vrouter itself. So we drop this
+             */
+            if (!stitched)
+                return MR_DROP;
+
+            /*
+             * If our stiched mac does not match, we will let the VM
+             * decide what to do with request
+             */
+            if (!VR_MAC_CMP(dmac, rt->rtr_req.rtr_mac))
+                return MR_FLOOD;
+
+            /*
+             * Very likely response need to go with stiched mac. But
+             * below conditions might override
+             */
+            resp_mac = rt->rtr_req.rtr_mac;
+        }
+
         if (flood && !stitched) {
             if (stats)
                 stats->vrf_arp_physical_flood++;
@@ -229,7 +266,7 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
 
 static int
 vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
-                      struct vr_forwarding_md *fmd)
+                      struct vr_forwarding_md *fmd, unsigned char *eth_dmac)
 {
     bool handled = true;
     unsigned char dmac[VR_ETHER_ALEN];
@@ -237,6 +274,7 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
 
     struct vr_packet *pkt_c;
     struct vr_interface *vif = pkt->vp_if;
+    VR_MAC_COPY(dmac, eth_dmac);
 
     arp_result = vif->vif_mac_request(vif, pkt, fmd, dmac);
     switch (arp_result) {
@@ -386,6 +424,7 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     int nheader, handled = 1;
+    unsigned char eth_dmac[VR_ETHER_ALEN];
 
     if (pkt->vp_flags & VP_FLAG_MULTICAST)
         goto unhandled;
@@ -398,9 +437,11 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         if (pkt->vp_len < (nheader + sizeof(struct vr_arp)))
             goto unhandled;
 
+        VR_MAC_COPY(eth_dmac, pkt_data(pkt));
+
         pkt_pull(pkt, nheader);
 
-        handled = vr_arp_input(pkt, fmd);
+        handled = vr_arp_input(pkt, fmd, eth_dmac);
         if (!handled) {
             pkt_push(pkt, nheader);
         }
@@ -468,7 +509,8 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
 }
 
 int
-vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+        unsigned char *eth_dmac)
 {
     int handled = 1;
     struct vr_arp sarp;
@@ -486,7 +528,7 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 
     switch (ntohs(sarp.arp_op)) {
     case VR_ARP_OP_REQUEST:
-        return vr_handle_arp_request(&sarp, pkt, fmd);
+        return vr_handle_arp_request(&sarp, pkt, fmd, eth_dmac);
 
     case VR_ARP_OP_REPLY:
         return vr_handle_arp_reply(&sarp, pkt, fmd);
@@ -606,6 +648,7 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     int handled = 0;
     unsigned short pull_len;
     struct vr_forwarding_md fmd;
+    unsigned char *data, eth_dmac[VR_ETHER_ALEN];
 
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
@@ -628,13 +671,16 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
         return vif_xconnect(vif, pkt, &fmd);
     }
 
+    data = pkt_data(pkt);
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     pkt_pull(pkt, pull_len);
 
-    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6)
+    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6) {
         handled = vr_l3_input(pkt, &fmd);
-    else if (pkt->vp_type == VP_TYPE_ARP)
-        handled = vr_arp_input(pkt, &fmd);
+    } else if (pkt->vp_type == VP_TYPE_ARP) {
+        VR_MAC_COPY(eth_dmac, data);
+        handled = vr_arp_input(pkt, &fmd, eth_dmac);
+    }
 
     if (!handled) {
         pkt_push(pkt, pull_len);
