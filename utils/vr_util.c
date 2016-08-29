@@ -12,12 +12,14 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #include <sys/socket.h>
 #if defined(__linux__)
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_ether.h>
+#include <linux/dcbnl.h>
 #elif defined(__FreeBSD__)
 #include <net/ethernet.h>
 #endif
@@ -306,6 +308,146 @@ fail:
         nl_free_client(cl);
 
     return NULL;
+}
+
+int
+vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)
+{
+    int ret;
+
+    ret = nl_build_set_dcb_state_msg(cl, ifname, state);
+    if (ret < 0)
+        return ret;
+
+    ret = nl_dcb_sendmsg(cl, DCB_CMD_SSTATE, NULL);
+    if (ret <= 0)
+        return ret;
+
+    if (ret != state) {
+        printf("vRouter: Set DCB State failed (Req/Resp: %u/%d)\n",
+                state, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+vr_send_get_dcb_state(struct nl_client *cl, uint8_t *ifname)
+{
+    int ret;
+
+    ret = nl_build_get_dcb_state_msg(cl, ifname);
+    if (ret < 0)
+        return ret;
+
+    return nl_dcb_sendmsg(cl, DCB_CMD_GSTATE, NULL);
+}
+
+int
+vr_send_set_dcbx(struct nl_client *cl, uint8_t *ifname, uint8_t dcbx)
+{
+    int ret;
+
+    ret = nl_build_set_dcbx(cl, ifname, dcbx);
+    if (ret < 0)
+        return ret;
+
+    ret = nl_dcb_sendmsg(cl, DCB_CMD_SDCBX, NULL);
+    if (ret < 0)
+        return ret;
+
+    if (ret) {
+        printf("vRouter: Set DCBX failed (Req/Resp: %u/%d)\n",
+            dcbx, ret);
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+vr_send_get_dcbx(struct nl_client *cl, uint8_t *ifname)
+{
+    int ret;
+
+    ret = nl_build_get_dcbx(cl, ifname);
+    if (ret < 0)
+        return ret;
+
+    return nl_dcb_sendmsg(cl, DCB_CMD_GDCBX, NULL);
+}
+
+int
+vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
+        struct priority *p)
+{
+    int ret;
+
+    ret = nl_build_get_priority_config_msg(cl, ifname);
+    if (ret < 0)
+        return ret;
+
+    ret = nl_dcb_sendmsg(cl, DCB_CMD_PGTX_GCFG, p);
+    if (ret < 0)
+        return ret;
+
+    return 0;
+}
+
+int
+vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname,
+        struct priority *p)
+{
+    int ret;
+
+    ret = nl_build_set_priority_config_msg(cl, ifname, p);
+    if (ret < 0)
+        return ret;
+
+    ret = nl_dcb_sendmsg(cl, DCB_CMD_PGTX_SCFG, NULL);
+    if (ret < 0)
+        return ret;
+
+    return 0;
+}
+
+int
+vr_send_set_dcb_all(struct nl_client *cl, uint8_t *ifname)
+{
+    int ret;
+
+    ret = nl_build_set_dcb_all(cl, ifname);
+    if (ret < 0)
+        return ret;
+
+    return nl_dcb_sendmsg(cl, DCB_CMD_SET_ALL, NULL);
+}
+
+int
+vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
+        struct priority *p)
+{
+    int ret;
+
+    ret = nl_build_get_ieee_ets(cl, ifname, p);
+    if (ret < 0)
+        return ret;
+
+    return nl_dcb_sendmsg(cl, DCB_CMD_IEEE_GET, p);
+}
+
+int
+vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname,
+        struct priority *p)
+{
+    int ret;
+
+    ret = nl_build_set_ieee_ets(cl, ifname, p);
+    if (ret < 0)
+        return ret;
+
+    return nl_dcb_sendmsg(cl, DCB_CMD_IEEE_SET, NULL);
 }
 
 int
