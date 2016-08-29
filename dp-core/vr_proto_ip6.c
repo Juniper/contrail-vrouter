@@ -117,19 +117,30 @@ vr_icmp6_input(struct vrouter *router, struct vr_packet *pkt,
 }
 
 void
+vr_inet6_fill_flow_from_req(struct vr_flow *flow_p, vr_flow_req *req)
+{
+    uint64_t *dst;
+
+    vr_fill_flow_common(flow_p, req->fr_flow_nh_id, req->fr_flow_proto,
+            req->fr_flow_sport, req->fr_flow_dport, AF_INET6);
+
+    dst = (uint64_t *)(flow_p->flow6_sip);
+    *dst = req->fr_flow_sip_u;
+    *(dst + 1) = req->fr_flow_sip_l;
+    *(dst + 2) = req->fr_flow_dip_u;
+    *(dst + 3) = req->fr_flow_dip_l;
+
+    return;
+}
+
+void
 vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
         unsigned char *ip, uint8_t proto, uint16_t sport, uint16_t dport)
 {
+    vr_fill_flow_common(flow_p, nh_id, proto, sport, dport, AF_INET6);
+
     /* copy both source and destinations */
     memcpy(flow_p->flow_ip, ip, 2 * VR_IP6_ADDRESS_LEN);
-    flow_p->flow6_proto = proto;
-    flow_p->flow6_nh_id = nh_id;
-    flow_p->flow6_sport = sport;
-    flow_p->flow6_dport = dport;
-    flow_p->flow6_family = AF_INET6;
-    flow_p->flow6_unused = 0;
-
-    flow_p->flow_key_len = VR_FLOW_IPV6_HASH_SIZE;
 
     return;
 }

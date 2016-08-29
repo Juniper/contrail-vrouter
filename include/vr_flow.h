@@ -23,6 +23,9 @@ typedef enum {
     FLOW_EVICT_DROP,
 } flow_result_t;
 
+
+#define VR_FLOW_RESP_FLAG_DELETED       0x0001
+
 #define VR_FLOW_FLAG_ACTIVE             0x0001
 #define VR_FLOW_FLAG_MODIFIED           0x0100
 #define VR_FLOW_FLAG_NEW_FLOW           0x0200
@@ -87,6 +90,7 @@ typedef enum {
         ((type == VP_TYPE_IP6) ? AF_INET6 \
                                : AF_INET)
 struct vr_forwarding_md;
+struct _vr_flow_req;
 
 struct vr_flow_defer_data {
     struct vr_flow_queue *vfdd_flow_queue;
@@ -144,6 +148,7 @@ struct vr_flow {
 #define flow_nh_id     key_u.ip_key.ip_nh_id
 #define flow_proto     key_u.ip_key.ip_proto
 #define flow_ip        key_u.ip_key.ip_addr
+#define flow_unused    key_u.ip_key.ip_unused
 #define flow4_family   key_u.ip4_key.ip4_family
 #define flow4_sip      key_u.ip4_key.ip4_sip
 #define flow4_dip      key_u.ip4_key.ip4_dip
@@ -201,6 +206,8 @@ struct vr_flow {
  * no two values will differ by more than hold count.
  */
 struct vr_flow_table_info {
+    uint64_t vfti_deleted;
+    uint64_t vfti_changed;
     uint64_t vfti_action_count;
     uint64_t vfti_added;
     uint32_t vfti_oflows;
@@ -420,9 +427,13 @@ extern unsigned short vr_inet_flow_nexthop(struct vr_packet *, unsigned short);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
-       unsigned char *, uint8_t, uint16_t, uint16_t);
+       uint32_t, uint32_t, uint8_t, uint16_t, uint16_t);
 extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
        unsigned char *, uint8_t, uint16_t, uint16_t);
+extern void vr_inet6_fill_flow_from_req(struct vr_flow *,
+        struct _vr_flow_req *);
+extern void vr_fill_flow_common(struct vr_flow *, unsigned short,
+                uint8_t, uint16_t, uint16_t, uint8_t);
 extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);
 extern bool vr_inet6_flow_is_fat_flow(struct vrouter *, struct vr_packet *,

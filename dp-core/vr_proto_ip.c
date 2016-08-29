@@ -763,19 +763,14 @@ vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 }
 
 void
-vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id, 
-        unsigned char *ip, uint8_t proto, uint16_t sport, uint16_t dport)
+vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
+                  uint32_t sip, uint32_t dip, uint8_t proto,
+                  uint16_t sport, uint16_t dport)
 {
-    /* copy both source and destinations */
-    memcpy(flow_p->flow_ip, ip, 2 * VR_IP_ADDRESS_LEN);
-    flow_p->flow4_proto = proto;
-    flow_p->flow4_nh_id = nh_id;
-    flow_p->flow4_sport = sport;
-    flow_p->flow4_dport = dport;
-    flow_p->flow4_family = AF_INET;
-    flow_p->flow4_unused = 0;
+    vr_fill_flow_common(flow_p, nh_id, proto, sport, dport, AF_INET);
 
-    flow_p->flow_key_len = VR_FLOW_IPV4_HASH_SIZE;
+    flow_p->flow4_sip = sip;
+    flow_p->flow4_dip = dip;
 
     return;
 }
@@ -807,7 +802,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
         vr_fragment_del(frag);
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
-    vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
+    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
             ip->ip_proto, sport, dport);
     return 0;
 }
@@ -908,7 +903,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
     }
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
-    vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
+    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
             ip->ip_proto, sport, dport);
 
     return 0;
