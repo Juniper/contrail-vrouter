@@ -17,16 +17,17 @@
 /* For sched_getaffinity() */
 #define _GNU_SOURCE
 
+#include <stdint.h>
+#include <getopt.h>
+#include <signal.h>
+#include <sys/time.h>
+
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
 #include "vr_bridge.h"
 #include "nl_util.h"
-
-#include <getopt.h>
-#include <signal.h>
-#include <sys/time.h>
 
 #include <rte_errno.h>
 #include <rte_ethdev.h>

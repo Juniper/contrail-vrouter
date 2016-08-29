@@ -37,6 +37,29 @@ pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
     return pkt_c;
 }
 
+struct vr_packet *
+pkt_cow(struct vr_packet *pkt, unsigned short head_room)
+{
+    struct vr_packet *clone_pkt;
+
+    /* Clone the packet */
+    clone_pkt = vr_pclone(pkt);
+    if (!clone_pkt) {
+        return NULL;
+    }
+
+    /* Increase the head space by the head_room */
+    if (vr_pcow(clone_pkt, head_room)) {
+        vr_pfree(clone_pkt, VP_DROP_PCOW_FAIL);
+        return NULL;
+    }
+
+    /* Copy the ttl from old packet */
+    clone_pkt->vp_ttl = pkt->vp_ttl;
+
+    return clone_pkt;
+}
+
 bool
 vr_ip_proto_pull(struct vr_ip *iph)
 {

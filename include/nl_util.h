@@ -107,11 +107,29 @@ extern void nl_init_generic_client_resp(struct nl_client *cl, char *resp,
 extern int nl_build_nlh(struct nl_client *, uint32_t, uint32_t);
 extern void nl_update_nlh(struct nl_client *);
 extern int nl_build_genlh(struct nl_client *, uint8_t, uint8_t);
-extern int nl_build_if_create_msg(struct nl_client *cl, struct vn_if *ifp, uint8_t ack);
-extern int nl_build_header(struct nl_client *cl, unsigned char **buf, uint32_t *buf_len);
-extern void nl_update_header(struct nl_client *cl, int data_len);
-extern int nl_build_family_name_attr(struct nl_client *cl, char *family);
-extern int nl_build_get_family_id(struct nl_client *cl, char *family);
+
+extern int nl_build_if_create_msg(struct nl_client *, struct vn_if *, uint8_t);
+extern int nl_build_header(struct nl_client *, unsigned char **, uint32_t *);
+extern void nl_update_header(struct nl_client *, int);
+extern int nl_build_family_name_attr(struct nl_client *, char *);
+extern int nl_build_get_family_id(struct nl_client *, char *);
+
+extern int nl_build_set_dcb_state_msg(struct nl_client *, uint8_t *, uint8_t);
+extern int nl_build_get_dcb_state_msg(struct nl_client *, uint8_t *);
+extern int nl_build_set_priority_config_msg(struct nl_client *, uint8_t *,
+        struct priority *);
+extern int nl_build_get_priority_config_msg(struct nl_client *, uint8_t *);
+extern int nl_build_set_dcb_all(struct nl_client *, uint8_t *);
+extern int nl_build_set_dcbx(struct nl_client *, uint8_t *,  uint8_t);
+extern int nl_build_get_dcbx(struct nl_client *, uint8_t *);
+extern int nl_build_set_ieee_ets(struct nl_client *, uint8_t *,
+        struct priority *);
+extern int nl_build_get_ieee_ets(struct nl_client *, uint8_t *,
+        struct priority *);
+extern int nl_dcb_parse_reply(struct nl_client *, uint8_t, void *);
+extern int nl_dcb_sendmsg(struct nl_client *, uint8_t, void *);
+extern int nl_parse_dcb_state(uint8_t *);
+
 extern int nl_get_sandesh_attr_size();
 extern int nl_get_attr_hdr_size();
 extern uint8_t *nl_get_buf_ptr(struct nl_client *cl);
@@ -227,7 +245,20 @@ extern int vr_send_fc_map_add(struct nl_client *, unsigned int, int16_t *,
         uint8_t, uint8_t *, uint8_t *, uint8_t *, uint8_t *);
 
 
+extern int vr_send_set_dcb_state(struct nl_client *, uint8_t *, uint8_t);
+extern int vr_send_set_dcbx(struct nl_client *, uint8_t *, uint8_t);
+extern int vr_send_set_priority_config(struct nl_client *, uint8_t *,
+        struct priority *);
 
+extern int vr_send_get_dcb_state(struct nl_client *, uint8_t *);
+extern int vr_send_get_dcbx(struct nl_client *, uint8_t *);
+extern int vr_send_get_priority_config(struct nl_client *, uint8_t *,
+        struct priority *);
+extern int vr_send_set_dcb_all(struct nl_client *, uint8_t *);
+extern int vr_send_set_ieee_ets(struct nl_client *, uint8_t *,
+        struct priority *);
+extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
+        struct priority *);
 #ifdef __cplusplus
 }
 #endif

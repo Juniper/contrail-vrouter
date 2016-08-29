@@ -357,7 +357,7 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
             return !handled;
 
         /* If fabric: Agent and kernel are interested in it */
-        cloned_pkt = vr_pclone(pkt);
+        cloned_pkt = pkt_cow(pkt, AGENT_PKT_HEAD_SPACE);
         if (cloned_pkt) {
             vr_preset(cloned_pkt);
             vif_xconnect(vif, cloned_pkt, fmd);
@@ -473,8 +473,7 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     int handled = 1;
     struct vr_arp sarp;
 
-    /* If vlan tagged packet, we let the VM handle the ARP packets */
-    if ((pkt->vp_type != VP_TYPE_ARP) || (fmd->fmd_vlan != VLAN_ID_INVALID))
+    if (pkt->vp_type != VP_TYPE_ARP)
         return !handled;
 
     if (pkt->vp_len < sizeof(struct vr_arp)) {
