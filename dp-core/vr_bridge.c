@@ -472,7 +472,8 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     dmac = (int8_t *) pkt_data(pkt);
 
     pull_len = 0;
-    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6) ||
+            (pkt->vp_type == VP_TYPE_ARP)) {
         pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
         if (pull_len && !pkt_pull(pkt, pull_len)) {
             vr_pfree(pkt, VP_DROP_PULL);
@@ -482,7 +483,6 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
     /* Do the bridge lookup for the packets not meant for "me" */
     if (!fmd->fmd_to_me) {
-
         /*
          * If DHCP packet coming from VM, Trap it to Agent before doing the bridge
          * lookup itself
@@ -498,6 +498,26 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                     vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
                     return 0;
                 }
+            }
+
+            /*
+             * Handle the unicast ARP, coming from VM, not
+             * destined to us. Broadcast ARP requests would be handled
+             * in L2 multicast nexthop. Multicast ARP on fabric
+             * interface also would be handled in L2 multicast nexthop.
+             * Unicast ARP packets on fabric interface would be handled
+             * in plug routines of interface.
+             */
+            if (!IS_MAC_BMCAST(dmac)) {
+                handled = 0;
+                if (pkt->vp_type == VP_TYPE_ARP) {
+                    handled = vr_arp_input(pkt, fmd, dmac);
+                } else if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
+                    handled = vr_neighbor_input(pkt, fmd, dmac);
+                }
+
+                if (handled)
+                    return 0;
             }
         }
 
