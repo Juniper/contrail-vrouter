@@ -438,7 +438,8 @@ gen(FILE *fp)
                 gen_write(fp_expect, nesting + 4, "strtoul(node->children->content, NULL, 0)");
                 gen_write(fp_expect, 0, ");\n");
 
-            } else if (!strncmp(type, "i64", strlen("i64"))) {
+            } else if ((!strncmp(type, "i64", strlen("i64"))) ||
+                      (!strncmp(type, "u64", strlen("u64")))) {
                 gen_write(ofp, 0, "strtoull(node->children->content, NULL, 0);\n");
 
                 gen_write(fp_expect, 0, "result = vt_gen_int64_compare(");

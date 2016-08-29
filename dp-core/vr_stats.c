@@ -168,6 +168,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_FLOW_LINK_LOCAL_OBJECT].ms_free);
         response->vms_flow_metadata_object += (stats_block[VR_FLOW_METADATA_OBJECT].ms_alloc -
                 stats_block[VR_FLOW_METADATA_OBJECT].ms_free);
+        response->vms_flow_table_data_object += (stats_block[VR_FLOW_TABLE_DATA_OBJECT].ms_alloc -
+                stats_block[VR_FLOW_TABLE_DATA_OBJECT].ms_free);
         response->vms_flow_table_info_object += (stats_block[VR_FLOW_TABLE_INFO_OBJECT].ms_alloc -
                 stats_block[VR_FLOW_TABLE_INFO_OBJECT].ms_free);
         response->vms_fragment_object += (stats_block[VR_FRAGMENT_OBJECT].ms_alloc -

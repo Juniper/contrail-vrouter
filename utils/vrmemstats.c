@@ -63,6 +63,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_flow_link_local_object);
     printf("Flow Metadata                   %" PRIu64 "\n",
             stats->vms_flow_metadata_object);
+    printf("Flow Table Data                 %" PRIu64 "\n",
+            stats->vms_flow_table_data_object);
     printf("Flow Table Info                 %" PRIu64 "\n",
             stats->vms_flow_table_info_object);
     printf("Fragment                        %" PRIu64 "\n",
