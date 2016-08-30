@@ -107,6 +107,8 @@ buffer sandesh vr_interface_req {
     51: byte        vifr_transport;
     52: list<i32>   vifr_fat_flow_protocol_port;
     53: i16         vifr_qos_map_index;
+    54: list<byte>  vifr_in_mirror_md;
+    55: list<byte>  vifr_out_mirror_md;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -342,6 +344,8 @@ buffer sandesh vr_mem_stats_req {
    60:  i64             vms_interface_fat_flow_config_object;
    61:  i64             vms_qos_map_object;
    62:  i64             vms_fc_object;
+   63:  i64             vms_interface_mirror_meta_object;
+   64:  i64             vms_interface_req_mirror_meta_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */

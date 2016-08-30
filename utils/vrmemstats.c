@@ -83,10 +83,14 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_interface_fat_flow_config_object);
     printf("Interface MAC                   %" PRIu64 "\n",
             stats->vms_interface_mac_object);
+    printf("Interface Mirror Meta Objects   %" PRIu64 "\n",
+            stats->vms_interface_mirror_meta_object);
     printf("Interface Request               %" PRIu64 "\n",
             stats->vms_interface_req_object);
     printf("Interface Request MAC           %" PRIu64 "\n",
             stats->vms_interface_req_mac_object);
+    printf("Interface Mirror Req Meta Objects   %" PRIu64 "\n",
+            stats->vms_interface_req_mirror_meta_object);
     printf("Interface Request Name          %" PRIu64 "\n",
             stats->vms_interface_req_name_object);
     printf("Interface Stats                 %" PRIu64 "\n",

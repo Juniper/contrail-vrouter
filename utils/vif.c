@@ -292,14 +292,14 @@ vr_vrf_assign_req_process(void *s)
     return;
 }
 
-static void
+static int
 vr_interface_print_head_space(void)
 {
     int i;
 
     for (i = 0; i < 12; i++)
         printf(" ");
-    return;
+    return i;
 }
 
 char *
@@ -405,7 +405,7 @@ static void
 list_get_print(vr_interface_req *req)
 {
     char name[50] = {0};
-    int printed = 0;
+    int printed = 0, len;
     unsigned int i;
     uint16_t proto, port;
     bool print_zero = false;
@@ -499,6 +499,39 @@ list_get_print(vr_interface_req *req)
             req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors, 0);
+
+    if (req->vifr_in_mirror_md_size) {
+        printed = vr_interface_print_head_space();
+        len = printf("Ingress Mirror Metadata: ");
+        printed += len;
+        for (i = 0; i < req->vifr_in_mirror_md_size; i++) {
+            printed += printf("%x ", 0xFF & req->vifr_in_mirror_md[i]);
+            if (printed > 68) {
+                printf("\n");
+                printed = vr_interface_print_head_space();
+                printf("%*c", len, ' ');
+                printed += len;
+            }
+        }
+        printf("\n");
+    }
+
+    if (req->vifr_out_mirror_md_size) {
+        printed = vr_interface_print_head_space();
+        len = printf("Egress Mirror Metadata: ");
+        printed += len;
+        for (i = 0; i < req->vifr_out_mirror_md_size; i++) {
+            printed += printf("%x ", 0xFF & req->vifr_out_mirror_md[i]);
+            if (printed > 68) {
+                printf("\n");
+                printed = vr_interface_print_head_space();
+                printf("%*c", len, ' ');
+                printed += len;
+            }
+        }
+        printf("\n");
+
+    }
 
     if (platform == DPDK_PLATFORM) {
         vr_interface_pe_counters_print("TX queue ", print_zero,
