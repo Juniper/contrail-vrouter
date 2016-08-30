@@ -12,6 +12,7 @@ extern "C" {
 
 #include "sandesh.h"
 #include "vr_types.h"
+#include "vr_interface.h"
 #include "vr_qos.h"
 #include "vr_flow.h"
 #include "vr_nexthop.h"
@@ -66,8 +67,10 @@ enum vr_malloc_objects_t {
     VR_INTERFACE_OBJECT,
     VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT,
     VR_INTERFACE_MAC_OBJECT,
+    VR_INTERFACE_MIRROR_META_OBJECT,
     VR_INTERFACE_REQ_OBJECT,
     VR_INTERFACE_REQ_MAC_OBJECT,
+    VR_INTERFACE_REQ_MIRROR_META_OBJECT,
     VR_INTERFACE_REQ_NAME_OBJECT,
     VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT,
     VR_INTERFACE_STATS_OBJECT,

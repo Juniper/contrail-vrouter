@@ -16,6 +16,7 @@ struct sandesh_object_md sandesh_md[] = {
     },
     [VR_INTERFACE_OBJECT_ID]    =   {
         .obj_len                =       4 * sizeof(vr_interface_req),
+        .obj_get_size          =        vr_interface_req_get_size,
         .obj_type_string        =       "vr_interface_req",
     },
     [VR_NEXTHOP_OBJECT_ID]      =   {

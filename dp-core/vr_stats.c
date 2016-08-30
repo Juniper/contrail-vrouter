@@ -259,7 +259,12 @@ vr_mem_stats_get(void)
                 stats_block[VR_QOS_MAP_OBJECT].ms_free);
         response->vms_fc_object += (stats_block[VR_FC_OBJECT].ms_alloc -
                 stats_block[VR_FC_OBJECT].ms_free);
-
+        response->vms_interface_mirror_meta_object +=
+            (stats_block[VR_INTERFACE_MIRROR_META_OBJECT].ms_alloc -
+            stats_block[VR_INTERFACE_MIRROR_META_OBJECT].ms_free);
+        response->vms_interface_req_mirror_meta_object +=
+            (stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_alloc -
+            stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_free);
         for (i = 0; i < VR_VROUTER_MAX_OBJECT; i++) {
             alloced += stats_block[i].ms_alloc;
             freed += stats_block[i].ms_free;

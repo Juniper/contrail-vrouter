@@ -404,14 +404,14 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
             if (!pkt->vp_if)
                 goto fail;
 
-            mirror_md_len = pkt->vp_if->vif_mirror_md_len;
-            mirror_md = pkt->vp_if->vif_mirror_md;
+            mirror_md_len = pkt->vp_if->vif_in_mirror_md_len;
+            mirror_md = pkt->vp_if->vif_in_mirror_md;
         } else {
             if (!pkt->vp_nh || !pkt->vp_nh->nh_dev)
              goto fail;
 
-            mirror_md_len = pkt->vp_nh->nh_dev->vif_mirror_md_len;
-            mirror_md = pkt->vp_nh->nh_dev->vif_mirror_md;
+            mirror_md_len = pkt->vp_nh->nh_dev->vif_out_mirror_md_len;
+            mirror_md = pkt->vp_nh->nh_dev->vif_out_mirror_md;
         }
 
         if (!mirror_md_len) {

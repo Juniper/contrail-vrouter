@@ -1378,6 +1378,20 @@ vif_free(struct vr_interface *vif)
         }
     }
 
+    if (vif->vif_in_mirror_md) {
+        vif->vif_in_mirror_md_len = 0;
+        vif->vif_in_mirror_md_size = 0;
+        vr_free(vif->vif_in_mirror_md, VR_INTERFACE_MIRROR_META_OBJECT);
+        vif->vif_in_mirror_md = NULL;
+    }
+
+    if (vif->vif_out_mirror_md) {
+        vif->vif_out_mirror_md_len = 0;
+        vif->vif_out_mirror_md_size = 0;
+        vr_free(vif->vif_out_mirror_md, VR_INTERFACE_MIRROR_META_OBJECT);
+        vif->vif_out_mirror_md = NULL;
+    }
+
     vr_free(vif, VR_INTERFACE_OBJECT);
 
     return;
@@ -1727,6 +1741,75 @@ vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
 }
 
 static int
+vr_interface_mirror_md_set(struct vr_interface *vif, vr_interface_req *req)
+{
+
+    /*
+     * If metadata is removed from request, make our metadata len to
+     * zero, so that it does not get used in packet processeing. The
+     * memory will get freed only at the time of deletion of interface
+     * _size hold the allocated memory size, so that we would not over
+     * shoot while copying
+     */
+    if (!req->vifr_in_mirror_md_size)
+        vif->vif_in_mirror_md_len = 0;
+
+    if (!req->vifr_out_mirror_md_size)
+        vif->vif_out_mirror_md_len = 0;
+
+    /*
+     * If metadata is newly set, create metadata memory for the
+     * requested size. If memory already exists, we dont accept
+     * bigger metadata
+     */
+    if (req->vifr_in_mirror_md_size) {
+        if (req->vifr_in_mirror_md_size > VIF_MAX_MIRROR_MD_SIZE)
+            req->vifr_in_mirror_md_size = VIF_MAX_MIRROR_MD_SIZE;
+
+        if (!vif->vif_in_mirror_md) {
+            vif->vif_in_mirror_md =
+                vr_zalloc(req->vifr_in_mirror_md_size,
+                                VR_INTERFACE_MIRROR_META_OBJECT);
+            if (!vif->vif_in_mirror_md)
+                return -ENOMEM;
+
+            vif->vif_in_mirror_md_size = req->vifr_in_mirror_md_size;
+        }
+
+        if (req->vifr_in_mirror_md_size > vif->vif_in_mirror_md_size)
+            return -EINVAL;
+
+        memcpy(vif->vif_in_mirror_md,
+                    req->vifr_in_mirror_md, req->vifr_in_mirror_md_size);
+        vif->vif_in_mirror_md_len = req->vifr_in_mirror_md_size;
+    }
+
+    if (req->vifr_out_mirror_md_size) {
+        if (req->vifr_out_mirror_md_size > VIF_MAX_MIRROR_MD_SIZE)
+            req->vifr_out_mirror_md_size = VIF_MAX_MIRROR_MD_SIZE;
+
+        if (!vif->vif_out_mirror_md) {
+            vif->vif_out_mirror_md =
+                vr_zalloc(req->vifr_out_mirror_md_size,
+                                VR_INTERFACE_MIRROR_META_OBJECT);
+            if (!vif->vif_out_mirror_md)
+                return -ENOMEM;
+
+            vif->vif_out_mirror_md_size = req->vifr_out_mirror_md_size;
+        }
+
+        if (req->vifr_out_mirror_md_size > vif->vif_out_mirror_md_size)
+            return -EINVAL;
+
+        memcpy(vif->vif_out_mirror_md,
+                    req->vifr_out_mirror_md, req->vifr_out_mirror_md_size);
+        vif->vif_out_mirror_md_len = req->vifr_out_mirror_md_size;
+    }
+
+    return 0;
+}
+
+static int
 vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 {
     int ret = 0;
@@ -1756,6 +1839,10 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
     vif->vif_qos_map_index = req->vifr_qos_map_index;
+
+    ret = vr_interface_mirror_md_set(vif, req);
+    if (ret)
+        return ret;
 
     if ((ret = vif_fat_flow_add(vif, req)))
         return ret;
@@ -1789,14 +1876,14 @@ vr_interface_add(vr_interface_req *req, bool need_response)
 
     if (!router || ((unsigned int)req->vifr_idx >= router->vr_max_interfaces)) {
         ret = -EINVAL;
-        goto generate_resp;
+        goto error;
     }
 
     if (req->vifr_type >= VIF_TYPE_MAX && (ret = -EINVAL))
-        goto generate_resp;
+        goto error;
 
     if (!vif_transport_valid(req))
-        goto generate_resp;
+        goto error;
 
     vif = __vrouter_get_interface(router, req->vifr_idx);
     if (vif) {
@@ -1807,14 +1894,14 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif = vr_zalloc(sizeof(*vif), VR_INTERFACE_OBJECT);
     if (!vif) {
         ret = -ENOMEM;
-        goto generate_resp;
+        goto error;
     }
 
     vif->vif_stats = vr_zalloc(vr_num_cpus *
             sizeof(struct vr_interface_stats), VR_INTERFACE_STATS_OBJECT);
     if (!vif->vif_stats) {
         ret = -ENOMEM;
-        goto generate_resp;
+        goto error;
     }
 
     for (i = 0; i < vr_num_cpus; i++) {
@@ -1822,19 +1909,13 @@ vr_interface_add(vr_interface_req *req, bool need_response)
                 sizeof(uint64_t), VR_INTERFACE_TO_LCORE_ERRORS_OBJECT);
         if (!vif->vif_stats[i].vis_queue_ierrors_to_lcore) {
             ret = -ENOMEM;
-            goto generate_resp;
+            goto error;
         }
     }
 
     vif->vif_type = req->vifr_type;
 
     vif_set_flags(vif, req);
-
-    vif->vif_mirror_id = req->vifr_mir_id;
-    if (!(vif->vif_flags & VIF_FLAG_MIRROR_RX) &&
-        !(vif->vif_flags & VIF_FLAG_MIRROR_TX)) {
-        vif->vif_mirror_id = VR_MAX_MIRROR_INDICES;
-    }
 
     vif->vif_vrf = req->vifr_vrf;
     vif->vif_vlan_id = VLAN_ID_INVALID;
@@ -1848,10 +1929,19 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
     vif->vif_qos_map_index = req->vifr_qos_map_index;
 
+    vif->vif_mirror_id = req->vifr_mir_id;
+    if (!(vif->vif_flags & VIF_FLAG_MIRROR_RX) &&
+        !(vif->vif_flags & VIF_FLAG_MIRROR_TX)) {
+        vif->vif_mirror_id = VR_MAX_MIRROR_INDICES;
+    }
+    ret = vr_interface_mirror_md_set(vif, req);
+    if (ret)
+        goto error;
+
     if (req->vifr_mac) {
         if (req->vifr_mac_size != sizeof(vif->vif_mac)) {
             ret = -EINVAL;
-            goto generate_resp;
+            goto error;
         }
 
         memcpy(vif->vif_mac, req->vifr_mac, sizeof(vif->vif_mac));
@@ -1866,7 +1956,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
 
     ret = vif_fat_flow_add(vif, req);
     if (ret)
-        goto generate_resp;
+        goto error;
 
     /*
      * the order below is probably not intuitive, but we do this because
@@ -1878,7 +1968,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_tx = vif_discard_tx;
     ret = vrouter_add_interface(vif, req);
     if (ret)
-        goto generate_resp;
+        goto error;
 
     ret = vif_drv_add(vif, req);
     if (ret) {
@@ -1889,12 +1979,13 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (!ret)
         vrouter_setup_vif(vif);
 
+error:
+    if (ret && vif)
+        vif_free(vif);
+
 generate_resp:
     if (need_response)
         vr_send_response(ret);
-
-    if (ret && vif)
-        vif_free(vif);
 
     return ret;
 }
@@ -1989,6 +2080,18 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
          * that the field is not valid - by setting the size to 0.
          */
         req->vifr_src_mac_size = 0;
+    }
+
+    if (intf->vif_in_mirror_md_len) {
+        memcpy(req->vifr_in_mirror_md, intf->vif_in_mirror_md,
+                intf->vif_in_mirror_md_len);
+        req->vifr_in_mirror_md_size = intf->vif_in_mirror_md_len;
+    }
+
+    if (intf->vif_out_mirror_md_len) {
+        memcpy(req->vifr_out_mirror_md, intf->vif_out_mirror_md,
+                intf->vif_out_mirror_md_len);
+        req->vifr_out_mirror_md_size = intf->vif_out_mirror_md_len;
     }
 
     /* vif counters */
@@ -2110,6 +2213,18 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
     return 0;
 }
 
+unsigned int
+vr_interface_req_get_size(void *req_p)
+{
+    vr_interface_req *req = (vr_interface_req *)req_p;
+
+    /*
+     * Standard interface request size + both ingress and egress
+     * metadata size
+     */
+    return ((4 * sizeof(*req)) + (2 * VIF_MAX_MIRROR_MD_SIZE));
+}
+
 static vr_interface_req *
 vr_interface_req_get(void)
 {
@@ -2133,6 +2248,14 @@ vr_interface_req_get(void)
             VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT);
     if (req->vifr_queue_ierrors_to_lcore)
         req->vifr_queue_ierrors_to_lcore_size = 0;
+
+    req->vifr_in_mirror_md = vr_zalloc(VIF_MAX_MIRROR_MD_SIZE,
+                                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+    req->vifr_in_mirror_md_size = 0;
+
+    req->vifr_out_mirror_md = vr_zalloc(VIF_MAX_MIRROR_MD_SIZE,
+                                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+    req->vifr_out_mirror_md_size = 0;
 
     return req;
 }
@@ -2174,6 +2297,20 @@ vr_interface_req_destroy(vr_interface_req *req)
         vr_free(req->vifr_queue_ierrors_to_lcore,
             VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT);
         req->vifr_queue_ierrors_to_lcore_size = 0;
+    }
+
+    if (req->vifr_in_mirror_md) {
+        vr_free(req->vifr_in_mirror_md,
+                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+        req->vifr_in_mirror_md_size = 0;
+        req->vifr_in_mirror_md = NULL;
+    }
+
+    if (req->vifr_out_mirror_md) {
+        vr_free(req->vifr_out_mirror_md,
+                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+        req->vifr_out_mirror_md_size = 0;
+        req->vifr_out_mirror_md = NULL;
     }
 
     vr_interface_req_free_fat_flow_config(req);

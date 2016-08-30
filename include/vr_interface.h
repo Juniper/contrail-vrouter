@@ -30,6 +30,7 @@
 #define VIF_TYPE_MONITORING         9
 #define VIF_TYPE_MAX               10
 
+
 #define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
 #define vif_is_fabric(vif)          (vif->vif_type == VIF_TYPE_PHYSICAL)
@@ -58,6 +59,7 @@
 
 
 #define VR_INTERFACE_NAME_LEN       64
+#define VIF_MAX_MIRROR_MD_SIZE      255
 
 #define VIF_TRANSPORT_VIRTUAL       0
 #define VIF_TRANSPORT_ETH           1
@@ -267,12 +269,16 @@ struct vr_interface {
     unsigned char *vif_src_mac;
     vr_htable_t vif_btable;
     unsigned char vif_rewrite[VR_ETHER_HLEN];
+    unsigned char vif_in_mirror_md_len;
+    unsigned char vif_in_mirror_md_size;
+    unsigned char vif_out_mirror_md_len;
+    unsigned char vif_out_mirror_md_size;
+    unsigned char *vif_in_mirror_md;
+    unsigned char *vif_out_mirror_md;
     unsigned char vif_name[VR_INTERFACE_NAME_LEN];
     unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
     int16_t vif_qos_map_index;
-    unsigned short vif_mirror_md_len;
-    unsigned char *vif_mirror_md;
 };
 
 struct vr_interface_settings {
@@ -317,6 +323,8 @@ extern int vif_vrf_table_get(struct vr_interface *, vr_vrf_assign_req *);
 extern unsigned int vif_vrf_table_get_nh(struct vr_interface *, unsigned short);
 extern int vif_vrf_table_set(struct vr_interface *, unsigned int,
         int, unsigned int);
+extern unsigned int vr_interface_req_get_size(void *);
+
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
