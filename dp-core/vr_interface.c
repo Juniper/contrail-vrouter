@@ -1378,6 +1378,18 @@ vif_free(struct vr_interface *vif)
         }
     }
 
+    if (vif->vif_in_mirror_md) {
+        vif->vif_in_mirror_md_len = 0;
+        vr_free(vif->vif_in_mirror_md, VR_INTERFACE_MIRROR_META_OBJECT);
+        vif->vif_in_mirror_md = NULL;
+    }
+
+    if (vif->vif_out_mirror_md) {
+        vif->vif_out_mirror_md_len = 0;
+        vr_free(vif->vif_out_mirror_md, VR_INTERFACE_MIRROR_META_OBJECT);
+        vif->vif_out_mirror_md = NULL;
+    }
+
     vr_free(vif, VR_INTERFACE_OBJECT);
 
     return;
@@ -1727,6 +1739,84 @@ vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
 }
 
 static int
+vr_interface_mirror_md_set(struct vr_interface *vif, vr_interface_req *req)
+{
+    int in_created = 0;
+
+    /* If metadata is removed, free ours */
+    if (!req->vifr_in_mirror_md_size) {
+        if (vif->vif_in_mirror_md_len) {
+            vif->vif_in_mirror_md_len = 0;
+            vr_free(vif->vif_in_mirror_md,
+                    VR_INTERFACE_MIRROR_META_OBJECT);
+            vif->vif_in_mirror_md = NULL;
+        }
+    }
+
+    if (!req->vifr_out_mirror_md_size) {
+        if (vif->vif_out_mirror_md_len) {
+            vif->vif_out_mirror_md_len = 0;
+            vr_free(vif->vif_out_mirror_md,
+                    VR_INTERFACE_MIRROR_META_OBJECT);
+            vif->vif_out_mirror_md = NULL;
+        }
+    }
+
+    /*
+     * If metadata is newly set, creates ours. Dont accept change of
+     * metadata or metadata len
+     */
+    if (req->vifr_in_mirror_md_size) {
+        if (req->vifr_in_mirror_md_size > VR_VIF_MAX_MIRROR_MD_SIZE)
+            req->vifr_in_mirror_md_size = VR_VIF_MAX_MIRROR_MD_SIZE;
+
+        if (!vif->vif_in_mirror_md_len) {
+            vif->vif_in_mirror_md =
+                vr_zalloc(req->vifr_in_mirror_md_size,
+                                VR_INTERFACE_MIRROR_META_OBJECT);
+            if (!vif->vif_in_mirror_md)
+                return -ENOMEM;
+
+            memcpy(vif->vif_in_mirror_md,
+                    req->vifr_in_mirror_md, req->vifr_in_mirror_md_size);
+            vif->vif_in_mirror_md_len = req->vifr_in_mirror_md_size;
+            in_created = 1;
+        }
+
+        if (vif->vif_in_mirror_md_len != req->vifr_in_mirror_md_size)
+            return -EINVAL;
+    }
+
+    if (req->vifr_out_mirror_md_size) {
+        if (req->vifr_out_mirror_md_size > VR_VIF_MAX_MIRROR_MD_SIZE)
+            req->vifr_out_mirror_md_size = VR_VIF_MAX_MIRROR_MD_SIZE;
+
+        if (!vif->vif_out_mirror_md_len) {
+            vif->vif_out_mirror_md = vr_zalloc(req->vifr_out_mirror_md_size,
+                                VR_INTERFACE_MIRROR_META_OBJECT);
+            if (!vif->vif_out_mirror_md) {
+                if (in_created) {
+                    vif->vif_in_mirror_md_len = 0;
+                    vr_free(vif->vif_in_mirror_md,
+                            VR_INTERFACE_MIRROR_META_OBJECT);
+                    vif->vif_in_mirror_md = NULL;
+                }
+                return -ENOMEM;
+            }
+
+            memcpy(vif->vif_out_mirror_md,
+                    req->vifr_out_mirror_md, req->vifr_out_mirror_md_size);
+            vif->vif_out_mirror_md_len = req->vifr_out_mirror_md_size;
+        }
+
+        if (vif->vif_out_mirror_md_len != req->vifr_out_mirror_md_size)
+            return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int
 vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 {
     int ret = 0;
@@ -1756,6 +1846,10 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 
     vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
     vif->vif_qos_map_index = req->vifr_qos_map_index;
+
+    ret = vr_interface_mirror_md_set(vif, req);
+    if (ret)
+        return ret;
 
     if ((ret = vif_fat_flow_add(vif, req)))
         return ret;
@@ -1835,6 +1929,10 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         !(vif->vif_flags & VIF_FLAG_MIRROR_TX)) {
         vif->vif_mirror_id = VR_MAX_MIRROR_INDICES;
     }
+
+    ret = vr_interface_mirror_md_set(vif, req);
+    if (ret)
+        goto generate_resp;
 
     vif->vif_vrf = req->vifr_vrf;
     vif->vif_vlan_id = VLAN_ID_INVALID;
@@ -1991,6 +2089,18 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         req->vifr_src_mac_size = 0;
     }
 
+    if (intf->vif_in_mirror_md_len) {
+        memcpy(req->vifr_in_mirror_md, intf->vif_in_mirror_md,
+                intf->vif_in_mirror_md_len);
+        req->vifr_in_mirror_md_size = intf->vif_in_mirror_md_len;
+    }
+
+    if (intf->vif_out_mirror_md_len) {
+        memcpy(req->vifr_out_mirror_md, intf->vif_out_mirror_md,
+                intf->vif_out_mirror_md_len);
+        req->vifr_out_mirror_md_size = intf->vif_out_mirror_md_len;
+    }
+
     /* vif counters */
     req->vifr_ibytes = 0;
     req->vifr_ipackets = 0;
@@ -2134,6 +2244,16 @@ vr_interface_req_get(void)
     if (req->vifr_queue_ierrors_to_lcore)
         req->vifr_queue_ierrors_to_lcore_size = 0;
 
+    req->vifr_in_mirror_md = vr_zalloc(VR_VIF_MAX_MIRROR_MD_SIZE,
+                                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+    if (req->vifr_in_mirror_md)
+        req->vifr_in_mirror_md_size = 0;
+
+    req->vifr_out_mirror_md = vr_zalloc(VR_VIF_MAX_MIRROR_MD_SIZE,
+                                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+    if (req->vifr_out_mirror_md)
+        req->vifr_out_mirror_md_size = 0;
+
     return req;
 }
 
@@ -2174,6 +2294,20 @@ vr_interface_req_destroy(vr_interface_req *req)
         vr_free(req->vifr_queue_ierrors_to_lcore,
             VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT);
         req->vifr_queue_ierrors_to_lcore_size = 0;
+    }
+
+    if (req->vifr_in_mirror_md) {
+        vr_free(req->vifr_in_mirror_md,
+                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+        req->vifr_in_mirror_md_size = 0;
+        req->vifr_in_mirror_md = NULL;
+    }
+
+    if (req->vifr_out_mirror_md) {
+        vr_free(req->vifr_out_mirror_md,
+                VR_INTERFACE_REQ_MIRROR_META_OBJECT);
+        req->vifr_out_mirror_md_size = 0;
+        req->vifr_out_mirror_md = NULL;
     }
 
     vr_interface_req_free_fat_flow_config(req);

@@ -7,6 +7,7 @@
 #define __VR_SANDESH_H__
 
 #define VR_FLOW_MAX_CPUS    128
+#define VR_VIF_MAX_MIRROR_MD_SIZE 255
 
 struct sandesh_object_md {
     unsigned int obj_len;

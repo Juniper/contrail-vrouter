@@ -15,7 +15,8 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_type_string        =       "vr_null_object",
     },
     [VR_INTERFACE_OBJECT_ID]    =   {
-        .obj_len                =       4 * sizeof(vr_interface_req),
+        .obj_len                =       ((4 * sizeof(vr_interface_req))
+                    + (2 * VR_VIF_MAX_MIRROR_MD_SIZE)),
         .obj_type_string        =       "vr_interface_req",
     },
     [VR_NEXTHOP_OBJECT_ID]      =   {

@@ -30,6 +30,7 @@
 #define VIF_TYPE_MONITORING         9
 #define VIF_TYPE_MAX               10
 
+
 #define vif_is_virtual(vif)         ((vif->vif_type == VIF_TYPE_VIRTUAL) ||\
                                         (vif->vif_type == VIF_TYPE_VIRTUAL_VLAN))
 #define vif_is_fabric(vif)          (vif->vif_type == VIF_TYPE_PHYSICAL)
@@ -271,8 +272,10 @@ struct vr_interface {
     unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
     int16_t vif_qos_map_index;
-    unsigned short vif_mirror_md_len;
-    unsigned char *vif_mirror_md;
+    unsigned char vif_in_mirror_md_len;
+    unsigned char vif_out_mirror_md_len;
+    unsigned char *vif_in_mirror_md;
+    unsigned char *vif_out_mirror_md;
 };
 
 struct vr_interface_settings {
