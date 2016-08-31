@@ -416,20 +416,28 @@ lh_work(struct work_struct *work)
     return;
 }
 
-static void
+static int
 lh_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    struct work_arg *wa = kzalloc(sizeof(*wa), GFP_KERNEL);
+    unsigned int alloc_flag;
+    struct work_arg *wa;
 
+    if (in_softirq()) {
+        alloc_flag = GFP_ATOMIC;
+    } else {
+        alloc_flag = GFP_KERNEL;
+    }
+
+    wa = kzalloc(sizeof(*wa), alloc_flag);
     if (!wa)
-        return;
+        return -ENOMEM;
 
     wa->fn = fn;
     wa->wa_arg = arg;
     INIT_WORK(&wa->wa_work, lh_work);
     schedule_work_on(cpu, &wa->wa_work);
 
-    return;
+    return 0;
 }
 
 static void
