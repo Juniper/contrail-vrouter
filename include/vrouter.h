@@ -162,7 +162,7 @@ struct host_os {
     unsigned int (*hos_pgso_size)(struct vr_packet *);
 
     unsigned int (*hos_get_cpu)(void);
-    void (*hos_schedule_work)(unsigned int, void (*)(void *), void *);
+    int (*hos_schedule_work)(unsigned int, void (*)(void *), void *);
     void (*hos_delay_op)(void);
     void (*hos_defer)(struct vrouter *, vr_defer_cb, void *);
     void *(*hos_get_defer_data)(unsigned int);
