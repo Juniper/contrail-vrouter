@@ -1434,11 +1434,12 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     uint32_t sip = 0;
 
     struct vr_packet *tmp;
-    struct vr_ip *ip;
-    struct vr_ip6 *ip6;
+    struct vr_ip *ip = NULL;
+    struct vr_ip6 *ip6 = NULL;
     struct vr_udp *udp;
     struct vr_vrf_stats *stats;
     struct vr_forwarding_class_qos *qos;
+    struct vr_nexthop *forward_nh;
 
     if (!fmd)
         goto send_fail;
@@ -1476,10 +1477,12 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             goto send_fail;
         }
 
+
+        ip = (struct vr_ip *)(pkt_data(pkt));
+
         if (pkt_len(pkt) > ((1 << sizeof(ip->ip_len) * 8)))
             goto send_fail;
 
-        ip = (struct vr_ip *)(pkt_data(pkt));
         udp = (struct vr_udp *)((char *)ip + ip->ip_hl * 4);
         udp->udp_csum = vr_ip_partial_csum(ip);
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
@@ -1493,6 +1496,27 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         udp = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
         udp->udp_csum = vr_ip6_partial_csum(ip6);
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
+    }
+
+    /*
+     * If the nexthop we are forwarding to is an Ecmp nexthop, the
+     * component nh need to be chosen based on inner network header
+     * rather on newly added mirror udp header. So calculate the ecmp
+     * index before adding any further headers. It is better to do an
+     * extra look up as this is a Mirrored packet, rather manipulating
+     * the network and innernetwork headers to avoid the extra lookup
+     */
+    fmd->fmd_flow_index = -1;
+
+    if (ip) {
+        forward_nh = vr_inet_ip_lookup(fmd->fmd_dvrf, ip->ip_daddr);
+    } else {
+        forward_nh = vr_inet6_ip_lookup(fmd->fmd_dvrf, ip6->ip6_dst);
+    }
+
+    if (forward_nh && (forward_nh->nh_type == NH_COMPOSITE) &&
+            (forward_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP)) {
+        nh_composite_ecmp_select_nh(pkt, forward_nh, fmd);
     }
 
 
