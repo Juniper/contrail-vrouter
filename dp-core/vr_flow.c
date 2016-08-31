@@ -1713,8 +1713,7 @@ __vr_flow_schedule_transition(struct vrouter *router, struct vr_flow_entry *fe,
     }
     flmd->flmd_defer_data = defer;
 
-    vr_schedule_work(vr_get_cpu(), vr_flow_work, (void *)flmd);
-    return 0;
+    return vr_schedule_work(vr_get_cpu(), vr_flow_work, (void *)flmd);
 }
 
 static int
