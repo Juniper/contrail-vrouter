@@ -331,11 +331,12 @@ fh_get_cpu(void)
 	return (cpuid);
 }
 
-static void
+static int
 fh_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-
 	vr_log(VR_ERR, "%s: not implemented\n", __func__);
+
+    return -EOPNOTSUPP;
 }
 
 static void
