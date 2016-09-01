@@ -342,11 +342,9 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 {
     bool reset = true;
     unsigned int captured_len, clone_len = 0, mirror_md_len = 0;
-    unsigned long sec, usec;
     void *mirror_md;
     unsigned char *buf;
     struct vr_nexthop *nh, *pkt_nh;
-    struct vr_pcap *pcap;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
     unsigned char default_mme[2] = {0xff, 0x0};
@@ -388,8 +386,6 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
     pkt->vp_flags &= ~VP_FLAG_GRO;
 
     if (mirror->mir_flags & VR_MIRROR_FLAG_DYNAMIC) {
-
-        clone_len += sizeof(struct vr_pcap);
 
         if (mtype == MIRROR_TYPE_ACL) {
             if (fmd->fmd_flow_index >= 0) {
@@ -442,7 +438,6 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 
                 clone_len += pkt_nh->nh_encap_len;
 
-
                 if (vr_pcow(pkt, clone_len))
                     goto fail;
                 clone_len = 0;
@@ -464,27 +459,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 
     captured_len = htonl(pkt_len(pkt));
     if (mirror_md_len) {
-
         buf = pkt_push(pkt, mirror_md_len);
         if (!buf)
             goto fail;
         memcpy(buf, mirror_md, mirror_md_len);
-
-        /* Add the pcap header */
-        pcap = (struct vr_pcap *)pkt_push(pkt, sizeof(struct vr_pcap));
-        if (!pcap)
-            goto fail;
-
-        pcap->pcap_incl_len = captured_len;
-        pcap->pcap_orig_len = captured_len;
-
-        vr_get_time(&sec, &usec);
-
-        pcap->pcap_ts_sec = sec;
-        pcap->pcap_ts_usec = usec;
-
-        pcap->pcap_ts_sec = htonl(pcap->pcap_ts_sec);
-        pcap->pcap_ts_usec = htonl(pcap->pcap_ts_usec);
     }
 
     if (nh->nh_vrf >= 0)
