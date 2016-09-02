@@ -303,6 +303,8 @@ struct vr_vlan_hdr {
 #define VR_ETH_PROTO_VLAN       0x8100
 
 #define VR_DIAG_CSUM         0xffff
+#define VR_UDP_PORT_RANGE_START 49152
+#define VR_UDP_PORT_RANGE_END   65535
 
 static inline int8_t
 vr_vlan_get_tos(uint8_t *eth_data)
