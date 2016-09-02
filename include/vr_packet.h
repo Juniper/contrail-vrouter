@@ -261,11 +261,13 @@ struct vr_packet {
 };
 
 
+#define VP_QUEUE_INVALID    0xFF
 #define VP_PRIORITY_INVALID 0xF
 
 extern void pkt_reset(struct vr_packet *);
 extern struct vr_packet *pkt_copy(struct vr_packet *, unsigned short,
         unsigned short);
+extern struct vr_packet *pkt_cow(struct vr_packet *, unsigned short);
 extern int vr_myip(struct vr_interface *, unsigned int);
 
 typedef enum {

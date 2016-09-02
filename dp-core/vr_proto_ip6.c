@@ -390,6 +390,9 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_route_req rt;
     struct vr_neighbor_option *nopt;
 
+    if (fmd->fmd_vlan != VLAN_ID_INVALID)
+        return MR_FLOOD;
+
     icmph = (struct vr_icmp *)pkt_data(pkt);
     pull_len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
     nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + pull_len);

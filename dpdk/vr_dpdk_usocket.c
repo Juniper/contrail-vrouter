@@ -6,17 +6,18 @@
  * All rights reserved
  */
 
-#include "nl_util.h"
-#include "vr_dpdk.h"
-#include "vr_dpdk_usocket.h"
-#include "vr_message.h"
-
 #include <fcntl.h>
 #include <poll.h>
 #include <linux/netlink.h>
 #include <sys/eventfd.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <stdint.h>
+
+#include "nl_util.h"
+#include "vr_dpdk.h"
+#include "vr_dpdk_usocket.h"
+#include "vr_message.h"
 
 #include <rte_byteorder.h>
 #include <rte_errno.h>

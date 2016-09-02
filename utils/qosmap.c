@@ -26,6 +26,7 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_ether.h>
+#include <linux/dcbnl.h>
 #endif
 
 #include <net/if.h>
@@ -43,18 +44,76 @@
 #include "ini_parser.h"
 #include "vr_packet.h"
 
+#define DCBX_MODE_CEE       1
+#define DCBX_MODE_IEEE      2
+
+
 static bool dump_pending = false;
 static int marker = -1;
 
-unsigned int help_set, dump_fc_set, dump_qos_set;
-unsigned int get_fc_set, set_fc_set, fc_set;
-unsigned int get_qos_set, set_qos_set, delete_qos_set;
-unsigned int dscp_set, mpls_qos_set, dotonep_set, queue_set;
+static unsigned int help_set, dump_fc_set, dump_qos_set;
+static unsigned int get_fc_set, set_fc_set, fc_set;
+static unsigned int get_qos_set, set_qos_set, delete_qos_set;
+static unsigned int dscp_set, mpls_qos_set, dotonep_set, queue_set;
+static unsigned int set_queue_set, pg_set, pg_bw_set, strict_set;
+static unsigned int get_queue_set, tc_set, dcbx_set;
 
-uint8_t dotonep, dscp, mpls_qos, fc, queue;
-unsigned int qos_index;
+static uint8_t dotonep, dscp, mpls_qos, fc, queue;
+static uint8_t dcbx_mode, dcb_enable;
+static unsigned int qos_index, if_index;
+static uint8_t ifname[IFNAMSIZ];
 
+struct priority priority_map;
 struct nl_client *cl;
+
+static void
+dump_priority(void)
+{
+    unsigned int i;
+    unsigned char ifname[IF_NAMESIZE];
+    uint8_t *dcbx_str;
+
+    printf("Priority Operation\n");
+    printf("Interface:                  %5s\n", if_indextoname(if_index, ifname));
+    if (dcbx_mode & DCB_CAP_DCBX_VER_IEEE) {
+        dcbx_str = "IEEE";
+    } else if (dcbx_mode & DCB_CAP_DCBX_VER_CEE) {
+        dcbx_str = "CEE";
+    } else {
+        dcbx_str = "Unknown DCBX mode";
+    }
+
+    printf("DCBX:                       %5s\n", dcbx_str);
+    printf("DCB State:                  %5s\n", dcb_enable ? "Enabled" : "Disabled");
+    printf("Priority:                   ");
+    for (i = 0; i < NUM_TC; i++) {
+        printf("%5u", i);
+    }
+    printf("\n");
+    printf("Traffic Class:              ");
+    for (i = 0; i < NUM_TC; i++) {
+        printf("%5u", priority_map.prio_to_tc[i]);
+    }
+    printf("\n");
+
+    printf("Priority Group:             ");
+    for (i = 0; i < NUM_PG; i++) {
+        printf("%5u", priority_map.tc_to_group[i]);
+    }
+    printf("\n");
+    printf("Priority Group Bandwidth:   ");
+    for (i = 0; i < NUM_PG; i++) {
+        printf("%5u", priority_map.prio_group_bw[i]);
+    }
+    printf("\n");
+    printf("Strictness:                 ");
+    for (i = 0; i < NUM_TC; i++) {
+        printf("%5u", (priority_map.tc_strictness & (1 << i)) ? 1 : 0);
+    }
+    printf("\n");
+
+    return;
+}
 
 void
 vr_fc_map_req_process(void *s)
@@ -130,7 +189,7 @@ vr_response_process(void *s)
 }
 
 static int
-qos_map_op(void)
+vr_qos_map_op(void)
 {
     int ret;
     unsigned int num_dscp, num_mpls_qos, num_dotonep;
@@ -184,7 +243,97 @@ op_retry:
     return ret;
 }
 
+static int
+interface_queue_get(void)
+{
+    int ret;
+
+    ret = vr_send_get_dcbx(cl, ifname);
+    if (ret < 0) {
+        printf("vRouter: GET of DCBX mode failed\n");
+        return ret;
+    }
+    dcbx_mode = ret;
+
+    if (dcbx_mode & DCB_CAP_DCBX_VER_CEE) {
+        ret = vr_send_get_dcb_state(cl, ifname);
+        if (ret < 0) {
+            printf("vRouter: GET of DCB state failed\n");
+            return ret;
+        }
+
+        dcb_enable = ret;
+
+        memset(&priority_map, 0, sizeof(priority_map));
+        ret = vr_send_get_priority_config(cl, ifname, &priority_map);
+    } else if (dcbx_mode & DCB_CAP_DCBX_VER_IEEE) {
+        ret = vr_send_get_ieee_ets(cl, ifname, &priority_map);
+    } else {
+        printf("vRouter: Unknown DCBX mode %x\n", dcbx_mode);
+        return 0;
+    }
+
+    if (ret < 0) {
+        printf("GET Priority Config failed on interface %s\n", ifname);
+        return ret;
+    }
+
+    dump_priority();
+
+    return 0;
+}
+
+static int
+interface_queue_set(void)
+{
+    int ret, i;
+
+    ret = vr_send_set_dcbx(cl, ifname, dcbx_mode | DCB_CAP_DCBX_HOST);
+    if (ret < 0)
+        return ret;
+
+    if (dcbx_mode == DCB_CAP_DCBX_VER_CEE) {
+        ret = vr_send_set_dcb_state(cl, ifname, 1);
+        if (ret < 0)
+            return ret;
+
+        ret = vr_send_set_priority_config(cl, ifname, &priority_map);
+        if (ret < 0)
+            return ret;
+
+        ret = vr_send_set_dcb_all(cl, ifname);
+        if (ret < 0)
+            return ret;
+    } else if (dcbx_mode == DCB_CAP_DCBX_VER_IEEE) {
+        for (i = 0; i < 8; i++)
+            priority_map.tc_to_group[i] = i;
+
+        ret = vr_send_set_ieee_ets(cl, ifname, &priority_map);
+        if (ret < 0)
+            return ret;
+    }
+
+    return 0;
+}
+
+static int
+qos_map_op(void)
+{
+    int ret;
+
+    if (set_queue_set) {
+        ret = interface_queue_set();
+    } else if (get_queue_set) {
+        ret = interface_queue_get();
+    } else {
+        ret = vr_qos_map_op();
+    }
+
+    return ret;
+}
+
 enum opt_qos_index {
+    DCBX_MODE_OPT_INDEX,
     DELETE_QOS_MAP_OPT_INDEX,
     DUMP_FC_OPT_INDEX,
     DUMP_QOS_MAP_OPT_INDEX,
@@ -194,28 +343,165 @@ enum opt_qos_index {
     FC_OPT_INDEX,
     GET_FC_OPT_INDEX,
     GET_QOS_MAP_OPT_INDEX,
+    GET_QUEUE_OPT_INDEX,
+    PRIORITY_GROUP_OPT_INDEX,
+    PRIORITY_GROUP_BW_OPT_INDEX,
     QUEUE_ID_OPT_INDEX,
     SET_FC_OPT_INDEX,
     SET_QOS_MAP_OPT_INDEX,
+    SET_QUEUE_OPT_INDEX,
+    STRICT_OPT_INDEX,
+    TC_OPT_INDEX,
     HELP_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
+
+static int
+extract_priority_to_tc_map(char *up2tc)
+{
+    char *tok;
+    uint8_t *prio_to_tc = priority_map.prio_to_tc;
+    unsigned int length, offset = 0, i = 0;
+    unsigned long tc;
+
+    length = strlen(up2tc);
+    do {
+        tok = vr_extract_token(up2tc + offset, ',');
+        if (tok) {
+            errno = 0;
+            tc = strtoul(tok, NULL, 0);
+            if (errno || tc > 7) {
+                printf("Invalid value in the priority to tc mapping\n");
+                return EINVAL;
+            }
+            prio_to_tc[i] = tc;
+        }
+
+        offset += strlen(tok) + 1;
+    } while (tok && (++i < NUM_PRIO) && (offset < length));
+
+    return 0;
+}
+
+static int
+extract_strictness_map(char *strictness)
+{
+    unsigned int i;
+
+    if (strlen(strictness) > NUM_TC) {
+        printf("Invalid value in strictness\n");
+        return EINVAL;
+    }
+
+    for (i = 0; i < NUM_TC; i++) {
+        if (strictness[i] != '0') {
+            if (strictness[i] != '1') {
+                printf("Invalid value in strictness\n");
+                return EINVAL;
+            }
+            priority_map.tc_strictness |= (1 << i);
+        }
+    }
+
+    return 0;
+}
+
+
+static int
+extract_priority_group_bandwidth(char *pgbw_string)
+{
+    char *tok;
+    uint8_t *priority_group_bw = priority_map.prio_group_bw;
+    unsigned int length, offset = 0, i = 0;
+    unsigned long bandwidth, aggregate = 0;
+
+    length = strlen(pgbw_string);
+    do {
+        tok = vr_extract_token(pgbw_string + offset, ',');
+        if (tok) {
+            errno = 0;
+            bandwidth = strtoul(tok, NULL, 0);
+            if (errno || (bandwidth > 100) || (aggregate > 100)) {
+                printf("Invalid value in the priority group bandwidth\n");
+                return EINVAL;
+            }
+            aggregate += bandwidth;
+            priority_group_bw[i] = bandwidth;
+        }
+
+        offset += strlen(tok) + 1;
+    } while (tok && (++i < NUM_PG) && (offset < length));
+
+    return 0;
+}
+
+static int
+extract_priority_groups(char *pg_string)
+{
+    char *tok;
+    uint8_t *tc_to_group = priority_map.tc_to_group;
+    unsigned int length, offset = 0, i = 0;
+    unsigned long group;
+
+    length = strlen(pg_string);
+    do {
+        tok = vr_extract_token(pg_string + offset, ',');
+        if (tok) {
+            errno = 0;
+            group = strtoul(tok, NULL, 0);
+            if (errno) {
+                printf("Invalid value in the priority groups\n");
+                return EINVAL;
+            }
+            tc_to_group[i] = group;
+        }
+
+        offset += strlen(tok) + 1;
+    } while (tok && (++i < NUM_TC) && (offset < length));
+
+    return 0;
+}
+
+static int
+get_dcbx_mode(char *mode)
+{
+    unsigned int len, op_mode = -EINVAL;
+
+    len = strlen(mode);
+    if (!len || len < 3 || len > 4)
+        return op_mode;
+
+    if (!strncmp(mode, "cee", strlen("cee")))
+        op_mode = DCB_CAP_DCBX_VER_CEE;
+    else if (!strncmp(mode, "ieee", strlen("ieee")))
+        op_mode = DCB_CAP_DCBX_VER_IEEE;
+
+    return op_mode;
+}
+
 static struct option long_options[] = {
-    [DELETE_QOS_MAP_OPT_INDEX]  = {"delete-qos",    required_argument,  &delete_qos_set,    1},
-    [DUMP_FC_OPT_INDEX]         = {"dump-fc",       no_argument,        &dump_fc_set,       1},
-    [DUMP_QOS_MAP_OPT_INDEX]    = {"dump-qos",      no_argument,        &dump_qos_set,      1},
-    [DOTONEP_OPT_INDEX]         = {"dotonep",       required_argument,  &dotonep_set,       1},
-    [DSCP_OPT_INDEX]            = {"dscp",          required_argument,  &dscp_set,          1},
-    [MPLS_QOS_OPT_INDEX]        = {"mpls_qos",      required_argument,  &mpls_qos_set,      1},
-    [FC_OPT_INDEX]              = {"fc",            required_argument,  &fc_set,            1},
-    [GET_FC_OPT_INDEX]          = {"get-fc",        required_argument,  &get_fc_set,        1},
-    [GET_QOS_MAP_OPT_INDEX]     = {"get-qos",       required_argument,  &get_qos_set,       1},
-    [QUEUE_ID_OPT_INDEX]        = {"queue",         required_argument,  &queue_set,         1},
-    [SET_FC_OPT_INDEX]          = {"set-fc",        required_argument,  &set_fc_set,        1},
-    [SET_QOS_MAP_OPT_INDEX]     = {"set-qos",       required_argument,  &set_qos_set,       1},
-    [HELP_OPT_INDEX]            = {"help",          no_argument,        &help_set,          1},
-    [MAX_OPT_INDEX]             = { NULL,           0,                  0,                  0}
+    [DCBX_MODE_OPT_INDEX]           = {"dcbx",          required_argument,  &dcbx_set,          1},
+    [DELETE_QOS_MAP_OPT_INDEX]      = {"delete-qos",    required_argument,  &delete_qos_set,    1},
+    [DUMP_FC_OPT_INDEX]             = {"dump-fc",       no_argument,        &dump_fc_set,       1},
+    [DUMP_QOS_MAP_OPT_INDEX]        = {"dump-qos",      no_argument,        &dump_qos_set,      1},
+    [DOTONEP_OPT_INDEX]             = {"dotonep",       required_argument,  &dotonep_set,       1},
+    [DSCP_OPT_INDEX]                = {"dscp",          required_argument,  &dscp_set,          1},
+    [MPLS_QOS_OPT_INDEX]            = {"mpls_qos",      required_argument,  &mpls_qos_set,      1},
+    [FC_OPT_INDEX]                  = {"fc",            required_argument,  &fc_set,            1},
+    [GET_FC_OPT_INDEX]              = {"get-fc",        required_argument,  &get_fc_set,        1},
+    [GET_QOS_MAP_OPT_INDEX]         = {"get-qos",       required_argument,  &get_qos_set,       1},
+    [GET_QUEUE_OPT_INDEX]           = {"get-queue",     required_argument,  &get_queue_set,     1},
+    [PRIORITY_GROUP_OPT_INDEX]      = {"pg",            required_argument,  &pg_set,            1},
+    [PRIORITY_GROUP_BW_OPT_INDEX]   = {"bw",            required_argument,  &pg_bw_set,         1},
+    [QUEUE_ID_OPT_INDEX]            = {"queue",         required_argument,  &queue_set,         1},
+    [SET_FC_OPT_INDEX]              = {"set-fc",        required_argument,  &set_fc_set,        1},
+    [SET_QOS_MAP_OPT_INDEX]         = {"set-qos",       required_argument,  &set_qos_set,       1},
+    [SET_QUEUE_OPT_INDEX]           = {"set-queue",     required_argument,  &set_queue_set,     1},
+    [STRICT_OPT_INDEX]              = {"strict",        required_argument,  &strict_set,        1},
+    [TC_OPT_INDEX]                  = {"tc",            required_argument,  &tc_set,            1},
+    [HELP_OPT_INDEX]                = {"help",          no_argument,        &help_set,          1},
+    [MAX_OPT_INDEX]                 = { NULL,           0,                  0,                  0}
 };
 
 
@@ -226,6 +512,8 @@ Usage(void)
     printf("       --set-fc <fc-id> <--dscp | --mpls_qos | --dotonep | --queue> <value>\n");
     printf("       --get-qos <index>\n");
     printf("       --set-qos <index> <--dscp | --mpls_qos | --dotonep> <value> --fc <fc-id>\n");
+    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101.. --tc 0,1,..\n");
+    printf("       --get-queue <ifname>\n");
     printf("       --dump-fc\n");
     printf("       --dump-qos\n");
     printf("       --delete-qos <index>\n");
@@ -240,9 +528,34 @@ validate_options(void)
 {
     unsigned int set = dotonep_set + mpls_qos_set + dscp_set + queue_set;
     unsigned int op_set = get_fc_set + get_qos_set + set_fc_set +
-        set_qos_set + dump_fc_set + dump_qos_set + delete_qos_set;
+        set_qos_set + dump_fc_set + dump_qos_set + delete_qos_set + get_queue_set;
+    unsigned int prio_opt_set = dcbx_set + set_queue_set + pg_set + pg_bw_set + strict_set + tc_set;
 
-    if (op_set != 1) {
+    if ((prio_opt_set || get_queue_set) &&
+            (get_platform() != LINUX_PLATFORM)) {
+        printf("Queue options are valid only for kernel based vRouter\n");
+        exit(EINVAL);
+    }
+
+    if (op_set) {
+        if (op_set != 1 || prio_opt_set) {
+            goto exit_options;
+        }
+    } else if (prio_opt_set) {
+        if (dcbx_mode & DCB_CAP_DCBX_VER_IEEE) {
+            if (pg_set) {
+                printf("--pg option is not accepted for IEEE mode\n");
+                goto exit_options;
+            }
+
+            if (prio_opt_set != 5)
+                goto exit_options;
+        } else {
+            if (prio_opt_set != 6) {
+                goto exit_options;
+            }
+        }
+    } else {
         goto exit_options;
     }
 
@@ -271,6 +584,13 @@ validate_options(void)
             printf("Invalid options\n");
             goto exit_options;
         }
+    } else if (prio_opt_set) {
+        dump_priority();
+    } else if (get_queue_set) {
+        if (set) {
+            printf("Invalid options\n");
+            goto exit_options;
+        }
     }
 
     return;
@@ -286,6 +606,13 @@ parse_long_opts(int opt_index, char *opt_arg)
     errno = 0;
 
     switch (opt_index) {
+    case DCBX_MODE_OPT_INDEX:
+        dcbx_mode = get_dcbx_mode(opt_arg);
+        if (dcbx_mode < 0) {
+            Usage();
+        }
+        break;
+
     case DOTONEP_OPT_INDEX:
         dotonep = strtoul(opt_arg, NULL, 0);
         break;
@@ -296,6 +623,18 @@ parse_long_opts(int opt_index, char *opt_arg)
 
     case DUMP_FC_OPT_INDEX:
     case DUMP_QOS_MAP_OPT_INDEX:
+        break;
+
+    case PRIORITY_GROUP_OPT_INDEX:
+        if (extract_priority_groups(optarg)) {
+            Usage();
+        }
+        break;
+
+    case PRIORITY_GROUP_BW_OPT_INDEX:
+        if (extract_priority_group_bandwidth(optarg)) {
+            Usage();
+        }
         break;
 
     case MPLS_QOS_OPT_INDEX:
@@ -310,12 +649,37 @@ parse_long_opts(int opt_index, char *opt_arg)
         queue = strtoul(opt_arg, NULL, 0);
         break;
 
+    case DELETE_QOS_MAP_OPT_INDEX:
     case GET_QOS_MAP_OPT_INDEX:
     case GET_FC_OPT_INDEX:
     case SET_FC_OPT_INDEX:
     case SET_QOS_MAP_OPT_INDEX:
-    case DELETE_QOS_MAP_OPT_INDEX:
         qos_index = strtoul(opt_arg, NULL, 0);
+        break;
+
+    case GET_QUEUE_OPT_INDEX:
+    case SET_QUEUE_OPT_INDEX:
+        if_index = if_nametoindex(opt_arg);
+        if (!if_index) {
+            printf("%s: No such interface exist in the system\n", opt_arg);
+            exit(EINVAL);
+        }
+
+        strncpy(ifname, opt_arg, IFNAMSIZ - 1);
+        ifname[IFNAMSIZ - 1] = '\0';
+
+        break;
+
+    case STRICT_OPT_INDEX:
+        if (extract_strictness_map(optarg)) {
+            Usage();
+        }
+        break;
+
+    case TC_OPT_INDEX:
+        if (extract_priority_to_tc_map(optarg)) {
+            Usage();
+        }
         break;
 
     case HELP_OPT_INDEX:
@@ -332,12 +696,12 @@ parse_long_opts(int opt_index, char *opt_arg)
     return;
 }
 
-
 int
 main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index;
+    unsigned int sock_proto;
 
     while ((opt = getopt_long(argc, argv, "", long_options,
                     &option_index)) >= 0) {
@@ -353,7 +717,13 @@ main(int argc, char *argv[])
 
     validate_options();
 
-    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (set_queue_set || get_queue_set) {
+        sock_proto = NETLINK_ROUTE;
+    } else {
+        sock_proto = VR_NETLINK_PROTO_DEFAULT;
+    }
+
+    cl = vr_get_nl_client(sock_proto);
     if (!cl)
         exit(1);
 

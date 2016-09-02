@@ -5,6 +5,12 @@
  * All rights reserved
  */
 
+#include <stdint.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <linux/genetlink.h>
+
+#include <rte_errno.h>
 #include "nl_util.h"
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
@@ -12,12 +18,6 @@
 #include "vr_genetlink.h"
 #include "vr_uvhost.h"
 #include "vr_uvhost_msg.h"
-
-#include <sys/stat.h>
-#include <sys/un.h>
-#include <linux/genetlink.h>
-
-#include <rte_errno.h>
 
 #define HDR_LEN (NLMSG_HDRLEN + GENL_HDRLEN + sizeof(struct nlattr))
 

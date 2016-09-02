@@ -5,15 +5,16 @@
  * All rights reserved
  */
 
-#include "vr_dpdk.h"
-#include "vr_btable.h"
-#include "nl_util.h"
-
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include "vr_dpdk.h"
+#include "vr_btable.h"
+#include "nl_util.h"
 
 #include <rte_errno.h>
 

@@ -1048,6 +1048,9 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_vrf_stats *stats;
     struct vr_route_req rt;
 
+    if (fmd->fmd_vlan != VLAN_ID_INVALID)
+        return MR_FLOOD;
+
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     /* here we will not check for stats, but will check before use */
 

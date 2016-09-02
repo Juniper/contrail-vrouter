@@ -25,6 +25,18 @@ struct vr_util_flags {
     char *vuf_flag_string;
 };
 
+#define NUM_TC              8
+#define NUM_PG              8
+#define NUM_PRIO            8
+
+struct priority {
+    uint8_t prio_to_tc[NUM_PRIO];
+    uint8_t prio_group_bw[NUM_PG];
+    uint8_t tc_to_group[NUM_TC];
+    uint8_t tc_bw_pct[NUM_TC];
+    uint8_t tc_strictness;
+};
+
 #ifdef __cplusplus
 }
 #endif
