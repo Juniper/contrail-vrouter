@@ -502,11 +502,13 @@ dpdk_get_mono_time(unsigned int *sec, unsigned int *nsec)
 }
 
 /* Work callback called on NetLink lcore */
-static void
+static int
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
     /* no RCU reader lock needed, just do the work */
     fn(arg);
+
+    return 0;
 }
 
 static void
