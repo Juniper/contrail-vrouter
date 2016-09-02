@@ -22,8 +22,7 @@ typedef enum {
 
 /* Mirror packet can be either MPLSoGre or MPLSoUDP. Lets calculate the
  * highest for head space */
-#define VR_MIRROR_PKT_HEAD_SPACE    (sizeof(struct vr_pcap) + \
-        sizeof(struct vr_udp) + sizeof(struct vr_ip6) + \
+#define VR_MIRROR_PKT_HEAD_SPACE    (sizeof(struct vr_udp) + sizeof(struct vr_ip6) + \
         VR_MPLS_HDR_LEN + sizeof(struct vr_udp) + sizeof(struct vr_ip) + \
         VR_ETHER_HLEN)
 
