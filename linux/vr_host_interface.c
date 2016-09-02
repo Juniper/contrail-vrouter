@@ -793,8 +793,9 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
     skb_reset_mac_header(skb);
+    /* linux subtracts 1 from the queue value */
     if (pkt->vp_queue != VP_QUEUE_INVALID)
-        skb->queue_mapping = pkt->vp_queue;
+        skb->queue_mapping = pkt->vp_queue + 1;
 
     if (pkt->vp_priority != VP_PRIORITY_INVALID)
         skb->priority = pkt->vp_priority;

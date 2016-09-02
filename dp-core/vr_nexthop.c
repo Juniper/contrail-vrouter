@@ -401,7 +401,7 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
     ip->ip_hl = 5;
     if (qos) {
         ip->ip_tos = VR_IP_DSCP(qos->vfcq_dscp);
-        pkt->vp_queue = qos->vfcq_queue_id + 1;
+        pkt->vp_queue = qos->vfcq_queue_id;
         pkt->vp_priority = qos->vfcq_dotonep_qos;
     } else {
         ip->ip_tos = 0;
@@ -1902,7 +1902,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     ip->ip_hl = 5;
     if (qos) {
         ip->ip_tos = VR_IP_DSCP(qos->vfcq_dscp);
-        pkt->vp_queue = qos->vfcq_queue_id + 1;
+        pkt->vp_queue = qos->vfcq_queue_id;
         pkt->vp_priority = qos->vfcq_dotonep_qos;
     } else {
         ip->ip_tos = 0;
@@ -2036,7 +2036,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
                 vr_inet6_set_tos((struct vr_ip6 *)pkt_network_header(pkt),
                         qos->vfcq_dscp);
             }
-            pkt->vp_queue = qos->vfcq_queue_id + 1;
+            pkt->vp_queue = qos->vfcq_queue_id;
             pkt->vp_priority = qos->vfcq_dotonep_qos;
         }
     }
