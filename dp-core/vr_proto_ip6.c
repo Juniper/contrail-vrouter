@@ -406,7 +406,8 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 int
-vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+        unsigned char *eth_dmac)
 {
     int handled = 1;
     uint32_t pull_len, len;
@@ -454,6 +455,8 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 
     if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION)
         goto drop;
+
+    VR_MAC_COPY(dmac, eth_dmac);
 
     ndisc_result = vif->vif_mac_request(vif, pkt, fmd, dmac);
     switch (ndisc_result) {
