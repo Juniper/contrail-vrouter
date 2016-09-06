@@ -385,8 +385,17 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
 
         /* Schedule the deletion on a cpu based on bucket index */
         cpu_num = head_ent->hentry_index % vr_num_cpus;
-        vr_schedule_work(cpu_num, vr_htable_hentry_scheduled_delete,
-                                                (void *)delete_data);
+        if (vr_schedule_work(cpu_num, vr_htable_hentry_scheduled_delete,
+                                                (void *)delete_data)) {
+            /*
+             * We can only write back the status as not scheduled. There
+             * might be some entries that get marked as Deleted, but
+             * would not be pushed to free list as work queue is not
+             * scheduled. These marked entries would be deleted only if
+             * this hash bucket is revisisted
+             */
+            (void)__sync_bool_compare_and_swap(&delete_data->hd_scheduled, 1, 0);
+        }
     }
 
     return;
