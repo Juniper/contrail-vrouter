@@ -617,6 +617,59 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_SOURCE_VALID;
 }
 
+/*
+ * nh_ecmp_config_hash is two byte value. The configurable hash as such is
+ * 5 bit field. We store agent added configurable hash values in the first
+ * byte and convert them to Flow flags and store them in second byte
+ */
+static void
+nh_ecmp_store_ecmp_config_hash(vr_nexthop_req *req, struct vr_nexthop *nh)
+{
+    unsigned char hash;
+    unsigned short flow_hash;
+    int i;
+
+    if (!nh || (nh->nh_type != NH_COMPOSITE) ||
+       (!(nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))) {
+        return;
+    }
+
+    if (!req || !req->nhr_ecmp_config_hash) {
+        nh->nh_ecmp_config_hash = 0;
+        return;
+    }
+
+    flow_hash = 0;
+    hash = req->nhr_ecmp_config_hash & NH_ECMP_CONFIG_HASH_MASK;
+
+    for (i = 0; i < NH_ECMP_CONFIG_HASH_BITS; i++) {
+        switch (hash & (1 << i)) {
+        case NH_ECMP_CONFIG_HASH_PROTO:
+            flow_hash |= VR_FLOW_ECMP_CONFIG_HASH_PROTO;
+            break;
+        case NH_ECMP_CONFIG_HASH_SRC_IP:
+            flow_hash |= VR_FLOW_ECMP_CONFIG_HASH_SRC_IP;
+            break;
+        case NH_ECMP_CONFIG_HASH_SRC_PORT:
+            flow_hash |= VR_FLOW_ECMP_CONFIG_HASH_SRC_PORT;
+            break;
+        case NH_ECMP_CONFIG_HASH_DST_IP:
+            flow_hash |= VR_FLOW_ECMP_CONFIG_HASH_DST_IP;
+            break;
+        case NH_ECMP_CONFIG_HASH_DST_PORT:
+            flow_hash |= VR_FLOW_ECMP_CONFIG_HASH_DST_PORT;
+            break;
+        default:
+            break;
+        }
+    }
+
+    /* In the nh, store flow hash values in the second byte */
+    nh->nh_ecmp_config_hash = hash | ((flow_hash << 8) & 0xFF00);
+
+    return;
+}
+
 static int
 nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
@@ -642,20 +695,29 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (!fe) {
+
+        /*
+         * If the flow entry does not exist, apply the configured
+         * hash parameters to select candidate nexthop. We pass 1's compliment
+         * value to the flow key formation, which negates again before
+         * evaluating valid hash key values
+         */
+        hash = (~(nh->nh_ecmp_config_hash >> 8)) & NH_ECMP_CONFIG_HASH_MASK;
         if (pkt->vp_type == VP_TYPE_IP) {
-            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp);
+            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp, hash);
             if (ret < 0)
                 return ret;
         } else if (pkt->vp_type == VP_TYPE_IP6) {
             ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
             ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                                fmd->fmd_vlan, ip6, flowp);
+                                     fmd->fmd_vlan, ip6, flowp, hash);
             if (ret < 0)
                 return ret;
         } else {
             return ret;
         }
     }
+
 
     hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
     hash %= count;
@@ -2354,6 +2416,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
         nh->nh_reach_nh = nh_composite_ecmp;
         nh->nh_validate_src = nh_composite_ecmp_validate_src;
+        nh_ecmp_store_ecmp_config_hash(req, nh);
         if (active) {
             nh->nh_component_ecmp = vr_zalloc(active *
                     sizeof(struct vr_component_nh), VR_NEXTHOP_COMPONENT_OBJECT);
@@ -2781,6 +2844,8 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
         req->nhr_nh_list_size = req->nhr_nh_count =  nh->nh_component_cnt;
         if (dump && (req->nhr_nh_list_size > VR_NEXTHOP_COMPONENT_DUMP_LIMIT))
             req->nhr_nh_list_size = VR_NEXTHOP_COMPONENT_DUMP_LIMIT;
+        req->nhr_ecmp_config_hash = nh->nh_ecmp_config_hash &
+                                         NH_ECMP_CONFIG_HASH_MASK;
 
         if (nh->nh_component_cnt) {
             req->nhr_nh_list =

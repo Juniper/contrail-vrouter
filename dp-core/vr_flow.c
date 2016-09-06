@@ -1660,13 +1660,13 @@ vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
     case  AF_INET6:
         type = VP_TYPE_IP6;
         vr_inet6_fill_flow(&key, req->fr_flow_nh_id, req->fr_flow_ip,
-            req->fr_flow_proto, req->fr_flow_sport, req->fr_flow_dport);
+            req->fr_flow_proto, req->fr_flow_sport, req->fr_flow_dport, 0);
         break;
 
     case  AF_INET:
         type = VP_TYPE_IP;
         vr_inet_fill_flow(&key, req->fr_flow_nh_id, req->fr_flow_ip,
-            req->fr_flow_proto, req->fr_flow_sport, req->fr_flow_dport);
+            req->fr_flow_proto, req->fr_flow_sport, req->fr_flow_dport, 0);
         break;
 
     default:

@@ -764,25 +764,49 @@ vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 
 void
 vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id, 
-        unsigned char *ip, uint8_t proto, uint16_t sport, uint16_t dport)
+        unsigned char *ip, uint8_t proto, uint16_t sport,
+        uint16_t dport, uint8_t valid_fkey_params)
 {
-    /* copy both source and destinations */
-    memcpy(flow_p->flow_ip, ip, 2 * VR_IP_ADDRESS_LEN);
-    flow_p->flow4_proto = proto;
-    flow_p->flow4_nh_id = nh_id;
-    flow_p->flow4_sport = sport;
-    flow_p->flow4_dport = dport;
     flow_p->flow4_family = AF_INET;
     flow_p->flow4_unused = 0;
-
     flow_p->flow_key_len = VR_FLOW_IPV4_HASH_SIZE;
+    flow_p->flow4_nh_id = nh_id;
+
+    valid_fkey_params = (~valid_fkey_params) & VR_FLOW_ECMP_CONFIG_HASH_MASK;
+
+    if (valid_fkey_params & VR_FLOW_ECMP_CONFIG_HASH_SRC_IP)
+        memcpy(flow_p->flow_ip, ip, VR_IP_ADDRESS_LEN);
+    else
+        memset(flow_p->flow_ip, 0, VR_IP_ADDRESS_LEN);
+
+    if (valid_fkey_params & VR_FLOW_ECMP_CONFIG_HASH_DST_IP)
+        memcpy(flow_p->flow_ip + VR_IP_ADDRESS_LEN,
+               ip + VR_IP_ADDRESS_LEN, VR_IP_ADDRESS_LEN);
+    else
+        memset(flow_p->flow_ip + VR_IP_ADDRESS_LEN, 0, VR_IP_ADDRESS_LEN);
+
+    if (valid_fkey_params & VR_FLOW_ECMP_CONFIG_HASH_PROTO)
+        flow_p->flow4_proto = proto;
+    else
+        flow_p->flow4_proto = 0;
+
+    if (valid_fkey_params & VR_FLOW_ECMP_CONFIG_HASH_SRC_PORT)
+        flow_p->flow4_sport = sport;
+    else
+        flow_p->flow4_sport = 0;
+
+    if (valid_fkey_params & VR_FLOW_ECMP_CONFIG_HASH_DST_PORT)
+        flow_p->flow4_dport = dport;
+    else
+        flow_p->flow4_dport = 0;
 
     return;
 }
 
 static int
 vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
-        struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p)
+        struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p,
+        uint8_t valid_fkey_params)
 {
     uint16_t sport, dport;
     unsigned short nh_id;
@@ -808,7 +832,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
     vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
-            ip->ip_proto, sport, dport);
+            ip->ip_proto, sport, dport, valid_fkey_params);
     return 0;
 }
 
@@ -841,7 +865,7 @@ vr_inet_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
 static int
 vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip *ip,
-        struct vr_flow *flow_p)
+        struct vr_flow *flow_p, uint8_t valid_fkey_params)
 {
     int ret = 0;
 
@@ -859,7 +883,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
             /* we will generate a flow only for the first icmp error */
             if ((unsigned char *)ip == pkt_network_header(pkt)) {
                 ret = vr_inet_proto_flow(router, vrf, pkt, vlan,
-                        (struct vr_ip *)(icmph + 1), flow_p);
+                        (struct vr_ip *)(icmph + 1), flow_p, valid_fkey_params);
                 if (ret)
                     return ret;
 
@@ -909,22 +933,28 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
     vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
-            ip->ip_proto, sport, dport);
+            ip->ip_proto, sport, dport, valid_fkey_params);
 
     return 0;
 }
 
 int
 vr_inet_form_flow(struct vrouter *router, unsigned short vrf, 
-        struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p)
+        struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p,
+        uint8_t valid_fkey_params)
 {
     int ret;
     struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
 
+    /*
+     * TODO: If source port and destination port are masked fields,
+     * in forming the key, even if the transport header is invalid,
+     * we can form the key
+     */
     if (vr_ip_transport_header_valid(ip)) {
-        ret = vr_inet_proto_flow(router, vrf, pkt, vlan, ip, flow_p);
+        ret = vr_inet_proto_flow(router, vrf, pkt, vlan, ip, flow_p, valid_fkey_params);
     } else {
-        ret = vr_inet_fragment_flow(router, vrf, pkt, vlan, flow_p);
+        ret = vr_inet_fragment_flow(router, vrf, pkt, vlan, flow_p, valid_fkey_params);
     }
 
     return ret;
@@ -955,12 +985,13 @@ vr_inet_should_trap(struct vr_packet *pkt, struct vr_flow *flow_p)
 
 int
 vr_inet_get_flow_key(struct vrouter *router, struct vr_packet *pkt,
-        struct vr_forwarding_md *fmd, struct vr_flow *flow)
+        struct vr_forwarding_md *fmd, struct vr_flow *flow, uint8_t valid_fkey_params)
 {
     int ret;
     struct vr_ip *ip;
 
-    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow);
+    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
+                                                        flow, valid_fkey_params);
     if (ret < 0)
         return ret;
 
@@ -1011,7 +1042,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         return FLOW_FORWARD;
     }
 
-    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow_p);
+    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, flow_p, 0);
     if (ret < 0) {
         if (!vr_ip_transport_header_valid(ip) && vr_enqueue_to_assembler) {
             vr_enqueue_to_assembler(router, pkt, fmd);
