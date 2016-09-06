@@ -65,6 +65,15 @@ enum nexthop_type {
 #define NH_SOURCE_VALID                     1
 #define NH_SOURCE_MISMATCH                  2
 
+
+#define NH_ECMP_CONFIG_HASH_BITS            5
+#define NH_ECMP_CONFIG_HASH_MASK            ((1 << NH_ECMP_CONFIG_HASH_BITS) - 1)
+#define NH_ECMP_CONFIG_HASH_PROTO           0x01
+#define NH_ECMP_CONFIG_HASH_SRC_IP          0x02
+#define NH_ECMP_CONFIG_HASH_SRC_PORT        0x04
+#define NH_ECMP_CONFIG_HASH_DST_IP          0x08
+#define NH_ECMP_CONFIG_HASH_DST_PORT        0x10
+
 struct vr_packet;
 
 struct vr_forwarding_md;
@@ -119,6 +128,7 @@ struct vr_nexthop {
          struct {
             unsigned short cnt;
             unsigned short ecmp_cnt;
+            unsigned short ecmp_config_hash;
             struct vr_component_nh *component;
             struct vr_component_nh *ecmp_active;
          } nh_composite;
@@ -162,6 +172,7 @@ struct vr_nexthop {
 #define nh_component_nh         nh_u.nh_composite.component
 #define nh_component_ecmp_cnt   nh_u.nh_composite.ecmp_cnt
 #define nh_component_ecmp       nh_u.nh_composite.ecmp_active
+#define nh_ecmp_config_hash     nh_u.nh_composite.ecmp_config_hash
 
 
 static inline bool

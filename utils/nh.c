@@ -85,6 +85,41 @@ nh_type(uint32_t type)
 }
 
 char *
+nh_ecmp_config_hash_str(uint8_t hash, char *ptr)
+{
+    int i;
+
+    strcpy(ptr,"");
+    hash = hash & ((1 << NH_ECMP_CONFIG_HASH_BITS) - 1);
+    for (i = 0; i < NH_ECMP_CONFIG_HASH_BITS; i++) {
+        switch (hash & (1 << i)) {
+        case 0:
+            break;
+        case NH_ECMP_CONFIG_HASH_PROTO:
+            strcat(ptr, "Proto,");
+            break;
+        case NH_ECMP_CONFIG_HASH_SRC_IP:
+            strcat(ptr, "SrcIP,");
+            break;
+        case NH_ECMP_CONFIG_HASH_SRC_PORT:
+            strcat(ptr, "SrcPort,");
+            break;
+        case NH_ECMP_CONFIG_HASH_DST_IP:
+            strcat(ptr, "DstIp,");
+            break;
+        case NH_ECMP_CONFIG_HASH_DST_PORT:
+            strcat(ptr, "DstPort");
+            break;
+        default:
+            strcat(ptr, "Invalid,");
+            break;
+        }
+    }
+
+    return ptr;
+}
+
+char *
 nh_flags(uint32_t flags, uint8_t type, char *ptr)
 {
     int i;
@@ -265,6 +300,13 @@ vr_nexthop_req_process(void *s_req)
         nh_print_newline_header();
         printf("Vrf:%d\n", req->nhr_vrf);
     } else if (req->nhr_type == NH_COMPOSITE) {
+        if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
+            if (req->nhr_ecmp_config_hash) {
+                nh_print_newline_header();
+                nh_ecmp_config_hash_str(req->nhr_ecmp_config_hash, flags_mem);
+                printf("Valid Hash Key Parameters: %s", flags_mem);
+            }
+        }
         nh_print_newline_header();
         printf("Sub NH(label):");
         for (i = 0; i < req->nhr_nh_list_size; i++) {
