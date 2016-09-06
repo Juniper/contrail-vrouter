@@ -51,6 +51,7 @@ buffer sandesh vr_nexthop_req {
     21: i16         nhr_nh_count;
     22: list<byte>  nhr_tun_sip6;
     23: list<byte>  nhr_tun_dip6;
+    24: byte        nhr_ecmp_config_hash;
 }
 
 buffer sandesh vr_interface_req {

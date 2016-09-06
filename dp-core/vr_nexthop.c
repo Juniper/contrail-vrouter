@@ -617,6 +617,44 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_SOURCE_VALID;
 }
 
+static void
+nh_ecmp_apply_config_hash(struct vr_flow *flowp,
+                struct vr_nexthop *nh, int flow_type)
+{
+    unsigned short hash;
+    int i;
+
+    if (!flowp || !nh || !nh->nh_ecmp_config_hash)
+        return;
+
+    hash = (~nh->nh_ecmp_config_hash) &
+                ((1 << NH_ECMP_CONFIG_HASH_BITS) - 1);
+    for (i = 0; i < NH_ECMP_CONFIG_HASH_BITS; i++) {
+        switch (hash & (1 << i)) {
+        case NH_ECMP_CONFIG_HASH_PROTO:
+            flowp->flow_proto = 0;
+            break;
+        case NH_ECMP_CONFIG_HASH_SRC_IP:
+            memset(flowp->flow_ip, 0, VR_IP_ADDR_SIZE(flow_type));
+            break;
+        case NH_ECMP_CONFIG_HASH_SRC_PORT:
+            flowp->flow_sport = 0;
+            break;
+        case NH_ECMP_CONFIG_HASH_DST_IP:
+            memset(flowp->flow_ip + VR_IP_ADDR_SIZE(flow_type), 0,
+                                            VR_IP_ADDR_SIZE(flow_type));
+            break;
+        case NH_ECMP_CONFIG_HASH_DST_PORT:
+            flowp->flow_dport = 0;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return;
+}
+
 static int
 nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
@@ -656,6 +694,12 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
             return ret;
         }
     }
+
+    /*
+     * Apply the Ecmp cobfigure hash parameters before calculating the
+     * hash on flow key
+     */
+    nh_ecmp_apply_config_hash(flowp, nh, pkt->vp_type);
 
     hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
     hash %= count;
@@ -2354,6 +2398,8 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
         nh->nh_reach_nh = nh_composite_ecmp;
         nh->nh_validate_src = nh_composite_ecmp_validate_src;
+        nh->nh_ecmp_config_hash = req->nhr_ecmp_config_hash &
+                                        ((2 << NH_ECMP_CONFIG_HASH_BITS) - 1);
         if (active) {
             nh->nh_component_ecmp = vr_zalloc(active *
                     sizeof(struct vr_component_nh), VR_NEXTHOP_COMPONENT_OBJECT);
@@ -2781,6 +2827,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
         req->nhr_nh_list_size = req->nhr_nh_count =  nh->nh_component_cnt;
         if (dump && (req->nhr_nh_list_size > VR_NEXTHOP_COMPONENT_DUMP_LIMIT))
             req->nhr_nh_list_size = VR_NEXTHOP_COMPONENT_DUMP_LIMIT;
+        req->nhr_ecmp_config_hash = nh->nh_ecmp_config_hash;
 
         if (nh->nh_component_cnt) {
             req->nhr_nh_list =
