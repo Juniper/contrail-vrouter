@@ -587,7 +587,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
 
         if (qos) {
             vr_inet_set_tos(ip, VR_IP_DSCP(qos->vfcq_dscp));
-            pkt->vp_queue = qos->vfcq_queue_id + 1;
+            pkt->vp_queue = qos->vfcq_queue_id;
             pkt->vp_priority = qos->vfcq_dotonep_qos;
         }
 
