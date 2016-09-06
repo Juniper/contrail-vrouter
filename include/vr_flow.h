@@ -86,6 +86,14 @@ typedef enum {
 #define VR_FLOW_FAMILY(type) \
         ((type == VP_TYPE_IP6) ? AF_INET6 \
                                : AF_INET)
+
+#define VR_FLOW_ECMP_CONFIG_HASH_MASK         0x1F
+#define VR_FLOW_ECMP_CONFIG_HASH_PROTO        0x01
+#define VR_FLOW_ECMP_CONFIG_HASH_SRC_IP       0x02
+#define VR_FLOW_ECMP_CONFIG_HASH_SRC_PORT     0x04
+#define VR_FLOW_ECMP_CONFIG_HASH_DST_IP       0x08
+#define VR_FLOW_ECMP_CONFIG_HASH_DST_PORT     0x10
+
 struct vr_forwarding_md;
 
 struct vr_flow_defer_data {
@@ -414,29 +422,29 @@ flow_result_t vr_inet_flow_lookup(struct vrouter *, struct vr_packet *,
 flow_result_t vr_inet6_flow_lookup(struct vrouter *, struct vr_packet *,
                                   struct vr_forwarding_md *);
 int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
-        uint16_t, struct vr_ip6 *, struct vr_flow *);
+        uint16_t, struct vr_ip6 *, struct vr_flow *, uint8_t);
 
 extern unsigned short vr_inet_flow_nexthop(struct vr_packet *, unsigned short);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
 extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
-       unsigned char *, uint8_t, uint16_t, uint16_t);
+       unsigned char *, uint8_t, uint16_t, uint16_t, uint8_t);
 extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
-       unsigned char *, uint8_t, uint16_t, uint16_t);
+       unsigned char *, uint8_t, uint16_t, uint16_t, uint8_t);
 extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);
 extern bool vr_inet6_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);
 extern bool vr_inet_flow_allow_new_flow(struct vrouter *, struct vr_packet *);
 extern int vr_inet_get_flow_key(struct vrouter *, struct vr_packet *,
-        struct vr_forwarding_md *, struct vr_flow *);
+        struct vr_forwarding_md *, struct vr_flow *, uint8_t);
 
 extern unsigned int vr_reinject_packet(struct vr_packet *,
         struct vr_forwarding_md *);
 
 bool vr_valid_link_local_port(struct vrouter *, int, int, int);
 int vr_inet_form_flow(struct vrouter *, unsigned short,
-                struct vr_packet *, uint16_t, struct vr_flow *);
+                struct vr_packet *, uint16_t, struct vr_flow *, uint8_t);
 int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
