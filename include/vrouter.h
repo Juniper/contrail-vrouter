@@ -15,6 +15,7 @@ extern "C" {
 #include "vr_interface.h"
 #include "vr_qos.h"
 #include "vr_flow.h"
+#include "vr_interface.h"
 #include "vr_nexthop.h"
 #include "vr_route.h"
 #include "vr_response.h"
