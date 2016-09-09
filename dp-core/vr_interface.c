@@ -1988,7 +1988,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_oerrors = 0;
     /* queue counters */
     req->vifr_queue_ipackets = 0;
-    for (i = 0; i < VR_MAX_CPUS; i++)
+    for (i = 0; i < vr_num_cpus; i++)
         req->vifr_queue_ierrors_to_lcore[i] = 0;
     req->vifr_queue_ierrors = 0;
     req->vifr_queue_opackets = 0;
@@ -2072,6 +2072,18 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     return;
 }
 
+unsigned int
+vr_interface_req_get_size(void *req_p)
+{
+    unsigned int size = 4 * sizeof(vr_interface_req);
+    vr_interface_req *req = (vr_interface_req *)req_p;
+
+    if (req->vifr_queue_ierrors_to_lcore)
+        size += (vr_num_cpus * sizeof(int64_t));
+
+    return size;
+}
+
 static int
 vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
         unsigned int core)
@@ -2116,7 +2128,7 @@ vr_interface_req_get(void)
     req->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN,
             VR_INTERFACE_REQ_NAME_OBJECT);
 
-    req->vifr_queue_ierrors_to_lcore = vr_zalloc(VR_MAX_CPUS * sizeof(uint64_t),
+    req->vifr_queue_ierrors_to_lcore = vr_zalloc(vr_num_cpus * sizeof(uint64_t),
             VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT);
     if (req->vifr_queue_ierrors_to_lcore)
         req->vifr_queue_ierrors_to_lcore_size = 0;
