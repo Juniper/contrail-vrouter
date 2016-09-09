@@ -322,4 +322,5 @@ extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
 extern fat_flow_port_mask_t vif_fat_flow_lookup(struct vr_interface *,
         uint8_t, uint16_t, uint16_t);
+extern unsigned int vr_interface_req_get_size(void *);
 #endif /* __VR_INTERFACE_H__ */
