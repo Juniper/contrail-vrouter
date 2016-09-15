@@ -145,6 +145,9 @@ bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!vn_rtable)
         return -EINVAL;
 
+    if (rt->rtr_req.rtr_mac_size != VR_ETHER_ALEN)
+        return -EINVAL;
+
     if (IS_MAC_ZERO(rt->rtr_req.rtr_mac))
         return -EINVAL;
 
@@ -193,6 +196,9 @@ bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     struct vr_bridge_entry *be;
 
     if (!vn_rtable)
+        return -EINVAL;
+
+    if (rt->rtr_req.rtr_mac_size != VR_ETHER_ALEN)
         return -EINVAL;
 
     VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
@@ -370,6 +376,9 @@ bridge_table_dump(struct vr_rtable * __unsued, struct vr_route_req *rt)
         ret = -ENOMEM;
         goto generate_response;
     }
+
+    if (rt->rtr_req.rtr_mac_size != VR_ETHER_ALEN)
+        return -EINVAL;
 
     mac = (char *)(((vr_route_req *)(dumper->dump_req))->rtr_mac);
     if (!mac) {
