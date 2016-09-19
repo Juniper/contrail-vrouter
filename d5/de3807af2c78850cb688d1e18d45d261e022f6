@@ -1,0 +1,8 @@
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Approved+1: Hari Prasad Killi <haripk@juniper.net>
+Code-Review+2: Hari Prasad Killi <haripk@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Mon, 19 Sep 2016 05:23:49 -0700
+Reviewed-on: https://review.opencontrail.org/24260
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/master
