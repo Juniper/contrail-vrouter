@@ -1050,8 +1050,14 @@ linux_pull_outer_headers(struct sk_buff *skb)
         } else if (ip_proto == VR_IP_PROTO_ICMP6) {
             icmph = (struct vr_icmp *) ((char *)ip6h + sizeof(struct ipv6hdr));
             if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
-                /* ICMP options size for neighbor solicit is 24 bytes */
-                offset += 24;
+                /*
+                 * ICMPV6 header contain Target address which is mandatory
+                 * and is 16 byte long. Possibly it can only contain an option
+                 * which is MAC address length long
+                 */
+                offset += VR_IP6_ADDRESS_LEN;
+                if (skb->len >= (offset + VR_ETHER_ALEN))
+                    offset += VR_ETHER_ALEN;
 
                 if (!pskb_may_pull(skb, offset))
                     goto pull_fail;
