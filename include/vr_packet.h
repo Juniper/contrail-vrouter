@@ -792,6 +792,25 @@ vr_icmp_echo(struct vr_icmp *icmph)
 }
 
 static inline bool
+vr_v6_prefix_is_ll(uint8_t *prefix)
+{
+    if (prefix && (prefix[0] == 0xFE) && (prefix[1] == 0x80))
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_v6_prefix_null(uint8_t *prefix)
+{
+    uint64_t *p = (uint64_t *)(prefix);
+    if (p && (!p[0]) && (!p[1]))
+        return true;
+
+    return false;
+}
+
+static inline bool
 vr_icmp_error(struct vr_icmp *icmph)
 {
     uint8_t type = icmph->icmp_type;

@@ -230,8 +230,16 @@ vr_ip_transport_parse(struct vr_ip *iph, struct vr_ip6 *ip6h,
             } else if ((ip_proto == VR_IP_PROTO_ICMP6) && ip6h) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
-                    /* ICMP options size for neighbor solicit is 24 bytes */
-                    pull_len += 24;
+                    /*
+                     * We do not know if neighbour option of length
+                     * VR_ETHER_ALEN is not at all there or not in this
+                     * frag. So we will calculate the length to
+                     * be inclusive of both Target address and neighbour
+                     * option. If option is not preset, slow path would
+                     * take care of it
+                     */
+                    pull_len += sizeof(struct vr_neighbor_option) +
+                                VR_IP6_ADDRESS_LEN + VR_ETHER_ALEN;
                 } else if (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL) {
                     pull_len += 8;
                 } else if (vr_icmp6_error(icmph)) {
