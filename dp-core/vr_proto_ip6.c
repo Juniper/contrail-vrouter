@@ -32,15 +32,34 @@ vr_inet6_ip_lookup(unsigned short vrf, uint8_t *ip6)
     return vr_inet_route_lookup(vrf, &rt);
 }
 
-static int
-vr_v6_prefix_is_ll(uint8_t prefix[])
+/*
+ * The Icmp6 packet is considered DAD, if the source IP address in the
+ * IPV6 header is NULL, and if no source link layer option is specified
+ * after the Target address
+ */
+static bool
+vr_icmp6_pkt_dad(struct vr_packet *pkt)
 {
-    if ((prefix[0] == 0xFE) && (prefix[1] == 0x80)) {
-        return true;
-    }
-    return false;
-}
+    struct vr_ip6 *ip6;
+    struct vr_icmp *icmph;
 
+    ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+    if ((!ip6) || (ip6->ip6_version != 6))
+        return false;
+
+    icmph = (struct vr_icmp *)(pkt_data(pkt));
+    if ((!icmph) || (icmph->icmp_type != VR_ICMP6_TYPE_NEIGH_SOL))
+        return false;
+
+    if (!vr_v6_prefix_null(ip6->ip6_src))
+        return false;
+
+    /* VR_IP6_ADDRESS_LEN is for Target address */
+    if (pkt_len(pkt) > (sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN))
+        return false;
+
+    return true;
+}
 
 /* TODO: consolidate all sum calculation routines */
 static inline uint16_t
@@ -383,21 +402,17 @@ mac_response_t
 vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *dmac)
 {
-    uint32_t rt6_prefix[4], pull_len;
+    uint32_t rt6_prefix[4];
     unsigned char mac[VR_ETHER_ALEN];
-
     struct vr_icmp *icmph;
     struct vr_route_req rt;
-    struct vr_neighbor_option *nopt;
+    struct vr_ip6 *ip6;
 
     if (fmd->fmd_vlan != VLAN_ID_INVALID)
         return MR_FLOOD;
 
-    icmph = (struct vr_icmp *)pkt_data(pkt);
-    pull_len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
-    nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + pull_len);
     /* We let DAD packets bridged */
-    if (IS_MAC_ZERO(nopt->vno_value))
+    if (vr_icmp6_pkt_dad(pkt))
         return MR_NOT_ME;
 
 
@@ -405,10 +420,41 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     rt.rtr_req.rtr_family = AF_INET6;
     rt.rtr_req.rtr_prefix = (uint8_t *)&rt6_prefix;
-    memcpy(rt.rtr_req.rtr_prefix, icmph->icmp_data, 16);
     rt.rtr_req.rtr_prefix_size = 16;
     rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
     rt.rtr_req.rtr_mac = mac;
+    /*
+     * If request is coming from other compute nodes, and if that
+     * particular compute node is part of ECMP, we need to route these
+     * packets though we have stiched mac for VM, as packets from VM to
+     * that ECMP are routed packets
+     * Neighbor requests from Tor have to be flooded so that required nodes
+     * will answer that
+     */
+    if (fmd->fmd_src != TOR_SOURCE) {
+        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+        if (!ip6)
+            return MR_DROP;
+
+        memcpy(rt.rtr_req.rtr_prefix, ip6->ip6_src, 16);
+        vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
+
+        if (rt.rtr_nh->nh_type == NH_COMPOSITE) {
+            /* The source of ARP request can not be anything other than ECMP */
+            if (!(rt.rtr_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))
+                return MR_DROP;
+
+            /* Mark it as ecmp source. -1 is invalid */
+            fmd->fmd_ecmp_src_nh_index = 0;
+        }
+
+        rt.rtr_nh = NULL;
+        rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
+        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    }
+
+    icmph = (struct vr_icmp *)pkt_data(pkt);
+    memcpy(rt.rtr_req.rtr_prefix, icmph->icmp_data, 16);
 
     vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
 
@@ -456,18 +502,6 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         pkt_push(pkt, pull_len);
         return !handled;
     }
-
-    if (pkt->vp_len < (sizeof(struct vr_icmp) + VR_IP6_ADDRESS_LEN +
-                sizeof(struct vr_neighbor_option)))
-        goto drop;
-
-    len = sizeof(*icmph) + VR_IP6_ADDRESS_LEN;
-    nopt = (struct vr_neighbor_option *)(pkt_data(pkt) + len);
-    if (pkt->vp_len < (len + (nopt->vno_length * 8)))
-        goto drop;
-
-    if (nopt->vno_type != SOURCE_LINK_LAYER_ADDRESS_OPTION)
-        goto drop;
 
     VR_MAC_COPY(dmac, eth_dmac);
 

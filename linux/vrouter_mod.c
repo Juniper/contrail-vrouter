@@ -1835,8 +1835,14 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             } else if (ip6h && (l4_proto == VR_IP_PROTO_ICMP6)) {
                 icmph = (struct vr_icmp *)((unsigned char *)ip6h + hlen);
                 if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
-                    /* ICMP options size for neighbor solicit is 24 bytes */
-                    pull_len += 24;
+                    /*
+                     * For neighbour solicitation, Target address is
+                     * mandatory, but neighbour option is not. So pull
+                     * only if there is enough length in the packet
+                     */
+                    pull_len += VR_IP6_ADDRESS_LEN;
+                    if (skb->len >= (pull_len + VR_ETHER_ALEN))
+                        pull_len += VR_ETHER_ALEN;
                     if (!pskb_may_pull(skb, pull_len))
                         goto error;
                 } else if (icmph->icmp_type == VR_ICMP6_TYPE_ROUTER_SOL) {
