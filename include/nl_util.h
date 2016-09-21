@@ -202,7 +202,7 @@ extern void vr_nexthop_req_destroy(vr_nexthop_req *);
 
 extern void address_mask(uint8_t *, uint8_t, unsigned int);
 extern int vr_send_route_dump(struct nl_client *, unsigned int, unsigned int,
-        unsigned int, uint8_t *, unsigned int);
+        unsigned int, uint8_t *);
 extern int vr_send_route_get(struct nl_client *, unsigned int, unsigned int,
         unsigned int family, uint8_t *, unsigned int, uint8_t *);
 extern int vr_send_route_delete(struct nl_client *, unsigned int, unsigned int,
