@@ -194,7 +194,6 @@ vr_route_dump(vr_route_req *req)
     }
         
     vr_req.rtr_req.rtr_marker_size = req->rtr_marker_size;
-    vr_req.rtr_req.rtr_marker_plen = req->rtr_prefix_len;
     if (req->rtr_marker_size) {
         vr_req.rtr_req.rtr_marker = (uint8_t*)&rt_marker;
         memcpy(vr_req.rtr_req.rtr_marker, req->rtr_marker, RT_IP_ADDR_SIZE(req->rtr_family));
