@@ -39,7 +39,6 @@ static struct nl_client *cl;
 static int resp_code;
 
 static uint8_t rt_prefix[16], rt_marker[16];
-unsigned int rt_marker_plen;
 
 static bool cmd_proxy_set = false;
 static bool cmd_trap_set = false;
@@ -141,7 +140,6 @@ vr_route_req_process(void *s_req)
     if ((rt->rtr_family == AF_INET) ||
         (rt->rtr_family == AF_INET6)) {
         memcpy(rt_marker, rt->rtr_prefix, RT_IP_ADDR_SIZE(rt->rtr_family));
-        rt_marker_plen = rt->rtr_prefix_len;
 
         if (rt->rtr_prefix_size) {
             if (cmd_op == SANDESH_OP_GET)
@@ -195,7 +193,6 @@ vr_route_req_process(void *s_req)
         printf("\n");
     } else {
         memcpy(rt_marker, rt->rtr_mac, VR_ETHER_ALEN);
-        rt_marker_plen = VR_ETHER_ALEN;
 
         bzero(flags, sizeof(flags));
         if (rt->rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
@@ -277,9 +274,6 @@ vr_route_op(struct nl_client *cl)
 
     if (cmd_op == SANDESH_OP_DUMP || cmd_op == SANDESH_OP_GET) {
         vr_print_rtable_header(cmd_family_id, cmd_vrf_id);
-        if (cmd_family_id == AF_BRIDGE) {
-            rt_marker_plen = VR_ETHER_ALEN;
-        }
     }
 
     if (cmd_proxy_set)
@@ -305,7 +299,7 @@ op_retry:
     case SANDESH_OP_DUMP:
         dump = true;
         ret = vr_send_route_dump(cl, 0, cmd_vrf_id, cmd_family_id,
-                rt_marker, rt_marker_plen);
+                rt_marker);
         break;
 
     case SANDESH_OP_DELETE:
