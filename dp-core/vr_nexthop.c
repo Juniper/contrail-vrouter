@@ -636,7 +636,7 @@ nh_ecmp_store_ecmp_config_hash(vr_nexthop_req *req, struct vr_nexthop *nh)
     }
 
     if (!req || !req->nhr_ecmp_config_hash) {
-        nh->nh_ecmp_config_hash = 0;
+        nh->nh_ecmp_config_hash = ((VR_FLOW_KEY_ALL << 8) & 0xFF00);
         return;
     }
 
