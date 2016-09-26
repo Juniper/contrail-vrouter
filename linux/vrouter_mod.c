@@ -1668,7 +1668,6 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
                     if (frag_size < pull_len)
                         goto slow_path;
                     if (linux_ip_proto_pull((struct iphdr *)icmp_pl_iph)) {
-                        pull_len -= sizeof(struct vr_icmp);
                         if (icmp_pl_iph->ip_proto == VR_IP_PROTO_TCP)
                             pull_len += sizeof(struct vr_tcp);
                         else if (icmp_pl_iph->ip_proto == VR_IP_PROTO_UDP)
