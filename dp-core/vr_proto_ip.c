@@ -764,32 +764,20 @@ vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 
 void
 vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id, 
-        unsigned char *ip, uint8_t proto, uint16_t sport,
+        uint32_t sip, uint32_t dip, uint8_t proto, uint16_t sport,
         uint16_t dport, uint8_t valid_fkey_params)
 {
+    valid_fkey_params &= VR_FLOW_KEY_ALL;
     memset(flow_p, 0, VR_FLOW_IPV4_HASH_SIZE);
 
-    flow_p->flow4_family = AF_INET;
-    flow_p->flow_key_len = VR_FLOW_IPV4_HASH_SIZE;
-    flow_p->flow4_nh_id = nh_id;
-
-    valid_fkey_params &= VR_FLOW_KEY_ALL;
+    vr_fill_flow_common(flow_p, nh_id, proto, sport, dport,
+                        AF_INET, valid_fkey_params);
 
     if (valid_fkey_params & VR_FLOW_KEY_SRC_IP)
-        memcpy(flow_p->flow_ip, ip, VR_IP_ADDRESS_LEN);
+        flow_p->flow4_sip = sip;
 
     if (valid_fkey_params & VR_FLOW_KEY_DST_IP)
-        memcpy(flow_p->flow_ip + VR_IP_ADDRESS_LEN,
-               ip + VR_IP_ADDRESS_LEN, VR_IP_ADDRESS_LEN);
-
-    if (valid_fkey_params & VR_FLOW_KEY_PROTO)
-        flow_p->flow4_proto = proto;
-
-    if (valid_fkey_params & VR_FLOW_KEY_SRC_PORT)
-        flow_p->flow4_sport = sport;
-
-    if (valid_fkey_params & VR_FLOW_KEY_DST_PORT)
-        flow_p->flow4_dport = dport;
+        flow_p->flow4_dip = dip;
 
     return;
 }
@@ -822,7 +810,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
         vr_fragment_del(frag);
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
-    vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
+    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
             ip->ip_proto, sport, dport, valid_fkey_params);
     return 0;
 }
@@ -923,7 +911,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
     }
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
-    vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
+    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
             ip->ip_proto, sport, dport, valid_fkey_params);
 
     return 0;

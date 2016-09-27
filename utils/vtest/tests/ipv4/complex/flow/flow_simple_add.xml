@@ -70,7 +70,10 @@
         <vr_flow_req>
             <fr_op>flow_set</fr_op>
             <!-- IP src and IP dst -->
-            <fr_flow_ip>1:1:1:1:2:2:2:2</fr_flow_ip>
+            <fr_flow_sip_l>1:1:1:1</fro_flow_sip_l>
+            <fr_flow_sip_u>0:0:0:0</fro_flow_sip_u>
+            <fr_flow_dip_l>2:2:2:2</fro_flow_dip_l>
+            <fr_flow_dip_u>0:0:0:0</fro_flow_dip_u>
             <fr_family>2</fr_family>
             <fr_index>-1</fr_index>
             <fr_flags>1</fr_flags>

@@ -44,10 +44,12 @@
 #include "vr_os.h"
 #include "ini_parser.h"
 #include "vr_packet.h"
+#include "vr_message.h"
 
 #define TABLE_FLAG_VALID        0x1
 
 #define MAX_FLOW_NL_MSG_BUNCH   15
+#define MAX_FLOWS               4000000
 
 #define MEM_DEV                 "/dev/flow"
 
@@ -106,6 +108,9 @@ struct flow_table {
     u_int64_t ft_processed;
     u_int64_t ft_created;
     u_int64_t ft_added;
+    u_int64_t ft_deleted;
+    u_int64_t ft_changed;
+    u_int64_t ft_total_entries;
     unsigned int ft_num_entries;
     unsigned int ft_flags;
     unsigned int ft_cpus;
@@ -116,40 +121,57 @@ struct flow_table {
     char flow_table_path[256];
 } main_table;
 
+struct flow_md {
+    unsigned int fmd_index;
+    unsigned int fmd_gen_id;
+};
+
+
 struct nl_client *cl;
 vr_flow_req flow_req;
+vr_flow_table_data ftable;
+static struct flow_md flow_md_mem[MAX_FLOWS];
+static int array_index;
+
 
 static void flow_dump_nexthop(vr_nexthop_req *, vr_interface_req *,
         char *, bool);
 static vr_nexthop_req *flow_get_nexthop(int);
-static int flow_table_map(vr_flow_req *);
+static int flow_table_map(vr_flow_table_data *);
+static int flow_table_get(void);
 
 void
 vr_response_process(void *sresp)
 {
     vr_response *resp = (vr_response *)sresp;
 
-    if (resp->resp_code < 0)
+    if (resp->resp_code < 0) {
         printf("%s: %s\n", __func__, strerror(-resp->resp_code));
+        exit(-2);
+    }
 
     return;
 }
 
 void
-vr_flow_req_process(void *sreq)
+vr_flow_response_process(void *sresp)
 {
-    vr_flow_req *req = (vr_flow_req *)sreq;
+    if (array_index == -1)
+        return;
 
-    switch (req->fr_op) {
-    case FLOW_OP_FLOW_TABLE_GET:
-        if (flow_table_map(req) <= 0)
-            return;
+    vr_flow_response *resp = (vr_flow_response *)sresp;
+    flow_md_mem[array_index].fmd_index = resp->fresp_index;
+    flow_md_mem[array_index].fmd_gen_id = resp->fresp_gen_id;
+    return;
+}
 
-        break;
 
-    default:
-        break;
-    }
+void
+vr_flow_table_data_process(void *sreq)
+{
+    vr_flow_table_data *ftable = (vr_flow_table_data *)sreq;
+
+    flow_table_map(ftable);
 
     return;
 }
@@ -1110,9 +1132,9 @@ flow_dump_table(struct flow_table *ft)
 
     printf("Flow table(size %lu, entries %u)\n\n", ft->ft_span,
             ft->ft_num_entries);
-    printf("Entries: Created %lu Added %lu Processed %lu Used Overflow entries %u\n",
-            ft->ft_created, ft->ft_added, ft->ft_processed,
-            ft->ft_oflow_entries);
+    printf("Entries: Created %lu Added %lu Deleted %lu Changed %lu Processed %lu Used Overflow entries %u\n",
+            ft->ft_created, ft->ft_added, ft->ft_deleted, ft->ft_changed,
+            ft->ft_processed, ft->ft_oflow_entries);
     printf("(Created Flows/CPU: ");
     for (i = 0; i < ft->ft_hold_stat_count; i++) {
         printf("%u", ft->ft_hold_stat[i]);
@@ -1572,75 +1594,115 @@ static void
 flow_rate(void)
 {
     struct flow_table *ft = &main_table;
-    unsigned int i;
     struct vr_flow_entry *fe;
     struct timeval now;
     struct timeval last_time;
-    int active_entries = 0;
-    int prev_active_entries = 0;
-    int total_entries = 0;
-    int prev_total_entries = 0;
     int diff_ms;
-    int rate;
-    int total_rate;
+    int hold_count_old = 0;
+    int processed_count_old = 0;
+    int added_count_old = 0;
+    int deleted_count_old = 0;
 
     gettimeofday(&last_time, NULL);
     while (1) {
-        active_entries = 0;
-        total_entries = 0;
+        int hold_rate = 0;
+        int hold_count = 0;
+
+        int processed_rate = 0;
+        int processed_count = 0;
+
+        int added_rate = 0;
+        int added_count = 0;
+
+        int deleted_rate = 0;
+        int deleted_count = 0;
+
+        int flow_op_rate = 0;
+        struct tm *tm;
+
         usleep(500000);
-        for (i = 0; i < ft->ft_num_entries; i++) {
-            fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
-            if (fe->fe_flags & VR_FLOW_FLAG_ACTIVE) {
-                if (fe->fe_flags & VR_FLOW_FLAG_EVICTED) {
-                    continue;
-                }
-                total_entries++;
-                if (fe->fe_action != VR_FLOW_ACTION_HOLD)
-                    active_entries++;
-            }
-        }
+        flow_table_get();
         gettimeofday(&now, NULL);
+
         /* calc time difference and rate */
         diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
         diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
         assert(diff_ms > 0 );
-        rate = (active_entries - prev_active_entries) * 1000;
-        rate /= diff_ms;
-        total_rate = (total_entries - prev_total_entries) * 1000;
-        total_rate /= diff_ms;
-        if (rate != 0 || total_rate != 0) {
-            printf("New = %4d, Flow setup rate = %4d flows/sec, ",
-                   (active_entries - prev_active_entries), rate);
-            printf("Flow rate = %4d flows/sec, for last %4d ms\n", total_rate, diff_ms);
+
+        hold_count = ft->ft_created - hold_count_old;
+        hold_rate = hold_count * 1000 / diff_ms;
+
+        processed_count = ft->ft_processed - processed_count_old;
+        processed_rate = processed_count * 1000 / diff_ms;
+
+        added_count = ft->ft_added - added_count_old;
+        added_rate = added_count * 1000 / diff_ms;
+
+        deleted_count = ft->ft_deleted - deleted_count_old;
+        deleted_rate = deleted_count * 1000 / diff_ms;
+
+        flow_op_rate = processed_rate + added_rate + deleted_rate;
+
+        char fmt[64];
+        tm = localtime(&now.tv_sec);
+        strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S", tm);
+
+        if (hold_rate || processed_rate || added_rate || deleted_rate) {
+            printf ("%s.%03d:  Entries = %8d "
+                    "Rate = %6d (Fwd = %8d Rev = %8d Del = %8d) "
+                    "Hold = %8d\n", fmt, (int)now.tv_usec/1000,
+                    (int)ft->ft_total_entries, flow_op_rate, processed_count,
+                    added_count, deleted_count, hold_count);
             fflush(stdout);
         }
 
         last_time = now;
-        prev_active_entries = active_entries;
-        prev_total_entries = total_entries;
+        hold_count_old = ft->ft_created;
+        processed_count_old = ft->ft_processed;
+        added_count_old = ft->ft_added;
+        deleted_count_old = ft->ft_deleted;
     }
 }
 
 static int
-flow_table_map(vr_flow_req *req)
+get_flow_table_map_counts(vr_flow_table_data *table, struct flow_table *ft)
+{
+    ft->ft_processed = table->ftable_processed;
+    ft->ft_created = table->ftable_created;
+    ft->ft_hold_oflows = table->ftable_hold_oflows;
+    ft->ft_added = table->ftable_added;
+    ft->ft_oflow_entries = table->ftable_oflow_entries;
+    ft->ft_deleted = table->ftable_deleted;
+    ft->ft_changed = table->ftable_changed;
+    ft->ft_total_entries = table->ftable_used_entries;
+
+    return 0;
+}
+
+static int
+flow_table_map(vr_flow_table_data *table)
 {
     int ret;
     unsigned int i;
     struct flow_table *ft = &main_table;
     const char *flow_path;
 
-    if (req->fr_ftable_dev < 0)
+    if (table->ftable_dev < 0)
         exit(ENODEV);
+
+    if (ft->ft_entries != 0) {
+        get_flow_table_map_counts(table, ft);
+        return ft->ft_num_entries;
+    }
 
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
     if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
                 (strcmp(platform, PLATFORM_NIC) == 0))) {
-        flow_path = req->fr_file_path;
+        flow_path = table->ftable_file_path;
     } else {
         flow_path = MEM_DEV;
         ret = mknod(MEM_DEV, S_IFCHR | O_RDWR,
-                makedev(req->fr_ftable_dev, req->fr_rid));
+                makedev(table->ftable_dev, table->ftable_rid));
         if (ret && errno != EEXIST) {
             perror(MEM_DEV);
             exit(errno);
@@ -1653,7 +1715,7 @@ flow_table_map(vr_flow_req *req)
         exit(errno);
     }
 
-    ft->ft_entries = (struct vr_flow_entry *)mmap(NULL, req->fr_ftable_size,
+    ft->ft_entries = (struct vr_flow_entry *)mmap(NULL, table->ftable_size,
             PROT_READ, MAP_SHARED, mem_fd, 0);
     /* the file descriptor is no longer needed */
     close(mem_fd);
@@ -1662,25 +1724,27 @@ flow_table_map(vr_flow_req *req)
         exit(errno);
     }
 
-    ft->ft_span = req->fr_ftable_size;
+    ft->ft_span = table->ftable_size;
     ft->ft_num_entries = ft->ft_span / sizeof(struct vr_flow_entry);
-    ft->ft_processed = req->fr_processed;
-    ft->ft_created = req->fr_created;
-    ft->ft_hold_oflows = req->fr_hold_oflows;
-    ft->ft_added = req->fr_added;
-    ft->ft_cpus = req->fr_cpus;
-    ft->ft_oflow_entries = req->fr_oflow_entries;
+    ft->ft_processed = table->ftable_processed;
+    ft->ft_created = table->ftable_created;
+    ft->ft_hold_oflows = table->ftable_hold_oflows;
+    ft->ft_added = table->ftable_added;
+    ft->ft_cpus = table->ftable_cpus;
+    ft->ft_oflow_entries = table->ftable_oflow_entries;
+    ft->ft_deleted = table->ftable_deleted;
+    ft->ft_changed = table->ftable_changed;
 
-    if (req->fr_hold_stat && req->fr_hold_stat_size) {
-        ft->ft_hold_stat_count = req->fr_hold_stat_size;
-        for (i = 0; i < req->fr_hold_stat_size; i++) {
+    if (table->ftable_hold_stat && table->ftable_hold_stat_size) {
+        ft->ft_hold_stat_count = table->ftable_hold_stat_size;
+        for (i = 0; i < table->ftable_hold_stat_size; i++) {
             if (i ==
                     (sizeof(ft->ft_hold_stat) / sizeof(ft->ft_hold_stat[0]))) {
                 ft->ft_hold_stat_count = i;
                 break;
             }
 
-            ft->ft_hold_stat[i] = req->fr_hold_stat[i];
+            ft->ft_hold_stat[i] = table->ftable_hold_stat[i];
         }
     } else {
         ft->ft_hold_stat_count = 0;
@@ -1691,11 +1755,11 @@ flow_table_map(vr_flow_req *req)
 }
 
 static int
-flow_make_flow_req(vr_flow_req *req)
+flow_make_flow_req(void *req, char *flow_str)
 {
     int ret;
 
-    ret = vr_sendmsg(cl, req, "vr_flow_req");
+    ret = vr_sendmsg(cl, req, flow_str);
     if (ret <= 0)
         return ret;
 
@@ -1711,10 +1775,10 @@ static int
 flow_table_get(void)
 {
     /* get the kernel's view of the flow table */
-    memset(&flow_req, 0, sizeof(flow_req));
-    flow_req.fr_op = FLOW_OP_FLOW_TABLE_GET;
+    memset(&ftable, 0, sizeof(ftable));
+    ftable.ftable_op = FLOW_OP_FLOW_TABLE_GET;
 
-    return flow_make_flow_req(&flow_req);
+    return flow_make_flow_req(&ftable, "vr_flow_table_data");
 }
 
 static int
@@ -1743,94 +1807,104 @@ flow_table_setup(void)
     return ret;
 }
 
-static void
-flow_do_op(unsigned long flow_index, char action)
+static int
+fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action)
 {
     struct vr_flow_entry *fe;
 
-    memset(&flow_req, 0, sizeof(flow_req));
-    flow_req.fr_flow_ip_size = 8;
-
+    memset(req, 0, sizeof(*req));
     fe = flow_get(flow_index);
     if (!fe) {
         printf("Invalid flow index value %lu\n", flow_index);
-        return;
+        return -1;
     }
 
     if (action == 'g') {
         if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE)) {
             printf("Flow index %lu is not active\n", flow_index);
-            return;
+            return -1;
         }
 
         if (!show_evicted_set && (fe->fe_flags & VR_FLOW_FLAG_EVICTED)) {
             printf("Flow at index %lu is EVICTED. Use --show-evicted\n",
                     flow_index);
-            return;
+            return -1;
         }
 
         flow_get_entry(fe);
-        return;
+        return -1;
     }
 
     if ((fe->fe_type != VP_TYPE_IP) && (fe->fe_type != VP_TYPE_IP6))
-        return;
+        return -1;
 
-    flow_req.fr_op = FLOW_OP_FLOW_SET;
-    flow_req.fr_index = flow_index;
-    flow_req.fr_family = VR_FLOW_FAMILY(fe->fe_type);
-    flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    flow_req.fr_flow_ip = malloc(2 * VR_IP_ADDR_SIZE(fe->fe_type));
-    if (!flow_req.fr_flow_ip) {
-        printf("Unable to allocate %u bytes for storing address\n",
-                2 * VR_IP_ADDR_SIZE(fe->fe_type));
-        return;
+    req->fr_op = FLOW_OP_FLOW_SET;
+    req->fr_index = flow_index;
+    req->fr_family = VR_FLOW_FAMILY(fe->fe_type);
+    req->fr_flags = VR_FLOW_FLAG_ACTIVE;
+    if (fe->fe_type == VP_TYPE_IP) {
+        req->fr_flow_sip_l = fe->fe_key.flow4_sip;
+        req->fr_flow_dip_l = fe->fe_key.flow4_dip;
+    } else {
+        memcpy(&req->fr_flow_sip_l, fe->fe_key.flow_ip,
+              2 * VR_IP_ADDR_SIZE(fe->fe_type));
     }
 
-    memcpy(flow_req.fr_flow_ip, fe->fe_key.flow_ip,
-              2 * VR_IP_ADDR_SIZE(fe->fe_type));
-    flow_req.fr_flow_ip_size = 2 * VR_IP_ADDR_SIZE(fe->fe_type);
-    flow_req.fr_flow_proto = fe->fe_key.flow_proto;
-    flow_req.fr_flow_sport = fe->fe_key.flow_sport;
-    flow_req.fr_flow_dport = fe->fe_key.flow_dport;
-    flow_req.fr_flow_nh_id = fe->fe_key.flow_nh_id;
-    flow_req.fr_gen_id     = fe->fe_gen_id;
+    req->fr_flow_proto = fe->fe_key.flow_proto;
+    req->fr_flow_sport = fe->fe_key.flow_sport;
+    req->fr_flow_dport = fe->fe_key.flow_dport;
+    req->fr_flow_nh_id = fe->fe_key.flow_nh_id;
+    req->fr_gen_id     = fe->fe_gen_id;
 
     switch (action) {
     case 'd':
-        flow_req.fr_action = VR_FLOW_ACTION_DROP;
+        req->fr_action = VR_FLOW_ACTION_DROP;
         break;
 
     case 'f':
-        flow_req.fr_action = VR_FLOW_ACTION_FORWARD;
+        req->fr_action = VR_FLOW_ACTION_FORWARD;
         break;
 
     case 'i':
-        flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE ^ VR_FLOW_FLAG_ACTIVE;
-        flow_req.fr_action = VR_FLOW_ACTION_DROP;
+        req->fr_flags = VR_FLOW_FLAG_ACTIVE ^ VR_FLOW_FLAG_ACTIVE;
+        req->fr_action = VR_FLOW_ACTION_DROP;
         break;
 
     default:
-        goto exit_validate;
+        return -1;
     }
 
     if (mirror >= 0) {
-        flow_req.fr_mir_id = mirror;
-        flow_req.fr_flags |= VR_FLOW_FLAG_MIRROR;
+        req->fr_mir_id = mirror;
+        req->fr_flags |= VR_FLOW_FLAG_MIRROR;
     } else
-        flow_req.fr_flags &= ~VR_FLOW_FLAG_MIRROR;
+        req->fr_flags &= ~VR_FLOW_FLAG_MIRROR;
 
+    return 0;
+}
 
-    flow_make_flow_req(&flow_req);
-
-exit_validate:
-    if (flow_req.fr_flow_ip) {
-        free(flow_req.fr_flow_ip);
-        flow_req.fr_flow_ip = NULL;
-        flow_req.fr_flow_ip_size = 0;
-    }
-
+static void
+flow_do_op(unsigned long flow_index, char action)
+{
+    if (fill_flow_req(&flow_req, flow_index, action))
+        return;
+    flow_make_flow_req(&flow_req, "vr_flow_req");
     return;
+}
+
+static void
+flow_process_response()
+{
+    int ret;
+    struct nl_response *resp;
+
+    cl->cl_buf_offset = 0;
+    if ((ret = nl_recvmsg(cl)) > 0) {
+        resp = nl_parse_reply(cl);
+        if (resp->nl_op == SANDESH_REQUEST) {
+            sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);
+        }
+    }
 }
 
 static int
@@ -1895,16 +1969,23 @@ flow_make_flow_req_perf(vr_flow_req *req)
         return ret;
 
     cl->cl_buf_offset = 0;
-    count = 0;
     if (errno == EAGAIN || errno == EWOULDBLOCK)
         ret = 0;
+
+    while (count != 0) {
+        count--;
+        flow_process_response();
+     }
+
+    cl->cl_buf_offset = 0;
 
     return ret;
 }
 
-void run_perf(void) {
+void
+run_perf(void)
+{
     struct vr_flow_entry *fe;
-    struct nl_response *resp;
     uint32_t sip = inet_addr("1.1.1.1");
     uint32_t dip = inet_addr("2.2.2.2");
     int ret;
@@ -1914,42 +1995,26 @@ void run_perf(void) {
 
     memset(&flow_req, 0, sizeof(flow_req));
     flow_req.fr_family = AF_INET;
-    flow_req.fr_flow_ip = malloc(8);
-    if (!flow_req.fr_flow_ip)
-        return;
-    flow_req.fr_flow_ip_size = 8;
     flow_req.fr_op = FLOW_OP_FLOW_SET;
-    flow_req.fr_index = -1;
     flow_req.fr_flags = VR_FLOW_FLAG_ACTIVE;
-    memcpy(flow_req.fr_flow_ip, (uint8_t *)&sip, sizeof(sip));
-    memcpy(flow_req.fr_flow_ip + 4, (uint8_t *)&dip, sizeof(dip));
+    flow_req.fr_flow_sip_l = sip;
+    flow_req.fr_flow_dip_l = dip;
     flow_req.fr_flow_proto = proto;
-    flow_req.fr_flow_sport = htons(sport);
     flow_req.fr_flow_nh_id = nhid;
-    flow_req.fr_gen_id = 1;
+    flow_req.fr_gen_id = 0;
 
     struct timeval last_time;
     gettimeofday(&last_time, NULL);
 
     int i = 0;
     for (i = 0; i < perf; i++) {
+        more = false;
+        array_index = i;
         flow_req.fr_action = VR_FLOW_ACTION_HOLD;
         flow_req.fr_flow_sport = htons(sport + (i / 65535));
         flow_req.fr_flow_dport = htons(i % 65535);
+        flow_req.fr_index = -1;
         flow_make_flow_req_perf(&flow_req);
-    }
-
-    /* process responses from previous requests */
-    while (i != 0) {
-        i--;
-        cl->cl_buf_offset = 0;
-        if ((ret = nl_recvmsg(cl)) > 0) {
-            resp = nl_parse_reply(cl);
-            if (resp->nl_op == SANDESH_REQUEST) {
-                sandesh_decode(resp->nl_data, resp->nl_len,
-                                vr_find_sandesh_info, &ret);
-            }
-        }
     }
     cl->cl_buf_offset = 0;
 
@@ -1960,70 +2025,31 @@ void run_perf(void) {
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
     printf("Created %d HOLD entries in %d msec\n", perf, diff_ms);
 
-    int flow_index[perf];
-    int flow_genid[perf];
-    for (i = 0; i < perf; i++) {
-        flow_index[i] = -1;
-        flow_genid[i] = 0;
-    }
-    struct flow_table *ft = &main_table;
-    for (i = 0; i < ft->ft_num_entries; i++) {
-        fe = flow_get(i);
-        if (fe->fe_type != VP_TYPE_IP)
-            continue;
-        if (fe->fe_key.flow4_proto != proto)
-            continue;
-
-        int index = (ntohs(fe->fe_key.flow4_sport) - sport) * 65535 +
-            ntohs(fe->fe_key.flow4_dport);
-        if (index > 2000000) {
-            printf("Error index %d sport %x dport %x\n", index,
-                   fe->fe_key.flow4_sport, fe->fe_key.flow4_dport);
-        }
-
-        flow_index[index] = i;
-        flow_genid[index] = fe->fe_gen_id;
-    }
-
     gettimeofday(&last_time, NULL);
-
     for (i = 0; i < perf; i++) {
-        memcpy(flow_req.fr_flow_ip, (uint8_t *)&dip, sizeof(dip));
-        memcpy(flow_req.fr_flow_ip + 4, (uint8_t *)&sip, sizeof(sip));
+        array_index = -1;
+        flow_req.fr_flow_sip_l = dip;
+        flow_req.fr_flow_dip_l = sip;
         flow_req.fr_flow_sport = htons(i % 65535);
         flow_req.fr_flow_dport = htons(sport + (i / 65535));
         flow_req.fr_index = -1;
         flow_req.fr_action = VR_FLOW_ACTION_FORWARD;
+        flow_req.fr_gen_id = 0;
         more = true;
         flow_make_flow_req_perf(&flow_req);
 
-        memcpy(flow_req.fr_flow_ip, (uint8_t *)&sip, sizeof(sip));
-        memcpy(flow_req.fr_flow_ip + 4, (uint8_t *)&dip, sizeof(dip));
+        flow_req.fr_flow_sip_l = sip;
+        flow_req.fr_flow_dip_l = dip;
         flow_req.fr_flow_sport = htons(sport + (i / 65535));
         flow_req.fr_flow_dport = htons(i % 65535);
-        flow_req.fr_index = flow_index[i];
         flow_req.fr_action = VR_FLOW_ACTION_FORWARD;
-        flow_req.fr_gen_id = flow_genid[i];
+        flow_req.fr_index = flow_md_mem[i].fmd_index;
+        flow_req.fr_gen_id = flow_md_mem[i].fmd_gen_id;
         if (i == (perf - 1)) {
             more = false;
         }
         flow_make_flow_req_perf(&flow_req);
     }
-
-    /* process responses from previous requests */
-    i *= 2; /* there were two requests per one loop cycle */
-    while (i != 0) {
-        i--;
-        cl->cl_buf_offset = 0;
-        if ((ret = nl_recvmsg(cl)) > 0) {
-            resp = nl_parse_reply(cl);
-            if (resp->nl_op == SANDESH_REQUEST) {
-                sandesh_decode(resp->nl_data, resp->nl_len,
-                                vr_find_sandesh_info, &ret);
-            }
-        }
-    }
-    cl->cl_buf_offset = 0;
 
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
@@ -2031,31 +2057,44 @@ void run_perf(void) {
     printf("Created %d HOLD and %d FWD entries in %d msec\n",
             perf, perf, diff_ms);
 
-    free(flow_req.fr_flow_ip);
 }
 
-void run_flush(void) {
+void
+run_flush(void)
+{
+    int i;
+    int diff_ms;
+    int count = 0;
     struct vr_flow_entry *fe;
     struct flow_table *ft = &main_table;
     struct timeval now;
     struct timeval last_time;
-    int diff_ms;
+    vr_flow_req *table = malloc(sizeof(vr_flow_req) * ft->ft_num_entries);
 
+    printf("Scanning flow table\n");
     gettimeofday(&last_time, NULL);
-    int i;
-    int count = 0;
     for (i = 0; i < ft->ft_num_entries; i++) {
-        fe = flow_get(i);
-        if (fe->fe_type != VP_TYPE_IP)
+        if (fill_flow_req(&table[count], i, 'i'))
             continue;
         count++;
-        flow_do_op(i, 'i');
+    }
+    gettimeofday(&now, NULL);
+    diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
+    diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
+    printf("Found %d entries in %d msec\n", count, diff_ms);
+
+    printf("Deleting %d entries in flow-table\n", count);
+    gettimeofday(&last_time, NULL);
+    for (i = 0; i < count; i++) {
+        flow_make_flow_req(&table[i], "vr_flow_req");
+        flow_process_response();
     }
 
     gettimeofday(&now, NULL);
     diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
     diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
     printf("Deleted %d entries in %d msec\n", count, diff_ms);
+    free(table);
 }
 
 static void
@@ -2450,6 +2489,11 @@ main(int argc, char *argv[])
 
         case 'p':
             perf = strtoul(optarg, NULL, 0);
+            if (perf > MAX_FLOWS) {
+                printf("Invalid perf count %d. Max value %d\n", perf,
+                       MAX_FLOWS);
+                exit(-1);
+            }
             break;
 
         case 'b' :

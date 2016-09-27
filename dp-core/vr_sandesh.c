@@ -64,10 +64,10 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vrouter_ops),
         .obj_type_string        =       "vrouter_ops",
     },
-    [VR_FLOW_INFO_OBJECT_ID]         =   {
-        .obj_len                =       ((4 * sizeof(vr_flow_req)) +
+    [VR_FLOW_TABLE_DATA_OBJECT_ID]         =   {
+        .obj_len                =       ((4 * sizeof(vr_flow_table_data)) +
                     (VR_FLOW_MAX_CPUS * sizeof(unsigned int))),
-        .obj_type_string        =       "vr_flow_req",
+        .obj_type_string        =       "vr_flow_table_data",
     },
     [VR_MEM_STATS_OBJECT_ID]     =   {
         .obj_len                =       4 * sizeof(vr_mem_stats_req),
@@ -81,6 +81,10 @@ struct sandesh_object_md sandesh_md[] = {
     [VR_FC_MAP_OBJECT_ID]     =   {
         .obj_len                =       4 * sizeof(vr_fc_map_req),
         .obj_type_string        =       "vr_fc_map_req",
+    },
+    [VR_FLOW_RESPONSE_OBJECT_ID] = {
+        .obj_len                =       4 * sizeof(vr_flow_response),
+        .obj_type_string         =       "vr_flow_response",
     },
 };
 

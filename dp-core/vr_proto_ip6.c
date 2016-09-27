@@ -131,33 +131,39 @@ vr_icmp6_input(struct vrouter *router, struct vr_packet *pkt,
 }
 
 void
+vr_inet6_fill_flow_from_req(struct vr_flow *flow_p, vr_flow_req *req)
+{
+    uint64_t *dst;
+
+    vr_fill_flow_common(flow_p, req->fr_flow_nh_id, req->fr_flow_proto,
+            req->fr_flow_sport, req->fr_flow_dport, AF_INET6, VR_FLOW_KEY_ALL);
+
+    dst = (uint64_t *)(flow_p->flow6_sip);
+    *dst = req->fr_flow_sip_u;
+    *(dst + 1) = req->fr_flow_sip_l;
+    *(dst + 2) = req->fr_flow_dip_u;
+    *(dst + 3) = req->fr_flow_dip_l;
+
+    return;
+}
+
+void
 vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
         unsigned char *ip, uint8_t proto, uint16_t sport, uint16_t dport,
         uint8_t valid_fkey_params)
 {
     memset(flow_p, 0, VR_FLOW_IPV6_HASH_SIZE);
-
-    flow_p->flow6_nh_id = nh_id;
-    flow_p->flow6_family = AF_INET6;
-    flow_p->flow_key_len = VR_FLOW_IPV6_HASH_SIZE;
-
     valid_fkey_params &= VR_FLOW_KEY_ALL;
+
+    vr_fill_flow_common(flow_p, nh_id, proto, sport, dport,
+                        AF_INET6, valid_fkey_params);
 
     if (valid_fkey_params & VR_FLOW_KEY_SRC_IP)
         memcpy(flow_p->flow_ip, ip, VR_IP6_ADDRESS_LEN);
 
     if (valid_fkey_params & VR_FLOW_KEY_DST_IP)
-        memcpy(flow_p->flow_ip + VR_IP6_ADDRESS_LEN, ip + VR_IP6_ADDRESS_LEN,
-                                                          VR_IP6_ADDRESS_LEN);
-
-    if (valid_fkey_params & VR_FLOW_KEY_PROTO)
-        flow_p->flow6_proto = proto;
-
-    if (valid_fkey_params & VR_FLOW_KEY_SRC_PORT)
-        flow_p->flow6_sport = sport;
-
-    if (valid_fkey_params & VR_FLOW_KEY_DST_PORT)
-        flow_p->flow6_dport = dport;
+        memcpy(flow_p->flow_ip + VR_IP6_ADDRESS_LEN,
+               ip + VR_IP6_ADDRESS_LEN, VR_IP6_ADDRESS_LEN);
 
     return;
 }
