@@ -1985,7 +1985,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
      */
     if (!(req->fr_flags & VR_FLOW_FLAG_ACTIVE)) {
         if (!fe)
-            return -EINVAL;
+            return -ENOENT;
 
         infop->vfti_deleted++;
         flow_resp->fresp_flags |= VR_FLOW_RESP_FLAG_DELETED;
