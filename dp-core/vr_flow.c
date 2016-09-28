@@ -1892,7 +1892,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
      */
     if (!(req->fr_flags & VR_FLOW_FLAG_ACTIVE)) {
         if (!fe)
-            return -EINVAL;
+            return -ENOENT;
+
         return vr_flow_delete(router, req, fe);
     }
 
