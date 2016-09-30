@@ -67,6 +67,7 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_fragment_queue_fail += stats->vds_fragment_queue_fail;
     response->vds_vlan_fwd_tx += stats->vds_vlan_fwd_tx;
     response->vds_vlan_fwd_enq += stats->vds_vlan_fwd_enq;
+    response->vds_trap_original += stats->vds_trap_original;
 
     return;
 }

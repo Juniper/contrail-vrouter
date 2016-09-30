@@ -388,4 +388,5 @@ buffer sandesh vr_drop_stats_req {
     50: i64             vds_vlan_fwd_tx;
     51: i64             vds_vlan_fwd_enq;
     52: i64             vds_flow_evict;
+    53: i64             vds_trap_original;
 }
