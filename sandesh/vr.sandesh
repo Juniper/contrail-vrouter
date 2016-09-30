@@ -399,6 +399,7 @@ buffer sandesh vr_drop_stats_req {
     51: i64             vds_vlan_fwd_enq;
     52: i64             vds_drop_new_flow;
     53: i64             vds_flow_evict;
+    54: i64             vds_trap_original;
 }
 
 buffer sandesh vr_qos_map_req {

@@ -81,6 +81,10 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_flow_evict);
     printf("\n");
 
+    printf("Original Packet Trapped       %" PRIu64 "\n",
+            stats->vds_trap_original);
+    printf("\n");
+
     printf("Discards                      %" PRIu64 "\n",
             stats->vds_discard);
     printf("TTL Exceeded                  %" PRIu64 "\n",
