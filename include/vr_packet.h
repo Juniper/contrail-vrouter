@@ -182,7 +182,8 @@
 #define VP_DROP_VLAN_FWD_ENQ                46
 #define VP_DROP_NEW_FLOWS                   47
 #define VP_DROP_FLOW_EVICT                  48
-#define VP_DROP_MAX                         49
+#define VP_DROP_TRAP_ORIGINAL               49
+#define VP_DROP_MAX                         50
 
 
 struct vr_drop_stats {
@@ -235,6 +236,7 @@ struct vr_drop_stats {
     uint64_t vds_vlan_fwd_enq;
     uint64_t vds_drop_new_flow;
     uint64_t vds_flow_evict;
+    uint64_t vds_trap_original;
 };
 
 /*

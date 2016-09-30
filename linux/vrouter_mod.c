@@ -78,6 +78,7 @@ extern void vhost_exit(void);
 extern int lh_gro_process(struct vr_packet *, struct vr_interface *, bool);
 
 static void lh_reset_skb_fields(struct vr_packet *pkt);
+static unsigned int lh_get_cpu(void);
 
 static int
 lh_printk(const char *format, ...)
@@ -302,17 +303,26 @@ lh_pgso_size(struct vr_packet *pkt)
 static void
 lh_pfree(struct vr_packet *pkt, unsigned short reason)
 {
-    struct vrouter *router = vrouter_get(0);
-    struct sk_buff *skb;
+    unsigned int cpu;
 
-    skb = vp_os_packet(pkt);
-    if (!skb)
-        return;
+    struct vrouter *router = vrouter_get(0);
+    struct sk_buff *skb = NULL;
+
+    if (pkt) {
+        skb = vp_os_packet(pkt);
+        if (!skb)
+            return;
+        cpu = pkt->vp_cpu;
+    } else {
+        cpu = lh_get_cpu();
+    }
 
     if (router)
-        ((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
+        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
 
-    kfree_skb(skb);
+    if (skb)
+        kfree_skb(skb);
+
     return;
 }
 
