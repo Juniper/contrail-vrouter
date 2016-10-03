@@ -85,9 +85,11 @@ dump_priority(void)
 
     printf("DCBX:                       %5s\n", dcbx_str);
     printf("DCB State:                  %5s\n", dcb_enable ? "Enabled" : "Disabled");
-    printf("Priority:                   ");
+
+    printf("\n");
+    printf("                            ");
     for (i = 0; i < NUM_TC; i++) {
-        printf("%5u", i);
+        printf("   P%u", i);
     }
     printf("\n");
     printf("Traffic Class:              ");
@@ -96,9 +98,23 @@ dump_priority(void)
     }
     printf("\n");
 
+    printf("\n");
+    printf("                            ");
+    for (i = 0; i < NUM_TC; i++) {
+        printf("  TC%u", i);
+    }
+    printf("\n");
+
     printf("Priority Group:             ");
     for (i = 0; i < NUM_PG; i++) {
         printf("%5u", priority_map.tc_to_group[i]);
+    }
+    printf("\n");
+
+    printf("\n");
+    printf("                            ");
+    for (i = 0; i < NUM_PG; i++) {
+        printf("  PG%u", i);
     }
     printf("\n");
     printf("Priority Group Bandwidth:   ");
