@@ -641,6 +641,8 @@ exit_options:
 static void
 parse_long_opts(int opt_index, char *opt_arg)
 {
+    unsigned int i;
+
     errno = 0;
 
     switch (opt_index) {
@@ -649,6 +651,13 @@ parse_long_opts(int opt_index, char *opt_arg)
         if (dcbx_mode < 0) {
             Usage();
         }
+
+        if (dcbx_mode == DCB_CAP_DCBX_VER_IEEE) {
+            for (i = 0; i < NUM_TC; i++) {
+                priority_map.tc_to_group[i] = i;
+            }
+        }
+
         break;
 
     case DOTONEP_OPT_INDEX:
