@@ -430,7 +430,8 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 }
 
 static bool
-nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
+nh_udp_tunnel6_helper(struct vr_packet *pkt,
+        struct vr_nexthop *nh, uint16_t sport, uint16_t dport)
 {
     unsigned int v4_ip;
     uint8_t *sip = NULL;
@@ -466,8 +467,8 @@ nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh)
         return false;
     }
 
-    udp->udp_sport = nh->nh_udp_tun6_sport;
-    udp->udp_dport = nh->nh_udp_tun6_dport;
+    udp->udp_sport = sport;
+    udp->udp_dport = dport;
     udp->udp_length = htons(pkt_len(pkt));
     udp->udp_csum = 0;
 
@@ -1432,15 +1433,16 @@ static int
 nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
               struct vr_forwarding_md *fmd)
 {
-    unsigned int head_space;
-    uint32_t sip = 0;
-
+    int ret = -1;
+    unsigned int head_space, hash;
+    uint32_t sip = 0, port_range;
     struct vr_packet *tmp;
     struct vr_ip *ip;
     struct vr_ip6 *ip6;
     struct vr_udp *udp;
     struct vr_vrf_stats *stats;
     struct vr_forwarding_class_qos *qos;
+    struct vr_flow flow, *flowp = &flow;
 
     if (!fmd)
         goto send_fail;
@@ -1462,6 +1464,23 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt = tmp;
     }
 
+    fmd->fmd_udp_src_port = nh->nh_udp_tun_sport;
+    if (pkt->vp_type == VP_TYPE_IP) {
+        ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp);
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+        ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
+                                                fmd->fmd_vlan, ip6, flowp);
+    }
+
+    if (!ret) {
+        hash = vr_hash(flowp, flowp->flow_key_len, 0);
+        port_range = VR_UDP_PORT_RANGE_END - VR_UDP_PORT_RANGE_START;
+        fmd->fmd_udp_src_port = (uint16_t)
+            (((uint64_t ) hash * port_range) >> 32);
+        fmd->fmd_udp_src_port += VR_UDP_PORT_RANGE_START;
+    }
+
     if (nh->nh_family == AF_INET) {
         if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
             sip = nh_generate_sip(nh, pkt);
@@ -1472,7 +1491,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
 
         qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-        if (nh_udp_tunnel_helper(pkt, nh->nh_udp_tun_sport,
+        if (nh_udp_tunnel_helper(pkt, fmd->fmd_udp_src_port,
                     nh->nh_udp_tun_dport, sip,
                     nh->nh_udp_tun_dip, qos) == false) {
             goto send_fail;
@@ -1487,7 +1506,8 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
     } else if (nh->nh_family == AF_INET6) {
-        if (nh_udp_tunnel6_helper(pkt, nh) == false) {
+        if (nh_udp_tunnel6_helper(pkt, nh, fmd->fmd_udp_src_port,
+                   nh->nh_udp_tun_dport) == false) {
             goto send_fail;
         }
 
@@ -1496,7 +1516,6 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         udp->udp_csum = vr_ip6_partial_csum(ip6);
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
     }
-
 
     pkt_set_network_header(pkt, pkt->vp_data);
 
