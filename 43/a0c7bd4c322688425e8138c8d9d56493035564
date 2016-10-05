@@ -1,0 +1,9 @@
+Verified+2: opencontrail-admin <ci-admin@opencontrail.org>
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Approved+1: Anand H. Krishnan <anandhk@juniper.net>
+Code-Review+2: Anand H. Krishnan <anandhk@juniper.net>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Tue, 04 Oct 2016 23:12:58 -0700
+Reviewed-on: https://review.opencontrail.org/24617
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/master
