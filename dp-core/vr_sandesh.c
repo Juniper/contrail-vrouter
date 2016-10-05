@@ -49,7 +49,7 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_type_string        =       "vr_vrf_stats_req",
     },
     [VR_DROP_STATS_OBJECT_ID]     =   {
-        .obj_len                =       4 * sizeof(vr_vrf_stats_req),
+        .obj_len                =       4 * sizeof(vr_drop_stats_req),
         .obj_type_string        =       "vr_drop_stats_req",
     },
     [VR_RESPONSE_OBJECT_ID]     =   {

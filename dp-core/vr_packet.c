@@ -416,4 +416,3 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
 
     return 0;
 }
-

@@ -280,7 +280,7 @@ flow_get_vif(int vif_index)
 {
     int ret;
 
-    ret = vr_send_interface_get(cl, 0, vif_index, -1, 0);
+    ret = vr_send_interface_get(cl, 0, vif_index, -1, 0, 0);
     if (ret < 0)
         return NULL;
 

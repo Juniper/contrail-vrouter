@@ -177,6 +177,9 @@ vr_lib_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     struct vr_hpacket *hpkt;
 
+    /* Handle Vrouter statistics */
+    pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
+
     hpkt = VR_PACKET_TO_HPACKET(pkt);
     vr_hpacket_free(hpkt);
     return;

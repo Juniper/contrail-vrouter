@@ -154,11 +154,12 @@ extern int vr_response_common_process(vr_response *, bool *);
 extern unsigned long vr_sum_drop_stats(vr_drop_stats_req *);
 extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
-extern int vr_send_drop_stats_get(struct nl_client *, unsigned int, int);
+extern int vr_send_drop_stats_get(struct nl_client *, unsigned int,
+        short);
 
 extern int vr_send_interface_dump(struct nl_client *, unsigned int, int, int);
 extern int vr_send_interface_get(struct nl_client *, unsigned int,
-                int, int, int);
+                int, int, int, int);
 extern int vr_send_interface_delete(struct nl_client *, unsigned int,
         char *, int);
 extern int vr_send_interface_add(struct nl_client *, int, char *, int,
@@ -259,6 +260,8 @@ extern int vr_send_set_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
 extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
+extern void vr_print_drop_stats(vr_drop_stats_req *, int);
+
 #ifdef __cplusplus
 }
 #endif
