@@ -270,13 +270,15 @@ struct vr_interface {
     vr_htable_t vif_btable;
     unsigned char vif_rewrite[VR_ETHER_HLEN];
     int16_t vif_qos_map_index;
+    unsigned char vif_name[VR_INTERFACE_NAME_LEN];
+    uint64_t *vif_drop_stats;
+    struct vr_btable *vif_pcpu_drop_stats;
     unsigned char *vif_in_mirror_md;
     unsigned char *vif_out_mirror_md;
     unsigned char vif_in_mirror_md_len;
     unsigned char vif_in_mirror_md_size;
     unsigned char vif_out_mirror_md_len;
     unsigned char vif_out_mirror_md_size;
-    unsigned char vif_name[VR_INTERFACE_NAME_LEN];
     unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
 };

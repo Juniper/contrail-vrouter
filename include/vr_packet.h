@@ -136,61 +136,54 @@
 #define VP_DROP_DISCARD                     0
 #define VP_DROP_PULL                        1
 #define VP_DROP_INVALID_IF                  2
-#define VP_DROP_ARP_NO_WHERE_TO_GO          3
-#define VP_DROP_GARP_FROM_VM                4
-#define VP_DROP_INVALID_ARP                 5
-#define VP_DROP_TRAP_NO_IF                  6
-#define VP_DROP_NOWHERE_TO_GO               7
-#define VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED   8
-#define VP_DROP_FLOW_NO_MEMORY              9
-#define VP_DROP_FLOW_INVALID_PROTOCOL       10
-#define VP_DROP_FLOW_NAT_NO_RFLOW           11
-#define VP_DROP_FLOW_ACTION_DROP            12
-#define VP_DROP_FLOW_ACTION_INVALID         13
-#define VP_DROP_FLOW_UNUSABLE               14
-#define VP_DROP_FLOW_TABLE_FULL             15
-#define VP_DROP_INTERFACE_TX_DISCARD        16
-#define VP_DROP_INTERFACE_DROP              17
-#define VP_DROP_DUPLICATED                  18
-#define VP_DROP_PUSH                        19
-#define VP_DROP_TTL_EXCEEDED                20
-#define VP_DROP_INVALID_NH                  21
-#define VP_DROP_INVALID_LABEL               22
-#define VP_DROP_INVALID_PROTOCOL            23
-#define VP_DROP_INTERFACE_RX_DISCARD        24
-#define VP_DROP_INVALID_MCAST_SOURCE        25
-#define VP_DROP_HEAD_ALLOC_FAIL             26
-#define VP_DROP_HEAD_SPACE_RESERVE_FAIL     27
-#define VP_DROP_PCOW_FAIL                   28
-#define VP_DROP_MCAST_DF_BIT                29
-#define VP_DROP_MCAST_CLONE_FAIL            30
-#define VP_DROP_NO_MEMORY                   31
-#define VP_DROP_REWRITE_FAIL                32
-#define VP_DROP_MISC                        33
-#define VP_DROP_INVALID_PACKET              34
-#define VP_DROP_CKSUM_ERR                   35
-/* #define VP_DROP_CLONE_FAIL               36 - UNUSED */
-#define VP_DROP_NO_FMD                      37
-#define VP_DROP_CLONED_ORIGINAL             38
-#define VP_DROP_INVALID_VNID                39
-#define VP_DROP_FRAGMENTS                   40
-#define VP_DROP_INVALID_SOURCE              41
-#define VP_DROP_ARP_NO_ROUTE                42
-#define VP_DROP_L2_NO_ROUTE                 43
-#define VP_DROP_FRAGMENT_QUEUE_FAIL         44
-#define VP_DROP_VLAN_FWD_TX                 45
-#define VP_DROP_VLAN_FWD_ENQ                46
-#define VP_DROP_NEW_FLOWS                   47
-#define VP_DROP_FLOW_EVICT                  48
-#define VP_DROP_MAX                         49
+#define VP_DROP_INVALID_ARP                 3
+#define VP_DROP_TRAP_NO_IF                  4
+#define VP_DROP_NOWHERE_TO_GO               5
+#define VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED   6
+#define VP_DROP_FLOW_NO_MEMORY              7
+#define VP_DROP_FLOW_INVALID_PROTOCOL       8
+#define VP_DROP_FLOW_NAT_NO_RFLOW           9
+#define VP_DROP_FLOW_ACTION_DROP            10
+#define VP_DROP_FLOW_ACTION_INVALID         11
+#define VP_DROP_FLOW_UNUSABLE               12
+#define VP_DROP_FLOW_TABLE_FULL             13
+#define VP_DROP_INTERFACE_TX_DISCARD        14
+#define VP_DROP_INTERFACE_DROP              15
+#define VP_DROP_DUPLICATED                  16
+#define VP_DROP_PUSH                        17
+#define VP_DROP_TTL_EXCEEDED                18
+#define VP_DROP_INVALID_NH                  19
+#define VP_DROP_INVALID_LABEL               20
+#define VP_DROP_INVALID_PROTOCOL            21
+#define VP_DROP_INTERFACE_RX_DISCARD        22
+#define VP_DROP_INVALID_MCAST_SOURCE        23
+#define VP_DROP_HEAD_ALLOC_FAIL             24
+#define VP_DROP_PCOW_FAIL                   25
+#define VP_DROP_MCAST_DF_BIT                26
+#define VP_DROP_MCAST_CLONE_FAIL            27
+#define VP_DROP_NO_MEMORY                   28
+#define VP_DROP_REWRITE_FAIL                29
+#define VP_DROP_MISC                        30
+#define VP_DROP_INVALID_PACKET              31
+#define VP_DROP_CKSUM_ERR                   32
+#define VP_DROP_NO_FMD                      33
+#define VP_DROP_CLONED_ORIGINAL             34
+#define VP_DROP_INVALID_VNID                35
+#define VP_DROP_FRAGMENTS                   36
+#define VP_DROP_INVALID_SOURCE              37
+#define VP_DROP_L2_NO_ROUTE                 38
+#define VP_DROP_FRAGMENT_QUEUE_FAIL         39
+#define VP_DROP_VLAN_FWD_TX                 40
+#define VP_DROP_VLAN_FWD_ENQ                41
+#define VP_DROP_NEW_FLOWS                   42
+#define VP_DROP_FLOW_EVICT                  43
+#define VP_DROP_MAX                         44
 
 
 struct vr_drop_stats {
     uint64_t vds_discard;
     uint64_t vds_pull;
     uint64_t vds_invalid_if;
-    uint64_t vds_arp_no_where_to_go;
-    uint64_t vds_garp_from_vm;
     uint64_t vds_invalid_arp;
     uint64_t vds_trap_no_if;
     uint64_t vds_nowhere_to_go;
@@ -213,7 +206,6 @@ struct vr_drop_stats {
     uint64_t vds_interface_rx_discard;
     uint64_t vds_invalid_mcast_source;
     uint64_t vds_head_alloc_fail;
-    uint64_t vds_head_space_reserve_fail;
     uint64_t vds_pcow_fail;
     uint64_t vds_mcast_df_bit;
     uint64_t vds_mcast_clone_fail;
@@ -222,13 +214,11 @@ struct vr_drop_stats {
     uint64_t vds_misc;
     uint64_t vds_invalid_packet;
     uint64_t vds_cksum_err;
-    uint64_t vds_clone_fail;
     uint64_t vds_no_fmd;
     uint64_t vds_cloned_original;
     uint64_t vds_invalid_vnid;
     uint64_t vds_frag_err;
     uint64_t vds_invalid_source;
-    uint64_t vds_arp_no_route;
     uint64_t vds_l2_no_route;
     uint64_t vds_fragment_queue_fail;
     uint64_t vds_vlan_fwd_tx;
@@ -269,6 +259,7 @@ extern struct vr_packet *pkt_copy(struct vr_packet *, unsigned short,
         unsigned short);
 extern struct vr_packet *pkt_cow(struct vr_packet *, unsigned short);
 extern int vr_myip(struct vr_interface *, unsigned int);
+extern void vr_pfree(struct vr_packet *, unsigned short);
 
 typedef enum {
     L4_TYPE_UNKNOWN,
@@ -894,6 +885,7 @@ extern unsigned short vr_generate_unique_ip_id(void);
 extern void vr_proto_fragment(struct vr_interface *, struct vr_packet *);
 extern unsigned short vr_ip_partial_csum(struct vr_ip *);
 extern unsigned short vr_ip6_partial_csum(struct vr_ip6 *);
+extern void vr_pdrop_stats(struct vr_interface *, unsigned short, int);
 
 enum {
     UNKNOWN_SOURCE,

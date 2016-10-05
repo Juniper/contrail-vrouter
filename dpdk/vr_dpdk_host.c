@@ -148,19 +148,17 @@ dpdk_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 }
 
 static void
-dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
+dpdk_pkt_free(struct vr_packet *pkt)
 {
-    struct vrouter *router = vrouter_get(0);
-
-    router->vr_pdrop_stats[rte_lcore_id()][reason]++;
-
     rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
 }
 
 void
 vr_dpdk_pfree(struct rte_mbuf *mbuf, unsigned short reason)
 {
-    dpdk_pfree(vr_dpdk_mbuf_to_pkt(mbuf), reason);
+    struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(mbuf);
+    vr_pdrop_stats(pkt->vp_if, reason, rte_lcore_id());
+    dpdk_pkt_free(pkt);
 }
 
 
@@ -1219,7 +1217,7 @@ struct host_os dpdk_host = {
     .hos_palloc                     =    dpdk_palloc,
     .hos_palloc_head                =    dpdk_palloc_head, /* not implemented */
     .hos_pexpand_head               =    dpdk_pexpand_head, /* not implemented */
-    .hos_pfree                      =    dpdk_pfree,
+    .hos_pkt_free                   =    dpdk_pkt_free,
     .hos_preset                     =    dpdk_preset,
     .hos_pclone                     =    dpdk_pclone,
     .hos_pcopy                      =    dpdk_pcopy,

@@ -13,6 +13,7 @@
 #include "vr_htable.h"
 #include "vr_datapath.h"
 #include "vr_bridge.h"
+#include "vr_btable.h"
 
 volatile bool agent_alive = false;
 
@@ -1389,6 +1390,16 @@ vif_free(struct vr_interface *vif)
         vif->vif_out_mirror_md = NULL;
     }
 
+    if (vif->vif_drop_stats) {
+        vr_free(vif->vif_drop_stats, VR_DROP_STATS_OBJECT);
+        vif->vif_drop_stats = NULL;
+    }
+
+    if (vif->vif_pcpu_drop_stats) {
+        vr_btable_free(vif->vif_pcpu_drop_stats);
+        vif->vif_pcpu_drop_stats = NULL;
+    }
+
     vr_free(vif, VR_INTERFACE_OBJECT);
 
     return;
@@ -1915,6 +1926,34 @@ vr_interface_add(vr_interface_req *req, bool need_response)
             goto error;
         }
     }
+
+    /*
+     * The dropstats need to be available per interface. Incrementing
+     * atomically the same statistics across many CPUs might attract
+     * significatnt delay. Alternative approach of allocating memory for
+     * every dropstat for every CPU will be large chunk of memory
+     * considering large number of interfaces, number of dropstats,
+     * number of CPUs and size of every counter.  To normalise both the
+     * requirements, one set of dropstats of 64 bit size and another set
+     * of dropstats of one byte per every cpu is allocated. The later is
+     * incremented without any contention as it is per cpu. When the
+     * one byte counter reaches its max value, it is added to the
+     * 64 bit counter atomically. This results in decreasing the delay
+     * as well decresing the memory requirement
+     */
+    vif->vif_drop_stats = vr_zalloc((VP_DROP_MAX * sizeof(uint64_t)),
+                                               VR_DROP_STATS_OBJECT);
+    if (!vif->vif_drop_stats) {
+        ret = -ENOMEM;
+        goto error;
+    }
+
+    /*
+     * We continue to create the interface even if per cpu stats
+     * allocation fails. In this case, we directly increment on
+     * vif_drop_stats atomically
+     */
+    vif->vif_pcpu_drop_stats = vr_btable_alloc((vr_num_cpus * VP_DROP_MAX), 1);
 
     vif->vif_type = req->vifr_type;
 

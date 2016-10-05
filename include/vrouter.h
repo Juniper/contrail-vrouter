@@ -156,7 +156,7 @@ struct host_os {
     struct vr_packet *(*hos_palloc)(unsigned int);
     struct vr_packet *(*hos_palloc_head)(struct vr_packet *, unsigned int);
     struct vr_packet *(*hos_pexpand_head)(struct vr_packet *, unsigned int);
-    void (*hos_pfree)(struct vr_packet *, unsigned short);
+    void (*hos_pkt_free)(struct vr_packet *);
     struct vr_packet *(*hos_pclone)(struct vr_packet *);
     void (*hos_preset)(struct vr_packet *);
     int (*hos_pcopy)(unsigned char *, struct vr_packet *, unsigned int,
@@ -220,7 +220,7 @@ struct host_os {
 #define vr_palloc                       vrouter_host->hos_palloc
 #define vr_palloc_head                  vrouter_host->hos_palloc_head
 #define vr_pexpand_head                 vrouter_host->hos_pexpand_head
-#define vr_pfree                        vrouter_host->hos_pfree
+#define vr_pkt_free                     vrouter_host->hos_pkt_free
 #define vr_pclone                       vrouter_host->hos_pclone
 #define vr_preset                       vrouter_host->hos_preset
 #define vr_pcopy                        vrouter_host->hos_pcopy
@@ -296,7 +296,6 @@ struct vrouter {
     struct vr_timer *vr_fragment_table_scanner;
     struct vr_timer *vr_fragment_otable_scanner;
 
-    uint64_t **vr_pdrop_stats;
     struct vr_malloc_stats **vr_malloc_stats;
 
     uint16_t vr_link_local_ports_size;

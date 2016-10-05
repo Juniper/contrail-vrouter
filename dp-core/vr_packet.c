@@ -5,6 +5,7 @@
  */
 #include <vr_os.h>
 #include <vr_packet.h>
+#include <vr_btable.h>
 
 struct vr_packet *
 pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
@@ -415,5 +416,70 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
         *pkt_typep = pkt_type;
 
     return 0;
+}
+
+void
+vr_pdrop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
+{
+    uint8_t *data;
+    unsigned int count = 1;
+
+    /*
+     * Lets log the errors as of now, till we are sure that nothing is
+     * un accounted
+     */
+    if (!vif) {
+        vr_printf("Vrouter: vr_pdrop_stats NULL VIF, reason %d\n", reason);
+        return;
+    }
+
+    if (reason >= VP_DROP_MAX) {
+        vr_printf("Vrouter: vr_pdrop_stats invalid reason %d for VIF %d\n",
+                reason, vif->vif_idx);
+        return;
+    }
+
+    if (cpu < 0) {
+        vr_printf("Vrouter: vr_pdrop_stats invalid CPU %d"
+                   " for VIF %d reason %d\n", cpu, vif->vif_idx, reason);
+        return;
+    }
+
+
+    /* Increment per cpu stats */
+    if (vif->vif_pcpu_drop_stats) {
+        data = vr_btable_get(vif->vif_pcpu_drop_stats,
+                            ((cpu * VP_DROP_MAX) + reason));
+        if (data) {
+            count = ++(*data);
+            if (count < 255)
+                return;
+            *data = 0;
+        }
+    }
+
+    /*
+     * Fall through, either for failure of per cpu stat or for carry
+     * over
+     */
+    (void)__sync_add_and_fetch(vif->vif_drop_stats + reason, count);
+
+    return;
+}
+
+void
+vr_pfree(struct vr_packet *pkt, unsigned short reason)
+{
+
+    if (!pkt)
+        return;
+
+    /* Manipulate the drop stats */
+    vr_pdrop_stats(pkt->vp_if, reason, pkt->vp_cpu);
+
+    /* Now free the packet */
+    vr_pkt_free(pkt);
+
+    return;
 }
 

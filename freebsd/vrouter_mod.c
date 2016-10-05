@@ -208,9 +208,8 @@ fh_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 }
 
 static void
-fh_pfree(struct vr_packet *pkt, unsigned short reason)
+fh_pkt_free(struct vr_packet *pkt)
 {
-	struct vrouter *router;
 	struct mbuf *m;
 
 	KASSERT(pkt, ("Null packet"));
@@ -218,11 +217,6 @@ fh_pfree(struct vr_packet *pkt, unsigned short reason)
 	/* Fetch original mbuf from packet structure */
 	m = vp_os_packet(pkt);
 	KASSERT(m, ("NULL mbuf in pkt:%p", pkt));
-
-	router = vrouter_get(0);
-	if (router)
-		((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
-
 	m_freem(m);
 	uma_zfree(zone_vr_packet, pkt);
 }
@@ -686,7 +680,7 @@ struct host_os freebsd_host = {
 	.hos_palloc			= fh_palloc,
 	.hos_palloc_head		= fh_palloc_head,
 	.hos_pexpand_head		= fh_pexpand_head,
-	.hos_pfree			= fh_pfree,
+	.hos_pkt_free			= fh_pkt_free,
 	.hos_preset			= fh_preset,
 	.hos_pclone			= fh_pclone,
 	.hos_pcopy			= fh_pcopy,

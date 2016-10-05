@@ -482,8 +482,6 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_discard;
     sum += req->vds_pull;
     sum += req->vds_invalid_if;
-    sum += req->vds_arp_no_where_to_go;
-    sum += req->vds_garp_from_vm;
     sum += req->vds_invalid_arp;
     sum += req->vds_trap_no_if;
     sum += req->vds_nowhere_to_go;
@@ -506,7 +504,6 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_interface_rx_discard;
     sum += req->vds_invalid_mcast_source;
     sum += req->vds_head_alloc_fail;
-    sum += req->vds_head_space_reserve_fail;
     sum += req->vds_pcow_fail;
     sum += req->vds_mcast_df_bit;
     sum += req->vds_mcast_clone_fail;
@@ -515,13 +512,11 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_misc;
     sum += req->vds_invalid_packet;
     sum += req->vds_cksum_err;
-    sum += req->vds_clone_fail;
     sum += req->vds_no_fmd;
     sum += req->vds_cloned_original;
     sum += req->vds_invalid_vnid;
     sum += req->vds_frag_err;
     sum += req->vds_invalid_source;
-    sum += req->vds_arp_no_route;
     sum += req->vds_l2_no_route;
     sum += req->vds_fragment_queue_fail;
     sum += req->vds_vlan_fwd_tx;
@@ -559,14 +554,14 @@ vr_drop_stats_req_get_copy(vr_drop_stats_req *src)
 
 int
 vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
-        int core)
+        short if_id)
 {
     vr_drop_stats_req req;
 
     memset(&req, 0, sizeof(req));
     req.h_op = SANDESH_OP_GET;
     req.vds_rid = router_id;
-    req.vds_core = core;
+    req.vds_if_id = if_id;
 
     return vr_sendmsg(cl, &req, "vr_drop_stats_req");
 }
