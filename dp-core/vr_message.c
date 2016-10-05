@@ -183,6 +183,55 @@ vr_message_process_response(int (*cb)(void *, unsigned int, void *),
 }
 
 int
+vr_message_multi_response(struct vr_message_multi *objects)
+{
+    char *buf = NULL;
+    unsigned int i, len = 0, ret = 0;
+    struct vr_mproto *proto;
+    struct vr_mtransport *trans;
+
+    if ((!objects) ||
+            (objects->vr_mm_object_count >= VR_MESSAGE_MULTI_MAX_OBJECTS))
+        goto response_fail;
+
+    proto = message_h.vm_proto;
+    trans = message_h.vm_trans;
+    if (!proto || !trans)
+        goto response_fail;
+
+
+    for (i = 0; i < objects->vr_mm_object_count; i++) {
+        len += proto->mproto_buf_len(objects->vr_mm_object_type[i],
+                objects->vr_mm_object[i]);
+    }
+
+    if (!len)
+        goto response_fail;
+
+    buf = trans->mtrans_alloc(len);
+    if (!buf) {
+        ret = -ENOMEM;
+        goto response_fail;
+    }
+
+    for (i = 0; i < objects->vr_mm_object_count; i++) {
+        ret = proto->mproto_encode(buf, len, objects->vr_mm_object_type[i],
+                            objects->vr_mm_object[i], VR_MESSAGE_TYPE_RESPONSE);
+        if (ret < 0)
+            goto response_fail;
+    }
+
+    return vr_message_queue_response(buf, ret);
+
+response_fail:
+    if (buf)
+        trans->mtrans_free(buf);
+    vr_send_response(ret);
+
+    return ret;
+}
+
+int
 vr_message_response(unsigned int object_type, void *object, int ret)
 {
     char *buf = NULL;

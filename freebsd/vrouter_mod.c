@@ -210,19 +210,16 @@ fh_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 static void
 fh_pfree(struct vr_packet *pkt, unsigned short reason)
 {
-	struct vrouter *router;
 	struct mbuf *m;
 
 	KASSERT(pkt, ("Null packet"));
 
+    /* Handle vrouter statistics */
+    pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
+
 	/* Fetch original mbuf from packet structure */
 	m = vp_os_packet(pkt);
 	KASSERT(m, ("NULL mbuf in pkt:%p", pkt));
-
-	router = vrouter_get(0);
-	if (router)
-		((uint64_t *)(router->vr_pdrop_stats[pkt->vp_cpu]))[reason]++;
-
 	m_freem(m);
 	uma_zfree(zone_vr_packet, pkt);
 }

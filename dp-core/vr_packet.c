@@ -5,6 +5,7 @@
  */
 #include <vr_os.h>
 #include <vr_packet.h>
+#include <vr_btable.h>
 
 struct vr_packet *
 pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
@@ -416,4 +417,3 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
 
     return 0;
 }
-
