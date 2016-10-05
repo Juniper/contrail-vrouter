@@ -90,7 +90,7 @@ static int8_t vr_transport = 0;
 static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
-static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set;
+static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, drop_set;
 
 static unsigned int vr_op, vr_if_type;
 static bool dump_pending = false;
@@ -278,6 +278,15 @@ vr_interface_print_header(void)
     }
 
     printf("\n\n");
+    return;
+}
+
+void
+vr_drop_stats_req_process(void *s_req)
+{
+    vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
+    vr_print_drop_stats(stats, core);
+
     return;
 }
 
@@ -499,6 +508,9 @@ list_get_print(vr_interface_req *req)
             req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors, 0);
+    vr_interface_print_head_space();
+    printf("Drops:%" PRIu64 "\n", req->vifr_dpackets);
+
 
     if (req->vifr_in_mirror_md_size) {
         printed = vr_interface_print_head_space();
@@ -908,7 +920,8 @@ op_retry:
          * decremented back in vRouter.
          */
         if (!vr_vrf_assign_dump) {
-            ret = vr_send_interface_get(cl, 0, vr_ifindex, if_kindex, core + 1);
+            ret = vr_send_interface_get(cl, 0, vr_ifindex, if_kindex,
+                    core + 1, drop_set);
         } else {
             dump = true;
             ret = vr_send_vrf_assign_dump(cl, 0, vr_ifindex, var_marker);
@@ -955,7 +968,7 @@ Usage()
     printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
     printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci]\n");
     printf("\t   [--delete <intf_id>]\n");
-    printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate]\n");
+    printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate] [--get-drop-stats]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
     printf("\t   [--list][--core <core number>][--rate]\n");
     printf("\t   [--help]\n");
@@ -969,6 +982,7 @@ enum if_opt_index {
     CREATE_OPT_INDEX,
     GET_OPT_INDEX,
     RATE_OPT_INDEX,
+    DROP_OPT_INDEX,
     LIST_OPT_INDEX,
     VRF_OPT_INDEX,
     MAC_OPT_INDEX,
@@ -996,6 +1010,7 @@ static struct option long_options[] = {
     [CREATE_OPT_INDEX]      =   {"create",      required_argument,  &create_set,        1},
     [GET_OPT_INDEX]         =   {"get",         required_argument,  &get_set,           1},
     [RATE_OPT_INDEX]        =   {"rate",        no_argument,        &rate_set,          1},
+    [DROP_OPT_INDEX]        =   {"get-drop-stats",no_argument,      &drop_set,          1},
     [LIST_OPT_INDEX]        =   {"list",        no_argument,        &list_set,          1},
     [VRF_OPT_INDEX]         =   {"vrf",         required_argument,  &vrf_set,           1},
     [MAC_OPT_INDEX]         =   {"mac",         required_argument,  &mac_set,           1},
@@ -1200,8 +1215,8 @@ validate_options(void)
         return;
     }
     if (get_set) {
-        if ((sum_opt > 1) && (sum_opt != 3) &&
-                (!kindex_set && !core_set && !rate_set))
+        if ((sum_opt > 1) && (sum_opt != 3) && (sum_opt != 4) &&
+                (!kindex_set && !core_set && !rate_set && !drop_set))
             Usage();
         return;
     }
@@ -1211,6 +1226,8 @@ validate_options(void)
         return;
     }
     if (list_set) {
+        if (drop_set)
+            Usage();
         if (!core_set) {
             if (rate_set && !(sum_opt > 2))
                 return;

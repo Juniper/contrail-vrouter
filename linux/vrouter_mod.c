@@ -303,40 +303,15 @@ lh_pgso_size(struct vr_packet *pkt)
 static void
 lh_pfree(struct vr_packet *pkt, unsigned short reason)
 {
-    unsigned int cpu;
+    struct sk_buff *skb;
 
-    struct vrouter *router = vrouter_get(0);
-    struct sk_buff *skb = NULL;
+    /* Handle the Vrouter statistics */
+    pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
 
-    if (pkt) {
-        skb = vp_os_packet(pkt);
-        if (!skb)
-            return;
-        cpu = pkt->vp_cpu;
-    } else {
-        cpu = lh_get_cpu();
-    }
-
-    if (router)
-        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
-
+    skb = vp_os_packet(pkt);
     if (skb)
         kfree_skb(skb);
 
-    return;
-}
-
-void
-lh_pfree_skb(struct sk_buff *skb, unsigned short reason)
-{
-    struct vrouter *router = vrouter_get(0);
-    unsigned int cpu;
-
-    cpu = vr_get_cpu();
-    if ((cpu < vr_num_cpus) && (router))
-        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
-
-    kfree_skb(skb);
     return;
 }
 
@@ -399,6 +374,17 @@ lh_get_cpu(void)
 
     return cpu;
 }
+
+void
+lh_pfree_skb(struct sk_buff *skb, struct vr_interface *vif,
+             unsigned short reason)
+{
+    pkt_drop_stats(vif, reason, lh_get_cpu());
+
+    kfree_skb(skb);
+    return;
+}
+
 
 static void
 lh_get_mono_time(unsigned int *sec, unsigned int *nsec)
@@ -2186,9 +2172,9 @@ struct host_os linux_host = {
     .hos_page_free                  =       lh_page_free,
 
     .hos_palloc                     =       lh_palloc,
+    .hos_pfree                      =       lh_pfree,
     .hos_palloc_head                =       lh_palloc_head,
     .hos_pexpand_head               =       lh_pexpand_head,
-    .hos_pfree                      =       lh_pfree,
     .hos_preset                     =       lh_preset,
     .hos_pclone                     =       lh_pclone,
     .hos_pcopy                      =       lh_pcopy,

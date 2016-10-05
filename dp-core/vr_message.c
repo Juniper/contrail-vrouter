@@ -183,6 +183,62 @@ vr_message_process_response(int (*cb)(void *, unsigned int, void *),
 }
 
 int
+vr_message_multi_response(struct vr_message_multi *objects)
+{
+    char *buf = NULL;
+    int ret = 0;
+    unsigned int i, buf_len = 0, len = 0;
+    struct vr_mproto *proto;
+    struct vr_mtransport *trans;
+
+    if ((!objects) ||
+            (objects->vr_mm_object_count >= VR_MESSAGE_MULTI_MAX_OBJECTS))
+        goto response_fail;
+
+    proto = message_h.vm_proto;
+    trans = message_h.vm_trans;
+    if (!proto || !trans)
+        goto response_fail;
+
+
+    for (i = 0; i < objects->vr_mm_object_count; i++) {
+        buf_len += proto->mproto_buf_len(objects->vr_mm_object_type[i],
+                objects->vr_mm_object[i]);
+    }
+
+    if (!buf_len)
+        goto response_fail;
+
+    buf = trans->mtrans_alloc(buf_len);
+    if (!buf) {
+        ret = -ENOMEM;
+        goto response_fail;
+    }
+
+    for (i = 0; i < objects->vr_mm_object_count; i++) {
+        ret = proto->mproto_encode(buf + len, buf_len - len, objects->vr_mm_object_type[i],
+                            objects->vr_mm_object[i], VR_MESSAGE_TYPE_RESPONSE);
+        if (ret < 0)
+            goto response_fail;
+
+        len += ret;
+    }
+
+    vr_printf("Vrouter buf_len %d len %d\n", buf_len, len);
+    return vr_message_queue_response(buf, len);
+
+response_fail:
+    if (buf)
+        trans->mtrans_free(buf);
+    vr_send_response(ret);
+
+    if (ret < 0)
+        return ret;
+
+    return len;
+}
+
+int
 vr_message_response(unsigned int object_type, void *object, int ret)
 {
     char *buf = NULL;

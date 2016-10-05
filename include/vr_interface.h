@@ -104,6 +104,9 @@
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
                          VIF_FLAG_VLAN_OFFLOAD)
 
+/* Only to be used from Agent/utility to request for Drop stats dump */
+#define VIF_FLAG_GET_DROP_STATS    0x01
+
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
 
@@ -270,13 +273,15 @@ struct vr_interface {
     vr_htable_t vif_btable;
     unsigned char vif_rewrite[VR_ETHER_HLEN];
     int16_t vif_qos_map_index;
+    unsigned char vif_name[VR_INTERFACE_NAME_LEN];
+    uint64_t *vif_drop_stats;
+    struct vr_btable *vif_pcpu_drop_stats;
     unsigned char *vif_in_mirror_md;
     unsigned char *vif_out_mirror_md;
     unsigned char vif_in_mirror_md_len;
     unsigned char vif_in_mirror_md_size;
     unsigned char vif_out_mirror_md_len;
     unsigned char vif_out_mirror_md_size;
-    unsigned char vif_name[VR_INTERFACE_NAME_LEN];
     unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
 };

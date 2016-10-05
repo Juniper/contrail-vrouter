@@ -58,6 +58,14 @@ struct vr_message {
     struct vr_qelem vr_message_queue;
 };
 
+#define VR_MESSAGE_MULTI_MAX_OBJECTS    8
+
+struct vr_message_multi {
+    unsigned int vr_mm_object_count;
+    unsigned int vr_mm_object_type[VR_MESSAGE_MULTI_MAX_OBJECTS];
+    void *vr_mm_object[VR_MESSAGE_MULTI_MAX_OBJECTS];
+};
+
 struct vr_message_handler {
     struct vr_mproto *vm_proto;
     struct vr_mtransport *vm_trans;
@@ -85,6 +93,7 @@ void vr_message_dump_exit(void *, int);
 
 int vr_message_request(struct vr_message *);
 int vr_message_response(unsigned int, void *, int);
+int vr_message_multi_response(struct vr_message_multi *);
 int vr_message_make_request(unsigned int, void *);
 int vr_message_process_response(int (*)(void *, unsigned int, void *), void *);
 int vr_message_dump_object(void *, unsigned int, void *);
