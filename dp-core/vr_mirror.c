@@ -377,8 +377,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
           struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
     bool reset = true;
-    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE,
-                 mirror_md_len = 0;
+    unsigned int captured_len, clone_len = VR_MIRROR_PKT_HEAD_SPACE;
+    unsigned int mirror_md_len = 0, drop_reason;
     unsigned char default_mme[2] = {0xff, 0x0};
     unsigned long sec, usec;
 
@@ -437,14 +437,19 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
                 if (pkt_nh->nh_family == AF_INET)
                     clone_len += pkt_nh->nh_encap_len;
 
-                if (vr_pcow(&pkt, clone_len))
+                if (vr_pcow(&pkt, clone_len)) {
+                    drop_reason = VP_DROP_PCOW_FAIL;
                     goto fail;
+                }
+
                 clone_len = 0;
 
                 if (pkt_nh->nh_family == AF_INET) {
                     if (!pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, pkt, fmd,
-                                    pkt_nh->nh_data, pkt_nh->nh_encap_len))
+                                    pkt_nh->nh_data, pkt_nh->nh_encap_len)) {
+                        drop_reason = VP_DROP_REWRITE_FAIL;
                         goto fail;
+                    }
                 }
             }
         }
@@ -454,8 +459,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         vr_preset(pkt);
 
     if (clone_len) {
-        if (vr_pcow(&pkt, clone_len))
+        if (vr_pcow(&pkt, clone_len)) {
+            drop_reason = VP_DROP_PCOW_FAIL;
             goto fail;
+        }
     }
 
     pkt->vp_flags |= VP_FLAG_FROM_DP;
@@ -463,8 +470,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     pkt->vp_flags |= (VP_FLAG_FLOW_SET | VP_FLAG_GSO | VP_FLAG_CSUM_PARTIAL);
     pkt->vp_flags &= ~VP_FLAG_GRO;
     buf = pkt_push(pkt, mirror_md_len);
-    if (!buf)
+    if (!buf) {
+        drop_reason = VP_DROP_PUSH;
         goto fail;
+    }
 
     captured_len = htonl(pkt_len(pkt));
     if (mirror_md_len)
@@ -473,8 +482,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     if (mirror->mir_flags & VR_MIRROR_PCAP) {
         /* Add the pcap header */
         pcap = (struct vr_pcap *)pkt_push(pkt, sizeof(struct vr_pcap));
-        if (!pcap)
+        if (!pcap) {
+            drop_reason = VP_DROP_PUSH;
             goto fail;
+        }
 
         pcap->pcap_incl_len = captured_len;
         pcap->pcap_orig_len = captured_len;
@@ -495,7 +506,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     return 0;
 
 fail:
-    vr_pfree(pkt, VP_DROP_PUSH);
+    vr_pfree(pkt, drop_reason);
     return 0;
 }
 
