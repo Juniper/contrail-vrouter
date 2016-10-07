@@ -1655,13 +1655,15 @@ vr_fill_flow_common(struct vr_flow *flowp, unsigned short nh_id,
 
 static struct vr_flow_entry *
 vr_add_flow(unsigned int rid, struct vr_flow *key, uint8_t type,
-        bool need_hold_queue, unsigned int *fe_index)
+        bool need_hold_queue, unsigned int *fe_index,
+        uint8_t *fe_gen_id)
 {
     struct vr_flow_entry *flow_e;
     struct vrouter *router = vrouter_get(rid);
 
     flow_e = vr_find_flow(router, key, type, fe_index);
     if (flow_e) {
+        *fe_gen_id = flow_e->fe_gen_id;
         /* a race between agent and dp. allow agent to handle this error */
         return NULL;
     } else {
@@ -1673,7 +1675,7 @@ vr_add_flow(unsigned int rid, struct vr_flow *key, uint8_t type,
 }
 
 static struct vr_flow_entry *
-vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
+vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index, uint8_t *fe_gen_id)
 {
     uint8_t type;
     bool need_hold_queue = false;
@@ -1702,7 +1704,8 @@ vr_add_flow_req(vr_flow_req *req, unsigned int *fe_index)
     if (req->fr_action == VR_FLOW_ACTION_HOLD)
         need_hold_queue = true;
 
-    fe = vr_add_flow(req->fr_rid, &key, type, need_hold_queue, fe_index);
+    fe = vr_add_flow(req->fr_rid, &key, type, need_hold_queue, fe_index,
+                     fe_gen_id);
     if (fe)
         req->fr_index = *fe_index;
 
@@ -1949,6 +1952,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
 {
     int ret;
     unsigned int fe_index = (unsigned int)-1;
+    uint8_t fe_gen_id = 0;
     bool new_flow = false, modified = false;
 
     struct vr_flow_entry *fe = NULL, *rfe = NULL;
@@ -1998,7 +2002,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
      * new flow entry with the key specified in the request
      */
     if (!fe) {
-        fe = vr_add_flow_req(req, &fe_index);
+        fe = vr_add_flow_req(req, &fe_index, &fe_gen_id);
         if (!fe) {
             if (fe_index != (unsigned int)-1) {
                 /*
@@ -2008,6 +2012,8 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
                  * error and allow agent to wait and handle flow add due to
                  * packet trap
                  */
+                flow_resp->fresp_index = fe_index;
+                flow_resp->fresp_gen_id = fe_gen_id;
                 return -EEXIST;
             }
             return -ENOSPC;
