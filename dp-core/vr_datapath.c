@@ -193,11 +193,6 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
 {
     struct vr_eth *eth;
     struct vr_arp *arp;
-    struct vr_forwarding_md fmd_new;
-    struct vr_interface *vif = pkt->vp_if;
-    struct vr_route_req rt;
-    bool vif_tx = false;
-    struct vr_nexthop *nh;
 
     eth = (struct vr_eth *)pkt_push(pkt, sizeof(*eth));
     if (!eth) {
@@ -220,44 +215,8 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
     memcpy(&arp->arp_dpa, &sarp->arp_spa, sizeof(sarp->arp_spa));
     memcpy(&arp->arp_spa, &sarp->arp_dpa, sizeof(sarp->arp_dpa));
 
-    vr_init_forwarding_md(&fmd_new);
-    fmd_new.fmd_dvrf = fmd->fmd_dvrf;
-    vr_pkt_type(pkt, 0, &fmd_new);
+    vr_mac_reply_send(pkt, fmd);
 
-    /*
-     * XXX: for vcp ports, there won't be bridge table entries. to avoid
-     * doing vr_bridge_input, we check for the flag NO_ARP_PROXY and
-     * and if set, directly send out on that interface
-     */
-
-
-    if (vif_is_vhost(vif) ||
-            (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)) {
-        vif_tx = true;
-    } else {
-
-        rt.rtr_req.rtr_label_flags = 0;
-        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-        rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-        rt.rtr_req.rtr_mac =(int8_t *) arp->arp_dha;
-        rt.rtr_req.rtr_vrf_id = fmd_new.fmd_dvrf;
-        nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
-        if (!nh || !(nh->nh_flags & NH_FLAG_VALID)) {
-            vr_pfree(pkt, VP_DROP_INVALID_NH);
-            return;
-        }
-        if (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
-            fmd_new.fmd_label = rt.rtr_req.rtr_label;
-
-        if (vif_is_virtual(vif) && (nh->nh_dev != vif)) {
-            vif_tx = true;
-        }
-    }
-
-    if (vif_tx)
-        vif->vif_tx(vif, pkt, &fmd_new);
-    else
-        nh_output(pkt, nh, &fmd_new);
     return;
 }
 
@@ -461,6 +420,59 @@ vif_plug_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
 unhandled:
     return !handled;
 }
+
+void
+vr_mac_reply_send(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    bool vif_tx = false;
+    struct vr_forwarding_md fmd_new;
+    struct vr_route_req rt;
+    struct vr_nexthop *nh;
+    struct vr_interface *vif = pkt->vp_if;
+
+    vr_init_forwarding_md(&fmd_new);
+    fmd_new.fmd_dvrf = fmd->fmd_dvrf;
+    vr_pkt_type(pkt, 0, &fmd_new);
+
+    /*
+     * XXX: for vcp ports, there won't be bridge table entries. to avoid
+     * doing vr_bridge_input, we check for the flag NO_ARP_PROXY and
+     * and if set, directly send out on that interface
+     * Incase of service instance with scaling of more than one, reply
+     * can not be bridged as the destination mac address might point to
+     * any of the primary/secondary. In this case, reply is forced
+     * to go on the receiving VIF
+     */
+    if (vif_is_vhost(vif) ||
+            (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)) {
+        vif_tx = true;
+    } else {
+        rt.rtr_req.rtr_label_flags = 0;
+        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+        rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+        rt.rtr_req.rtr_mac = pkt_data(pkt);
+        rt.rtr_req.rtr_vrf_id = fmd_new.fmd_dvrf;
+        nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
+        if (!nh || !(nh->nh_flags & NH_FLAG_VALID)) {
+            vr_pfree(pkt, VP_DROP_INVALID_NH);
+            return;
+        }
+        if (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
+            fmd_new.fmd_label = rt.rtr_req.rtr_label;
+
+        if (vif_is_virtual(vif) && (nh->nh_dev != vif)) {
+            vif_tx = true;
+        }
+    }
+
+    if (vif_tx)
+        vif->vif_tx(vif, pkt, &fmd_new);
+    else
+        nh_output(pkt, nh, &fmd_new);
+
+    return;
+}
+
 
 /*
  * This funciton parses the ethernet packet and assigns the
