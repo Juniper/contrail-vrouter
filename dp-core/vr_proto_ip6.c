@@ -323,7 +323,6 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     struct vr_ip6 *ip6;
     struct vr_icmp *icmph;
     struct vr_neighbor_option *nopt;
-    struct vr_interface *vif = pkt->vp_if;
 
 
     icmph = (struct vr_icmp *)pkt_data(pkt);
@@ -358,11 +357,7 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     icmph->icmp_csum =
         ~(vr_icmp6_checksum(ip6, icmph));
 
-    if (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY) {
-        vif->vif_tx(vif, pkt, fmd);
-    } else {
-        vr_bridge_input(vif->vif_router, pkt, fmd);
-    }
+    vr_mac_reply_send(pkt, fmd);
 
     return;
 }
