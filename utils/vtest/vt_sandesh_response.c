@@ -115,6 +115,20 @@ vr_flow_req_process(void *s) {
 }
 
 void
+vr_flow_response_process(void *s) {
+    void *buf = calloc(1, sizeof(vr_flow_response));
+    if (!buf) {
+        fprintf(stderr, "Cannot alloc memory \n");
+        exit(ENOMEM);
+    }
+
+    expect_msg.expected_ptr_num++;
+    expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
+    (memcpy(buf, s, sizeof(vr_flow_response)));
+
+}
+
+void
 vr_vxlan_req_process(void *s) {
     void *buf = calloc(1, sizeof(vr_vxlan_req));
     if (!buf) {
