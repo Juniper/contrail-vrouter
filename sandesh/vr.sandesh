@@ -277,6 +277,9 @@ buffer sandesh vrouter_ops {
    31: u32          vo_flow_used_oentries;
    32: u32          vo_bridge_used_entries;
    33: u32          vo_bridge_used_oentries;
+   34: i32          vo_burst_tokens;
+   35: i32          vo_burst_interval;
+   36: i32          vo_burst_step;
 }
 
 buffer sandesh vr_mem_stats_req {
@@ -455,4 +458,6 @@ buffer sandesh vr_flow_table_data {
    13: u32          ftable_cpus;
    14: u32          ftable_oflow_entries;
    15: list<u32>    ftable_hold_stat;
+   16: u32          ftable_burst_free_tokens;
+   17: u32          ftable_hold_entries;
 }

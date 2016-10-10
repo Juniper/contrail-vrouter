@@ -111,6 +111,8 @@ struct flow_table {
     u_int64_t ft_deleted;
     u_int64_t ft_changed;
     u_int64_t ft_total_entries;
+    unsigned int ft_burst_free_tokens;
+    unsigned int ft_hold_entries;
     unsigned int ft_num_entries;
     unsigned int ft_flags;
     unsigned int ft_cpus;
@@ -1135,6 +1137,7 @@ flow_dump_table(struct flow_table *ft)
     printf("Entries: Created %lu Added %lu Deleted %lu Changed %lu Processed %lu Used Overflow entries %u\n",
             ft->ft_created, ft->ft_added, ft->ft_deleted, ft->ft_changed,
             ft->ft_processed, ft->ft_oflow_entries);
+
     printf("(Created Flows/CPU: ");
     for (i = 0; i < ft->ft_hold_stat_count; i++) {
         printf("%u", ft->ft_hold_stat[i]);
@@ -1650,9 +1653,12 @@ flow_rate(void)
         if (hold_rate || processed_rate || added_rate || deleted_rate) {
             printf ("%s.%03d:  Entries = %8d "
                     "Rate = %6d (Fwd = %8d Rev = %8d Del = %8d) "
-                    "Hold = %8d\n", fmt, (int)now.tv_usec/1000,
+                    "Hold = %8d Free Burst Tokens = %8d Total Hold Entries %8d\n",
+                    fmt, (int)now.tv_usec/1000,
                     (int)ft->ft_total_entries, flow_op_rate, processed_count,
-                    added_count, deleted_count, hold_count);
+                    added_count, deleted_count, hold_count,
+                    ft->ft_burst_free_tokens,
+                    ft->ft_hold_entries);
             fflush(stdout);
         }
 
@@ -1675,6 +1681,9 @@ get_flow_table_map_counts(vr_flow_table_data *table, struct flow_table *ft)
     ft->ft_deleted = table->ftable_deleted;
     ft->ft_changed = table->ftable_changed;
     ft->ft_total_entries = table->ftable_used_entries;
+    ft->ft_burst_free_tokens = table->ftable_burst_free_tokens;
+    ft->ft_hold_entries = table->ftable_hold_entries;
+
 
     return 0;
 }
@@ -1734,6 +1743,9 @@ flow_table_map(vr_flow_table_data *table)
     ft->ft_oflow_entries = table->ftable_oflow_entries;
     ft->ft_deleted = table->ftable_deleted;
     ft->ft_changed = table->ftable_changed;
+    ft->ft_burst_free_tokens = table->ftable_burst_free_tokens;
+    ft->ft_hold_entries = table->ftable_hold_entries;
+
 
     if (table->ftable_hold_stat && table->ftable_hold_stat_size) {
         ft->ft_hold_stat_count = table->ftable_hold_stat_size;

@@ -140,6 +140,7 @@ struct vr_timer {
     void (*vt_timer)(void *);
     void *vt_vr_arg;
     void *vt_os_arg;
+    unsigned int vt_stop_timer;
     unsigned int vt_msecs;
 };
 
@@ -175,6 +176,7 @@ struct host_os {
     void (*hos_get_time)(unsigned long *, unsigned long *);
     void (*hos_get_mono_time)(unsigned int*, unsigned int *);
     int (*hos_create_timer)(struct vr_timer *);
+    int (*hos_restart_timer)(struct vr_timer *);
     void (*hos_delete_timer)(struct vr_timer *);
 
     void *(*hos_network_header)(struct vr_packet *);
@@ -237,6 +239,7 @@ struct host_os {
 #define vr_get_time                     vrouter_host->hos_get_time
 #define vr_get_mono_time                vrouter_host->hos_get_mono_time
 #define vr_create_timer                 vrouter_host->hos_create_timer
+#define vr_restart_timer                vrouter_host->hos_restart_timer
 #define vr_delete_timer                 vrouter_host->hos_delete_timer
 #define vr_network_header               vrouter_host->hos_network_header
 #define vr_inner_network_header         vrouter_host->hos_inner_network_header
