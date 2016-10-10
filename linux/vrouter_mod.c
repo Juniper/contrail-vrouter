@@ -2104,7 +2104,10 @@ linux_timer(unsigned long arg)
     struct timer_list *timer = (struct timer_list *)vtimer->vt_os_arg;
 
     vtimer->vt_timer(vtimer->vt_vr_arg);
-    mod_timer(timer, get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs));
+
+    if (vtimer->vt_stop_timer == 0) {
+        mod_timer(timer, get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs));
+    }
 
     return;
 }
@@ -2121,6 +2124,21 @@ lh_delete_timer(struct vr_timer *vtimer)
     }
 
     return;
+}
+
+static int
+lh_restart_timer(struct vr_timer *vtimer)
+{
+    struct timer_list *timer = (struct timer_list *)vtimer->vt_os_arg;
+
+    if (!timer || !vtimer->vt_msecs)
+        return -1;
+
+    vtimer->vt_stop_timer = 0;
+
+    mod_timer(timer, get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs));
+
+    return 0;
 }
 
 static int
@@ -2212,6 +2230,7 @@ struct host_os linux_host = {
     .hos_get_mono_time              =       lh_get_mono_time,
     .hos_create_timer               =       lh_create_timer,
     .hos_delete_timer               =       lh_delete_timer,
+    .hos_restart_timer              =       lh_restart_timer,
 
     .hos_network_header             =       lh_network_header,
     .hos_inner_network_header       =       lh_inner_network_header,

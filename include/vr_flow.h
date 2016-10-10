@@ -215,11 +215,17 @@ struct vr_flow {
  * no two values will differ by more than hold count.
  */
 struct vr_flow_table_info {
+    uint64_t vfti_burst_tokens;
+    uint64_t vfti_burst_used;
     uint64_t vfti_deleted;
     uint64_t vfti_changed;
     uint64_t vfti_action_count;
     uint64_t vfti_added;
     uint32_t vfti_oflows;
+    uint32_t vfti_burst_step_configured;
+    uint32_t vfti_burst_interval_configured;
+    uint32_t vfti_burst_tokens_configured;
+    struct vr_timer *vfti_timer;
     uint32_t vfti_hold_count[0];
 };
 
@@ -458,9 +464,11 @@ extern bool vr_inet6_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
 extern bool vr_inet_flow_allow_new_flow(struct vrouter *, struct vr_packet *);
 extern int vr_inet_get_flow_key(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *, struct vr_flow *, uint8_t);
-
 extern unsigned int vr_reinject_packet(struct vr_packet *,
         struct vr_forwarding_md *);
+extern void vr_flow_set_burst_params(struct vrouter *,int,int,int);
+extern void vr_flow_get_burst_params(struct vrouter *,int *,int *,int *);
+
 
 bool vr_valid_link_local_port(struct vrouter *, int, int, int);
 int vr_inet_form_flow(struct vrouter *, unsigned short,
@@ -479,5 +487,8 @@ int vr_flow_update_ecmp_index(struct vrouter *, struct vr_flow_entry *,
         unsigned int, struct vr_forwarding_md *);
 uint32_t vr_flow_get_rflow_src_info(struct vrouter *, struct
         vr_flow_entry *);
+unsigned int vr_flow_table_burst_step_configured(struct vrouter *);
+unsigned int vr_flow_table_burst_tokens_configured(struct vrouter *);
+unsigned int vr_flow_table_burst_time_configured(struct vrouter *);
 
 #endif /* __VR_FLOW_H__ */
