@@ -9,7 +9,7 @@ Import('dpdk_lib')
 env = VRouterEnv.Clone()
 
 # Flags
-env.Append(CCFLAGS = '-Werror -Wno-error=implicit-function-declaration -Wall')
+env.Append(CCFLAGS = '-Werror -Wno-error=implicit-function-declaration -Wno-error=unused-but-set-variable -Wall')
 env.Append(CCFLAGS = '-msse4.2')
 if env['OPT'] == 'debug':
     env.Append(CCFLAGS = '-DCOMPILE_DEBUG_LOGS')
