@@ -414,7 +414,7 @@ extract_priority_group_bandwidth(char *pgbw_string)
     char *tok;
     uint8_t *priority_group_bw = priority_map.prio_group_bw;
     unsigned int length, offset = 0, i = 0;
-    unsigned long bandwidth, aggregate = 0;
+    unsigned long bandwidth;
 
     length = strlen(pgbw_string);
     do {
@@ -422,11 +422,10 @@ extract_priority_group_bandwidth(char *pgbw_string)
         if (tok) {
             errno = 0;
             bandwidth = strtoul(tok, NULL, 0);
-            if (errno || (bandwidth > 100) || (aggregate > 100)) {
+            if (errno || (bandwidth > 100)) {
                 printf("Invalid value in the priority group bandwidth\n");
                 return EINVAL;
             }
-            aggregate += bandwidth;
             priority_group_bw[i] = bandwidth;
         }
 
@@ -526,6 +525,9 @@ Usage(void)
 static void
 validate_options(void)
 {
+    bool strict_bw_specified = false;
+
+    unsigned int i, aggregate_bw = 0;
     unsigned int set = dotonep_set + mpls_qos_set + dscp_set + queue_set;
     unsigned int op_set = get_fc_set + get_qos_set + set_fc_set +
         set_qos_set + dump_fc_set + dump_qos_set + delete_qos_set + get_queue_set;
@@ -585,6 +587,26 @@ validate_options(void)
             goto exit_options;
         }
     } else if (prio_opt_set) {
+        if (set_queue_set) {
+            for (i = 0; i < NUM_PG; i++) {
+                if ((priority_map.tc_strictness & (1 << i)) &&
+                        (priority_map.prio_group_bw[i])) {
+                    if (!strict_bw_specified) {
+                        strict_bw_specified = true;
+                        printf("NOTE: Bandwidth specification does not work ");
+                        printf("with strict priority\n");
+                    }
+                    priority_map.prio_group_bw[i] = 0;
+                }
+
+                aggregate_bw += priority_map.prio_group_bw[i];
+                if (aggregate_bw > 100) {
+                    printf("Aggregate bandwidth is greater than 100\n");
+                    goto exit_options;
+                }
+            }
+        }
+
         dump_priority();
     } else if (get_queue_set) {
         if (set) {
