@@ -136,6 +136,7 @@ vhost_rx_handler(struct sk_buff **pskb)
         return RX_HANDLER_PASS;
 
     skb->dev = vdev;
+    *pskb = skb;
 
     (void)__sync_fetch_and_add(&vdev->stats.rx_bytes, skb->len);
     (void)__sync_fetch_and_add(&vdev->stats.rx_packets, 1);
