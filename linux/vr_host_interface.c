@@ -1581,17 +1581,26 @@ linux_if_get_settings(struct vr_interface *vif,
     rtnl_lock();
 
     if (netif_running(dev)) {
-        struct ethtool_cmd cmd;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0) && LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0))
+       struct ethtool_cmd cmd;
         /* As per lxr, this API was introduced in 3.2.0 */ 
         if (!(ret = __ethtool_get_settings(dev, &cmd))) {
             settings->vis_speed = ethtool_cmd_speed(&cmd);
+            settings->vis_duplex = cmd.duplex;
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0))
+       struct ethtool_link_ksettings ekmd;
+       ekmd.base.cmd = ETHTOOL_GSET;
+       if  (!(ret = __ethtool_get_link_ksettings(dev, &ekmd))) {
+            settings->vis_speed = ekmd.base.speed;
+            settings->vis_duplex = ekmd.base.duplex;
 #else
+       struct ethtool_cmd cmd;
         cmd.cmd = ETHTOOL_GSET;
         if  (!(ret = dev_ethtool_get_settings(dev, &cmd))) {
             settings->vis_speed = cmd.speed;
-#endif
             settings->vis_duplex = cmd.duplex;
+#endif
         }
     }
 
