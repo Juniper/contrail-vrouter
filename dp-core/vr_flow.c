@@ -64,7 +64,8 @@ static bool vr_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
 struct vr_flow_entry *vr_find_flow(struct vrouter *, struct vr_flow *,
         uint8_t, unsigned int *);
 unsigned int vr_trap_flow(struct vrouter *, struct vr_flow_entry *,
-        struct vr_packet *, unsigned int, struct vr_flow_stats *);
+        struct vr_packet *, unsigned int, struct vr_flow_stats *,
+        struct vr_packet_node *);
 
 void get_random_bytes(void *buf, int nbytes);
 
@@ -600,6 +601,7 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
         struct vr_packet *pkt, unsigned int index,
         struct vr_flow_stats *stats, struct vr_forwarding_md *fmd)
 {
+    int ret = 0;
     unsigned int i;
     unsigned short drop_reason = 0;
     struct vr_flow_queue *vfq = fe->fe_hold_list;
@@ -619,9 +621,9 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
     pnode = &vfq->vfq_pnodes[i];
     vr_flow_fill_pnode(pnode, pkt, fmd);
     if (!i)
-        vr_trap_flow(router, fe, pkt, index, stats);
+        ret = vr_trap_flow(router, fe, pkt, index, stats, pnode);
 
-    return 0;
+    return ret;
 drop:
     vr_pfree(pkt, drop_reason);
     return 0;
@@ -904,15 +906,20 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
 unsigned int
 vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
         struct vr_packet *pkt, unsigned int index,
-        struct vr_flow_stats *stats)
+        struct vr_flow_stats *stats, struct vr_packet_node *pnode)
 {
     unsigned int trap_reason;
+
     struct vr_packet *npkt;
     struct vr_flow_trap_arg ta;
 
     npkt = vr_pclone(pkt);
-    if (!npkt)
-        return -ENOMEM;
+    if (!npkt) {
+        vr_pfree(NULL, VP_DROP_TRAP_ORIGINAL);
+        if (pnode)
+            pnode->pl_packet = NULL;
+        npkt = pkt;
+    }
 
     vr_preset(npkt);
 

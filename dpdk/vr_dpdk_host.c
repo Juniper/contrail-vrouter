@@ -154,7 +154,10 @@ dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 
     router->vr_pdrop_stats[rte_lcore_id()][reason]++;
 
-    rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
+    if (pkt)
+        rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
+
+    return;
 }
 
 void
