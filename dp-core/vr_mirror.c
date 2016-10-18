@@ -437,7 +437,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
                 if (pkt_nh->nh_family == AF_INET)
                     clone_len += pkt_nh->nh_encap_len;
 
-                if (vr_pcow(pkt, clone_len))
+                if (vr_pcow(&pkt, clone_len))
                     goto fail;
                 clone_len = 0;
 
@@ -454,7 +454,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
         vr_preset(pkt);
 
     if (clone_len) {
-        if (vr_pcow(pkt, clone_len))
+        if (vr_pcow(&pkt, clone_len))
             goto fail;
     }
 

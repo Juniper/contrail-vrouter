@@ -481,7 +481,7 @@ fh_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 }
 
 static int
-fh_pcow(struct vr_packet *pkt, unsigned short head_room)
+fh_pcow(struct vr_packet **pkt, unsigned short head_room)
 {
 
 	vr_log(VR_ERR, "%s: not implemented\n", __func__);

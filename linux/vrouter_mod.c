@@ -537,10 +537,11 @@ lh_put_defer_data(void *data)
 }
 
 static int
-lh_pcow(struct vr_packet *pkt, unsigned short head_room)
+lh_pcow(struct vr_packet **pktp, unsigned short head_room)
 {
     unsigned int old_off, new_off;
     int data_off = 0;
+    struct vr_packet *pkt = *pktp;
 
     struct sk_buff *skb = vp_os_packet(pkt);
 
