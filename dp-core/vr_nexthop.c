@@ -906,7 +906,7 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
             hashrnd_inited = 1;
         }
-        hashval = vr_hash(pkt_data(pkt), sizeof(struct vr_eth), vr_hashrnd);
+        hashval = vr_hash(eth, sizeof(struct vr_eth), vr_hashrnd);
         /* Include the VRF to calculate the hash */
         hashval = vr_hash_2words(hashval, fmd->fmd_dvrf, vr_hashrnd);
 
