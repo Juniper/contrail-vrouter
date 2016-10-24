@@ -434,6 +434,9 @@ vr_mac_reply_send(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     fmd_new.fmd_dvrf = fmd->fmd_dvrf;
     vr_pkt_type(pkt, 0, &fmd_new);
 
+    /* Disable the flow processing for response packets */
+    pkt->vp_flags |= VP_FLAG_FLOW_SET;
+
     /*
      * XXX: for vcp ports, there won't be bridge table entries. to avoid
      * doing vr_bridge_input, we check for the flag NO_ARP_PROXY and
