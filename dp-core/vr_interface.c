@@ -231,6 +231,25 @@ free_pkt:
     return 0;
 }
 
+static inline void
+vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    struct vr_forwarding_md mfmd;
+
+    if (!fmd) {
+        vr_init_forwarding_md(&mfmd);
+    } else {
+        mfmd = *fmd;
+    }
+
+    mfmd.fmd_dvrf = vif->vif_vrf;
+    vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd);
+
+    return;
+}
+
+/* agent driver */
 static unsigned char *
 agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
@@ -608,6 +627,8 @@ vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
     if (vif_mode_xconnect(vif))
         return vif_xconnect(vif, pkt, &fmd);
 
+    vif_mirror(vif, pkt, &fmd);
+
     return vr_fabric_input(vif, pkt, vlan_id);
 }
 
@@ -674,6 +695,8 @@ vhost_tx(struct vr_interface *vif, struct vr_packet *pkt,
         }
     }
 
+    vif_mirror(vif, pkt, fmd);
+
     ret = hif_ops->hif_rx(vif, pkt);
     if (ret < 0) {
         ret = 0;
@@ -736,6 +759,8 @@ vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
+    vif_mirror(vif, pkt, NULL);
+
     if (vr_untag_pkt(pkt)) {
         stats->vis_ierrors++;
         vr_pfree(pkt, VP_DROP_PULL);
@@ -770,6 +795,7 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
         vr_pset_data(pkt, pkt->vp_data);
     }
 
+    vif_mirror(vif, pkt, fmd);
 
     pvif = vif->vif_parent;
     if (!pvif)
@@ -877,6 +903,8 @@ vm_srx(struct vr_interface *vif, struct vr_packet *pkt,
     else
         vrf = vif->vif_vrf_table[vlan_id].va_vrf;
 
+    vif_mirror(vif, pkt, NULL);
+
     return vr_virtual_input(vrf, vif, pkt, vlan_id);
 }
 
@@ -900,6 +928,8 @@ vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_interface *sub_vif = NULL;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
     struct vr_eth *eth = (struct vr_eth *)pkt_data(pkt);
+
+    vif_mirror(vif, pkt, NULL);
 
     if (vlan_id != VLAN_ID_INVALID && vlan_id < VLAN_ID_MAX) {
         if (vif->vif_btable) {
@@ -941,6 +971,8 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
 
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
+
+    vif_mirror(vif, pkt, NULL);
 
     if (vif_mode_xconnect(vif))
         pkt->vp_flags |= VP_FLAG_TO_ME;
@@ -1027,6 +1059,8 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
+    vif_mirror(vif, pkt, NULL);
+
     /*
      * please see the text on xconnect mode
      *
@@ -1065,8 +1099,9 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
     int ret, handled;
     bool stats_count = true, from_subvif = false;
 
-    struct vr_forwarding_md m_fmd;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
+
+    vif_mirror(vif, pkt, fmd);
 
     if (vif_is_virtual(vif)) {
         handled = vif_plug_mac_request(vif, pkt, fmd);
@@ -1097,12 +1132,6 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
     if (stats_count) {
         stats->vis_obytes += pkt_len(pkt);
         stats->vis_opackets++;
-    }
-
-    if (vif->vif_flags & VIF_FLAG_MIRROR_TX) {
-        vr_init_forwarding_md(&m_fmd);
-        m_fmd.fmd_dvrf = vif->vif_vrf;
-        vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &m_fmd);
     }
 
     ret = hif_ops->hif_tx(vif, pkt);
@@ -1209,7 +1238,6 @@ eth_drv_add(struct vr_interface *vif,
         if (vif->vif_type == VIF_TYPE_PHYSICAL)
             vif->vif_mtu = 1514;
     }
-
 
     if (vif->vif_type != VIF_TYPE_STATS) {
         vif->vif_tx = eth_tx;
