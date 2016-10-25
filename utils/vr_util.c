@@ -1386,7 +1386,7 @@ free_rtr_req:
 
 int
 vr_send_route_dump(struct nl_client *cl, unsigned int router_id, unsigned int vrf,
-        unsigned int family, uint8_t *marker, unsigned int marker_plen)
+        unsigned int family, uint8_t *marker)
 {
     vr_route_req req;
 
@@ -1397,8 +1397,6 @@ vr_send_route_dump(struct nl_client *cl, unsigned int router_id, unsigned int vr
     req.rtr_family = family;
 
     if (family == AF_BRIDGE) {
-        if (marker_plen != VR_ETHER_ALEN)
-            return -EINVAL;
         req.rtr_mac = marker;
         req.rtr_mac_size = VR_ETHER_ALEN;
     } else {
@@ -1406,7 +1404,6 @@ vr_send_route_dump(struct nl_client *cl, unsigned int router_id, unsigned int vr
         req.rtr_prefix_size = RT_IP_ADDR_SIZE(family);
         req.rtr_marker = marker;
         req.rtr_marker_size = RT_IP_ADDR_SIZE(family);
-        req.rtr_marker_plen = marker_plen;
     }
 
     return vr_sendmsg(cl, &req, "vr_route_req");
