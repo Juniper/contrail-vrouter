@@ -487,7 +487,7 @@ dpdk_get_time(unsigned long *sec, unsigned long *usec)
 }
 
 static void
-dpdk_get_mono_time(unsigned int *sec, unsigned int *nsec)
+dpdk_get_mono_time(unsigned long *sec, unsigned long *nsec)
 {
     struct timespec ts;
 

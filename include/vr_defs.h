@@ -36,7 +36,9 @@
 #define AGENT_TRAP_TOR_CONTROL_PKT  14
 #define AGENT_TRAP_FLOW_ACTION_HOLD 15
 #define AGENT_TRAP_ROUTER_ALERT     16
-#define MAX_AGENT_HDR_COMMANDS      17
+#define AGENT_TRAP_MAC_LEARN        17
+#define AGENT_TRAP_MAC_MOVE         18
+#define MAX_AGENT_HDR_COMMANDS      19
 
 enum rt_type{
     RT_UCAST = 0,
@@ -51,9 +53,12 @@ enum rt_type{
 #define VR_RT_ARP_FLOOD_FLAG        0x8
 
 /* for bridge routes */
-#define VR_BE_VALID_FLAG                 0x01
-#define VR_BE_LABEL_VALID_FLAG           0x02
-#define VR_BE_FLOOD_DHCP_FLAG            0x04
+#define VR_BE_VALID_FLAG            0x01
+#define VR_BE_LABEL_VALID_FLAG      0x02
+#define VR_BE_FLOOD_DHCP_FLAG       0x04
+#define VR_BE_MAC_MOVED_FLAG        0x08
+
+#define VR_BRIDGE_FLAG_MASK(flags)      ((flags) & ~VR_BE_VALID_FLAG)
 
 #define AGENT_PKT_HEAD_SPACE (sizeof(struct vr_eth) + \
         sizeof(struct agent_hdr))
