@@ -151,6 +151,7 @@ static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_UNKNOWN_UC_FLOOD, "Uuf",  "Unknown Unicast Flood"},
     {VIF_FLAG_VLAN_OFFLOAD,     "Vof",  "VLAN insert/strip offload"},
     {VIF_FLAG_DROP_NEW_FLOWS,   "Df",   "Drop New Flows"},
+    {VIF_FLAG_MAC_LEARN,        "L",    "MAC Learning Enabled"},
 };
 
 static char *

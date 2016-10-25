@@ -117,7 +117,7 @@ static inline void
 fragment_entry_set(struct vr_fragment *fe, unsigned short vrf, struct vr_ip *iph,
         unsigned short sport, unsigned short dport)
 {
-    unsigned int sec, nsec;
+    unsigned long sec, nsec;
 
     fe->f_sip = iph->ip_saddr;
     fe->f_dip = iph->ip_daddr;
@@ -188,7 +188,7 @@ unsigned int
 vr_assembler_table_scan(struct vr_fragment **head)
 {
     unsigned int scanned = 0;
-    unsigned int sec, nsec, dest;
+    unsigned long sec, nsec, dest;
     struct vr_fragment *frag = *head, *next, **prev;
 
     prev = head;
@@ -287,7 +287,8 @@ vr_fragment_assembler(struct vr_fragment **head_p,
         struct vr_fragment_queue_element *vfqe)
 {
     int ret = 0;
-    unsigned int sec, nsec, list_length = 0, drop_reason;
+    unsigned long sec, nsec;
+    unsigned int list_length = 0, drop_reason;
     bool found = false, frag_head = false;
 
     struct vrouter *router;
@@ -552,7 +553,7 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
     unsigned int hash, index, i;
     struct vr_fragment_key key;
     struct vr_fragment *fe;
-    unsigned int sec, nsec;
+    unsigned long sec, nsec;
 
     fragment_key(&key, vrf, iph);
     hash = vr_hash(&key, sizeof(key), 0);
@@ -600,7 +601,7 @@ fragment_reap(struct vr_btable *table, int start,
 {
     unsigned int i;
     struct vr_fragment *fe;
-    unsigned int sec, nsec;
+    unsigned long sec, nsec;
 
     vr_get_mono_time(&sec, &nsec);
 

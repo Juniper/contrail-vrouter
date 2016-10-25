@@ -67,6 +67,7 @@ enum vr_malloc_objects_t {
     VR_HPACKET_POOL_OBJECT,
     VR_HTABLE_OBJECT,
     VR_INTERFACE_OBJECT,
+    VR_INTERFACE_BRIDGE_LOCK_OBJECT,
     VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT,
     VR_INTERFACE_MAC_OBJECT,
     VR_INTERFACE_MIRROR_META_OBJECT,
@@ -173,7 +174,7 @@ struct host_os {
     void *(*hos_get_defer_data)(unsigned int);
     void (*hos_put_defer_data)(void *);
     void (*hos_get_time)(unsigned long *, unsigned long *);
-    void (*hos_get_mono_time)(unsigned int*, unsigned int *);
+    void (*hos_get_mono_time)(unsigned long *, unsigned long *);
     int (*hos_create_timer)(struct vr_timer *);
     void (*hos_delete_timer)(struct vr_timer *);
 

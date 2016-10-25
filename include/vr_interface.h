@@ -99,6 +99,7 @@
  * marked by vrouter agent to enforce flow-limit
  */
 #define VIF_FLAG_DROP_NEW_FLOWS     0x40000
+#define VIF_FLAG_MAC_LEARN          0x80000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
@@ -267,6 +268,7 @@ struct vr_interface {
     struct vr_interface **vif_sub_interfaces;
     struct vr_interface_driver *vif_driver;
     unsigned char *vif_src_mac;
+    uint8_t *vif_bridge_table_lock;
     vr_htable_t vif_btable;
     unsigned char vif_rewrite[VR_ETHER_HLEN];
     int16_t vif_qos_map_index;
