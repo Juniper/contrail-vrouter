@@ -254,6 +254,9 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
 
     mfmd.fmd_dvrf = vif->vif_vrf;
 
+    if (pkt->vp_type == VP_TYPE_NULL)
+        vr_pkt_type(pkt, 0, &mfmd);
+
     vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd, mirror_type);
 
     return;
@@ -992,8 +995,6 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
-    vif_mirror(vif, pkt, NULL, vif->vif_flags & VIF_FLAG_MIRROR_RX);
-
     if (vif_mode_xconnect(vif))
         pkt->vp_flags |= VP_FLAG_TO_ME;
 
@@ -1015,6 +1016,8 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     pkt_set_network_header(pkt, pkt->vp_data);
+
+    vif_mirror(vif, pkt, NULL, vif->vif_flags & VIF_FLAG_MIRROR_RX);
 
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
