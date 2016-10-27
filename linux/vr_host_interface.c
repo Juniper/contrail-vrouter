@@ -36,7 +36,7 @@ extern void vhost_exit(void);
 extern void vhost_if_add(struct vr_interface *);
 extern void vhost_if_del(struct net_device *);
 extern void vhost_if_del_phys(struct net_device *);
-extern void lh_pfree_skb(struct sk_buff *, unsigned short);
+extern void lh_pfree_skb(struct sk_buff *, struct vr_interface *, unsigned short);
 extern int vr_gro_vif_add(struct vrouter *, unsigned int, char *, unsigned short);
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
@@ -154,12 +154,13 @@ vr_skb_get_rxhash(struct sk_buff *skb)
 }
 
 static inline struct sk_buff*
-linux_skb_vlan_insert(struct sk_buff *skb, unsigned short vlan_id)
+linux_skb_vlan_insert(struct vr_interface *vif, struct sk_buff *skb,
+                      unsigned short vlan_id)
 {
     struct vlan_ethhdr *veth;
 
     if (skb_cow_head(skb, VLAN_HLEN) < 0) {
-        lh_pfree_skb(skb, VP_DROP_MISC);
+        lh_pfree_skb(skb, vif, VP_DROP_MISC);
         return NULL;
     }
 
@@ -283,7 +284,7 @@ linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
      */
     if (skb->ip_summed == CHECKSUM_PARTIAL) {
         if (skb_checksum_help(skb)) {
-            lh_pfree_skb(skb, VP_DROP_MISC);
+            lh_pfree_skb(skb, vif, VP_DROP_MISC);
             return 0;
         }
     }
@@ -451,7 +452,7 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     return linux_xmit(vif, seg, type);
 
 exit_xmit:
-    lh_pfree_skb(seg, reason);
+    lh_pfree_skb(seg, vif, reason);
     return err;
 }
 
@@ -827,7 +828,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 transport_off = network_off + sizeof(struct vr_ip6);
                 proto = ip6->ip6_nxt;
             } else {
-                lh_pfree_skb(skb, VP_DROP_INVALID_PROTOCOL);
+                lh_pfree_skb(skb, vif, VP_DROP_INVALID_PROTOCOL);
                 return 0;
             }
 
@@ -1162,7 +1163,7 @@ linux_rx_handler(struct sk_buff **pskb)
     if (dev->type == ARPHRD_ETHER) {
         skb_push(skb, skb->mac_len);
         if (skb->vlan_tci & VLAN_TAG_PRESENT) {
-            if (!(skb = linux_skb_vlan_insert(skb,
+            if (!(skb = linux_skb_vlan_insert(vif, skb,
                             skb->vlan_tci & 0xEFFF)))
                 return RX_HANDLER_CONSUMED;
 
@@ -2062,6 +2063,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     nh_id = *((unsigned short *)(skb_mac_header(skb) + sizeof(vif_id)));
 #endif
 
+    gro_vif = skb->dev->ml_priv;
 
     nh = __vrouter_get_nexthop(router, nh_id);
     if (!nh) {
@@ -2121,7 +2123,6 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     }
 
 
-    gro_vif = skb->dev->ml_priv;
     if (gro_vif) {
         gro_vif_stats = vif_get_stats(gro_vif, pkt->vp_cpu);
         if (gro_vif_stats) {
@@ -2135,7 +2136,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     return RX_HANDLER_CONSUMED;
 
 drop:
-    lh_pfree_skb(skb, drop_reason);
+    lh_pfree_skb(skb, gro_vif, drop_reason);
     return RX_HANDLER_CONSUMED;
 }
 

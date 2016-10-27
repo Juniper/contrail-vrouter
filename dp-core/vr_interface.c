@@ -13,6 +13,7 @@
 #include "vr_htable.h"
 #include "vr_datapath.h"
 #include "vr_bridge.h"
+#include "vr_btable.h"
 
 volatile bool agent_alive = false;
 
@@ -45,6 +46,8 @@ extern void vif_bridge_deinit(struct vr_interface *);
 extern int vif_bridge_delete(struct vr_interface *, struct vr_interface *);
 extern int vif_bridge_add(struct vr_interface *, struct vr_interface *);
 extern void vhost_remove_xconnect(void);
+extern void vr_drop_stats_get_vif_stats(vr_drop_stats_req *, struct vr_interface *);
+
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -1429,6 +1432,16 @@ vif_free(struct vr_interface *vif)
         vif->vif_out_mirror_md = NULL;
     }
 
+    if (vif->vif_drop_stats) {
+        vr_free(vif->vif_drop_stats, VR_DROP_STATS_OBJECT);
+        vif->vif_drop_stats = NULL;
+    }
+
+    if (vif->vif_pcpu_drop_stats) {
+        vr_btable_free(vif->vif_pcpu_drop_stats);
+        vif->vif_pcpu_drop_stats = NULL;
+    }
+
     vr_free(vif, VR_INTERFACE_OBJECT);
 
     return;
@@ -1956,6 +1969,34 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         }
     }
 
+    /*
+     * The dropstats need to be available per interface. Incrementing
+     * atomically the same statistics across many CPUs might attract
+     * significatnt delay. Alternative approach of allocating memory for
+     * every dropstat for every CPU will be large chunk of memory
+     * considering large number of interfaces, number of dropstats,
+     * number of CPUs and size of every counter.  To normalise both the
+     * requirements, one set of dropstats of 64 bit size and another set
+     * of dropstats of one byte per every cpu is allocated. The later is
+     * incremented without any contention as it is per cpu. When the
+     * one byte counter reaches its max value, it is added to the
+     * 64 bit counter atomically. This results in decreasing the delay
+     * as well decresing the memory requirement
+     */
+    vif->vif_drop_stats = vr_zalloc((VP_DROP_MAX * sizeof(uint64_t)),
+                                               VR_DROP_STATS_OBJECT);
+    if (!vif->vif_drop_stats) {
+        ret = -ENOMEM;
+        goto error;
+    }
+
+    /*
+     * We continue to create the interface even if per cpu stats
+     * allocation fails. In this case, we directly increment on
+     * vif_drop_stats atomically
+     */
+    vif->vif_pcpu_drop_stats = vr_btable_alloc((vr_num_cpus * VP_DROP_MAX), 1);
+
     vif->vif_type = req->vifr_type;
 
     vif_set_flags(vif, req);
@@ -2069,6 +2110,28 @@ vr_interface_add_response(vr_interface_req *req,
     req->vifr_dev_obytes += stats->vis_dev_obytes;
     req->vifr_dev_opackets += stats->vis_dev_opackets;
     req->vifr_dev_oerrors += stats->vis_dev_oerrors;
+}
+
+static uint64_t
+vr_interface_get_drops(struct vr_interface *vif)
+{
+    uint8_t *count, cpu;
+    int stats_index;
+    uint64_t total_drops;
+
+    total_drops = 0;
+    for (stats_index = 0; stats_index < VP_DROP_MAX; stats_index++) {
+        total_drops += vif->vif_drop_stats[stats_index];
+        if (vif->vif_pcpu_drop_stats) {
+            for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+                count = vr_btable_get(vif->vif_pcpu_drop_stats,
+                            ((cpu * VP_DROP_MAX) + stats_index));
+                total_drops += *count;
+            }
+        }
+    }
+
+    return total_drops;
 }
 
 static void
@@ -2228,6 +2291,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     }
 
     req->vifr_qos_map_index = intf->vif_qos_map_index;
+    req->vifr_dpackets = vr_interface_get_drops(intf);
     return;
 }
 
@@ -2372,11 +2436,18 @@ vr_interface_req_destroy(vr_interface_req *req)
 static int
 vr_interface_get(vr_interface_req *req)
 {
-    int ret = 0;
-
-    struct vr_interface *vif = NULL;
+    int ret = 0, obj_cnt = 0;
+    struct vr_message_multi mm;
+    vr_response resp;
     struct vrouter *router;
-    vr_interface_req *resp = NULL;
+    vr_interface_req *vif_resp = NULL;
+    vr_drop_stats_req *drop_resp = NULL;
+    struct vr_interface *vif = NULL;
+
+    resp.h_op = SANDESH_OP_RESPONSE;
+    mm.vr_mm_object_type[obj_cnt] = VR_RESPONSE_OBJECT_ID;
+    mm.vr_mm_object[obj_cnt] = &resp;
+    obj_cnt++;
 
     router = vrouter_get(req->vifr_rid);
     if (!router) {
@@ -2389,22 +2460,52 @@ vr_interface_get(vr_interface_req *req)
     else
         vif = __vrouter_get_interface(router, req->vifr_idx);
 
-    if (vif) {
-        resp = vr_interface_req_get();
-        if (!resp) {
+    if (!vif) {
+        ret = -ENOENT;
+        goto generate_response;
+    }
+
+    vif_resp = vr_interface_req_get();
+    if (!vif_resp) {
+        ret = -ENOMEM;
+        goto generate_response;
+    }
+
+    ret = vr_interface_make_req(vif_resp, vif, (unsigned)(req->vifr_core - 1));
+    if (ret < 0)
+        goto generate_response;
+
+    mm.vr_mm_object_type[obj_cnt] = VR_INTERFACE_OBJECT_ID;
+    mm.vr_mm_object[obj_cnt] = vif_resp;
+    obj_cnt++;
+
+    if (req->vifr_flags & VIF_FLAG_GET_DROP_STATS) {
+        drop_resp = vr_zalloc(sizeof(*drop_resp), VR_DROP_STATS_REQ_OBJECT);
+        if (!drop_resp) {
             ret = -ENOMEM;
             goto generate_response;
         }
 
-        /* zero vifr_core means to sum up all the per-core stats */
-        vr_interface_make_req(resp, vif, (unsigned)(req->vifr_core - 1));
-    } else
-        ret = -ENOENT;
+        if (!vif->vif_pcpu_drop_stats)
+            drop_resp->vds_pcpu_stats_failure_status = 1;
+
+        vr_drop_stats_get_vif_stats(drop_resp, vif);
+
+        mm.vr_mm_object_type[obj_cnt] = VR_DROP_STATS_OBJECT_ID;
+        mm.vr_mm_object[obj_cnt] = drop_resp;
+        obj_cnt++;
+    }
 
 generate_response:
-    vr_message_response(VR_INTERFACE_OBJECT_ID, ret ? NULL : resp, ret);
-    if (resp)
-        vr_interface_req_destroy(resp);
+    mm.vr_mm_object_count = obj_cnt;
+    resp.resp_code = ret;
+    vr_message_multi_response(&mm);
+
+    if (vif_resp)
+        vr_interface_req_destroy(vif_resp);
+
+    if (drop_resp)
+        vr_free(drop_resp, VR_DROP_STATS_REQ_OBJECT);
 
     return 0;
 }
@@ -2416,8 +2517,9 @@ vr_interface_dump(vr_interface_req *r)
     unsigned int i;
     vr_interface_req *resp = NULL;
     struct vr_interface *vif;
-    struct vrouter *router = vrouter_get(r->vifr_vrf);
+    struct vrouter *router = vrouter_get(r->vifr_rid);
     struct vr_message_dumper *dumper = NULL;
+    vr_drop_stats_req *drop_resp = NULL;
 
     if (!router && (ret = -ENODEV))
         goto generate_response;
@@ -2437,6 +2539,12 @@ vr_interface_dump(vr_interface_req *r)
         goto generate_response;
     }
 
+    drop_resp = vr_zalloc(sizeof(*drop_resp), VR_DROP_STATS_REQ_OBJECT);
+    if (!drop_resp) {
+        ret = -ENOMEM;
+        goto generate_response;
+    }
+
     for (i = (unsigned int)(r->vifr_marker + 1);
             i < router->vr_max_interfaces; i++) {
         vif = router->vr_interfaces[i];
@@ -2446,15 +2554,33 @@ vr_interface_dump(vr_interface_req *r)
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;
-        }
 
-        vr_interface_req_free_fat_flow_config(resp);
+            if (r->vifr_flags & VIF_FLAG_GET_DROP_STATS) {
+                if (!vif->vif_pcpu_drop_stats)
+                    drop_resp->vds_pcpu_stats_failure_status = 1;
+
+                vr_drop_stats_get_vif_stats(drop_resp, vif);
+
+                ret = vr_message_dump_object(dumper, VR_DROP_STATS_OBJECT_ID, drop_resp);
+                /*
+                 * If we succed in interface dump, but fail to add drop
+                 * stats dump, the caller would retry the interface
+                 * again
+                 */
+                if (ret <= 0)
+                    break;
+            }
+            vr_interface_req_free_fat_flow_config(resp);
+        }
     }
 
 generate_response:
     vr_message_dump_exit(dumper, ret);
     if (resp)
         vr_interface_req_destroy(resp);
+
+    if (drop_resp)
+        vr_free(drop_resp, VR_DROP_STATS_REQ_OBJECT);
 
     return 0;
 }
