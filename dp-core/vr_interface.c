@@ -247,6 +247,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     mfmd.fmd_dvrf = vif->vif_vrf;
+    mfmd.fmd_flow_index = -1;
 
     if (pkt->vp_type == VP_TYPE_NULL)
         vr_pkt_type(pkt, 0, &mfmd);
