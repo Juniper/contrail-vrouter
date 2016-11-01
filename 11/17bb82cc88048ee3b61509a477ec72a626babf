@@ -1,0 +1,9 @@
+Verified+2: Zuul <zuul@lists.opencontrail.org>
+Code-Review+2: Raja Sivaramakrishnan <raja@juniper.net>
+Approved+1: Karl Klashinsky <klash@juniper.net>
+Code-Review+1: Sergey Matov <smatov@mirantis.com>
+Submitted-by: Zuul <zuul@lists.opencontrail.org>
+Submitted-at: Tue, 01 Nov 2016 06:26:49 -0700
+Reviewed-on: https://review.opencontrail.org/24969
+Project: Juniper/contrail-vrouter
+Branch: refs/heads/R3.1
