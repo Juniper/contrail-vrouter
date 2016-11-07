@@ -15,6 +15,8 @@
 #include "vr_bridge.h"
 #include "vr_btable.h"
 
+unsigned int vr_interfaces = VR_MAX_INTERFACES;
+
 volatile bool agent_alive = false;
 
 static struct vr_host_interface_ops *hif_ops;
@@ -3176,7 +3178,7 @@ vr_interface_init(struct vrouter *router)
     unsigned int table_memory = 0;
 
     if (!router->vr_interfaces) {
-        router->vr_max_interfaces = VR_MAX_INTERFACES;
+        router->vr_max_interfaces = vr_interfaces;
         table_memory = router->vr_max_interfaces *
             sizeof(struct vr_interface *);
         router->vr_interfaces = vr_zalloc(table_memory,
