@@ -49,7 +49,7 @@ pkt_cow(struct vr_packet *pkt, unsigned short head_room)
     }
 
     /* Increase the head space by the head_room */
-    if (vr_pcow(clone_pkt, head_room)) {
+    if (vr_pcow(&clone_pkt, head_room)) {
         vr_pfree(clone_pkt, VP_DROP_PCOW_FAIL);
         return NULL;
     }
