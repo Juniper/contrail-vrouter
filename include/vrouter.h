@@ -182,7 +182,7 @@ struct host_os {
                                    unsigned short, unsigned short *,
                                    int (*is_label_l2)(unsigned int,
                                        unsigned int, unsigned short *));
-    int  (*hos_pcow)(struct vr_packet *, unsigned short);
+    int  (*hos_pcow)(struct vr_packet **, unsigned short);
     uint16_t (*hos_get_udp_src_port)(struct vr_packet *,
                                      struct vr_forwarding_md *,
                                      unsigned short);

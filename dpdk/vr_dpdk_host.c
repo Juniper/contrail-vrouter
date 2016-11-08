@@ -685,9 +685,31 @@ dpdk_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 
 /* VRouter callback */
 static int
-dpdk_pcow(struct vr_packet *pkt, unsigned short head_room)
+dpdk_pcow(struct vr_packet **pktp, unsigned short head_room)
 {
+    struct vr_packet *pkt = *pktp;
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
+    struct rte_mbuf *m_copy;
+    struct vr_packet *p_copy;
+
+    /*
+     * If this is an indirect mbuf, allocate a new mbuf and copy
+     * its data. Then free the original mbuf.
+     */
+    if (RTE_MBUF_INDIRECT(mbuf)) {
+        m_copy = vr_dpdk_pktmbuf_copy(mbuf, mbuf->pool);
+        if (!m_copy) {
+            return -ENOMEM;
+        }
+
+        p_copy = vr_dpdk_mbuf_to_pkt(m_copy);
+        *p_copy = *pkt;
+        p_copy->vp_head = m_copy->buf_addr;
+
+        rte_pktmbuf_free(mbuf);
+        mbuf = m_copy;
+        *pktp = p_copy;
+    }
 
     if (head_room > rte_pktmbuf_headroom(mbuf)) {
         return -ENOMEM;
