@@ -19,9 +19,10 @@
 #include "sandesh.h"
 #include "vr_response.h"
 
-#if (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
 #define GENL_ID_GENERATE 0
-#endif
+#endif /* Linux 4.10.0 */
 static int netlink_trans_request(struct sk_buff *, struct genl_info *);
 
 static struct genl_ops vrouter_genl_ops[] = {
@@ -32,16 +33,25 @@ static struct genl_ops vrouter_genl_ops[] = {
     },
 };
 
+/* This becomes the group id 0x4 since group id allocation starts at */
+/* 0x4 and it is the only group for this family */
+struct genl_multicast_group vrouter_genl_groups[] = {
+  { .name = "VRouterGroup" },
+};
+
 struct genl_family vrouter_genl_family = {
     .id         =   GENL_ID_GENERATE,
     .name       =   "vrouter",
     .version    =   1,
     .maxattr    =   NL_ATTR_MAX - 1,
     .netnsok    =   true,
-#if (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || \
+     (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
     .ops        =   vrouter_genl_ops,
     .n_ops      =   ARRAY_SIZE(vrouter_genl_ops),
-#endif
+    .mcgrps     =   vrouter_genl_groups,
+    .n_mcgrps   =   ARRAY_SIZE(vrouter_genl_groups),
+#endif /* Linux 4.10.0 */
 };
 
 #define NETLINK_RESPONSE_HEADER_LEN       (NLMSG_HDRLEN + GENL_HDRLEN + \
@@ -187,7 +197,8 @@ vr_genetlink_init(void)
      (!(defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7))))
     return genl_register_family_with_ops(&vrouter_genl_family, vrouter_genl_ops,
         ARRAY_SIZE(vrouter_genl_ops));
-#elif (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || \
+       (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
     return genl_register_family(&vrouter_genl_family);
 #else
     return genl_register_family_with_ops(&vrouter_genl_family,
