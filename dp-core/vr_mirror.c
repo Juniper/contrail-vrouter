@@ -444,7 +444,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 
                 clone_len += pkt_nh->nh_encap_len;
 
-                if (vr_pcow(pkt, clone_len)) {
+                if (vr_pcow(&pkt, clone_len)) {
                     drop_reason = VP_DROP_PCOW_FAIL;
                     goto fail;
                 }
@@ -464,7 +464,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
         vr_preset(pkt);
 
     if (clone_len) {
-        if (vr_pcow(pkt, clone_len)) {
+        if (vr_pcow(&pkt, clone_len)) {
             drop_reason = VP_DROP_PCOW_FAIL;
             goto fail;
         }
