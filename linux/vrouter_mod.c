@@ -2046,11 +2046,22 @@ lh_network_header(struct vr_packet *pkt)
     return NULL;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+    typedef unsigned long linux_timer_callback_param_t;
+#else
+    typedef struct timer_list * linux_timer_callback_param_t;
+#endif
+
 static void
-linux_timer(unsigned long arg)
+linux_timer(linux_timer_callback_param_t arg)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
     struct vr_timer *vtimer = (struct vr_timer *)arg;
-    struct timer_list *timer = (struct timer_list *)vtimer->vt_os_arg;
+    struct timer_list *timer = &vtimer->timer;
+#else
+    struct timer_list *timer = arg;
+    struct vr_timer *vtimer = from_timer(vtimer, timer, timer);
+#endif
 
     vtimer->vt_timer(vtimer->vt_vr_arg);
     mod_timer(timer, get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs));
@@ -2061,15 +2072,27 @@ linux_timer(unsigned long arg)
 static void
 lh_delete_timer(struct vr_timer *vtimer)
 {
-    struct timer_list *timer = (struct timer_list *)vtimer->vt_os_arg;
+    struct timer_list *timer = &vtimer->timer;
 
     if (timer) {
         del_timer_sync(timer);
-        vr_free(vtimer->vt_os_arg, VR_TIMER_OBJECT);
-        vtimer->vt_os_arg = NULL;
     }
 
     return;
+}
+
+static int
+lh_restart_timer(struct vr_timer *vtimer)
+{
+    struct timer_list *timer = &vtimer->timer;
+    if (!timer || !vtimer->vt_msecs)
+        return -1;
+
+    vtimer->vt_stop_timer = 0;
+
+    mod_timer(timer, get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs));
+
+    return 0;
 }
 
 static int
@@ -2077,14 +2100,15 @@ lh_create_timer(struct vr_timer *vtimer)
 {
     struct timer_list *timer;
 
-    timer = vr_zalloc(sizeof(*timer), VR_TIMER_OBJECT);
-    if (!timer)
-        return -ENOMEM;
+    timer = &vtimer->timer;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
     init_timer(timer);
-
-    vtimer->vt_os_arg = (void *)timer;
     timer->data = (unsigned long)vtimer;
     timer->function = linux_timer;
+#else
+    /* timer_list api has changed in 4.15 */
+    timer_setup(timer, linux_timer, 0);
+#endif
     timer->expires = get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs);
     timer->expires = get_jiffies_64() + msecs_to_jiffies(vtimer->vt_msecs);
     add_timer(timer);
