@@ -156,7 +156,7 @@ vr_htable_get_hentry_by_index(vr_htable_t htable, unsigned int index)
     vr_hentry_t *ent;
 
     ent = __vr_htable_get_hentry_by_index(htable, index);
-    if(ent && (ent->hentry_flags & VR_HENTRY_FLAG_VALID))
+    if (ent && (ent->hentry_flags & VR_HENTRY_FLAG_VALID))
         return ent;
 
     return NULL;
@@ -586,7 +586,7 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
             return ent;
     }
 
-    for(o_ent = ent->hentry_next; o_ent; o_ent = o_ent->hentry_next) {
+    for (o_ent = ent->hentry_next; o_ent; o_ent = o_ent->hentry_next) {
 
         /* Though in the list, can be under the deletion */
         if (!(o_ent->hentry_flags & VR_HENTRY_FLAG_VALID))

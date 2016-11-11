@@ -13,31 +13,10 @@
 #include "vr_defs.h"
 #include "vr_hash.h"
 
-struct vr_bridge_entry_key {
-    unsigned char be_mac[VR_ETHER_ALEN];
-    unsigned short be_vrf_id;
-}__attribute__((packed));
-
-struct vr_bridge_entry;
-
-struct vr_dummy_bridge_entry {
-    vr_hentry_t be_hentry;
-    struct vr_bridge_entry_key be_key;
-    struct vr_nexthop *be_nh;
-    uint32_t be_label;
-    unsigned short be_flags;
-} __attribute__((packed));
-
-#define VR_BRIDGE_ENTRY_PACK (64 - sizeof(struct vr_dummy_bridge_entry))
-
-struct vr_bridge_entry {
-    vr_hentry_t be_hentry;
-    struct vr_bridge_entry_key be_key;
-    struct vr_nexthop *be_nh;
-    uint32_t be_label;
-    unsigned short be_flags;
-    unsigned char be_pack[VR_BRIDGE_ENTRY_PACK];
-} __attribute__((packed));
+#if defined(__linux__) && defined(__KERNEL__)
+extern short vr_bridge_table_major;
+#endif
+unsigned char *vr_bridge_table_path;
 
 unsigned int vr_bridge_entries = VR_DEF_BRIDGE_ENTRIES;
 unsigned int vr_bridge_oentries = 0;
@@ -52,6 +31,20 @@ struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
 extern l4_pkt_type_t vr_ip6_well_known_packet(struct vr_packet *);
+
+void *vr_bridge_table, *vr_bridge_otable;
+
+void *
+vr_bridge_get_va(struct vrouter *router, uint64_t offset)
+{
+    return vr_htable_get_address(vn_rtable, offset);
+}
+
+unsigned int
+vr_bridge_table_size(struct vrouter *router)
+{
+    return vr_htable_size(vn_rtable);
+}
 
 bool
 vr_unknown_uc_flood(struct vr_interface *ingress_vif,
@@ -94,6 +87,49 @@ vr_find_free_bridge_entry(unsigned int vrf_id, char *mac)
     return be;
 }
 
+static struct vr_bridge_entry *
+bridge_add(unsigned int router_id, unsigned int vrf,
+        uint8_t *mac, int nh_id)
+{
+    struct vr_bridge_entry *be;
+    struct vr_bridge_entry_key key;
+    struct vr_nexthop *old_nh;
+
+    VR_MAC_COPY(key.be_mac, mac);
+    key.be_vrf_id = vrf;
+    be = vr_find_bridge_entry(&key);
+    if (!be) {
+        be = vr_find_free_bridge_entry(vrf, mac);
+        if (!be)
+            return NULL;
+
+        VR_MAC_COPY(be->be_key.be_mac, mac);
+        be->be_key.be_vrf_id = vrf;
+        be->be_packets = 0;
+        be->be_flags = VR_BE_VALID_FLAG;
+    }
+
+    /* Un ref the old nexthop */
+    if (be->be_nh_id != nh_id) {
+        old_nh = be->be_nh;
+        be->be_nh = vrouter_get_nexthop(router_id, nh_id);
+        if (be->be_nh) {
+            be->be_nh_id = be->be_nh->nh_id;
+        } else {
+            be->be_nh_id = -1;
+        }
+
+        if (be->be_flags & VR_BE_MAC_MOVED_FLAG) {
+            be->be_flags &= ~VR_BE_MAC_MOVED_FLAG;
+        }
+
+        if (old_nh)
+            vrouter_put_nexthop(old_nh);
+    }
+
+    return be;
+}
+
 static int
 __bridge_table_add(struct vr_route_req *rt)
 {
@@ -101,43 +137,14 @@ __bridge_table_add(struct vr_route_req *rt)
     unsigned short flags, i;
 
     struct vr_bridge_entry *be;
-    struct vr_nexthop *old_nh;
-    struct vr_bridge_entry_key key;
+
+    be = bridge_add(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_vrf_id,
+            rt->rtr_req.rtr_mac, rt->rtr_req.rtr_nh_id);
+    if (!be)
+        return -ENOMEM;
 
     rt->rtr_req.rtr_label_flags =
         VR_BRIDGE_FLAG_MASK(rt->rtr_req.rtr_label_flags);
-
-    VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
-    key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
-
-    be = vr_find_bridge_entry(&key);
-    if (!be) {
-        be = vr_find_free_bridge_entry(rt->rtr_req.rtr_vrf_id,
-                                        (char *)rt->rtr_req.rtr_mac);
-        if (!be)
-            return -ENOMEM;
-
-        VR_MAC_COPY(be->be_key.be_mac, rt->rtr_req.rtr_mac);
-        be->be_key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
-        be->be_flags = VR_BE_VALID_FLAG;
-    }
-
-    if (be->be_nh != rt->rtr_nh) {
-        /* Un ref the old nexthop */
-        old_nh = be->be_nh;
-        be->be_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid,
-                                        rt->rtr_req.rtr_nh_id);
-        if (old_nh)
-            vrouter_put_nexthop(old_nh);
-    } else {
-        /*
-         * if the nexthop hasn't changed and if the MAC move flag
-         * has been set, retain the flag
-         */
-        if (be->be_flags & VR_BE_MAC_MOVED_FLAG) {
-            rt->rtr_req.rtr_label_flags |= VR_BE_MAC_MOVED_FLAG;
-        }
-    }
 
     if (rt->rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)
         be->be_label = rt->rtr_req.rtr_label;
@@ -155,6 +162,8 @@ __bridge_table_add(struct vr_route_req *rt)
             break;
         }
     }
+
+    rt->rtr_req.rtr_index = be->be_hentry.hentry_index;
 
     return ret;
 }
@@ -195,6 +204,7 @@ bridge_table_entry_free(vr_htable_t table, vr_hentry_t *hentry,
 {
     struct vr_nexthop *nh;
     struct vr_bridge_entry *be = (struct vr_bridge_entry *)hentry;
+
     if (!be)
         return;
 
@@ -204,8 +214,11 @@ bridge_table_entry_free(vr_htable_t table, vr_hentry_t *hentry,
     if (be->be_nh) {
         nh = be->be_nh;
         be->be_nh = NULL;
+        be->be_nh_id = -1;
         vrouter_put_nexthop(nh);
     }
+
+    be->be_packets = 0;
     vr_htable_release_hentry(table, hentry);
 
     return;
@@ -234,44 +247,81 @@ bridge_table_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     return 0;
 }
 
-static struct vr_nexthop *
-bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
+static void
+bridge_update_route_req(struct vr_bridge_entry *be, struct vr_route_req *rt)
+{
+    rt->rtr_req.rtr_label_flags = be->be_flags;
+    rt->rtr_req.rtr_label = be->be_label;
+    rt->rtr_nh = be->be_nh;
+    if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
+        if (rt->rtr_req.rtr_mac) {
+            VR_MAC_COPY(rt->rtr_req.rtr_mac, be->be_key.be_mac);
+        }
+    } else {
+        rt->rtr_req.rtr_index = be->be_hentry.hentry_index;
+    }
+
+    return;
+}
+
+static struct vr_bridge_entry *
+__bridge_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 {
     struct vr_bridge_entry *be;
     struct vr_bridge_entry_key key;
 
     rt->rtr_req.rtr_label_flags = 0;
+    rt->rtr_nh = NULL;
 
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
         be = (struct vr_bridge_entry *)
              vr_htable_get_hentry_by_index(vn_rtable, rt->rtr_req.rtr_index);
-        if (!be)
-            return NULL;
-
-        rt->rtr_req.rtr_label_flags = be->be_flags;
-        rt->rtr_req.rtr_label = be->be_label;
-        rt->rtr_nh = be->be_nh;
-        if (rt->rtr_req.rtr_mac)
-            VR_MAC_COPY(rt->rtr_req.rtr_mac, be->be_key.be_mac);
-
-        return rt->rtr_nh;
+    } else {
+        VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
+        key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
+        be = vr_find_bridge_entry(&key);
     }
 
+    return be;
+}
 
-    rt->rtr_nh = NULL;
-    rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    VR_MAC_COPY(key.be_mac, rt->rtr_req.rtr_mac);
-    key.be_vrf_id = rt->rtr_req.rtr_vrf_id;
 
-    be = vr_find_bridge_entry(&key);
-    if (be) {
-        rt->rtr_req.rtr_label_flags = be->be_flags;
-        rt->rtr_req.rtr_label = be->be_label;
-        rt->rtr_nh = be->be_nh;
-        rt->rtr_req.rtr_index = be->be_hentry.hentry_index;
-    }
+static struct vr_nexthop *
+bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
+{
+    struct vr_bridge_entry *be;
+
+    be = __bridge_lookup(vrf_id, rt);
+    if (be)
+        bridge_update_route_req(be, rt);
 
     return rt->rtr_nh;
+}
+
+static struct vr_bridge_entry *
+bridge_lookup(uint8_t *mac, struct vr_forwarding_md *fmd)
+{
+    struct vr_route_req rt;
+    struct vr_bridge_entry *be;
+
+    rt.rtr_req.rtr_label_flags = 0;
+    rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+    rt.rtr_req.rtr_mac = mac;
+    /* If multicast L2 packet, use broadcast composite nexthop */
+    if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
+        rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
+    rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
+    be = __bridge_lookup(rt.rtr_req.rtr_vrf_id, &rt);
+    if (be)
+        bridge_update_route_req(be, &rt);
+
+    if (fmd && (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)) {
+        vr_forwarding_md_set_label(fmd, rt.rtr_req.rtr_label,
+                VR_LABEL_TYPE_UNKNOWN);
+    }
+
+    return be;
 }
 
 unsigned short
@@ -291,18 +341,10 @@ vr_bridge_route_flags(unsigned int vrf_id, unsigned char *mac)
 }
 
 int
-vr_bridge_set_route_flags(unsigned int vrf_id, unsigned char *mac,
-        unsigned short flags)
+vr_bridge_set_route_flags(struct vr_bridge_entry *be, unsigned short flags)
 {
     unsigned short be_flags, be_flags_old;
 
-    struct vr_bridge_entry *be;
-    struct vr_bridge_entry_key key;
-
-    VR_MAC_COPY(key.be_mac, mac);
-    key.be_vrf_id = vrf_id;
-
-    be = vr_find_bridge_entry(&key);
     if (be) {
         be_flags = be_flags_old = be->be_flags;
         if (be_flags & VR_BE_VALID_FLAG) {
@@ -468,6 +510,93 @@ bridge_entry_key(vr_htable_t table, vr_hentry_t *entry, unsigned int
     return &be->be_key;
 }
 
+#if 0
+static void
+vr_bridge_table_data_destroy(vr_bridge_table_data *data)
+{
+    if (data) {
+        if (data->btable_file_path) {
+            vr_free(data->btable_file_path, VR_BRIDGE_TABLE_DATA_OBJECT);
+            data->btable_file_path = NULL;
+        }
+        vr_free(data, VR_BRIDGE_TABLE_DATA_OBJECT);
+    }
+
+    return;
+}
+
+static vr_bridge_table_data *
+vr_bridge_table_data_get(void)
+{
+    vr_bridge_table_data *data = vr_zalloc(sizeof(vr_bridge_table_data),
+                VR_BRIDGE_TABLE_DATA_OBJECT);
+    if (!data)
+        return NULL;
+
+    if (vr_bridge_table_path) {
+        data->btable_file_path = vr_zalloc(VR_UNIX_PATH_MAX,
+                VR_BRIDGE_TABLE_DATA_OBJECT);
+        if (!data->btable_file_path) {
+            goto exit_func;
+        }
+    }
+
+    return data;
+
+exit_func:
+    vr_bridge_table_data_destroy(data);
+    return NULL;
+}
+
+
+void
+vr_bridge_table_data_process(void *s_req)
+{
+    int ret = 0;
+    struct vrouter *router;
+    vr_bridge_table_data *resp = NULL, *req = (vr_bridge_table_data *)s_req;
+
+    router = vrouter_get(req->btable_rid);
+    if (!router) {
+        ret = -EINVAL;
+        goto generate_response;
+    }
+
+    resp = vr_bridge_table_data_get();
+    if (!resp) {
+        ret = -ENOMEM;
+        goto generate_response;
+    }
+
+    resp->btable_op = req->btable_op;
+    switch (req->btable_op) {
+    case SANDESH_OP_GET:
+        resp->btable_size = vr_bridge_table_size(router);
+#if defined(__linux__) && defined(__KERNEL__)
+        resp->btable_dev = vr_bridge_table_major;
+#endif
+        if (vr_bridge_table_path) {
+            strncpy(resp->btable_file_path, vr_bridge_table_path,
+                    VR_UNIX_PATH_MAX - 1);
+        }
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+generate_response:
+    vr_message_response(VR_BRIDGE_TABLE_DATA_OBJECT_ID, resp, ret);
+    if (resp) {
+        vr_bridge_table_data_destroy(resp);
+        resp = NULL;
+    }
+
+    return;
+}
+#endif
+
 int
 bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
@@ -479,8 +608,9 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     if (!vr_bridge_oentries)
         vr_bridge_oentries = ((vr_bridge_entries / 5) + 1023) & ~1023;
 
-    rtable->algo_data = vr_htable_create(vrouter_get(0), vr_bridge_entries,
-                vr_bridge_oentries, sizeof(struct vr_bridge_entry),
+    rtable->algo_data = vr_htable_attach(vrouter_get(0), vr_bridge_entries,
+                vr_bridge_table, vr_bridge_oentries, vr_bridge_otable,
+                sizeof(struct vr_bridge_entry),
                 sizeof(struct vr_bridge_entry_key), 0, bridge_entry_key);
 
     if (!rtable->algo_data)
@@ -575,8 +705,8 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
 
     struct vr_eth *eth;
     struct vr_packet *pkt_c;
-    struct vr_route_req rtr;
-    struct vr_nexthop *nh;
+    struct vr_nexthop *nh = NULL;
+    struct vr_bridge_entry *be;
 
     eth = (struct vr_eth *)pkt_data(pkt);
     if (!eth)
@@ -585,16 +715,17 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
     if (IS_MAC_BMCAST(eth->eth_smac))
         return 0;
 
-    rtr.rtr_req.rtr_rid = 0;
-    rtr.rtr_req.rtr_label_flags = 0;
-    rtr.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    rtr.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-    rtr.rtr_req.rtr_mac = eth->eth_smac;
-    rtr.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
-    nh = vr_bridge_lookup(fmd->fmd_dvrf, &rtr);
+    be = bridge_lookup(eth->eth_smac, fmd);
+    if (be) {
+        nh = be->be_nh;
+    }
+
     if (!nh) {
-        rtr.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
-        nh = vr_bridge_lookup(fmd->fmd_dvrf, & rtr);
+        be = bridge_lookup((uint8_t *)vr_bcast_mac, fmd);
+        if (be) {
+            nh = be->be_nh;
+        }
+
         if (!nh)
             return 0;
 
@@ -602,24 +733,18 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
         if (lock < 0)
             return 0;
 
-        rtr.rtr_req.rtr_nh_id = nh->nh_id;
-        rtr.rtr_req.rtr_label_flags = 0;
-        rtr.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-        rtr.rtr_req.rtr_mac = eth->eth_smac;
-        ret = bridge_entry_add(NULL, &rtr);
-
+        be = bridge_add(0, fmd->fmd_dvrf, eth->eth_smac, nh->nh_id);
         bridge_table_unlock(pkt->vp_if, eth->eth_smac, lock);
-        if (ret)
-            return ret;
+        if (!be)
+            return -ENOMEM;
 
         trap_reason = AGENT_TRAP_MAC_LEARN;
         trap = true;
     } else {
-        if (nh->nh_validate_src) {
+        if (!(be->be_flags & VR_BE_MAC_MOVED_FLAG) && (nh->nh_validate_src)) {
             valid_src = nh->nh_validate_src(pkt, nh, fmd, NULL);
             if (valid_src != NH_SOURCE_VALID) {
-                ret = vr_bridge_set_route_flags(fmd->fmd_dvrf,
-                        rtr.rtr_req.rtr_mac, VR_BE_MAC_MOVED_FLAG);
+                ret = vr_bridge_set_route_flags(be, VR_BE_MAC_MOVED_FLAG);
                 if (!ret) {
                     /* trap the packet for mac move */
                     trap_reason = AGENT_TRAP_MAC_MOVE;
@@ -630,6 +755,8 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
         }
     }
 
+    __sync_fetch_and_add(&be->be_packets, 1);
+
     if (trap) {
         pkt_c = pkt_cow(pkt, 0);
         if (!pkt_c) {
@@ -637,7 +764,8 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
             ret = -ENOMEM;
         }
 
-        vr_trap(pkt_c, fmd->fmd_dvrf, trap_reason, &rtr.rtr_req.rtr_index);
+        vr_trap(pkt_c, fmd->fmd_dvrf,
+                trap_reason, (void *)&be->be_hentry.hentry_index);
     }
 
     return ret;
@@ -647,14 +775,14 @@ unsigned int
 vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
-    struct vr_route_req rt;
-    struct vr_forwarding_md cmd;
-    struct vr_nexthop *nh = NULL;
-    unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
     int reason, handled;
-    struct vr_vrf_stats *stats;
     l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
+    unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
+
     int8_t *dmac;
+    struct vr_bridge_entry *be;
+    struct vr_nexthop *nh = NULL;
+    struct vr_vrf_stats *stats;
 
     dmac = (int8_t *) pkt_data(pkt);
 
@@ -730,28 +858,21 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
         }
 
-        rt.rtr_req.rtr_label_flags = 0;
-        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-        rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
-        rt.rtr_req.rtr_mac = dmac;
-        /* If multicast L2 packet, use broadcast composite nexthop */
-        if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
-            rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
-        rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
+        be = bridge_lookup(dmac, fmd);
+        if (be)
+            nh = be->be_nh;
 
-        nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
         if (!nh || nh->nh_type == NH_DISCARD) {
 
             /* If Flooding of unknown unicast not allowed, drop the packet */
             if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
-                                 IS_MAC_BMCAST(rt.rtr_req.rtr_mac)) {
+                                 IS_MAC_BMCAST(dmac)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return 0;
             }
 
-            rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
-            rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-            nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
+            be = bridge_lookup(vr_bcast_mac, fmd);
+            nh = be->be_nh;
             if (!nh) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return 0;
@@ -763,6 +884,9 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             /* Treat this unknown unicast packet as multicast */
             pkt->vp_flags |= VP_FLAG_MULTICAST;
         }
+
+        if (be)
+            __sync_fetch_and_add(&be->be_packets, 1);
 
         if (nh->nh_type != NH_L2_RCV)
             overlay_len = VROUTER_L2_OVERLAY_LEN;
@@ -788,20 +912,6 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
             return 0;
         }
-    }
-
-
-    /*
-     * If there is a label attached to this bridge entry add the
-     * label
-     */
-    if (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG) {
-        if (!fmd) {
-            vr_init_forwarding_md(&cmd);
-            fmd = &cmd;
-        }
-        vr_forwarding_md_set_label(fmd, rt.rtr_req.rtr_label,
-                VR_LABEL_TYPE_UNKNOWN);
     }
 
     if (pull_len && !pkt_push(pkt, pull_len)) {
