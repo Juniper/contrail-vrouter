@@ -15,6 +15,7 @@ extern "C" {
 #include "vr_interface.h"
 #include "vr_qos.h"
 #include "vr_flow.h"
+#include "vr_bridge.h"
 #include "vr_interface.h"
 #include "vr_nexthop.h"
 #include "vr_route.h"
@@ -46,6 +47,7 @@ extern unsigned int vr_num_cpus;
 enum vr_malloc_objects_t {
     VR_ASSEMBLER_TABLE_OBJECT,
     VR_BRIDGE_MAC_OBJECT,
+    VR_BRIDGE_TABLE_DATA_OBJECT,
     VR_BTABLE_OBJECT,
     VR_BUILD_INFO_OBJECT,
     VR_DEFER_OBJECT,
@@ -86,6 +88,7 @@ enum vr_malloc_objects_t {
     VR_MESSAGE_OBJECT,
     VR_MESSAGE_RESPONSE_OBJECT,
     VR_MESSAGE_DUMP_OBJECT,
+    VR_MEM_OBJECT,
     VR_MEM_STATS_REQ_OBJECT,
     VR_MIRROR_OBJECT,
     VR_MIRROR_TABLE_OBJECT,

@@ -14,6 +14,7 @@
 
 #include "vr_dpdk.h"
 #include "vr_btable.h"
+#include "vr_mem.h"
 #include "nl_util.h"
 
 #include <rte_errno.h>
@@ -29,9 +30,9 @@ struct vr_hugepage_info {
     uint32_t num_pages;
 } vr_hugepage_md[HPI_MAX];
 
-extern void *vr_flow_table;
-extern void *vr_oflow_table;
-extern unsigned char *vr_flow_path;
+extern void *vr_flow_table, *vr_oflow_table;
+extern void *vr_bridge_table, *vr_bridge_otable;
+extern unsigned char *vr_flow_path, *vr_bridge_table_path;
 
 static int
 vr_hugepage_info_init(void)
@@ -135,24 +136,54 @@ exit_func:
     return 0;
 }
 
+
 int
-vr_dpdk_flow_mem_init(void)
+vr_dpdk_table_mem_init(unsigned int table, unsigned int entries,
+        unsigned long size, unsigned int oentries, unsigned long osize)
 {
     int ret, i, fd;
-    size_t size, flow_table_size;
-    struct vr_hugepage_info *hpi;
-    char *file_name, *touse_file_name = NULL;
-    struct stat f_stat;
+
+    void **table_p;
     char shm_file[VR_UNIX_PATH_MAX];
+    char *file_name, *touse_file_name = NULL;
+    char *shmem_name, *hp_file_name;
+    unsigned char **path;
 
-    if (!vr_oflow_entries)
-        vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
+    struct stat f_stat;
+    struct vr_hugepage_info *hpi;
 
-    flow_table_size = VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE;
+    if (!oentries) {
+        oentries = (entries / 5 + 1023) & ~1023;
+        osize = (size / entries) * oentries;
+    }
+
+    size += osize;
+
+    switch (table) {
+    case VR_MEM_FLOW_TABLE_OBJECT:
+        shmem_name = "flow.shmem";
+        hp_file_name = "flow";
+        table_p = &vr_dpdk.flow_table;
+        path = &vr_flow_path;
+        vr_oflow_entries = oentries;
+        break;
+
+    case VR_MEM_BRIDGE_TABLE_OBJECT:
+        shmem_name = "bridge.shmem";
+        hp_file_name = "bridge";
+        table_p = &vr_dpdk.bridge_table;
+        path = &vr_bridge_table_path;
+        vr_bridge_oentries = oentries;
+        break;
+
+    default:
+        return -EINVAL;
+    }
 
     if (no_huge_set) {
         /* Create a shared memory under the socket directory. */
-        ret = snprintf(shm_file, sizeof(shm_file), "%s/flow.shmem", vr_socket_dir);
+        ret = snprintf(shm_file, sizeof(shm_file), "%s/%s",
+                vr_socket_dir, shmem_name);
         if (ret >= sizeof(shm_file)) {
             RTE_LOG(ERR, VROUTER, "Error creating shared memory file\n");
             return -ENOMEM;
@@ -170,12 +201,11 @@ vr_dpdk_flow_mem_init(void)
             hpi = &vr_hugepage_md[i];
             if (!hpi->mnt)
                 continue;
-            file_name = malloc(strlen(hpi->mnt) + strlen("/flow") + 1);
-            sprintf(file_name, "%s/flow", hpi->mnt);
+            file_name = malloc(strlen(hpi->mnt) + strlen(hp_file_name) + 1);
+            sprintf(file_name, "%s/%s", hpi->mnt, hp_file_name);
             if (stat(file_name, &f_stat) == -1) {
                 if (!touse_file_name) {
-                    size = hpi->size;
-                    if (size >= flow_table_size) {
+                    if (hpi->size >= size) {
                         touse_file_name = file_name;
                     } else {
                         free(file_name);
@@ -196,33 +226,40 @@ vr_dpdk_flow_mem_init(void)
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }
-        if (no_huge_set){
-            ret = ftruncate(fd, flow_table_size);
+
+        if (no_huge_set) {
+            ret = ftruncate(fd, size);
             if (ret == -1) {
                 RTE_LOG(ERR, VROUTER, "Error truncating file %s: %s (%d)\n",
                     touse_file_name, rte_strerror(errno), errno);
                 return -errno;
             }
         }
-        vr_dpdk.flow_table = mmap(NULL, flow_table_size, PROT_READ | PROT_WRITE,
+
+        *table_p = mmap(NULL, size, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
         /* the file descriptor is no longer needed */
         close(fd);
-        if (vr_dpdk.flow_table == MAP_FAILED) {
+        if (*table_p == MAP_FAILED) {
             RTE_LOG(ERR, VROUTER, "Error mmapping file %s: %s (%d)\n",
                 touse_file_name, rte_strerror(errno), errno);
             return -errno;
         }
-        memset(vr_dpdk.flow_table, 0, flow_table_size);
-        vr_flow_path = (unsigned char *)touse_file_name;
+        memset(*table_p, 0, size);
+        *path = (unsigned char *)touse_file_name;
     }
 
-    if (!vr_dpdk.flow_table)
-        return -ENOMEM;
+    return 0;
+}
 
-    vr_flow_hold_limit = VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT;
-    RTE_LOG(INFO, VROUTER, "Max HOLD flow entries set to %u\n",
-            vr_flow_hold_limit);
+int
+vr_dpdk_bridge_init(void)
+{
+    if (!vr_dpdk.bridge_table)
+        return -1;
+
+    vr_bridge_table = vr_dpdk.bridge_table;
+    vr_bridge_otable = vr_dpdk.bridge_table + VR_BRIDGE_TABLE_SIZE;
 
     return 0;
 }
@@ -230,12 +267,18 @@ vr_dpdk_flow_mem_init(void)
 int
 vr_dpdk_flow_init(void)
 {
+    if (!vr_dpdk.flow_table)
+        return -1;
 
     vr_flow_table = vr_dpdk.flow_table;
     vr_oflow_table = vr_dpdk.flow_table + VR_FLOW_TABLE_SIZE;
 
     if (!vr_flow_table)
         return -1;
+
+    vr_flow_hold_limit = VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT;
+    RTE_LOG(INFO, VROUTER, "Max HOLD flow entries set to %u\n",
+            vr_flow_hold_limit);
 
     return 0;
 }

@@ -40,15 +40,15 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_flow_req),
         .obj_type_string        =       "vr_flow_req",
     },
-    [VR_VRF_ASSIGN_OBJECT_ID]     =   {
+    [VR_VRF_ASSIGN_OBJECT_ID]   =   {
         .obj_len                =       4 * sizeof(vr_vrf_assign_req),
         .obj_type_string        =       "vr_vrf_assign_req",
     },
-    [VR_VRF_STATS_OBJECT_ID]     =   {
+    [VR_VRF_STATS_OBJECT_ID]    =   {
         .obj_len                =       4 * sizeof(vr_vrf_stats_req),
         .obj_type_string        =       "vr_vrf_stats_req",
     },
-    [VR_DROP_STATS_OBJECT_ID]     =   {
+    [VR_DROP_STATS_OBJECT_ID]   =   {
         .obj_len                =       4 * sizeof(vr_drop_stats_req),
         .obj_type_string        =       "vr_drop_stats_req",
     },
@@ -56,11 +56,11 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_response),
         .obj_type_string        =       "vr_response",
     },
-    [VR_VXLAN_OBJECT_ID]     =   {
+    [VR_VXLAN_OBJECT_ID]        =   {
         .obj_len                =       4 * sizeof(vr_vxlan_req),
         .obj_type_string        =       "vr_vxlan_req",
     },
-    [VR_VROUTER_OPS_OBJECT_ID]     =   {
+    [VR_VROUTER_OPS_OBJECT_ID]  =   {
         .obj_len                =       4 * sizeof(vrouter_ops),
         .obj_type_string        =       "vrouter_ops",
     },
@@ -69,23 +69,29 @@ struct sandesh_object_md sandesh_md[] = {
                     (VR_FLOW_MAX_CPUS * sizeof(unsigned int))),
         .obj_type_string        =       "vr_flow_table_data",
     },
-    [VR_MEM_STATS_OBJECT_ID]     =   {
+    [VR_MEM_STATS_OBJECT_ID]    =   {
         .obj_len                =       4 * sizeof(vr_mem_stats_req),
         .obj_type_string        =       "vr_mem_stats_req",
     },
-    [VR_QOS_MAP_OBJECT_ID]     =   {
+    [VR_QOS_MAP_OBJECT_ID]      =   {
         .obj_len                =       4 * sizeof(vr_qos_map_req),
         .obj_get_size           =       vr_qos_map_req_get_size,
         .obj_type_string        =       "vr_qos_map_req",
     },
-    [VR_FC_MAP_OBJECT_ID]     =   {
+    [VR_FC_MAP_OBJECT_ID]       =   {
         .obj_len                =       4 * sizeof(vr_fc_map_req),
         .obj_type_string        =       "vr_fc_map_req",
     },
     [VR_FLOW_RESPONSE_OBJECT_ID] = {
         .obj_len                =       4 * sizeof(vr_flow_response),
-        .obj_type_string         =       "vr_flow_response",
+        .obj_type_string        =       "vr_flow_response",
     },
+#if 0
+    [VR_BRIDGE_TABLE_DATA_OBJECT_ID] = {
+        .obj_len                =       4 * sizeof(vr_bridge_table_data),
+        .obj_type_string        =       "vr_bridge_table_data",
+    },
+#endif
 };
 
 static unsigned int
