@@ -43,7 +43,7 @@ unsigned char *vr_flow_path;
 unsigned int vr_flow_hold_limit = VR_DEF_MAX_FLOW_TABLE_HOLD_COUNT;
 
 #if defined(__linux__) && defined(__KERNEL__)
-extern unsigned short vr_flow_major;
+extern short vr_flow_major;
 #endif
 
 uint32_t vr_hashrnd = 0;

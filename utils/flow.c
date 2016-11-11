@@ -45,6 +45,7 @@
 #include "ini_parser.h"
 #include "vr_packet.h"
 #include "vr_message.h"
+#include "vr_mem.h"
 
 #define TABLE_FLAG_VALID        0x1
 
@@ -1695,30 +1696,9 @@ flow_table_map(vr_flow_table_data *table)
         return ft->ft_num_entries;
     }
 
-    const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
-    if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
-                (strcmp(platform, PLATFORM_NIC) == 0))) {
-        flow_path = table->ftable_file_path;
-    } else {
-        flow_path = MEM_DEV;
-        ret = mknod(MEM_DEV, S_IFCHR | O_RDWR,
-                makedev(table->ftable_dev, table->ftable_rid));
-        if (ret && errno != EEXIST) {
-            perror(MEM_DEV);
-            exit(errno);
-        }
-    }
-
-    mem_fd = open(flow_path, O_RDONLY | O_SYNC);
-    if (mem_fd <= 0) {
-        perror(MEM_DEV);
-        exit(errno);
-    }
-
-    ft->ft_entries = (struct vr_flow_entry *)mmap(NULL, table->ftable_size,
-            PROT_READ, MAP_SHARED, mem_fd, 0);
-    /* the file descriptor is no longer needed */
-    close(mem_fd);
+    ft->ft_entries = (struct vr_flow_entry *)vr_table_map(table->ftable_dev,
+            VR_MEM_FLOW_TABLE_OBJECT, table->ftable_file_path,
+            table->ftable_size);
     if (ft->ft_entries == MAP_FAILED) {
         printf("flow table: %s\n", strerror(errno));
         exit(errno);
