@@ -388,7 +388,7 @@ lh_pfree_skb(struct sk_buff *skb, struct vr_interface *vif,
 
 
 static void
-lh_get_mono_time(unsigned int *sec, unsigned int *nsec)
+lh_get_mono_time(unsigned long *sec, unsigned long *nsec)
 {
     struct timespec t;
     uint64_t jiffies = get_jiffies_64();

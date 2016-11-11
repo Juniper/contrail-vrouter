@@ -482,6 +482,12 @@ bridge_entry_add(struct rtable_fspec *fs, struct vr_route_req *req)
 {
     struct vrouter *router;
 
+    if (!fs) {
+        fs = vr_get_family(AF_BRIDGE);
+        if (!fs)
+            return -EINVAL;
+    }
+
     router = vrouter_get(req->rtr_req.rtr_rid);
     if (!router)
         return -EINVAL;

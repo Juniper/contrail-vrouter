@@ -346,6 +346,7 @@ buffer sandesh vr_mem_stats_req {
    63:  i64             vms_fc_object;
    64:  i64             vms_interface_mirror_meta_object;
    65:  i64             vms_interface_req_mirror_meta_object;
+   66:  i64             vms_interface_bridge_lock_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */

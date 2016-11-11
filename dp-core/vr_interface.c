@@ -418,6 +418,8 @@ agent_trap_may_truncate(int trap_reason)
     case AGENT_TRAP_ECMP_RESOLVE:
     case AGENT_TRAP_HANDLE_DF:
     case AGENT_TRAP_ZERO_TTL:
+    case AGENT_TRAP_MAC_LEARN:
+    case AGENT_TRAP_MAC_MOVE:
         return 1;
 
     case AGENT_TRAP_ARP:
@@ -526,11 +528,9 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
     case AGENT_TRAP_ECMP_RESOLVE:
     case AGENT_TRAP_SOURCE_MISMATCH:
-        if (params->trap_param)
-            hdr->hdr_cmd_param = htonl(*(unsigned int *)(params->trap_param));
-        break;
-
     case AGENT_TRAP_DIAG:
+    case AGENT_TRAP_MAC_LEARN:
+    case AGENT_TRAP_MAC_MOVE:
         if (params->trap_param)
             hdr->hdr_cmd_param = htonl(*(unsigned int *)(params->trap_param));
         break;
@@ -1402,6 +1402,12 @@ vif_free(struct vr_interface *vif)
         vif_bridge_deinit(vif);
     }
 
+    if (vif->vif_bridge_table_lock) {
+        vr_free(vif->vif_bridge_table_lock,
+                VR_INTERFACE_BRIDGE_LOCK_OBJECT);
+        vif->vif_bridge_table_lock = NULL;
+    }
+
     if (vif->vif_src_mac) {
         vr_free(vif->vif_src_mac, VR_INTERFACE_MAC_OBJECT);
         vif->vif_src_mac = NULL;
@@ -1776,8 +1782,42 @@ del_fail:
 }
 
 static void
+vif_free_bridge_table_lock(struct vrouter *router, void *mem)
+{
+    if (mem)
+        vr_free(mem, VR_INTERFACE_BRIDGE_LOCK_OBJECT);
+
+    return;
+}
+
+static int
 vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
 {
+    void *mem;
+    struct vr_defer_data *vdd;
+
+    if (req->vifr_flags & VIF_FLAG_MAC_LEARN) {
+        if (!vif->vif_bridge_table_lock) {
+            vif->vif_bridge_table_lock =
+                vr_zalloc(vr_num_cpus * sizeof(uint8_t),
+                        VR_INTERFACE_BRIDGE_LOCK_OBJECT);
+            if (!vif->vif_bridge_table_lock) {
+                return -ENOMEM;
+            }
+        }
+    } else if (vif->vif_flags & VIF_FLAG_MAC_LEARN) {
+        if (vif->vif_bridge_table_lock) {
+            vdd = vr_get_defer_data(sizeof(*vdd));
+            if (vdd) {
+                mem = vif->vif_bridge_table_lock;
+                vif->vif_bridge_table_lock = NULL;
+                vdd->vdd_data = mem;
+                vr_defer(vif->vif_router, vif_free_bridge_table_lock,
+                        (void *)mem);
+            }
+        }
+    }
+
     vif->vif_flags = (vif->vif_flags & VIF_VR_CAP_MASK) |
                      (req->vifr_flags & ~VIF_VR_CAP_MASK);
 
@@ -1789,7 +1829,7 @@ vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
         vif->vif_flags |= (VIF_FLAG_L3_ENABLED | VIF_FLAG_L2_ENABLED);
     }
 
-    return;
+    return 0;
 }
 
 static int
@@ -1882,7 +1922,9 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
         vr_interface_service_disable(vif);
     }
 
-    vif_set_flags(vif, req);
+    ret = vif_set_flags(vif, req);
+    if (ret)
+        return ret;
 
     vif->vif_mirror_id = req->vifr_mir_id;
     if (!(vif->vif_flags & VIF_FLAG_MIRROR_RX) &&
@@ -2001,7 +2043,9 @@ vr_interface_add(vr_interface_req *req, bool need_response)
 
     vif->vif_type = req->vifr_type;
 
-    vif_set_flags(vif, req);
+    ret = vif_set_flags(vif, req);
+    if (ret)
+        goto error;
 
     vif->vif_vrf = req->vifr_vrf;
     vif->vif_vlan_id = VLAN_ID_INVALID;
