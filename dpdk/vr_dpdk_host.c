@@ -1444,7 +1444,12 @@ vr_dpdk_host_init(void)
 
     if (!vrouter_host) {
         vrouter_host = vrouter_get_host();
+
         if (vr_dpdk_flow_init()) {
+            return -1;
+        }
+
+        if (vr_dpdk_bridge_init()) {
             return -1;
         }
     }
