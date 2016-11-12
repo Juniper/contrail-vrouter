@@ -251,7 +251,10 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
 
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_VLAN_INSERT
         && dev_info.rx_offload_capa & DEV_RX_OFFLOAD_VLAN_STRIP) {
-        vif->vif_flags |= VIF_FLAG_VLAN_OFFLOAD;
+        /*
+         * Enabling vlan offload causes performance degradation, possibly
+         * dut to a DPDK library issue, so don't set VIF_FLAG_VLAN_OFFLOAD
+         */ 
     } else {
         vif->vif_flags &= ~VIF_FLAG_VLAN_OFFLOAD;
     }
