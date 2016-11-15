@@ -12,6 +12,7 @@
 #include "vr_vxlan.h"
 #include "vr_bridge.h"
 #include "vr_datapath.h"
+#include "vr_offloads.h"
 
 int
 vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
@@ -101,6 +102,7 @@ vr_vxlan_trav_cb(unsigned int index, void *data, void *udata)
     vr_vxlan_req resp;
 
     vr_vxlan_make_req(&resp, nh, index);
+    vr_offload_vxlan_get(&resp);
     return vr_message_dump_object(dumper, VR_VXLAN_OBJECT_ID, &resp);
 }
 
@@ -147,8 +149,11 @@ vr_vxlan_get(vr_vxlan_req *req)
             ret = -ENOENT;
     }
 
-    if (!ret)
+    if (!ret) {
         vr_vxlan_make_req(req, nh, req->vxlanr_vnid);
+        /* Debug comparison to check if matching entry is programmed on NIC */
+        vr_offload_vxlan_get(req);
+    }
     else
         req = NULL;
 
@@ -173,6 +178,9 @@ vr_vxlan_del(vr_vxlan_req *req)
     nh = vr_itable_del(router->vr_vxlan_table, req->vxlanr_vnid);
     if (nh)
         vrouter_put_nexthop(nh);
+
+    /* notify hw offload of change, if enabled */
+    vr_offload_vxlan_del(req->vxlanr_vnid);
 
 generate_resp:
     vr_send_response(ret);
@@ -199,6 +207,18 @@ vr_vxlan_add(vr_vxlan_req *req)
     }
 
     nh_old = vr_itable_set(router->vr_vxlan_table, req->vxlanr_vnid, nh);
+
+    ret = vr_offload_vxlan_add(nh, req->vxlanr_vnid);
+    if (ret) {
+        /* If offload add fails, restore old nexthop */
+        if (nh_old && nh_old != VR_ITABLE_ERR_PTR)
+            vr_itable_set(router->vr_vxlan_table, req->vxlanr_vnid, nh_old);
+        else
+            vr_itable_del(router->vr_vxlan_table, req->vxlanr_vnid);
+        vrouter_put_nexthop(nh);
+        goto generate_resp;
+    }
+
     if (nh_old) {
         if (nh_old == VR_ITABLE_ERR_PTR) {
             ret = -EINVAL;

@@ -13,6 +13,7 @@
 #include "vr_bridge.h"
 #include "vr_datapath.h"
 #include "vr_btable.h"
+#include "vr_offloads.h"
 
 unsigned int vr_mpls_labels = VR_DEF_LABELS;
 
@@ -86,6 +87,10 @@ vr_mpls_del(vr_mpls_req *req)
 
     ret =  __vr_mpls_del(router, req->mr_label);
 
+    /* notify hw offload of change, if enabled */
+    if (!ret)
+        vr_offload_mpls_del(req->mr_label);
+
 generate_resp:
     vr_send_response(ret);
 
@@ -131,6 +136,13 @@ vr_mpls_add(vr_mpls_req *req)
         && nh->nh_type == NH_ENCAP && !(nh->nh_flags & NH_FLAG_MCAST))
         vrouter_host->hos_add_mpls(router, req->mr_label);
 
+    /* notify hw offload of change, if enabled */
+    if (!ret) {
+        ret = vr_offload_mpls_add(nh, req->mr_label);
+        if (ret)
+            __vr_mpls_del(router, req->mr_label);
+    }
+
 generate_resp:
     vr_send_response(ret);
 
@@ -173,6 +185,7 @@ vr_mpls_dump(vr_mpls_req *r)
         nh = __vrouter_get_label(router, i);
         if (nh) {
            vr_mpls_make_req(&req, nh, i);
+           vr_offload_mpls_get(&req);
            ret = vr_message_dump_object(dumper, VR_MPLS_OBJECT_ID, &req);
            if (ret <= 0)
                break;
@@ -210,6 +223,9 @@ vr_mpls_get(vr_mpls_req *req)
     }
 
     vr_mpls_make_req(req, nh, req->mr_label);
+
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_mpls_get(req);
 
 generate_response:
     if (ret)

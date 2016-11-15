@@ -55,6 +55,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += linux/vr_host_interface.o linux/vr_genetlink.o
 	vrouter-y += linux/vr_mem.o linux/vr_fragment_assembler.o
 
+	vrouter-y += dp-core/vr_offloads.o
 	vrouter-y += dp-core/vr_message.o dp-core/vr_sandesh.o
 	vrouter-y += dp-core/vr_queue.o dp-core/vr_index_table.o
 	vrouter-y += dp-core/vrouter.o dp-core/vr_route.o
