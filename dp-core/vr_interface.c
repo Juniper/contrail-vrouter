@@ -13,6 +13,7 @@
 #include "vr_htable.h"
 #include "vr_datapath.h"
 #include "vr_bridge.h"
+#include "vr_offloads.h"
 
 volatile bool agent_alive = false;
 
@@ -1696,6 +1697,8 @@ vr_interface_delete(vr_interface_req *req, bool need_response)
     if (!vif && (ret = -ENODEV))
         goto del_fail;
 
+    vr_offload_interface_del(vif);
+
     vif_delete(vif);
 
 del_fail:
@@ -1797,6 +1800,10 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif = __vrouter_get_interface(router, req->vifr_idx);
     if (vif) {
         ret = vr_interface_change(vif, req);
+        /* notify hw offload of change, if enabled */
+        if (!ret)
+            ret = vr_offload_interface_add(vif);
+
         goto generate_resp;
     }
 
@@ -1885,6 +1892,14 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (!ret)
         vrouter_setup_vif(vif);
 
+    /* notify hw offload of change, if enabled */
+    if (!ret) {
+        ret = vr_offload_interface_add(vif);
+        if (ret) {
+            vif_delete(vif);
+            vif = NULL;
+        }
+    }
 generate_resp:
     if (need_response)
         vr_send_response(ret);
@@ -1952,6 +1967,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_transport = intf->vif_transport;
     req->vifr_os_idx = intf->vif_os_idx;
     req->vifr_mtu = intf->vif_mtu;
+    req->vifr_nh_id = intf->vif_nh_id;
     if (req->vifr_mac_size && req->vifr_mac)
         memcpy(req->vifr_mac, intf->vif_mac,
                 MINIMUM(req->vifr_mac_size, sizeof(intf->vif_mac)));
@@ -2208,8 +2224,13 @@ vr_interface_get(vr_interface_req *req)
 
         /* zero vifr_core means to sum up all the per-core stats */
         vr_interface_make_req(resp, vif, (unsigned)(req->vifr_core - 1));
+        /* adds in stats for pkts which were offloaded on NIC and does debug
+           comparison to check if matching entry is programmed on NIC */
+        vr_offload_interface_get(resp);
+
     } else
         ret = -ENOENT;
+
 
 generate_response:
     vr_message_response(VR_INTERFACE_OBJECT_ID, ret ? NULL : resp, ret);
@@ -2253,6 +2274,10 @@ vr_interface_dump(vr_interface_req *r)
         if (vif) {
             /* zero vifr_core means to sum up all the per-core stats */
             vr_interface_make_req(resp, vif, (unsigned)(r->vifr_core - 1));
+
+            /* let hw offload fill in relevant fields */
+            vr_offload_interface_get(resp);
+
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;
