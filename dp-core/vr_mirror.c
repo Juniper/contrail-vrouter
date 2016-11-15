@@ -9,6 +9,7 @@
 #include "vr_sandesh.h"
 #include "vr_message.h"
 #include "vr_mirror.h"
+#include "vr_offloads.h"
 
 struct vr_mirror_entry *
 vrouter_get_mirror(unsigned int rid, unsigned int index)
@@ -62,6 +63,8 @@ __vr_mirror_del(struct vrouter *router, unsigned int index)
         vr_free(mirror, VR_MIRROR_OBJECT);
     }
     vrouter_put_nexthop(nh);
+
+    vr_offload_mirror_del(index);
 
     return 0;
 }
@@ -127,6 +130,13 @@ vr_mirror_add(vr_mirror_req *req)
     if (old_nh)
         vrouter_put_nexthop(old_nh);
 
+    /* if offload failed, release the newly added mirror entry.
+     * vrouter_put_mirror() also drops the reference on the nhop.
+     */
+    ret = vr_offload_mirror_add(mirror, req->mirr_index);
+    if (ret)
+        __vr_mirror_del(router, req->mirr_index);
+
 generate_resp:
     vr_send_response(ret);
 
@@ -174,6 +184,7 @@ vr_mirror_dump(vr_mirror_req *r)
         mirror = router->vr_mirrors[i];
         if (mirror) {
            vr_mirror_make_req(&req, mirror, i);
+           vr_offload_mirror_get(&req);
            ret = vr_message_dump_object(dumper, VR_MIRROR_OBJECT_ID, &req);
            if (ret <= 0)
                break;
@@ -205,6 +216,7 @@ vr_mirror_get(vr_mirror_req *req)
 
     if (mirror) {
         vr_mirror_make_req(req, mirror, req->mirr_index);
+        vr_offload_mirror_get(req);
     } else
         req = NULL;
 

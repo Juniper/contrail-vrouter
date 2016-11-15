@@ -9,6 +9,7 @@
 #include <vr_route.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
+#include "vr_offloads.h"
 
 unsigned int vr_vrfs = VR_DEF_VRFS;
 
@@ -80,6 +81,10 @@ vr_route_delete(vr_route_req *req)
         ret = fs->route_del(fs, &vr_req);
     }
 
+    /* notify hw offload of change, if enabled */
+    if (!ret)
+        vr_offload_route_del(req);
+
 error:
     vr_send_response(ret);
 
@@ -111,6 +116,14 @@ vr_route_add(vr_route_req *req)
         ret = fs->route_add(fs, &vr_req);
     }
 
+    /* notify hw offload of change, if enabled */
+    if (!ret) {
+        ret = vr_offload_route_add(req);
+        if (ret)
+            fs->route_del(fs, &vr_req);
+    }
+
+error:
     vr_send_response(ret);
 
     return ret;
@@ -165,6 +178,8 @@ vr_route_get(vr_route_req *req)
         ret = rtable->algo_get(vr_req.rtr_req.rtr_vrf_id, &vr_req);
     }
 
+    if (!ret)
+        vr_offload_route_get(req);
 generate_response:
     vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
     if (mac_mem_free && vr_req.rtr_req.rtr_mac) {
