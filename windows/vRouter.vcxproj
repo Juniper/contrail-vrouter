@@ -128,6 +128,7 @@
     <ClInclude Include="..\include\vr_sandesh.h" />
     <ClInclude Include="..\include\vr_stats.h" />
     <ClInclude Include="..\include\vr_vxlan.h" />
+    <ClInclude Include="..\include\vr_offloads.h" />
     <ClInclude Include="..\include\vr_windows.h" />
     <ClInclude Include="..\include\windows_devices.h" />
     <ClInclude Include="..\include\windows_builtins.h" />
@@ -239,6 +240,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\dp-core\vr_vxlan.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\dp-core\vr_offloads.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="precompsrc2.c" />
