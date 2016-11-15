@@ -20,6 +20,8 @@
 #include "vr_ip_mtrie.h"
 #include "vr_bridge.h"
 
+#include "vr_offloads.h"
+
 #define VR_NUM_FLOW_TABLES          1
 
 #define VR_NUM_OFLOW_TABLES         1
@@ -190,6 +192,7 @@ vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe,
         if (fe->fe_mme) {
             vr_mirror_meta_entry_del(router, fe->fe_mme);
             fe->fe_mme = NULL;
+            vr_offload_flow_meta_data_set(index, 0, 0, 0);
         }
     }
     fe->fe_flags &= ~VR_FLOW_FLAG_MIRROR;
@@ -220,6 +223,8 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
     }
     fe->fe_hold_list = NULL;
     fe->fe_key.flow_key_len = 0;
+
+    (void)vr_offload_flow_del(fe);
 
     vr_flow_reset_mirror(router, fe, fe->fe_hentry.hentry_index);
     fe->fe_ecmp_nh_index = -1;
@@ -1487,29 +1492,33 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
-
-    flow_e = vr_find_flow(router, key, pkt->vp_type,  &fe_index);
-    if (!flow_e) {
-        if (pkt->vp_nh &&
-            (pkt->vp_nh->nh_flags &
-             (NH_FLAG_RELAXED_POLICY | NH_FLAG_FLOW_LOOKUP)))
-            return FLOW_FORWARD;
-
-        if (!vr_flow_allow_new_flow(router, pkt, &drop_reason, &burst)) {
-            vr_pfree(pkt, drop_reason);
-            return FLOW_CONSUMED;
-        }
-
-        flow_e = vr_flow_get_free_entry(router, key, pkt->vp_type,
-                true, &fe_index);
+    if (!fmd->fmd_fe) {
+        flow_e = vr_find_flow(router, key, pkt->vp_type,  &fe_index);
         if (!flow_e) {
-            vr_pfree(pkt, VP_DROP_FLOW_TABLE_FULL);
-            return FLOW_CONSUMED;
-        }
+            if (pkt->vp_nh &&
+                (pkt->vp_nh->nh_flags &
+                 (NH_FLAG_RELAXED_POLICY | NH_FLAG_FLOW_LOOKUP)))
+                return FLOW_FORWARD;
 
-        flow_e->fe_vrf = fmd->fmd_dvrf;
-        /* mark as hold */
-        vr_flow_entry_set_hold(router, flow_e, burst);
+            if (!vr_flow_allow_new_flow(router, pkt, &drop_reason, &burst)) {
+                vr_pfree(pkt, drop_reason);
+                return FLOW_CONSUMED;
+            }
+
+            flow_e = vr_flow_get_free_entry(router, key, pkt->vp_type,
+                    true, &fe_index);
+            if (!flow_e) {
+                vr_pfree(pkt, VP_DROP_FLOW_TABLE_FULL);
+                return FLOW_CONSUMED;
+            }
+
+            flow_e->fe_vrf = fmd->fmd_dvrf;
+            /* mark as hold */
+            vr_flow_entry_set_hold(router, flow_e, burst);
+        }
+    } else {
+        flow_e = fmd->fmd_fe;
+        fe_index = fmd->fmd_flow_index;
     }
 
     if (flow_e->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
@@ -1864,6 +1873,13 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
                 req->fr_mir_sip, req->fr_mir_sport,
                 req->fr_pcap_meta_data, req->fr_pcap_meta_data_size,
                 req->fr_mir_vrf);
+
+        if (fe->fe_mme) {
+            vr_offload_flow_meta_data_set(req->fr_index,
+                                          req->fr_pcap_meta_data_size,
+                                          req->fr_pcap_meta_data,
+                                          req->fr_mir_vrf);
+        }
     }
 
     return;
@@ -2228,6 +2244,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
     if (fe) {
         if (!(modified = vr_flow_start_modify(router, fe)))
             return -EBUSY;
+        fe_index = (unsigned int)(req->fr_index);
     }
 
     if ((ret = vr_flow_set_req_is_invalid(router, req, fe)))
@@ -2363,6 +2380,14 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
 
 
     ret = vr_flow_schedule_transition(router, req, fe);
+
+    /*
+     * offload, no need to differentiate between add and modify. Pass the
+     * reverse flow as well if present.
+     */
+    if (!ret) {
+        vr_offload_flow_set(fe, fe_index, rfe);
+    }
 
 exit_set:
     if (modified && fe) {
