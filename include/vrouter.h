@@ -23,6 +23,7 @@ extern "C" {
 #include "vr_mpls.h"
 #include "vr_index_table.h"
 #include "vr_mem.h"
+#include "vr_offloads.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -229,6 +230,10 @@ struct host_os {
     bool hos_nl_broadcast_supported;
     int (*hos_huge_page_config)(uint64_t *, int, int *, int);
     void *(*hos_huge_page_mem_get)(int);
+    int (*hos_offload_flow_create)(struct vr_offload_flow *oflow);
+    int (*hos_offload_flow_destroy)(struct vr_offload_flow *oflow);
+    void (*hos_offload_prepare)(struct vr_packet *pkt, struct vr_forwarding_md *fmd);
+
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -281,6 +286,9 @@ struct host_os {
 #define vr_nl_broadcast_supported       vrouter_host->hos_nl_broadcast_supported
 #define vr_huge_page_config             vrouter_host->hos_huge_page_config
 #define vr_huge_page_mem_get            vrouter_host->hos_huge_page_mem_get
+#define vr_offload_flow_destroy         vrouter_host->hos_offload_flow_destroy
+#define vr_offload_flow_create          vrouter_host->hos_offload_flow_create
+#define vr_offload_prepare              vrouter_host->hos_offload_prepare
 
 extern struct host_os *vrouter_host;
 
