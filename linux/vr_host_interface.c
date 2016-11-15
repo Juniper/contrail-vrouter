@@ -136,10 +136,6 @@ vr_skb_get_rxhash(struct sk_buff *skb)
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     return skb->rxhash;
-#elif
-    return skb->hash;
-#else
-    return 0;
 #endif
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0))
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
