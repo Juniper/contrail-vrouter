@@ -8,6 +8,7 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_packet.h"
+#include "vr_offloads.h"
 #include <vr_interface.h>
 #include <vr_response.h>
 
@@ -89,6 +90,16 @@ vr_vrf_assign_set(vr_vrf_assign_req *req)
 
     ret = vif_vrf_table_set(vif, req->var_vlan_id, req->var_vif_vrf,
             req->var_nh_id);
+    if (ret == 0) {
+        ret = vr_offload_vif_vrf_set(req);
+        if (ret) {
+            /*
+             * If the offload fails to set the entry, reset vif_vrf_table.
+             */
+            vif_vrf_table_set(vif, req->var_vlan_id, -1, 0);
+        }
+    }
+
 exit_set:
     if (vif)
         vrouter_put_interface(vif);
