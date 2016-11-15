@@ -454,15 +454,19 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     if (!lookup)
         return FLOW_FORWARD;
 
-    ret = vr_inet6_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
-                                     ip6, flow_p, VR_FLOW_KEY_ALL, true, true);
-    if (ret < 0) {
-        if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
-            vr_enqueue_to_assembler(router, pkt, fmd);
-        } else {
-            vr_pfree(pkt, VP_DROP_MISC);
+    if(fmd->fmd_fe)
+        flow_p = &fmd->fmd_fe->fe_key;
+    else {
+        ret = vr_inet6_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
+                                 ip6, flow_p, VR_FLOW_KEY_ALL, true, true);
+        if (ret < 0) {
+            if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
+                vr_enqueue_to_assembler(router, pkt, fmd);
+            } else {
+                vr_pfree(pkt, VP_DROP_MISC);
+            }
+            return FLOW_CONSUMED;
         }
-        return FLOW_CONSUMED;
     }
 
     if (pkt->vp_flags & VP_FLAG_FLOW_SET)

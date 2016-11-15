@@ -1081,18 +1081,21 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         return FLOW_FORWARD;
     }
 
-    ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt,
-                              fmd->fmd_vlan, flow_p, VR_FLOW_KEY_ALL, true);
-    if (ret < 0) {
-        if (!vr_ip_transport_header_valid(ip) && vr_enqueue_to_assembler) {
-            vr_enqueue_to_assembler(router, pkt, fmd);
-        } else {
-            /* unlikely to be hit. you can safely discount misc drops here */
-            vr_pfree(pkt, VP_DROP_MISC);
+    if(fmd->fmd_fe)
+        flow_p = &fmd->fmd_fe->fe_key;
+    else {
+        ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt,
+                                  fmd->fmd_vlan, flow_p, VR_FLOW_KEY_ALL, true);
+        if (ret < 0) {
+            if (!vr_ip_transport_header_valid(ip) && vr_enqueue_to_assembler) {
+                vr_enqueue_to_assembler(router, pkt, fmd);
+            } else {
+                /* unlikely to be hit. you can safely discount misc drops here */
+                vr_pfree(pkt, VP_DROP_MISC);
+            }
+            return FLOW_CONSUMED;
         }
-        return FLOW_CONSUMED;
     }
-
 
     if (vif_is_fabric(pkt->vp_if) && !fmd->fmd_outer_src_ip) {
         if (flow_p->flow4_proto == VR_IP_PROTO_GRE) {

@@ -12,6 +12,7 @@
 #include "vr_vxlan.h"
 #include "vr_bridge.h"
 #include "vr_datapath.h"
+#include "vr_offloads.h"
 
 int
 vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
@@ -38,20 +39,24 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         drop_reason = VP_DROP_INVALID_VNID;
         goto fail;
     }
+    if (!fmd->fmd_fe) {
+        vnid = ntohl(vxlan->vxlan_vnid) >> VR_VXLAN_VNID_SHIFT;
+        if (!pkt_pull(pkt, sizeof(struct vr_vxlan))) {
+            drop_reason = VP_DROP_PULL;
+            goto fail;
+        }
 
-    vnid = ntohl(vxlan->vxlan_vnid) >> VR_VXLAN_VNID_SHIFT;
-    if (!pkt_pull(pkt, sizeof(struct vr_vxlan))) {
-        drop_reason = VP_DROP_PULL;
-        goto fail;
+        nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid);
+        if (!nh) {
+            drop_reason = VP_DROP_INVALID_VNID;
+            goto fail;
+        }
+    } else {
+        vnid = fmd->fmd_label;
+        nh = pkt->vp_nh;
     }
 
     vr_fmd_set_label(fmd, vnid, VR_LABEL_TYPE_VXLAN_ID);
-
-    nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid);
-    if (!nh) {
-        drop_reason = VP_DROP_INVALID_VNID;
-        goto fail;
-    }
 
     fmd->fmd_vlan = VLAN_ID_INVALID;
 
@@ -90,6 +95,8 @@ vr_vxlan_make_req(vr_vxlan_req *req, struct vr_nexthop *nh, unsigned int vnid)
     req->vxlanr_vnid = vnid;
     if (nh)
         req->vxlanr_nhid = nh->nh_id;
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_vxlan_get(req);
     return;
 }
 
@@ -170,6 +177,9 @@ vr_vxlan_del(vr_vxlan_req *req)
         goto generate_resp;
     }
 
+    /* notify hw offload of change, if enabled */
+    vr_offload_vxlan_del(req->vxlanr_vnid);
+
     nh = vr_itable_del(router->vr_vxlan_table, req->vxlanr_vnid);
     if (nh)
         vrouter_put_nexthop(nh);
@@ -199,6 +209,18 @@ vr_vxlan_add(vr_vxlan_req *req)
     }
 
     nh_old = vr_itable_set(router->vr_vxlan_table, req->vxlanr_vnid, nh);
+
+    ret = vr_offload_vxlan_add(nh, req->vxlanr_vnid);
+    if (ret) {
+        /* If offload add fails, restore old nexthop */
+        if (nh_old && nh_old != VR_ITABLE_ERR_PTR)
+            vr_itable_set(router->vr_vxlan_table, req->vxlanr_vnid, nh_old);
+        else
+            vr_itable_del(router->vr_vxlan_table, req->vxlanr_vnid);
+        vrouter_put_nexthop(nh);
+        goto generate_resp;
+    }
+
     if (nh_old) {
         if (nh_old == VR_ITABLE_ERR_PTR) {
             ret = -EINVAL;

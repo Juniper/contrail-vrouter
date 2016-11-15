@@ -251,3 +251,14 @@ get_platform_str(void)
 {
     return read_string(DEFAULT_SECTION, PLATFORM_KEY);
 }
+
+bool
+get_offload_enabled(void)
+{
+    const char *offload_str = read_string(DEFAULT_SECTION, OFFLOAD_KEY);
+    if (offload_str) {
+        if (!strcmp(offload_str, OFFLOAD_ENABLED))
+            return true;
+    }
+    return false;
+}

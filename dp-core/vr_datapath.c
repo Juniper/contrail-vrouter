@@ -656,6 +656,8 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     unsigned short pull_len;
     unsigned char *data, eth_dmac[VR_ETHER_ALEN];
 
+    if (vr_offload_prepare)
+        vr_offload_prepare(pkt, fmd);
     fmd->fmd_vlan = vlan_id;
     fmd->fmd_dvrf = vif->vif_vrf;
 

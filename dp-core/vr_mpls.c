@@ -13,6 +13,7 @@
 #include "vr_bridge.h"
 #include "vr_datapath.h"
 #include "vr_btable.h"
+#include "vr_offloads.h"
 
 unsigned int vr_mpls_labels = VR_DEF_LABELS;
 
@@ -84,6 +85,9 @@ vr_mpls_del(vr_mpls_req *req)
         goto generate_resp;
     }
 
+    /* notify hw offload of change, if enabled */
+    vr_offload_mpls_del(req->mr_label);
+
     ret =  __vr_mpls_del(router, req->mr_label);
 
 generate_resp:
@@ -131,6 +135,13 @@ vr_mpls_add(vr_mpls_req *req)
         && nh->nh_type == NH_ENCAP && !(nh->nh_flags & NH_FLAG_MCAST))
         vrouter_host->hos_add_mpls(router, req->mr_label);
 
+    /* notify hw offload of change, if enabled */
+    if (!ret) {
+        ret = vr_offload_mpls_add(nh, req->mr_label);
+        if (ret)
+            __vr_mpls_del(router, req->mr_label);
+    }
+
 generate_resp:
     vr_send_response(ret);
 
@@ -144,6 +155,9 @@ vr_mpls_make_req(vr_mpls_req *req, struct vr_nexthop *nh,
     req->mr_rid = 0;
     req->mr_nhid = nh->nh_id;
     req->mr_label = label;
+
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_mpls_get(req);
 
     return;
 }
@@ -337,11 +351,14 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         goto dropit;
     }
 
-    nh = __vrouter_get_label(router, label);
-    if (!nh) {
-        drop_reason = VP_DROP_INVALID_LABEL;
-        goto dropit;
-    }
+    if (!fmd->fmd_fe) {
+        nh = __vrouter_get_label(router, label);
+        if (!nh) {
+            drop_reason = VP_DROP_INVALID_LABEL;
+            goto dropit;
+        }
+    } else
+        nh = pkt->vp_nh;
 
     /*
      * Mark it for GRO. Diag, L2 and multicast nexthops unmark if
