@@ -450,5 +450,6 @@ extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
 unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);
 unsigned int vr_flow_table_used_total_entries(struct vrouter *);
 
+int vr_flow_incr_stats(int , uint32_t , uint16_t, uint32_t);
 
 #endif /* __VR_FLOW_H__ */

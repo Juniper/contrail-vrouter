@@ -23,6 +23,7 @@
 #include <vr_mirror.h>
 #include <vr_vxlan.h>
 #include <vr_qos.h>
+#include <vr_offloads.h>
 
 static struct vrouter router;
 struct host_os *vrouter_host;
@@ -497,8 +498,12 @@ init_fail:
 static int
 vrouter_soft_reset(void)
 {
+    int ret = 0;
     vrouter_exit(true);
-    return vrouter_init();
+    ret = vrouter_init();
+    if (!ret)
+        ret = vr_offload_soft_reset();
+    return ret;
 }
 
 void
