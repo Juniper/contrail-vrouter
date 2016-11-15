@@ -18,6 +18,7 @@
 #include "vr_route.h"
 #include "vr_hash.h"
 #include "vr_mirror.h"
+#include "vr_offloads.h"
 
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
@@ -2840,6 +2841,7 @@ vr_nexthop_delete(vr_nexthop_req *req)
     if (!nh) {
         ret = -EINVAL;
     } else {
+        vr_offload_nexthop_del(nh);
         vrouter_put_nexthop(nh);
         nh->nh_destructor(nh);
     }
@@ -3596,6 +3598,15 @@ error:
         nh->nh_flags |= NH_FLAG_VALID;
 
     ret = vrouter_add_nexthop(nh);
+
+    if (ret) {
+        nh->nh_destructor(nh);
+        goto generate_resp;
+    }
+    else /* notify hw offload of change, if enabled */
+        ret = vr_offload_nexthop_add(nh);
+
+    /* if offload failed, delete kernel entry for consistency */
     if (ret)
         nh->nh_destructor(nh);
 
@@ -3932,6 +3943,10 @@ vr_nexthop_get(vr_nexthop_req *req)
     } else
         ret = -ENOENT;
 
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    if (!ret)
+        vr_offload_nexthop_get(nh, resp);
+
 generate_response:
     vr_message_response(VR_NEXTHOP_OBJECT_ID, ret < 0 ? NULL : resp, ret, false);
     if (resp)
@@ -3970,6 +3985,10 @@ vr_nexthop_dump(vr_nexthop_req *r)
 
             resp->h_op = SANDESH_OP_DUMP;
             ret = vr_nexthop_make_req(resp, nh);
+
+            if (!ret)
+                vr_offload_nexthop_get(nh, resp);
+
             if ((ret < 0) || ((ret = vr_message_dump_object(dumper,
                                 VR_NEXTHOP_OBJECT_ID, resp)) <= 0)) {
                 vr_nexthop_req_destroy(resp);
@@ -4103,3 +4122,4 @@ vr_nexthop_init(struct vrouter *router)
 {
     return nh_table_init(router);
 }
+
