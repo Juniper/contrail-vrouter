@@ -368,6 +368,44 @@ struct vr_ip {
     unsigned int ip_daddr;
 } __attribute__((packed));
 
+static inline void
+vr_incremental_diff(unsigned int oldval, unsigned int newval,
+        unsigned int *diff)
+{
+    unsigned int tmp;
+
+    tmp = ~oldval + newval;
+    if (tmp < newval)
+        tmp += 1;
+
+    *diff += tmp;
+    if (*diff < tmp)
+        *diff += 1;
+
+    return;
+}
+
+static inline void
+vr_ip_incremental_csum(struct vr_ip *ip, unsigned int diff)
+{
+    unsigned int csum;
+
+    diff = (diff >> 16) + (diff & 0xffff);
+    if (diff >> 16) {
+        diff &= 0xffff;
+        diff += 1;
+    }
+
+    csum = ~(ip->ip_csum) & 0xffff;
+    csum += diff;
+    csum = (csum >> 16) + (csum & 0xffff);
+    if (csum >> 16)
+        csum = (csum & 0xffff) + 1;
+
+    ip->ip_csum = (~csum & 0xffff);
+    return;
+}
+
 #define SOURCE_LINK_LAYER_ADDRESS_OPTION    1
 #define TARGET_LINK_LAYER_ADDRESS_OPTION    2
 
@@ -612,23 +650,6 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
         return false;
 
     return true;
-}
-
-static inline void
-vr_incremental_diff(unsigned int oldval, unsigned int newval,
-        unsigned int *diff)
-{
-    unsigned int tmp;
-
-    tmp = ~oldval + newval;
-    if (tmp < newval)
-        tmp += 1;
-
-    *diff += tmp;
-    if (*diff < tmp)
-        *diff += 1;
-
-    return;
 }
 
 #define VR_TCP_FLAG_FIN         0x0001
