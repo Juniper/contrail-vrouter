@@ -620,6 +620,11 @@ validate_options(void)
                     printf("Aggregate bandwidth is greater than 100\n");
                     goto exit_options;
                 }
+
+                if(priority_map.prio_to_tc[i] != priority_map.tc_to_group[i]) {
+                    printf("Only 1-1 mapping between traffic class and priority group is allowed\n");
+                    goto exit_options;
+                }
             }
         }
 
