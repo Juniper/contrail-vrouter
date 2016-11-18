@@ -20,6 +20,7 @@
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
+#include "vr_dpdk_gro.h"
 
 #include <signal.h>
 
@@ -1226,6 +1227,8 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
         }
     }
 
+    vr_dpdk_gro_init(lcore_id, lcore);
+
     return 0;
 }
 
@@ -1518,6 +1521,8 @@ dpdk_lcore_fwd_loop(void)
 
             /* flush all TX queues */
             vr_dpdk_lcore_flush(lcore);
+            /* flush inactive GRO flows */
+            dpdk_gro_flush_all_inactive(lcore);
 
             /* check if we need to TX bond queues */
             if (unlikely(lcore->lcore_nb_bonds_to_tx > 0)) {

@@ -64,7 +64,7 @@
 #define VR_HASH_INITVAL     0xdeadbeef
 
 struct __unaligned_u32 { uint32_t x; } __attribute__((packed));
-static inline uint32_t __get_unaligned_word(const void *p)
+static inline uint32_t __get_unaligned_word(void *p)
 {
     union {
         uint8_t bytes[sizeof(uint32_t)];
@@ -89,10 +89,10 @@ static inline uint32_t __get_unaligned_word(const void *p)
  *
  * Returns the hash value of the key. The result depends on endianness.
  */
-static inline uint32_t vr_hash(const void *key, uint32_t length, uint32_t initval)
+static inline uint32_t vr_hash(void *key, uint32_t length, uint32_t initval)
 {
     uint32_t a, b, c;
-    const uint8_t *k = key;
+    uint8_t *k = key;
 
     /* Set up the internal state */
     a = b = c = VR_HASH_INITVAL + length + initval;
