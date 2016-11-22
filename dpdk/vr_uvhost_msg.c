@@ -566,12 +566,25 @@ vr_uvhm_set_vring_enable(vr_uvh_client_t *vru_cl)
         return -1;
     }
 
+    /*
+     * If the queue is higher than the number supported by vrouter, silently
+     * fail here (as there is no error message returned to qemu).
+     */
+    if ((vring_idx / 2) >= vr_dpdk.nb_fwd_lcores) {
+        RTE_LOG(ERR, UVHOST, "%s: Can not %s %s queue %d (only %d queues)\n",
+            __func__, enable ? "enable" : "disable",
+            (vring_idx & 1) ? "RX" : "TX", vring_idx / 2,
+            vr_dpdk.nb_fwd_lcores);
+        return 0;
+    }
+
     vr_uvhost_log("Client %s: setting vring %u ready state %d\n",
                   uvhm_client_name(vru_cl), vring_idx, enable);
 
     uvhm_check_vring_ready(vru_cl, vring_idx);
 
     queue_num = vring_idx / 2;
+
     if (vring_idx & 1) {
         /* RX queues */
         vr_dpdk_virtio_rx_queue_enable_disable(vru_cl->vruc_idx,
@@ -619,8 +632,14 @@ static int
 vr_uvhm_get_queue_num(vr_uvh_client_t *vru_cl)
 {
     /* We support up to number of forwarding lcores queues as they are the only
-     * lcores that handle rx queues. */
-    vru_cl->vruc_msg.u64 = vr_dpdk.nb_fwd_lcores;
+     * lcores that handle rx queues. However, this causes a failure when spawning
+     * the VM if the number of VCPUs in the VM is higher than the number of
+     * forwarding cores in vrouter. So, return VR_DPDK_VIRTIO_MAX_QUEUES here,
+     * but siliently fail the enable/disable of queues higher than the number
+     * of forwarding cores when the message is received from qemu later. The
+     * expectation is that the VM should not enable more queues that that.
+     */
+    vru_cl->vruc_msg.u64 = VR_DPDK_VIRTIO_MAX_QUEUES;
     vr_uvhost_log("    GET QUEUE NUM: returns 0x%"PRIx64"\n",
                   vru_cl->vruc_msg.u64);
 
