@@ -372,6 +372,15 @@ enum opt_qos_index {
     MAX_OPT_INDEX
 };
 
+static void
+build_priority_to_tc_map(void)
+{
+    unsigned int i;
+    for (i = 0; i < NUM_TC; i++) {
+        priority_map.prio_to_tc[i] = priority_map.tc_to_group[i];
+    }
+    tc_set = 1;
+}
 
 static int
 extract_priority_to_tc_map(char *up2tc)
@@ -514,7 +523,7 @@ static struct option long_options[] = {
     [SET_QOS_MAP_OPT_INDEX]         = {"set-qos",       required_argument,  &set_qos_set,       1},
     [SET_QUEUE_OPT_INDEX]           = {"set-queue",     required_argument,  &set_queue_set,     1},
     [STRICT_OPT_INDEX]              = {"strict",        required_argument,  &strict_set,        1},
-    [TC_OPT_INDEX]                  = {"tc",            required_argument,  &tc_set,            1},
+    [TC_OPT_INDEX]                  = {"tc",            optional_argument,  &tc_set,            1},
     [HELP_OPT_INDEX]                = {"help",          no_argument,        &help_set,          1},
     [MAX_OPT_INDEX]                 = { NULL,           0,                  0,                  0}
 };
@@ -527,7 +536,7 @@ Usage(void)
     printf("       --set-fc <fc-id> <--dscp | --mpls_qos | --dotonep | --queue> <value>\n");
     printf("       --get-qos <index>\n");
     printf("       --set-qos <index> <--dscp | --mpls_qos | --dotonep> <value> --fc <fc-id>\n");
-    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101.. --tc 0,1,..\n");
+    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101..\n");
     printf("       --get-queue <ifname>\n");
     printf("       --dump-fc\n");
     printf("       --dump-qos\n");
@@ -724,8 +733,12 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case TC_OPT_INDEX:
-        if (extract_priority_to_tc_map(optarg)) {
-            Usage();
+        if(tc_set) {
+            if (extract_priority_to_tc_map(optarg)) {
+                Usage();
+            }
+        } else {
+            build_priority_to_tc_map();
         }
         break;
 
