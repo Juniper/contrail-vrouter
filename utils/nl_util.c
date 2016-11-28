@@ -53,6 +53,9 @@ extern void vr_mem_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_fc_map_req_process(void *s_req) __attribute__((weak));
 extern void vr_qos_map_req_process(void *s_req) __attribute__((weak));
 extern void vr_flow_table_data_process(void *s_req) __attribute__((weak));
+#if 0
+extern void vr_bridge_table_data_process(void *s_req) __attribute__((weak));
+#endif
 
 void
 vrouter_ops_process(void *s_req)
@@ -157,6 +160,14 @@ vr_fc_map_req_process(void *s_req)
 {
     return;
 }
+
+#if 0
+void
+vr_bridge_table_data_process(void *s_req)
+{
+    return;
+}
+#endif
 
 struct nl_response *
 nl_parse_gen_ctrl(struct nl_client *cl)

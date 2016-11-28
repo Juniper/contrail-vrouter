@@ -27,6 +27,7 @@
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
 #include "vr_bridge.h"
+#include "vr_mem.h"
 #include "nl_util.h"
 
 #include <rte_errno.h>
@@ -636,9 +637,19 @@ dpdk_init(void)
 
     version_print();
 
-    ret = vr_dpdk_flow_mem_init();
+    ret = vr_dpdk_table_mem_init(VR_MEM_FLOW_TABLE_OBJECT, vr_flow_entries,
+            VR_FLOW_TABLE_SIZE, vr_oflow_entries, VR_OFLOW_TABLE_SIZE);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "Error initializing flow table: %s (%d)\n",
+            rte_strerror(-ret), -ret);
+        return ret;
+    }
+
+    ret = vr_dpdk_table_mem_init(VR_MEM_BRIDGE_TABLE_OBJECT, vr_bridge_entries,
+            VR_BRIDGE_TABLE_SIZE, vr_bridge_oentries,
+            VR_BRIDGE_OFLOW_TABLE_SIZE);
+    if (ret < 0) {
+        RTE_LOG(ERR, VROUTER, "Error initializing bridge table: %s (%d)\n",
             rte_strerror(-ret), -ret);
         return ret;
     }

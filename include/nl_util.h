@@ -29,6 +29,9 @@ extern "C" {
 #define VR_NETLINK_PROTO_DEFAULT    -1
 #define VR_NETLINK_PROTO_TEST       -2
 
+#define BRIDGE_TABLE_DEV            "/dev/vr_bridge"
+#define FLOW_TABLE_DEV              "/dev/flow"
+
 struct nl_response {
     uint8_t *nl_data;
     unsigned int nl_type;
@@ -151,6 +154,7 @@ extern struct nl_client *vr_get_nl_client(int);
 
 extern int vr_response_common_process(vr_response *, bool *);
 
+extern void *vr_table_map(int, unsigned int, char *, size_t);
 extern unsigned long vr_sum_drop_stats(vr_drop_stats_req *);
 extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);

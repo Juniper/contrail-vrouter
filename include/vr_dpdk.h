@@ -505,6 +505,7 @@ struct vr_dpdk_global {
     /* NetLink socket handler */
     void *netlink_sock;
     void *flow_table;
+    void *bridge_table;
     /* Packet socket */
     void *packet_transport;
     /* Interface configuration mutex
@@ -647,11 +648,10 @@ uint64_t vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
 /* Check if port_id is a bond slave. */
 bool vr_dpdk_ethdev_bond_port_match(uint8_t port_id, struct vr_dpdk_ethdev *ethdev);
 
-/*
- * vr_dpdk_flow_mem.c
- */
-int vr_dpdk_flow_mem_init(void);
+int vr_dpdk_table_mem_init(unsigned int, unsigned int, unsigned long,
+        unsigned int, unsigned long);
 int vr_dpdk_flow_init(void);
+int vr_dpdk_bridge_init(void);
 
 /*
  * vr_dpdk_host.c

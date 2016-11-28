@@ -498,7 +498,7 @@ gen(FILE *fp)
                     gen_write(fp_expect, 0, "_size");
                     gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U8);\n");
 
-                } else if (!strncmp(sub_type, "i16", strlen("i32"))) {
+                } else if (!strncmp(sub_type, "i16", strlen("i16"))) {
                     gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U16, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
@@ -510,7 +510,8 @@ gen(FILE *fp)
                     gen_write(fp_expect, 0, "_size");
                     gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U16);\n");
 
-                } else if (!strncmp(sub_type, "i32", strlen("i32"))) {
+                } else if (!strncmp(sub_type, "i32", strlen("i32")) ||
+                        !strncmp(sub_type, "u32", strlen("u32"))) {
                     gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U32, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
@@ -522,7 +523,7 @@ gen(FILE *fp)
                     gen_write(fp_expect, 0, "_size");
                     gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U32);\n");
 
-                } else if (!strncmp(sub_type, "i64", strlen("i32"))) {
+                } else if (!strncmp(sub_type, "i64", strlen("i64"))) {
                     gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U64, &list_size);\n");
 
                     gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
