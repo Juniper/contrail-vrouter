@@ -369,10 +369,11 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         vr_init_forwarding_md(&fmd);
         fmd.fmd_dvrf = ntohs(hdr->hdr_vrf);
 
-        pkt->vp_type = VP_TYPE_AGENT;
-        pkt_set_network_header(pkt, pkt->vp_data + sizeof(struct vr_eth));
-        pkt_set_inner_network_header(pkt,
-                                     pkt->vp_data + sizeof(struct vr_eth));
+        if (vr_pkt_type(pkt, 0, &fmd) < 0) {
+            vif_drop_pkt(vif, pkt, 1);
+            return 0;
+        }
+
         return vif->vif_tx(vif, pkt, &fmd);
 
         break;

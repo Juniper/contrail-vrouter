@@ -1489,9 +1489,10 @@ nh_discard(struct vr_packet *pkt, struct vr_nexthop *nh,
     return 0;
 }
 
-static int
+static uint32_t
 nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
 {
+    uint32_t ip = 0, alt_ip;
     struct vr_ip *iph;
 
     iph = (struct vr_ip *)pkt_network_header(pkt);
@@ -1501,13 +1502,23 @@ nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
          * If the packet is from fabric, it must be destined to a VM on
          * this compute, so lets use dest ip
          */
-        if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
-            return iph->ip_daddr;
+        if ((pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL) ||
+                (pkt->vp_if->vif_type == VIF_TYPE_AGENT)) {
+            ip = iph->ip_daddr;
+            alt_ip = iph->ip_saddr;
+        } else {
+            ip = iph->ip_saddr;
+            alt_ip = iph->ip_daddr;
+        }
 
-        return iph->ip_saddr;
+        if ((nh->nh_type == NH_TUNNEL) && (nh->nh_flags & NH_FLAG_TUNNEL_UDP)) {
+            if (ip == nh->nh_udp_tun_dip) {
+                ip = alt_ip;
+            }
+        }
     }
 
-    return 0;
+    return ip;
 }
 
 static int
