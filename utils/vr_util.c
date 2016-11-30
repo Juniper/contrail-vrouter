@@ -366,7 +366,7 @@ vr_table_map(int major, unsigned int table,
     return mem;
 }
 
-#if 0
+#if 1
 int
 vr_send_get_bridge_table_data(struct nl_client *cl)
 {
@@ -586,6 +586,10 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_invalid_label);
     printf("Invalid Protocol              %" PRIu64 "\n",
             stats->vds_invalid_protocol);
+    printf("Etree Leaf to Leaf            %" PRIu64 "\n",
+            stats->vds_leaf_to_leaf);
+    printf("Bmac/ISID Mismatch            %" PRIu64 "\n",
+            stats->vds_bmac_isid_mismatch);
     printf("Rewrite Fail                  %" PRIu64 "\n",
             stats->vds_rewrite_fail);
     printf("Invalid Mcast Source          %" PRIu64 "\n",
@@ -1353,6 +1357,64 @@ vr_send_nexthop_get(struct nl_client *cl, unsigned int router_id,
     req.nhr_id = nh_index;
 
     return vr_sendmsg(cl, &req, "vr_nexthop_req");
+}
+
+int
+vr_send_pbb_tunnel_add(struct nl_client *cl, unsigned int router_id, int
+        nh_index, unsigned int flags, int vrf_index, int8_t *bmac,
+        unsigned int direct_nh_id, unsigned int direct_label)
+{
+    int ret = 0;
+    unsigned int i;
+    vr_nexthop_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_ADD;
+    req.nhr_rid = router_id;
+    req.nhr_vrf = vrf_index;
+    req.nhr_id = nh_index;
+    req.nhr_flags = flags;
+    req.nhr_type = NH_TUNNEL;
+
+    req.nhr_nh_list_size = 1;
+    req.nhr_nh_list = calloc(1, sizeof(uint32_t));
+    if (!req.nhr_nh_list) {
+        ret = -ENOMEM;
+        goto fail;
+    }
+
+    req.nhr_label_list = calloc(1, sizeof(uint32_t));
+    if (!req.nhr_label_list) {
+        ret = -ENOMEM;
+        goto fail;
+    }
+
+    req.nhr_pbb_evpn_mac_size = VR_ETHER_ALEN;
+    req.nhr_pbb_evpn_mac = calloc(VR_ETHER_ALEN, sizeof(uint8_t));
+    if (!req.nhr_pbb_evpn_mac) {
+        ret = -ENOMEM;
+        goto fail;
+    }
+    VR_MAC_COPY(req.nhr_pbb_evpn_mac, bmac);
+
+    req.nhr_label_list_size = 1;
+    req.nhr_nh_list[0] = direct_nh_id;
+    req.nhr_label_list[0] = direct_label;
+    req.nhr_family = AF_BRIDGE;
+
+    ret = vr_sendmsg(cl, &req, "vr_nexthop_req");
+fail:
+    if (req.nhr_nh_list) {
+        free(req.nhr_nh_list);
+        req.nhr_nh_list = NULL;
+    }
+
+    if (req.nhr_label_list) {
+        free(req.nhr_label_list);
+        req.nhr_label_list = NULL;
+    }
+
+    return ret;
 }
 
 int

@@ -294,7 +294,7 @@ vr_print_rtable_header(unsigned int family, unsigned int vrf)
     return;
 }
 
-#if 0
+#if 1
 static void
 vr_bridge_table_dump(unsigned int vrf)
 {
@@ -348,7 +348,7 @@ op_retry:
         break;
 
     case SANDESH_OP_DUMP:
-#if 0
+#if 1
         if (cmd_family_id == AF_BRIDGE) {
             vr_bridge_table_dump(cmd_vrf_id);
             return 0;
@@ -357,7 +357,7 @@ op_retry:
             dump = true;
             ret = vr_send_route_dump(cl, 0, cmd_vrf_id, cmd_family_id,
                 rt_marker);
-#if 0
+#if 1
         }
 #endif
 
@@ -393,7 +393,7 @@ op_retry:
     return 0;
 }
 
-#if 0
+#if 1
 static int
 bridge_table_map(vr_bridge_table_data *table)
 {
@@ -800,7 +800,7 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-#if 0
+#if 1
     if (cmd_family_id == AF_BRIDGE) {
         if (cmd_op == SANDESH_OP_DUMP || cmd_op == SANDESH_OP_GET) {
             ret = vr_bridge_table_setup(cl);
