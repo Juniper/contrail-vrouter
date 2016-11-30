@@ -509,10 +509,27 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
         pkt->vp_flags |= VP_FLAG_MULTICAST;
 
     eth_proto = ntohs(*(unsigned short *)(eth + VR_ETHER_PROTO_OFF));
+    if (eth_proto == VR_ETH_PROTO_PBB) {
+
+        if (pkt_len < (pull_len + sizeof(struct vr_pbb_itag)))
+            return -1;
+        pull_len += sizeof(struct vr_pbb_itag);
+
+        if (pkt_len < (pull_len + VR_ETHER_HLEN))
+            return -1;
+
+        pkt->vp_type = vr_eth_proto_to_pkt_type(eth_proto);
+        return 0;
+    }
+
     while (eth_proto == VR_ETH_PROTO_VLAN) {
         if (pkt_len < (pull_len + sizeof(*vlan)))
             return -1;
         vlan = (struct vr_vlan_hdr *)(eth + pull_len);
+        /*
+         * consider the packet as vlan tagged only if it is provider
+         * vlan tag. Customers vlan tag, Vrouter is not bothered off
+         */
         if (fmd && (fmd->fmd_vlan == VLAN_ID_INVALID))
             fmd->fmd_vlan = vlan->vlan_tag & 0xFFF;
         eth_proto = ntohs(vlan->vlan_proto);
@@ -647,8 +664,8 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         return 0;
 
     vr_bridge_input(vif->vif_router, pkt, &fmd);
-    return 0;
 
+    return 0;
 }
 
 unsigned int
@@ -812,4 +829,48 @@ vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
 
     handled = vr_gro_process(pkt, nh->nh_dev, (nh->nh_family == AF_BRIDGE));
     return handled;
+}
+
+int
+__vr_pbb_decode(struct vr_eth *eth, int len, struct vr_forwarding_md *fmd)
+{
+    int pbb_size = sizeof(struct vr_eth) + sizeof(struct vr_pbb_itag);
+
+    if (!eth || !fmd || (len < pbb_size))
+        return -1;
+
+    if (ntohs(eth->eth_proto) != VR_ETH_PROTO_PBB)
+        return -1;
+
+    /* Copy the PBB mac addresses to fmd */
+    VR_MAC_COPY(fmd->fmd_smac, eth->eth_smac);
+    VR_MAC_COPY(fmd->fmd_dmac, eth->eth_dmac);
+
+    return pbb_size;
+}
+
+int
+vr_pbb_decode(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    int pbb_size, decode_error = 1;
+
+    pbb_size = __vr_pbb_decode((struct vr_eth *)pkt_data(pkt),
+            pkt_head_len(pkt), fmd);
+    if (pbb_size <= 0) {
+        vr_pfree(pkt, VP_DROP_INVALID_PACKET);
+        return decode_error;
+    }
+
+    if (!pkt_pull(pkt, pbb_size)) {
+        vr_pfree(pkt, VP_DROP_PULL);
+        return decode_error;
+    }
+
+    /* Get the inner ether type and header pointers */
+    if (vr_pkt_type(pkt, 0, fmd) < 0) {
+        vr_pfree(pkt, VP_DROP_INVALID_PACKET);
+        return decode_error;
+    }
+
+    return !decode_error;
 }

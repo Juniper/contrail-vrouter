@@ -54,9 +54,11 @@ vr_vrf_stats_req_process(void *s_req)
             stats->vsr_l2_mcast_composites, stats->vsr_fabric_composites,
             stats->vsr_encap_composites, stats->vsr_evpn_composites);
     printf("Udp Tunnels %" PRIu64 ", Udp Mpls Tunnels %" PRIu64
-            ", Gre Mpls Tunnels %" PRIu64 ", Vxlan Tunnels %" PRIu64 "\n",
+            ", Gre Mpls Tunnels %" PRIu64 ", Vxlan Tunnels %" PRIu64
+            ", Pbb Tunnels %" PRIu64 "\n",
             stats->vsr_udp_tunnels, stats->vsr_udp_mpls_tunnels,
-            stats->vsr_gre_mpls_tunnels, stats->vsr_vxlan_tunnels);
+            stats->vsr_gre_mpls_tunnels, stats->vsr_vxlan_tunnels,
+            stats->vsr_pbb_tunnels);
     printf("L2 Encaps %" PRIu64 ", Encaps %" PRIu64 "\n",
             stats->vsr_l2_encaps, stats->vsr_encaps);
     printf("GROs %" PRIu64 ", Diags %" PRIu64 "\n",

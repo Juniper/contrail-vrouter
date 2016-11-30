@@ -564,7 +564,7 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
     if (fmd) {
         pnode->pl_outer_src_ip = fmd->fmd_outer_src_ip;
         pnode->pl_label = fmd->fmd_label;
-        if (vr_forwarding_md_label_is_vxlan_id(fmd))
+        if (vr_fmd_label_is_vxlan_id(fmd))
             pnode->pl_flags |= PN_FLAG_LABEL_IS_VXLAN_ID;
         if (fmd->fmd_to_me)
             pnode->pl_flags |= PN_FLAG_TO_ME;
@@ -1436,10 +1436,10 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
 
     fmd->fmd_outer_src_ip = pnode->pl_outer_src_ip;
     if (pnode->pl_flags & PN_FLAG_LABEL_IS_VXLAN_ID) {
-        vr_forwarding_md_set_label(fmd, pnode->pl_label,
+        vr_fmd_set_label(fmd, pnode->pl_label,
                 VR_LABEL_TYPE_VXLAN_ID);
     } else {
-        vr_forwarding_md_set_label(fmd, pnode->pl_label,
+        vr_fmd_set_label(fmd, pnode->pl_label,
                 VR_LABEL_TYPE_MPLS);
     }
 
@@ -1467,7 +1467,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
     if (!pkt->vp_nh) {
         if (vif_is_fabric(pkt->vp_if) && fmd &&
                 (fmd->fmd_label >= 0)) {
-            if (!vr_forwarding_md_label_is_vxlan_id(fmd))
+            if (!vr_fmd_label_is_vxlan_id(fmd))
                 pkt->vp_nh = __vrouter_get_label(router, fmd->fmd_label);
         }
     }

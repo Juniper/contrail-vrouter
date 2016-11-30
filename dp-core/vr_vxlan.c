@@ -45,7 +45,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         goto fail;
     }
 
-    vr_forwarding_md_set_label(fmd, vnid, VR_LABEL_TYPE_VXLAN_ID);
+    vr_fmd_set_label(fmd, vnid, VR_LABEL_TYPE_VXLAN_ID);
 
     nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid);
     if (!nh) {
