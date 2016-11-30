@@ -11,6 +11,7 @@
 #include "vr_flow.h"
 #include "vrouter.h"
 #include "vr_btable.h"
+#include "vr_bridge.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -94,7 +95,8 @@
 #define VP_TYPE_IP6OIP          5
 
 #define VP_TYPE_AGENT           6
-#define VP_TYPE_UNKNOWN         7
+#define VP_TYPE_PBB             7
+#define VP_TYPE_UNKNOWN         8
 #define VP_TYPE_MAX             VP_TYPE_UNKNOWN
 
 
@@ -109,11 +111,11 @@
 /*
  * Values to define the MPLS tunnel type
  */
-#define PKT_MPLS_TUNNEL_INVALID         0x00
-#define PKT_MPLS_TUNNEL_L3              0x01
-#define PKT_MPLS_TUNNEL_L2_UCAST        0x02
-#define PKT_MPLS_TUNNEL_L2_MCAST        0x03
-#define PKT_MPLS_TUNNEL_L2_MCAST_EVPN   0x04
+#define PKT_MPLS_TUNNEL_INVALID               0x00
+#define PKT_MPLS_TUNNEL_L3                    0x01
+#define PKT_MPLS_TUNNEL_L2_UCAST              0x02
+#define PKT_MPLS_TUNNEL_L2_MCAST              0x03
+#define PKT_MPLS_TUNNEL_L2_CONTROL_DATA       0x04
 
 
 /*
@@ -179,56 +181,9 @@
 #define VP_DROP_NEW_FLOWS                   42
 #define VP_DROP_FLOW_EVICT                  43
 #define VP_DROP_TRAP_ORIGINAL               44
-#define VP_DROP_MAX                         45
-
-
-struct vr_drop_stats {
-    uint64_t vds_discard;
-    uint64_t vds_pull;
-    uint64_t vds_invalid_if;
-    uint64_t vds_invalid_arp;
-    uint64_t vds_trap_no_if;
-    uint64_t vds_nowhere_to_go;
-    uint64_t vds_flow_queue_limit_exceeded;
-    uint64_t vds_flow_no_memory;
-    uint64_t vds_flow_invalid_protocol;
-    uint64_t vds_flow_nat_no_rflow;
-    uint64_t vds_flow_action_drop;
-    uint64_t vds_flow_action_invalid;
-    uint64_t vds_flow_unusable;
-    uint64_t vds_flow_table_full;
-    uint64_t vds_interface_tx_discard;
-    uint64_t vds_interface_drop;
-    uint64_t vds_duplicated;
-    uint64_t vds_push;
-    uint64_t vds_ttl_exceeded;
-    uint64_t vds_invalid_nh;
-    uint64_t vds_invalid_label;
-    uint64_t vds_invalid_protocol;
-    uint64_t vds_interface_rx_discard;
-    uint64_t vds_invalid_mcast_source;
-    uint64_t vds_head_alloc_fail;
-    uint64_t vds_pcow_fail;
-    uint64_t vds_mcast_df_bit;
-    uint64_t vds_mcast_clone_fail;
-    uint64_t vds_no_memory;
-    uint64_t vds_rewrite_fail;
-    uint64_t vds_misc;
-    uint64_t vds_invalid_packet;
-    uint64_t vds_cksum_err;
-    uint64_t vds_no_fmd;
-    uint64_t vds_cloned_original;
-    uint64_t vds_invalid_vnid;
-    uint64_t vds_frag_err;
-    uint64_t vds_invalid_source;
-    uint64_t vds_l2_no_route;
-    uint64_t vds_fragment_queue_fail;
-    uint64_t vds_vlan_fwd_tx;
-    uint64_t vds_vlan_fwd_enq;
-    uint64_t vds_drop_new_flow;
-    uint64_t vds_flow_evict;
-    uint64_t vds_trap_original;
-};
+#define VP_DROP_LEAF_TO_LEAF                45
+#define VP_DROP_BMAC_ISID_MISMATCH          46
+#define VP_DROP_MAX                         47
 
 /*
  * NOTE: Please do not add any more fields without ensuring
@@ -286,6 +241,14 @@ struct vr_vlan_hdr {
     unsigned short vlan_proto;
 } __attribute__((packed));
 
+struct vr_pbb_itag {
+    uint8_t    pbbi_pcp:3,
+               pbbi_dei:1,
+               pbbi_uca:1,
+               pbbi_res:3;
+    uint32_t   pbbi_isid:24;
+} __attribute__((packed));
+
 
 #define VR_ARP_HW_LEN           6
 #define VR_ARP_OP_REQUEST       1
@@ -295,6 +258,7 @@ struct vr_vlan_hdr {
 #define VR_ETH_PROTO_IP         0x800
 #define VR_ETH_PROTO_IP6        0x86DD
 #define VR_ETH_PROTO_VLAN       0x8100
+#define VR_ETH_PROTO_PBB        0x88E7
 
 #define VR_DIAG_CSUM         0xffff
 #define VR_UDP_PORT_RANGE_START 49152
@@ -552,6 +516,22 @@ int vr_inner_pkt_parse(unsigned char *va,
 #define IS_BMCAST_IP(ip) \
             (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF))
 
+static inline void
+vr_mcast_mac_from_isid(uint32_t isid, uint8_t *mac)
+{
+    if (!mac)
+        return;
+
+    mac[0] = 1;
+    mac[1] = 0x1E;
+    mac[2] = 0x83;
+    mac[3] = 0xFF & (isid >> 16);
+    mac[4] = 0xFF & (isid >> 8);
+    mac[5] = 0xFF & isid;
+
+    return;
+}
+
 #define VR_IP_ADDR_SIZE(type) \
         ((type == VP_TYPE_IP6) ? VR_IP6_ADDRESS_LEN \
                                : VR_IP_ADDRESS_LEN)
@@ -565,8 +545,10 @@ vr_eth_proto_to_pkt_type(unsigned short eth_proto)
         return VP_TYPE_IP6;
     else if (eth_proto == VR_ETH_PROTO_ARP)
         return VP_TYPE_ARP;
-    else
-        return VP_TYPE_UNKNOWN;
+    else if (eth_proto == VR_ETH_PROTO_PBB)
+        return VP_TYPE_PBB;
+
+    return VP_TYPE_UNKNOWN;
 }
 
 static inline bool
@@ -764,6 +746,10 @@ struct vr_sctp {
 #define VR_ICMP6_NEIGH_AD_FLAG_SOLCITED 0x4000
 #define VR_ICMP6_NEIGH_AD_FLAG_OVERRIDE 0x2000
 
+#define VR_ICMP6_NEIGH_AD_FLAG_ROUTER   0x8000
+#define VR_ICMP6_NEIGH_AD_FLAG_SOLCITED 0x4000
+#define VR_ICMP6_NEIGH_AD_FLAG_OVERRIDE 0x2000
+
 #define VR_IP6_PROTO_FRAG          44
 
 struct vr_icmp {
@@ -874,8 +860,8 @@ struct vr_vxlan {
 #define VR_VXLAN_HDR_LEN        (sizeof(struct vr_vxlan) + \
                                     sizeof(struct vr_ip) + sizeof(struct vr_udp))
 
-#define VR_L2_MCAST_CTRL_DATA           (0x0000)
-#define VR_L2_MCAST_CTRL_DATA_LEN       4
+#define VR_L2_CTRL_DATA           (0x0000)
+#define VR_L2_CTRL_DATA_LEN       4
 
 /*
  * The L2 mcast head space contains Vxlan header and 4 bytes of control
@@ -883,7 +869,7 @@ struct vr_vxlan {
  */
 #define VR_L2_MCAST_PKT_HEAD_SPACE  (VR_L3_MCAST_PKT_HEAD_SPACE + \
                                       VR_VXLAN_HDR_LEN + \
-                                        VR_L2_MCAST_CTRL_DATA_LEN)
+                                        VR_L2_CTRL_DATA_LEN)
 
 
 extern unsigned short vr_ip_csum(struct vr_ip *);
@@ -913,6 +899,9 @@ enum {
  */
 #define FMD_FLAG_LABEL_IS_VXLAN_ID      0x01
 #define FMD_FLAG_MAC_IS_MY_MAC          0x02
+#define FMD_FLAG_ETREE_ENABLE           0x04
+#define FMD_FLAG_ETREE_ROOT             0x08
+#define FMD_FLAG_L2_CONTROL_DATA        0x10
 
 struct vr_forwarding_md {
     int32_t fmd_flow_index;
@@ -929,6 +918,8 @@ struct vr_forwarding_md {
     int8_t fmd_dscp;
     int8_t fmd_dotonep;
     int8_t fmd_queue;
+    int8_t fmd_dmac[VR_ETHER_ALEN];
+    int8_t fmd_smac[VR_ETHER_ALEN];
 };
 
 static inline void
@@ -947,11 +938,14 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_flags = 0;
     fmd->fmd_dscp = -1;
     fmd->fmd_dotonep = -1;
+    VR_MAC_RESET(fmd->fmd_dmac);
+    VR_MAC_RESET(fmd->fmd_smac);
+
     return;
 }
 
 static inline bool
-vr_forwarding_md_label_is_vxlan_id(struct vr_forwarding_md *fmd)
+vr_fmd_label_is_vxlan_id(struct vr_forwarding_md *fmd)
 {
     if (fmd->fmd_flags & FMD_FLAG_LABEL_IS_VXLAN_ID)
         return true;
@@ -959,7 +953,47 @@ vr_forwarding_md_label_is_vxlan_id(struct vr_forwarding_md *fmd)
 }
 
 static inline void
-vr_forwarding_md_update_label_type(struct vr_forwarding_md *fmd,
+vr_fmd_update_etree(struct vr_forwarding_md *fmd, bool valid)
+{
+    if (valid)
+        fmd->fmd_flags |= FMD_FLAG_ETREE_ENABLE;
+    else
+        fmd->fmd_flags &= ~FMD_FLAG_ETREE_ENABLE;
+
+    return;
+}
+
+static inline void
+vr_fmd_update_etree_root(struct vr_forwarding_md *fmd, bool root)
+{
+    if (root)
+        fmd->fmd_flags |= FMD_FLAG_ETREE_ROOT;
+    else
+        fmd->fmd_flags &= ~FMD_FLAG_ETREE_ROOT;
+
+    return;
+}
+
+static inline bool
+vr_fmd_etree_is_enabled(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_flags & FMD_FLAG_ETREE_ENABLE)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_fmd_etree_is_root(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_flags & FMD_FLAG_ETREE_ROOT)
+        return true;
+
+    return false;
+}
+
+static inline void
+vr_fmd_update_label_type(struct vr_forwarding_md *fmd,
         unsigned int type)
 {
     if (type == VR_LABEL_TYPE_VXLAN_ID) {
@@ -972,13 +1006,33 @@ vr_forwarding_md_update_label_type(struct vr_forwarding_md *fmd,
 }
 
 static inline void
-vr_forwarding_md_set_label(struct vr_forwarding_md *fmd, unsigned int label,
+vr_fmd_set_label(struct vr_forwarding_md *fmd, unsigned int label,
         unsigned int type)
 {
     fmd->fmd_label = label;
-    vr_forwarding_md_update_label_type(fmd, type);
+    vr_fmd_update_label_type(fmd, type);
 
     return;
+}
+
+static inline void
+vr_fmd_update_l2_control_data(struct vr_forwarding_md *fmd, bool enable)
+{
+    if (enable)
+        fmd->fmd_flags |= FMD_FLAG_L2_CONTROL_DATA;
+    else
+        fmd->fmd_flags &= ~FMD_FLAG_L2_CONTROL_DATA;
+
+    return;
+}
+
+static inline bool
+vr_fmd_l2_control_data_is_enabled(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_flags & FMD_FLAG_L2_CONTROL_DATA)
+        return true;
+
+    return false;
 }
 
 
@@ -992,7 +1046,7 @@ vr_forwarding_md_set_label(struct vr_forwarding_md *fmd, unsigned int label,
                                     sizeof(struct vr_ip6) + \
                                     sizeof(struct vr_icmp) + \
                                     sizeof(struct vr_ip6) + VR_VXLAN_HDR_LEN + \
-                                    VR_L2_MCAST_CTRL_DATA_LEN + \
+                                    VR_L2_CTRL_DATA_LEN + \
                                     (2 * VR_ETHER_HLEN) + sizeof(struct agent_hdr))
 
 static inline bool

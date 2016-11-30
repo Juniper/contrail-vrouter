@@ -92,8 +92,10 @@ struct vr_util_flags inet_flags[] = {
 };
 
 struct vr_util_flags bridge_flags[] = {
-    {VR_BE_LABEL_VALID_FLAG,    "L",    "Label Valid"   },
-    {VR_BE_FLOOD_DHCP_FLAG,     "Df",   "DHCP flood"    },
+    {VR_BE_LABEL_VALID_FLAG,      "L",    "Label Valid"         },
+    {VR_BE_FLOOD_DHCP_FLAG,       "Df",   "DHCP flood"          },
+    {VR_BE_MAC_MOVED_FLAG,        "Mm",   "Mac Moved"           },
+    {VR_BE_L2_CONTROL_DATA_FLAG,  "L2c",  "L2 Evpn Control Word"},
 };
 
 static void
@@ -156,6 +158,10 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
         strcat(flag_string, "L");
     if (flags & VR_BE_FLOOD_DHCP_FLAG)
         strcat(flag_string, "Df");
+    if (flags & VR_BE_MAC_MOVED_FLAG)
+        strcat(flag_string, "Mm");
+    if (flags & VR_BE_L2_CONTROL_DATA_FLAG)
+        strcat(flag_string, "L2c");
 
     ret = printf("%-9d", index);
     for (i = ret; i < 12; i++)

@@ -203,6 +203,8 @@ extern int vr_send_nexthop_add(struct nl_client *, unsigned int,
         unsigned int, int, unsigned int, int, int);
 extern vr_nexthop_req *vr_nexthop_req_get_copy(vr_nexthop_req *);
 extern void vr_nexthop_req_destroy(vr_nexthop_req *);
+extern int vr_send_pbb_tunnel_add(struct nl_client *, unsigned int, int,
+        unsigned int, int, int8_t *, unsigned int, unsigned int);
 
 
 extern void address_mask(uint8_t *, uint8_t, unsigned int);

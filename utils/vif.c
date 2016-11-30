@@ -132,27 +132,28 @@ static void rate_stats(struct nl_client *, unsigned int);
 static int is_stdin_hit();
 
 static struct vr_util_flags flag_metadata[] = {
-    {VIF_FLAG_POLICY_ENABLED,   "P",    "Policy"            },
-    {VIF_FLAG_XCONNECT,         "X",    "Cross Connect"     },
-    {VIF_FLAG_SERVICE_IF,       "S",    "Service Chain"     },
-    {VIF_FLAG_MIRROR_RX,        "Mr",   "Receive Mirror"    },
-    {VIF_FLAG_MIRROR_TX,        "Mt",   "Transmit Mirror"   },
-    {VIF_FLAG_TX_CSUM_OFFLOAD,  "Tc",   "Transmit Checksum Offload"},
-    {VIF_FLAG_L3_ENABLED,       "L3",   "Layer 3"           },
-    {VIF_FLAG_L2_ENABLED,       "L2",   "Layer 2"           },
-    {VIF_FLAG_DHCP_ENABLED,     "D",    "DHCP"              },
-    {VIF_FLAG_VHOST_PHYS,       "Vp",   "Vhost Physical"    },
-    {VIF_FLAG_PROMISCOUS,       "Pr",   "Promiscuous"       },
-    {VIF_FLAG_NATIVE_VLAN_TAG,  "Vnt",  "Native Vlan Tagged"},
-    {VIF_FLAG_NO_ARP_PROXY,     "Mnp",  "No MAC Proxy"      },
-    {VIF_FLAG_PMD,              "Dpdk", "DPDK PMD Interface"},
-    {VIF_FLAG_FILTERING_OFFLOAD,"Rfl",  "Receive Filtering Offload"},
-    {VIF_FLAG_MONITORED,        "Mon",  "Interface is Monitored"},
-    {VIF_FLAG_UNKNOWN_UC_FLOOD, "Uuf",  "Unknown Unicast Flood"},
-    {VIF_FLAG_VLAN_OFFLOAD,     "Vof",  "VLAN insert/strip offload"},
-    {VIF_FLAG_DROP_NEW_FLOWS,   "Df",   "Drop New Flows"},
-    {VIF_FLAG_MAC_LEARN,        "L",    "MAC Learning Enabled"},
-    {VIF_FLAG_MAC_PROXY,        "Proxy", "MAC Requests Proxied Always"},
+    {VIF_FLAG_POLICY_ENABLED,   "P",        "Policy"            },
+    {VIF_FLAG_XCONNECT,         "X",        "Cross Connect"     },
+    {VIF_FLAG_SERVICE_IF,       "S",        "Service Chain"     },
+    {VIF_FLAG_MIRROR_RX,        "Mr",       "Receive Mirror"    },
+    {VIF_FLAG_MIRROR_TX,        "Mt",       "Transmit Mirror"   },
+    {VIF_FLAG_TX_CSUM_OFFLOAD,  "Tc",       "Transmit Checksum Offload"},
+    {VIF_FLAG_L3_ENABLED,       "L3",       "Layer 3"           },
+    {VIF_FLAG_L2_ENABLED,       "L2",       "Layer 2"           },
+    {VIF_FLAG_DHCP_ENABLED,     "D",        "DHCP"              },
+    {VIF_FLAG_VHOST_PHYS,       "Vp",       "Vhost Physical"    },
+    {VIF_FLAG_PROMISCOUS,       "Pr",       "Promiscuous"       },
+    {VIF_FLAG_NATIVE_VLAN_TAG,  "Vnt",      "Native Vlan Tagged"},
+    {VIF_FLAG_NO_ARP_PROXY,     "Mnp",      "No MAC Proxy"      },
+    {VIF_FLAG_PMD,              "Dpdk",     "DPDK PMD Interface"},
+    {VIF_FLAG_FILTERING_OFFLOAD,"Rfl",      "Receive Filtering Offload"},
+    {VIF_FLAG_MONITORED,        "Mon",      "Interface is Monitored"},
+    {VIF_FLAG_UNKNOWN_UC_FLOOD, "Uuf",      "Unknown Unicast Flood"},
+    {VIF_FLAG_VLAN_OFFLOAD,     "Vof",      "VLAN insert/strip offload"},
+    {VIF_FLAG_DROP_NEW_FLOWS,   "Df",       "Drop New Flows"},
+    {VIF_FLAG_MAC_LEARN,        "L",        "MAC Learning Enabled"},
+    {VIF_FLAG_MAC_PROXY,        "Proxy",    "MAC Requests Proxied Always"},
+    {VIF_FLAG_ETREE_ROOT,       "Er",       "Etree Root"},
 };
 
 static char *
@@ -510,6 +511,11 @@ list_get_print(vr_interface_req *req)
             req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors, 0);
+    if (req->vifr_isid || req->vifr_pbb_mac_size) {
+        vr_interface_print_head_space();
+        printf("ISID: %d Bmac: "MAC_FORMAT"\n",
+                req->vifr_isid, MAC_VALUE((uint8_t *)req->vifr_pbb_mac));
+    }
     vr_interface_print_head_space();
     printf("Drops:%" PRIu64 "\n", req->vifr_dpackets);
 
