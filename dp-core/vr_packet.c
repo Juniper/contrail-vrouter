@@ -306,13 +306,13 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
                 struct vr_ip6 **ip6hp, unsigned short gre_udp_encap,
                 unsigned char ip_proto)
 {
+    unsigned short eth_proto;
     unsigned int pull_len = *pull_lenp;
     unsigned int label, control_data;
     int pkt_type = 0;
     struct vr_ip6 *ip6h = NULL;
     struct vr_ip *iph = NULL;
     struct vr_eth *eth = NULL;
-    unsigned short eth_proto;
 
     if ((ip_proto == VR_IP_PROTO_GRE && gre_udp_encap == VR_GRE_PROTO_MPLS_NO) ||
         (ip_proto == VR_IP_PROTO_UDP && vr_mpls_udp_port(ntohs(gre_udp_encap)))) {
@@ -383,6 +383,18 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
     if (eth) {
 
         eth_proto = eth->eth_proto;
+        if (ntohs(eth_proto) == VR_ETH_PROTO_PBB_EVPN) {
+            pull_len += sizeof(struct vr_pbb_itag);
+            if (frag_size < pull_len)
+                return PKT_RET_SLOW_PATH;
+
+            eth = (struct vr_eth *)(va + pull_len);
+            pull_len += VR_ETHER_HLEN;
+            if (frag_size < pull_len)
+                return PKT_RET_SLOW_PATH;
+            eth_proto = eth->eth_proto;
+        }
+
         while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
             eth_proto = ((struct vr_vlan_hdr *)(va + pull_len))->vlan_proto;
             pull_len += sizeof(struct vr_vlan_hdr);
