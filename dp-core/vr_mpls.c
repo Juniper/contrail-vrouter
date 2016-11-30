@@ -268,7 +268,7 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
 
     nh = __vrouter_get_label(router, label);
     if(!nh) {
-        res = VP_DROP_INVALID_NH;
+        res = VP_DROP_INVALID_LABEL;
         goto fail;
     }
 

@@ -700,8 +700,8 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     int ret = 0, lock, valid_src;
-    unsigned int trap_reason;
-    bool trap = false;
+    unsigned int trap_reason, nh_flags = 0;
+    bool trap = false, root = false;
 
     struct vr_eth *eth;
     struct vr_packet *pkt_c;
@@ -768,6 +768,20 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
                 trap_reason, (void *)&be->be_hentry.hentry_index);
     }
 
+    /*
+     * Enable the etree and its root parameters. Currently, enabling the
+     * MAC learning can be considred as enabling the etree
+     */
+    if (vif_is_virtual(pkt->vp_if)) {
+        if (pkt->vp_if->vif_flags & VIF_FLAG_ETREE_ROOT)
+            root = true;
+    } else if (nh_flags & NH_FLAG_ETREE_ROOT) {
+        root = true;
+    }
+
+    vr_forwarding_md_update_etree_root(fmd, root);
+    vr_forwarding_md_update_etree(fmd, true);
+
     return ret;
 }
 
@@ -786,11 +800,22 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
     dmac = (int8_t *) pkt_data(pkt);
 
-    if (pkt->vp_if->vif_flags & VIF_FLAG_MAC_LEARN) {
-        if (vr_bridge_learn(router, pkt, fmd)) {
-            return 0;
+    /*
+     * Mac learning or mac move is identified either from the
+     * ingress interface capabilities  or the nexthop's capabilities
+     * (which has invoked the bridge processing)
+     */
+    if (!fmd->fmd_to_me) {
+        if ((pkt->vp_if->vif_flags & VIF_FLAG_MAC_LEARN) ||
+                (pkt->vp_nh && (pkt->vp_nh->nh_flags & NH_FLAG_MAC_LEARN))) {
+            if (vr_bridge_learn(router, pkt, fmd)) {
+                /* Forward without  learning ? */
+                vr_pfree(pkt, VP_DROP_DISCARD);
+                return 0;
+            }
         }
     }
+
 
     pull_len = 0;
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6) ||
@@ -825,6 +850,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
          * lookup itself
          */
         if (vif_is_virtual(pkt->vp_if)) {
+
             if (pkt->vp_type == VP_TYPE_IP)
                 l4_type = vr_ip_well_known_packet(pkt);
             else if (pkt->vp_type == VP_TYPE_IP6)
@@ -890,8 +916,16 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
         if (nh->nh_type != NH_L2_RCV)
             overlay_len = VROUTER_L2_OVERLAY_LEN;
-    }
 
+        /*
+         * If the tunel is a PBB tunnel, we need to accomodate for Itag
+         * and an extra ethernet (for Bmac) + Vlan header
+         */
+        if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+            overlay_len += VR_ETHER_HLEN + sizeof(struct vr_vlan_hdr) +
+                            sizeof(struct vr_pbb_itag);
+        }
+    }
 
     /* Adjust MSS for V4 and V6 packets */
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
