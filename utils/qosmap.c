@@ -56,7 +56,7 @@ static unsigned int get_fc_set, set_fc_set, fc_set;
 static unsigned int get_qos_set, set_qos_set, delete_qos_set;
 static unsigned int dscp_set, mpls_qos_set, dotonep_set, queue_set;
 static unsigned int set_queue_set, pg_set, pg_bw_set, strict_set;
-static unsigned int get_queue_set, tc_set, dcbx_set;
+static unsigned int get_queue_set, tc_set, dcbx_set, default_tc;
 
 static uint8_t dotonep, dscp, mpls_qos, fc, queue;
 static uint8_t dcbx_mode, dcb_enable;
@@ -373,6 +373,16 @@ enum opt_qos_index {
 };
 
 
+static void
+build_default_priority_to_tc_map(void)
+{
+    unsigned int i;
+    for (i = 0; i < NUM_PG; i++) {
+        priority_map.prio_to_tc[i] = priority_map.tc_to_group[i];
+    }
+    default_tc = 1;
+}
+
 static int
 extract_priority_to_tc_map(char *up2tc)
 {
@@ -475,6 +485,8 @@ extract_priority_groups(char *pg_string)
         offset += strlen(tok) + 1;
     } while (tok && (++i < NUM_TC) && (offset < length));
 
+    build_default_priority_to_tc_map();
+
     return 0;
 }
 
@@ -527,7 +539,7 @@ Usage(void)
     printf("       --set-fc <fc-id> <--dscp | --mpls_qos | --dotonep | --queue> <value>\n");
     printf("       --get-qos <index>\n");
     printf("       --set-qos <index> <--dscp | --mpls_qos | --dotonep> <value> --fc <fc-id>\n");
-    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101.. --tc 0,1,..\n");
+    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101..\n");
     printf("       --get-queue <ifname>\n");
     printf("       --dump-fc\n");
     printf("       --dump-qos\n");
@@ -547,7 +559,8 @@ validate_options(void)
     unsigned int set = dotonep_set + mpls_qos_set + dscp_set + queue_set;
     unsigned int op_set = get_fc_set + get_qos_set + set_fc_set +
         set_qos_set + dump_fc_set + dump_qos_set + delete_qos_set + get_queue_set;
-    unsigned int prio_opt_set = dcbx_set + set_queue_set + pg_set + pg_bw_set + strict_set + tc_set;
+    unsigned int prio_opt_set = dcbx_set + set_queue_set + pg_set + pg_bw_set + strict_set + tc_set + default_tc;
+    printf("Hello %d %d" ,tc_set, default_tc);
 
     if ((prio_opt_set || get_queue_set) &&
             (get_platform() != LINUX_PLATFORM)) {
@@ -733,6 +746,10 @@ parse_long_opts(int opt_index, char *opt_arg)
     default:
         Usage();
         break;
+    }
+
+    if(tc_set) {
+        default_tc = 0;
     }
 
     if (errno) {
