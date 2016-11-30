@@ -2446,17 +2446,26 @@ init_fail:
     return ret;
 }
 
-module_param(vr_flow_entries, uint, 0);
-module_param(vr_oflow_entries, uint, 0);
+module_param(vr_flow_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_flow_entries, "vrouter max flow entries,default value is "__stringify(VR_DEF_FLOW_ENTRIES));
+module_param(vr_oflow_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_oflow_entries, "vrouter max overflow flow entries");
 
-module_param(vr_bridge_entries, uint, 0);
-module_param(vr_bridge_oentries, uint, 0);
+module_param(vr_bridge_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_bridge_entries, "vrouter max bridge entries,default value is "__stringify(VR_DEF_BRIDGE_ENTRIES));
+module_param(vr_bridge_oentries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_bridge_oentries, "vrouter max overflow bridge entries");
 
-module_param(vr_mpls_labels, uint, 0);
-module_param(vr_nexthops, uint, 0);
-module_param(vr_vrfs, uint, 0);
-module_param(vr_flow_hold_limit, uint, 0);
-module_param(vr_interfaces, uint, 0);
+module_param(vr_mpls_labels, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_mpls_labels, "vrouter max labels,default value is "__stringify(VR_DEF_LABELS));
+module_param(vr_nexthops, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_nexthops, "vrouter max nexthops,default value is "__stringify(VR_DEF_NEXTHOPS));
+module_param(vr_vrfs, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_vrfs, "default value is "__stringify(VR_DEF_VRFS));
+module_param(vr_flow_hold_limit, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_flow_hold_limit, "max number of outstanding flows in hold state,default value is 8192");
+module_param(vr_interfaces, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_interfaces, "vrouter max interfaces,default value is "__stringify(VR_MAX_INTERFACES));
 
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 module_param(vr_use_linux_br, int, 0);
