@@ -154,6 +154,13 @@ vrouter_put_nexthop(struct vr_nexthop *nh)
 
     if (!ref_cnt ) {
 
+        /* If indirect, lets de-ref the direct nh too */
+        if ((nh->nh_flags & NH_FLAG_INDIRECT) && nh->nh_direct_nh) {
+            cnh = nh->nh_direct_nh;
+            nh->nh_direct_nh = NULL;
+            vrouter_put_nexthop(cnh);
+        }
+
         /* If composite de-ref the internal nexthops */
         if (nh->nh_type == NH_COMPOSITE) {
             component_cnt = nh->nh_component_cnt;
@@ -265,14 +272,21 @@ nh_vrf_translate(struct vr_packet *pkt, struct vr_nexthop *nh,
                  struct vr_forwarding_md *fmd)
 {
     struct vr_vrf_stats *stats;
+    struct vr_eth *eth;
 
     stats = vr_inet_vrf_stats(nh->nh_vrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_vrf_translates++;
 
     fmd->fmd_dvrf = nh->nh_vrf;
-    if (!(nh->nh_flags & NH_FLAG_VNID))
+    if (nh->nh_family == AF_INET)
         return vr_forward(nh->nh_router, pkt, fmd);
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (ntohs(eth->eth_proto) == VR_ETH_PROTO_PBB_EVPN) {
+        if (vr_pbb_input(pkt, fmd))
+            return 0;
+    }
 
     return vr_bridge_input(nh->nh_router, pkt, fmd);
 }
@@ -495,6 +509,48 @@ nh_udp_tunnel6_helper(struct vr_packet *pkt,
 
 
     return true;
+}
+
+static bool
+nh_pbb_evpn_tunnel_helper(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd, uint8_t *dmac, uint8_t *smac)
+{
+    int pbb_head_space;
+    struct vr_pbb_itag *pbb_itag;
+    struct vr_eth *eth;
+
+    pbb_head_space = sizeof(struct vr_pbb_itag) + VR_ETHER_HLEN;
+
+    /*
+     * As this is an indirect nexthop and we probably have inet tunnel
+     * further down, we can accmodate the head space for inet tunnel too
+     * to avaoid another pexpand
+     */
+    pbb_head_space += VR_MPLS_HDR_LEN + sizeof(struct vr_ip) +
+        sizeof(struct vr_udp) + VR_ETHER_HLEN;
+
+    if (pkt_head_space(pkt) < pbb_head_space) {
+        pkt = vr_pexpand_head(pkt, pbb_head_space - pkt_head_space(pkt));
+        if (!pkt)
+            return -1;
+    }
+
+    pbb_itag = (struct vr_pbb_itag *)pkt_push(pkt, sizeof(*pbb_itag));
+    if (!pbb_itag)
+        return -1;
+    pbb_itag->pbbi_pcp = pbb_itag->pbbi_dei = 0;
+    pbb_itag->pbbi_uca = pbb_itag->pbbi_res = 0;
+    pbb_itag->pbbi_isid = (htonl(pkt->vp_if->vif_isid) >> 8) & 0xFFFFFF;
+
+    eth = (struct vr_eth *)pkt_push(pkt, VR_ETHER_HLEN);
+    if(!eth)
+        return -1;
+
+    VR_MAC_COPY(eth->eth_dmac, dmac);
+    VR_MAC_COPY(eth->eth_smac, smac);
+    eth->eth_proto = htons(VR_ETH_PROTO_PBB_EVPN);
+
+    return 0;
 }
 
 static bool
@@ -779,7 +835,7 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
 
 drop:
     vr_pfree(pkt, drop_reason);
-    return ret;
+    return 0;
 }
 
 
@@ -854,6 +910,45 @@ nh_composite_mcast_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
 }
 
 static int
+nh_handle_mcast_uuc_pkt(struct vr_packet *pkt, struct vr_eth *eth,
+        struct vr_forwarding_md *fmd, unsigned int pkt_src)
+{
+    int handled = 1, pull_len;
+    struct vr_route_req rt;
+    struct vr_nexthop *nh;
+
+    /* If not a unicast mac, nothing to handle as uuc */
+    if (IS_MAC_BMCAST(eth->eth_dmac))
+        return !handled;
+
+    /*
+     * If packet is from VM or from TOR, we must have done a look up
+     * already in bridge before coming to this processing
+     */
+    if (!pkt_src || (pkt_src == PKT_SRC_TOR_REPL_TREE))
+        return !handled;
+
+    rt.rtr_req.rtr_label_flags = 0;
+    rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+    rt.rtr_req.rtr_mac = eth->eth_dmac;
+    rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
+
+    nh = vr_bridge_lookup(fmd->fmd_dvrf, &rt);
+    if (!nh || nh->nh_type != NH_ENCAP)
+        return !handled;
+
+    /* Get the packet to eth header */
+    pull_len = (unsigned long)eth - (unsigned long)pkt_data(pkt);
+    if (pull_len)
+        pkt_pull(pkt, pull_len);
+
+    nh_output(pkt, nh, fmd);
+
+    return handled;
+}
+
+static int
 nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
         struct vr_forwarding_md *fmd, unsigned int pkt_src, bool *flood_to_vms)
 {
@@ -890,7 +985,7 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
         /*
          * If not handled, packet needs to be flooded. If the ARP is
          * from MX, VM's should not see this ARP as VM's always need to
-         * Agentas gateway
+         * see Agent as gateway
          */
 
         if (pkt_src) {
@@ -993,7 +1088,8 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     int i, clone_size;
     bool flood_to_vms = true;
-    unsigned short drop_reason, label, pkt_vrf, pull_len;
+    unsigned short drop_reason, label, pkt_vrf, pull_len = 0,
+                   pbb_pull_len = 0;
     unsigned int tun_src, pkt_src, hashval, port_range, handled;
 
     struct vr_eth *eth = NULL;
@@ -1039,8 +1135,9 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (pkt_src == PKT_SRC_EDGE_REPL_TREE) {
-        eth = (struct vr_eth *)pkt_data_at_offset(pkt, pkt->vp_data +
-                VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
+        pull_len = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+        eth = (struct vr_eth *)pkt_data_at_offset(pkt,
+                                      pkt->vp_data + pull_len);
     } else {
         eth = (struct vr_eth *)pkt_data(pkt);
     }
@@ -1050,10 +1147,29 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto drop;
     }
 
+    if (ntohs(eth->eth_proto) == VR_ETH_PROTO_PBB_EVPN) {
+        pkt_pull(pkt, pull_len);
+        handled = vr_pbb_input(pkt, fmd);
+        if (handled)
+            return 0;
+        pbb_pull_len = sizeof(struct vr_pbb_itag) + VR_ETHER_HLEN;
+        eth = (struct vr_eth *)(((char *)eth) + pbb_pull_len);
+        /*
+         * PBB input would have  pulled the PBB header too. Get back the
+         * header as we require that
+         */
+        pkt_push(pkt, pull_len + pbb_pull_len);
+    }
+
     handled = nh_handle_mcast_control_pkt(pkt, eth, fmd, pkt_src, &flood_to_vms);
     if (handled)
         return 0;
 
+    if (flood_to_vms) {
+        handled = nh_handle_mcast_uuc_pkt(pkt, eth, fmd, pkt_src);
+        if (handled)
+            return 0;
+    }
 
     /*
      * The packet can come to this nexthp either from Fabric or from VM.
@@ -1112,9 +1228,11 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
                 break;
             }
 
-            if (pkt_src == PKT_SRC_EDGE_REPL_TREE) {
-                pull_len = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+            pull_len = pbb_pull_len;
+            if (pkt_src == PKT_SRC_EDGE_REPL_TREE)
+                pull_len += VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
 
+            if (pull_len) {
                 if (!pkt_pull(new_pkt, pull_len)) {
                     vr_pfree(new_pkt, VP_DROP_PULL);
                     break;
@@ -1124,8 +1242,15 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (pkt_src == PKT_SRC_INGRESS_REPL_TREE)
                 continue;
 
+            clone_size = 0;
+            if (pkt_src != PKT_SRC_EDGE_REPL_TREE) {
+                clone_size += VR_L2_MCAST_PKT_HEAD_SPACE;
+                if (dir_nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN)
+                    clone_size += VR_ETHER_HLEN + sizeof(struct vr_pbb_itag);
+            }
+
             /* Create head space for L2 Mcast header */
-            if (!(new_pkt = nh_mcast_clone(pkt, VR_L2_MCAST_PKT_HEAD_SPACE))) {
+            if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
             }
@@ -1138,6 +1263,9 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
                 /* Create head space for Vxlan header */
                 clone_size = VR_L2_MCAST_PKT_HEAD_SPACE - VR_L2_MCAST_CTRL_DATA_LEN;
+                if (dir_nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN)
+                    clone_size = VR_ETHER_HLEN + sizeof(struct vr_pbb_itag);
+
                 if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                     drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                     break;
@@ -1158,7 +1286,8 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             if (pkt_src == PKT_SRC_EDGE_REPL_TREE) {
 
-                pull_len = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+                pull_len = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN
+                    + pbb_pull_len;
 
                 if (!pkt_pull(new_pkt, pull_len)) {
                     vr_pfree(new_pkt, VP_DROP_PULL);
@@ -1294,6 +1423,7 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_nexthop *dir_nh;
     unsigned short drop_reason;
     struct vr_packet *new_pkt;
+    uint8_t eth_mac[VR_ETHER_ALEN];
 
     drop_reason = VP_DROP_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
@@ -1304,6 +1434,9 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
         drop_reason = VP_DROP_NO_FMD;
         goto drop;
     }
+
+    if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN)
+        vr_mcast_mac_from_isid(pkt->vp_if->vif_isid, eth_mac);
 
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
@@ -1324,6 +1457,14 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (!new_pkt) {
             drop_reason = VP_DROP_MCAST_CLONE_FAIL;
             break;
+        }
+
+        if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+            if (nh_pbb_evpn_tunnel_helper(nh->nh_router, new_pkt, fmd,
+                            eth_mac, pkt->vp_if->vif_pbb_evpn_mac)) {
+                vr_pfree(new_pkt, VP_DROP_PUSH);
+                continue;
+            }
         }
 
         vr_forwarding_md_set_label(fmd, nh->nh_component_nh[i].cnh_label,
@@ -1364,12 +1505,13 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
                     struct vr_forwarding_md *fmd)
 {
     int i;
+    int32_t label;
+    unsigned int dip, sip;
+    int8_t eth_mac[VR_ETHER_ALEN];
     struct vr_vrf_stats *stats;
     struct vr_nexthop *dir_nh;
     unsigned short drop_reason, pkt_vrf;
     struct vr_packet *new_pkt;
-    unsigned int dip, sip;
-    int32_t label;
 
     drop_reason = VP_DROP_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
@@ -1390,6 +1532,9 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     label = fmd->fmd_label;
     pkt_vrf = fmd->fmd_dvrf;
+    if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN)
+        vr_mcast_mac_from_isid(pkt->vp_if->vif_isid, eth_mac);
+
     for (i = 0; i < nh->nh_component_cnt; i++) {
         dir_nh = nh->nh_component_nh[i].cnh;
         fmd->fmd_dvrf = pkt_vrf;
@@ -1442,6 +1587,14 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (label < 0) {
                 vr_pfree(new_pkt, VP_DROP_INVALID_LABEL);
                 break;
+            }
+
+            if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+                if (nh_pbb_evpn_tunnel_helper(nh->nh_router, new_pkt, fmd,
+                            eth_mac, pkt->vp_if->vif_pbb_evpn_mac)) {
+                    vr_pfree(new_pkt, VP_DROP_PUSH);
+                    continue;
+                }
             }
 
             /*
@@ -1672,7 +1825,8 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
                 (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
             trap_arg.df_flow_index = fmd->fmd_flow_index;
-            return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            return 0;
         }
     }
 
@@ -1720,6 +1874,48 @@ send_fail:
     vr_pfree(pkt, reason);
     return 0;
 
+}
+
+static int
+nh_pbb_evpn_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
+        struct vr_forwarding_md *fmd)
+{
+    struct vr_vrf_stats *stats;
+
+    if (vr_forwarding_md_etree_is_enabled(fmd)) {
+        if ((!vr_forwarding_md_etree_is_root(fmd)) &&
+                    (!(nh->nh_flags & NH_FLAG_ETREE_ROOT))) {
+            vr_pfree(pkt, VP_DROP_LEAF_TO_LEAF);
+            return 0;
+        }
+    }
+
+    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    if (stats)
+        stats->vrf_pbb_evpn_tunnels++;
+
+    if (nh_pbb_evpn_tunnel_helper(nh->nh_router, pkt, fmd, nh->nh_pbb_evpn_mac,
+            pkt->vp_if->vif_pbb_evpn_mac)) {
+        vr_pfree(pkt, VP_DROP_PUSH);
+        return 0;
+    }
+    vr_forwarding_md_set_label(fmd, nh->nh_pbb_evpn_label, VR_LABEL_TYPE_MPLS);
+
+    return 1;
+}
+
+static int
+nh_pbb_evpn_tunnel_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
+        struct vr_forwarding_md *fmd, void *ret_data)
+{
+    if (VR_MAC_CMP(nh->nh_pbb_evpn_mac, fmd->fmd_mac)) {
+        if (ret_data)
+            *(unsigned int*)ret_data = nh->nh_flags;
+
+        return NH_SOURCE_VALID;
+    }
+
+    return NH_SOURCE_INVALID;
 }
 
 static int
@@ -1804,7 +2000,8 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
                 (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
             trap_arg.df_flow_index = fmd->fmd_flow_index;
-            return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            return 0;
         }
     }
 
@@ -1950,7 +2147,8 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
                 (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
             trap_arg.df_flow_index = fmd->fmd_flow_index;
-            return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            return 0;
         }
     }
 
@@ -2043,17 +2241,25 @@ send_fail:
 }
 
 
+/*
+ * Returns 0 - Completion of pkt handling
+ *        <0 - Error in pkt handling
+ */
 int
 nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
     bool need_flow_lookup = false;
+    int ret = 0;
+
 
     if (!pkt->vp_ttl) {
-        return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ZERO_TTL, NULL);
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ZERO_TTL, NULL);
+        return 0;
     }
 
     pkt->vp_nh = nh;
+
 
     /* If nexthop does not have valid data, drop it */
     if (!(nh->nh_flags & NH_FLAG_VALID)) {
@@ -2106,16 +2312,39 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
-    return nh->nh_reach_nh(pkt, nh, fmd);
+    ret = nh->nh_reach_nh(pkt, nh, fmd);
+    /*
+     * If returned status is 1, pkt is not run to completion. Either
+     * subject it to direct nh or free the packet
+     */
+    if (ret == 1) {
+        if (nh->nh_direct_nh) {
+            return nh_output(pkt, nh->nh_direct_nh, fmd);
+        } else {
+            vr_pfree(pkt, VP_DROP_DISCARD);
+            ret = 0;
+        }
+    }
+
+    return ret;
 }
 
 static int
 nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             struct vr_forwarding_md *fmd)
 {
+    int8_t eth_mac[VR_ETHER_ALEN], *pbb_self_mac = eth_mac;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
     struct vr_forwarding_class_qos *qos;
+
+    if (vr_forwarding_md_etree_is_enabled(fmd)) {
+        if ((!vr_forwarding_md_etree_is_root(fmd)) &&
+                    (!(nh->nh_flags & NH_FLAG_ETREE_ROOT))) {
+            vr_pfree(pkt, VP_DROP_LEAF_TO_LEAF);
+            return 0;
+        }
+    }
 
     /* No GRO for multicast and user packets */
     if ((pkt->vp_flags & VP_FLAG_MULTICAST) ||
@@ -2126,6 +2355,20 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!vif) {
         vr_pfree(pkt, VP_DROP_INVALID_IF);
         return 0;
+    }
+
+    if (!IS_MAC_ZERO(fmd->fmd_mac) &&
+            !IS_MAC_ZERO(vif->vif_pbb_evpn_mac)) {
+
+        if (pkt->vp_flags & VP_FLAG_MULTICAST)
+            vr_mcast_mac_from_isid(vif->vif_isid, pbb_self_mac);
+        else
+            pbb_self_mac = vif->vif_pbb_evpn_mac;
+
+        if (!VR_MAC_CMP(fmd->fmd_mac, pbb_self_mac)) {
+            vr_pfree(pkt, VP_DROP_BMAC_ISID_MISMATCH);
+            return 0;
+        }
     }
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
@@ -2257,7 +2500,8 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (vr_pkt_is_diag(pkt)) {
         pkt->vp_if = vif;
         vr_pset_data(pkt, pkt->vp_data);
-        return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_DIAG, &vif->vif_idx);
+        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_DIAG, &vif->vif_idx);
+        return 0;
     }
 
     vif->vif_tx(vif, pkt, fmd);
@@ -2445,6 +2689,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_component_nh[i].cnh = vrouter_get_nexthop(req->nhr_rid,
                                                     req->nhr_nh_list[i]);
         nh->nh_component_nh[i].cnh_label = req->nhr_label_list[i];
+
         if (nh->nh_component_nh[i].cnh)
             active++;
 
@@ -2453,8 +2698,8 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         } else {
             nh->nh_component_nh[i].cnh_ecmp_index = -1;
         }
-
     }
+
     nh->nh_component_cnt = req->nhr_nh_list_size;
 
     if (nh_composite_mcast_validate(nh, req))
@@ -2522,12 +2767,14 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
     struct vr_interface *vif, *old_vif;
 
-    if (req->nhr_family == AF_INET6) {
-        if (!req->nhr_tun_sip6 || !req->nhr_tun_dip6)
-            return -EINVAL;
-    } else {
-        if (!req->nhr_tun_sip || !req->nhr_tun_dip)
-            return -EINVAL;
+    if (!(req->nhr_flags & NH_FLAG_TUNNEL_PBB_EVPN)) {
+        if (req->nhr_family == AF_INET6) {
+            if (!req->nhr_tun_sip6 || !req->nhr_tun_dip6)
+                return -EINVAL;
+        } else if (req->nhr_family == AF_INET) {
+            if (!req->nhr_tun_sip || !req->nhr_tun_dip)
+                return -EINVAL;
+        }
     }
 
     old_vif = nh->nh_dev;
@@ -2593,6 +2840,24 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_dev = vif;
         nh->nh_reach_nh = nh_vxlan_tunnel;
+    } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+        if (!(nh->nh_flags & NH_FLAG_INDIRECT))
+            return -EINVAL;
+
+        if ((req->nhr_pbb_evpn_mac_size != VR_ETHER_ALEN) ||
+                (IS_MAC_ZERO(req->nhr_pbb_evpn_mac))) {
+            return -EINVAL;
+        }
+
+        nh->nh_pbb_evpn_label = -1;
+        if (req->nhr_label_list_size)
+            nh->nh_pbb_evpn_label = req->nhr_label_list[0];
+
+        VR_MAC_COPY(nh->nh_pbb_evpn_mac, req->nhr_pbb_evpn_mac);
+
+        nh->nh_validate_src = nh_pbb_evpn_tunnel_validate_src;
+        if (nh->nh_direct_nh)
+            nh->nh_reach_nh = nh_pbb_evpn_tunnel;
     } else {
         /* Reference to VIf should be cleaned */
         if (vif)
@@ -2603,6 +2868,43 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     memcpy(nh->nh_data, req->nhr_encap, req->nhr_encap_size);
     if (old_vif)
         vrouter_put_interface(old_vif);
+
+    return 0;
+}
+
+static int
+nh_indirect_add(struct vr_nexthop *nh, vr_nexthop_req *req)
+{
+    struct vr_nexthop *old_nh, *direct_nh = NULL;
+
+    /*
+     * Following check needs to be enahnced every time we make a new
+     * indirect nexthop
+     */
+    if ((nh->nh_type != NH_TUNNEL) ||
+            (!(nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN)))
+        return -EINVAL;
+
+    /*
+     * Lets allow without direct nh for greater convenience of adds,
+     * changes, but only one direct nh
+     */
+    if ((req->nhr_nh_list_size != 0) && (req->nhr_nh_list_size != 1))
+        return -EINVAL;
+
+    if (req->nhr_nh_list_size) {
+        direct_nh = vrouter_get_nexthop(req->nhr_rid, req->nhr_nh_list[0]);
+        if (!direct_nh)
+            return -EINVAL;
+    }
+
+    /* Remove the old nh */
+    old_nh = nh->nh_direct_nh;
+    nh->nh_direct_nh = direct_nh;
+    if (old_nh != direct_nh) {
+        if (old_nh)
+            vrouter_put_nexthop(old_nh);
+    }
 
     return 0;
 }
@@ -2687,6 +2989,7 @@ vr_nexthop_size(vr_nexthop_req *req)
 static bool
 vr_nexthop_valid_change(vr_nexthop_req *req, struct vr_nexthop *nh)
 {
+
     if (!(req->nhr_flags & NH_FLAG_VALID))
         return true;
 
@@ -2695,6 +2998,11 @@ vr_nexthop_valid_change(vr_nexthop_req *req, struct vr_nexthop *nh)
 
     if (req->nhr_encap_size &&
             req->nhr_encap_size != nh->nh_data_size)
+        return false;
+
+    /* Indirect to non-indirect and other way is not allowed */
+    if ((req->nhr_flags & NH_FLAG_INDIRECT) ^
+            (nh->nh_flags & NH_FLAG_INDIRECT))
         return false;
 
     return true;
@@ -2759,6 +3067,7 @@ vr_nexthop_add(vr_nexthop_req *req)
     nh->nh_rid = req->nhr_rid;
     nh->nh_router = vrouter_get(nh->nh_rid);
     nh->nh_vrf = req->nhr_vrf;
+    nh->nh_direct_nh = NULL;
 
     /*
      * If invalid to valid, lets make it valid after the whole nexthop
@@ -2769,6 +3078,12 @@ vr_nexthop_add(vr_nexthop_req *req)
         nh->nh_flags = (req->nhr_flags & ~NH_FLAG_VALID);
     else
         nh->nh_flags = req->nhr_flags;
+
+    if (nh->nh_flags & NH_FLAG_INDIRECT) {
+        ret = nh_indirect_add(nh, req);
+        if (ret)
+            goto generate_resp;
+    }
 
 
     if (req->nhr_flags & NH_FLAG_VALID) {
@@ -2869,6 +3184,16 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
     req->nhr_ref_cnt = nh->nh_users;
     req->nhr_nh_list_size = 0;
     req->nhr_vrf = nh->nh_vrf;
+
+    if (nh->nh_direct_nh) {
+        req->nhr_nh_list_size = 1;
+        req->nhr_nh_list =
+                vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int),
+                        VR_NEXTHOP_REQ_LIST_OBJECT);
+        if (!req->nhr_nh_list)
+            return -ENOMEM;
+        req->nhr_nh_list[0] = nh->nh_direct_nh->nh_id;
+    }
 
     switch (nh->nh_type) {
     case NH_RCV:
@@ -2974,6 +3299,23 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
                 encap = nh->nh_data;
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
+        } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+            if (nh->nh_pbb_evpn_label != -1) {
+                req->nhr_label_list_size = 1;
+                req->nhr_label_list =
+                    vr_zalloc(req->nhr_nh_list_size * sizeof(unsigned int),
+                                    VR_NEXTHOP_REQ_LIST_OBJECT);
+                if (!req->nhr_label_list)
+                    return -ENOMEM;
+                req->nhr_label_list[0] = nh->nh_pbb_evpn_label;
+            }
+
+            req->nhr_pbb_evpn_mac_size = VR_ETHER_ALEN;
+            req->nhr_pbb_evpn_mac = vr_zalloc(req->nhr_pbb_evpn_mac_size,
+                    VR_NEXTHOP_REQ_BMAC_OBJECT);
+            if (!req->nhr_pbb_evpn_mac)
+                return -ENOMEM;
+            VR_MAC_COPY(req->nhr_pbb_evpn_mac, nh->nh_pbb_evpn_mac);
         }
 
         break;
@@ -3072,6 +3414,12 @@ vr_nexthop_req_destroy(vr_nexthop_req *req)
     if (req->nhr_tun_dip6) {
         vr_free(req->nhr_tun_dip6, VR_NETWORK_ADDRESS_OBJECT);
         req->nhr_tun_dip6 = NULL;
+    }
+
+    if (req->nhr_pbb_evpn_mac) {
+        vr_free(req->nhr_pbb_evpn_mac, VR_NEXTHOP_REQ_BMAC_OBJECT);
+        req->nhr_pbb_evpn_mac = NULL;
+        req->nhr_pbb_evpn_mac_size = 0;
     }
 
     vr_free(req, VR_NEXTHOP_REQ_OBJECT);

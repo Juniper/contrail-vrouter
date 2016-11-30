@@ -1721,6 +1721,20 @@ lh_pull_inner_headers(struct vr_packet *pkt,
         eth_proto = eth->eth_proto;
         hoff += sizeof(struct vr_eth);
 
+        if (ntohs(eth_proto) == VR_ETH_PROTO_PBB_EVPN) {
+            pull_len += sizeof(struct vr_pbb_itag);
+            if (!pskb_may_pull(skb, pull_len))
+                goto error;
+            hoff += sizeof(struct vr_pbb_itag);
+
+            pull_len += VR_ETHER_HLEN;
+            if (!pskb_may_pull(skb, pull_len))
+                goto error;
+            eth = (struct vr_eth *)(skb->head + hoff);
+            eth_proto = eth->eth_proto;
+        }
+
+
         while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
             pull_len += sizeof(struct vr_vlan_hdr);
             if (!pskb_may_pull(skb, pull_len))
