@@ -46,12 +46,12 @@ buffer sandesh vr_nexthop_req {
     16: u32         nhr_flags;
     17: list<byte>  nhr_encap;
     18: list<i32>   nhr_nh_list;
-    19: i32         nhr_label;
-    20: list<i32>   nhr_label_list;
-    21: i16         nhr_nh_count;
-    22: list<byte>  nhr_tun_sip6;
-    23: list<byte>  nhr_tun_dip6;
-    24: byte        nhr_ecmp_config_hash;
+    19: list<i32>   nhr_label_list;
+    20: i16         nhr_nh_count;
+    21: list<byte>  nhr_tun_sip6;
+    22: list<byte>  nhr_tun_dip6;
+    23: byte        nhr_ecmp_config_hash;
+    24: list<byte>  nhr_pbb_mac;
 }
 
 buffer sandesh vr_interface_req {
@@ -112,6 +112,8 @@ buffer sandesh vr_interface_req {
     55: list<byte>  vifr_out_mirror_md;
     56: u64         vifr_dpackets;
     57: list<i16>   vifr_hw_queues;
+    58: u32         vifr_isid;
+    59: list<byte>  vifr_pbb_mac;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -238,6 +240,7 @@ buffer sandesh vr_vrf_stats_req {
    29:  i64                 vsr_arp_physical_flood;
    30:  i64                 vsr_l2_receives;
    31:  i64                 vsr_uuc_floods;
+   32:  i64                 vsr_pbb_tunnels;
 }
 
 buffer sandesh vr_response {
@@ -349,6 +352,8 @@ buffer sandesh vr_mem_stats_req {
    65:  i64             vms_interface_req_mirror_meta_object;
    66:  i64             vms_interface_bridge_lock_object;
    67:  i64             vms_interface_queue_object;
+   68:  i64             vms_interface_req_pbb_mac_object;
+   69:  i64             vms_nexthop_req_bmac_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */
@@ -402,6 +407,8 @@ buffer sandesh vr_drop_stats_req {
     47: i64             vds_drop_new_flow;
     48: i64             vds_flow_evict;
     49: i64             vds_trap_original;
+    50: i64             vds_leaf_to_leaf;
+    51: i64             vds_bmac_isid_mismatch;
 }
 
 buffer sandesh vr_qos_map_req {
@@ -464,4 +471,3 @@ buffer sandesh vr_bridge_table_data {
     4: u16          btable_dev;
     5: string       btable_file_path;
 }
-

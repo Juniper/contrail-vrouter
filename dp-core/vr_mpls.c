@@ -268,7 +268,7 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
 
     nh = __vrouter_get_label(router, label);
     if(!nh) {
-        res = VP_DROP_INVALID_NH;
+        res = VP_DROP_INVALID_LABEL;
         goto fail;
     }
 
@@ -276,13 +276,14 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
     case AF_INET:
         return PKT_MPLS_TUNNEL_L3;
     case AF_BRIDGE:
-        if (nh->nh_type != NH_COMPOSITE) {
-            return PKT_MPLS_TUNNEL_L2_UCAST;
-        }
-        if (label < VR_MAX_UCAST_LABELS) {
-            return PKT_MPLS_TUNNEL_L2_MCAST_EVPN;
-        }
-        return PKT_MPLS_TUNNEL_L2_MCAST;
+        if ((nh->nh_type == NH_COMPOSITE) && (label >= VR_MAX_UCAST_LABELS))
+            return PKT_MPLS_TUNNEL_L2_MCAST;
+
+        if (nh->nh_flags & NH_FLAG_L2_CONTROL_DATA)
+            return PKT_MPLS_TUNNEL_L2_CONTROL_DATA;
+
+        return PKT_MPLS_TUNNEL_L2_UCAST;
+
     default:
         res = VP_DROP_INVALID_NH;
     }
@@ -297,7 +298,7 @@ int
 vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    int ttl, l2_offset = 0;
+    int ttl, l2_offset = 0, pull_len = 0;
     unsigned int label;
     unsigned short drop_reason;
 
@@ -325,7 +326,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
     fmd->fmd_outer_src_ip = ip->ip_saddr;
-    vr_forwarding_md_set_label(fmd, label, VR_LABEL_TYPE_MPLS);
+    vr_fmd_set_label(fmd, label, VR_LABEL_TYPE_MPLS);
 
     /* Store the TTL in packet. Will be used for multicast replication */
     pkt->vp_ttl = ttl;
@@ -369,16 +370,30 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
 
     } else if (nh->nh_family == AF_BRIDGE) {
 
-        if (nh->nh_type == NH_COMPOSITE) {
-            if (label >= VR_MAX_UCAST_LABELS)
-                l2_offset = VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+        if ((nh->nh_type == NH_COMPOSITE) && (label >= VR_MAX_UCAST_LABELS)) {
+            l2_offset = VR_L2_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+            pull_len = VR_L2_CTRL_DATA_LEN;
+        } else if (nh->nh_flags & NH_FLAG_L2_CONTROL_DATA) {
+            vr_fmd_update_l2_control_data(fmd, true);
+            pull_len = VR_L2_CTRL_DATA_LEN;
+        }
+
+        if (pull_len) {
+            if (*(unsigned int *)pkt_data(pkt) != VR_L2_CTRL_DATA) {
+                drop_reason = VP_DROP_INVALID_PACKET;
+                goto dropit;
+            }
+
+            if (!pkt_pull(pkt, pull_len)) {
+                drop_reason = VP_DROP_PULL;
+                goto dropit;
+            }
         }
 
         if (vr_pkt_type(pkt, l2_offset, fmd) < 0) {
             drop_reason = VP_DROP_INVALID_PACKET;
             goto dropit;
         }
-
     } else {
         drop_reason = VP_DROP_INVALID_NH;
         goto dropit;

@@ -57,14 +57,4 @@ vr_vxlan_udp_port(unsigned short port)
     return false;
 }
 
-static inline bool
-vr_mpls_is_label_mcast(unsigned int lbl)
-{
-    if (lbl < VR_MAX_UCAST_LABELS) {
-        return false;
-    }
-
-    return true;
-}
-
 #endif /* __VR_MPLS_H__ */

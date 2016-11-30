@@ -306,13 +306,13 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
                 struct vr_ip6 **ip6hp, unsigned short gre_udp_encap,
                 unsigned char ip_proto)
 {
+    unsigned short eth_proto;
     unsigned int pull_len = *pull_lenp;
     unsigned int label, control_data;
     int pkt_type = 0;
     struct vr_ip6 *ip6h = NULL;
     struct vr_ip *iph = NULL;
     struct vr_eth *eth = NULL;
-    unsigned short eth_proto;
 
     if ((ip_proto == VR_IP_PROTO_GRE && gre_udp_encap == VR_GRE_PROTO_MPLS_NO) ||
         (ip_proto == VR_IP_PROTO_UDP && vr_mpls_udp_port(ntohs(gre_udp_encap)))) {
@@ -321,7 +321,7 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
         /* Take into consideration, the MPLS header and 4 bytes of
          * control information that might exist for L2 packet */
         if (frag_size < (pull_len + VR_MPLS_HDR_LEN +
-                                VR_L2_MCAST_CTRL_DATA_LEN)) {
+                                VR_L2_CTRL_DATA_LEN)) {
             return PKT_RET_SLOW_PATH;
         }
 
@@ -349,11 +349,16 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
             /* L2 Multicast packet with control information and
              * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
             eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
-                    VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
-            pull_len += VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN +
+                    VR_L2_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
+            pull_len += VR_MPLS_HDR_LEN + VR_L2_CTRL_DATA_LEN +
                             VR_VXLAN_HDR_LEN + sizeof(struct vr_eth);
-        } else if ((pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) ||
-                    (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST_EVPN)) {
+        } else if (pkt_type == PKT_MPLS_TUNNEL_L2_CONTROL_DATA) {
+            /* L2 packet with control information */
+            eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
+                    VR_L2_CTRL_DATA_LEN);
+            pull_len += VR_MPLS_HDR_LEN + VR_L2_CTRL_DATA_LEN +
+                                            sizeof(struct vr_eth);
+        } else if (pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) {
             /* L2 packet with no control information */
             eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN);
             pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_eth);
@@ -383,6 +388,18 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
     if (eth) {
 
         eth_proto = eth->eth_proto;
+        if (ntohs(eth_proto) == VR_ETH_PROTO_PBB) {
+            pull_len += sizeof(struct vr_pbb_itag);
+            if (frag_size < pull_len)
+                return PKT_RET_SLOW_PATH;
+
+            eth = (struct vr_eth *)(va + pull_len);
+            pull_len += VR_ETHER_HLEN;
+            if (frag_size < pull_len)
+                return PKT_RET_SLOW_PATH;
+            eth_proto = eth->eth_proto;
+        }
+
         while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
             eth_proto = ((struct vr_vlan_hdr *)(va + pull_len))->vlan_proto;
             pull_len += sizeof(struct vr_vlan_hdr);
