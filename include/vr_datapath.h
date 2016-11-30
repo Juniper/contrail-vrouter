@@ -62,6 +62,8 @@ extern int vif_plug_mac_request(struct vr_interface *, struct vr_packet *,
         struct vr_forwarding_md *);
 int vr_gro_input(struct vr_packet *, struct vr_nexthop *);
 void vr_mac_reply_send(struct vr_packet *, struct vr_forwarding_md *);
+int __vr_pbb_decode(struct vr_eth *, int , struct vr_forwarding_md *);
+int vr_pbb_decode(struct vr_packet *, struct vr_forwarding_md *);
 
 
 

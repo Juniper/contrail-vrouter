@@ -298,6 +298,8 @@ struct vr_interface {
     unsigned short vif_num_hw_queues;
     void *vif_queue_host_data;
     unsigned int  vif_ip;
+    unsigned int vif_isid;
+    uint8_t vif_pbb_mac[VR_ETHER_ALEN];
 };
 
 struct vr_interface_settings {

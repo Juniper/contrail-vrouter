@@ -6,6 +6,8 @@
 #ifndef __NEXTHOP_H__
 #define __NEXTHOP_H__
 
+#include "vr_defs.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,6 +43,10 @@ enum nexthop_type {
 #define NH_FLAG_ENCAP_L2                    0x000004
 #define NH_FLAG_TUNNEL_GRE                  0x000008
 #define NH_FLAG_TUNNEL_UDP                  0x000010
+/*
+ * Mcast flag can be appended to any type of nexthop, either an Encap,
+ * composite etc
+ */
 #define NH_FLAG_MCAST                       0x000020
 #define NH_FLAG_TUNNEL_UDP_MPLS             0x000040
 #define NH_FLAG_TUNNEL_VXLAN                0x000080
@@ -60,9 +66,6 @@ enum nexthop_type {
 #define NH_FLAG_ETREE_ROOT                  0x200000
 #define NH_FLAG_INDIRECT                    0x400000
 #define NH_FLAG_L2_CONTROL_DATA             0x800000
-
-#define NH_FLAG_VNID                        0x1000000
-
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
@@ -87,6 +90,11 @@ struct vr_component_nh {
     struct vr_nexthop *cnh;
 };
 
+typedef enum {
+    NH_PROCESSING_COMPLETE,
+    NH_PROCESSING_INCOMPLETE,
+} nh_processing_t;
+
 struct vr_nexthop {
     uint8_t         nh_type;
     /*
@@ -106,44 +114,50 @@ struct vr_nexthop {
             uint16_t        encap_family;
         } nh_encap;
 
-         struct {
+        struct {
             unsigned int    tun_sip;
             unsigned int    tun_dip;
             uint16_t        tun_encap_len;
-         } nh_gre_tun;
+        } nh_gre_tun;
 
-         struct {
+        struct {
             unsigned int    tun_sip;
             unsigned int    tun_dip;
             unsigned short  tun_sport;
             unsigned short  tun_dport;
             uint16_t        tun_encap_len;
-         } nh_udp_tun;
+        } nh_udp_tun;
 
-         struct {
+        struct {
+            int             tun_pbb_label;
+            uint8_t         tun_pbb_mac[VR_ETHER_ALEN];
+        } nh_pbb_tun;
+
+        struct {
              uint8_t        *tun_sip6;
              uint8_t        *tun_dip6;
              unsigned short tun_sport6;
              unsigned short tun_dport6;
              uint16_t       tun_encap_len;
-         } nh_udp_tun6;
+        } nh_udp_tun6;
 
-         struct {
+        struct {
             unsigned short cnt;
             unsigned short ecmp_cnt;
             unsigned short ecmp_config_hash;
             struct vr_component_nh *component;
             struct vr_component_nh *ecmp_active;
-         } nh_composite;
+        } nh_composite;
 
     } nh_u;
 
     struct vrouter      *nh_router;
+    struct vr_nexthop   *nh_direct_nh;
     int                 (*nh_validate_src)(struct vr_packet *,
                                            struct vr_nexthop *,
                                            struct vr_forwarding_md *,
                                            void *);
-    int                 (*nh_reach_nh)(struct vr_packet *,
+    nh_processing_t     (*nh_reach_nh)(struct vr_packet *,
                                        struct vr_nexthop *,
                                        struct vr_forwarding_md *);
     struct vr_interface *nh_dev;
@@ -177,6 +191,8 @@ struct vr_nexthop {
 #define nh_component_ecmp       nh_u.nh_composite.ecmp_active
 #define nh_ecmp_config_hash     nh_u.nh_composite.ecmp_config_hash
 
+#define nh_pbb_mac         nh_u.nh_pbb_tun.tun_pbb_mac
+#define nh_pbb_label       nh_u.nh_pbb_tun.tun_pbb_label
 
 static inline bool
 vr_nexthop_is_vcp(struct vr_nexthop *nh)
