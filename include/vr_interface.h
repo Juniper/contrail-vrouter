@@ -101,6 +101,7 @@
 #define VIF_FLAG_DROP_NEW_FLOWS     0x40000
 #define VIF_FLAG_MAC_LEARN          0x80000
 #define VIF_FLAG_MAC_PROXY          0x100000
+#define VIF_FLAG_ETREE_ROOT         0x200000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
@@ -297,6 +298,8 @@ struct vr_interface {
     unsigned short vif_num_hw_queues;
     void *vif_queue_host_data;
     unsigned int  vif_ip;
+    unsigned int vif_isid;
+    uint8_t vif_pbb_mac[VR_ETHER_ALEN];
 };
 
 struct vr_interface_settings {

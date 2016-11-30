@@ -1618,7 +1618,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
     }
 
     pull_len = hdr_len;
-    pull_len += VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN;
+    pull_len += VR_MPLS_HDR_LEN + VR_L2_CTRL_DATA_LEN;
 
     /*
      * vp_data is currently the offset of the start of the GRE/UDP header
@@ -1640,7 +1640,7 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             * assumption
             */
            mpls_pkt = false;
-           pull_len -= (VR_MPLS_HDR_LEN + VR_L2_MCAST_CTRL_DATA_LEN);
+           pull_len -= (VR_MPLS_HDR_LEN + VR_L2_CTRL_DATA_LEN);
            pull_len += sizeof(struct vr_vxlan) + sizeof(struct vr_eth);
            if (!pskb_may_pull(skb, pull_len))
                goto error;
@@ -1667,12 +1667,10 @@ lh_pull_inner_headers(struct vr_packet *pkt,
         if (ret == PKT_MPLS_TUNNEL_L3) {
             /* L3 packet */
 
-            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN +
+            pull_len = pull_len - VR_L2_CTRL_DATA_LEN +
                                                 sizeof(struct vr_ip);
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
-
-            hoff = pkt->vp_data + hdr_len + VR_MPLS_HDR_LEN;
 
             iph = (struct vr_ip *)(skb->head + hoff);
             if (vr_ip_is_ip6(iph)) {
@@ -1689,14 +1687,21 @@ lh_pull_inner_headers(struct vr_packet *pkt,
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
 
-            hoff += VR_L2_MCAST_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
+            hoff += VR_L2_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN;
             eth = (struct vr_eth *) (skb->head + hoff);
+		} else if (ret == PKT_MPLS_TUNNEL_L2_CONTROL_DATA) {
 
-        } else if ((ret == PKT_MPLS_TUNNEL_L2_UCAST) ||
-                   (ret == PKT_MPLS_TUNNEL_L2_MCAST_EVPN)) {
+			/* L2 packet with control data*/
+			pull_len = pull_len + sizeof(struct vr_eth);
+			if (!pskb_may_pull(skb, pull_len))
+				goto error;
+
+			hoff += VR_L2_CTRL_DATA_LEN;
+            eth = (struct vr_eth *) (skb->head + hoff);
+        } else if (ret == PKT_MPLS_TUNNEL_L2_UCAST) {
 
             /* L2 unicast packet */
-            pull_len = pull_len - VR_L2_MCAST_CTRL_DATA_LEN +
+            pull_len = pull_len - VR_L2_CTRL_DATA_LEN +
                                         sizeof(struct vr_eth);
             if (!pskb_may_pull(skb, pull_len))
                 goto error;
@@ -1718,6 +1723,20 @@ lh_pull_inner_headers(struct vr_packet *pkt,
 
         eth_proto = eth->eth_proto;
         hoff += sizeof(struct vr_eth);
+
+        if (ntohs(eth_proto) == VR_ETH_PROTO_PBB) {
+            pull_len += sizeof(struct vr_pbb_itag);
+            if (!pskb_may_pull(skb, pull_len))
+                goto error;
+            hoff += sizeof(struct vr_pbb_itag);
+
+            pull_len += VR_ETHER_HLEN;
+            if (!pskb_may_pull(skb, pull_len))
+                goto error;
+            eth = (struct vr_eth *)(skb->head + hoff);
+            eth_proto = eth->eth_proto;
+        }
+
 
         while (ntohs(eth_proto) == VR_ETH_PROTO_VLAN) {
             pull_len += sizeof(struct vr_vlan_hdr);
