@@ -93,6 +93,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_interface_req_object);
     printf("Interface Request MAC           %" PRIu64 "\n",
             stats->vms_interface_req_mac_object);
+    printf("Interface Request PBB MAC       %" PRIu64 "\n",
+            stats->vms_interface_req_pbb_evpn_mac_object);
     printf("Interface Mirror Req Meta Objects   %" PRIu64 "\n",
             stats->vms_interface_req_mirror_meta_object);
     printf("Interface Request Name          %" PRIu64 "\n",
@@ -139,6 +141,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_nexthop_req_list_object);
     printf("NextHop Request Encap           %" PRIu64 "\n",
             stats->vms_nexthop_req_encap_object);
+    printf("NextHop Request PBB BMAC        %" PRIu64 "\n",
+            stats->vms_nexthop_req_bmac_object);
     printf("NextHop Request                 %" PRIu64 "\n",
             stats->vms_nexthop_req_object);
     printf("Route Table                     %" PRIu64 "\n",

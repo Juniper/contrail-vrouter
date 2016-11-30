@@ -153,6 +153,7 @@ static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_DROP_NEW_FLOWS,   "Df",   "Drop New Flows"},
     {VIF_FLAG_MAC_LEARN,        "L",    "MAC Learning Enabled"},
     {VIF_FLAG_MAC_PROXY,        "Proxy", "MAC Requests Proxied Always"},
+    {VIF_FLAG_ETREE_ROOT,       "Er",   "Etree Root"},
 };
 
 static char *
@@ -510,6 +511,11 @@ list_get_print(vr_interface_req *req)
             req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors, 0);
+    if (req->vifr_isid || req->vifr_pbb_evpn_mac_size) {
+        vr_interface_print_head_space();
+        printf("ISID: %d Bmac: "MAC_FORMAT"\n",
+                req->vifr_isid, MAC_VALUE((uint8_t *)req->vifr_pbb_evpn_mac));
+    }
     vr_interface_print_head_space();
     printf("Drops:%" PRIu64 "\n", req->vifr_dpackets);
 

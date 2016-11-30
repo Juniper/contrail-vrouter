@@ -508,10 +508,28 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
         pkt->vp_flags |= VP_FLAG_MULTICAST;
 
     eth_proto = ntohs(*(unsigned short *)(eth + VR_ETHER_PROTO_OFF));
+    if (eth_proto == VR_ETH_PROTO_PBB_EVPN) {
+
+        if (pkt_len < (pull_len + sizeof(struct vr_pbb_itag)))
+            return -1;
+        pull_len += sizeof(struct vr_pbb_itag);
+
+        if (pkt_len < (pull_len + VR_ETHER_HLEN))
+            return -1;
+
+        eth_proto = ntohs(*(unsigned short *)(eth + pull_len +
+                                            VR_ETHER_PROTO_OFF));
+        pull_len += VR_ETHER_HLEN;
+    }
+
     while (eth_proto == VR_ETH_PROTO_VLAN) {
         if (pkt_len < (pull_len + sizeof(*vlan)))
             return -1;
         vlan = (struct vr_vlan_hdr *)(eth + pull_len);
+        /*
+         * consider the packet as vlan tagged only if it is provider
+         * vlan tag. Customers vlan tag, Vrouter is not bothered off
+         */
         if (fmd && (fmd->fmd_vlan == VLAN_ID_INVALID))
             fmd->fmd_vlan = vlan->vlan_tag & 0xFFF;
         eth_proto = ntohs(vlan->vlan_proto);
@@ -616,6 +634,8 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, unsigned short vlan_id)
 {
     struct vr_forwarding_md fmd;
+    bool root = false;
+    bridge_learn_result_t bl_res;
 
     vr_init_forwarding_md(&fmd);
     fmd.fmd_vlan = vlan_id;
@@ -645,9 +665,19 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, &fmd))
         return 0;
 
-    vr_bridge_input(vif->vif_router, pkt, &fmd);
-    return 0;
+    if (pkt->vp_if->vif_flags & VIF_FLAG_MAC_LEARN) {
+        bl_res = vr_bridge_learn(pkt->vp_if->vif_router, pkt, &fmd, NULL);
+        if (bl_res == BL_FAILURE)
+            return 0;
+        if (pkt->vp_if->vif_flags & VIF_FLAG_ETREE_ROOT)
+            root = true;
+        vr_forwarding_md_update_etree_root(&fmd,root);
+        vr_forwarding_md_update_etree(&fmd, true);
+    }
 
+    vr_bridge_input(vif->vif_router, pkt, &fmd);
+
+    return 0;
 }
 
 unsigned int
@@ -751,8 +781,10 @@ vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
     unsigned short *vlan_tag;
 
     eth = (struct vr_eth *)pkt_data(pkt);
+#if 0
     if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN))
         return 0;
+#endif
 
     new_eth = (struct vr_eth *)pkt_push(pkt, VR_VLAN_HLEN);
     if (!new_eth)
@@ -811,4 +843,53 @@ vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
 
     handled = vr_gro_process(pkt, nh->nh_dev, (nh->nh_family == AF_BRIDGE));
     return handled;
+}
+
+int
+vr_pbb_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+{
+    bool root = false;
+    int handled = 1;
+    unsigned int nh_flags;
+    bridge_learn_result_t bl_res;
+	struct vr_eth *eth;
+    struct vr_nexthop *nh;
+
+    eth = (struct vr_eth *)pkt_data(pkt);
+    if (ntohs(eth->eth_proto) != VR_ETH_PROTO_PBB_EVPN)
+        return !handled;
+
+    if (pkt_pull(pkt, sizeof(*eth) + sizeof(struct vr_pbb_itag)) < 0) {
+        vr_pfree(pkt, VP_DROP_PULL);
+        return handled;
+    }
+
+    /* Copy the PBB source mac to fmd  to do tunnel source validation */
+    VR_MAC_COPY(fmd->fmd_mac, eth->eth_smac);
+
+    if (!pkt->vp_nh || !(pkt->vp_nh->nh_flags & NH_FLAG_MAC_LEARN))
+        return !handled;
+
+    bl_res = vr_bridge_learn(pkt->vp_if->vif_router, pkt, fmd, &nh);
+    if (bl_res == BL_FAILURE) {
+        return handled;
+    } else if (bl_res == BL_MAC_EXISTS) {
+        if (nh && nh->nh_validate_src) {
+            nh->nh_validate_src(pkt, nh, fmd, &nh_flags);
+            if (nh_flags & NH_FLAG_ETREE_ROOT)
+                root = true;
+        }
+    } else if (bl_res == BL_NEW_MAC) {
+        /* We need to do a Source Bmac Lookup and identify whether it is
+         * a root or not. As a short cut, lets mark it as root
+         */
+        root = true;
+    }
+
+    vr_forwarding_md_update_etree_root(fmd, root);
+    vr_forwarding_md_update_etree(fmd, true);
+
+    /* Lets copy the PBB dst mac */
+    VR_MAC_COPY(fmd->fmd_mac, eth->eth_dmac);
+    return !handled;
 }

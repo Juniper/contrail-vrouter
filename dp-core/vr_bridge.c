@@ -107,6 +107,7 @@ bridge_add(unsigned int router_id, unsigned int vrf,
         be->be_key.be_vrf_id = vrf;
         be->be_packets = 0;
         be->be_flags = VR_BE_VALID_FLAG;
+        be->be_nh_id = -1;
     }
 
     /* Un ref the old nexthop */
@@ -187,12 +188,6 @@ bridge_table_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     if (!rt->rtr_nh)
         return -ENOENT;
 
-    if ((!(rt->rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)) &&
-        (rt->rtr_nh->nh_type == NH_TUNNEL)) {
-        vrouter_put_nexthop(rt->rtr_nh);
-        return -EINVAL;
-    }
-
     ret = __bridge_table_add(rt);
     vrouter_put_nexthop(rt->rtr_nh);
     return ret;
@@ -253,6 +248,8 @@ bridge_update_route_req(struct vr_bridge_entry *be, struct vr_route_req *rt)
     rt->rtr_req.rtr_label_flags = be->be_flags;
     rt->rtr_req.rtr_label = be->be_label;
     rt->rtr_nh = be->be_nh;
+    if (rt->rtr_nh)
+        rt->rtr_req.rtr_nh_id = rt->rtr_nh->nh_id;
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
         if (rt->rtr_req.rtr_mac) {
             VR_MAC_COPY(rt->rtr_req.rtr_mac, be->be_key.be_mac);
@@ -313,13 +310,9 @@ bridge_lookup(uint8_t *mac, struct vr_forwarding_md *fmd)
         rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     be = __bridge_lookup(rt.rtr_req.rtr_vrf_id, &rt);
-    if (be)
-        bridge_update_route_req(be, &rt);
 
-    if (fmd && (rt.rtr_req.rtr_label_flags & VR_BE_LABEL_VALID_FLAG)) {
-        vr_forwarding_md_set_label(fmd, rt.rtr_req.rtr_label,
-                VR_LABEL_TYPE_UNKNOWN);
-    }
+    if (be && fmd && (be->be_flags & VR_BE_LABEL_VALID_FLAG))
+        vr_forwarding_md_set_label(fmd, be->be_label, VR_LABEL_TYPE_UNKNOWN);
 
     return be;
 }
@@ -389,10 +382,8 @@ bridge_table_get(unsigned int vrf_id, struct vr_route_req *rt)
     struct vr_nexthop *nh;
 
     nh = bridge_table_lookup(vrf_id, rt);
-    if (nh) {
-        rt->rtr_req.rtr_nh_id = rt->rtr_nh->nh_id;
+    if (nh)
         return 0;
-    }
 
     return -ENOENT;
 }
@@ -510,7 +501,7 @@ bridge_entry_key(vr_htable_t table, vr_hentry_t *entry, unsigned int
     return &be->be_key;
 }
 
-#if 0
+#if 1
 static void
 vr_bridge_table_data_destroy(vr_bridge_table_data *data)
 {
@@ -695,13 +686,14 @@ bridge_table_lock(struct vr_interface *vif, uint8_t *mac)
     return hash;
 }
 
-unsigned int
+bridge_learn_result_t
 vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
-        struct vr_forwarding_md *fmd)
+        struct vr_forwarding_md *fmd, struct vr_nexthop **ret_nh)
 {
-    int ret = 0, lock, valid_src;
+    int lock, valid_src;
     unsigned int trap_reason;
     bool trap = false;
+    bridge_learn_result_t bl_res = BL_MAC_EXISTS;
 
     struct vr_eth *eth;
     struct vr_packet *pkt_c;
@@ -710,10 +702,10 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
 
     eth = (struct vr_eth *)pkt_data(pkt);
     if (!eth)
-        return 0;
+        return BL_MAC_NOT_LEARNT;
 
     if (IS_MAC_BMCAST(eth->eth_smac))
-        return 0;
+        return BL_MAC_NOT_LEARNT;
 
     be = bridge_lookup(eth->eth_smac, fmd);
     if (be) {
@@ -727,33 +719,36 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
         }
 
         if (!nh)
-            return 0;
+            return BL_MAC_NOT_LEARNT;
 
         lock = bridge_table_lock(pkt->vp_if, eth->eth_smac);
         if (lock < 0)
-            return 0;
+            return BL_MAC_NOT_LEARNT;
 
         be = bridge_add(0, fmd->fmd_dvrf, eth->eth_smac, nh->nh_id);
         bridge_table_unlock(pkt->vp_if, eth->eth_smac, lock);
         if (!be)
-            return -ENOMEM;
+            return BL_MAC_NOT_LEARNT;
 
         trap_reason = AGENT_TRAP_MAC_LEARN;
         trap = true;
+        bl_res = BL_NEW_MAC;
     } else {
         if (!(be->be_flags & VR_BE_MAC_MOVED_FLAG) && (nh->nh_validate_src)) {
             valid_src = nh->nh_validate_src(pkt, nh, fmd, NULL);
             if (valid_src != NH_SOURCE_VALID) {
-                ret = vr_bridge_set_route_flags(be, VR_BE_MAC_MOVED_FLAG);
-                if (!ret) {
+                if (!vr_bridge_set_route_flags(be, VR_BE_MAC_MOVED_FLAG)) {
                     /* trap the packet for mac move */
                     trap_reason = AGENT_TRAP_MAC_MOVE;
                     trap = true;
                 }
-                ret = 0;
             }
         }
+        if (be->be_flags & VR_BE_MAC_MOVED_FLAG)
+            bl_res = BL_MAC_MOVED;
     }
+    if (ret_nh)
+        *ret_nh = nh;
 
     __sync_fetch_and_add(&be->be_packets, 1);
 
@@ -761,14 +756,14 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
         pkt_c = pkt_cow(pkt, 0);
         if (!pkt_c) {
             pkt_c = pkt;
-            ret = -ENOMEM;
+            bl_res = BL_FAILURE;
         }
 
         vr_trap(pkt_c, fmd->fmd_dvrf,
                 trap_reason, (void *)&be->be_hentry.hentry_index);
     }
 
-    return ret;
+    return bl_res;
 }
 
 unsigned int
@@ -785,12 +780,6 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     struct vr_vrf_stats *stats;
 
     dmac = (int8_t *) pkt_data(pkt);
-
-    if (pkt->vp_if->vif_flags & VIF_FLAG_MAC_LEARN) {
-        if (vr_bridge_learn(router, pkt, fmd)) {
-            return 0;
-        }
-    }
 
     pull_len = 0;
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6) ||
@@ -825,6 +814,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
          * lookup itself
          */
         if (vif_is_virtual(pkt->vp_if)) {
+
             if (pkt->vp_type == VP_TYPE_IP)
                 l4_type = vr_ip_well_known_packet(pkt);
             else if (pkt->vp_type == VP_TYPE_IP6)
@@ -872,8 +862,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
 
             be = bridge_lookup(vr_bcast_mac, fmd);
-            nh = be->be_nh;
-            if (!nh) {
+            if (!be || !(nh = be->be_nh)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return 0;
             }
@@ -890,8 +879,16 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
         if (nh->nh_type != NH_L2_RCV)
             overlay_len = VROUTER_L2_OVERLAY_LEN;
-    }
 
+        /*
+         * If the tunel is a PBB tunnel, we need to accomodate for Itag
+         * and an extra ethernet (for Bmac) + Vlan header
+         */
+        if (nh->nh_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+            overlay_len += VR_ETHER_HLEN + sizeof(struct vr_vlan_hdr) +
+                            sizeof(struct vr_pbb_itag);
+        }
+    }
 
     /* Adjust MSS for V4 and V6 packets */
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
