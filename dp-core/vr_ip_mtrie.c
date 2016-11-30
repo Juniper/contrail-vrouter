@@ -777,6 +777,7 @@ mtrie_stats_get(vr_vrf_stats_req *req, vr_vrf_stats_req *response)
             response->vsr_arp_physical_flood += stats->vrf_arp_physical_flood;
             response->vsr_vrf_translates += stats->vrf_vrf_translates;
             response->vsr_uuc_floods += stats->vrf_uuc_floods;
+            response->vsr_pbb_evpn_tunnels += stats->vrf_pbb_evpn_tunnels;
         }
     }
 
@@ -797,7 +798,7 @@ mtrie_stats_empty(vr_vrf_stats_req *r)
             r->vsr_arp_virtual_stitch || r->vsr_arp_virtual_flood ||
             r->vsr_arp_physical_stitch || r->vsr_arp_tor_proxy ||
             r->vsr_arp_physical_flood || r->vsr_l2_receives ||
-            r->vsr_uuc_floods)
+            r->vsr_uuc_floods || r->vsr_pbb_evpn_tunnels)
         return false;
 
     return true;

@@ -66,6 +66,7 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_drop_new_flow += stats[VP_DROP_NEW_FLOWS];
     response->vds_flow_evict += stats[VP_DROP_FLOW_EVICT];
     response->vds_trap_original += stats[VP_DROP_TRAP_ORIGINAL];
+    response->vds_leaf_to_leaf += stats[VP_DROP_LEAF_TO_LEAF];
 
     return;
 }
@@ -233,6 +234,9 @@ vr_mem_stats_get(void)
                 stats_block[VR_INTERFACE_REQ_MAC_OBJECT].ms_free);
         response->vms_interface_req_name_object += (stats_block[VR_INTERFACE_REQ_NAME_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_REQ_NAME_OBJECT].ms_free);
+        response->vms_interface_req_pbb_evpn_mac_object +=
+            (stats_block[VR_INTERFACE_REQ_PBB_EVPN_MAC_OBJECT].ms_alloc -
+                stats_block[VR_INTERFACE_REQ_PBB_EVPN_MAC_OBJECT].ms_free);
         response->vms_interface_stats_object += (stats_block[VR_INTERFACE_STATS_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_STATS_OBJECT].ms_free);
         response->vms_interface_table_object += (stats_block[VR_INTERFACE_TABLE_OBJECT].ms_alloc -
@@ -271,6 +275,9 @@ vr_mem_stats_get(void)
                 stats_block[VR_NEXTHOP_OBJECT].ms_free);
         response->vms_nexthop_component_object += (stats_block[VR_NEXTHOP_COMPONENT_OBJECT].ms_alloc -
                 stats_block[VR_NEXTHOP_COMPONENT_OBJECT].ms_free);
+        response->vms_nexthop_req_bmac_object +=
+            (stats_block[VR_NEXTHOP_REQ_BMAC_OBJECT].ms_alloc -
+                stats_block[VR_NEXTHOP_REQ_BMAC_OBJECT].ms_free);
         response->vms_nexthop_req_list_object += (stats_block[VR_NEXTHOP_REQ_LIST_OBJECT].ms_alloc -
                 stats_block[VR_NEXTHOP_REQ_LIST_OBJECT].ms_free);
         response->vms_nexthop_req_encap_object += (stats_block[VR_NEXTHOP_REQ_ENCAP_OBJECT].ms_alloc -
