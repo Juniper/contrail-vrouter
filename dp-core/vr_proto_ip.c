@@ -493,7 +493,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
 {
     unsigned int hlen;
     unsigned short drop_reason, l4_port = 0;
-    int ret = 0, unhandled = 1;
+    int unhandled = 1;
 
     struct vr_ip *ip;
     unsigned char *l2_hdr;
@@ -616,10 +616,10 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         } else {
             vr_preset(pkt);
         }
-        ret = vif->vif_tx(vif, pkt, fmd);
+        vif->vif_tx(vif, pkt, fmd);
     }
 
-    return ret;
+    return 0;
 
 drop_pkt:
     vr_pfree(pkt, drop_reason);
