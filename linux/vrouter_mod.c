@@ -2446,17 +2446,26 @@ init_fail:
     return ret;
 }
 
-module_param(vr_flow_entries, uint, 0);
-module_param(vr_oflow_entries, uint, 0);
+module_param(vr_flow_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_flow_entries, "Number of entries in the flow table. Default is "__stringify(VR_DEF_FLOW_ENTRIES));
+module_param(vr_oflow_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_oflow_entries, "Number of overflow entries in the flow table.");
 
-module_param(vr_bridge_entries, uint, 0);
-module_param(vr_bridge_oentries, uint, 0);
+module_param(vr_bridge_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_bridge_entries, "Number of entries in the bridge table. Default is "__stringify(VR_DEF_BRIDGE_ENTRIES));
+module_param(vr_bridge_oentries, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_bridge_oentries, "Number of overflow entries in the bridge table.");
 
-module_param(vr_mpls_labels, uint, 0);
-module_param(vr_nexthops, uint, 0);
-module_param(vr_vrfs, uint, 0);
-module_param(vr_flow_hold_limit, uint, 0);
-module_param(vr_interfaces, uint, 0);
+module_param(vr_mpls_labels, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));
+module_param(vr_nexthops, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_nexthops, "Number of entries in the nexhop table. Default is "__stringify(VR_DEF_NEXTHOPS));
+module_param(vr_vrfs, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_vrfs, "Number of vrfs. Default is "__stringify(VR_DEF_VRFS));
+module_param(vr_flow_hold_limit, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_flow_hold_limit, "Maximum number of entries in the flow table that can be in the HOLD state. Default is 8192");
+module_param(vr_interfaces, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_interfaces, "Number of entries in the interface table. Default is "__stringify(VR_MAX_INTERFACES));
 
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 module_param(vr_use_linux_br, int, 0);
