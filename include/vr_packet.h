@@ -11,6 +11,7 @@
 #include "vr_flow.h"
 #include "vrouter.h"
 #include "vr_btable.h"
+#include "vr_bridge.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -179,7 +180,9 @@
 #define VP_DROP_NEW_FLOWS                   42
 #define VP_DROP_FLOW_EVICT                  43
 #define VP_DROP_TRAP_ORIGINAL               44
-#define VP_DROP_MAX                         45
+#define VP_DROP_LEAF_TO_LEAF                45
+#define VP_DROP_BMAC_ISID_MISMATCH          46
+#define VP_DROP_MAX                         47
 
 
 struct vr_drop_stats {
@@ -228,6 +231,7 @@ struct vr_drop_stats {
     uint64_t vds_drop_new_flow;
     uint64_t vds_flow_evict;
     uint64_t vds_trap_original;
+    uint64_t vds_bmac_isid_mismatch;
 };
 
 /*
@@ -286,6 +290,14 @@ struct vr_vlan_hdr {
     unsigned short vlan_proto;
 } __attribute__((packed));
 
+struct vr_pbb_itag {
+    uint8_t    pbbi_pcp:3,
+               pbbi_dei:1,
+               pbbi_uca:1,
+               pbbi_res:3;
+    uint32_t   pbbi_isid:24;
+} __attribute__((packed));
+
 
 #define VR_ARP_HW_LEN           6
 #define VR_ARP_OP_REQUEST       1
@@ -295,6 +307,7 @@ struct vr_vlan_hdr {
 #define VR_ETH_PROTO_IP         0x800
 #define VR_ETH_PROTO_IP6        0x86DD
 #define VR_ETH_PROTO_VLAN       0x8100
+#define VR_ETH_PROTO_PBB_EVPN   0x88E7
 
 #define VR_DIAG_CSUM         0xffff
 #define VR_UDP_PORT_RANGE_START 49152
@@ -551,6 +564,25 @@ int vr_inner_pkt_parse(unsigned char *va,
 #define MCAST_IP_MASK                   (0xF0000000)
 #define IS_BMCAST_IP(ip) \
             (((ntohl(ip) & MCAST_IP_MASK) == MCAST_IP) || (ip == 0xFFFFFFFF))
+
+static inline void
+vr_mcast_mac_from_isid(uint32_t isid, uint8_t *mac)
+{
+    if (!mac)
+        return;
+
+    /*
+     * ISID is in network byte order. Lets copy the 4 bytes of ISID and
+     * over write the MSB
+     */
+    *(unsigned int *)(mac + 2) = isid;
+
+    mac[0] = 1;
+    mac[1] = 0x1E;
+    mac[2] = 0x83;
+
+    return;
+}
 
 #define VR_IP_ADDR_SIZE(type) \
         ((type == VP_TYPE_IP6) ? VR_IP6_ADDRESS_LEN \
@@ -908,6 +940,8 @@ enum {
  * this variable
  */
 #define FMD_FLAG_LABEL_IS_VXLAN_ID      0x01
+#define FMD_FLAG_ETREE_ENABLE           0x02
+#define FMD_FLAG_ETREE_ROOT             0x04
 
 struct vr_forwarding_md {
     int32_t fmd_flow_index;
@@ -924,6 +958,7 @@ struct vr_forwarding_md {
     int8_t fmd_dscp;
     int8_t fmd_dotonep;
     int8_t fmd_queue;
+    int8_t fmd_mac[VR_ETHER_ALEN];
 };
 
 static inline void
@@ -942,6 +977,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_flags = 0;
     fmd->fmd_dscp = -1;
     fmd->fmd_dotonep = -1;
+    VR_MAC_RESET(fmd->fmd_mac);
     return;
 }
 
@@ -950,6 +986,46 @@ vr_forwarding_md_label_is_vxlan_id(struct vr_forwarding_md *fmd)
 {
     if (fmd->fmd_flags & FMD_FLAG_LABEL_IS_VXLAN_ID)
         return true;
+    return false;
+}
+
+static inline void
+vr_forwarding_md_update_etree(struct vr_forwarding_md *fmd, bool valid)
+{
+    if (valid)
+        fmd->fmd_flags |= FMD_FLAG_ETREE_ENABLE;
+    else
+        fmd->fmd_flags &= ~FMD_FLAG_ETREE_ENABLE;
+
+    return;
+}
+
+static inline void
+vr_forwarding_md_update_etree_root(struct vr_forwarding_md *fmd, bool root)
+{
+    if (root)
+        fmd->fmd_flags |= FMD_FLAG_ETREE_ROOT;
+    else
+        fmd->fmd_flags &= ~FMD_FLAG_ETREE_ROOT;
+
+    return;
+}
+
+static inline bool
+vr_forwarding_md_etree_is_enabled(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_flags & FMD_FLAG_ETREE_ENABLE)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_forwarding_md_etree_is_root(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_flags & FMD_FLAG_ETREE_ROOT)
+        return true;
+
     return false;
 }
 

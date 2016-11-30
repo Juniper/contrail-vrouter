@@ -59,6 +59,7 @@ struct vr_vrf_stats {
     uint64_t vrf_arp_tor_proxy;
     uint64_t vrf_arp_physical_flood;
     uint64_t vrf_uuc_floods;
+    uint64_t vrf_pbb_evpn_tunnels;
 };
 
 struct vr_route {
