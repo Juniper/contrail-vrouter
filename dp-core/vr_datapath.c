@@ -486,6 +486,7 @@ int
 vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
             struct vr_forwarding_md *fmd)
 {
+    bool pvlan = true;
     unsigned char *eth = pkt_data(pkt) + offset;
     unsigned short eth_proto;
     int pull_len, pkt_len = pkt_head_len(pkt) - offset;
@@ -502,11 +503,30 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
         pkt->vp_flags |= VP_FLAG_MULTICAST;
 
     eth_proto = ntohs(*(unsigned short *)(eth + VR_ETHER_PROTO_OFF));
+    if (eth_proto == VR_ETH_PROTO_PBB_EVPN) {
+
+        if (pkt_len < (pull_len + sizeof(struct vr_pbb_itag)))
+            return -1;
+        pull_len += sizeof(struct vr_pbb_itag);
+
+        if (pkt_len < (pull_len + VR_ETHER_HLEN))
+            return -1;
+
+        eth_proto = ntohs(*(unsigned short *)(eth + pull_len +
+                                            VR_ETHER_PROTO_OFF));
+        pull_len += VR_ETHER_HLEN;
+        pvlan = false;
+    }
+
     while (eth_proto == VR_ETH_PROTO_VLAN) {
         if (pkt_len < (pull_len + sizeof(*vlan)))
             return -1;
         vlan = (struct vr_vlan_hdr *)(eth + pull_len);
-        if (fmd && (fmd->fmd_vlan == VLAN_ID_INVALID))
+        /*
+         * consider the packet as vlan tagged only if it is provider
+         * vlan tag. Customers vlan tag, Vrouter is not bothered off
+         */
+        if (fmd && pvlan && (fmd->fmd_vlan == VLAN_ID_INVALID))
             fmd->fmd_vlan = vlan->vlan_tag & 0xFFF;
         eth_proto = ntohs(vlan->vlan_proto);
         pull_len += sizeof(*vlan);

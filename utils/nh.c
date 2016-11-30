@@ -203,7 +203,6 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
             break;
 
         case NH_FLAG_TUNNEL_VXLAN:
-        case NH_FLAG_VNID:
             strcat(ptr, "Vxlan, ");
             break;
 
@@ -213,6 +212,22 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
 
         case NH_FLAG_TUNNEL_SIP_COPY:
             strcat(ptr, "Copy SIP, ");
+            break;
+
+        case NH_FLAG_TUNNEL_PBB_EVPN:
+            strcat(ptr, "PbbEvpn, ");
+            break;
+
+        case NH_FLAG_INDIRECT:
+            strcat(ptr, "Indirect, ");
+            break;
+
+        case NH_FLAG_ETREE_ROOT:
+            strcat(ptr, "Etree Root, ");
+            break;
+
+        case NH_FLAG_MAC_LEARN:
+            strcat(ptr, "Mac Learn, ");
             break;
         }
     }
@@ -256,6 +271,13 @@ vr_nexthop_req_process(void *s_req)
     printf("Flags:%s",
             nh_flags(req->nhr_flags, req->nhr_type, flags_mem));
 
+    if ((req->nhr_flags & NH_FLAG_INDIRECT) && (req->nhr_nh_list_size)) {
+        i = -1;
+        if (req->nhr_label_list_size)
+            i = req->nhr_label_list[0];
+        printf("Direct NH(label): %d(%d)", req->nhr_nh_list[0], i);
+    }
+
     if (req->nhr_type == NH_RCV) {
         nh_print_newline_header();
         printf("Oif:%d\n", req->nhr_encap_oif_id);
@@ -270,23 +292,23 @@ vr_nexthop_req_process(void *s_req)
         }
     } else if (req->nhr_type == NH_TUNNEL) {
         nh_print_newline_header();
-        printf("Oif:%d Len:%d Flags %s Data:", req->nhr_encap_oif_id,
-                req->nhr_encap_size, nh_flags(req->nhr_flags, req->nhr_type, flags_mem));
-        for (i = 0; i< req->nhr_encap_size; i++) {
-            printf("%02x ", (unsigned char)req->nhr_encap[i]);
+        if (!(req->nhr_flags & NH_FLAG_TUNNEL_PBB_EVPN)) {
+            printf("Oif:%d Len:%d Data:", req->nhr_encap_oif_id, req->nhr_encap_size);
+            for (i = 0; i< req->nhr_encap_size; i++) {
+                printf("%02x ", (unsigned char)req->nhr_encap[i]);
+            }
+            nh_print_newline_header();
         }
-        nh_print_newline_header();
-        printf("Vrf:%d", req->nhr_vrf);
         if (req->nhr_family == AF_INET) {
             a.s_addr = req->nhr_tun_sip;
-            printf("  Sip:%s", inet_ntoa(a));
+            printf("Sip:%s", inet_ntoa(a));
             a.s_addr = req->nhr_tun_dip;
-            printf("  Dip:%s", inet_ntoa(a));
+            printf(" Dip:%s", inet_ntoa(a));
         } else if (req->nhr_family == AF_INET6) {
-            printf("  Sip: %s",
+            printf("Sip: %s",
                     inet_ntop(AF_INET6, (struct in6_addr *)req->nhr_tun_sip6,
                     in6_dst, sizeof(in6_dst)));
-            printf("  Dip: %s",
+            printf(" Dip: %s",
                     inet_ntop(AF_INET6, (struct in6_addr *)req->nhr_tun_dip6,
                     in6_dst, sizeof(in6_dst)));
         }
@@ -295,6 +317,14 @@ vr_nexthop_req_process(void *s_req)
             nh_print_newline_header();
             printf("Sport:%d Dport:%d\n", ntohs(req->nhr_tun_sport),
                                                   ntohs(req->nhr_tun_dport));
+        }
+
+        if (req->nhr_flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+            i = -1;
+            if (req->nhr_label_list_size)
+                i = req->nhr_label_list[0];
+            printf("Bmac: "MAC_FORMAT " Label: %d",
+                    MAC_VALUE((uint8_t *)req->nhr_pbb_evpn_mac), i);
         }
     } else if (req->nhr_type == NH_VRF_TRANSLATE) {
         nh_print_newline_header();
@@ -308,7 +338,7 @@ vr_nexthop_req_process(void *s_req)
             }
         }
         nh_print_newline_header();
-        printf("Sub NH(label):");
+        printf("Sub NH(label)(Flags):");
         for (i = 0; i < req->nhr_nh_list_size; i++) {
             if (printed > 60) {
                 nh_print_newline_header();
@@ -318,6 +348,9 @@ vr_nexthop_req_process(void *s_req)
             printed += printf(" %d", req->nhr_nh_list[i]);
             if (req->nhr_label_list[i] >= 0)
                 printed += printf("(%d)", req->nhr_label_list[i]);
+            if (req->nhr_flag_list)
+                printed += printf("(%s)",
+                           nh_flags(req->nhr_flag_list[i], 0, flags_mem));
         }
 
         if (req->nhr_nh_count &&
@@ -332,10 +365,17 @@ vr_nexthop_req_process(void *s_req)
     }
 
     printf("\n\n");
-    if (req->nhr_type == NH_COMPOSITE && command == SANDESH_OP_GET) {
-        for (i = 0; i < req->nhr_nh_list_size; i++) {
-            vr_nh_op(cl, command, type, req->nhr_nh_list[i], if_id, vrf_id,
-                     dst_mac, src_mac, sip, dip, flags);
+    if (command == SANDESH_OP_GET) {
+        if (req->nhr_type == NH_COMPOSITE) {
+            for (i = 0; i < req->nhr_nh_list_size; i++) {
+                vr_nh_op(cl, command, type, req->nhr_nh_list[i], if_id, vrf_id,
+                            dst_mac, src_mac, sip, dip, flags);
+            }
+        }
+
+        if ((req->nhr_flags & NH_FLAG_INDIRECT) && (req->nhr_nh_list_size)) {
+            vr_nh_op(cl, command, type, req->nhr_nh_list[0], if_id, vrf_id,
+                         dst_mac, src_mac, sip, dip, flags);
         }
     }
 }
@@ -358,7 +398,10 @@ vr_nh_op(struct nl_client *cl, int command, int type, uint32_t nh_id,
 op_retry:
     switch (command) {
     case SANDESH_OP_ADD:
-        if ((type == NH_ENCAP) || (type == NH_TUNNEL)) {
+        if (flags & NH_FLAG_TUNNEL_PBB_EVPN) {
+            ret = vr_send_pbb_tunnel_add(cl, 0, nh_id, flags,
+                    vrf_id, dst, comp_nh[0], lbl[0]);
+        } else if ((type == NH_ENCAP) || (type == NH_TUNNEL)) {
             ret = vr_send_nexthop_encap_tunnel_add(cl, 0, type, nh_id,
                     flags, vrf_id, if_id, src, dst, sip, dip, sport, dport);
         } else if (type == NH_COMPOSITE) {
@@ -408,6 +451,7 @@ cmd_usage()
            "       [--vrf <vrf_id> ]\n"
            "       [--pol NH with policy]\n"
            "       [--rpol NH with relaxed policy]\n"
+           "       [--root NH is an Etree Root]\n"
            "       [--rlkup Force Route Lookup]\n"
            "       [--type <type> type of the tunnel 1 - rcv, 2 - encap \n"
            "                       3 - tunnel, 4 - resolve, 5 - discard, 6 - Composite\n"
@@ -424,6 +468,11 @@ cmd_usage()
            "                    [--dmac <xx:xx:xx:xx:xx:xx> destination mac ]\n"
            "                    [--oif = out going interface index]\n"
            "                [TUNNEL_NH options - default Gre]\n"
+           "                    [--pbb PBB tunnel options]\n"
+           "                        [--cni <nh_id> direct nh member id]\n"
+           "                        [--lbl <lbl> Evpn label for PBB tunnel]\n"
+           "                        [--dmac <xx:xx:xx:xx:xx:xx> destination Bmac]\n"
+           "                        [--ind indirect flag]\n"
            "                    [--oif <if_id> out going interface index]\n"
            "                    [--smac <xx:xx:xx:xx:xx:xx> source mac ]\n"
            "                    [--dmac <xx:xx:xx:xx:xx:xx> destination mac ]\n"
@@ -495,7 +544,10 @@ enum opt_index {
     CRT_OPT_IND,
     DEL_OPT_IND,
     CMD_OPT_IND,
-    RL2_OPT_IND,
+    IND_OPT_IND,
+    PBB_OPT_IND,
+    ROOT_OPT_IND,
+    ML_OPT_IND,
     HLP_OPT_IND,
     MAX_OPT_IND
 };
@@ -546,6 +598,10 @@ static struct option long_options[] = {
     [CRT_OPT_IND]       = {"create", required_argument, &opt[CRT_OPT_IND],      1},
     [DEL_OPT_IND]       = {"delete", required_argument, &opt[DEL_OPT_IND],      1},
     [CMD_OPT_IND]       = {"cmd",   no_argument,        &opt[CMD_OPT_IND],      1},
+    [IND_OPT_IND]       = {"ind",   no_argument,        &opt[IND_OPT_IND],      1},
+    [PBB_OPT_IND]       = {"pbb",   no_argument,        &opt[PBB_OPT_IND],      1},
+    [ROOT_OPT_IND]      = {"root",  no_argument,        &opt[ROOT_OPT_IND],     1},
+    [ML_OPT_IND]        = {"ml",    no_argument,        &opt[ML_OPT_IND],       1},
     [HLP_OPT_IND]       = {"help",  no_argument,        &opt[HLP_OPT_IND],      1},
     [MAX_OPT_IND]       = { NULL,   0,                  0,                      0}
 };
@@ -680,11 +736,20 @@ validate_options(void)
         if (opt_set(POL_OPT_IND))
             flags |= NH_FLAG_POLICY_ENABLED;
 
+        if (opt_set(IND_OPT_IND))
+            flags |= NH_FLAG_INDIRECT;
+
         if (opt_set(RPOL_OPT_IND))
             flags |= NH_FLAG_RELAXED_POLICY;
 
         if (opt_set(RLKUP_OPT_IND))
             flags |= NH_FLAG_ROUTE_LOOKUP;
+
+        if (opt_set(ML_OPT_IND))
+            flags |= NH_FLAG_MAC_LEARN;
+
+        if (opt_set(ROOT_OPT_IND))
+            flags |= NH_FLAG_ETREE_ROOT;
 
         if (type == NH_RCV) {
             if (!opt_set(OIF_OPT_IND))
@@ -710,7 +775,21 @@ validate_options(void)
             }
 
         } else if (type == NH_TUNNEL) {
-            if (!opt_set(OIF_OPT_IND) || !opt_set(SMAC_OPT_IND) ||
+
+            if (opt_set(PBB_OPT_IND)) {
+                if (!opt_set(CNI_OPT_IND)) {
+                    cmd_usage();
+                }
+
+                if (comp_nh_ind != 1)
+                    cmd_usage();
+
+                if (!opt_set(LBL_OPT_IND) || !opt_set(DMAC_OPT_IND))
+                    cmd_usage();
+
+                flags |= NH_FLAG_TUNNEL_PBB_EVPN;
+
+            } else if (!opt_set(OIF_OPT_IND) || !opt_set(SMAC_OPT_IND) ||
                     !opt_set(DMAC_OPT_IND) || !opt_set(SIP_OPT_IND) ||
                     !opt_set(DIP_OPT_IND)) {
                 cmd_usage();
@@ -725,9 +804,11 @@ validate_options(void)
                 flags |= NH_FLAG_TUNNEL_VXLAN;
                 if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
                     cmd_usage();
-            } else {
-                flags |= NH_FLAG_TUNNEL_GRE;
             }
+
+            if (!(flags & (NH_FLAG_TUNNEL_UDP_MPLS | NH_FLAG_TUNNEL_UDP |
+                        NH_FLAG_TUNNEL_VXLAN | NH_FLAG_TUNNEL_PBB_EVPN)))
+                flags |= NH_FLAG_TUNNEL_GRE;
 
             if (memcmp(opt, zero_opt, sizeof(opt)))
                 cmd_usage();
@@ -768,9 +849,6 @@ validate_options(void)
                 cmd_usage();
 
         } else if (type == NH_VRF_TRANSLATE) {
-            if (opt_set(VXLAN_OPT_IND))
-                flags |= NH_FLAG_VNID;
-
             if (opt_set(UUCF_OPT_IND))
                 flags |= NH_FLAG_UNKNOWN_UC_FLOOD;
         } else {
