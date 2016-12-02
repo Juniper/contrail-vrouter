@@ -56,7 +56,7 @@ static unsigned int get_fc_set, set_fc_set, fc_set;
 static unsigned int get_qos_set, set_qos_set, delete_qos_set;
 static unsigned int dscp_set, mpls_qos_set, dotonep_set, queue_set;
 static unsigned int set_queue_set, pg_set, pg_bw_set, strict_set;
-static unsigned int get_queue_set, tc_set, dcbx_set;
+static unsigned int get_queue_set, tc_set, dcbx_set, default_tc;
 
 static uint8_t dotonep, dscp, mpls_qos, fc, queue;
 static uint8_t dcbx_mode, dcb_enable;
@@ -527,13 +527,36 @@ Usage(void)
     printf("       --set-fc <fc-id> <--dscp | --mpls_qos | --dotonep | --queue> <value>\n");
     printf("       --get-qos <index>\n");
     printf("       --set-qos <index> <--dscp | --mpls_qos | --dotonep> <value> --fc <fc-id>\n");
-    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101.. --tc 0,1,..\n");
+    printf("       --set-queue <ifname> --dcbx <cee | ieee> --pg 0,1,2.. --bw 10,20,.. --strict 101..\n");
     printf("       --get-queue <ifname>\n");
     printf("       --dump-fc\n");
     printf("       --dump-qos\n");
     printf("       --delete-qos <index>\n");
 
     exit(EINVAL);
+
+    return;
+}
+
+static void
+build_default_priority_to_tc_map(void)
+{
+    unsigned int i;
+    if (dcbx_mode == DCB_CAP_DCBX_VER_IEEE) {
+        for (i = 0; i < NUM_TC; i++) {
+            priority_map.prio_to_tc[i] = i;
+        }
+        default_tc = 1;
+    } else if (dcbx_mode == DCB_CAP_DCBX_VER_CEE) {
+        for (i = 0; i < NUM_TC; i++) {
+            priority_map.prio_to_tc[i] = priority_map.tc_to_group[i];
+        }
+        default_tc = 1;
+    } else {
+        printf("Incorrect mode \n");
+        Usage();
+        return;
+    }
 
     return;
 }
@@ -547,7 +570,12 @@ validate_options(void)
     unsigned int set = dotonep_set + mpls_qos_set + dscp_set + queue_set;
     unsigned int op_set = get_fc_set + get_qos_set + set_fc_set +
         set_qos_set + dump_fc_set + dump_qos_set + delete_qos_set + get_queue_set;
-    unsigned int prio_opt_set = dcbx_set + set_queue_set + pg_set + pg_bw_set + strict_set + tc_set;
+
+    if (set_queue_set && tc_set != 1) {
+        build_default_priority_to_tc_map();
+    }
+
+    unsigned int prio_opt_set = dcbx_set + set_queue_set + pg_set + pg_bw_set + strict_set + tc_set + default_tc;
 
     if ((prio_opt_set || get_queue_set) &&
             (get_platform() != LINUX_PLATFORM)) {
