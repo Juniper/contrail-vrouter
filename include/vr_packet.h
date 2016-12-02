@@ -1200,7 +1200,9 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
      * Fall through, either for failure of per cpu stat or for carry
      * over
      */
-    (void)__sync_add_and_fetch(vif->vif_drop_stats + reason, count);
+    if (vif->vif_drop_stats) {
+        (void)__sync_add_and_fetch(vif->vif_drop_stats + reason, count);
+    }
 
     return;
 }
