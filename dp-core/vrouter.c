@@ -276,7 +276,7 @@ vrouter_ops_get(void)
     if (!req)
         return NULL;
 
-    req->vo_build_info = vr_zalloc(strlen(ContrailBuildInfo),
+    req->vo_build_info = vr_zalloc(strlen(ContrailBuildInfo) + 1,
             VR_BUILD_INFO_OBJECT);
     if (!req->vo_build_info) {
         vr_free(req, VR_VROUTER_REQ_OBJECT);
@@ -340,7 +340,7 @@ vrouter_ops_get_process(void *s_req)
 
     /* Build info */
     strncpy(resp->vo_build_info, ContrailBuildInfo,
-            strlen(ContrailBuildInfo));
+            strlen(ContrailBuildInfo) + 1);
 
     /* Logging entries */
     resp->vo_log_level = vr_get_log_level();
