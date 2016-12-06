@@ -234,6 +234,10 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
             (icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REPLY)) {
             sport = icmph->icmp_eid;
             dport = ntohs(VR_ICMP6_TYPE_ECHO_REPLY);
+        } else if ((icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) ||
+                (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_AD)) {
+            pkt->vp_flags |= VP_FLAG_FLOW_SET;
+            return 0;
         } else {
             sport = 0;
             dport = icmph->icmp_type;
@@ -298,6 +302,9 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
                                              ip6, flow_p, VR_FLOW_KEY_ALL);
     if (ret < 0)
         return FLOW_CONSUMED;
+
+    if (pkt->vp_flags & VP_FLAG_FLOW_SET)
+        return FLOW_FORWARD;
 
     /*
      * if the interface is policy enabled, or if somebody else (eg:nexthop)
