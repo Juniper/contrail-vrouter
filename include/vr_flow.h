@@ -397,6 +397,8 @@ extern void vr_flow_exit(struct vrouter *, bool);
 
 extern bool vr_flow_forward(struct vrouter *,
         struct vr_packet *, struct vr_forwarding_md *);
+extern int vr_flow_hold(struct vrouter *, unsigned int,
+        struct vr_packet *, struct vr_forwarding_md *, unsigned int);
 
 void *vr_flow_get_va(struct vrouter *, uint64_t);
 
