@@ -1253,7 +1253,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             stats->vis_queue_opackets++;
         } else {
             /* TODO: a separate counter for this drop */
-            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
             stats->vis_queue_oerrors++;
             /* return 0 so we do not increment vif error counter */
             return 0;
@@ -1339,13 +1339,13 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             /* Software VLAN TCI insert. */
             if (unlikely(pkt_push(pkt, sizeof(struct vlan_hdr)) == NULL)) {
                 RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
-                vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+                vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
                 return -1;
             }
             m->l2_len += sizeof(struct vlan_hdr);
             if (unlikely(rte_vlan_insert(&m))) {
                 RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
-                vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+                vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
                 return -1;
             }
         } else {
@@ -1369,7 +1369,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             RTE_LOG(DEBUG, VROUTER, "%s: error %d during fragmentation of an "
                     "IP packet for interface %s on lcore %u\n", __func__,
                     num_of_frags, vif->vif_name, lcore_id);
-            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
             return -1;
         }
     }
@@ -1400,7 +1400,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 rte_pktmbuf_free(mbufs_out[i]);
 
             /* Drop the original packet (the one that has been fragmented) */
-            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
             return -1;
         }
     } else {
@@ -1411,7 +1411,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         } else {
             RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
                     "for lcore %u\n", __func__, vif->vif_name, lcore_id);
-            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
             return -1;
         }
     }
@@ -1440,6 +1440,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
+        pkt = vr_dpdk_packet_get(m, vif);
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);;
@@ -1462,7 +1463,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     } else {
         RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
-        vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+        vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
         return -1;
     }
 

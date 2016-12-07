@@ -487,7 +487,7 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
          * dequeue drops.
          */
         RTE_LOG(ERR, VROUTER, "Error receiving from packet socket: no vif attached\n");
-        vr_dpdk_pfree(usockp->usock_mbuf, VP_DROP_INTERFACE_DROP);
+        vr_dpdk_pfree(usockp->usock_mbuf, NULL, VP_DROP_INTERFACE_DROP);
         stats->vis_port_ierrors++;
     }
 
