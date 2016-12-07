@@ -660,7 +660,7 @@ int vr_dpdk_host_init(void);
 void vr_dpdk_host_exit(void);
 /* Convert internal packet fields */
 struct vr_packet * vr_dpdk_packet_get(struct rte_mbuf *m, struct vr_interface *vif);
-void vr_dpdk_pfree(struct rte_mbuf *mbuf, unsigned short reason);
+void vr_dpdk_pfree(struct rte_mbuf *mbuf, struct vr_interface *vif, unsigned short reason);
 /* Retry socket connection */
 int vr_dpdk_retry_connect(int sockfd, const struct sockaddr *addr,
                             socklen_t alen);

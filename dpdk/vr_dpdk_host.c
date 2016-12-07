@@ -159,9 +159,10 @@ dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 }
 
 void
-vr_dpdk_pfree(struct rte_mbuf *mbuf, unsigned short reason)
+vr_dpdk_pfree(struct rte_mbuf *mbuf, struct vr_interface *vif, unsigned short reason)
 {
     struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(mbuf);
+    pkt = vr_dpdk_packet_get(mbuf, vif);
     dpdk_pfree(pkt, reason);
 }
 
