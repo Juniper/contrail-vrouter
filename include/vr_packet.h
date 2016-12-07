@@ -1179,11 +1179,6 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
     if (router)
         ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
 
-    if (!vif) {
-        vr_printf("Vrouter: vr_pdrop_stats NULL VIF, reason %d\n", reason);
-        return;
-    }
-
     /* Increment per cpu stats */
     if (vif->vif_pcpu_drop_stats) {
         data = vr_btable_get(vif->vif_pcpu_drop_stats,

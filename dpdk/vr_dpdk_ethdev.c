@@ -1048,7 +1048,7 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     if (unlikely(mask_to_drop != 0)) {
         for (i = 0; i < *nb_pkts; i++) {
             if (mask_to_drop & (1ULL << i)) {
-                vr_dpdk_pfree(pkts[i], VP_DROP_PULL);
+                vr_dpdk_pfree(pkts[i], vif, VP_DROP_PULL);
             } else {
                 pkts[nb_pkts_ret] = pkts[i];
                 if (mask_to_distribute & (1ULL << i)) {
