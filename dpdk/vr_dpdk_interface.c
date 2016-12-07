@@ -1224,6 +1224,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     int num_of_frags = 1;
     int i;
     bool will_fragment;
+    int check_vr_dpdk_1 = 1;
+    int check_vr_dpdk_2 = 1;
+    int check_vr_dpdk_3 = 1;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -1260,9 +1263,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         }
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
-        if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+        check_vr_dpdk_1 = (VR_DPDK_PKT_DUMP_VIF_FILTER(vif));
 #endif
-        rte_pktmbuf_dump(stdout, m, 0x60);
+        if(check_vr_dpdk_1)
+          rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
         vr_dpdk_packet_wakeup(vif);
         return 0;
@@ -1356,9 +1360,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
-    if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+    check_vr_dpdk_2 = (VR_DPDK_PKT_DUMP_VIF_FILTER(vif));
 #endif
-    rte_pktmbuf_dump(stdout, m, 0x60);
+    if(check_vr_dpdk_2)
+      rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
     if (unlikely(will_fragment)) {
@@ -1452,9 +1457,10 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
-    if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
+    check_vr_dpdk_3 = (VR_DPDK_PKT_DUMP_VIF_FILTER(vif));
 #endif
-    rte_pktmbuf_dump(stdout, m, 0x60);
+    if(check_vr_dpdk_3)
+      rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
