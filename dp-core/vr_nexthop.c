@@ -601,15 +601,22 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (stats)
         stats->vrf_ecmp_composites++;
 
-    if (!fmd || fmd->fmd_ecmp_nh_index >= (short)nh->nh_component_cnt)
+    if (!fmd)
         goto drop;
 
-    if (fmd->fmd_ecmp_nh_index >= 0)
-        member_nh = nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh;
+    if (fmd->fmd_ecmp_nh_index >= 0) {
+        if (fmd->fmd_ecmp_nh_index < nh->nh_component_cnt)
+            member_nh = nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh;
+    }
 
     if (!member_nh) {
-        vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ECMP_RESOLVE, &fmd->fmd_flow_index);
-        return 0;
+        ret = vr_flow_hold(nh->nh_router, fmd->fmd_flow_index, pkt, fmd,
+                AGENT_TRAP_ECMP_RESOLVE);
+        if (ret != -EAGAIN) {
+            return 0;
+        }
+
+        ret = 0;
     }
 
     vr_forwarding_md_set_label(fmd,
