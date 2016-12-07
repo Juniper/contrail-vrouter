@@ -839,7 +839,7 @@ vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
         struct vr_packet *pkt, unsigned int index,
         struct vr_flow_stats *stats)
 {
-    unsigned int trap_reason;
+    unsigned int trap_reason = 0;
     struct vr_packet *npkt;
     struct vr_flow_trap_arg ta;
 
@@ -850,6 +850,11 @@ vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
     vr_preset(npkt);
 
     switch (fe->fe_flags & VR_FLOW_FLAG_TRAP_MASK) {
+    case VR_FLOW_FLAG_TRAP_ECMP:
+        trap_reason = AGENT_TRAP_ECMP_RESOLVE;
+        fe->fe_flags &= ~VR_FLOW_FLAG_TRAP_ECMP;
+        break;
+
     default:
         /*
          * agent needs a method to identify new flows from existing flows.
@@ -865,19 +870,19 @@ vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
             trap_reason = AGENT_TRAP_FLOW_ACTION_HOLD;
         }
 
-        ta.vfta_index = index;
-        if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6))
-            ta.vfta_nh_index = fe->fe_key.flow_nh_id;
-        if (stats) {
-            ta.vfta_stats = *stats;
-        } else {
-            ta.vfta_stats = fe->fe_stats;
-        }
-
-        ta.vfta_gen_id = fe->fe_gen_id;
-
         break;
     }
+
+    ta.vfta_index = index;
+    if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6))
+        ta.vfta_nh_index = fe->fe_key.flow_nh_id;
+    if (stats) {
+        ta.vfta_stats = *stats;
+    } else {
+        ta.vfta_stats = fe->fe_stats;
+    }
+
+    ta.vfta_gen_id = fe->fe_gen_id;
 
     return vr_trap(npkt, fe->fe_vrf, trap_reason, &ta);
 }
@@ -910,6 +915,84 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     }
 
     return vr_flow_action(router, fe, index, pkt, fmd);
+}
+
+int
+vr_flow_hold(struct vrouter *router, unsigned int fe_index,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+        unsigned int trap_reason)
+{
+    bool modified = false;
+    int ret = 0;
+    unsigned int i;
+
+    struct vr_flow_entry *fe = vr_get_flow_entry(router, fe_index);
+
+    if (!fe) {
+        ret = -EINVAL;
+        goto exit_hold;
+    }
+
+    /* try for some number of times */
+    for (i = 0; i < 10; i++) {
+        if ((modified = vr_flow_start_modify(router, fe))) {
+            break;
+        }
+    }
+
+    if (!modified) {
+        ret = -EBUSY;
+        goto exit_hold;
+    }
+
+    /*
+     * to take care of the cases where the ecmp index changes
+     * before the packet is put on the hold queue. For e.g.:
+     * the case of second packet, where by the time the second
+     * packet came here, agent had already decided to change
+     * the index based on the information from the first packet.
+     * It so happened that the change to the flow entry did
+     * not happen when the nexthop code checked for the index,
+     * but by the time the packet reached here, agent had
+     * already made the change.
+     */
+    if (trap_reason == AGENT_TRAP_ECMP_RESOLVE) {
+        if (fmd->fmd_ecmp_nh_index != fe->fe_ecmp_nh_index) {
+            ret = -EAGAIN;
+            goto exit_modified;
+        }
+    }
+
+    if (!fe->fe_hold_list) {
+        switch (trap_reason) {
+        case AGENT_TRAP_ECMP_RESOLVE:
+            fe->fe_flags |= VR_FLOW_FLAG_TRAP_ECMP;
+            break;
+
+        default:
+            break;
+        }
+
+        fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue),
+                VR_FLOW_QUEUE_OBJECT);
+        if (!fe->fe_hold_list) {
+            ret = -ENOMEM;
+            goto exit_hold;
+        }
+
+    }
+
+    vr_enqueue_flow(router, fe, pkt, fe_index, &fe->fe_stats, fmd);
+
+exit_modified:
+    vr_flow_stop_modify(router, fe);
+
+exit_hold:
+    if (ret && (ret != -EAGAIN)) {
+        vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
+    }
+
+    return ret;
 }
 
 static unsigned int
