@@ -1768,7 +1768,20 @@ vr_interface_delete(vr_interface_req *req, bool need_response)
     struct vr_interface *vif;
     struct vrouter *router = vrouter_get(req->vifr_rid);
 
-    vif = __vrouter_get_interface(router, req->vifr_idx);
+    /* Interface can be deleted using vif name of OS interface name or
+     * index
+     */
+    if (req->vifr_name) {
+        if (2 == sscanf(req->vifr_name, "vif%u/%u", &req->vifr_rid,
+                    &req->vifr_idx))
+            vif = __vrouter_get_interface(vrouter_get(req->vifr_rid),
+                    req->vifr_idx);
+        else
+            vif = vif_find(router, req->vifr_name);
+    } else {
+        vif = __vrouter_get_interface(router, req->vifr_idx);
+    }
+
     if (!vif && (ret = -ENODEV))
         goto del_fail;
 

@@ -968,7 +968,7 @@ Usage()
     printf("\t   \t--xconnect <physical interface name>\n");
     printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
     printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci]\n");
-    printf("\t   [--delete <intf_id>]\n");
+    printf("\t   [--delete <intf_id>|<intf_name>]\n");
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate] [--get-drop-stats]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
     printf("\t   [--list][--core <core number>][--rate]\n");
@@ -1084,7 +1084,10 @@ parse_long_opts(int option_index, char *opt_arg)
 
         case DELETE_OPT_INDEX:
             vr_op = SANDESH_OP_DELETE;
-            vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
+            if (isdigit(opt_arg[0]))
+                vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
+            else
+                strncpy(if_name, opt_arg, sizeof(if_name) - 1);
             if (errno)
                 Usage();
             break;
