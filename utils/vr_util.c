@@ -366,7 +366,6 @@ vr_table_map(int major, unsigned int table,
     return mem;
 }
 
-#if 0
 int
 vr_send_get_bridge_table_data(struct nl_client *cl)
 {
@@ -379,7 +378,6 @@ vr_send_get_bridge_table_data(struct nl_client *cl)
 
     return vr_sendmsg(cl, &req, "vr_bridge_table_data");
 }
-#endif
 
 int
 vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)

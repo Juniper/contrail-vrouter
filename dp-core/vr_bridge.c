@@ -510,7 +510,6 @@ bridge_entry_key(vr_htable_t table, vr_hentry_t *entry, unsigned int
     return &be->be_key;
 }
 
-#if 0
 static void
 vr_bridge_table_data_destroy(vr_bridge_table_data *data)
 {
@@ -595,7 +594,6 @@ generate_response:
 
     return;
 }
-#endif
 
 int
 bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)

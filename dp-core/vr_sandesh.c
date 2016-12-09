@@ -86,12 +86,10 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_flow_response),
         .obj_type_string        =       "vr_flow_response",
     },
-#if 0
     [VR_BRIDGE_TABLE_DATA_OBJECT_ID] = {
         .obj_len                =       4 * sizeof(vr_bridge_table_data),
         .obj_type_string        =       "vr_bridge_table_data",
     },
-#endif
 };
 
 static unsigned int

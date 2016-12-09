@@ -455,3 +455,11 @@ buffer sandesh vr_flow_table_data {
    15: list<u32>    ftable_hold_stat;
 }
 
+buffer sandesh vr_bridge_table_data {
+    1: sandesh_op   btable_op;
+    2: u16          btable_rid;
+    3: u32          btable_size;
+    4: u16          btable_dev;
+    5: string       btable_file_path;
+}
+
