@@ -20,6 +20,7 @@
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
+#include "vr_dpdk_gro.h"
 
 #include <signal.h>
 
@@ -1233,6 +1234,8 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
         }
     }
 
+    vr_dpdk_gro_init(lcore_id, lcore);
+
     return 0;
 }
 
@@ -1467,7 +1470,7 @@ dpdk_lcore_fwd_loop(void)
     uint64_t cur_bond_cycles = 0;
     uint64_t cur_assembler_cycles = 0;
     uint64_t diff_cycles;
-    uint64_t last_tx_cycles = 0;
+    uint64_t last_tx_cycles = 0, last_gro_flush_cycles = 0;
     uint64_t last_bond_tx_cycles = 0;
     uint64_t last_assembler_cycles = 0;
     /* always calculate bond TX timeout in CPU cycles */
@@ -1517,7 +1520,12 @@ dpdk_lcore_fwd_loop(void)
             dpdk_fragment_assembler_table_scan(NULL);
         }
 
-        /* check if we need to flush TX queues */
+        /* check if we need to flush TX queues and timeout GRO flows */
+        diff_cycles = cur_cycles - last_gro_flush_cycles;
+        if (unlikely((100*tx_flush_cycles) < diff_cycles)) {
+            last_gro_flush_cycles = cur_cycles;
+            dpdk_gro_flush_all_inactive(lcore);
+        }
         diff_cycles = cur_cycles - last_tx_cycles;
         if (unlikely(tx_flush_cycles < diff_cycles)) {
             /* update TX flush cycles */
