@@ -29,6 +29,7 @@
 
 #include <rte_config.h>
 #include <rte_port.h>
+#include <rte_ip.h>
 #include <rte_port_ring.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
@@ -122,7 +123,7 @@ extern unsigned vr_packet_sz;
  * the IP headers of the fragments and we have to prepend an outer (tunnel)
  * header. */
 #define VR_DPDK_FRAG_DIRECT_MBUF_SZ     (sizeof(struct rte_mbuf)    \
-                                         + RTE_PKTMBUF_HEADROOM)
+                                         + 2*RTE_PKTMBUF_HEADROOM)
 /* Size of indirect mbufs used for fragmentation. These mbufs holds only a
  * pointer to the data in other mbufs, thus they don't need any additional
  * buffer size. */
@@ -365,6 +366,18 @@ enum vr_dpdk_lcore_cmd {
     VR_DPDK_LCORE_RX_QUEUE_SET_CMD,
 };
 
+struct gro_ctrl {
+    int     gro_queued;
+    int     gro_flushed;
+    int     gro_bad_csum;
+    int     gro_cnt;
+    int     gro_flows;
+    int     gro_flush_inactive_flows;
+
+    struct rte_hash *gro_tbl_v4_handle;
+    struct rte_hash *gro_tbl_v6_handle;
+};
+
 struct vr_dpdk_lcore_rx_queue_remove_arg {
     unsigned int vif_id;
     bool clear_f_rx;
@@ -396,6 +409,8 @@ struct vr_dpdk_lcore {
     u_int64_t lcore_fwd_loops;
     /* Flag controlling the assembler work */
     bool do_fragment_assembly;
+    /* GRO ctrl structure */
+    struct gro_ctrl gro;
 
     /**********************************************************************/
     /* Big and less frequently used fields */
@@ -844,5 +859,7 @@ void dpdk_fragment_assembler_exit(void);
 int dpdk_fragment_assembler_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd);
 void dpdk_fragment_assembler_table_scan(void *);
+void dpdk_gro_flush_all_inactive(struct vr_dpdk_lcore *lcore);
+int dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt);
 
 #endif /*_VR_DPDK_H_ */

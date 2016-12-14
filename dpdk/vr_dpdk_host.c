@@ -991,8 +991,9 @@ out:
 static unsigned int
 dpdk_pgso_size(struct vr_packet *pkt)
 {
-    /* TODO: not implemented */
-    return 0;
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
+
+    return m->tso_segsz;
 }
 
 static void
@@ -1250,8 +1251,7 @@ struct host_os dpdk_host = {
     .hos_pfrag_len                  =    dpdk_pfrag_len,
     .hos_phead_len                  =    dpdk_phead_len,
     .hos_pset_data                  =    dpdk_pset_data,
-    .hos_pgso_size                  =    dpdk_pgso_size, /* not implemented, returns 0 */
-
+    .hos_pgso_size                  =    dpdk_pgso_size,
     .hos_get_cpu                    =    dpdk_get_cpu,
     .hos_schedule_work              =    dpdk_schedule_work,
     .hos_delay_op                   =    dpdk_delay_op, /* do nothing */
@@ -1275,7 +1275,7 @@ struct host_os dpdk_host = {
 #endif
     .hos_pkt_from_vm_tcp_mss_adj    =    dpdk_pkt_from_vm_tcp_mss_adj,
     .hos_pkt_may_pull               =    dpdk_pkt_may_pull,
-
+    .hos_gro_process                =    dpdk_gro_process,
     .hos_add_mpls                   =    dpdk_add_mpls,
     .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
     .hos_enqueue_to_assembler       =    dpdk_fragment_assembler_enqueue,
@@ -1457,7 +1457,7 @@ vr_dpdk_host_init(void)
     /*
      * Turn off GRO/GSO as they are not implemented with DPDK.
      */
-    vr_perfr = vr_perfs = 0;
+    vr_perfs = 0;
 
     /*
      * Allow at least one file descriptor per interface (as required by the
