@@ -29,6 +29,7 @@
 
 #include <rte_config.h>
 #include <rte_port.h>
+#include <rte_ip.h>
 #include <rte_port_ring.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
@@ -103,7 +104,7 @@ extern unsigned vr_packet_sz;
 /* Number of hardware RX ring descriptors per queue */
 #define VR_DPDK_NB_RXD              128
 /* Number of hardware TX ring descriptors per queue */
-#define VR_DPDK_NB_TXD              128
+#define VR_DPDK_NB_TXD              512 
 /* Offset to MPLS label for hardware filtering (in 16-bit word units) */
 #define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
                                     + sizeof(struct vr_ip)      \
@@ -122,7 +123,7 @@ extern unsigned vr_packet_sz;
  * the IP headers of the fragments and we have to prepend an outer (tunnel)
  * header. */
 #define VR_DPDK_FRAG_DIRECT_MBUF_SZ     (sizeof(struct rte_mbuf)    \
-                                         + RTE_PKTMBUF_HEADROOM)
+                                         + 2*RTE_PKTMBUF_HEADROOM)
 /* Size of indirect mbufs used for fragmentation. These mbufs holds only a
  * pointer to the data in other mbufs, thus they don't need any additional
  * buffer size. */
@@ -206,6 +207,7 @@ extern unsigned vr_packet_sz;
  * allow for standard jumbo frame size (9000 / 1500 = 6) + 1 additional segment
  * for outer headers. */
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
+#define VR_DPDK_FRAG_MAX_IP_SEGS    128 
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 /*
  * Use IO lcores:
@@ -365,6 +367,18 @@ enum vr_dpdk_lcore_cmd {
     VR_DPDK_LCORE_RX_QUEUE_SET_CMD,
 };
 
+struct gro_ctrl {
+    int     gro_queued;
+    int     gro_flushed;
+    int     gro_bad_csum;
+    int     gro_cnt;
+    int     gro_flows;
+    int     gro_flush_inactive_flows;
+
+    struct rte_hash *gro_tbl_v4_handle;
+    struct rte_hash *gro_tbl_v6_handle;
+};
+
 struct vr_dpdk_lcore_rx_queue_remove_arg {
     unsigned int vif_id;
     bool clear_f_rx;
@@ -396,6 +410,8 @@ struct vr_dpdk_lcore {
     u_int64_t lcore_fwd_loops;
     /* Flag controlling the assembler work */
     bool do_fragment_assembly;
+    /* GRO ctrl structure */
+    struct gro_ctrl gro;
 
     /**********************************************************************/
     /* Big and less frequently used fields */
@@ -685,6 +701,8 @@ void dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
 /* Creates a copy of the given packet mbuf */
 struct rte_mbuf *
 vr_dpdk_pktmbuf_copy(struct rte_mbuf *md, struct rte_mempool *mp);
+struct rte_mbuf *
+vr_dpdk_pktmbuf_copy_mon(struct rte_mbuf *md, struct rte_mempool *mp);
 
 /*
  * vr_dpdk_interface.c
@@ -844,5 +862,10 @@ void dpdk_fragment_assembler_exit(void);
 int dpdk_fragment_assembler_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd);
 void dpdk_fragment_assembler_table_scan(void *);
+void dpdk_gro_flush_all_inactive(struct vr_dpdk_lcore *lcore);
+int dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt);
+int dpdk_segment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in, 
+                struct rte_mbuf **mbuf_out, const unsigned short out_num, 
+                const unsigned short mss_size, bool do_outer_ip_csum);
 
 #endif /*_VR_DPDK_H_ */
