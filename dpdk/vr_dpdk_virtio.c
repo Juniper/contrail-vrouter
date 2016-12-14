@@ -244,6 +244,33 @@ struct rte_port_in_ops vr_dpdk_virtio_reader_ops = {
     .f_stats = dpdk_virtio_reader_stats_read
 };
 
+void
+vr_dpdk_set_vhost_send_func(unsigned int vif_idx, uint32_t mrg)
+{
+    int i;
+    vr_dpdk_virtioq_t *vq;
+
+    if (vif_idx >= VR_MAX_INTERFACES) {
+        return;
+    }
+
+    for (i = 0; i < VR_DPDK_VIRTIO_MAX_QUEUES*2; i++) {
+        if (i & 1) {
+            vq = &vr_dpdk_virtio_rxqs[vif_idx][i/2];
+        } else {
+            vq = &vr_dpdk_virtio_txqs[vif_idx][i/2];
+        }
+
+        if (mrg) {
+            vq->send = dpdk_virtio_dev_to_vm_tx_burst_mergeable;
+            vq->vdv_hlen = sizeof(struct virtio_net_hdr_mrg_rxbuf);
+        } else {
+            vq->send = dpdk_virtio_dev_to_vm_tx_burst;
+            vq->vdv_hlen = sizeof(struct virtio_net_hdr);
+        }
+    }
+}
+
 /*
  * vr_dpdk_vrtio_uvh_get_blk_size - set the block size of fd.
  * On error -1 is returned, otherwise 0.
@@ -790,7 +817,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         pkt_len = desc->len;
         pkt_addr = vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
         /* Check the descriptor is sane. */
-        if (unlikely(desc->len < sizeof(struct virtio_net_hdr) ||
+        if (unlikely(desc->len < vq->vdv_hlen ||
                 desc->addr == 0 || pkt_addr == NULL)) {
             goto free_mbuf;
         }
@@ -801,7 +828,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 
         /* Skip virtio_net_hdr as we don't support mergeable receive buffers. */
         if (likely(desc->flags & VRING_DESC_F_NEXT &&
-                pkt_len == sizeof(struct virtio_net_hdr))) {
+                pkt_len == vq->vdv_hlen)) {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u F_NEXT\n",
                 __func__, vq, i);
             desc = &vq->vdv_desc[desc->next];
@@ -810,8 +837,8 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         } else {
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p pkt %u no F_NEXT\n",
                 __func__, vq, i);
-            pkt_addr += sizeof(struct virtio_net_hdr);
-            pkt_len -= sizeof(struct virtio_net_hdr);
+            pkt_addr += vq->vdv_hlen;
+            pkt_len -= vq->vdv_hlen;
         }
         /* Now pkt_addr points to the packet data. */
 
@@ -914,7 +941,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
  * Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
  * BSD LICENSE
  */
-static inline uint32_t __attribute__((always_inline))
+inline uint32_t __attribute__((always_inline))
 dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         vr_dpdk_virtioq_t *vq, struct rte_mbuf **pkts, uint32_t count)
 {
@@ -1101,12 +1128,313 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
     return count;
 }
 
+static inline uint32_t __attribute__((always_inline))
+copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t res_base_idx,
+    uint16_t res_end_idx, struct vq_buf_vector *buf_vec,struct rte_mbuf *pkt)
+{
+    uint32_t vec_idx = 0;
+    uint32_t entry_success = 0;
+    /* The virtio_hdr is initialised to 0. */
+    struct virtio_net_hdr_mrg_rxbuf virtio_hdr = {
+        {0, 0, 0, 0, 0, 0}, 0};
+    uint16_t cur_idx = res_base_idx;
+    uint64_t vb_addr = 0;
+    uint64_t vb_hdr_addr = 0;
+    uint32_t seg_offset = 0;
+    uint32_t vb_offset = 0;
+    uint32_t seg_avail;
+    uint32_t vb_avail;
+    uint32_t cpy_len, entry_len;
+
+    if (pkt == NULL)
+        return 0;
+
+    RTE_LOG(DEBUG, VROUTER, "%s: Current Index %d| "
+        "End Index %d\n",
+        __func__, cur_idx, res_end_idx);
+
+    /*
+     * Convert from gpa to vva
+     * (guest physical addr -> vhost virtual addr)
+     */
+    vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, 
+                                                        buf_vec[vec_idx].buf_addr);
+    vb_hdr_addr = vb_addr;
+
+    /* Prefetch buffer address. */
+    rte_prefetch0((void *)(uintptr_t)vb_addr);
+
+    virtio_hdr.num_buffers = res_end_idx - res_base_idx;
+
+    RTE_LOG(DEBUG, VROUTER, "%s RX: Num merge buffers %d\n",
+        __func__, virtio_hdr.num_buffers);
+
+    rte_memcpy((void *)(uintptr_t)vb_hdr_addr,
+        (const void *)&virtio_hdr, vq->vdv_hlen);
+
+    seg_avail = rte_pktmbuf_data_len(pkt);
+    vb_offset = vq->vdv_hlen;
+    vb_avail = buf_vec[vec_idx].buf_len - vq->vdv_hlen;
+
+    entry_len = vq->vdv_hlen;
+
+    if (vb_avail == 0) {
+        uint32_t desc_idx =
+            buf_vec[vec_idx].desc_idx;
+
+        if ((vq->vdv_desc[desc_idx].flags
+            & VRING_DESC_F_NEXT) == 0) {
+            /* Update vdv_used ring with vdv_desc information */
+            vq->vdv_used->ring[cur_idx & (vq->vdv_size - 1)].id
+                = buf_vec[vec_idx].desc_idx;
+            vq->vdv_used->ring[cur_idx & (vq->vdv_size - 1)].len
+                = entry_len;
+
+            entry_len = 0;
+            cur_idx++;
+            entry_success++;
+        }
+
+        vec_idx++;
+        vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, 
+                                                          buf_vec[vec_idx].buf_addr);
+
+        /* Prefetch buffer address. */
+        rte_prefetch0((void *)(uintptr_t)vb_addr);
+        vb_offset = 0;
+        vb_avail = buf_vec[vec_idx].buf_len;
+    }
+
+    cpy_len = RTE_MIN(vb_avail, seg_avail);
+
+    while (cpy_len > 0) {
+        /* Copy mbuf data to vring buffer */
+        rte_memcpy((void *)(uintptr_t)(vb_addr + vb_offset),
+            rte_pktmbuf_mtod_offset(pkt, const void *, seg_offset),
+            cpy_len);
+
+        seg_offset += cpy_len;
+        vb_offset += cpy_len;
+        seg_avail -= cpy_len;
+        vb_avail -= cpy_len;
+        entry_len += cpy_len;
+
+        if (seg_avail != 0) {
+            /*
+             * The virtio buffer in this vring
+             * entry reach to its end.
+             * But the segment doesn't complete.
+             */
+            if ((vq->vdv_desc[buf_vec[vec_idx].desc_idx].flags &
+                VRING_DESC_F_NEXT) == 0) {
+                /* Update vdv_used ring with vdv_desc information */
+                vq->vdv_used->ring[cur_idx & (vq->vdv_size - 1)].id
+                    = buf_vec[vec_idx].desc_idx;
+                vq->vdv_used->ring[cur_idx & (vq->vdv_size - 1)].len
+                    = entry_len;
+                entry_len = 0;
+                cur_idx++;
+                entry_success++;
+            }
+
+            vec_idx++;
+            vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl,
+                                                        buf_vec[vec_idx].buf_addr);
+            vb_offset = 0;
+            vb_avail = buf_vec[vec_idx].buf_len;
+            cpy_len = RTE_MIN(vb_avail, seg_avail);
+        } else {
+            /*
+             * This current segment complete, need continue to
+             * check if the whole packet complete or not.
+             */
+            pkt = pkt->next;
+            if (pkt != NULL) {
+                /*
+                 * There are more segments.
+                 */
+                if (vb_avail == 0) {
+                    /*
+                     * This current buffer from vring is
+                     * vdv_used up, need fetch next buffer
+                     * from buf_vec.
+                     */
+                    uint32_t desc_idx =
+                        buf_vec[vec_idx].desc_idx;
+
+                    if ((vq->vdv_desc[desc_idx].flags &
+                        VRING_DESC_F_NEXT) == 0) {
+                        uint16_t wrapped_idx =
+                            cur_idx & (vq->vdv_size - 1);
+                        /*
+                         * Update vdv_used ring with the
+                         * descriptor information
+                         */
+                        vq->vdv_used->ring[wrapped_idx].id
+                            = desc_idx;
+                        vq->vdv_used->ring[wrapped_idx].len
+                            = entry_len;
+                        entry_success++;
+                        entry_len = 0;
+                        cur_idx++;
+                    }
+
+                    /* Get next buffer from buf_vec. */
+                    vec_idx++;
+                    vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl,
+                                                    buf_vec[vec_idx].buf_addr);
+                    vb_avail =
+                        buf_vec[vec_idx].buf_len;
+                    vb_offset = 0;
+                }
+
+                seg_offset = 0;
+                seg_avail = rte_pktmbuf_data_len(pkt);
+                cpy_len = RTE_MIN(vb_avail, seg_avail);
+            } else {
+                /*
+                 * This whole packet completes.
+                 */
+                /* Update vdv_used ring with vdv_desc information */
+                vq->vdv_used->ring[cur_idx & (vq->vdv_size - 1)].id
+                    = buf_vec[vec_idx].desc_idx;
+                vq->vdv_used->ring[cur_idx & (vq->vdv_size - 1)].len
+                    = entry_len;
+                entry_success++;
+                break;
+            }
+        }
+    }
+
+    return entry_success;
+}
+
+static inline void __attribute__((always_inline))
+update_secure_len(vr_dpdk_virtioq_t *vq, uint32_t id,
+    uint32_t *secure_len, struct vq_buf_vector *buf_vec, uint32_t *vec_idx)
+{
+    uint16_t wrapped_idx = id & (vq->vdv_size - 1);
+    uint32_t idx = vq->vdv_avail->ring[wrapped_idx];
+    uint8_t next_desc;
+    uint32_t len = *secure_len;
+    uint32_t vec_id = *vec_idx;
+
+    do {
+        next_desc = 0;
+        len += vq->vdv_desc[idx].len;
+        buf_vec[vec_id].buf_addr = vq->vdv_desc[idx].addr;
+        buf_vec[vec_id].buf_len = vq->vdv_desc[idx].len;
+        buf_vec[vec_id].desc_idx = idx;
+        vec_id++;
+
+        if (vq->vdv_desc[idx].flags & VRING_DESC_F_NEXT) {
+            idx = vq->vdv_desc[idx].next;
+            next_desc = 1;
+        }
+    } while (next_desc);
+
+    *secure_len = len;
+    *vec_idx = vec_id;
+}
+
+inline uint32_t __attribute__((always_inline))
+dpdk_virtio_dev_to_vm_tx_burst_mergeable(struct dpdk_virtio_writer *p,
+        vr_dpdk_virtioq_t *vq, struct rte_mbuf **pkts, uint32_t count)
+{
+    uint32_t pkt_idx = 0, entry_success = 0;
+    uint16_t avail_idx;
+    uint16_t res_base_idx, res_cur_idx;
+    uint8_t success = 0;
+    vr_uvh_client_t *vru_cl;
+    struct vq_buf_vector buf_vec[VR_BUF_VECTOR_MAX];
+
+    if (unlikely(vq->vdv_ready_state == VQ_NOT_READY))
+        return 0;
+
+    vru_cl = vr_dpdk_virtio_get_vif_client(vq->vdv_vif_idx);
+    if (unlikely(vru_cl == NULL))
+        return 0;
+
+    count = RTE_MIN((uint32_t)VR_DPDK_VIRTIO_TX_BURST_SZ, count);
+
+    if (count == 0)
+        return 0;
+
+    for (pkt_idx = 0; pkt_idx < count; pkt_idx++) {
+        uint32_t pkt_len = pkts[pkt_idx]->pkt_len + vq->vdv_hlen;
+
+        do {
+            /*
+             * As many data cores may want access to available
+             * buffers, they need to be reserved.
+             */
+            uint32_t secure_len = 0;
+            uint32_t vec_idx = 0;
+
+            res_base_idx = vq->vdv_last_used_idx_res;
+            res_cur_idx = res_base_idx;
+
+            do {
+                avail_idx = *((volatile uint16_t *)&vq->vdv_avail->idx);
+                if (unlikely(res_cur_idx == avail_idx)) {
+                    RTE_LOG(DEBUG, VROUTER,
+                        "Failed "
+                        "to get enough vdv_desc from "
+                        "vring\n");
+                    return pkt_idx;
+                } else {
+                    update_secure_len(vq, res_cur_idx, &secure_len, buf_vec, &vec_idx);
+                    res_cur_idx++;
+                }
+            } while (pkt_len > secure_len);
+
+            /* vq->vdv_last_used_idx_res is atomically updated. */
+            success = rte_atomic16_cmpset(&vq->vdv_last_used_idx_res,
+                            res_base_idx,
+                            res_cur_idx);
+        } while (success == 0);
+
+        entry_success = copy_from_mbuf_to_vring(vq, vru_cl, res_base_idx,
+            res_cur_idx, buf_vec, pkts[pkt_idx]);
+
+        rte_compiler_barrier();
+
+        /*
+         * Wait until it's our turn to add our buffer
+         * to the vdv_used ring.
+         */
+        while (unlikely(vq->vdv_last_used_idx != res_base_idx))
+            rte_pause();
+
+        *(volatile uint16_t *)&vq->vdv_used->idx += entry_success;
+        vq->vdv_last_used_idx = res_cur_idx;
+
+        /* flush vdv_used->idx update before we read vdv_avail->flags. */
+        rte_mb();
+
+        /* Kick the guest if necessary. */
+        if (unlikely(!(vq->vdv_avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
+            p->nb_syscalls++;
+            eventfd_write(vq->vdv_callfd, 1);
+        }
+    }
+
+    return count;
+}
+
 static inline void
 dpdk_virtio_send_burst(struct dpdk_virtio_writer *p)
 {
     uint32_t nb_tx;
 
-    nb_tx = dpdk_virtio_dev_to_vm_tx_burst(p, p->tx_virtioq,
+    if (unlikely(p->tx_virtioq->send == NULL)) {
+        if (vr_perfs) 
+            p->tx_virtioq->send = dpdk_virtio_dev_to_vm_tx_burst; 
+        else
+            p->tx_virtioq->send = dpdk_virtio_dev_to_vm_tx_burst_mergeable; 
+    }
+
+    nb_tx = p->tx_virtioq->send(p, p->tx_virtioq,
                     p->tx_buf, p->tx_buf_count);
 
     DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
