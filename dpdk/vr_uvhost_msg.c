@@ -224,6 +224,14 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
                            (1ULL << VIRTIO_NET_F_MQ) |
                            (1ULL << VHOST_USER_F_PROTOCOL_FEATURES) |
                            (1ULL << VHOST_F_LOG_ALL);
+    if (vr_perfs)
+        vru_cl->vruc_msg.u64 |= (1ULL << VIRTIO_NET_F_GUEST_TSO4)|
+                                (1ULL << VIRTIO_NET_F_HOST_TSO4) |
+                                (1ULL << VIRTIO_NET_F_GUEST_TSO6)|
+                                (1ULL << VIRTIO_NET_F_HOST_TSO6);
+    if (vr_perfr)
+        vru_cl->vruc_msg.u64 |= (1ULL << VIRTIO_NET_F_MRG_RXBUF);
+
     vr_uvhost_log("    GET FEATURES: returns 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
@@ -244,6 +252,11 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
     vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
+    if (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_MRG_RXBUF)) {
+        vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 1);
+    } else {
+        vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 0);
+    }
     return 0;
 }
 

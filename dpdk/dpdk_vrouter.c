@@ -57,6 +57,8 @@ enum vr_opt_index {
     VTEST_VLAN_OPT_INDEX,
 #define VDEV_OPT                "vdev"
     VDEV_OPT_INDEX,
+#define NO_GRO_OPT              "no-gro"
+    NO_GRO_OPT_INDEX,
 #define BRIDGE_ENTRIES_OPT      "vr_bridge_entries"
     BRIDGE_ENTRIES_OPT_INDEX,
 #define BRIDGE_OENTRIES_OPT     "vr_bridge_oentries"
@@ -90,6 +92,7 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 
 static int no_daemon_set;
+static int no_gro_set = 0;
 int no_huge_set;
 unsigned int vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
 unsigned int vr_packet_sz = VR_DEF_MAX_PACKET_SZ;
@@ -855,6 +858,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VDEV_OPT_INDEX]                =   {VDEV_OPT,              required_argument,
                                                     NULL,                   0},
+    [NO_GRO_OPT_INDEX]              =   {NO_GRO_OPT,            no_argument,
+                                                    &no_gro_set,            1},
     [BRIDGE_ENTRIES_OPT_INDEX]      =   {BRIDGE_ENTRIES_OPT,    required_argument,
                                                     NULL,                   0},
     [BRIDGE_OENTRIES_OPT_INDEX]     =   {BRIDGE_OENTRIES_OPT,   required_argument,
@@ -921,6 +926,7 @@ parse_long_opts(int opt_flow_index, char *optarg)
     switch (opt_flow_index) {
     case NO_DAEMON_OPT_INDEX:
     case NO_HUGE_OPT_INDEX:
+    case NO_GRO_OPT_INDEX:
         break;
 
     case VERSION_OPT_INDEX:
@@ -1128,6 +1134,8 @@ main(int argc, char *argv[])
             return 1;
         }
     }
+
+    vr_perfr = no_gro_set?0:1;
 
     /* init DPDK first since vRouter uses DPDK mallocs and logs */
     ret = dpdk_init();
