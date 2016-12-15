@@ -210,7 +210,7 @@ vr_mirror_get(vr_mirror_req *req)
     } else
         req = NULL;
 
-    return vr_message_response(VR_MIRROR_OBJECT_ID, req, ret);
+    return vr_message_response(VR_MIRROR_OBJECT_ID, req, ret, false);
 }
 
 void
