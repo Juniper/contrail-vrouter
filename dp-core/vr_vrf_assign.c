@@ -71,7 +71,7 @@ vr_vrf_assign_get(vr_vrf_assign_req *req)
     ret = vif_vrf_table_get(vif, &resp);
     vrouter_put_interface(vif);
 exit_get:
-    vr_message_response(VR_VRF_ASSIGN_OBJECT_ID, ret ? NULL : &resp, ret);
+    vr_message_response(VR_VRF_ASSIGN_OBJECT_ID, ret ? NULL : &resp, ret, false);
     return 0;
 }
 
