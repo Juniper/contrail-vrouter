@@ -217,6 +217,7 @@ struct host_os {
     unsigned int *(*hos_get_enabled_log_types)(int *);
     void (*hos_soft_reset)(struct vrouter *);
     int (*hos_is_frag_limit_exceeded)(void);
+    bool hos_nl_broadcast_available;
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -265,6 +266,7 @@ struct host_os {
 #define vr_get_log_level                vrouter_host->hos_get_log_level
 #define vr_get_enabled_log_types        vrouter_host->hos_get_enabled_log_types
 #define vr_soft_reset                   vrouter_host->hos_soft_reset
+#define vr_nl_broadcast_available       vrouter_host->hos_nl_broadcast_available
 
 struct vr_malloc_stats {
     int64_t ms_size;

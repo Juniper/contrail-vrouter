@@ -1344,6 +1344,7 @@ struct host_os dpdk_host = {
     .hos_get_enabled_log_types      =    dpdk_get_enabled_log_types,
     .hos_soft_reset                 =    dpdk_soft_reset,
     .hos_is_frag_limit_exceeded     =    dpdk_is_frag_limit_exceeded,
+    .hos_nl_broadcast_available     =    false,
 };
 
 struct host_os *

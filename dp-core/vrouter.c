@@ -374,7 +374,7 @@ generate_response:
     if (ret)
         req = NULL;
 
-    vr_message_response(VR_VROUTER_OPS_OBJECT_ID, req, ret);
+    vr_message_response(VR_VROUTER_OPS_OBJECT_ID, req, ret, false);
     if (resp)
         vrouter_ops_destroy(resp);
 
