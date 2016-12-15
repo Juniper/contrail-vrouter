@@ -77,7 +77,7 @@ vr_message_request(struct vr_message *message)
 }
 
 static int
-vr_message_queue_response(char *buf, int len)
+vr_message_queue_response(char *buf, int len, bool broadcast)
 {
     struct vr_message *response;
 
@@ -87,6 +87,7 @@ vr_message_queue_response(char *buf, int len)
 
     response->vr_message_buf = buf;
     response->vr_message_len = len;
+    response->vr_message_broadcast = broadcast;
     vr_queue_enqueue(&message_h.vm_response_queue,
             &response->vr_message_queue);
 
@@ -224,7 +225,7 @@ vr_message_multi_response(struct vr_message_multi *objects)
         len += ret;
     }
 
-    return vr_message_queue_response(buf, len);
+    return vr_message_queue_response(buf, len, false);
 
 response_fail:
     if (buf)
@@ -236,7 +237,7 @@ response_fail:
 }
 
 int
-vr_message_response(unsigned int object_type, void *object, int ret)
+vr_message_response_generic(unsigned int object_type, void *object, int ret, bool broadcast)
 {
     char *buf = NULL;
     unsigned int len = 0;
@@ -261,7 +262,7 @@ vr_message_response(unsigned int object_type, void *object, int ret)
     if (ret < 0)
         goto response_fail;
 
-    return vr_message_queue_response(buf, ret);
+    return vr_message_queue_response(buf, ret, broadcast);
 
 response_fail:
     if (buf)
@@ -327,7 +328,8 @@ vr_message_dump_exit(void *context, int ret)
                 trans->mtrans_free(dumper->dump_buffer);
         } else
             vr_message_queue_response(dumper->dump_buffer,
-                    dumper->dump_offset);
+				      dumper->dump_offset,
+				      false);
 
         vr_free(dumper, VR_MESSAGE_DUMP_OBJECT);
     }

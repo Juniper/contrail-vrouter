@@ -100,7 +100,7 @@ vt_recv_vRouter_msg( struct vtest *test) {
     if (!test) {
         return E_PROCESS_XML_ERR_FARG;
     }
-    ret = vr_recvmsg(test->vrouter_cl, false);
+    ret = vr_recvmsg(test->vrouter_cl, false, false);
     test->messages.data[test->message_ptr_num].recv_ret_value = ret;
     return ret;
 }

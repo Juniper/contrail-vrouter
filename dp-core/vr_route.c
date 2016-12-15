@@ -109,6 +109,8 @@ vr_route_add(vr_route_req *req)
         }
 
         ret = fs->route_add(fs, &vr_req);
+	if (ret >= 0)
+	  vr_message_response_broadcast(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
     }
 
     vr_send_response(ret);
