@@ -3561,7 +3561,7 @@ vr_nexthop_get(vr_nexthop_req *req)
         ret = -ENOENT;
 
 generate_response:
-    vr_message_response(VR_NEXTHOP_OBJECT_ID, ret < 0 ? NULL : resp, ret);
+    vr_message_response(VR_NEXTHOP_OBJECT_ID, ret < 0 ? NULL : resp, ret, false);
     if (resp)
         vr_nexthop_req_destroy(resp);
 

@@ -82,6 +82,7 @@ vr_route_delete(vr_route_req *req)
 
 error:
     vr_send_response(ret);
+    vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_DELETE, ret);
 
     return ret;
 }
@@ -112,6 +113,7 @@ vr_route_add(vr_route_req *req)
     }
 
     vr_send_response(ret);
+    vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_ADD, ret);
 
     return ret;
 }
@@ -166,7 +168,7 @@ vr_route_get(vr_route_req *req)
     }
 
 generate_response:
-    vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret);
+    vr_message_response(VR_ROUTE_OBJECT_ID, ret ? NULL : &vr_req, ret, false);
     if (mac_mem_free && vr_req.rtr_req.rtr_mac) {
         vr_free(vr_req.rtr_req.rtr_mac, VR_ROUTE_REQ_MAC_OBJECT);
         vr_req.rtr_req.rtr_mac = NULL;
@@ -298,7 +300,7 @@ vr_inet_vrf_stats_get(struct vrouter *router, vr_vrf_stats_req *req)
 
     ret = rtable->algo_stats_get(req, &response);
 generate_error:
-    vr_message_response(VR_VRF_STATS_OBJECT_ID, ret ? NULL : &response, ret);
+    vr_message_response(VR_VRF_STATS_OBJECT_ID, ret ? NULL : &response, ret, false);
     return;
 }
 
