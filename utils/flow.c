@@ -235,7 +235,7 @@ flow_get_dropstats(void)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -253,7 +253,7 @@ flow_get_nexthop(int id)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -269,7 +269,7 @@ flow_get_mirror_nh(int id)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -285,7 +285,7 @@ flow_get_vif(int vif_index)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -327,7 +327,7 @@ flow_get_route(unsigned int family, unsigned int vrf, uint8_t *prefix)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -1743,7 +1743,7 @@ flow_make_flow_req(void *req, char *flow_str)
     if (ret <= 0)
         return ret;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return ret;
 
@@ -1879,7 +1879,7 @@ flow_process_response()
     struct nl_response *resp;
 
     cl->cl_buf_offset = 0;
-    if ((ret = nl_recvmsg(cl)) > 0) {
+    if ((ret = nl_recvmsg(cl, false)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp->nl_op == SANDESH_REQUEST) {
             sandesh_decode(resp->nl_data, resp->nl_len, vr_find_sandesh_info, &ret);

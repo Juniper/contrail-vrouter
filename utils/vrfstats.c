@@ -26,6 +26,9 @@
 #include "vr_mpls.h"
 #include "vr_defs.h"
 
+#include <linux/netlink.h>
+
+
 static struct nl_client *cl;
 static unsigned int stats_op;
 static int marker = -1;
@@ -106,7 +109,7 @@ op_retry:
     if (ret < 0)
         return ret;
 
-    ret = vr_recvmsg(cl, dump);
+    ret = vr_recvmsg(cl, dump, false);
     if (ret <= 0)
         return ret;
 
@@ -186,11 +189,51 @@ validate_options(void)
     return;
 }
 
+
+void read_event(int sock)
+{
+  struct sockaddr_nl nladdr;
+  struct msghdr msg;
+  struct iovec iov;
+  char buffer[65536];
+  int ret;
+  int i=0;
+
+  struct nlmsghdr *nlh;
+
+  iov.iov_base = (void *) buffer;
+  iov.iov_len = sizeof(buffer);
+  msg.msg_name = (void *) &(nladdr);
+  msg.msg_namelen = sizeof(nladdr);
+  msg.msg_iov = &iov;
+  msg.msg_iovlen = 1;
+
+  printf("Ok, listening.\n");
+  ret = recvmsg(sock, &msg, 0);
+  if (ret < 0)
+    printf("ret < 0.\n");
+  else {
+    printf("Received message payload: %x\n", NLMSG_DATA((struct nlmsghdr *) &buffer));
+    nlh = (struct nlmsghdr *) &buffer;
+    printf("nlh->nlmsg_type %d\n", nlh->nlmsg_type);
+    printf("nlh->nlmsg_type == NLMSG_DONE -> %d\n", nlh->nlmsg_type == NLMSG_DONE);
+    printf("nlh->nlmsg_type == NETLINK_GENERIC -> %d\n", nlh->nlmsg_type == NETLINK_GENERIC);
+    
+    for (i=0; i<ret; i++) {
+      printf("%x ", buffer[i]);
+    }
+    printf("\n");
+  }
+}
+
+
 int
 main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index;
+
+    
 
     while (((opt = getopt_long(argc, argv, "",
                         long_options, &option_index)) >= 0)) {
@@ -211,6 +254,17 @@ main(int argc, char *argv[])
         exit(1);
     }
 
+    while (1) {
+      ret = vr_recvmsg(cl, false, false);
+      if (ret < 0) {
+	printf("Ret %d\n", ret);
+	exit(2);
+      }
+      else {
+	printf("Received %d\n", ret);
+      }
+    }
+    
     vr_stats_op(cl);
 
     return 0;
