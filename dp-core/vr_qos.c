@@ -345,7 +345,7 @@ vr_qos_map_get(vr_qos_map_req *req)
     }
 
     vr_qos_map_make_req(req->qmr_id, resp, fc_p);
-    vr_message_response(VR_QOS_MAP_OBJECT_ID, resp, ret);
+    vr_message_response(VR_QOS_MAP_OBJECT_ID, resp, ret, false);
     if (resp) {
         vr_qos_map_req_destroy(resp);
     }
@@ -663,7 +663,7 @@ vr_fc_map_get(vr_fc_map_req *req)
     resp->fmr_queue_id[0] = fc_p->vfc_queue_id;
 
 generate_response:
-    vr_message_response(VR_FC_MAP_OBJECT_ID, ret < 0 ? NULL : resp, ret);
+    vr_message_response(VR_FC_MAP_OBJECT_ID, ret < 0 ? NULL : resp, ret, false);
     if (resp)
         vr_fc_map_req_destroy(resp);
 
