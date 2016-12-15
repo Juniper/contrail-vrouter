@@ -1628,6 +1628,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
      */
     vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
     if (!vif || (pkt->vp_if != vif)) {
+        pkt->vp_if = NULL;
         vr_pfree(pkt, VP_DROP_INVALID_IF);
         return -ENODEV;
     }
