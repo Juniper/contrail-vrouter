@@ -2211,6 +2211,7 @@ struct host_os linux_host = {
     .hos_get_log_level              =       lh_get_log_level,
     .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
     .hos_soft_reset                 =       lh_soft_reset,
+    .hos_nl_broadcast_supported     =       true,
 };
     
 struct host_os *

@@ -215,7 +215,7 @@ generate_response:
     if (ret)
         req = NULL;
 
-    vr_message_response(VR_MPLS_OBJECT_ID, req, ret);
+    vr_message_response(VR_MPLS_OBJECT_ID, req, ret, false);
 
     return 0;
 }
