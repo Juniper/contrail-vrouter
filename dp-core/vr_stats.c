@@ -132,7 +132,7 @@ vr_drop_stats_get(unsigned int rid, short core)
     /* otherwise the counters will be zeros */
 
 exit_get:
-    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : response, ret);
+    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : response, ret, false);
 
     if (response != NULL)
         vr_free(response, VR_DROP_STATS_REQ_OBJECT);
@@ -311,7 +311,7 @@ vr_mem_stats_get(void)
     response->vms_freed = freed;
 
 exit_get:
-    vr_message_response(VR_MEM_STATS_OBJECT_ID, ret ? NULL : response, ret);
+    vr_message_response(VR_MEM_STATS_OBJECT_ID, ret ? NULL : response, ret, false);
     if (response != NULL)
         vr_free(response, VR_MEM_STATS_REQ_OBJECT);
 

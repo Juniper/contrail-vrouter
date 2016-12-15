@@ -2250,7 +2250,7 @@ vr_flow_table_data_process(void *s_req)
     resp->ftable_oflow_entries = vr_flow_table_used_oflow_entries(router);
 
 send_response:
-    vr_message_response(VR_FLOW_TABLE_DATA_OBJECT_ID, resp, ret);
+    vr_message_response(VR_FLOW_TABLE_DATA_OBJECT_ID, resp, ret, false);
     if (resp)
         vr_flow_table_data_destroy(resp);
 
@@ -2283,7 +2283,7 @@ vr_flow_req_process(void *s_req)
         ret = -EINVAL;
     }
 
-    vr_message_response(VR_FLOW_RESPONSE_OBJECT_ID, &flow_resp, ret);
+    vr_message_response(VR_FLOW_RESPONSE_OBJECT_ID, &flow_resp, ret, false);
 
     return;
 }

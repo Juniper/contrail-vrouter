@@ -152,7 +152,7 @@ vr_vxlan_get(vr_vxlan_req *req)
     else
         req = NULL;
 
-    vr_message_response(VR_VXLAN_OBJECT_ID, req, ret);
+    vr_message_response(VR_VXLAN_OBJECT_ID, req, ret, false);
 
     return 0;
 }
