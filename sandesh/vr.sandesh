@@ -111,6 +111,7 @@ buffer sandesh vr_interface_req {
     54: list<byte>  vifr_in_mirror_md;
     55: list<byte>  vifr_out_mirror_md;
     56: u64         vifr_dpackets;
+    57: list<i16>   vifr_hw_queues;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -347,6 +348,7 @@ buffer sandesh vr_mem_stats_req {
    64:  i64             vms_interface_mirror_meta_object;
    65:  i64             vms_interface_req_mirror_meta_object;
    66:  i64             vms_interface_bridge_lock_object;
+   67:  i64             vms_interface_queue_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */

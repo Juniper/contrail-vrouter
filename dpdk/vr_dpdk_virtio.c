@@ -294,7 +294,9 @@ static unsigned int vif_rx_queue_lcore[VR_MAX_INTERFACES][VR_MAX_INTERFACES];
  * Returns nothing.
  */
 static void
-dpdk_virtio_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_virtio_rx_queue_release(unsigned lcore_id,
+        unsigned queue_index __attribute__((unused)),
+        struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
@@ -372,12 +374,14 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
  * Returns nothing.
  */
 static void
-dpdk_virtio_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_virtio_tx_queue_release(unsigned lcore_id, unsigned queue_index,
+        struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue *tx_queue =
+        &lcore->lcore_tx_queues[vif->vif_idx][queue_index];
     struct vr_dpdk_queue_params *tx_queue_params
-                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+        = &lcore->lcore_tx_queue_params[vif->vif_idx][queue_index];
 
     tx_queue->txq_ops.f_tx = NULL;
     rte_wmb();
@@ -407,9 +411,9 @@ vr_dpdk_virtio_tx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
     unsigned int vif_idx = vif->vif_idx;
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx][0];
     struct vr_dpdk_queue_params *tx_queue_params
-                = &lcore->lcore_tx_queue_params[vif_idx];
+                = &lcore->lcore_tx_queue_params[vif_idx][0];
 
     /* Check input parameters */
     /* virtio TX is thread safe, so just use one of the rings */
@@ -574,7 +578,7 @@ vr_dpdk_virtio_tx_queue_set(void *arg)
     }
 
     lcore = vr_dpdk.lcores[rte_lcore_id()];
-    tx_queue = &lcore->lcore_tx_queues[p->vif_id];
+    tx_queue = &lcore->lcore_tx_queues[p->vif_id][0];
     port = (struct dpdk_virtio_writer *)tx_queue->q_queue_h;
 
     /* Assign new queue to the lcore's tx_queue handler */

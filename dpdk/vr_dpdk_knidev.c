@@ -314,7 +314,9 @@ struct rte_port_out_ops dpdk_knidev_writer_ops = {
 
 /* Release KNI RX queue */
 static void
-dpdk_kni_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_kni_rx_queue_release(unsigned lcore_id,
+        unsigned queue_index __attribute__((unused)),
+        struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
@@ -375,12 +377,14 @@ vr_dpdk_kni_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
 /* Release KNI TX queue */
 static void
-dpdk_kni_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_kni_tx_queue_release(unsigned lcore_id, unsigned queue_index,
+        struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue *tx_queue =
+        &lcore->lcore_tx_queues[vif->vif_idx][queue_index];
     struct vr_dpdk_queue_params *tx_queue_params
-                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+        = &lcore->lcore_tx_queue_params[vif->vif_idx][queue_index];
 
     tx_queue->txq_ops.f_tx = NULL;
     rte_wmb();
@@ -406,9 +410,9 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
     uint8_t port_id = 0;
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx][0];
     struct vr_dpdk_queue_params *tx_queue_params
-                    = &lcore->lcore_tx_queue_params[vif_idx];
+                    = &lcore->lcore_tx_queue_params[vif_idx][0];
     struct vr_dpdk_ethdev *ethdev;
 
     if (vif->vif_type == VIF_TYPE_HOST) {

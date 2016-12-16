@@ -97,12 +97,14 @@ dpdk_ring_to_push_remove(unsigned lcore_id, struct rte_ring *tx_ring)
  * The function is called by the NetLink lcore only.
  */
 static void
-dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_ring_tx_queue_release(unsigned lcore_id, unsigned queue_index,
+        struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
+    struct vr_dpdk_queue *tx_queue =
+        &lcore->lcore_tx_queues[vif->vif_idx][queue_index];
     struct vr_dpdk_queue_params *tx_queue_params
-                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+        = &lcore->lcore_tx_queue_params[vif->vif_idx][queue_index];
 
     tx_queue->txq_ops.f_tx = NULL;
     rte_wmb();
@@ -127,21 +129,32 @@ dpdk_ring_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
 /* Init ring TX queue */
 struct vr_dpdk_queue *
 vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
-    unsigned host_lcore_id)
+        unsigned int queue_id, unsigned host_lcore_id)
 {
+    int ret;
+    uint8_t port_id;
+    unsigned int vif_idx = vif->vif_idx, dpdk_queue_index;
+    const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
+
+    char ring_name[RTE_RING_NAMESIZE];
+    struct rte_ring *tx_ring;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_lcore *host_lcore = vr_dpdk.lcores[host_lcore_id];
-    const unsigned socket_id = rte_lcore_to_socket_id(lcore_id);
-    uint8_t port_id;
-    unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-    struct vr_dpdk_queue_params *tx_queue_params
-                = &lcore->lcore_tx_queue_params[vif_idx];
-    struct vr_dpdk_queue *host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx];
-    struct rte_ring *tx_ring;
-    char ring_name[RTE_RING_NAMESIZE];
-    int ret;
+    struct vr_dpdk_queue *tx_queue;
+    struct vr_dpdk_queue_params *tx_queue_params;
+    struct vr_dpdk_queue *host_tx_queue;
 
+
+    if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+        dpdk_queue_index =
+            lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue_id];
+    } else {
+        dpdk_queue_index = 0;
+    }
+
+    tx_queue = &lcore->lcore_tx_queues[vif_idx][dpdk_queue_index];
+    tx_queue_params = &lcore->lcore_tx_queue_params[vif_idx][dpdk_queue_index];
+    host_tx_queue = &host_lcore->lcore_tx_queues[vif_idx][dpdk_queue_index];
 
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
