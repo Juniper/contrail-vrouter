@@ -92,7 +92,7 @@ extern unsigned vr_packet_sz;
  * (limited by NIC and number of per queue TX/RX descriptors) */
 #define VR_DPDK_MAX_NB_RX_QUEUES    11
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_TX_QUEUES    16
+#define VR_DPDK_MAX_NB_TX_QUEUES    128
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_RSS_QUEUES   16
 /* Maximum number of bond members per ethernet device */
@@ -299,7 +299,8 @@ typedef struct vr_dpdk_queue *
         unsigned queue_or_lcore_id);
 /* Release queue operation */
 typedef void
-    (*vr_dpdk_queue_release_op)(unsigned lcore_id, struct vr_interface *vif);
+    (*vr_dpdk_queue_release_op)(unsigned lcore_id, unsigned queue_index,
+            struct vr_interface *vif);
 
 struct vr_dpdk_queue {
     SLIST_ENTRY(vr_dpdk_queue) q_next;
@@ -406,7 +407,7 @@ struct vr_dpdk_lcore {
     /* Table of RX queues */
     struct vr_dpdk_queue lcore_rx_queues[VR_MAX_INTERFACES];
     /* Table of TX queues */
-    struct vr_dpdk_queue lcore_tx_queues[VR_MAX_INTERFACES] __rte_cache_aligned;
+    struct vr_dpdk_queue *lcore_tx_queues[VR_MAX_INTERFACES] __rte_cache_aligned;
     /* List of rings to push */
     struct vr_dpdk_ring_to_push lcore_rings_to_push[VR_DPDK_MAX_RINGS] __rte_cache_aligned;
     /* List of bond queue params to TX LACP packets periodically */
@@ -414,7 +415,19 @@ struct vr_dpdk_lcore {
     /* Table of RX queue params */
     struct vr_dpdk_queue_params lcore_rx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
     /* Table of TX queue params */
-    struct vr_dpdk_queue_params lcore_tx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
+    struct vr_dpdk_queue_params *lcore_tx_queue_params[VR_MAX_INTERFACES] __rte_cache_aligned;
+    /*
+     * number of queues/lcore - basically one hardware queue + rings
+     * to other cores that hosts each hardware queue
+     */
+    uint16_t num_tx_queues_per_lcore[VR_MAX_INTERFACES];
+    /* for each vif, the hardware queue that is tied to this lcore */
+    int16_t lcore_hw_queue[VR_MAX_INTERFACES];
+    /*
+     * given a hardware queue, the index to the array of vr_dpdk_queue.
+     * Enables us to get the queue faster
+     */
+    int16_t *lcore_hw_queue_to_dpdk_index[VR_MAX_INTERFACES];
     void (*fragment_assembly_func)(void *arg);
     void *fragment_assembly_arg;
 };
@@ -829,7 +842,7 @@ vr_dpdk_ring_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 /* Init ring TX queue */
 struct vr_dpdk_queue *
 vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
-    unsigned host_lcore_id);
+        unsigned int queue_id, unsigned host_lcore_id);
 void dpdk_ring_to_push_add(unsigned lcore_id, struct rte_ring *tx_ring,
     struct vr_dpdk_queue *tx_queue);
 

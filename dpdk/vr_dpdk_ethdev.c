@@ -168,7 +168,9 @@ vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif)
 
 /* Release ethdev RX queue */
 static void
-dpdk_ethdev_rx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_ethdev_rx_queue_release(unsigned lcore_id,
+        unsigned queue_index __attribute__((unused)),
+        struct vr_interface *vif)
 {
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_dpdk_queue *rx_queue = &lcore->lcore_rx_queues[vif->vif_idx];
@@ -233,13 +235,18 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
 /* Release ethdev TX queue */
 static void
-dpdk_ethdev_tx_queue_release(unsigned lcore_id, struct vr_interface *vif)
+dpdk_ethdev_tx_queue_release(unsigned lcore_id, unsigned queue_index,
+        struct vr_interface *vif)
 {
     int i;
+
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif->vif_idx];
-    struct vr_dpdk_queue_params *tx_queue_params
-                        = &lcore->lcore_tx_queue_params[vif->vif_idx];
+    struct vr_dpdk_queue *tx_queue;
+    struct vr_dpdk_queue_params *tx_queue_params;
+
+    tx_queue = &lcore->lcore_tx_queues[vif->vif_idx][queue_index];
+    tx_queue_params =
+        &lcore->lcore_tx_queue_params[vif->vif_idx][queue_index];
 
     /* remove queue params from the list of bonds to TX */
     for (i = 0; i < lcore->lcore_nb_bonds_to_tx; i++) {
@@ -273,19 +280,28 @@ struct vr_dpdk_queue *
 vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned queue_or_lcore_id)
 {
-    uint16_t tx_queue_id = queue_or_lcore_id;
     uint8_t port_id;
-    unsigned int vif_idx = vif->vif_idx;
+    uint16_t tx_queue_id = queue_or_lcore_id;
+    unsigned int vif_idx = vif->vif_idx, dpdk_queue_index;
     const unsigned int socket_id = rte_lcore_to_socket_id(lcore_id);
 
     struct vr_dpdk_ethdev *ethdev;
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
-    struct vr_dpdk_queue_params *tx_queue_params
-                    = &lcore->lcore_tx_queue_params[vif_idx];
+    struct vr_dpdk_queue *tx_queue;
+    struct vr_dpdk_queue_params *tx_queue_params;
 
     ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
     port_id = ethdev->ethdev_port_id;
+
+    if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+        dpdk_queue_index =
+            lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][tx_queue_id];
+    } else {
+        dpdk_queue_index = 0;
+    }
+
+    tx_queue = &lcore->lcore_tx_queues[vif_idx][dpdk_queue_index];
+    tx_queue_params = &lcore->lcore_tx_queue_params[vif_idx][dpdk_queue_index];
 
     /* init queue */
     tx_queue->txq_ops = rte_port_ethdev_writer_ops;
@@ -331,11 +347,7 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
 
     ethdev->ethdev_nb_rx_queues = RTE_MIN(dev_info.max_rx_queues,
         VR_DPDK_MAX_NB_RX_QUEUES);
-    /* [PAKCET_ID..FWD_ID) lcores have just TX queues, so we increase
-     * the number of TX queues here */
-    ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
-        vr_dpdk.nb_fwd_lcores + (VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID)),
-        VR_DPDK_MAX_NB_TX_QUEUES);
+    ethdev->ethdev_nb_tx_queues = dev_info.max_tx_queues;
 
     /* Check if we have dedicated an lcore for SR-IOV VF IO. */
     if (vr_dpdk.vf_lcore_id) {

@@ -1408,6 +1408,12 @@ vif_free(struct vr_interface *vif)
         vif->vif_bridge_table_lock = NULL;
     }
 
+    if (vif->vif_hw_queues) {
+        vr_free(vif->vif_hw_queues, VR_INTERFACE_QUEUE_OBJECT);
+        vif->vif_hw_queues = NULL;
+        vif->vif_num_hw_queues = 0;
+    }
+
     if (vif->vif_src_mac) {
         vr_free(vif->vif_src_mac, VR_INTERFACE_MAC_OBJECT);
         vif->vif_src_mac = NULL;
@@ -2082,6 +2088,18 @@ vr_interface_add(vr_interface_req *req, bool need_response)
 
     if (req->vifr_name) {
         strncpy(vif->vif_name, req->vifr_name, sizeof(vif->vif_name) - 1);
+    }
+
+    if (req->vifr_hw_queues_size) {
+        vif->vif_hw_queues = vr_malloc(sizeof(uint16_t) *
+                req->vifr_hw_queues_size, VR_INTERFACE_QUEUE_OBJECT);
+        if (!vif->vif_hw_queues) {
+            goto error;
+        }
+
+        vif->vif_num_hw_queues = req->vifr_hw_queues_size;
+        memcpy(vif->vif_hw_queues, req->vifr_hw_queues,
+                req->vifr_hw_queues_size * sizeof(uint16_t));
     }
 
     ret = vif_fat_flow_add(vif, req);
