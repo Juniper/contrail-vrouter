@@ -482,8 +482,10 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
 
     vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
 
-    if (rt.rtr_req.rtr_label_flags & VR_RT_ARP_PROXY_FLAG)
+    if ((vif->vif_flags & VIF_FLAG_MAC_PROXY) ||
+            (rt.rtr_req.rtr_label_flags & VR_RT_ARP_PROXY_FLAG)) {
         return vr_get_proxy_mac(pkt, fmd, &rt, dmac);
+    }
 
     return MR_FLOOD;
 }
