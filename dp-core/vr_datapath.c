@@ -33,6 +33,11 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     /* here we will not check for stats, but will check before use */
 
+    if (vif->vif_flags & VIF_FLAG_MAC_PROXY) {
+        resp_mac = vif->vif_mac;
+        goto proxy_selected;
+    }
+
     if (vif->vif_type == VIF_TYPE_PHYSICAL)
         from_fabric = true;
 
@@ -163,6 +168,7 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
     } else {
 
+proxy_selected:
         if (!stitched && flood) {
             /*
              * if there is no stitching information, but flood flag is set
