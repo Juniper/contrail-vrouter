@@ -19,6 +19,8 @@
 #include "vr_hash.h"
 #include "vr_ip_mtrie.h"
 
+#include "vr_offloads.h"
+
 #define VR_NUM_FLOW_TABLES          1
 
 #define VR_NUM_OFLOW_TABLES         1
@@ -182,6 +184,7 @@ vr_flow_reset_mirror(struct vrouter *router, struct vr_flow_entry *fe,
         if (fe->fe_mme) {
             vr_mirror_meta_entry_del(router, fe->fe_mme);
             fe->fe_mme = NULL;
+            vr_offload_flow_meta_data_set(index, 0, 0, 0);
         }
     }
     fe->fe_flags &= ~VR_FLOW_FLAG_MIRROR;
@@ -212,6 +215,8 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
     }
     fe->fe_hold_list = NULL;
     fe->fe_key.flow_key_len = 0;
+
+    (void)vr_offload_flow_del(fe);
 
     vr_flow_reset_mirror(router, fe, fe->fe_hentry.hentry_index);
     fe->fe_ecmp_nh_index = -1;
@@ -1365,6 +1370,45 @@ vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     return vif_fat_flow_lookup(vif_l, l4_proto, sport, dport);
 }
 
+#if defined(__KERNEL__) && defined(__linux__)
+/*
+ * Called by offload module to update flow stats with packets which have been
+ * offloaded.  over_flow_bytes accounts for overflows which happen in firmware
+ * between updates using this function.
+ */
+int
+vr_flow_incr_stats(int fe_index, uint32_t flow_bytes, uint16_t over_flow_bytes,
+                   uint32_t flow_packets)
+{
+    struct vrouter *router = vrouter_get(0);
+    struct vr_flow_entry *fe;
+    uint32_t new_stats;
+
+    if (router == NULL)
+        return -EINVAL;
+
+    fe = vr_flow_get_entry(router, fe_index);
+    if (fe == NULL)
+        return -ENOENT;
+
+    if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+        return -ENOENT;
+
+    new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_bytes, flow_bytes);
+    if (new_stats < flow_bytes)
+        ++fe->fe_stats.flow_bytes_oflow;
+    fe->fe_stats.flow_bytes_oflow += over_flow_bytes;
+
+    new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_packets, flow_packets);
+    if (new_stats < flow_packets)
+        ++fe->fe_stats.flow_packets_oflow;
+
+    return 0;
+}
+
+EXPORT_SYMBOL(vr_flow_incr_stats);
+#endif
+
 static flow_result_t
 vr_do_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
@@ -1606,6 +1650,13 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
                 req->fr_mir_sip, req->fr_mir_sport,
                 req->fr_pcap_meta_data, req->fr_pcap_meta_data_size,
                 req->fr_mir_vrf);
+
+        if (fe->fe_mme) {
+            vr_offload_flow_meta_data_set(req->fr_index,
+                                          req->fr_pcap_meta_data_size,
+                                          req->fr_pcap_meta_data,
+                                          req->fr_mir_vrf);
+        }
     }
 
     return;
@@ -1881,6 +1932,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
     if (fe) {
         if (!(modified = vr_flow_start_modify(router, fe)))
             return -EBUSY;
+        fe_index = (unsigned int)(req->fr_index);
     }
 
     if ((ret = vr_flow_set_req_is_invalid(router, req, fe)))
@@ -2002,6 +2054,14 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req)
         fe->fe_flags &= ~VR_FLOW_FLAG_NEW_FLOW;
 
     ret = vr_flow_schedule_transition(router, req, fe);
+
+    /*
+     * offload, no need to differentiate between add and modify. Pass the
+     * reverse flow as well if present.
+     */
+    if (!ret) {
+        vr_offload_flow_set(fe, fe_index, rfe);
+    }
 
 exit_set:
     if (modified && fe) {

@@ -17,6 +17,7 @@
 #include "vr_datapath.h"
 #include "vr_route.h"
 #include "vr_hash.h"
+#include "vr_offloads.h"
 
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
@@ -2195,6 +2196,7 @@ vr_nexthop_delete(vr_nexthop_req *req)
     if (!nh) {
         ret = -EINVAL;
     } else {
+        vr_offload_nexthop_del(nh);
         vrouter_put_nexthop(nh);
         nh->nh_destructor(nh);
     }
@@ -2742,6 +2744,15 @@ vr_nexthop_add(vr_nexthop_req *req)
         nh->nh_flags |= NH_FLAG_VALID;
 
     ret = vrouter_add_nexthop(nh);
+
+    if (ret) {
+        nh->nh_destructor(nh);
+        goto generate_resp;
+    }
+    else /* notify hw offload of change, if enabled */
+        ret = vr_offload_nexthop_add(nh);
+
+    /* if offload failed, delete kernel entry for consistency */
     if (ret)
         nh->nh_destructor(nh);
 
@@ -3024,6 +3035,10 @@ vr_nexthop_get(vr_nexthop_req *req)
     } else
         ret = -ENOENT;
 
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    if (!ret)
+        vr_offload_nexthop_get(nh, resp);
+
 generate_response:
     vr_message_response(VR_NEXTHOP_OBJECT_ID, ret < 0 ? NULL : resp, ret);
     if (resp)
@@ -3062,6 +3077,10 @@ vr_nexthop_dump(vr_nexthop_req *r)
 
             resp->h_op = SANDESH_OP_DUMP;
             ret = vr_nexthop_make_req(resp, nh);
+
+            if (!ret)
+                vr_offload_nexthop_get(nh, resp);
+
             if (ret || ((ret = vr_message_dump_object(dumper,
                                 VR_NEXTHOP_OBJECT_ID, resp)) <= 0)) {
                 vr_nexthop_req_destroy(resp);
@@ -3196,3 +3215,39 @@ vr_nexthop_init(struct vrouter *router)
 {
     return nh_table_init(router);
 }
+
+
+#if defined(__KERNEL__) && defined(__linux__)
+int
+vr_nexthop_update_offload_vrfstats(uint32_t vrfid, uint32_t num_cntrs,
+                               uint64_t *cntrs)
+{
+    uint32_t i;
+    uint64_t *dst_cntr;
+    uint64_t *src_cntr;
+    struct vr_vrf_stats *stats;
+    uint32_t tmp[2];
+    uint64_t tmp64;
+    /* hw offload stats always go to CPU 0 */
+    stats = vr_inet_vrf_stats(vrfid, 0);
+    if (stats && num_cntrs <= sizeof(struct vr_vrf_stats) * sizeof(uint64_t)) {
+        dst_cntr = (uint64_t *)stats;
+        src_cntr = cntrs;
+        for (i = 0; i < num_cntrs; i++) {
+            tmp[0] = (uint32_t)(*src_cntr);
+            tmp[1] = (uint32_t)((*src_cntr) >> 32);
+            tmp[0] = ntohl(tmp[0]);
+            tmp[1] = ntohl(tmp[1]);
+            tmp64 = (uint64_t)tmp[0] |
+                    ((uint64_t)tmp[1] << 32);
+            *dst_cntr += tmp64;
+            src_cntr++;
+            dst_cntr++;
+        }
+    }
+
+    return 0;
+}
+EXPORT_SYMBOL(vr_nexthop_update_offload_vrfstats);
+#endif
+

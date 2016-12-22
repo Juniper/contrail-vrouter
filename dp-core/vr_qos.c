@@ -13,6 +13,7 @@
 #include "vr_interface.h"
 #include "vr_datapath.h"
 #include "vr_qos.h"
+#include "vr_offloads.h"
 
 unsigned int vr_qos_map_entries = VR_DEF_QOS_MAP_ENTRIES;
 unsigned int vr_fc_map_entries = VR_DEF_FC_MAP_ENTRIES;
@@ -270,6 +271,8 @@ vr_qos_map_delete(vr_qos_map_req *req)
         vr_free(fc_p, VR_QOS_MAP_OBJECT);
     }
 
+    vr_offload_qos_map_del(req);
+
 generate_response:
     vr_send_response(ret);
     return;
@@ -307,6 +310,9 @@ vr_qos_map_dump(vr_qos_map_req *req)
         }
 
         vr_qos_map_make_req(i, resp, fc_p);
+
+        vr_offload_qos_map_get(resp);
+
         ret = vr_message_dump_object(dumper, VR_QOS_MAP_OBJECT_ID, resp);
         vr_qos_map_req_destroy(resp);
         if (ret <= 0)
@@ -345,6 +351,10 @@ vr_qos_map_get(vr_qos_map_req *req)
     }
 
     vr_qos_map_make_req(req->qmr_id, resp, fc_p);
+
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_qos_map_get(resp);
+
     vr_message_response(VR_QOS_MAP_OBJECT_ID, resp, ret);
     if (resp) {
         vr_qos_map_req_destroy(resp);
@@ -412,6 +422,13 @@ vr_qos_map_add(vr_qos_map_req *req)
         fc_e->vfc_dotonep_qos = req->qmr_dotonep[i];
         fc_e->vfc_id = req->qmr_dotonep_fc_id[i];
         fc_e->vfc_valid = 1;
+    }
+
+    ret = vr_offload_qos_map_add(req);
+    if (ret) {
+        vr_printf("offload QoS map not supported - not configuring\n");
+        vr_free(fc_p, VR_QOS_MAP_OBJECT);
+        goto generate_response;
     }
 
     if (need_set) {
@@ -568,6 +585,7 @@ vr_fc_map_delete(vr_fc_map_req *req)
     }
 
     memset(fc_p, 0, sizeof(*fc_p));
+    vr_offload_fc_map_del(req);
     vr_send_response(0);
 
     return;
@@ -613,6 +631,8 @@ vr_fc_map_dump(vr_fc_map_req *req)
         resp->fmr_mpls_qos[0] = fc_p->vfc_mpls_qos;
         resp->fmr_dotonep[0] = fc_p->vfc_dotonep_qos;
         resp->fmr_queue_id[0] = fc_p->vfc_queue_id;
+
+        vr_offload_fc_map_get(resp);
 
         ret = vr_message_dump_object(dumper, VR_FC_MAP_OBJECT_ID, resp);
         vr_fc_map_req_destroy(resp);
@@ -662,6 +682,9 @@ vr_fc_map_get(vr_fc_map_req *req)
     resp->fmr_dotonep[0] = fc_p->vfc_dotonep_qos;
     resp->fmr_queue_id[0] = fc_p->vfc_queue_id;
 
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_fc_map_get(resp);
+
 generate_response:
     vr_message_response(VR_FC_MAP_OBJECT_ID, ret < 0 ? NULL : resp, ret);
     if (resp)
@@ -701,6 +724,12 @@ vr_fc_map_add(vr_fc_map_req *req)
         fc_p->vfc_dotonep_qos = req->fmr_dotonep[i];
         fc_p->vfc_queue_id = req->fmr_queue_id[i];
         fc_p->vfc_valid = 1;
+    }
+
+    ret = vr_offload_fc_map_add(req);
+    if (ret) {
+        vr_printf("offload FC map not supported - not configuring\n");
+        memset(fc_p, 0, sizeof(*fc_p));
     }
 
 generate_response:
