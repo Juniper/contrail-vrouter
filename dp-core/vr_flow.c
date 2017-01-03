@@ -1379,7 +1379,6 @@ vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     return vif_fat_flow_lookup(vif_l, l4_proto, sport, dport);
 }
 
-#if defined(__KERNEL__) && defined(__linux__)
 /*
  * Called by offload module to update flow stats with packets which have been
  * offloaded.  over_flow_bytes accounts for overflows which happen in firmware
@@ -1414,9 +1413,6 @@ vr_flow_incr_stats(int fe_index, uint32_t flow_bytes, uint16_t over_flow_bytes,
 
     return 0;
 }
-
-EXPORT_SYMBOL(vr_flow_incr_stats);
-#endif
 
 static flow_result_t
 vr_do_flow_lookup(struct vrouter *router, struct vr_packet *pkt,

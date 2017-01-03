@@ -91,6 +91,8 @@ vr_vxlan_make_req(vr_vxlan_req *req, struct vr_nexthop *nh, unsigned int vnid)
     req->vxlanr_vnid = vnid;
     if (nh)
         req->vxlanr_nhid = nh->nh_id;
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_vxlan_get(req);
     return;
 }
 
@@ -102,7 +104,6 @@ vr_vxlan_trav_cb(unsigned int index, void *data, void *udata)
     vr_vxlan_req resp;
 
     vr_vxlan_make_req(&resp, nh, index);
-    vr_offload_vxlan_get(&resp);
     return vr_message_dump_object(dumper, VR_VXLAN_OBJECT_ID, &resp);
 }
 
@@ -149,11 +150,8 @@ vr_vxlan_get(vr_vxlan_req *req)
             ret = -ENOENT;
     }
 
-    if (!ret) {
+    if (!ret)
         vr_vxlan_make_req(req, nh, req->vxlanr_vnid);
-        /* Debug comparison to check if matching entry is programmed on NIC */
-        vr_offload_vxlan_get(req);
-    }
     else
         req = NULL;
 

@@ -157,6 +157,9 @@ vr_mpls_make_req(vr_mpls_req *req, struct vr_nexthop *nh,
     req->mr_nhid = nh->nh_id;
     req->mr_label = label;
 
+    /* Debug comparison to check if matching entry is programmed on NIC */
+    vr_offload_mpls_get(req);
+
     return;
 }
 
@@ -185,7 +188,6 @@ vr_mpls_dump(vr_mpls_req *r)
         nh = __vrouter_get_label(router, i);
         if (nh) {
            vr_mpls_make_req(&req, nh, i);
-           vr_offload_mpls_get(&req);
            ret = vr_message_dump_object(dumper, VR_MPLS_OBJECT_ID, &req);
            if (ret <= 0)
                break;
@@ -223,9 +225,6 @@ vr_mpls_get(vr_mpls_req *req)
     }
 
     vr_mpls_make_req(req, nh, req->mr_label);
-
-    /* Debug comparison to check if matching entry is programmed on NIC */
-    vr_offload_mpls_get(req);
 
 generate_response:
     if (ret)
