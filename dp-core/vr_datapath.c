@@ -74,6 +74,9 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     }
 
 
+    if (vif->vif_flags & VIF_FLAG_MAC_PROXY)
+        goto proxy_selected;
+
     /*
      * situations that are handled here (from_fabric)
      *
@@ -182,6 +185,7 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
     }
 
+proxy_selected:
     VR_MAC_COPY(dmac, resp_mac);
 
     return MR_PROXY;

@@ -100,6 +100,7 @@
  */
 #define VIF_FLAG_DROP_NEW_FLOWS     0x40000
 #define VIF_FLAG_MAC_LEARN          0x80000
+#define VIF_FLAG_MAC_PROXY          0x100000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
