@@ -37,64 +37,64 @@
 #endif
 
 struct vr_offload_ops {
-    char *handler_id;   /* Hardware vendor identifier */
+    char *voo_handler_id;   /* Hardware vendor identifier */
 
     /* perform soft reset, including initializing tables */
-    int (*soft_reset)(void);
+    int (*voo_soft_reset)(void);
 
     /* flow related functions */
-    int (*flow_set)(struct vr_flow_entry *, unsigned int,
+    int (*voo_flow_set)(struct vr_flow_entry *, unsigned int,
                     struct vr_flow_entry *);
-    int (*flow_del)(struct vr_flow_entry *);
-    int (*flow_meta_data_set)(unsigned int, unsigned int, void *,
+    int (*voo_flow_del)(struct vr_flow_entry *);
+    int (*voo_flow_meta_data_set)(unsigned int, unsigned int, void *,
                               unsigned short);
 
     /* Dropstats */
-    int (*drop_stats_get)(vr_drop_stats_req *response);
+    int (*voo_drop_stats_get)(vr_drop_stats_req *response);
 
     /* Interface */
-    int (*interface_add)(struct vr_interface *);
-    int (*interface_del)(struct vr_interface *);
-    int (*interface_get)(vr_interface_req *);
+    int (*voo_interface_add)(struct vr_interface *);
+    int (*voo_interface_del)(struct vr_interface *);
+    int (*voo_interface_get)(vr_interface_req *);
 
     /* vif_vrf table */
-    int (*vif_vrf_set)(vr_vrf_assign_req *);
-    int (*vif_vrf_get)(vr_vrf_assign_req *);
+    int (*voo_vif_vrf_set)(vr_vrf_assign_req *);
+    int (*voo_vif_vrf_get)(vr_vrf_assign_req *);
 
     /* MPLS (ILM) */
-    int (*mpls_add)(struct vr_nexthop *, int);
-    int (*mpls_del)(int);
-    int (*mpls_get)(vr_mpls_req *);
+    int (*voo_mpls_add)(struct vr_nexthop *, int);
+    int (*voo_mpls_del)(int);
+    int (*voo_mpls_get)(vr_mpls_req *);
 
     /* VXLAN (VNID) */
-    int (*vxlan_add)(struct vr_nexthop *, int);
-    int (*vxlan_del)(int);
-    int (*vxlan_get)(vr_vxlan_req *);
+    int (*voo_vxlan_add)(struct vr_nexthop *, int);
+    int (*voo_vxlan_del)(int);
+    int (*voo_vxlan_get)(vr_vxlan_req *);
 
     /* Mirror table */
-    int (*mirror_add)(struct vr_mirror_entry *, unsigned int);
-    int (*mirror_del)(unsigned int);
-    int (*mirror_get)(vr_mirror_req *);
+    int (*voo_mirror_add)(struct vr_mirror_entry *, unsigned int);
+    int (*voo_mirror_del)(unsigned int);
+    int (*voo_mirror_get)(vr_mirror_req *);
 
     /* NHOP */
-    int (*nexthop_add)(struct vr_nexthop *);
-    int (*nexthop_del)(struct vr_nexthop *);
-    int (*nexthop_get)(struct vr_nexthop *, vr_nexthop_req *);
+    int (*voo_nexthop_add)(struct vr_nexthop *);
+    int (*voo_nexthop_del)(struct vr_nexthop *);
+    int (*voo_nexthop_get)(struct vr_nexthop *, vr_nexthop_req *);
 
     /* route */
-    int (*route_add)(vr_route_req *);
-    int (*route_del)(vr_route_req *);
-    int (*route_get)(vr_route_req *);
-    int (*route_dump)(struct vr_route_req *);
+    int (*voo_route_add)(vr_route_req *);
+    int (*voo_route_del)(vr_route_req *);
+    int (*voo_route_get)(vr_route_req *);
+    int (*voo_route_dump)(struct vr_route_req *);
 
     /* QoS */
-    int (*fc_map_add)(vr_fc_map_req *);
-    int (*fc_map_del)(vr_fc_map_req *);
-    int (*fc_map_get)(vr_fc_map_req *);
+    int (*voo_fc_map_add)(vr_fc_map_req *);
+    int (*voo_fc_map_del)(vr_fc_map_req *);
+    int (*voo_fc_map_get)(vr_fc_map_req *);
 
-    int (*qos_map_add)(vr_qos_map_req *);
-    int (*qos_map_del)(vr_qos_map_req *);
-    int (*qos_map_get)(vr_qos_map_req *);
+    int (*voo_qos_map_add)(vr_qos_map_req *);
+    int (*voo_qos_map_del)(vr_qos_map_req *);
+    int (*voo_qos_map_get)(vr_qos_map_req *);
 };
 
 extern struct vr_offload_ops *offload_ops;
@@ -110,8 +110,8 @@ static inline int vr_offload_soft_reset(void)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->soft_reset)
-        return offload->soft_reset();
+    if (offload && offload->voo_soft_reset)
+        return offload->voo_soft_reset();
     return 0;
 }
 
@@ -122,8 +122,8 @@ static inline int vr_offload_flow_set(struct vr_flow_entry * fe,
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->flow_set)
-        return offload->flow_set(fe, fe_index, rfe);
+    if (offload && offload->voo_flow_set)
+        return offload->voo_flow_set(fe, fe_index, rfe);
     return 0;
 }
 
@@ -131,8 +131,8 @@ static inline int vr_offload_flow_del(struct vr_flow_entry * fe)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->flow_del)
-        return offload->flow_del(fe);
+    if (offload && offload->voo_flow_del)
+        return offload->voo_flow_del(fe);
     return 0;
 }
 
@@ -146,8 +146,8 @@ static inline int vr_offload_flow_meta_data_set(unsigned int fe_index,
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->flow_meta_data_set)
-        return offload->flow_meta_data_set(fe_index, meta_data_len,
+    if (offload && offload->voo_flow_meta_data_set)
+        return offload->voo_flow_meta_data_set(fe_index, meta_data_len,
                                     meta_data, mir_vrf);
     return 0;
 }
@@ -157,8 +157,8 @@ static inline int vr_offload_drop_stats_get(vr_drop_stats_req *resp)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->drop_stats_get)
-        return offload->drop_stats_get(resp);
+    if (offload && offload->voo_drop_stats_get)
+        return offload->voo_drop_stats_get(resp);
     return 0;
 }
 
@@ -167,8 +167,8 @@ static inline int vr_offload_interface_add(struct vr_interface * intf)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->interface_add)
-        return offload->interface_add(intf);
+    if (offload && offload->voo_interface_add)
+        return offload->voo_interface_add(intf);
     return 0;
 }
 
@@ -176,8 +176,8 @@ static inline int vr_offload_interface_get(vr_interface_req *resp)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->interface_get)
-        return offload->interface_get(resp);
+    if (offload && offload->voo_interface_get)
+        return offload->voo_interface_get(resp);
     return 0;
 }
 
@@ -185,8 +185,8 @@ static inline int vr_offload_interface_del(struct vr_interface * intf)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->interface_del)
-        return offload->interface_del(intf);
+    if (offload && offload->voo_interface_del)
+        return offload->voo_interface_del(intf);
     return 0;
 }
 
@@ -194,8 +194,8 @@ static inline int vr_offload_vif_vrf_set(vr_vrf_assign_req *req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->vif_vrf_set)
-       return offload->vif_vrf_set(req);
+    if (offload && offload->voo_vif_vrf_set)
+       return offload->voo_vif_vrf_set(req);
     return 0;
 }
 
@@ -203,8 +203,8 @@ static inline int vr_offload_vif_vrf_get(vr_vrf_assign_req *resp)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->vif_vrf_get)
-        return offload->vif_vrf_get(resp);
+    if (offload && offload->voo_vif_vrf_get)
+        return offload->voo_vif_vrf_get(resp);
     return 0;
 }
 
@@ -212,8 +212,8 @@ static inline int vr_offload_nexthop_add(struct vr_nexthop * nh)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->nexthop_add)
-        return offload->nexthop_add(nh);
+    if (offload && offload->voo_nexthop_add)
+        return offload->voo_nexthop_add(nh);
     return 0;
 }
 
@@ -221,8 +221,8 @@ static inline int vr_offload_nexthop_del(struct vr_nexthop * nh)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->nexthop_del)
-        return offload->nexthop_del(nh);
+    if (offload && offload->voo_nexthop_del)
+        return offload->voo_nexthop_del(nh);
     return 0;
 }
 
@@ -231,8 +231,8 @@ static inline int vr_offload_nexthop_get(struct vr_nexthop * nh,
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->nexthop_get)
-        return offload->nexthop_get(nh, resp);
+    if (offload && offload->voo_nexthop_get)
+        return offload->voo_nexthop_get(nh, resp);
     return 0;
 }
 
@@ -240,8 +240,8 @@ static inline int vr_offload_mpls_add(struct vr_nexthop * nh, int label)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->mpls_add)
-        return offload->mpls_add(nh, label);
+    if (offload && offload->voo_mpls_add)
+        return offload->voo_mpls_add(nh, label);
     return 0;
 }
 
@@ -249,8 +249,8 @@ static inline int vr_offload_mpls_get(vr_mpls_req * resp)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->mpls_get)
-        return offload->mpls_get(resp);
+    if (offload && offload->voo_mpls_get)
+        return offload->voo_mpls_get(resp);
     return 0;
 }
 
@@ -258,16 +258,16 @@ static inline int vr_offload_mpls_del(int label)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->mpls_del)
-        return offload->mpls_del(label);
+    if (offload && offload->voo_mpls_del)
+        return offload->voo_mpls_del(label);
     return 0;
 }
 
 static inline int vr_offload_vxlan_add(struct vr_nexthop * nh, int vnid)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
-    if (offload && offload->vxlan_add)
-        return offload->vxlan_add(nh, vnid);
+    if (offload && offload->voo_vxlan_add)
+        return offload->voo_vxlan_add(nh, vnid);
     return 0;
 }
 
@@ -275,8 +275,8 @@ static inline int vr_offload_vxlan_get(vr_vxlan_req * resp)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->vxlan_get)
-        return offload->vxlan_get(resp);
+    if (offload && offload->voo_vxlan_get)
+        return offload->voo_vxlan_get(resp);
     return 0;
 }
 
@@ -284,8 +284,8 @@ static inline int vr_offload_vxlan_del(int vnid)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->vxlan_del)
-        return offload->vxlan_del(vnid);
+    if (offload && offload->voo_vxlan_del)
+        return offload->voo_vxlan_del(vnid);
     return 0;
 }
 
@@ -294,8 +294,8 @@ static inline int vr_offload_mirror_add(struct vr_mirror_entry * mirror,
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->mirror_add)
-        return offload->mirror_add(mirror, index);
+    if (offload && offload->voo_mirror_add)
+        return offload->voo_mirror_add(mirror, index);
     return 0;
 }
 
@@ -303,8 +303,8 @@ static inline int vr_offload_mirror_del(unsigned int index)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->mirror_del)
-        return offload->mirror_del(index);
+    if (offload && offload->voo_mirror_del)
+        return offload->voo_mirror_del(index);
     return 0;
 }
 
@@ -312,8 +312,8 @@ static inline int vr_offload_mirror_get(vr_mirror_req * resp)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->mirror_get)
-        return offload->mirror_get(resp);
+    if (offload && offload->voo_mirror_get)
+        return offload->voo_mirror_get(resp);
     return 0;
 }
 
@@ -321,8 +321,8 @@ static inline int vr_offload_route_del(vr_route_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->route_del)
-        return offload->route_del(req);
+    if (offload && offload->voo_route_del)
+        return offload->voo_route_del(req);
     return 0;
 }
 
@@ -330,8 +330,8 @@ static inline int vr_offload_route_add(vr_route_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->route_add)
-        return offload->route_add(req);
+    if (offload && offload->voo_route_add)
+        return offload->voo_route_add(req);
     return 0;
 }
 
@@ -339,8 +339,8 @@ static inline int vr_offload_route_get(vr_route_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->route_get)
-        return offload->route_get(req);
+    if (offload && offload->voo_route_get)
+        return offload->voo_route_get(req);
     return 0;
 }
 
@@ -348,8 +348,8 @@ static inline int vr_offload_route_dump(struct vr_route_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->route_dump)
-        return offload->route_dump(req);
+    if (offload && offload->voo_route_dump)
+        return offload->voo_route_dump(req);
     return 0;
 }
 
@@ -357,8 +357,8 @@ static inline int vr_offload_fc_map_add(vr_fc_map_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->fc_map_add)
-        return offload->fc_map_add(req);
+    if (offload && offload->voo_fc_map_add)
+        return offload->voo_fc_map_add(req);
     return 0;
 }
 
@@ -366,8 +366,8 @@ static inline int vr_offload_fc_map_del(vr_fc_map_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->fc_map_del)
-        return offload->fc_map_del(req);
+    if (offload && offload->voo_fc_map_del)
+        return offload->voo_fc_map_del(req);
     return 0;
 }
 
@@ -375,8 +375,8 @@ static inline int vr_offload_fc_map_get(vr_fc_map_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->fc_map_get)
-        return offload->fc_map_get(req);
+    if (offload && offload->voo_fc_map_get)
+        return offload->voo_fc_map_get(req);
     return 0;
 }
 
@@ -384,8 +384,8 @@ static inline int vr_offload_qos_map_add(vr_qos_map_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->qos_map_add)
-        return offload->qos_map_add(req);
+    if (offload && offload->voo_qos_map_add)
+        return offload->voo_qos_map_add(req);
     return 0;
 }
 
@@ -393,8 +393,8 @@ static inline int vr_offload_qos_map_del(vr_qos_map_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->qos_map_del)
-        return offload->qos_map_del(req);
+    if (offload && offload->voo_qos_map_del)
+        return offload->voo_qos_map_del(req);
     return 0;
 }
 
@@ -402,9 +402,9 @@ static inline int vr_offload_qos_map_get(vr_qos_map_req * req)
 {
     struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
 
-    if (offload && offload->qos_map_get)
-        return offload->qos_map_get(req);
+    if (offload && offload->voo_qos_map_get)
+        return offload->voo_qos_map_get(req);
     return 0;
 }
 
-#endif
+#endif /* __VR_OFFLOADS_H__ */

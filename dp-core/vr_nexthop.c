@@ -3217,7 +3217,10 @@ vr_nexthop_init(struct vrouter *router)
 }
 
 
-#if defined(__KERNEL__) && defined(__linux__)
+/*
+ * Called by offload module to update vrfstats with packets which have been
+ * offloaded.
+ */
 int
 vr_nexthop_update_offload_vrfstats(uint32_t vrfid, uint32_t num_cntrs,
                                uint64_t *cntrs)
@@ -3248,6 +3251,4 @@ vr_nexthop_update_offload_vrfstats(uint32_t vrfid, uint32_t num_cntrs,
 
     return 0;
 }
-EXPORT_SYMBOL(vr_nexthop_update_offload_vrfstats);
-#endif
 
