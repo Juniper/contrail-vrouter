@@ -278,6 +278,13 @@ struct vr_interface {
     int16_t vif_qos_map_index;
     unsigned char vif_name[VR_INTERFACE_NAME_LEN];
     uint64_t *vif_drop_stats;
+    /*
+     * The list of hardware queues that will be used in this NIC.
+     * 'agent' reads the configuration and lets us know the list.
+     * We need this information to bind the specific queues to
+     * each forwarding lcores in DPDK.
+     */
+    uint16_t *vif_hw_queues;
     struct vr_btable *vif_pcpu_drop_stats;
     unsigned char *vif_in_mirror_md;
     unsigned char *vif_out_mirror_md;
@@ -286,6 +293,9 @@ struct vr_interface {
     unsigned char vif_out_mirror_md_len;
     unsigned char vif_out_mirror_md_size;
     unsigned short vif_vrf_table_users;
+    /* the number of hardware queues. from agent configuration */
+    unsigned short vif_num_hw_queues;
+    void *vif_queue_host_data;
     unsigned int  vif_ip;
 };
 

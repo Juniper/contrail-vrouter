@@ -26,6 +26,120 @@
 #include <rte_port_ethdev.h>
 #include <rte_eth_af_packet.h>
 
+static void
+dpdk_vif_queue_free(struct vr_interface *vif)
+{
+    unsigned int lcore, i;
+    struct vr_dpdk_lcore *lcore_p;
+
+    i = lcore = VR_DPDK_FWD_LCORE_ID;
+    do {
+        lcore_p = vr_dpdk.lcores[i];
+        if (lcore_p->lcore_tx_queues[vif->vif_idx]) {
+            vr_free(lcore_p->lcore_tx_queues[vif->vif_idx],
+                    VR_INTERFACE_QUEUE_OBJECT);
+            lcore_p->lcore_tx_queues[vif->vif_idx] = NULL;
+        }
+
+        if (lcore_p->lcore_tx_queue_params[vif->vif_idx]) {
+            vr_free(lcore_p->lcore_tx_queue_params[vif->vif_idx],
+                    VR_INTERFACE_QUEUE_OBJECT);
+            lcore_p->lcore_tx_queue_params[vif->vif_idx] = NULL;
+        }
+
+        if (lcore_p->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+            vr_free(lcore_p->lcore_hw_queue_to_dpdk_index[vif->vif_idx],
+                    VR_INTERFACE_QUEUE_OBJECT);
+            lcore_p->lcore_hw_queue_to_dpdk_index[vif->vif_idx] = NULL;
+        }
+
+        i = rte_get_next_lcore(i, 1, 1);
+    } while (i != lcore);
+
+    if (vif->vif_queue_host_data) {
+        vr_free(vif->vif_queue_host_data, VR_INTERFACE_QUEUE_OBJECT);
+        vif->vif_queue_host_data = NULL;
+    }
+
+    return;
+}
+
+static int
+dpdk_vif_queue_setup(struct vr_interface *vif)
+{
+    int16_t vif_max_queue = -1;
+    uint16_t num_tx_queues_per_lcore;
+    unsigned int lcore, i;
+
+    struct vr_dpdk_lcore *lcore_p;
+    struct vif_queue_dpdk_data *q_data;
+
+    if (vif->vif_num_hw_queues) {
+        num_tx_queues_per_lcore = vif->vif_num_hw_queues;
+        for (i = 0; i < vif->vif_num_hw_queues; i++) {
+            if (vif->vif_hw_queues[i] > vif_max_queue) {
+                vif_max_queue = vif->vif_hw_queues[i];
+            }
+        }
+
+        q_data = vif->vif_queue_host_data;
+        if (!q_data) {
+            vif->vif_queue_host_data = vr_malloc(sizeof(*q_data),
+                    VR_INTERFACE_QUEUE_OBJECT);
+            if (!vif->vif_queue_host_data) {
+                goto unwind;
+            }
+
+            q_data = (struct vif_queue_dpdk_data *)vif->vif_queue_host_data;
+            memset(q_data->vqdd_queue_to_lcore, -1,
+                    VR_DPDK_MAX_NB_TX_QUEUES * sizeof(int16_t));
+        }
+    } else {
+        num_tx_queues_per_lcore = 1;
+    }
+
+    lcore = VR_DPDK_FWD_LCORE_ID;
+    do {
+        if (lcore >= VR_DPDK_PACKET_LCORE_ID) {
+            lcore_p = vr_dpdk.lcores[lcore];
+            lcore_p->lcore_hw_queue[vif->vif_idx] = -1;
+            lcore_p->lcore_tx_queues[vif->vif_idx] =
+                vr_zalloc(num_tx_queues_per_lcore * sizeof(struct vr_dpdk_queue),
+                        VR_INTERFACE_QUEUE_OBJECT);
+            if (!lcore_p->lcore_tx_queues) {
+                goto unwind;
+            }
+
+            lcore_p->lcore_tx_queue_params[vif->vif_idx] =
+                vr_zalloc(num_tx_queues_per_lcore *
+                        sizeof(struct vr_dpdk_queue_params),
+                        VR_INTERFACE_QUEUE_OBJECT);
+            if (!lcore_p->lcore_tx_queue_params) {
+                goto unwind;
+            }
+            lcore_p->num_tx_queues_per_lcore[vif->vif_idx] =
+                num_tx_queues_per_lcore;
+
+            if (vif_max_queue > 0) {
+                lcore_p->lcore_hw_queue_to_dpdk_index[vif->vif_idx] =
+                    (int16_t *)vr_zalloc(sizeof(int16_t) * (vif_max_queue + 1),
+                            VR_INTERFACE_QUEUE_OBJECT);
+                if (!lcore_p->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+                    goto unwind;
+                }
+            }
+        }
+
+        lcore = rte_get_next_lcore(lcore, 1, 1);
+    } while (lcore != VR_DPDK_FWD_LCORE_ID);
+
+    return 0;
+
+unwind:
+    dpdk_vif_queue_free(vif);
+    return -ENOMEM;
+}
+
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
  * Returns 0 on success, < 0 otherwise.
@@ -42,6 +156,10 @@ dpdk_virtual_if_add(struct vr_interface *vif)
     nrxqs = vr_dpdk_virtio_nrxqs(vif);
     /* virtio TX is thread safe, so we assign TX queue to each lcore */
     ntxqs = (uint16_t)-1;
+
+    ret = dpdk_vif_queue_setup(vif);
+    if (ret)
+        return ret;
 
     ret = vr_dpdk_lcore_if_schedule(vif, vr_dpdk_lcore_least_used_get(),
                 nrxqs, &vr_dpdk_virtio_rx_queue_init,
@@ -69,6 +187,7 @@ dpdk_virtual_if_add(struct vr_interface *vif)
 static int
 dpdk_virtual_vlan_if_add(struct vr_interface *vif)
 {
+
     RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) virtual VLAN(o/i) %u/%u device %s\n",
                 vif->vif_idx, vif->vif_gen, vif->vif_ovlan_id, vif->vif_vlan_id,
                 vif->vif_name);
@@ -96,6 +215,8 @@ dpdk_virtual_if_del(struct vr_interface *vif)
         RTE_LOG(ERR, VROUTER, "Error deleting vif %u virtual device %s\n",
                 vif->vif_idx, vif->vif_name);
     }
+
+    dpdk_vif_queue_free(vif);
 
     return ret;
 }
@@ -418,6 +539,10 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
 
     dpdk_vif_attach_ethdev(vif, ethdev);
 
+    ret = dpdk_vif_queue_setup(vif);
+    if (ret < 0)
+        return ret;
+
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER,
@@ -499,6 +624,10 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 
     dpdk_vif_attach_ethdev(vif, ethdev);
 
+    ret = dpdk_vif_queue_setup(vif);
+    if (ret < 0)
+        return ret;
+
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "    error starting eth device %" PRIu8
@@ -576,6 +705,8 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
         rte_eth_dev_release_port(ethdev_ptr);
     }
 
+    dpdk_vif_queue_free(vif);
+
     /* release eth device */
     return vr_dpdk_ethdev_release(ethdev);
 }
@@ -628,6 +759,10 @@ dpdk_vhost_if_add(struct vr_interface *vif)
                 port_id, MAC_VALUE(mac_addr.addr_bytes));
     }
 
+    ret = dpdk_vif_queue_setup(vif);
+    if (ret < 0)
+        return ret;
+
     /* Probe KNI. */
     ret = vr_dpdk_knidev_init(port_id, vif);
     switch (ret) {
@@ -666,6 +801,8 @@ dpdk_vhost_if_del(struct vr_interface *vif)
                 vif->vif_idx, vif->vif_name);
 
     vr_dpdk_lcore_if_unschedule(vif);
+
+    dpdk_vif_queue_free(vif);
 
     /* Release KNI or TAP device. */
     if (vr_dpdk.kni_state > 0)
@@ -747,6 +884,10 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
         return -EINVAL;
     }
 
+    ret = dpdk_vif_queue_setup(vif);
+    if (ret)
+        return ret;
+
     /*
      * TODO: we always use DPDK port 0 for monitoring KNI
      * DPDK numerates all the detected Ethernet devices starting from 0.
@@ -815,6 +956,8 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
 
     vr_dpdk_lcore_if_unschedule(vif);
 
+    dpdk_vif_queue_free(vif);
+
     /* Release KNI or TAP device. */
     if (vr_dpdk.kni_state > 0)
         return vr_dpdk_knidev_release(vif);
@@ -875,13 +1018,21 @@ dpdk_if_add(struct vr_interface *vif)
     if (vr_dpdk_is_stop_flag_set())
         return -EINPROGRESS;
 
-    if      (vif_is_fabric(vif))        return dpdk_fabric_if_add(vif);
-    else if (vif_is_vm(vif))            return dpdk_virtual_if_add(vif);
-    else if (vif_is_vlan(vif))          return dpdk_virtual_vlan_if_add(vif);
-    else if (vif_is_namespace(vif))     return dpdk_af_packet_if_add(vif);
-    else if (vif_is_vhost(vif))         return dpdk_vhost_if_add(vif);
-    else if (vif_is_agent(vif))         return dpdk_agent_if_add(vif);
-    else if (vif_is_monitoring(vif))    return dpdk_monitoring_if_add(vif);
+    if (vif_is_fabric(vif)) {
+        return dpdk_fabric_if_add(vif);
+    } else if (vif_is_vm(vif)) {
+        return dpdk_virtual_if_add(vif);
+    } else if (vif_is_vlan(vif)) {
+        return dpdk_virtual_vlan_if_add(vif);
+    } else if (vif_is_namespace(vif)) {
+        return dpdk_af_packet_if_add(vif);
+    } else if (vif_is_vhost(vif)) {
+        return dpdk_vhost_if_add(vif);
+    } else if (vif_is_agent(vif)) {
+        return dpdk_agent_if_add(vif);
+    } else if (vif_is_monitoring(vif)) {
+        return dpdk_monitoring_if_add(vif);
+    }
 
     RTE_LOG(ERR, VROUTER,
             "Error adding vif %d (%s): unsupported interface type %d transport %d\n",
@@ -896,13 +1047,19 @@ dpdk_if_del(struct vr_interface *vif)
     if (vr_dpdk_is_stop_flag_set())
         return -EINPROGRESS;
 
-    if      (vif_is_fabric(vif) ||
-             vif_is_namespace(vif))    return dpdk_fabric_af_packet_if_del(vif);
-    else if (vif_is_vm(vif))           return dpdk_virtual_if_del(vif);
-    else if (vif_is_vlan(vif))         return dpdk_virtual_vlan_if_del(vif);
-    else if (vif_is_vhost(vif))        return dpdk_vhost_if_del(vif);
-    else if (vif_is_agent(vif))        return dpdk_agent_if_del(vif);
-    else if (vif_is_monitoring(vif))   return dpdk_monitoring_if_del(vif);
+    if (vif_is_fabric(vif) || vif_is_namespace(vif)) {
+        return dpdk_fabric_af_packet_if_del(vif);
+    } else if (vif_is_vm(vif)) {
+        return dpdk_virtual_if_del(vif);
+    } else if (vif_is_vlan(vif)) {
+        return dpdk_virtual_vlan_if_del(vif);
+    } else if (vif_is_vhost(vif)) {
+        return dpdk_vhost_if_del(vif);
+    } else if (vif_is_agent(vif)) {
+        return dpdk_agent_if_del(vif);
+    } else if (vif_is_monitoring(vif)) {
+        return dpdk_monitoring_if_del(vif);
+    }
 
     RTE_LOG(ERR, VROUTER,
             "Error deleting vif %d: unsupported interface type %d transport %d\n",
@@ -1211,23 +1368,41 @@ dpdk_fragment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
 static int
 dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
-    const unsigned lcore_id = rte_lcore_id();
+    uint8_t queue_index;
+    bool will_fragment;
+    int ret, num_of_frags = 1, i;
+    unsigned int vif_idx = vif->vif_idx, dpdk_queue_index;
+    const unsigned int lcore_id = rte_lcore_id();
+
     struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct rte_mbuf *p_copy;
     struct vr_interface_stats *stats;
-    int ret;
     struct rte_mbuf *mbufs_out[VR_DPDK_FRAG_MAX_IP_FRAGS];
-    int num_of_frags = 1;
-    int i;
-    bool will_fragment;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
 
+    if (pkt->vp_queue != VP_QUEUE_INVALID) {
+        queue_index = pkt->vp_queue;
+    } else {
+        if (lcore->lcore_hw_queue[vif_idx] >= 0) {
+            queue_index = lcore->lcore_hw_queue[vif_idx];
+        } else {
+            queue_index = 0;
+        }
+    }
+
+    if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+        dpdk_queue_index =
+            lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue_index];
+    } else {
+        dpdk_queue_index = 0;
+    }
+
+    tx_queue = &lcore->lcore_tx_queues[vif_idx][dpdk_queue_index];
     stats = vif_get_stats(vif, lcore_id);
 
     /* reset mbuf data pointer and length */
@@ -1237,7 +1412,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
-        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
+        monitoring_tx_queue =
+            &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]][0];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);
             if (likely(p_copy != NULL)) {
@@ -1426,13 +1602,14 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
     struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
     unsigned vif_idx = vif->vif_idx;
-    struct vr_dpdk_queue *tx_queue = &lcore->lcore_tx_queues[vif_idx];
+    struct vr_dpdk_queue *tx_queue;
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct rte_mbuf *p_copy;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
 
+    tx_queue = &lcore->lcore_tx_queues[vif_idx][0];
     /* reset mbuf data pointer and length */
     m->data_off = pkt_head_space(pkt);
     m->data_len = pkt_head_len(pkt);
@@ -1440,7 +1617,8 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
-        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
+        monitoring_tx_queue =
+            &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]][0];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);;
             if (likely(p_copy != NULL)) {
@@ -1539,6 +1717,8 @@ dpdk_if_get_encap(struct vr_interface *vif)
 static void
 dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
 {
+    unsigned int i;
+
     struct vr_interface_stats *stats;
     struct vr_dpdk_lcore *lcore;
     struct vr_dpdk_queue *queue;
@@ -1574,27 +1754,33 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
         vr_dpdk_virtio_xstats_update(stats, queue);
     }
 
+    stats->vis_queue_opackets = stats->vis_queue_oerrors = 0;
+    stats->vis_port_opackets = stats->vis_port_oerrors = 0;
     /* TX queue */
-    queue = &lcore->lcore_tx_queues[vif->vif_idx];
-    if (queue->q_vif == vif) {
-        /* update stats */
-        if (queue->txq_ops.f_stats != NULL) {
-            if (queue->txq_ops.f_stats(queue->q_queue_h,
-                &tx_stats, 0) == 0) {
-                if (queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
-                    /* DPDK ports count dropped packets twice */
-                    stats->vis_queue_opackets = tx_stats.n_pkts_in - tx_stats.n_pkts_drop;
-                    stats->vis_queue_oerrors = tx_stats.n_pkts_drop;
-                } else {
-                    /* DPDK ports count dropped packets twice */
-                    stats->vis_port_opackets = tx_stats.n_pkts_in - tx_stats.n_pkts_drop;
-                    stats->vis_port_oerrors = tx_stats.n_pkts_drop;
+    for (i = 0; i < lcore->num_tx_queues_per_lcore[vif->vif_idx]; i++) {
+        queue = &lcore->lcore_tx_queues[vif->vif_idx][i];
+        if (queue->q_vif == vif) {
+            /* update stats */
+            if (queue->txq_ops.f_stats != NULL) {
+                if (queue->txq_ops.f_stats(queue->q_queue_h,
+                            &tx_stats, 0) == 0) {
+                    if (queue->txq_ops.f_tx == rte_port_ring_writer_ops.f_tx) {
+                        /* DPDK ports count dropped packets twice */
+                        stats->vis_queue_opackets += tx_stats.n_pkts_in -
+                            tx_stats.n_pkts_drop;
+                        stats->vis_queue_oerrors += tx_stats.n_pkts_drop;
+                    } else {
+                        /* DPDK ports count dropped packets twice */
+                        stats->vis_port_opackets += tx_stats.n_pkts_in -
+                            tx_stats.n_pkts_drop;
+                        stats->vis_port_oerrors += tx_stats.n_pkts_drop;
+                    }
                 }
             }
-        }
 
-        /* update virtio syscalls counters */
-        vr_dpdk_virtio_xstats_update(stats, queue);
+            /* update virtio syscalls counters */
+            vr_dpdk_virtio_xstats_update(stats, queue);
+        }
     }
 }
 
@@ -1635,6 +1821,15 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
                         }
                     }
                 }
+                /*
+                 * observed bug: in the kni code, when a memzone is allocated
+                 * and used for kni, it is not zalloced. If that memory happens
+                 * to be part/full of the freed memory below, then we will run
+                 * into issues. For e.g a subsequent check for a particular value
+                 * in the non-zalloced code fails. Hence, this workaround, which
+                 * zeroes out the memory before freeing. Things seem to work.
+                 */
+                memset(eth_xstats, 0, sizeof(*eth_xstats)*nb_xstats);
                 rte_free(eth_xstats);
             }
         }
@@ -1651,13 +1846,16 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
 static void
 dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
 {
-    struct vr_interface_stats *stats;
     uint8_t port_id;
-    struct rte_eth_stats eth_stats;
+    uint16_t queue_id, dpdk_queue_index, num_queues, i;
+
+    struct vr_interface_stats *stats;
     struct vr_dpdk_lcore *lcore;
     struct vr_dpdk_queue *queue;
     struct vr_dpdk_queue_params *queue_params;
-    uint16_t queue_id;
+    struct vif_queue_dpdk_data *q_data =
+        (struct vif_queue_dpdk_data *)vif->vif_queue_host_data;
+    struct rte_eth_stats eth_stats;
 
     /* check if vif is a PMD */
     if (!vif_is_fabric(vif) || vif->vif_os == NULL)
@@ -1691,13 +1889,42 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
     }
 
     /* get lcore TX queue index */
-    queue = &lcore->lcore_tx_queues[vif->vif_idx];
-    if (queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
-        queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx];
-        queue_id = queue_params->qp_ethdev.queue_id;
-        if (queue_id < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
-            stats->vis_dev_obytes = eth_stats.q_obytes[queue_id];
-            stats->vis_dev_opackets = eth_stats.q_opackets[queue_id];
+    if (vif->vif_hw_queues) {
+        num_queues = vif->vif_num_hw_queues;
+        if (!q_data)
+            num_queues = 1;
+    } else {
+        num_queues = 1;
+    }
+
+    stats->vis_dev_obytes = stats->vis_dev_opackets = 0;
+    for (i = 0; i < num_queues; i++) {
+        if (vif->vif_hw_queues) {
+            queue_id = vif->vif_hw_queues[i];
+            if (q_data->vqdd_queue_to_lcore[queue_id] != lcore_id) {
+                continue;
+            }
+        } else {
+            queue_id = i;
+        }
+
+        if (lcore->lcore_tx_queues[vif->vif_idx]) {
+            if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+                dpdk_queue_index =
+                    lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue_id];
+            } else {
+                dpdk_queue_index = 0;
+            }
+
+            queue = &lcore->lcore_tx_queues[vif->vif_idx][dpdk_queue_index];
+            if (queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
+                queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx][queue_id];
+                queue_id = queue_params->qp_ethdev.queue_id;
+                if (queue_id < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
+                    stats->vis_dev_obytes += eth_stats.q_obytes[queue_id];
+                    stats->vis_dev_opackets += eth_stats.q_opackets[queue_id];
+                }
+            }
         }
     }
 

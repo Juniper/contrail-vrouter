@@ -204,16 +204,171 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     return 0;
 }
 
+static int
+vr_dpdk_init_hw_tx_queues(struct vr_interface *vif, unsigned int least_used_id,
+        uint16_t nb_tx_queues, vr_dpdk_queue_init_op tx_queue_init_op)
+{
+
+    bool use_packet_lcore = false;
+    unsigned int lcore_id, queue, queue_index, num_fwd_cores;
+
+    struct vr_dpdk_queue *tx_queue;
+    struct vr_dpdk_lcore *lcore;
+    struct vif_queue_dpdk_data *q_data = NULL;
+
+    num_fwd_cores = vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORE_ID -
+        VR_DPDK_PACKET_LCORE_ID;
+
+    if (vif->vif_num_hw_queues) {
+        if (vif->vif_num_hw_queues > VR_DPDK_MAX_NB_TX_QUEUES) {
+            return -EINVAL;
+        }
+
+        nb_tx_queues = vif->vif_num_hw_queues;
+        q_data = (struct vif_queue_dpdk_data *)vif->vif_queue_host_data;
+    } else {
+        if (nb_tx_queues > num_fwd_cores) {
+            nb_tx_queues = num_fwd_cores;
+        }
+    }
+
+    if (nb_tx_queues >= num_fwd_cores) {
+        use_packet_lcore = true;
+    }
+
+    lcore_id = least_used_id;
+    for (queue_index = 0; queue_index < nb_tx_queues; queue_index++) {
+        if (lcore_id >= VR_DPDK_PACKET_LCORE_ID) {
+            if (!use_packet_lcore) {
+                while (lcore_id < VR_DPDK_FWD_LCORE_ID) {
+                    lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
+                }
+            }
+
+            if (vif->vif_num_hw_queues) {
+                queue = vif->vif_hw_queues[queue_index];
+            } else {
+                queue = queue_index;
+            }
+
+            RTE_LOG(INFO, VROUTER, "    lcore %2u TX to HW queue %" PRIu16 "\n",
+                    lcore_id, queue);
+
+            lcore = vr_dpdk.lcores[lcore_id];
+            if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+                lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue] =
+                    queue_index;
+            }
+
+            tx_queue = (*tx_queue_init_op)(lcore_id, vif, queue);
+            if (tx_queue == NULL)
+                return -EFAULT;
+
+            if (q_data) {
+                q_data->vqdd_queue_to_lcore[queue] = lcore_id;
+            }
+
+            dpdk_lcore_queue_add(lcore_id, &lcore->lcore_tx_head, tx_queue);
+
+            if (lcore->lcore_hw_queue[vif->vif_idx] < 0) {
+                lcore->lcore_hw_queue[vif->vif_idx] = queue;
+            }
+        }
+
+        lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
+        while (lcore_id < VR_DPDK_PACKET_LCORE_ID) {
+            lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
+        }
+
+        if ((lcore_id == least_used_id) &&
+                (nb_tx_queues == VR_DPDK_ONE_QUEUE_PER_CORE)) {
+            break;
+        }
+    }
+
+
+    return queue_index;
+}
+
+static int
+vr_dpdk_init_sw_tx_rings(struct vr_interface *vif, unsigned int least_used_id)
+{
+    unsigned int queue, queue_index, num_queues_per_lcore = 1;
+    unsigned int lcore_id, host_lcore_id;
+
+    struct vr_dpdk_queue *tx_queue;
+    struct vif_queue_dpdk_data *q_data = NULL;
+    struct vr_dpdk_lcore *lcore;
+
+    if (vif->vif_num_hw_queues) {
+        num_queues_per_lcore = vif->vif_num_hw_queues;
+        q_data = (struct vif_queue_dpdk_data *)vif->vif_queue_host_data;
+    }
+
+    /* init TX queues starting with the least used lcore */
+    lcore_id = least_used_id;
+    /* for all lcores */
+    do {
+        if (lcore_id >= VR_DPDK_PACKET_LCORE_ID) {
+            lcore = vr_dpdk.lcores[lcore_id];
+
+            if ((num_queues_per_lcore == 1) &&
+                    (lcore->lcore_hw_queue[vif->vif_idx] >= 0)) {
+                goto get_next_lcore;
+            }
+
+            for (queue_index = 0; queue_index < num_queues_per_lcore;
+                    queue_index++) {
+                if (vif->vif_hw_queues) {
+                    queue = vif->vif_hw_queues[queue_index];
+                    host_lcore_id = q_data->vqdd_queue_to_lcore[queue];
+                } else {
+                    queue = queue_index;
+                    host_lcore_id = least_used_id;
+                }
+
+                if (host_lcore_id == lcore_id) {
+                    continue;
+                }
+
+                RTE_LOG(INFO, VROUTER,
+                        "    lcore %2u TX queue %u to SW ring in lcore %u\n",
+                        lcore_id, queue, host_lcore_id);
+                if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx]) {
+                    lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue] =
+                        queue_index;
+                }
+                tx_queue = vr_dpdk_ring_tx_queue_init(lcore_id, vif,
+                        queue, host_lcore_id);
+                if (tx_queue == NULL) {
+                    lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue] = -1;
+                    return -EFAULT;
+                }
+
+                /* add the queue to the lcore */
+                dpdk_lcore_queue_add(lcore_id, &lcore->lcore_tx_head,
+                        tx_queue);
+            }
+        }
+
+get_next_lcore:
+        /* skip master lcore and wrap */
+        lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
+    } while (lcore_id != least_used_id);
+
+    return 0;
+}
+
 /* Schedule an interface */
 int
 vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     uint16_t nb_rx_queues, vr_dpdk_queue_init_op rx_queue_init_op,
     uint16_t nb_tx_queues, vr_dpdk_queue_init_op tx_queue_init_op)
 {
-    unsigned lcore_id;
-    uint16_t queue_id;
+    int16_t queue_id;
+    unsigned int lcore_id, usable_queues;
+
     struct vr_dpdk_queue *rx_queue;
-    struct vr_dpdk_queue *tx_queue;
     struct vr_dpdk_lcore *lcore;
 
     if (least_used_id == VR_MAX_CPUS) {
@@ -225,45 +380,14 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     if (vif_is_fabric(vif) && vr_dpdk.vf_lcore_id)
         least_used_id = vr_dpdk.vf_lcore_id;
 
-    /* init TX queues starting with the least used lcore */
-    lcore_id = least_used_id;
-    queue_id = 0;
-    /* for all lcores */
-    do {
-        /* PACKET_LCORE_ID and up have TX queues */
-        if (lcore_id >= VR_DPDK_PACKET_LCORE_ID) {
-            /*
-             * do not schedule hardware TX queue on service lcores if
-             * there are no enough queues for all the forwarding lcores
-             */
-            if (((lcore_id >= VR_DPDK_FWD_LCORE_ID)
-                    || (nb_tx_queues >= vr_dpdk.nb_fwd_lcores
-                            + (VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID)))
-                && (queue_id < nb_tx_queues)) {
-                /* there is a hardware queue available */
-                RTE_LOG(INFO, VROUTER, "    lcore %2u TX to HW queue %" PRIu16 "\n",
-                    lcore_id, queue_id);
-                tx_queue = (*tx_queue_init_op)(lcore_id, vif, queue_id);
-                if (tx_queue == NULL)
-                    return -EFAULT;
-                /* next queue */
-                queue_id++;
-            } else {
-                /* no more hardware queues left, so we use rings instead */
-                RTE_LOG(INFO, VROUTER, "    lcore %2u TX to SW ring\n", lcore_id);
-                tx_queue = vr_dpdk_ring_tx_queue_init(lcore_id, vif, least_used_id);
-                if (tx_queue == NULL)
-                    return -EFAULT;
-            }
+    usable_queues = vr_dpdk_init_hw_tx_queues(vif, least_used_id,
+            nb_tx_queues, tx_queue_init_op);
+    if (usable_queues < 0)
+        return usable_queues;
 
-            /* add the queue to the lcore */
-            lcore = vr_dpdk.lcores[lcore_id];
-            dpdk_lcore_queue_add(lcore_id, &lcore->lcore_tx_head, tx_queue);
-        }
-
-        /* skip master lcore and wrap */
-        lcore_id = rte_get_next_lcore(lcore_id, 1, 1);
-    } while (lcore_id != least_used_id);
+    usable_queues = vr_dpdk_init_sw_tx_rings(vif, least_used_id);
+    if (usable_queues < 0)
+        return usable_queues;
 
     if (VR_DPDK_USE_IO_LCORES && nb_rx_queues == 1
         && vif_is_virtual(vif)) {
@@ -408,7 +532,7 @@ vr_dpdk_lcore_cmd_post_all(uint16_t cmd, uint64_t cmd_arg)
 void
 dpdk_lcore_rxtx_release_all(struct vr_interface *vif)
 {
-    unsigned lcore_id;
+    unsigned lcore_id, i;
     struct vr_dpdk_lcore *lcore;
     struct vr_dpdk_queue_params *rx_queue_params;
     struct vr_dpdk_queue_params *tx_queue_params;
@@ -422,13 +546,16 @@ dpdk_lcore_rxtx_release_all(struct vr_interface *vif)
         rx_queue_params = &lcore->lcore_rx_queue_params[vif->vif_idx];
         if (rx_queue_params->qp_release_op) {
             RTE_LOG(INFO, VROUTER, "    releasing lcore %u RX queue\n", lcore_id);
-            rx_queue_params->qp_release_op(lcore_id, vif);
+            rx_queue_params->qp_release_op(lcore_id, 0, vif);
         }
 
-        tx_queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx];
-        if (tx_queue_params->qp_release_op) {
-            RTE_LOG(INFO, VROUTER, "    releasing lcore %u TX queue\n", lcore_id);
-            tx_queue_params->qp_release_op(lcore_id, vif);
+        for (i = 0; i < lcore->num_tx_queues_per_lcore[vif->vif_idx]; i++) {
+            tx_queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx][i];
+            if (tx_queue_params->qp_release_op) {
+                RTE_LOG(INFO, VROUTER, "    releasing lcore %u TX queue %u\n",
+                        lcore_id, i);
+                tx_queue_params->qp_release_op(lcore_id, i, vif);
+            }
         }
     }
 }
@@ -646,7 +773,8 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
          __func__, nb_pkts, vif->vif_name);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
-        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]];
+        monitoring_tx_queue =
+            &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]][0];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
                 mbuf = pkts[i];
@@ -993,14 +1121,21 @@ dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
     struct vr_dpdk_queue* tx_queue;
     struct vrouter* router = vrouter_get(0);
     struct rte_mbuf* pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_interface *eth_vif;
+    uint16_t hw_queue;
     unsigned nb_pkts, i;
 
     /*
      * Receive packets from VLAN interface and send them to the wire.
      * Those packets will not be seen in vifdump on the physical vif.
      */
-    if (router->vr_eth_if) {
-        tx_queue = &lcore->lcore_tx_queues[router->vr_eth_if->vif_idx];
+    eth_vif = router->vr_eth_if;
+    if (eth_vif) {
+        hw_queue = lcore->lcore_hw_queue[eth_vif->vif_idx];
+        if (hw_queue < 0)
+            hw_queue = 0;
+
+        tx_queue = &lcore->lcore_tx_queues[eth_vif->vif_idx][hw_queue];
         if (tx_queue->txq_ops.f_tx) {
             if (vr_dpdk.kni_state > 0)
                 nb_pkts = rte_kni_rx_burst(vr_dpdk.vlan_dev, pkts,
@@ -1333,7 +1468,7 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
     uint16_t cmd = lcore->lcore_cmd;
     uint64_t cmd_arg = lcore->lcore_cmd_arg;
     int ret = 0;
-    unsigned vif_idx;
+    unsigned vif_idx, i;
     struct vr_dpdk_queue *rx_queue;
     struct vr_dpdk_queue *tx_queue;
     struct vr_dpdk_lcore_rx_queue_remove_arg *rxq_rm_arg;
@@ -1357,10 +1492,12 @@ vr_dpdk_lcore_cmd_handle(struct vr_dpdk_lcore *lcore)
         break;
     case VR_DPDK_LCORE_TX_RM_CMD:
         vif_idx = (unsigned)cmd_arg;
-        tx_queue = &lcore->lcore_tx_queues[vif_idx];
-        if (tx_queue->q_queue_h) {
-            /* remove the queue from the lcore */
-            dpdk_lcore_tx_queue_remove(lcore, tx_queue);
+        for (i = 0; i < lcore->num_tx_queues_per_lcore[vif_idx]; i++) {
+            tx_queue = &lcore->lcore_tx_queues[vif_idx][i];
+            if (tx_queue->q_queue_h) {
+                /* remove the queue from the lcore */
+                dpdk_lcore_tx_queue_remove(lcore, tx_queue);
+            }
         }
         lcore->lcore_cmd = VR_DPDK_LCORE_NO_CMD;
         break;
