@@ -1475,22 +1475,22 @@ flow_stats(void)
     struct vr_flow_entry *fe;
     struct timeval now;
     struct timeval last_time;
-    int active_entries = 0;
-    int hold_entries = 0;
-    int prev_active_entries = 0;
-    int prev_hold_entries = 0;
-    int total_entries = 0;
-    int prev_total_entries = 0;
-    int diff_ms;
-    int rate;
-    int avg_setup_rate = 0;
-    int avg_teardown_rate = 0;
+    uint64_t active_entries = 0;
+    uint64_t hold_entries = 0;
+    uint64_t prev_active_entries = 0;
+    uint64_t prev_hold_entries = 0;
+    uint64_t total_entries = 0;
+    uint64_t prev_total_entries = 0;
+    uint64_t diff_ms;
+    uint64_t rate;
+    uint64_t avg_setup_rate = 0;
+    uint64_t avg_teardown_rate = 0;
     uint64_t setup_time = 0;
     uint64_t teardown_time = 0;
-    int total_rate;
-    int flow_action_drop = 0;
-    int flow_action_fwd = 0;
-    int flow_action_nat = 0;
+    uint64_t total_rate;
+    uint64_t flow_action_drop = 0;
+    uint64_t flow_action_fwd = 0;
+    uint64_t flow_action_nat = 0;
 
     gettimeofday(&last_time, NULL);
     while (1) {
@@ -1566,23 +1566,23 @@ flow_stats(void)
 
         printf("Flow Statistics\n");
         printf("---------------\n");
-        printf("    Total  Entries  --- Total = %7d, new = %7d \n",
+        printf("    Total  Entries  --- Total = %7zu, new = %7zu \n",
                 total_entries, (total_entries - prev_total_entries));
-        printf("    Active Entries  --- Total = %7d, new = %7d \n",
+        printf("    Active Entries  --- Total = %7zu, new = %7zu \n",
                 active_entries, (active_entries - prev_active_entries));
-        printf("    Hold   Entries  --- Total = %7d, new = %7d \n",
+        printf("    Hold   Entries  --- Total = %7zu, new = %7zu \n",
                 hold_entries, (hold_entries - prev_hold_entries));
-        printf("    Fwd flow Entries  - Total = %7d\n", flow_action_fwd);
-        printf("    drop flow Entries - Total = %7d\n", flow_action_drop);
-        printf("    NAT flow Entries  - Total = %7d\n\n", flow_action_nat);
+        printf("    Fwd flow Entries  - Total = %7zu\n", flow_action_fwd);
+        printf("    drop flow Entries - Total = %7zu\n", flow_action_drop);
+        printf("    NAT flow Entries  - Total = %7zu\n\n", flow_action_nat);
         printf("    Rate of change of Active Entries\n");
         printf("    --------------------------------\n");
-        printf("        current rate      = %8d\n", rate);
-        printf("        Avg setup rate    = %8d\n", avg_setup_rate);
-        printf("        Avg teardown rate = %8d\n", avg_teardown_rate);
+        printf("        current rate      = %8zu\n", rate);
+        printf("        Avg setup rate    = %8zu\n", avg_setup_rate);
+        printf("        Avg teardown rate = %8zu\n", avg_teardown_rate);
         printf("    Rate of change of Flow Entries\n");
         printf("    ------------------------------\n");
-        printf("        current rate      = %8d\n", total_rate);
+        printf("        current rate      = %8zu\n", total_rate);
 
         last_time = now;
         prev_active_entries = active_entries;
