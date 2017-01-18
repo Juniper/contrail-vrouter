@@ -224,6 +224,16 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
                            (1ULL << VIRTIO_NET_F_MQ) |
                            (1ULL << VHOST_USER_F_PROTOCOL_FEATURES) |
                            (1ULL << VHOST_F_LOG_ALL);
+
+    if (dpdk_check_rx_mrgbuf_disable() == 0)
+        vru_cl->vruc_msg.u64 |= (1ULL << VIRTIO_NET_F_MRG_RXBUF); 
+
+    if (vr_perfs)
+        vru_cl->vruc_msg.u64 |= (1ULL << VIRTIO_NET_F_GUEST_TSO4)|
+                                (1ULL << VIRTIO_NET_F_HOST_TSO4) |
+                                (1ULL << VIRTIO_NET_F_GUEST_TSO6)|
+                                (1ULL << VIRTIO_NET_F_HOST_TSO6);
+
     vr_uvhost_log("    GET FEATURES: returns 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
@@ -241,9 +251,35 @@ vr_uvmh_get_features(vr_uvh_client_t *vru_cl)
 static int
 vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
 {
+    struct vr_interface *vif;
+    uint8_t is_gso_vm = 1;
     vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
+    vif = __vrouter_get_interface(vrouter_get(0), vru_cl->vruc_idx);
+    is_gso_vm =  (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_GUEST_TSO4)) | 
+                 (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_HOST_TSO4))  |
+                 (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_GUEST_TSO6)) |
+                 (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_HOST_TSO6));
+
+    /* TODO: For now, assume if a VM can't do GSO, it can't do GRO either
+     * as there is no virtio feature bit for GRO
+     */
+    if (vif) {
+        if (!!is_gso_vm) {
+            vif->vif_flags |= VIF_FLAG_GRO_NEEDED; 
+        } else {
+            vif->vif_flags &= ~VIF_FLAG_GRO_NEEDED; 
+        }
+    }
+
+    if (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_MRG_RXBUF)) {
+        vif->vif_flags |= VIF_FLAG_MRG_RXBUF;
+        vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 1);
+    } else {
+        vif->vif_flags &= ~VIF_FLAG_MRG_RXBUF; 
+        vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 0);
+    }
     return 0;
 }
 
