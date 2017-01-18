@@ -20,6 +20,7 @@
 #include "vr_dpdk_usocket.h"
 #include "vr_dpdk_virtio.h"
 #include "vr_uvhost.h"
+#include "vr_dpdk_gro.h"
 
 #include <signal.h>
 
@@ -1368,6 +1369,10 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
         }
     }
 
+    if (vr_dpdk_gro_init(lcore_id, lcore) < 0) {
+        RTE_LOG(CRIT, VROUTER, "Error initializing GRO tables on lcore %u\n", lcore_id);
+    }
+
     return 0;
 }
 
@@ -1604,7 +1609,7 @@ dpdk_lcore_fwd_loop(void)
     uint64_t cur_bond_cycles = 0;
     uint64_t cur_assembler_cycles = 0;
     uint64_t diff_cycles;
-    uint64_t last_tx_cycles = 0;
+    uint64_t last_tx_cycles = 0, last_gro_flush_cycles = 0;
     uint64_t last_bond_tx_cycles = 0;
     uint64_t last_assembler_cycles = 0;
     /* always calculate bond TX timeout in CPU cycles */
@@ -1618,8 +1623,10 @@ dpdk_lcore_fwd_loop(void)
     /* calculate timeouts in CPU cycles */
     const uint64_t tx_flush_cycles = (rte_get_timer_hz() + US_PER_S - 1)
         * VR_DPDK_TX_FLUSH_US / US_PER_S;
+    const uint64_t gro_flush_cycles = 100 * tx_flush_cycles;
 #else
     const uint64_t tx_flush_cycles = VR_DPDK_TX_FLUSH_LOOPS;
+    const uint64_t gro_flush_cycles = 100 * tx_flush_cycles;
 #endif
 
     RTE_LOG(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", lcore_id);
@@ -1654,7 +1661,12 @@ dpdk_lcore_fwd_loop(void)
             dpdk_fragment_assembler_table_scan(NULL);
         }
 
-        /* check if we need to flush TX queues */
+        /* check if we need to flush TX queues and timeout GRO flows */
+        diff_cycles = cur_cycles - last_gro_flush_cycles;
+        if (unlikely(gro_flush_cycles < diff_cycles)) {
+            last_gro_flush_cycles = cur_cycles;
+            dpdk_gro_flush_all_inactive(lcore);
+        }
         diff_cycles = cur_cycles - last_tx_cycles;
         if (unlikely(tx_flush_cycles < diff_cycles)) {
             /* update TX flush cycles */

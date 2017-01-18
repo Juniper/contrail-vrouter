@@ -271,6 +271,54 @@ vr_dpdk_pktmbuf_copy(struct rte_mbuf *md, struct rte_mempool *mp)
     return (mc);
 }
 
+/**
+ * Creates a copy of the given packet mbuf.
+ *
+ * Creates a new packet mbuf from the given pool.
+ * Walks through all segments of the given packet mbuf, and appends them
+ * in the new packet upto the size of the new packet and ignores the rest
+ *
+ * @param md
+ *   The packet mbuf to be copied.
+ * @param mp
+ *   The mempool from which the "copy" mbufs are allocated.
+ * @return
+ *   - The pointer to the new "copy" mbuf on success.
+ *   - NULL if allocation fails.
+ */
+
+inline struct rte_mbuf *
+vr_dpdk_pktmbuf_copy_mon(struct rte_mbuf *md, struct rte_mempool *mp)
+{
+    struct rte_mbuf *mc;
+    char *append_ptr;
+    uint32_t append_len;
+
+    if (unlikely ((mc = rte_pktmbuf_alloc(mp)) == NULL))
+        return (NULL);
+
+    dpdk_pktmbuf_data_copy(mc, md);
+    mc->pkt_len = md->data_len;
+
+    while (md->next)
+    {
+        md = md->next;
+        append_ptr = rte_pktmbuf_append(mc, md->data_len);
+        append_len = (append_ptr)? md->data_len : rte_pktmbuf_tailroom(mc);
+        if (append_ptr == NULL) {
+            append_ptr = rte_pktmbuf_append(mc, rte_pktmbuf_tailroom(mc));
+            rte_memcpy(append_ptr, rte_pktmbuf_mtod(md, void*), append_len);
+            break;
+        }
+        rte_memcpy(append_ptr, rte_pktmbuf_mtod(md, void*), append_len);
+    }
+
+    mc->nb_segs = 1;
+
+    __rte_mbuf_sanity_check(mc, 1);
+    return (mc);
+}
+
 /* VRouter callback */
 static struct vr_packet *
 dpdk_pclone(struct vr_packet *pkt)
@@ -991,8 +1039,9 @@ out:
 static unsigned int
 dpdk_pgso_size(struct vr_packet *pkt)
 {
-    /* TODO: not implemented */
-    return 0;
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
+
+    return m->tso_segsz;
 }
 
 static void
@@ -1250,8 +1299,7 @@ struct host_os dpdk_host = {
     .hos_pfrag_len                  =    dpdk_pfrag_len,
     .hos_phead_len                  =    dpdk_phead_len,
     .hos_pset_data                  =    dpdk_pset_data,
-    .hos_pgso_size                  =    dpdk_pgso_size, /* not implemented, returns 0 */
-
+    .hos_pgso_size                  =    dpdk_pgso_size,
     .hos_get_cpu                    =    dpdk_get_cpu,
     .hos_schedule_work              =    dpdk_schedule_work,
     .hos_delay_op                   =    dpdk_delay_op, /* do nothing */
@@ -1275,7 +1323,7 @@ struct host_os dpdk_host = {
 #endif
     .hos_pkt_from_vm_tcp_mss_adj    =    dpdk_pkt_from_vm_tcp_mss_adj,
     .hos_pkt_may_pull               =    dpdk_pkt_may_pull,
-
+    .hos_gro_process                =    dpdk_gro_process,
     .hos_add_mpls                   =    dpdk_add_mpls,
     .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
     .hos_enqueue_to_assembler       =    dpdk_fragment_assembler_enqueue,
@@ -1453,11 +1501,6 @@ vr_dpdk_host_init(void)
             return -1;
         }
     }
-
-    /*
-     * Turn off GRO/GSO as they are not implemented with DPDK.
-     */
-    vr_perfr = vr_perfs = 0;
 
     /*
      * Allow at least one file descriptor per interface (as required by the
