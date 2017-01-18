@@ -105,7 +105,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
         .hthresh = 0,   /* Ring host threshold */
         .wthresh = 0,   /* Ring writeback threshold */
     },
-    .tx_free_thresh = 0,    /* Use PMD default values */
+    .tx_free_thresh = 384,
     .tx_rs_thresh = 0,      /* Use PMD default values */
     .txq_flags = 0          /* Set flags for the Tx queue */
 };
