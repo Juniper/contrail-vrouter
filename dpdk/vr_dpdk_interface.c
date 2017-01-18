@@ -1085,6 +1085,16 @@ dpdk_if_add_tap(struct vr_interface *vif)
     return 0;
 }
 
+static int
+dpdk_pkt_is_gso(struct rte_mbuf *m)
+{
+    /*
+     * This is only for TCP4/TCP6. UDP frag offload goes through the
+     * regular dpdk_fragment_packet() path
+     */
+    return (m->ol_flags & (PKT_RX_GSO_TCP4| PKT_RX_GSO_TCP6));
+}
+
 static inline void
 dpdk_hw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
@@ -1248,7 +1258,7 @@ dpdk_sw_checksum(struct vr_packet *pkt, bool will_fragment)
     }
 }
 
-static uint16_t
+uint16_t
 dpdk_get_ether_header_len(const void *data)
 {
     struct ether_hdr *eth = (struct ether_hdr *)data;
@@ -1369,8 +1379,7 @@ static int
 dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     uint8_t queue_index;
-    bool will_fragment;
-    int ret, num_of_frags = 1, i;
+    int ret, i;
     unsigned int vif_idx = vif->vif_idx, dpdk_queue_index;
     const unsigned int lcore_id = rte_lcore_id();
 
@@ -1380,7 +1389,10 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct rte_mbuf *p_copy;
     struct vr_interface_stats *stats;
-    struct rte_mbuf *mbufs_out[VR_DPDK_FRAG_MAX_IP_FRAGS];
+    struct rte_mbuf *mbufs_frags_out[VR_DPDK_FRAG_MAX_IP_FRAGS];
+    struct rte_mbuf *mbufs_segs_out[VR_DPDK_FRAG_MAX_IP_SEGS];
+    int num_of_frags = 1, num_of_segs = 1;
+    bool will_fragment, will_segment;
 
     RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
@@ -1407,21 +1419,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     /* reset mbuf data pointer and length */
     m->data_off = pkt_head_space(pkt);
+    m->pkt_len = pkt_len(pkt);
     m->data_len = pkt_head_len(pkt);
-    /* TODO: we do not support mbuf chains */
-    m->pkt_len = pkt_head_len(pkt);
-
-    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
-        monitoring_tx_queue =
-            &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]][0];
-        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
-            p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);
-            if (likely(p_copy != NULL)) {
-                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
-                                p_copy);
-            }
-        }
-    }
 
     if (unlikely(vif->vif_type == VIF_TYPE_AGENT)) {
         ret = rte_ring_mp_enqueue(vr_dpdk.packet_ring, m);
@@ -1450,6 +1449,9 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     will_fragment = (vr_pkt_type_is_overlay(pkt->vp_type) &&
             vif->vif_mtu < rte_pktmbuf_pkt_len(m));
 
+    /* Segmentation is applicable instead of fragmentation if packet has GSO enabled */
+    will_segment = will_fragment && dpdk_pkt_is_gso(m);
+
     /*
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
      * i.e. there is no direct equivalent of skb->ip_summed field.
@@ -1461,33 +1463,35 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
      * This is not elegant and need to be addressed.
      * See dpdk/app/test-pmd/csumonly.c for more checksum examples
      */
-    if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
-        /* if NIC supports checksum offload */
-        if (likely((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) &&
-                   !will_fragment))
-            /* Can not do hardware checksumming for fragmented packets */
-            dpdk_hw_checksum(pkt);
-        else {
-            dpdk_sw_checksum(pkt, will_fragment);
+    if (!will_segment) {
+        if (unlikely(pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
+            /* if NIC supports checksum offload */
+            if (likely((vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD) &&
+                       !will_fragment))
+                /* Can not do hardware checksumming for fragmented packets */
+                dpdk_hw_checksum(pkt);
+            else {
+                dpdk_sw_checksum(pkt, will_fragment);
 
-            /* We could not calculate the inner checkums in hardware, but we
-             * still can do outer header in hardware. */
-            if (unlikely(will_fragment &&
-                        (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
+                /* We could not calculate the inner checkums in hardware, but we
+                 * still can do outer header in hardware. */
+                if (unlikely(will_fragment &&
+                            (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)))
+                    dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
+            }
+
+        } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
+            /* If NIC supports checksum offload.
+             * Inner checksum is already done. Compute outer IPv4 checksum,
+             * set UDP length, and zero UDP checksum.
+             */
+            if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
                 dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
-        }
 
-    } else if (likely(vr_pkt_type_is_overlay(pkt->vp_type))) {
-        /* If NIC supports checksum offload.
-         * Inner checksum is already done. Compute outer IPv4 checksum,
-         * set UDP length, and zero UDP checksum.
-         */
-        if (likely(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD)) {
-            dpdk_ipv4_outer_tunnel_hw_checksum(pkt);
-
-        } else if (likely(!will_fragment)) {
-            /* if wont fragment it later */
-            dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
+            } else if (likely(!will_fragment)) {
+                /* if wont fragment it later */
+                dpdk_ipv4_outer_tunnel_sw_checksum(pkt);
+            }
         }
     }
 
@@ -1537,8 +1541,19 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     rte_pktmbuf_dump(stdout, m, 0x60);
 #endif
 
-    if (unlikely(will_fragment)) {
-        num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_out,
+    if (unlikely(will_segment)) {
+        num_of_segs = dpdk_segment_packet(pkt, m, mbufs_segs_out,
+                VR_DPDK_FRAG_MAX_IP_SEGS, m->tso_segsz, 
+                (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD));
+        if (num_of_segs < 0) {
+            RTE_LOG(DEBUG, VROUTER, "%s: error %d during GSO of an "
+                    "IP packet for interface %s on lcore %u\n", __func__,
+                    num_of_segs, vif->vif_name, lcore_id);
+            vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            return -1;
+        }
+    } else if (unlikely(will_fragment)) {
+        num_of_frags = dpdk_fragment_packet(pkt, m, mbufs_frags_out,
                 VR_DPDK_FRAG_MAX_IP_FRAGS, vif->vif_mtu,
                 !(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD), lcore_id);
         if (num_of_frags < 0) {
@@ -1547,6 +1562,37 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                     num_of_frags, vif->vif_name, lcore_id);
             vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
             return -1;
+        }
+    }
+
+    if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
+        monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]][0];
+        if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
+            if (num_of_frags > 1) {
+                int i;
+                for (i=0; i < num_of_frags; i++) {
+                    p_copy = vr_dpdk_pktmbuf_copy_mon(mbufs_frags_out[i], vr_dpdk.rss_mempool);
+                    if (likely(p_copy != NULL)) {
+                        monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
+                                        p_copy);
+                    }
+                }
+            } else if (num_of_segs > 1) {
+                int i;
+                for (i=0; i < num_of_segs; i++) {
+                    p_copy = vr_dpdk_pktmbuf_copy_mon(mbufs_segs_out[i], vr_dpdk.rss_mempool);
+                    if (likely(p_copy != NULL)) {
+                        monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
+                                        p_copy);
+                    }
+                }
+            } else {
+                p_copy = vr_dpdk_pktmbuf_copy_mon(m, vr_dpdk.rss_mempool);
+                if (likely(p_copy != NULL)) {
+                    monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
+                                    p_copy);
+                }
+            }
         }
     }
 
@@ -1559,7 +1605,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         unsigned mask = (1 << num_of_frags) - 1;
 
         if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
-            tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_out, mask);
+            tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_frags_out, mask);
             if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
 
@@ -1573,10 +1619,27 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
              * fragmentation does not have pkt structure. It is because we do
              * not support chained mbufs that are results of fragmentation. */
             for (i = 0; i < num_of_frags; ++i)
-                rte_pktmbuf_free(mbufs_out[i]);
+                rte_pktmbuf_free(mbufs_frags_out[i]);
 
             /* Drop the original packet (the one that has been fragmented) */
             vr_dpdk_pfree(m, VP_DROP_INTERFACE_DROP);
+            return -1;
+        }
+    } else if (unlikely(num_of_segs > 1)) {
+        uint64_t mask = (uint64_t)((uint64_t) (1ULL << (uint64_t)num_of_segs) - 1);
+
+        if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
+            tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_segs_out, mask);
+            if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
+                tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+        } else {
+            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
+                    "for lcore %u\n", __func__, vif->vif_name, lcore_id);
+            /* Can not do vif_drop_pkt() on segments as mbufs after
+             * segmentation does not have pkt structure */
+            for (i = 0; i < num_of_segs; ++i)
+                rte_pktmbuf_free(mbufs_segs_out[i]);
+
             return -1;
         }
     } else {
@@ -1620,7 +1683,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         monitoring_tx_queue =
             &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]][0];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
-            p_copy = vr_dpdk_pktmbuf_copy(m, vr_dpdk.rss_mempool);;
+            p_copy = vr_dpdk_pktmbuf_copy_mon(m, vr_dpdk.rss_mempool);;
             if (likely(p_copy != NULL)) {
                 monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                                 p_copy);
