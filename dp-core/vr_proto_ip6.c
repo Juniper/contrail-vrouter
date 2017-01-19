@@ -444,10 +444,6 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     if (ip6->ip6_nxt != VR_IP_PROTO_ICMP6)
         return !handled;
 
-    /* Link local neighbour discovery is bridged */
-    if (vr_v6_prefix_is_ll(ip6->ip6_dst))
-        return !handled;
-
     if (pkt->vp_len < pull_len + sizeof(struct vr_icmp))
         goto drop;
 
