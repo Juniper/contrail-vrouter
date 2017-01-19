@@ -701,6 +701,10 @@ struct vr_sctp {
 #define VR_ICMP6_TYPE_NEIGH_SOL    135
 #define VR_ICMP6_TYPE_NEIGH_AD     136
 
+#define VR_ICMP6_NEIGH_AD_FLAG_ROUTER   0x8000
+#define VR_ICMP6_NEIGH_AD_FLAG_SOLCITED 0x4000
+#define VR_ICMP6_NEIGH_AD_FLAG_OVERRIDE 0x2000
+
 #define VR_IP6_PROTO_FRAG          44
 
 struct vr_icmp {
@@ -837,6 +841,7 @@ enum {
  * this variable
  */
 #define FMD_FLAG_LABEL_IS_VXLAN_ID      0x01
+#define FMD_FLAG_MAC_IS_MY_MAC          0x02
 
 struct vr_forwarding_md {
     int32_t fmd_flow_index;
