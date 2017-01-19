@@ -382,10 +382,9 @@ vr_vrf_stats_req_process(void *s_req)
 int
 inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
 {
-    int i;
+    unsigned char pmask, pmask_byte;
     struct vr_rtable *rtable;
     struct vrouter *router;
-    unsigned int pmask, pmask_byte;
 
     router = vrouter_get(req->rtr_req.rtr_rid);
     if (!router)
@@ -404,27 +403,31 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
     rtable = router->vr_inet_rtable;
     if (!rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) ||
-            ((unsigned int)(req->rtr_req.rtr_prefix_len) > 
+            ((unsigned int)(req->rtr_req.rtr_prefix_len) >
                             (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)))
         return -EINVAL;
 
+    /* Zero the bits in prefix, which are set beyond the mask len */
     if (req->rtr_req.rtr_prefix) {
 
-        if (req->rtr_req.rtr_family == AF_INET)
-            pmask = ~((1 << (32 - req->rtr_req.rtr_prefix_len)) - 1);
-        else
-            pmask = 0; /* TBD: Assume V6 prefix length will be multiple of 8 */
-            
-        pmask_byte = req->rtr_req.rtr_prefix_len/8;
-        if (pmask_byte < (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)-1)) {
-            for (i=pmask_byte+1; i<RT_IP_ADDR_SIZE(req->rtr_req.rtr_family); i++) {
-                req->rtr_req.rtr_prefix[i] = 0;
-                pmask = pmask >> 8;
-            }
-            req->rtr_req.rtr_prefix[pmask_byte] = 
-                         req->rtr_req.rtr_prefix[pmask_byte] & (pmask & 0xff);
+        pmask = req->rtr_req.rtr_prefix_len % 8;
+        pmask_byte = req->rtr_req.rtr_prefix_len / 8;
+        /*
+         * pmask_byte identifies the byte bumber from which we need to
+         * reset prefix till the end of prefix. If mask len is not 8 bit
+         * boundary, we calculate that in pmask
+         */
+        if (pmask) {
+            pmask = ~((1 << (8 - pmask)) - 1);
+            req->rtr_req.rtr_prefix[pmask_byte] =
+                         req->rtr_req.rtr_prefix[pmask_byte] & pmask;
+            pmask_byte++;
         }
-    } 
+        for (; pmask_byte < RT_IP_ADDR_SIZE(req->rtr_req.rtr_family);
+                                                            pmask_byte++) {
+            req->rtr_req.rtr_prefix[pmask_byte] = 0;
+        }
+    }
 
     if (rtable) {
         if (rtable->algo_add)
