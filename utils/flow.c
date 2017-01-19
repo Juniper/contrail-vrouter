@@ -1444,7 +1444,7 @@ static void
 flow_stats(void)
 {
     struct flow_table *ft = &main_table;
-    unsigned int i;
+    unsigned int i, iteration = 0;
     struct vr_flow_entry *fe;
     struct timeval now;
     struct timeval last_time;
@@ -1456,8 +1456,8 @@ flow_stats(void)
     int prev_total_entries = 0;
     int diff_ms;
     int rate;
-    int avg_setup_rate = 0;
-    int avg_teardown_rate = 0;
+    uint64_t avg_setup_rate = 0;
+    uint64_t avg_teardown_rate = 0;
     uint64_t setup_time = 0;
     uint64_t teardown_time = 0;
     int total_rate;
@@ -1505,6 +1505,12 @@ flow_stats(void)
         rate /= diff_ms;
         total_rate = (total_entries - prev_total_entries) * 1000;
         total_rate /= diff_ms;
+        if (iteration == 0) {
+            rate = 0;
+            total_rate = 0;
+            iteration = 1;
+        }
+
         if (rate != 0 || total_rate != 0) {
             if (rate < -1000) {
                 avg_teardown_rate = avg_teardown_rate * teardown_time -
@@ -1551,8 +1557,8 @@ flow_stats(void)
         printf("    Rate of change of Active Entries\n");
         printf("    --------------------------------\n");
         printf("        current rate      = %8d\n", rate);
-        printf("        Avg setup rate    = %8d\n", avg_setup_rate);
-        printf("        Avg teardown rate = %8d\n", avg_teardown_rate);
+        printf("        Avg setup rate    = %8zu\n", avg_setup_rate);
+        printf("        Avg teardown rate = %8zu\n", avg_teardown_rate);
         printf("    Rate of change of Flow Entries\n");
         printf("    ------------------------------\n");
         printf("        current rate      = %8d\n", total_rate);
