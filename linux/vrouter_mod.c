@@ -915,10 +915,13 @@ lh_csum_verify_fast(struct vr_ip *iph, struct tcphdr *tcph,
 static int
 lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
 {
+    uint32_t size;
+
+    size = ntohs(iph->ip_len) - (iph->ip_hl * 4);
     skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
-                                   ntohs(iph->ip_len) - (iph->ip_hl * 4), 
-                                   IPPROTO_TCP, 0);
-    if (__skb_checksum_complete(skb)) {
+                                   size,
+                                   iph->ip_proto, 0);
+    if (__skb_checksum_complete_head(skb, size)) {
         return -1;
     }
 
@@ -945,21 +948,19 @@ lh_handle_checksum_complete_skb(struct sk_buff *skb)
 static int
 lh_csum_verify_udp(struct sk_buff *skb, struct vr_ip *iph)
 {
+    uint32_t size;
+
+    size = ntohs(iph->ip_len) - (iph->ip_hl * 4);
+
     if (skb->ip_summed == CHECKSUM_COMPLETE) {
         if (!csum_tcpudp_magic(iph->ip_saddr, iph->ip_daddr,
-                               skb->len, IPPROTO_UDP, skb->csum)) {
+                               size, IPPROTO_UDP, skb->csum)) {
             skb->ip_summed = CHECKSUM_UNNECESSARY;
             return 0;
         }
     }
 
-    skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
-                                   skb->len, IPPROTO_UDP, 0);
-    if (__skb_checksum_complete(skb)) {
-        return -1;
-    }
-
-    return 0;
+    return lh_csum_verify(skb, iph);
 }
 
 /*
