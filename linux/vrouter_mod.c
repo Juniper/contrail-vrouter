@@ -972,10 +972,13 @@ lh_csum_verify_fast(struct vr_ip *iph, void *transport_hdr, unsigned
 static int
 lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
 {
+    uint32_t size;
+
+    size = ntohs(iph->ip_len) - (iph->ip_hl * 4);
     skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
-                                   ntohs(iph->ip_len) - (iph->ip_hl * 4), 
+                                   size,
                                    iph->ip_proto, 0);
-    if (__skb_checksum_complete(skb)) {
+    if (__skb_checksum_complete_head(skb, size)) {
         return -1;
     }
 
@@ -1010,13 +1013,7 @@ lh_csum_verify_udp(struct sk_buff *skb, struct vr_ip *iph)
         }
     }
 
-    skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr,
-                                   skb->len, IPPROTO_UDP, 0);
-    if (__skb_checksum_complete(skb)) {
-        return -1;
-    }
-
-    return 0;
+    return lh_csum_verify(skb, iph);
 }
 
 /*
