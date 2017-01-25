@@ -183,6 +183,7 @@ proxy_selected:
             if (stitched) {
                 stats->vrf_arp_virtual_stitch++;
             } else {
+                fmd->fmd_flags |= FMD_FLAG_MAC_IS_MY_MAC;
                 stats->vrf_arp_virtual_proxy++;
             }
         }

@@ -338,6 +338,8 @@ void
 vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         unsigned char *dmac)
 {
+    uint16_t adv_flags = 0;
+
     struct vr_eth *eth;
     struct vr_ip6 *ip6;
     struct vr_icmp *icmph;
@@ -366,7 +368,11 @@ vr_neighbor_proxy(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     /* Update ICMP header and options */
     icmph->icmp_type = VR_ICMP6_TYPE_NEIGH_AD;
-    icmph->icmp_eid = htons(0x4000);
+    adv_flags |= VR_ICMP6_NEIGH_AD_FLAG_SOLCITED;
+    if (fmd->fmd_flags & FMD_FLAG_MAC_IS_MY_MAC)
+        adv_flags |= VR_ICMP6_NEIGH_AD_FLAG_ROUTER;
+
+    icmph->icmp_eid = htons(adv_flags);
 
     /* length in units of 8 octets */
     nopt->vno_type = TARGET_LINK_LAYER_ADDRESS_OPTION;
