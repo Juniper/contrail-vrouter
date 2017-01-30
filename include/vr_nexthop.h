@@ -36,30 +36,33 @@ enum nexthop_type {
 
 #define NH_VXLAN_VRF                        NH_VRF_TRANSLATE
 
-#define NH_FLAG_VALID                       0x00001
-#define NH_FLAG_POLICY_ENABLED              0x00002
-#define NH_FLAG_ENCAP_L2                    0x00004
-#define NH_FLAG_TUNNEL_GRE                  0x00008
-#define NH_FLAG_TUNNEL_UDP                  0x00010
-/*
- * Mcast flag can be appended to any type of nexthop, either an Encap,
- * composite etc
- */
-#define NH_FLAG_MCAST                       0x00020
-#define NH_FLAG_TUNNEL_UDP_MPLS             0x00040
-#define NH_FLAG_TUNNEL_VXLAN                0x00080
-#define NH_FLAG_RELAXED_POLICY              0x00100
-#define NH_FLAG_COMPOSITE_FABRIC            0x00200
-#define NH_FLAG_COMPOSITE_ECMP              0x00400
-#define NH_FLAG_COMPOSITE_L2                0x00800
-#define NH_FLAG_COMPOSITE_EVPN              0x01000
-#define NH_FLAG_COMPOSITE_ENCAP             0x02000
-#define NH_FLAG_COMPOSITE_TOR               0x04000
-#define NH_FLAG_VNID                        0x08000
-#define NH_FLAG_ROUTE_LOOKUP                0x10000
-#define NH_FLAG_UNKNOWN_UC_FLOOD            0x20000
-#define NH_FLAG_TUNNEL_SIP_COPY             0x40000
-#define NH_FLAG_FLOW_LOOKUP                 0x80000
+#define NH_FLAG_VALID                       0x000001
+#define NH_FLAG_POLICY_ENABLED              0x000002
+#define NH_FLAG_ENCAP_L2                    0x000004
+#define NH_FLAG_TUNNEL_GRE                  0x000008
+#define NH_FLAG_TUNNEL_UDP                  0x000010
+#define NH_FLAG_MCAST                       0x000020
+#define NH_FLAG_TUNNEL_UDP_MPLS             0x000040
+#define NH_FLAG_TUNNEL_VXLAN                0x000080
+#define NH_FLAG_RELAXED_POLICY              0x000100
+#define NH_FLAG_COMPOSITE_FABRIC            0x000200
+#define NH_FLAG_COMPOSITE_ECMP              0x000400
+#define NH_FLAG_COMPOSITE_L2                0x000800
+#define NH_FLAG_COMPOSITE_EVPN              0x001000
+#define NH_FLAG_COMPOSITE_ENCAP             0x002000
+#define NH_FLAG_COMPOSITE_TOR               0x004000
+#define NH_FLAG_ROUTE_LOOKUP                0x008000
+#define NH_FLAG_UNKNOWN_UC_FLOOD            0x010000
+#define NH_FLAG_TUNNEL_SIP_COPY             0x020000
+#define NH_FLAG_FLOW_LOOKUP                 0x040000
+#define NH_FLAG_TUNNEL_PBB                  0x080000
+#define NH_FLAG_MAC_LEARN                   0x100000
+#define NH_FLAG_ETREE_ROOT                  0x200000
+#define NH_FLAG_INDIRECT                    0x400000
+#define NH_FLAG_L2_CONTROL_DATA             0x800000
+
+#define NH_FLAG_VNID                        0x1000000
+
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
