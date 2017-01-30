@@ -177,6 +177,7 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             if (stitched) {
                 stats->vrf_arp_virtual_stitch++;
             } else {
+                fmd->fmd_flags |= FMD_FLAG_MAC_IS_MY_MAC;
                 stats->vrf_arp_virtual_proxy++;
             }
         }
