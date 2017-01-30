@@ -46,12 +46,12 @@ buffer sandesh vr_nexthop_req {
     16: u32         nhr_flags;
     17: list<byte>  nhr_encap;
     18: list<i32>   nhr_nh_list;
-    19: i32         nhr_label;
-    20: list<i32>   nhr_label_list;
-    21: i16         nhr_nh_count;
-    22: list<byte>  nhr_tun_sip6;
-    23: list<byte>  nhr_tun_dip6;
-    24: byte        nhr_ecmp_config_hash;
+    19: list<i32>   nhr_label_list;
+    20: i16         nhr_nh_count;
+    21: list<byte>  nhr_tun_sip6;
+    22: list<byte>  nhr_tun_dip6;
+    23: byte        nhr_ecmp_config_hash;
+    24: list<byte>  nhr_pbb_mac;
 }
 
 buffer sandesh vr_interface_req {
@@ -112,6 +112,8 @@ buffer sandesh vr_interface_req {
     55: list<byte>  vifr_out_mirror_md;
     56: u64         vifr_dpackets;
     57: list<i16>   vifr_hw_queues;
+    58: u32         vifr_isid;
+    59: list<byte>  vifr_pbb_mac;
 }
 
 buffer sandesh vr_vxlan_req {

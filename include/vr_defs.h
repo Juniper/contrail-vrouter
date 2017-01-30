@@ -57,6 +57,7 @@ enum rt_type{
 #define VR_BE_LABEL_VALID_FLAG      0x02
 #define VR_BE_FLOOD_DHCP_FLAG       0x04
 #define VR_BE_MAC_MOVED_FLAG        0x08
+#define VR_BE_L2_CONTROL_DATA_FLAG  0x10
 
 #define VR_BRIDGE_FLAG_MASK(flags)      ((flags) & ~VR_BE_VALID_FLAG)
 
