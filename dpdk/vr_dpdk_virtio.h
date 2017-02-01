@@ -21,11 +21,24 @@
  */
 #define VR_DPDK_VIRTIO_MAX_QUEUES 16
 
+#define VR_BUF_VECTOR_MAX 256
 
 typedef enum vq_ready_state {
     VQ_NOT_READY,
     VQ_READY,
 } vq_ready_state_t;
+
+/*
+ * Structure contains buffer address, length and descriptor index
+ * from vring to do scatter RX.
+ */
+struct vq_buf_vector {
+    uint64_t buf_addr;
+    uint32_t buf_len;
+    uint32_t desc_idx;
+};
+
+struct dpdk_virtio_writer;
 
 /* virtio queue */
 typedef struct vr_dpdk_virtioq {
@@ -33,6 +46,7 @@ typedef struct vr_dpdk_virtioq {
     struct vring_avail  *vdv_avail;     /**< Virtqueue available ring. */
     struct vring_used   *vdv_used;      /**< Virtqueue used ring. */
     uint32_t            vdv_size;       /**< Size of descriptor ring. */
+    uint32_t            vdv_hlen;       /**< Size of virtio header */
 
     volatile uint16_t   vdv_last_used_idx;
     volatile uint16_t   vdv_last_used_idx_res;
@@ -42,6 +56,8 @@ typedef struct vr_dpdk_virtioq {
     /* Big and less frequently used fields */
     int                 vdv_callfd; /**< Used to notify the guest (trigger interrupt). */
     int                 vdv_kickfd; /**< Currently unused as polling mode is enabled. */
+    uint32_t            (*vdv_send_func)(struct dpdk_virtio_writer *p,
+                        struct vr_dpdk_virtioq *vq, struct rte_mbuf **pkts, uint32_t count);
     /* TODO: not used
     int vdv_enabled_state;
     int vdv_zero_copy;
@@ -50,6 +66,7 @@ typedef struct vr_dpdk_virtioq {
 } __rte_cache_aligned vr_dpdk_virtioq_t;
 
 int vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize);
+void vr_dpdk_set_vhost_send_func(unsigned int vif_idx, uint32_t mrg);
 uint16_t vr_dpdk_virtio_nrxqs(struct vr_interface *vif);
 uint16_t vr_dpdk_virtio_ntxqs(struct vr_interface *vif);
 struct vr_dpdk_queue *
@@ -99,5 +116,4 @@ extern struct rte_port_out_ops vr_dpdk_virtio_writer_ops;
 
 extern struct vr_dpdk_virtioq vr_dpdk_virtio_rxqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
 extern struct vr_dpdk_virtioq vr_dpdk_virtio_txqs[VR_MAX_INTERFACES][VR_DPDK_VIRTIO_MAX_QUEUES];
-
 #endif /* __VR_DPDK_VIRTIO_H__ */
