@@ -730,7 +730,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
 
                         /* ring is full, drop the packets */
                         for (j = 1; j < lcore_nb_pkts; j++) {
-                            vr_dpdk_pfree(lcore_pkts[dst_lcore_idx][j], VP_DROP_INTERFACE_DROP);
+                            vr_dpdk_pfree(lcore_pkts[dst_lcore_idx][j], vif, VP_DROP_INTERFACE_DROP);
                         }
                     } else {
                         /* mark the lcore to retry */
@@ -807,12 +807,12 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
                 vif_is_fabric(vif))) {
             if ((mbuf->vlan_tci & 0xFFF) != vr_dpdk.vlan_tag) {
                 if (vr_dpdk.vlan_ring == NULL || rte_vlan_insert(&mbuf)) {
-                    vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
+                    vr_dpdk_pfree(mbuf, vif, VP_DROP_VLAN_FWD_ENQ);
                     continue;
                 }
                 /* Packets will be dequeued in dpdk_lcore_fwd_io() */
                 if (rte_ring_mp_enqueue(vr_dpdk.vlan_ring, mbuf) != 0)
-                    vr_dpdk_pfree(mbuf, VP_DROP_VLAN_FWD_ENQ);
+                    vr_dpdk_pfree(mbuf, vif, VP_DROP_VLAN_FWD_ENQ);
                 /* Nothing to route, take the next packet. */
                 continue;
             } else {
@@ -1033,7 +1033,7 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
         } else {
             /* the vif is no longer available, just drop the packets */
             for (i = 1; i < nb_pkts; i++)
-                vr_dpdk_pfree(pkts[i], VP_DROP_INTERFACE_DROP);
+                vr_dpdk_pfree(pkts[i], NULL, VP_DROP_INTERFACE_DROP);
         }
     }
 
@@ -1083,7 +1083,7 @@ dpdk_lcore_tx_rings_push(struct vr_dpdk_lcore *lcore)
                 stats->vis_port_oerrors += nb_pkts;
                 for (i = 0; i < nb_pkts; i++)
                     /* TODO: a separate counter for this drop */
-                    vr_dpdk_pfree(pkts[i], VP_DROP_INTERFACE_DROP);
+                    vr_dpdk_pfree(pkts[i], NULL, VP_DROP_INTERFACE_DROP);
             }
         }
         rtp++;
@@ -1155,7 +1155,7 @@ dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
     else
         i = vr_dpdk_tapdev_enqueue_burst(vr_dpdk.vlan_dev, pkts, nb_pkts);
     for (; i < nb_pkts; i++)
-        vr_dpdk_pfree(pkts[i], VP_DROP_VLAN_FWD_TX);
+        vr_dpdk_pfree(pkts[i], NULL, VP_DROP_VLAN_FWD_TX);
 }
 
 /*

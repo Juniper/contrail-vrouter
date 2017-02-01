@@ -1169,14 +1169,13 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
      * un accounted
      */
     if (reason >= VP_DROP_MAX) {
-        vr_printf("Vrouter: vr_pdrop_stats invalid reason %d for VIF %d\n",
-                reason, vif->vif_idx);
+        vr_printf("Vrouter: vr_pdrop_stats invalid reason %d\n", reason);
         return;
     }
 
     if (cpu < 0) {
         vr_printf("Vrouter: vr_pdrop_stats invalid CPU %d"
-                   " for VIF %d reason %d\n", cpu, vif->vif_idx, reason);
+                   " reason %d\n", cpu, reason);
         return;
     }
 
@@ -1184,10 +1183,9 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
     if (router)
         ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
 
-    if (!vif) {
-        vr_printf("Vrouter: vr_pdrop_stats NULL VIF, reason %d\n", reason);
+    /* If vif is NULL, no accounting can be done against the vif. So return */
+    if (!vif)
         return;
-    }
 
     /* Increment per cpu stats */
     if (vif->vif_pcpu_drop_stats) {
@@ -1205,7 +1203,9 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
      * Fall through, either for failure of per cpu stat or for carry
      * over
      */
-    (void)__sync_add_and_fetch(vif->vif_drop_stats + reason, count);
+    if (vif->vif_drop_stats) {
+        (void)__sync_add_and_fetch(vif->vif_drop_stats + reason, count);
+    }
 
     return;
 }
