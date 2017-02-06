@@ -762,15 +762,17 @@ vr_untag_pkt(struct vr_packet *pkt)
  * modify the data pointer of skb
  */
 int
-vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id)
+vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id, bool force_tag)
 {
     uint8_t priority = 0;
     struct vr_eth *new_eth, *eth;
     unsigned short *vlan_tag;
 
     eth = (struct vr_eth *)pkt_data(pkt);
-    if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN))
-        return 0;
+    if (!force_tag) {
+        if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN))
+            return 0;
+    }
 
     new_eth = (struct vr_eth *)pkt_push(pkt, VR_VLAN_HLEN);
     if (!new_eth)

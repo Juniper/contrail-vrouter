@@ -800,8 +800,8 @@ static int
 vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
+    bool force_tag = false;
     int ret = 0;
-
     struct vr_interface *pvif;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
@@ -810,11 +810,16 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
         stats->vis_opackets++;
     }
 
-    fmd->fmd_vlan = vif->vif_vlan_id;
     if (vif_is_vlan(vif)) {
         if (vif->vif_ovlan_id) {
-            fmd->fmd_vlan = vif->vif_ovlan_id;
-            if (vr_tag_pkt(pkt, vif->vif_ovlan_id)) {
+            /*
+             * If the packet is already received with Tag on interface,
+             * we can force this tag, as double tag is intended
+             */
+            if (fmd->fmd_vlan != VLAN_ID_INVALID)
+                force_tag = true;
+
+            if (vr_tag_pkt(pkt, vif->vif_ovlan_id, force_tag)) {
                 goto drop;
             }
             vr_pset_data(pkt, pkt->vp_data);
