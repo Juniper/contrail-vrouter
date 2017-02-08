@@ -2386,7 +2386,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!IS_MAC_ZERO(fmd->fmd_dmac) &&
             !IS_MAC_ZERO(vif->vif_pbb_mac)) {
 
-        if (pkt->vp_flags & VP_FLAG_MULTICAST)
+        if (IS_MAC_BMCAST(fmd->fmd_dmac))
             vr_mcast_mac_from_isid(vif->vif_isid, pbb_self_mac);
         else
             pbb_self_mac = vif->vif_pbb_mac;
