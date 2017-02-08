@@ -156,9 +156,9 @@ __bridge_table_add(struct vr_route_req *rt)
      */
     ret = -EAGAIN;
     for (i = 0; i < 10; i++) {
-        flags = be->be_flags & VR_BE_VALID_FLAG;
+        flags = be->be_flags;
         if (__sync_bool_compare_and_swap(&be->be_flags, flags,
-                flags | rt->rtr_req.rtr_label_flags)) {
+                VR_BE_VALID_FLAG | rt->rtr_req.rtr_label_flags)) {
             ret = 0;
             break;
         }
