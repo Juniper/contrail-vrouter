@@ -249,7 +249,7 @@ op_retry:
     if (ret < 0)
         return ret;
 
-    ret = vr_recvmsg(cl, dump);
+    ret = vr_recvmsg(cl, dump, false);
     if (ret <= 0)
         return ret;
 
