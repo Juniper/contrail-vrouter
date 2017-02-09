@@ -2434,9 +2434,15 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 }
 
 static int
-nh_encap_l3_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
+nh_encap_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
                          struct vr_forwarding_md *fmd, void *ret_data)
 {
+    bool root = false;
+
+    if (nh->nh_flags & NH_FLAG_ETREE_ROOT)
+        root = true;
+    vr_fmd_update_etree_root(fmd,root);
+
     if (pkt->vp_if == nh->nh_dev)
         return NH_SOURCE_VALID;
 
@@ -2952,9 +2958,9 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_reach_nh = nh_encap_l2;
     } else {
         nh->nh_reach_nh = nh_encap_l3;
-        nh->nh_validate_src = nh_encap_l3_validate_src;
     }
 
+    nh->nh_validate_src = nh_encap_validate_src;
     nh->nh_dev = vif;
     nh->nh_encap_family = req->nhr_encap_family;
     nh->nh_encap_len = req->nhr_encap_size;
