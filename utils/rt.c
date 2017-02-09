@@ -49,7 +49,7 @@ static bool cmd_proxy_set = false;
 static bool cmd_trap_set = false;
 static bool cmd_flood_set = false;
 
-static int cmd_set, dump_set, get_set;
+static int cmd_set, dump_set, get_set, monitor_set;
 static int family_set, help_set, vrf_set;
 static int cust_flags;
 
@@ -67,6 +67,8 @@ static int32_t cmd_label;
 static uint32_t cmd_replace_plen = 0xFFFFFFFF;
 static char cmd_dst_mac[6];
 static bool dump_pending;
+
+static int monitor = 0;
 
 static void Usage(void);
 static void usage_internal(void);
@@ -199,6 +201,17 @@ vr_route_req_process(void *s_req)
     char addr[INET6_ADDRSTRLEN];
     char flags[32];
     vr_route_req *rt = (vr_route_req *)s_req;
+
+    if (monitor) {
+      if (rt->rtr_family == AF_INET)
+	printf("AF_INET  ");
+      else if (rt->rtr_family == AF_INET6)
+	printf("AF_INET6 ");
+      else
+	printf("%8d ", rt->rtr_family);
+
+      printf("%7d ", rt->rtr_vrf_id);
+    }
 
     if ((rt->rtr_family == AF_INET) ||
         (rt->rtr_family == AF_INET6)) {
@@ -383,7 +396,7 @@ op_retry:
         return ret;
 
 
-    ret = vr_recvmsg(cl, dump);
+    ret = vr_recvmsg(cl, dump, false);
     if (ret <= 0)
         return ret;
 
@@ -430,7 +443,7 @@ vr_bridge_table_setup(struct nl_client *cl)
     if (!ret)
         return ret;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return -1;
 
@@ -473,10 +486,13 @@ usage_internal()
 static void
 validate_options(void)
 {
-    unsigned int set = dump_set + family_set + cmd_set + help_set;
+    unsigned int set = dump_set + family_set + cmd_set + help_set + monitor_set;
 
     char addr[INET6_ADDRSTRLEN];
     struct ether_addr *eth;
+
+    if (monitor)
+      return;
 
     if (cmd_op < 0)
         goto usage;
@@ -593,6 +609,7 @@ usage_internal:
 enum opt_flow_index {
     COMMAND_OPT_INDEX,
     DUMP_OPT_INDEX,
+    MONITOR_OPT_INDEX,
     FAMILY_OPT_INDEX,
     GET_OPT_INDEX,
     VRF_OPT_INDEX,
@@ -601,13 +618,14 @@ enum opt_flow_index {
 };
 
 static struct option long_options[] = {
-    [COMMAND_OPT_INDEX]       = {"cmd",    no_argument,       &cmd_set,    1},
-    [DUMP_OPT_INDEX]          = {"dump",   required_argument, &dump_set,   1},
-    [FAMILY_OPT_INDEX]        = {"family", required_argument, &family_set, 1},
-    [GET_OPT_INDEX]           = {"get",    required_argument, &get_set,    1},
-    [VRF_OPT_INDEX]           = {"vrf",    required_argument, &vrf_set,    1},
-    [HELP_OPT_INDEX]          = {"help",   no_argument,       &help_set,   1},
-    [MAX_OPT_INDEX]           = { NULL,    0,                 0,           0},
+    [COMMAND_OPT_INDEX]       = {"cmd",     no_argument,       &cmd_set,     1},
+    [DUMP_OPT_INDEX]          = {"dump",    required_argument, &dump_set,    1},
+    [MONITOR_OPT_INDEX]          = {"monitor", no_argument,       &monitor_set, 1},
+    [FAMILY_OPT_INDEX]        = {"family",  required_argument, &family_set,  1},
+    [GET_OPT_INDEX]           = {"get",     required_argument, &get_set,     1},
+    [VRF_OPT_INDEX]           = {"vrf",     required_argument, &vrf_set,     1},
+    [HELP_OPT_INDEX]          = {"help",    no_argument,       &help_set,    1},
+    [MAX_OPT_INDEX]           = { NULL,     0,                 0,            0},
 };
 
 static void
@@ -615,6 +633,7 @@ Usage(void)
 {
     printf("Usage:   rt --dump <vrf_id> [--family <inet|inet6|bridge>]>\n");
     printf("         rt --get <address/plen> --vrf <id> [--family <inet|inet6>]\n");
+    printf("         rt --monitor\n");
     printf("         rt --help\n");
     printf("\n");
     printf("--dump   Dumps the routing table corresponding to vrf_id\n");
@@ -664,6 +683,10 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
 
     case VRF_OPT_INDEX:
         cmd_vrf_id = strtoul(opt_arg, NULL, 0);
+        break;
+
+    case MONITOR_OPT_INDEX:
+      monitor = 1;
         break;
 
     case HELP_OPT_INDEX:
@@ -797,6 +820,10 @@ main(int argc, char *argv[])
     if (!cl) {
         exit(1);
     }
+
+    if (monitor)
+      while (1)
+	vr_recvmsg(cl, false, true);
 
     if (cmd_family_id == AF_BRIDGE) {
         if (cmd_op == SANDESH_OP_DUMP || cmd_op == SANDESH_OP_GET) {

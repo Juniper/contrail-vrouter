@@ -187,7 +187,7 @@ vr_get_mem_stats(struct nl_client *cl)
     if (ret < 0)
         return ret;
 
-    return vr_recvmsg(cl, false);
+    return vr_recvmsg(cl, false, false);
 }
 
 enum opt_index {
