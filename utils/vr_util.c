@@ -202,7 +202,7 @@ vr_proto_string(unsigned short proto)
 
 /* send and receive */
 int
-vr_recvmsg(struct nl_client *cl, bool dump)
+vr_recvmsg(struct nl_client *cl, bool dump, bool msg_wait)
 {
     int ret = 0;
     bool pending = true;
@@ -210,7 +210,7 @@ vr_recvmsg(struct nl_client *cl, bool dump)
     struct nlmsghdr *nlh;
 
     while (pending) {
-        if ((ret = nl_recvmsg(cl)) > 0) {
+        if ((ret = nl_recvmsg(cl, msg_wait)) > 0) {
             if (dump) {
                 pending = true;
             } else {
@@ -296,6 +296,7 @@ vr_get_nl_client(int proto)
         sock_proto = get_protocol();
 
     ret = nl_socket(cl, get_domain(), get_type(), sock_proto);
+    // printf("domain=%d type=%d ip=%d sock_proto=%d\n", get_domain(), get_type(), get_ip(), sock_proto);
     if (ret <= 0)
         goto fail;
 
