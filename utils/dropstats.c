@@ -65,7 +65,7 @@ vr_get_drop_stats(struct nl_client *cl)
     if (ret < 0)
         return ret;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return ret;
 
