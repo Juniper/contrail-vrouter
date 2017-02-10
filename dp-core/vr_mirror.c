@@ -122,6 +122,7 @@ vr_mirror_add(vr_mirror_req *req)
     mirror->mir_rid = req->mirr_rid;
     mirror->mir_flags = req->mirr_flags;
     mirror->mir_vni = req->mirr_vni;
+    mirror->mir_vlan_id = req->mirr_vlan;
     router->vr_mirrors[req->mirr_index] = mirror;
 
     if (old_nh)
@@ -145,6 +146,7 @@ vr_mirror_make_req(vr_mirror_req *req, struct vr_mirror_entry *mirror,
     req->mirr_flags = mirror->mir_flags;
     req->mirr_rid = mirror->mir_rid;
     req->mirr_vni = mirror->mir_vni;
+    req->mirr_vlan = mirror->mir_vlan_id;
     return;
 }
 
@@ -362,6 +364,13 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
     mirror = router->vr_mirrors[mirror_id];
     if (!mirror)
         return 0;
+
+    if (mirror->mir_flags & VR_MIRROR_FLAG_HW_ASSISTED) {
+        if (fmd) {
+            fmd->fmd_mirror_vlan = mirror->mir_vlan_id;
+            return 0;
+        }
+    }
 
     /* in almost all the cases, fmd should be set */
     if (fmd) {

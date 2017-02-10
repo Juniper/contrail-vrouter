@@ -157,6 +157,7 @@ buffer sandesh vr_mirror_req {
     6: i32          mirr_flags;
     7: i32          mirr_marker;
     8: i32          mirr_vni;
+    9: i16          mirr_vlan;
 }
 
 buffer sandesh vr_flow_req {

@@ -1131,6 +1131,7 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
 {
     int ret, handled;
     bool stats_count = true, from_subvif = false;
+    bool force_tag = true;
 
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
@@ -1159,6 +1160,10 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
                  (fmd->fmd_vlan != VLAN_ID_INVALID))) {
                 from_subvif = true;
                 stats_count = false;
+        }
+    } else if vif_is_fabric (vif) {
+        if (fmd->fmd_mirror_vlan != VLAN_ID_INVALID) {
+            vr_tag_pkt(pkt, fmd->fmd_mirror_vlan, force_tag);
         }
     }
 

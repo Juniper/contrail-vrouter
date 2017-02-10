@@ -6,9 +6,9 @@
 
 #define VR_MAX_MIRROR_INDICES           255
 #define VR_MIRROR_FLAG_DYNAMIC          0x1
-
 /* This can be deleted after Agent's references are gone */
 #define VR_MIRROR_FLAG_MARKED_DELETE    0x2
+#define VR_MIRROR_FLAG_HW_ASSISTED      0x4
 
 struct vrouter;
 struct vr_packet;
@@ -31,7 +31,8 @@ typedef enum {
 struct vr_mirror_entry {
     unsigned int mir_rid;
     int mir_vni;
-    unsigned int mir_flags;
+    uint16_t mir_vlan_id;
+    uint16_t mir_flags;
     struct vr_nexthop *mir_nh;
 };
 
