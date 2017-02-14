@@ -283,10 +283,8 @@ struct vrouter {
     struct vr_mirror_entry **vr_mirrors;
     vr_itable_t vr_vxlan_table;
 
-    struct vr_btable *vr_fragment_table;
-    struct vr_btable *vr_fragment_otable;
+    vr_htable_t vr_fragment_table;
     struct vr_timer *vr_fragment_table_scanner;
-    struct vr_timer *vr_fragment_otable_scanner;
 
     uint64_t **vr_pdrop_stats;
     struct vr_malloc_stats **vr_malloc_stats;

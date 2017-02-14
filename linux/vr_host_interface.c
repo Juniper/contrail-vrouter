@@ -817,6 +817,10 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 ip6 = (struct vr_ip6 *)ip;
                 transport_off = network_off + sizeof(struct vr_ip6);
                 proto = ip6->ip6_nxt;
+                if (proto == VR_IP6_PROTO_FRAG) {
+                    transport_off += sizeof(struct vr_ip6_frag);
+                    proto = ((struct vr_ip6_frag *)(ip6 + 1))->ip6_frag_nxt;
+                }
             } else {
                 lh_pfree_skb(skb, VP_DROP_INVALID_PROTOCOL);
                 return 0;
@@ -947,10 +951,11 @@ linux_pull_outer_headers(struct sk_buff *skb)
 {
     struct vlan_hdr *vhdr;
     bool thdr = false, pull = false;
-    uint16_t proto, offset, ip_proto = 0;
+    uint16_t proto, offset, ip_proto = 0, ip_hdr_len = 0;
     struct iphdr *iph = NULL;
     struct ipv6hdr *ip6h = NULL;
     struct vr_icmp *icmph;
+    struct vr_ip6_frag *v6_frag;
 
     offset = skb->mac_len;
     proto = skb->protocol;
@@ -971,6 +976,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
             goto pull_fail;
 
         iph = ip_hdr(skb);
+        ip_hdr_len = iph->ihl * 4;
         offset += (iph->ihl * 4) - sizeof(struct iphdr);
         if (!pskb_may_pull(skb, offset))
             goto pull_fail;
@@ -987,11 +993,21 @@ linux_pull_outer_headers(struct sk_buff *skb)
         if (!pskb_may_pull(skb, offset))
             goto pull_fail;
 
+        ip_hdr_len = sizeof(struct ipv6hdr);
         ip6h = ipv6_hdr(skb);
-        thdr = true;
         pull = vr_ip6_proto_pull((struct vr_ip6 *)ip6h);
         if (pull) {
             ip_proto = ip6h->nexthdr;
+            if (ip_proto == VR_IP6_PROTO_FRAG) {
+                offset += sizeof(struct vr_ip6_frag);
+                if (!pskb_may_pull(skb, offset))
+                    goto pull_fail;
+                ip_hdr_len += sizeof(struct vr_ip6_frag);
+                ip6h = ipv6_hdr(skb);
+                v6_frag = (struct vr_ip6_frag *)(ip6h + 1);
+                ip_proto = v6_frag->ip6_frag_nxt;
+            }
+            thdr = vr_ip6_transport_header_valid((struct vr_ip6 *)ip6h);
         }
     } else if (proto == htons(ETH_P_ARP)) {
         offset += sizeof(struct vr_arp);
@@ -1021,7 +1037,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
 
         if (ip_proto == VR_IP_PROTO_ICMP) {
             if (vr_icmp_error((struct vr_icmp *)((unsigned char *)iph +
-                            (iph->ihl * 4)))) {
+                            ip_hdr_len))) {
                 iph = (struct iphdr *)(skb->data + offset);
                 offset += sizeof(struct iphdr);
                 if (!pskb_may_pull(skb, offset))
@@ -1037,7 +1053,7 @@ linux_pull_outer_headers(struct sk_buff *skb)
                 }
             }
         } else if (ip_proto == VR_IP_PROTO_ICMP6) {
-            icmph = (struct vr_icmp *) ((char *)ip6h + sizeof(struct ipv6hdr));
+            icmph = (struct vr_icmp *) ((char *)ip6h + ip_hdr_len);
             if (icmph->icmp_type == VR_ICMP6_TYPE_NEIGH_SOL) {
                 /* ICMP options size for neighbor solicit is 24 bytes */
                 offset += 24;
@@ -1050,6 +1066,15 @@ linux_pull_outer_headers(struct sk_buff *skb)
                     goto pull_fail;
                 ip6h = (struct ipv6hdr *)(skb->data + offset -
                         sizeof(struct ipv6hdr));
+                if (ip6h->nexthdr == VR_IP6_PROTO_FRAG) {
+                    offset += sizeof(struct vr_ip6_frag) +
+                                    sizeof(struct vr_icmp);
+                    if (!pskb_may_pull(skb, offset))
+                        goto pull_fail;
+
+                    return 0;
+                }
+
                 if (vr_ip6_proto_pull((struct vr_ip6 *)ip6h)) {
                     offset += sizeof(struct vr_icmp);
                     if (!pskb_may_pull(skb, offset))

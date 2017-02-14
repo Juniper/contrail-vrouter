@@ -331,6 +331,9 @@ vr_grat_arp(struct vr_arp *sarp)
 
 #define VR_IP_ADDRESS_LEN   4
 
+#define VR_IP6_MF               0x1
+#define VR_IP6_FRAG_OFFSET_BITS 3
+
 struct vr_ip {
 #if defined(__KERNEL__) && defined(__linux__)
 #if defined(__LITTLE_ENDIAN_BITFIELD)
@@ -377,6 +380,12 @@ struct vr_neighbor_option {
     uint8_t vno_value[0];
 } __attribute__((packed));
 
+struct vr_ip6_frag {
+    uint8_t ip6_frag_nxt;
+    uint8_t ip6_frag_res;
+    uint16_t ip6_frag_offset;
+    uint32_t ip6_frag_id;
+} __attribute__((packed));
 
 struct vr_ip6_pseudo {
     unsigned char ip6_src[VR_IP6_ADDRESS_LEN];
@@ -715,6 +724,53 @@ vr_icmp_error(struct vr_icmp *icmph)
 
     if ((type == VR_ICMP_TYPE_DEST_UNREACH) ||
             (type == VR_ICMP_TYPE_TIME_EXCEEDED))
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_ip6_transport_header_valid(struct vr_ip6 *ip6)
+{
+    struct vr_ip6_frag *frag;
+    unsigned short offset;
+
+    if (ip6->ip6_nxt != VR_IP6_PROTO_FRAG)
+        return true;
+
+    frag = (struct vr_ip6_frag *)(ip6 + 1);
+    offset = (ntohs(frag->ip6_frag_offset)) >> VR_IP6_FRAG_OFFSET_BITS;
+    if (offset)
+        return false;
+
+    return true;
+}
+
+static inline bool
+vr_ip6_fragment(struct vr_ip6 *ip6)
+{
+    if (ip6->ip6_nxt == VR_IP6_PROTO_FRAG)
+        return true;
+
+    return false;
+}
+
+static inline bool
+vr_ip6_fragment_head(struct vr_ip6 *ip6)
+{
+    struct vr_ip6_frag *frag;
+    unsigned short offset;
+    bool more;
+
+    if (ip6->ip6_nxt != VR_IP6_PROTO_FRAG)
+        return false;
+
+    frag = (struct vr_ip6_frag *)(ip6 + 1);
+    offset = ntohs(frag->ip6_frag_offset);
+    more = (offset & VR_IP6_MF) ? true : false;
+    offset = offset >> VR_IP6_FRAG_OFFSET_BITS;
+
+    if (more && !offset)
         return true;
 
     return false;
