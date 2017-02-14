@@ -41,21 +41,35 @@ struct vr_hentry_delete_data {
     unsigned short hd_scheduled;
 };
 
-void
-vr_htable_trav(vr_htable_t htable, unsigned int marker, htable_trav_cb cb,
-                                                                void *data)
+int
+vr_htable_trav_range(vr_htable_t htable, unsigned int start,
+        unsigned int range, htable_trav_cb cb, void *data)
 {
-    unsigned int i;
+    unsigned int i, hindex;
     vr_hentry_t *ent;
     struct vr_htable *table = (struct vr_htable *)htable;
 
     if (!table || !cb)
-        return;
+        return -EINVAL;
 
-    for (i = marker; i < table->ht_hentries + table->ht_oentries; i++) {
-        ent = vr_htable_get_hentry_by_index(htable, i);
-        cb(htable, ent, i, data);
+    for (i = start; i < start + range; i++) {
+        hindex = i % (table->ht_oentries + table->ht_hentries);
+        ent = vr_htable_get_hentry_by_index(htable, hindex);
+        cb(htable, ent, hindex, data);
     }
+
+    return i;
+}
+
+void
+vr_htable_trav(vr_htable_t htable, unsigned int marker,
+        htable_trav_cb cb, void *data)
+{
+    unsigned int range;
+    struct vr_htable *table = (struct vr_htable *)htable;
+
+    range = (table->ht_hentries + table->ht_oentries - marker);
+    vr_htable_trav_range(htable, marker, range, cb, data);
 
     return;
 }
