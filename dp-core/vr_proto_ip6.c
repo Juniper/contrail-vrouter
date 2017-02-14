@@ -12,6 +12,28 @@
 #include <vr_datapath.h>
 #include <vr_ip_mtrie.h>
 #include <vr_bridge.h>
+#include <vr_fragment.h>
+
+static bool
+vr_ip6_fragment_tail(struct vr_ip6 *ip6)
+{
+    struct vr_ip6_frag *v6_frag;
+    unsigned short frag, offset;
+    bool more;
+
+    if (ip6->ip6_nxt != VR_IP6_PROTO_FRAG)
+        return false;
+
+    v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+    frag = ntohs(v6_frag->ip6_frag_offset);
+    more = (frag & VR_IP6_MF) ? true : false;
+    offset = frag > VR_IP6_FRAG_OFFSET_BITS;
+
+    if (!more && offset)
+        return true;
+
+    return false;
+}
 
 struct vr_nexthop *
 vr_inet6_ip_lookup(unsigned short vrf, uint8_t *ip6)
@@ -116,19 +138,19 @@ vr_icmp6_input(struct vrouter *router, struct vr_packet *pkt,
     return handled;
 }
 
+
 void
 vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
         unsigned char *ip, uint8_t proto, uint16_t sport, uint16_t dport)
 {
-    /* copy both source and destinations */
-    memcpy(flow_p->flow_ip, ip, 2 * VR_IP6_ADDRESS_LEN);
-    flow_p->flow6_proto = proto;
-    flow_p->flow6_nh_id = nh_id;
-    flow_p->flow6_sport = sport;
-    flow_p->flow6_dport = dport;
-    flow_p->flow6_family = AF_INET6;
-    flow_p->flow6_unused = 0;
-
+	/* copy both source and destinations */
+	memcpy(flow_p->flow_ip, ip, 2 * VR_IP6_ADDRESS_LEN);
+	flow_p->flow6_proto = proto;
+	flow_p->flow6_nh_id = nh_id;
+	flow_p->flow6_sport = sport;
+	flow_p->flow6_dport = dport;
+	flow_p->flow6_family = AF_INET6;
+	flow_p->flow6_unused = 0;
     flow_p->flow_key_len = VR_FLOW_IPV6_HASH_SIZE;
 
     return;
@@ -169,23 +191,42 @@ vr_inet6_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
 }
 
 static int
-vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
+vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
         struct vr_flow *flow_p)
 {
+    int ret = 0;
+    uint8_t ip6_nxt;
     unsigned short *t_hdr, sport, dport;
     unsigned short nh_id;
+    struct vr_ip6_frag *v6_frag;
 
     struct vr_icmp *icmph;
     fat_flow_port_mask_t port_mask;
 
     t_hdr = (unsigned short *)((char *)ip6 + sizeof(struct vr_ip6));
-    if (ip6->ip6_nxt == VR_IP_PROTO_ICMP6) {
+    ip6_nxt = ip6->ip6_nxt;
+
+    if (ip6_nxt == VR_IP6_PROTO_FRAG) {
+        v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+        ip6_nxt = v6_frag->ip6_frag_nxt;
+        t_hdr = (unsigned short *)(v6_frag + 1);
+    }
+
+    if (ip6_nxt == VR_IP_PROTO_ICMP6) {
         icmph = (struct vr_icmp *)t_hdr;
         if (vr_icmp6_error(icmph)) {
-            vr_inet6_form_flow(router, vrf, pkt, vlan,
-                    (struct vr_ip6 *)(icmph + 1), flow_p);
-            vr_inet6_flow_swap(flow_p);
+            if ((unsigned char *)ip6 == pkt_network_header(pkt)) {
+                ret = vr_inet6_form_flow(router, vrf, pkt, vlan,
+                        (struct vr_ip6 *)(icmph + 1), flow_p);
+                if (ret)
+                    return ret;
+
+                vr_inet6_flow_swap(flow_p);
+            } else {
+                return -1;
+            }
+
             return 0;
         } else if ((icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REQ) ||
             (icmph->icmp_type == VR_ICMP6_TYPE_ECHO_REPLY)) {
@@ -199,9 +240,9 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
             sport = 0;
             dport = icmph->icmp_type;
         }
-    } else if ((ip6->ip6_nxt == VR_IP_PROTO_TCP) ||
-            (ip6->ip6_nxt == VR_IP_PROTO_UDP) ||
-            (ip6->ip6_nxt == VR_IP_PROTO_SCTP)) {
+    } else if ((ip6_nxt == VR_IP_PROTO_TCP) ||
+            (ip6_nxt == VR_IP_PROTO_UDP) ||
+            (ip6_nxt == VR_IP_PROTO_SCTP)) {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
     } else {
@@ -209,7 +250,7 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
         dport = 0;
     }
 
-    port_mask = vr_flow_fat_flow_lookup(router, pkt, ip6->ip6_nxt,
+    port_mask = vr_flow_fat_flow_lookup(router, pkt, ip6_nxt,
             sport, dport);
     switch (port_mask) {
     case SOURCE_PORT_MASK:
@@ -230,10 +271,66 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
     vr_inet6_fill_flow(flow_p, nh_id, (unsigned char *)&ip6->ip6_src,
-            ip6->ip6_nxt, sport, dport);
+            ip6_nxt, sport, dport);
 
     return 0;
 }
+
+static int
+vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
+        struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
+        struct vr_flow *flow_p)
+{
+    uint16_t sport, dport;
+    unsigned short nh_id;
+    struct vr_fragment *frag;
+    struct vr_ip6_frag *v6_frag;
+
+    frag = vr_fragment_get(router, vrf,
+            (struct vr_ip *)(pkt_network_header(pkt)));
+    if (!frag) {
+        return -1;
+    }
+
+    v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+
+    frag->f_received += (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag));
+    if (vr_ip6_fragment_tail(ip6)) {
+        frag->f_expected = (((ntohs(v6_frag->ip6_frag_offset)) >>
+            VR_IP6_FRAG_OFFSET_BITS) * 8) +
+            ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag);
+    }
+
+    sport = frag->f_sport;
+    dport = frag->f_dport;
+    if (frag->f_received == frag->f_expected) {
+        vr_fragment_del(router->vr_fragment_table, frag);
+    }
+
+    nh_id = vr_inet_flow_nexthop(pkt, vlan);
+    vr_inet6_fill_flow(flow_p, nh_id, (unsigned char *)&ip6->ip6_src,
+            v6_frag->ip6_frag_nxt, sport, dport);
+
+    return 0;
+}
+
+int
+vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
+        struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
+        struct vr_flow *flow_p)
+{
+    int ret = 0;
+
+    if (vr_ip6_transport_header_valid(ip6)) {
+        ret = vr_inet6_proto_flow(router, vrf, pkt, vlan, ip6, flow_p);
+    } else {
+        ret = vr_inet6_fragment_flow(router, vrf, pkt, vlan, ip6, flow_p);
+    }
+
+    return ret;
+
+}
+
 
 flow_result_t
 vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
@@ -243,22 +340,12 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     bool lookup = false;
     struct vr_flow flow, *flow_p = &flow;
     struct vr_ip6 *ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+    struct vr_packet *pkt_c;
 
     /*
      * if the packet has already done one round of flow lookup, there
      * is no point in doing it again, eh?
      */
-    if (pkt->vp_flags & VP_FLAG_FLOW_SET)
-        return FLOW_FORWARD;
-
-    /* Skip flow lookup for V6 frags */
-    if (ip6->ip6_nxt == VR_IP6_PROTO_FRAG)
-        return FLOW_FORWARD;
-
-    ret = vr_inet6_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan, ip6, flow_p);
-    if (ret < 0)
-        return FLOW_CONSUMED;
-
     if (pkt->vp_flags & VP_FLAG_FLOW_SET)
         return FLOW_FORWARD;
 
@@ -271,12 +358,34 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         lookup = true;
     }
 
+    if (!lookup)
+        return FLOW_FORWARD;
 
-    if (lookup) {
-        return vr_flow_lookup(router, flow_p, pkt, fmd);
+    ret = vr_inet6_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
+                                             ip6, flow_p);
+    if (ret < 0) {
+        if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
+            vr_enqueue_to_assembler(router, pkt, fmd);
+        } else {
+            vr_pfree(pkt, VP_DROP_MISC);
+        }
+        return FLOW_CONSUMED;
     }
 
-    return FLOW_FORWARD;
+    if (pkt->vp_flags & VP_FLAG_FLOW_SET)
+        return FLOW_FORWARD;
+
+    if (vr_ip6_fragment_head(ip6)) {
+        vr_v6_fragment_add(router, fmd->fmd_dvrf, ip6, flow_p->flow6_sport, flow_p->flow6_dport);
+        if (vr_enqueue_to_assembler) {
+            pkt_c = vr_pclone(pkt);
+            if (pkt_c) {
+                vr_enqueue_to_assembler(router, pkt_c, fmd);
+            }
+        }
+    }
+
+    return vr_flow_lookup(router, flow_p, pkt, fmd);
 }
 
 

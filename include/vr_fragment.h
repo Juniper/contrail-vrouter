@@ -14,9 +14,11 @@
 #define VR_FRAG_ENQUEUE_ATTEMPTS                3
 
 struct vr_fragment_key {
-    unsigned int fk_sip;
-    unsigned int fk_dip;
-    unsigned short fk_id;
+    uint64_t fk_sip_u;
+    uint64_t fk_sip_l;
+    uint64_t fk_dip_u;
+    uint64_t fk_dip_l;
+    uint32_t fk_id;
     unsigned short fk_vrf;
 } __attribute__((packed));
 
@@ -32,6 +34,9 @@ struct vr_fragment_queue {
 };
 
 struct vr_fragment {
+    vr_hentry_t f_hentry;
+    /* packing to make sure that members are aligned */
+    uint8_t f_packing[3];
     struct vr_fragment_key f_key;
     unsigned short f_sport;
     unsigned short f_dport;
@@ -43,21 +48,24 @@ struct vr_fragment {
     bool f_port_info_valid;
 } __attribute__((packed));
 
-#define f_sip f_key.fk_sip
-#define f_dip f_key.fk_dip
+#define f_sip_u f_key.fk_sip_u
+#define f_sip_l f_key.fk_sip_l
+#define f_dip_u f_key.fk_dip_u
+#define f_dip_l f_key.fk_dip_l
 #define f_id  f_key.fk_id
 #define f_vrf f_key.fk_vrf
+#define f_len f_key.fk_len
 
 int vr_fragment_table_init(struct vrouter *);
 void vr_fragment_table_exit(struct vrouter *);
 struct vr_fragment *vr_fragment_get(struct vrouter *, unsigned short,
         struct vr_ip *);
-int vr_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
+int vr_v4_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
                 unsigned short, unsigned short);
-void vr_fragment_del(struct vr_fragment *);
-uint32_t __vr_fragment_get_hash(unsigned int, unsigned int,
-        unsigned int, struct vr_packet *);
-uint32_t vr_fragment_get_hash(unsigned int, struct vr_packet *);
+int vr_v6_fragment_add(struct vrouter *, unsigned short, struct vr_ip6 *,
+                unsigned short, unsigned short);
+void vr_fragment_del(vr_htable_t, struct vr_fragment *);
+uint32_t vr_fragment_get_hash(struct vr_packet_node *);
 int vr_fragment_assembler(struct vr_fragment **,
         struct vr_fragment_queue_element *);
 unsigned int vr_assembler_table_scan(struct vr_fragment **);

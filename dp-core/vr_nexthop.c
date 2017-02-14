@@ -2219,7 +2219,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
     int ret = 0;
     unsigned int i;
     struct vr_nexthop *tmp_nh;
-    struct vr_component_nh *component_nh;
+    struct vr_component_nh *component_nh = NULL;
 
     if (req->nhr_nh_list_size != req->nhr_label_list_size) {
         ret = -EINVAL;

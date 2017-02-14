@@ -210,9 +210,10 @@ static void
 __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
 {
     if (fe->fe_hold_list) {
-        vr_printf("vrouter: Potential memory leak @ %s:%d\n",
+		vr_printf("vrouter: Potential memory leak @ %s:%d\n",
                 __FILE__, __LINE__);
     }
+
     fe->fe_hold_list = NULL;
     fe->fe_key.flow_key_len = 0;
 
@@ -546,6 +547,7 @@ vr_find_flow(struct vrouter *router, struct vr_flow *key,
     return fe;
 }
 
+
 void
 vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
@@ -575,19 +577,24 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
             pnode->pl_flags |= PN_FLAG_TO_ME;
     }
 
-    if (ip && vr_ip_is_ip4(ip)) {
-        /*
-         * Source IP & Dest IP can change while the packet is in the queue
-         * (NAT). For e.g.: when the cloned head of a fragment is enqueued
-         * to the assembler and subsequently dequeued by the assembler, the
-         * original packet might have undergone a NAT, resulting in wrong
-         * hash and thus a wrong search for other fragments of the packet.
-         * Hence, store them here for others interested in the original IPs
-         */
-        pnode->pl_inner_src_ip = ip->ip_saddr;
-        pnode->pl_inner_dst_ip = ip->ip_daddr;
-        if (vr_ip_fragment_head(ip))
-            pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+    if (ip) {
+        if (vr_ip_is_ip4(ip)) {
+            /*
+             * Source IP & Dest IP can change while the packet is in the queue
+             * (NAT). For e.g.: when the cloned head of a fragment is enqueued
+             * to the assembler and subsequently dequeued by the assembler, the
+             * original packet might have undergone a NAT, resulting in wrong
+             * hash and thus a wrong search for other fragments of the packet.
+             * Hence, store them here for others interested in the original IPs
+             */
+            pnode->pl_inner_src_ip = ip->ip_saddr;
+            pnode->pl_inner_dst_ip = ip->ip_daddr;
+            if (vr_ip_fragment_head(ip))
+                pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+        } else if (vr_ip_is_ip6(ip)) {
+            if (vr_ip6_fragment_head((struct vr_ip6 *)ip))
+                pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+        }
     }
 
     pnode->pl_vrf = fmd->fmd_dvrf;
@@ -1113,32 +1120,43 @@ static void
 vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
+    uint8_t proto = 0, hlen = 0;
     uint16_t tcp_offset_flags;
-    unsigned int length;
+    unsigned int length = 0;
 
     struct vr_ip *iph;
     struct vr_ip6 *ip6h;
-    struct vr_tcp *tcph = NULL;
+    struct vr_tcp *tcph;
+    struct vr_ip6_frag *v6_frag;
     struct vr_flow_entry *rflow_e = NULL;
 
-    iph = (struct vr_ip *)pkt_network_header(pkt);
-    if (!vr_ip_transport_header_valid(iph))
-        return;
-
     if (pkt->vp_type == VP_TYPE_IP) {
-        if (iph->ip_proto != VR_IP_PROTO_TCP)
+        iph = (struct vr_ip *)pkt_network_header(pkt);
+        if (!vr_ip_transport_header_valid(iph))
             return;
+        proto = iph->ip_proto;
 
         length = ntohs(iph->ip_len) - (iph->ip_hl * 4);
-        tcph = (struct vr_tcp *)((unsigned char *)iph + (iph->ip_hl * 4));
+        hlen = iph->ip_hl * 4;
     } else if (pkt->vp_type == VP_TYPE_IP6) {
-        ip6h = (struct vr_ip6 *)iph;
-        if (ip6h->ip6_nxt != VR_IP_PROTO_TCP)
+        ip6h = (struct vr_ip6 *)pkt_network_header(pkt);
+        if (!vr_ip6_transport_header_valid(ip6h))
             return;
-
+        proto = ip6h->ip6_nxt;
         length = ntohs(ip6h->ip6_plen);
-        tcph = (struct vr_tcp *)((unsigned char *)iph + sizeof(struct vr_ip6));
+        hlen = sizeof(struct vr_ip6);
+        if (proto == VR_IP6_PROTO_FRAG) {
+            v6_frag = (struct vr_ip6_frag *)(ip6h + 1);
+            proto = v6_frag->ip6_frag_nxt;
+            length -= sizeof(struct vr_ip6_frag);
+            hlen += sizeof(struct vr_ip6_frag);
+        }
     }
+
+    if (proto != VR_IP_PROTO_TCP)
+        return;
+
+    tcph = (struct vr_tcp *)(pkt_network_header(pkt) + hlen);
 
     if (tcph) {
         if (vr_flow_is_fat_flow(router, pkt, flow_e))

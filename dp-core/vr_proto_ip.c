@@ -798,8 +798,9 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
 
     sport = frag->f_sport;
     dport = frag->f_dport;
-    if (frag->f_received == frag->f_expected)
-        vr_fragment_del(frag);
+    if (frag->f_received == frag->f_expected) {
+        vr_fragment_del(router->vr_fragment_table, frag);
+    }
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
     vr_inet_fill_flow(flow_p, nh_id, (unsigned char *)&ip->ip_saddr,
@@ -999,7 +1000,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
 
 
     if (vr_ip_fragment_head(ip)) {
-        vr_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
+        vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
                 flow_p->flow4_dport);
         if (vr_enqueue_to_assembler) {
             pkt_c = vr_pclone(pkt);

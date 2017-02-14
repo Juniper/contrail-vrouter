@@ -391,6 +391,7 @@ typedef enum {
 
 struct vr_packet;
 struct vrouter;
+struct vr_ip6;
 
 extern int vr_flow_init(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);
@@ -433,6 +434,9 @@ extern unsigned int vr_reinject_packet(struct vr_packet *,
 bool vr_valid_link_local_port(struct vrouter *, int, int, int);
 int vr_inet_form_flow(struct vrouter *, unsigned short,
                 struct vr_packet *, uint16_t, struct vr_flow *);
+int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
+                uint16_t, struct vr_ip6 *, struct vr_flow *);
+
 int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
