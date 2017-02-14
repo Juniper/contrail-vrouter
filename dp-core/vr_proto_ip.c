@@ -807,7 +807,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
     sport = frag->f_sport;
     dport = frag->f_dport;
     if (frag->f_received == frag->f_expected)
-        vr_fragment_del(frag);
+        vr_fragment_del(router->vr_fragment_table, frag);
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
     vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,

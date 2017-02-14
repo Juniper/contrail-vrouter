@@ -87,7 +87,7 @@
  * and flushed out of that entry, while still maintaining the metadata.
  */
 
-#define FRAG_TABLE_ENTRIES  1024
+#define FRAG_TABLE_ENTRIES  4096
 #define FRAG_TABLE_BUCKETS  4
 #define FRAG_OTABLE_ENTRIES 512
 
@@ -105,12 +105,34 @@ __fragment_key(struct vr_fragment_key *key, unsigned short vrf, uint32_t sip,
     return;
 }
 
+#define VR_FRAGMENT_FROM_HENTRY(entry)      \
+    (struct vr_fragment *)((entry) ?\
+    CONTAINER_OF(f_hentry, struct vr_fragment, entry) :\
+    NULL)
+
+#define VR_HENTRY_FROM_FRAGMENT(fe)        \
+    (vr_hentry_t *)((fe) ? &fe->f_hentry : NULL)
+
 static inline void
 fragment_key(struct vr_fragment_key *key, unsigned short vrf,
         struct vr_ip *iph)
 {
     __fragment_key(key, vrf, iph->ip_saddr, iph->ip_daddr, iph->ip_id);
     return;
+}
+
+static vr_hentry_key
+vr_fragment_get_entry_key(vr_htable_t table, vr_hentry_t *entry,
+        unsigned int *key_len)
+{
+    struct vr_fragment *fe =
+        (struct vr_fragment *)CONTAINER_OF(f_hentry, struct vr_fragment, entry);
+
+    if (key_len) {
+        *key_len = sizeof(struct vr_fragment_key);
+    }
+
+    return &fe->f_key;
 }
 
 static inline void
@@ -133,22 +155,23 @@ fragment_entry_set(struct vr_fragment *fe, unsigned short vrf, struct vr_ip *iph
     return;
 }
 
-static inline struct vr_fragment *
-fragment_oentry_get(struct vrouter *router, unsigned int index)
+void
+vr_fragment_queue_free(struct vr_fragment_queue *queue)
 {
-    return (struct vr_fragment *)vr_btable_get(router->vr_fragment_otable, index);
-}
+    struct vr_fragment_queue_element *vfqe, *next;
 
-static inline struct vr_fragment *
-fragment_entry_get(struct vrouter *router, unsigned int index)
-{
-    return (struct vr_fragment *)vr_btable_get(router->vr_fragment_table, index);
-}
+    vfqe = queue->vfq_tail;
+    queue->vfq_tail = NULL;
+    while (vfqe) {
+        next = vfqe->fqe_next;
+        if (vfqe->fqe_pnode.pl_packet)
+            vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
+        vfqe->fqe_pnode.pl_packet = NULL;
+        vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
+        vfqe = next;
+    }
 
-static inline bool
-fragment_entry_alloc(struct vr_fragment *fe)
-{
-    return __sync_bool_compare_and_swap(&fe->f_dip, 0, 1);
+    return;
 }
 
 static void
@@ -497,50 +520,33 @@ fail:
 
 
 void
-vr_fragment_del(struct vr_fragment *fe)
+vr_fragment_del(vr_htable_t table, struct vr_fragment *fe)
 {
     fe->f_dip = 0;
+    fe->f_received = 0;
+    vr_htable_release_hentry(table, VR_HENTRY_FROM_FRAGMENT(fe));
+
+    return;
 }
 
 int
 vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
         unsigned short sport, unsigned short dport)
 {
-    unsigned int hash, index, i;
     struct vr_fragment_key key;
     struct vr_fragment *fe;
+    vr_htable_t ftable = router->vr_fragment_table;
 
     fragment_key(&key, vrf, iph);
-    hash = vr_hash(&key, sizeof(key), 0);
-    index = (hash % FRAG_TABLE_ENTRIES) * FRAG_TABLE_BUCKETS;
-    for (i = 0; i < FRAG_TABLE_BUCKETS; i++) {
-        fe = fragment_entry_get(router, index + i);
-        if (fe && !fe->f_dip && fragment_entry_alloc(fe)) {
-            fragment_entry_set(fe, vrf, iph, sport, dport);
-            break;
-        } else {
-            fe = NULL;
-            continue;
-        }
-    }
+    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, &key, 0));
+    if (fe)
+        return 0;
 
-    if (!fe) {
-        index = (hash % FRAG_OTABLE_ENTRIES);
-        for (i = 0; i < FRAG_OTABLE_ENTRIES; i++) {
-            fe = fragment_oentry_get(router, (index + i) % FRAG_OTABLE_ENTRIES);
-            if (fe && !fe->f_dip && fragment_entry_alloc(fe)) {
-                fragment_entry_set(fe, vrf, iph, sport, dport);
-                break;
-            } else {
-                fe = NULL;
-                continue;
-            }
-        }
-    }
-
+    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_free_hentry(ftable, &key, 0));
     if (!fe)
         return -ENOMEM;
 
+    fragment_entry_set(fe, vrf, iph, sport, dport);
     fe->f_received += (ntohs(iph->ip_len) - (iph->ip_hl * 4));
 
     return 0;
@@ -549,34 +555,14 @@ vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
 struct vr_fragment *
 vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
 {
-    unsigned int hash, index, i;
-    struct vr_fragment_key key;
-    struct vr_fragment *fe;
     unsigned int sec, nsec;
 
+    struct vr_fragment_key key;
+    struct vr_fragment *fe;
+    vr_htable_t ftable = router->vr_fragment_table;
+
     fragment_key(&key, vrf, iph);
-    hash = vr_hash(&key, sizeof(key), 0);
-    index = (hash % FRAG_TABLE_ENTRIES) * FRAG_TABLE_BUCKETS;
-    for (i = 0; i < FRAG_TABLE_BUCKETS; i++) {
-        fe = fragment_entry_get(router, index + i);
-        if (fe && !memcmp((const void *)&key, (const void *)&(fe->f_key),
-                    sizeof(key)))
-            break;
-    }
-
-    if (i == FRAG_TABLE_BUCKETS) {
-        index = (hash % FRAG_OTABLE_ENTRIES);
-        for (i = 0; i < FRAG_OTABLE_ENTRIES; i++) {
-            fe = fragment_oentry_get(router, (index + i) % FRAG_OTABLE_ENTRIES);
-            if (fe && !memcmp((const void *)&key, (const void *)&(fe->f_key),
-                        sizeof(key)))
-                break;
-        }
-
-        if (i == FRAG_OTABLE_ENTRIES)
-            fe = NULL;
-    }
-
+    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, &key, 0));
     if (fe) {
         vr_get_mono_time(&sec, &nsec);
         fe->f_time = sec;
@@ -589,82 +575,74 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
 
 struct scanner_params {
     struct vrouter *sp_router;
-    struct vr_btable *sp_fragment_table;
-    unsigned int sp_num_entries;
-    int sp_last_scanned_entry;
+    int sp_scan_marker;
 };
 
 static void
-fragment_reap(struct vr_btable *table, int start,
-        unsigned int num_entries)
+__fragment_reap(vr_htable_t table, vr_hentry_t *ent,
+        unsigned int index, void *data)
 {
-    unsigned int i;
-    struct vr_fragment *fe;
     unsigned int sec, nsec;
+    struct vr_fragment *fe;
+
+    fe = VR_FRAGMENT_FROM_HENTRY(ent);
+    if (!fe || !fe->f_dip)
+        return;
 
     vr_get_mono_time(&sec, &nsec);
-
-    for (i = 0; i < ENTRIES_PER_SCAN; i++) {
-        fe = vr_btable_get(table, (start + i) % num_entries);
-        if (fe && fe->f_dip) {
-            if (sec > fe->f_time + 1)
-                vr_fragment_del(fe);
-        }
+    if (sec > fe->f_time + 1) {
+        vr_fragment_del(table, fe);
     }
 
-
     return;
+}
+
+static int
+fragment_reap(vr_htable_t htable, int start)
+{
+    return vr_htable_trav_range(htable, start, ENTRIES_PER_SCAN,
+            __fragment_reap, NULL);
 }
 
 static void
 fragment_table_scanner(void *arg)
 {
+    int ret;
     struct scanner_params *sp = (struct scanner_params *)arg;
 
-    fragment_reap(sp->sp_fragment_table, sp->sp_last_scanned_entry + 1,
-            sp->sp_num_entries);
+    ret = fragment_reap(sp->sp_router->vr_fragment_table, sp->sp_scan_marker);
+    if (ret < 0)
+        return;
 
-    sp->sp_last_scanned_entry += ENTRIES_PER_SCAN;
-    sp->sp_last_scanned_entry %= sp->sp_num_entries;
-
+    sp->sp_scan_marker = ret;
     return;
 }
 
 static struct vr_timer *
-fragment_table_scanner_init(struct vrouter *router, struct vr_btable *table)
+fragment_table_scanner_init(struct vrouter *router)
 {
-    unsigned int num_entries;
     struct vr_timer *vtimer;
     struct scanner_params *scanner;
 
-    if (!table)
-        return NULL;
-
-    num_entries = vr_btable_entries(table);
-
     scanner = vr_zalloc(sizeof(*scanner), VR_FRAGMENT_SCANNER_OBJECT);
     if (!scanner) {
-        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, num_entries);
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, sizeof(*scanner));
         return NULL;
     }
-
     scanner->sp_router = router;
-    scanner->sp_fragment_table = table;
-    scanner->sp_num_entries = num_entries;
-    scanner->sp_last_scanned_entry = -1;
+    scanner->sp_scan_marker = 0;
 
     vtimer = vr_malloc(sizeof(*vtimer), VR_TIMER_OBJECT);
     if (!vtimer) {
-        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, num_entries);
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, sizeof(*vtimer));
         goto fail_init;
     }
 
     vtimer->vt_timer = fragment_table_scanner;
     vtimer->vt_vr_arg = scanner;
     vtimer->vt_msecs = 1000;
-
     if (vr_create_timer(vtimer)) {
-        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, num_entries);
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
         goto fail_init;
     }
 
@@ -688,27 +666,6 @@ vr_fragment_table_scanner_exit(struct vrouter *router)
         router->vr_fragment_table_scanner = NULL;
     }
 
-    if (router->vr_fragment_otable_scanner) {
-        vr_delete_timer(router->vr_fragment_otable_scanner);
-        vr_free(router->vr_fragment_otable_scanner->vt_vr_arg,
-                VR_FRAGMENT_SCANNER_OBJECT);
-        vr_free(router->vr_fragment_otable_scanner, VR_TIMER_OBJECT);
-        router->vr_fragment_otable_scanner = NULL;
-    }
-
-    return;
-}
-
-void
-vr_fragment_table_exit(struct vrouter *router)
-{
-    vr_fragment_table_scanner_exit(router);
-
-    if (router->vr_fragment_table)
-        vr_btable_free(router->vr_fragment_table);
-    if (router->vr_fragment_otable)
-        vr_btable_free(router->vr_fragment_otable);
-
     return;
 }
 
@@ -717,65 +674,44 @@ vr_fragment_table_scanner_init(struct vrouter *router)
 {
     if (!router->vr_fragment_table_scanner) {
         router->vr_fragment_table_scanner =
-            fragment_table_scanner_init(router, router->vr_fragment_table);
-        if (!router->vr_fragment_table_scanner)
+            fragment_table_scanner_init(router);
+        if (!router->vr_fragment_table_scanner) {
             return -ENOMEM;
-    }
-
-    if (!router->vr_fragment_otable_scanner) {
-        router->vr_fragment_otable_scanner =
-            fragment_table_scanner_init(router, router->vr_fragment_otable);
-        if (!router->vr_fragment_otable_scanner)
-            return -ENOMEM;
+        }
     }
 
     return 0;
 }
 
+void
+vr_fragment_table_exit(struct vrouter *router)
+{
+    vr_fragment_table_scanner_exit(router);
+
+    if (router->vr_fragment_table) {
+        vr_htable_delete(router->vr_fragment_table);
+        router->vr_fragment_table = NULL;
+    }
+
+    return;
+}
+
 int
 vr_fragment_table_init(struct vrouter *router)
 {
-    int num_entries, ret;
+    int ret;
 
+    router->vr_fragment_table = vr_htable_create(router,
+            FRAG_TABLE_ENTRIES, FRAG_OTABLE_ENTRIES,
+            sizeof(struct vr_fragment), sizeof(struct vr_fragment_key),
+            FRAG_TABLE_BUCKETS, vr_fragment_get_entry_key);
     if (!router->vr_fragment_table) {
-        num_entries = FRAG_TABLE_ENTRIES * FRAG_TABLE_BUCKETS;
-        router->vr_fragment_table = vr_btable_alloc(num_entries,
-                sizeof(struct vr_fragment));
-        if (!router->vr_fragment_table)
-            return vr_module_error(-ENOMEM, __FUNCTION__,
-                    __LINE__, num_entries);
-    }
-
-    if (!router->vr_fragment_otable) {
-        num_entries = FRAG_OTABLE_ENTRIES;
-        router->vr_fragment_otable = vr_btable_alloc(num_entries,
-                sizeof(struct vr_fragment));
-        if (!router->vr_fragment_otable)
-            return vr_module_error(-ENOMEM, __FUNCTION__,
-                    __LINE__, num_entries);
+        return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
+                FRAG_TABLE_ENTRIES + FRAG_OTABLE_ENTRIES);
     }
 
     if ((ret = vr_fragment_table_scanner_init(router)))
         return ret;
 
     return 0;
-}
-
-void
-vr_fragment_queue_free(struct vr_fragment_queue *queue)
-{
-    struct vr_fragment_queue_element *vfqe, *next;
-
-    vfqe = queue->vfq_tail;
-    queue->vfq_tail = NULL;
-    while (vfqe) {
-        next = vfqe->fqe_next;
-        if (vfqe->fqe_pnode.pl_packet)
-            vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
-        vfqe->fqe_pnode.pl_packet = NULL;
-        vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
-        vfqe = next;
-    }
-
-    return;
 }

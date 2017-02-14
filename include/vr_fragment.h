@@ -32,6 +32,9 @@ struct vr_fragment_queue {
 };
 
 struct vr_fragment {
+    vr_hentry_t f_hentry;
+    /* packing to make sure that members are aligned */
+    uint8_t f_packing[3];
     struct vr_fragment_key f_key;
     unsigned short f_sport;
     unsigned short f_dport;
@@ -54,7 +57,7 @@ struct vr_fragment *vr_fragment_get(struct vrouter *, unsigned short,
         struct vr_ip *);
 int vr_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
                 unsigned short, unsigned short);
-void vr_fragment_del(struct vr_fragment *);
+void vr_fragment_del(vr_htable_t, struct vr_fragment *);
 uint32_t __vr_fragment_get_hash(unsigned int, unsigned int,
         unsigned int, struct vr_packet *);
 uint32_t vr_fragment_get_hash(unsigned int, struct vr_packet *);
