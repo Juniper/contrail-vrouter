@@ -337,6 +337,7 @@ struct vr_dummy_flow_entry {
     uint8_t fe_drop_reason;
     uint8_t fe_type;
     unsigned short fe_udp_src_port;
+    uint32_t fe_src_info;
 } __attribute__((packed));
 
 #define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
@@ -364,6 +365,13 @@ struct vr_flow_entry {
     uint8_t fe_drop_reason;
     uint8_t fe_type;
     unsigned short fe_udp_src_port;
+    /*
+     * fe_src_info holds outer source IP if the packet is received on
+     * Fabric or the interface index if packet is received on Vmi. This
+     * helps, if reverse flow is Ecmp, in choosing the reverse flow's
+     * component NH as this source
+     */
+    uint32_t fe_src_info;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 
@@ -469,5 +477,7 @@ unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);
 unsigned int vr_flow_table_used_total_entries(struct vrouter *);
 int vr_flow_update_ecmp_index(struct vrouter *, struct vr_flow_entry *,
         unsigned int, struct vr_forwarding_md *);
+uint32_t vr_flow_get_rflow_src_info(struct vrouter *, struct
+        vr_flow_entry *);
 
 #endif /* __VR_FLOW_H__ */

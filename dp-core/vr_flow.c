@@ -221,6 +221,7 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
         (VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_EVICTED |
          VR_FLOW_FLAG_NEW_FLOW | VR_FLOW_FLAG_DELETE_MARKED);
     fe->fe_ttl = 0;
+    fe->fe_src_info = 0;
 
     return;
 }
@@ -263,6 +264,21 @@ vr_flow_get_key(vr_htable_t flow_table, vr_hentry_t *entry,
     return &fe->fe_key;
 }
 
+uint32_t
+vr_flow_get_rflow_src_info(struct vrouter *router,
+        struct vr_flow_entry *fe)
+{
+    struct vr_flow_entry *rfe;
+
+    if ((!fe) || !(fe->fe_flags & VR_RFLOW_VALID))
+        return (unsigned int)-1;
+
+    rfe = vr_flow_get_entry(router, fe->fe_rflow);
+    if (!rfe)
+        return (unsigned int)-1;
+
+    return rfe->fe_src_info;
+}
 
 static inline bool
 vr_flow_set_active(struct vr_flow_entry *fe)
@@ -1323,6 +1339,15 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 
     if (flow_e->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
         return FLOW_EVICT_DROP;
+
+    /*
+     * Store the source of the packet which gets used incase of Ecmp
+     * Source
+     */
+    if (vif_is_fabric(pkt->vp_if))
+        flow_e->fe_src_info = fmd->fmd_outer_src_ip;
+    else if (vif_is_virtual(pkt->vp_if))
+        flow_e->fe_src_info = pkt->vp_if->vif_idx;
 
     vr_flow_set_forwarding_md(router, flow_e, fe_index, fmd);
     vr_flow_tcp_digest(router, flow_e, pkt, fmd);

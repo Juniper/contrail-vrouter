@@ -671,12 +671,62 @@ nh_ecmp_store_ecmp_config_hash(vr_nexthop_req *req, struct vr_nexthop *nh)
     return;
 }
 
+
+/*
+ * Returns the ecmp nh index based on the reverse flows information. If
+ * the reverse flow is created because of a packet on Fabric,
+ * rflow_src_info contains tunnel's source IP, if created because of a
+ * packet on VMI, it contains VMI's index. The ecmp nh is chosen in such
+ * a way that packet is given to same reverse flow source
+ */
+static int
+nh_composite_ecmp_select_by_rflow(struct vr_packet *pkt,
+        struct vr_nexthop *nh, struct vr_forwarding_md *fmd,
+        uint32_t rflow_src_info)
+{
+    int index;
+    uint32_t ip;
+    struct vr_nexthop *cnh;
+
+    ip = fmd->fmd_outer_src_ip;
+    fmd->fmd_outer_src_ip = rflow_src_info;
+    for (index = 0; index < nh->nh_component_cnt; index++) {
+        cnh = nh->nh_component_nh[index].cnh;
+        if (!cnh || !(cnh->nh_flags & NH_FLAG_VALID))
+            continue;
+
+        /*
+         * Make use of tunnel's nh_validate_src as it validates the
+         * tunnel source
+         */
+        if ((cnh->nh_type == NH_TUNNEL) && cnh->nh_validate_src) {
+            if (NH_SOURCE_VALID == cnh->nh_validate_src(pkt, cnh, fmd, NULL))
+                break;
+        }
+
+        /*
+         * nh_validate_src cant be used as it compares VIF pointer for
+         * encap. Validate the index explicitly
+         */
+        if (cnh->nh_type == NH_ENCAP) {
+            if (cnh->nh_dev->vif_idx == rflow_src_info)
+                break;
+        }
+    }
+
+    fmd->fmd_outer_src_ip = ip;
+    if (index == nh->nh_component_cnt)
+       index = -1;
+
+    return index;
+}
+
 static int
 nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
 {
-    int ret = -1, ecmp_index;
-    unsigned int hash, hash_ecmp, count;
+    int ret = -1, ecmp_index = -1;
+    unsigned int hash, hash_ecmp, count, rflow_src_info;
 
     struct vr_flow flow, *flowp = &flow;
     struct vr_flow_entry *fe = NULL;
@@ -691,8 +741,21 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (fmd->fmd_flow_index >= 0) {
         fe = vr_flow_get_entry(nh->nh_router, fmd->fmd_flow_index);
-        if (fe)
+        if (fe) {
             flowp = &fe->fe_key;
+            /*
+             * If the ecmp index is explicitly configured as -1, the
+             * index need to be chosen as the one matchig with reverse
+             * flow's source.
+             */
+            if (fmd->fmd_ecmp_nh_index == -1) {
+                rflow_src_info = vr_flow_get_rflow_src_info(nh->nh_router, fe);
+                if (rflow_src_info != (unsigned int)-1) {
+                    ecmp_index = nh_composite_ecmp_select_by_rflow(pkt,
+                            nh, fmd, rflow_src_info);
+                }
+            }
+        }
     }
 
     if (!fe) {
@@ -718,17 +781,19 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
 
-    hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
-    hash %= count;
-    ecmp_index = cnhp[hash].cnh_ecmp_index;
-    cnh = cnhp[hash].cnh;
-    if (!cnh) {
-        if (nh->nh_component_ecmp_cnt) {
-            cnhp = nh->nh_component_ecmp;
-            hash_ecmp %= nh->nh_component_ecmp_cnt;
-            ecmp_index = cnhp[hash_ecmp].cnh_ecmp_index;
-            if (!(cnh = cnhp[hash_ecmp].cnh))
-                return -1;
+    if (ecmp_index == -1) {
+        hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
+        hash %= count;
+        ecmp_index = cnhp[hash].cnh_ecmp_index;
+        cnh = cnhp[hash].cnh;
+        if (!cnh) {
+            if (nh->nh_component_ecmp_cnt) {
+                cnhp = nh->nh_component_ecmp;
+                hash_ecmp %= nh->nh_component_ecmp_cnt;
+                ecmp_index = cnhp[hash_ecmp].cnh_ecmp_index;
+                if (!(cnh = cnhp[hash_ecmp].cnh))
+                    return -1;
+            }
         }
     }
 
