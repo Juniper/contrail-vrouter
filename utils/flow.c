@@ -1119,6 +1119,17 @@ flow_get_entry(struct vr_flow_entry *fe)
     return;
 }
 
+static inline int
+print_new_line_if_required(int printed, int max_print)
+{
+    if (printed >= max_print) {
+        printf("\n");
+        return 0;
+    }
+
+    return printed;
+}
+
 static void
 flow_dump_table(struct flow_table *ft)
 {
@@ -1358,77 +1369,85 @@ flow_dump_table(struct flow_table *ft)
                 action = 'U';
             }
 
-            printf("(");
-            printf("Gen: %u, ", fe->fe_gen_id);
+            printed = printf("(");
+            printed += printf("Gen: %u, ", fe->fe_gen_id);
             if ((fe->fe_type == VP_TYPE_IP) || (fe->fe_type == VP_TYPE_IP6))
-                printf("K(nh):%u, ", fe->fe_key.flow_nh_id);
+                printed += printf("K(nh):%u, ", fe->fe_key.flow_nh_id);
 
-            printf("Action:%c", action);
+            printed += printf("Action:%c", action);
             if (need_flag_print)
-                printf("(%s)", flag_string);
+                printed += printf("(%s)", flag_string);
             if (need_drop_reason) {
                 if (drop_reason != NULL)
-                    printf("(%s)", drop_reason);
+                    printed += printf("(%s)", drop_reason);
                 else
-                    printf("(%u)", fe->fe_drop_reason);
+                    printed += printf("(%u)", fe->fe_drop_reason);
             }
 
-            printf(", ");
-            printf("Flags:");
+            printed += printf(", ");
+            printed += printf("Flags:");
             if (fe->fe_flags & VR_FLOW_FLAG_EVICTED)
-                printf("E");
+                printed += printf("E");
             if (fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
-                printf("Ec");
+                printed += printf("Ec");
             if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
-                printf("N");
+                printed += printf("N");
             if (fe->fe_flags & VR_FLOW_FLAG_MODIFIED)
-                printf("M");
+                printed += printf("M");
             if (fe->fe_flags & VR_FLOW_FLAG_DELETE_MARKED)
-                printf("Dm");
+                printed += printf("Dm");
 
-            printf(", ");
+            printed += printf(", ");
             if (fe->fe_key.flow4_proto == VR_IP_PROTO_TCP) {
-                printf("TCP:");
+                printed += printf("TCP:");
 
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_SYN)
-                    printf("S");
+                    printed += printf("S");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_SYN_R)
-                    printf("Sr");
+                    printed += printf("Sr");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED)
-                    printf("E");
+                    printed += printf("E");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_ESTABLISHED_R)
-                    printf("Er");
+                    printed += printf("Er");
 
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_FIN)
-                    printf("F");
+                    printed += printf("F");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_FIN_R)
-                    printf("Fr");
+                    printed += printf("Fr");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_RST)
-                    printf("R");
+                    printed += printf("R");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_HALF_CLOSE)
-                    printf("C");
+                    printed += printf("C");
                 if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
-                    printf("D");
+                    printed += printf("D");
 
-                printf(", ");
+                printed += printf(", ");
             }
 
             if (fe->fe_ecmp_nh_index >= 0)
-                printf("E:%d, ", fe->fe_ecmp_nh_index);
+                printed += printf("E:%d, ", fe->fe_ecmp_nh_index);
 
-            printf("QOS:%d, ", fe->fe_qos_id);
-            printf("S(nh):%u, ", fe->fe_src_nh_index);
-            printf(" Stats:%u/%u, ", fe->fe_stats.flow_packets,
+            printed += printf("QOS:%d, ", fe->fe_qos_id);
+            printed += printf("S(nh):%u, ", fe->fe_src_nh_index);
+            printed = print_new_line_if_required(printed, 70);
+            printed += printf(" Stats:%u/%u, ", fe->fe_stats.flow_packets,
                     fe->fe_stats.flow_bytes);
+            printed = print_new_line_if_required(printed, 70);
+
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
-                printf(" Mirror Index :");
+                printed += printf(" Mirror Index :");
                 if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES)
-                    printf(" %d", fe->fe_mirror_id);
+                    printed += printf(" %d", fe->fe_mirror_id);
                 if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
-                    printf(", %d, ", fe->fe_sec_mirror_id);
+                    printed += printf(", %d, ", fe->fe_sec_mirror_id);
+                printed = print_new_line_if_required(printed, 70);
             }
-            printf(" SPort %d", fe->fe_udp_src_port);
-            printf(" TTL %d", fe->fe_ttl);
+            printed += printf(" SPort %d,", fe->fe_udp_src_port);
+            printed = print_new_line_if_required(printed, 70);
+            printf(" TTL %d,", fe->fe_ttl);
+            printed = print_new_line_if_required(printed, 70);
+            inet_ntop(AF_INET, &fe->fe_src_info, in_dest, sizeof(in_dest));
+            printf(" Sinfo %s", in_dest);
             printf(")");
         }
 
