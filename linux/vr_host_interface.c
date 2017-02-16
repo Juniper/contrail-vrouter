@@ -1653,7 +1653,8 @@ linux_if_tx_csum_offload(struct net_device *dev)
 #ifndef RHEL_MAJOR
     if (dev->dev.parent) {
         driver_name = dev_driver_string(dev->dev.parent);
-        if (driver_name && (!strncmp(driver_name, "ixgbe", 6))) {
+        if (driver_name && ((!strncmp(driver_name, "ixgbe", 6)) ||
+                            (!strncmp(driver_name, "i40e", 4)))) {
             return 1;
         }
     }
