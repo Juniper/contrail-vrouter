@@ -683,7 +683,7 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 void dpdk_adjust_tcp_mss(struct tcphdr *tcph, unsigned short overlay_len,
                             unsigned char iph_len);
 /* Creates a copy of the given packet mbuf */
-inline struct rte_mbuf *
+extern struct rte_mbuf *
 vr_dpdk_pktmbuf_copy(struct rte_mbuf *md, struct rte_mempool *mp);
 
 /*
