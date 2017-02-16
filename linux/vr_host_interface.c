@@ -1638,8 +1638,8 @@ linux_if_get_encap(struct vr_interface *vif)
 /*
  * linux_if_tx_csum_offload - returns 1 if the device supports checksum offload
  * on transmit for tunneled packets. Devices which have NETIF_F_HW_CSUM set
- * are capable of doing this, but there are some devices (such as ixgbe) which
- * support it even though they don't set NETIF_F_HW_CSUM.
+ * are capable of doing this, but there are some devices (such as ixgbe, i40e)
+ * which support it even though they don't set NETIF_F_HW_CSUM.
  */
 static int
 linux_if_tx_csum_offload(struct net_device *dev)
@@ -1653,7 +1653,8 @@ linux_if_tx_csum_offload(struct net_device *dev)
 #ifndef RHEL_MAJOR
     if (dev->dev.parent) {
         driver_name = dev_driver_string(dev->dev.parent);
-        if (driver_name && (!strncmp(driver_name, "ixgbe", 6))) {
+        if (driver_name && ((!strncmp(driver_name, "ixgbe", 6)) ||
+                            (!strncmp(driver_name, "i40e", 5)))) {
             return 1;
         }
     }
