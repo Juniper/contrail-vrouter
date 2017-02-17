@@ -366,6 +366,9 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_bridge_used_oentries =
         vr_bridge_table_used_oflow_entries(router);
 
+    vr_flow_get_burst_params(router, &resp->vo_burst_tokens,
+            &resp->vo_burst_interval, &resp->vo_burst_step);
+
     req = resp;
 generate_response:
     if (ret)
@@ -434,6 +437,8 @@ vrouter_ops_add_process(void *s_req)
         vr_flow_hold_limit = (unsigned int)req->vo_flow_hold_limit;
     if (req->vo_mudp != -1)
         vr_mudp = req->vo_mudp;
+    vr_flow_set_burst_params(vrouter_get(req->vo_rid), req->vo_burst_tokens,
+            req->vo_burst_interval, req->vo_burst_step);
 
     /* Neither of currently called functions signals an error. Just send OK
      * response here for now. */

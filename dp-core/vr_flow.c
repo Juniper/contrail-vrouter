@@ -1022,7 +1022,78 @@ vr_flow_table_hold_count(struct vrouter *router)
 }
 
 static void
-vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry *flow_e)
+vr_flow_burst_timeout(void *arg)
+{
+    int tokens;
+    struct vrouter *router = (struct vrouter *)arg;
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
+
+    tokens = infop->vfti_burst_tokens - infop->vfti_burst_used;
+    if (tokens > 0) {
+
+        tokens  = infop->vfti_burst_tokens_configured - tokens;
+        if (tokens <= 0) {
+            infop->vfti_timer->vt_stop_timer = 1;
+            return;
+        }
+
+        if (tokens > infop->vfti_burst_step_configured)
+            tokens = infop->vfti_burst_step_configured;
+    } else {
+        tokens = infop->vfti_burst_step_configured;
+    }
+
+    infop->vfti_burst_tokens += tokens;
+
+    return;
+}
+
+static void
+vr_flow_start_burst_processing(struct vrouter *router)
+{
+    struct vr_timer *vtimer;
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
+
+    if (!infop->vfti_burst_tokens_configured ||
+            !infop->vfti_burst_interval_configured ||
+            !infop->vfti_burst_step_configured) {
+        return;
+    }
+
+    if (!infop->vfti_timer) {
+        vtimer = vr_zalloc(sizeof(*vtimer), VR_TIMER_OBJECT);
+        if (!vtimer) {
+            vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, sizeof(*vtimer));
+            return;
+        }
+
+        vtimer->vt_timer = vr_flow_burst_timeout;
+        vtimer->vt_vr_arg = router;
+        vtimer->vt_msecs = infop->vfti_burst_interval_configured;
+
+        if (vr_create_timer(vtimer)) {
+            vr_free(vtimer, VR_TIMER_OBJECT);
+            return;
+        }
+
+        infop->vfti_timer = vtimer;
+    } else {
+        if (!infop->vfti_timer->vt_stop_timer)
+            return;
+
+        if (__sync_bool_compare_and_swap(
+                 &infop->vfti_timer->vt_stop_timer, 1, 0)) {
+            infop->vfti_timer->vt_msecs = infop->vfti_burst_interval_configured;
+            vr_restart_timer(infop->vfti_timer);
+        }
+    }
+
+    return;
+}
+
+static void
+vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry
+        *flow_e, bool burst)
 {
     unsigned int cpu;
     uint64_t act_count;
@@ -1052,6 +1123,11 @@ vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry *flow_e)
     }
 
     infop->vfti_hold_count[cpu]++;
+
+    if (burst == true) {
+        (void)__sync_add_and_fetch(&infop->vfti_burst_used, 1);
+        vr_flow_start_burst_processing(router);
+    }
 
     return;
 }
@@ -1279,11 +1355,71 @@ vr_flow_vif_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
     return true;
 }
 
+void
+vr_flow_get_burst_params(struct vrouter *router, int *burst_tokens,
+        int *burst_interval, int *burst_step)
+{
+    struct vr_flow_table_info *infop;
+
+    if (!router || !router->vr_flow_table_info)
+        return;
+
+    infop = router->vr_flow_table_info;
+
+    if (burst_tokens)
+        *burst_tokens = infop->vfti_burst_tokens_configured;
+    if (burst_interval)
+        *burst_interval = infop->vfti_burst_interval_configured;
+    if (burst_step)
+        *burst_step = infop->vfti_burst_step_configured;
+
+    return;
+}
+
+void
+vr_flow_set_burst_params(struct vrouter *router, int burst_tokens,
+                                int burst_interval, int burst_step)
+{
+    struct vr_flow_table_info *infop;
+
+    if (!router || !router->vr_flow_table_info)
+        return;
+
+    infop = router->vr_flow_table_info;
+
+    if (burst_tokens != -1)
+        infop->vfti_burst_tokens_configured = burst_tokens;
+
+    if (burst_interval != -1)
+        infop->vfti_burst_interval_configured = burst_interval;
+
+    if (burst_step != -1)
+        infop->vfti_burst_step_configured = burst_step;
+
+
+    vr_flow_start_burst_processing(router);
+    return;
+}
+
+static inline unsigned int
+vr_flow_burst_count(struct vrouter *router)
+{
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
+
+    return infop->vfti_burst_tokens;
+}
+
 static inline bool
 vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
-                       unsigned short *drop_reason)
+                       unsigned short *drop_reason, bool *burst)
 {
+    unsigned int hold_count;
+    struct vr_flow_table_info *infop = router->vr_flow_table_info;
+
+
     *drop_reason = VP_DROP_FLOW_UNUSABLE;
+    if (burst)
+        *burst = false;
 
     if (pkt->vp_type == VP_TYPE_IP) {
         if (!vr_inet_flow_allow_new_flow(router, pkt)) {
@@ -1292,11 +1428,17 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
         }
     }
 
-    if ((vr_flow_hold_limit) &&
-            (vr_flow_table_hold_count(router) >
-             vr_flow_hold_limit)) {
-        *drop_reason = VP_DROP_FLOW_UNUSABLE;
-        return false;
+    if (vr_flow_hold_limit) {
+        hold_count = vr_flow_table_hold_count(router);
+        if (hold_count > vr_flow_hold_limit) {
+            if (infop->vfti_burst_used >= vr_flow_burst_count(router)) {
+                *drop_reason = VP_DROP_FLOW_UNUSABLE;
+                return false;
+            }
+            if (burst) {
+                *burst = true;
+            }
+        }
     }
 
     return vr_flow_vif_allow_new_flow(router, pkt, drop_reason);
@@ -1309,6 +1451,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     unsigned int fe_index;
     struct vr_flow_entry *flow_e;
     unsigned short drop_reason = 0;
+    bool burst = false;
 
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
@@ -1320,7 +1463,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
              (NH_FLAG_RELAXED_POLICY | NH_FLAG_FLOW_LOOKUP)))
             return FLOW_FORWARD;
 
-        if (!vr_flow_allow_new_flow(router, pkt, &drop_reason)) {
+        if (!vr_flow_allow_new_flow(router, pkt, &drop_reason, &burst)) {
             vr_pfree(pkt, drop_reason);
             return FLOW_CONSUMED;
         }
@@ -1334,7 +1477,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 
         flow_e->fe_vrf = fmd->fmd_dvrf;
         /* mark as hold */
-        vr_flow_entry_set_hold(router, flow_e);
+        vr_flow_entry_set_hold(router, flow_e, burst);
     }
 
     if (flow_e->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
@@ -2095,7 +2238,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
 
     if ((req->fr_action == VR_FLOW_ACTION_HOLD) &&
             (fe->fe_action != VR_FLOW_ACTION_HOLD)) {
-        vr_flow_entry_set_hold(router, fe);
+        vr_flow_entry_set_hold(router, fe, false);
     } else {
         fe->fe_action = req->fr_action;
     }
@@ -2132,6 +2275,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
 
     if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
         fe->fe_flags &= ~VR_FLOW_FLAG_NEW_FLOW;
+
 
 
     ret = vr_flow_schedule_transition(router, req, fe);
@@ -2212,9 +2356,10 @@ void
 vr_flow_table_data_process(void *s_req)
 {
     int i, ret = 0;
-    vr_flow_table_data *resp, *ftable = (vr_flow_table_data *)s_req;
-    struct vrouter *router;
     uint64_t hold_count = 0;
+    struct vrouter *router;
+    struct vr_flow_table_info *infop;
+    vr_flow_table_data *resp, *ftable = (vr_flow_table_data *)s_req;
 
     router = vrouter_get(ftable->ftable_rid);
     resp = vr_flow_table_data_get(ftable);
@@ -2223,6 +2368,7 @@ vr_flow_table_data_process(void *s_req)
         goto send_response;
     }
 
+    infop = router->vr_flow_table_info;
     resp->ftable_op = ftable->ftable_op;
     resp->ftable_size = vr_flow_table_size(router);
 #if defined(__linux__) && defined(__KERNEL__)
@@ -2232,21 +2378,22 @@ vr_flow_table_data_process(void *s_req)
         strncpy(resp->ftable_file_path, vr_flow_path, VR_UNIX_PATH_MAX - 1);
 
     resp->ftable_used_entries = vr_flow_table_used_total_entries(router);
-    resp->ftable_deleted = router->vr_flow_table_info->vfti_deleted;
-    resp->ftable_changed = router->vr_flow_table_info->vfti_changed;
-    resp->ftable_processed = router->vr_flow_table_info->vfti_action_count;
-    resp->ftable_hold_oflows = router->vr_flow_table_info->vfti_oflows;
-    resp->ftable_added = router->vr_flow_table_info->vfti_added;
+    resp->ftable_deleted = infop->vfti_deleted;
+    resp->ftable_changed = infop->vfti_changed;
+    resp->ftable_processed = infop->vfti_action_count;
+    resp->ftable_hold_oflows = infop->vfti_oflows;
+    resp->ftable_added = infop->vfti_added;
     resp->ftable_cpus = vr_num_cpus;
     /* we only have space for 64 stats block max when encoding */
     for (i = 0; ((i < vr_num_cpus) && (i < VR_FLOW_MAX_CPUS)); i++) {
-        resp->ftable_hold_stat[i] =
-                router->vr_flow_table_info->vfti_hold_count[i];
+        resp->ftable_hold_stat[i] = infop->vfti_hold_count[i];
         hold_count += resp->ftable_hold_stat[i];
     }
 
     resp->ftable_created = hold_count;
     resp->ftable_oflow_entries = vr_flow_table_used_oflow_entries(router);
+    resp->ftable_burst_free_tokens = infop->vfti_burst_tokens - infop->vfti_burst_used;
+    resp->ftable_hold_entries = vr_flow_table_hold_count(router);
 
 send_response:
     vr_message_response(VR_FLOW_TABLE_DATA_OBJECT_ID, resp, ret);
@@ -2254,7 +2401,6 @@ send_response:
         vr_flow_table_data_destroy(resp);
 
     return;
-
 }
 
 /*
@@ -2312,7 +2458,14 @@ vr_flow_table_info_reset(struct vrouter *router)
     if (!router->vr_flow_table_info)
         return;
 
+    if (router->vr_flow_table_info->vfti_timer) {
+        vr_delete_timer(router->vr_flow_table_info->vfti_timer);
+        vr_free(router->vr_flow_table_info->vfti_timer, VR_TIMER_OBJECT);
+        router->vr_flow_table_info->vfti_timer = NULL;
+    }
+
     memset(router->vr_flow_table_info, 0, router->vr_flow_table_info_size);
+
     return;
 }
 

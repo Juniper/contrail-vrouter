@@ -51,6 +51,9 @@ enum opt_vrouter_index {
     SET_UDP_COFF_INDEX,
     SET_FLOW_HOLD_LIMIT_INDEX,
     SET_MUDP_INDEX,
+    SET_BURST_TOKENS_INDEX,
+    SET_BURST_INTERVAL_INDEX,
+    SET_BURST_STEP_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -117,7 +120,7 @@ static unsigned int log_level;
 static int perfr = -1, perfs = -1, from_vm_mss_adj = -1, to_vm_mss_adj = -1;
 static int perfr1 = -1, perfr2 = -1, perfr3 = -1, perfp = -1, perfq1 = -1;
 static int perfq2 = -1, perfq3 = -1, udp_coff = -1, flow_hold_limit = -1;
-static int mudp = -1;
+static int mudp = -1, burst_tokens = -1, burst_interval = -1, burst_step = -1;
 
 static int platform, vrouter_op = -1;
 
@@ -316,6 +319,9 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Used Over Flow entries               %u\n"
         "    Used Bridge entries                  %u\n"
         "    Used Over Flow bridge entries        %u\n"
+        "    Burst Total Tokens                   %u\n"
+        "    Burst Interval                       %u\n"
+        "    Burst Step                           %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -324,7 +330,8 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_perfq1, req->vo_perfq2, req->vo_perfq3,
         req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp,
         req->vo_flow_used_entries, req->vo_flow_used_oentries,
-        req->vo_bridge_used_entries, req->vo_bridge_used_oentries
+        req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
+        req->vo_burst_tokens, req->vo_burst_interval, req->vo_burst_step
     );
 
     return;
@@ -418,7 +425,7 @@ vr_vrouter_op(struct nl_client *cl)
                     perfr, perfs, from_vm_mss_adj, to_vm_mss_adj,
                     perfr1, perfr2, perfr3, perfp, perfq1,
                     perfq2, perfq3, udp_coff, flow_hold_limit,
-                    mudp);
+                    mudp, burst_tokens, burst_interval, burst_step);
         }
         break;
 
@@ -497,6 +504,15 @@ static struct option long_options[] = {
     [SET_MUDP_INDEX] = {
         "mudp", required_argument, &opt[SET_MUDP_INDEX], 1
     },
+    [SET_BURST_TOKENS_INDEX] = {
+        "burst_tokens", required_argument, &opt[SET_BURST_TOKENS_INDEX], 1
+    },
+    [SET_BURST_INTERVAL_INDEX] = {
+        "burst_interval", required_argument, &opt[SET_BURST_INTERVAL_INDEX], 1
+    },
+    [SET_BURST_STEP_INDEX] = {
+        "burst_step", required_argument, &opt[SET_BURST_STEP_INDEX], 1
+    },
     [MAX_OPT_INDEX] = {NULL, 0, 0, 0}
 };
 
@@ -511,7 +527,9 @@ Usage(void)
                "vrouter ([--set-log-level <level>] [--enable-log-type <type>]...\n"
                "         [--disable-log-type <type>]...)\n"
                "vrouter ([--set-mudp <0|1>] [--from_vm_mss_adj <0|1>]...\n"
-               "         [--flow_hold_limit <0|1>]...)\n\n"
+               "         [--flow_hold_limit <0|1>]...)\n"
+               "vrouter ([--burst_tokens <int>>] [--burst_interval<int>]...\n"
+               "         [--burst_step<int>]...)\n\n"
                "Options:\n"
                "--info Dumps information about vrouter\n"
                "--get-log-level Prints current log level\n"
@@ -522,6 +540,9 @@ Usage(void)
                "--from_vm_mss_adj <0|1> Turn on|off TCP MSS on packets from VM\n"
                "--flow_hold_limit <0|1> Turn on|off flow hold limit\n"
                "--mudp <0|1> Turn on|off MPLS over UDP globally\n"
+               "--burst_tokens <int> total burst tokens \n"
+               "--burst_interval <int> timer interval of burst tokens in ms\n"
+               "--burst_step <int> burst tokens to add at every interval\n"
                "--help Prints this message\n\n"
                "<type> is one of:\n"
                "    vrouter\n"
@@ -544,7 +565,9 @@ Usage(void)
         printf("Usage:\n"
                "vrouter --info | --help\n"
                "vrouter ([--set-mudp <0|1>] [--from_vm_mss_adj <0|1>]...\n"
-               "         [--flow_hold_limit <0|1>]...)\n\n"
+               "         [--flow_hold_limit <0|1>]...)\n"
+               "vrouter ([--burst_tokens <int>>] [--burst_interval<int>]...\n"
+               "         [--burst_step<int>]...)\n\n"
                "--info Dumps information about vrouter\n"
                "--perfr <0|1> Turn on|off GRO\n"
                "--perfs <0|1> Turn on|off segmentation in software\n"
@@ -560,6 +583,9 @@ Usage(void)
                "--udp_coff <0|1> NIC cksum offload for outer UDP hdr\n"
                "--flow_hold_limit <0|1> Turn on|off flow hold limit\n"
                "--mudp <0|1> Turn on|off MPLS over UDP globally\n"
+               "--burst_tokens <int> total burst tokens \n"
+               "--burst_interval <int> timer interval of burst tokens in ms\n"
+               "--burst_step <int> burst tokens to add at every interval\n"
                "--help Prints this message\n"
                "\n");
         break;
@@ -807,6 +833,36 @@ parse_long_opts(int opt_index, char *opt_arg)
         mudp = (int)strtol(opt_arg, NULL, 0);
         if (errno != 0) {
             printf("vrouter: Error parsing mudp: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_BURST_TOKENS_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        burst_tokens = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing burst_tokens: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_BURST_INTERVAL_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        burst_interval = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing burst_interval: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
+        break;
+
+    case SET_BURST_STEP_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        burst_step = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing burst_step: %s: %s (%d)\n", opt_arg,
                     strerror(errno), errno);
             Usage();
         }
