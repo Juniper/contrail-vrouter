@@ -1803,8 +1803,8 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
 
         qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-        if (nh_udp_tunnel_helper(pkt, fmd->fmd_udp_src_port,
-                    nh->nh_udp_tun_dport, sip,
+        if (nh_udp_tunnel_helper(pkt, htons(fmd->fmd_udp_src_port),
+                    htons(nh->nh_udp_tun_dport), sip,
                     nh->nh_udp_tun_dip, qos) == false) {
             goto send_fail;
         }
@@ -1818,8 +1818,8 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
     } else if (nh->nh_family == AF_INET6) {
-        if (nh_udp_tunnel6_helper(pkt, nh, fmd->fmd_udp_src_port,
-                   nh->nh_udp_tun_dport) == false) {
+        if (nh_udp_tunnel6_helper(pkt, nh, htons(fmd->fmd_udp_src_port),
+                   htons(nh->nh_udp_tun_dport)) == false) {
             goto send_fail;
         }
 
