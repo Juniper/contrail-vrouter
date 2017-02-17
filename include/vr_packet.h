@@ -1214,7 +1214,7 @@ pkt_init_fragment(struct vr_packet *dst, struct vr_packet *src)
 }
 
 static inline void
-pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
+vr_drop_stats_update(struct vr_interface *vif, unsigned short reason, int cpu)
 {
     uint8_t *data;
     unsigned int count = 1;

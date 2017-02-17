@@ -307,7 +307,7 @@ lh_pfree(struct vr_packet *pkt, unsigned short reason)
     struct sk_buff *skb;
 
     /* Handle the Vrouter statistics */
-    pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
+    vr_drop_stats_update(pkt->vp_if, reason, pkt->vp_cpu);
 
     skb = vp_os_packet(pkt);
     if (skb)
@@ -380,7 +380,7 @@ void
 lh_pfree_skb(struct sk_buff *skb, struct vr_interface *vif,
              unsigned short reason)
 {
-    pkt_drop_stats(vif, reason, lh_get_cpu());
+    vr_drop_stats_update(vif, reason, lh_get_cpu());
 
     kfree_skb(skb);
     return;

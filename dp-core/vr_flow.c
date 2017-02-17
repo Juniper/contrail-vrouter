@@ -932,7 +932,7 @@ vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
     npkt = vr_pclone(pkt);
     if (!npkt) {
         /* Lets manipulate the stats */
-        pkt_drop_stats(pkt->vp_if, VP_DROP_TRAP_ORIGINAL, pkt->vp_cpu);
+        vr_drop_stats_update(pkt->vp_if, VP_DROP_TRAP_ORIGINAL, pkt->vp_cpu);
         if (pnode)
             pnode->pl_packet = NULL;
         npkt = pkt;

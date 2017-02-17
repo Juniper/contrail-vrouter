@@ -153,7 +153,7 @@ dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     if (pkt) {
         /* Handle Vrouter statistics */
-        pkt_drop_stats(pkt->vp_if, reason, rte_lcore_id());
+        vr_drop_stats_update(pkt->vp_if, reason, rte_lcore_id());
 
         rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
     }

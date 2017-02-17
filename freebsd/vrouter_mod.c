@@ -215,7 +215,7 @@ fh_pfree(struct vr_packet *pkt, unsigned short reason)
 	KASSERT(pkt, ("Null packet"));
 
     /* Handle vrouter statistics */
-    pkt_drop_stats(pkt->vp_if, reason, pkt->vp_cpu);
+    vr_drop_stats_update(pkt->vp_if, reason, pkt->vp_cpu);
 
 	/* Fetch original mbuf from packet structure */
 	m = vp_os_packet(pkt);
