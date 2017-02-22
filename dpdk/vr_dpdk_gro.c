@@ -12,6 +12,14 @@
  *
  * vr_dpdk_gro.c -- TCP Offloads on the receiver
  *
+ * This is an adaptation of FreeBSD's tcp_lro.c.
+ * Copyright (c) 2007, Myricom Inc.
+ * Copyright (c) 2008, Intel Corporation.
+ * Copyright (c) 2012 The FreeBSD Foundation
+ * All rights reserved.
+ * Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+ * BSD LICENSE
+ *
  */
 
 #include "vr_dpdk.h"
