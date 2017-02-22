@@ -12,6 +12,12 @@
  *
  * vr_dpdk_gso.c -- TCP Offloads on the sender
  *
+ * This is an adaptation of FreeBSD's patch for gso
+ * Copyright (C) 2014, Stefano Garzarella - Universita` di Pisa
+ * All rights reserved.
+ * BSD LICENSE
+ *
+ *
  */
 
 #include "vr_dpdk.h"
