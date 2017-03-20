@@ -15,6 +15,7 @@
  */
 
 #include "vr_dpdk.h"
+#include "vhost.h"
 // #include "vr_packet.h"
 
 #include <rte_errno.h>
@@ -28,6 +29,10 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 
 /*
  * vr_dpdk_tapdev_init - initializes TAP device using specified Ethernet port.
@@ -40,6 +45,7 @@ vr_dpdk_tapdev_init(struct vr_interface *vif)
     int i, fd;
     struct vr_dpdk_tapdev *tapdev = NULL;
     struct ifreq ifr;
+    struct sockaddr_nl tap_nl_addr;
 
     RTE_LOG(INFO, VROUTER, "    creating TAP device %s\n", vif->vif_name);
 
@@ -80,12 +86,36 @@ vr_dpdk_tapdev_init(struct vr_interface *vif)
     synchronize_rcu();
     tapdev->tapdev_fd = fd;
 
+    /* Create tap netlink socket for link up/down mtu change notifications */
+    if (vif_is_vhost(vif) && vr_dpdk.tap_nl_fd <= 0) {
+        vr_dpdk.tap_nl_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+        if (vr_dpdk.tap_nl_fd < 0) {
+            RTE_LOG(ERR, VROUTER, "    error creating tap netlink socket\n");
+            goto error;
+        }
+
+        memset ((void *) &tap_nl_addr, 0, sizeof (tap_nl_addr));
+        tap_nl_addr.nl_family = AF_NETLINK;
+        tap_nl_addr.nl_pid = getpid ();
+        tap_nl_addr.nl_groups = RTMGRP_LINK;
+        if (bind(vr_dpdk.tap_nl_fd,
+                    (struct sockaddr *) &tap_nl_addr, sizeof (tap_nl_addr)) < 0) {
+            RTE_LOG(ERR, VROUTER, "    error binding tap netlink socket\n");
+            goto error;
+        }
+    }
+
     return 0;
 
 error:
     if (tapdev->tapdev_fd > 0) {
         close(tapdev->tapdev_fd);
         tapdev->tapdev_fd = -1;
+    }
+
+    if (vr_dpdk.tap_nl_fd > 0) {
+        close(vr_dpdk.tap_nl_fd);
+        vr_dpdk.tap_nl_fd = -1;
     }
 
     return -EINVAL;
@@ -131,6 +161,11 @@ vr_dpdk_tapdev_release(struct vr_interface *vif)
                 rte_pktmbuf_free(mbuf);
             }
         }
+    }
+
+    if (vif_is_vhost(vif) && vr_dpdk.tap_nl_fd > 0) {
+        close(vr_dpdk.tap_nl_fd);
+        vr_dpdk.tap_nl_fd = -1;
     }
 
     return 0;
@@ -499,4 +534,167 @@ vr_dpdk_tapdev_rxtx(void)
     } /* for all TAP devices. */
 
     return total_pkts;
+}
+
+static void vr_dpdk_handle_vhost0_notification(uint32_t mtu, uint32_t if_up)
+{
+    static int vhost_mtu = 1500; /* Default MTU */
+    static int vhost_if_status = 1; /* Default if state */
+
+    struct vr_interface *vif;
+    struct vrouter *router = vrouter_get(0);
+    struct vr_dpdk_ethdev *ethdev = NULL;
+    uint8_t slave_port_id, port_id = 0;
+    int ret = 0, i;
+
+    if (vhost_mtu != mtu) {
+        /*
+         * TODO: DPDK bond PMD does not implement mtu_set op, so we need to
+         * set the MTU manually for all the slaves.
+         */
+        /* Bond vif uses first slave port ID. */
+        if (router->vr_eth_if)
+            ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
+
+        if (ethdev && (ethdev->ethdev_nb_slaves > 0)) {
+            RTE_LOG(INFO, VROUTER, "Changing bond eth device %" PRIu8 " MTU\n",
+                    ethdev->ethdev_port_id);
+
+            rte_eth_devices[ethdev->ethdev_port_id].data->mtu = mtu;
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                slave_port_id = ethdev->ethdev_slaves[i];
+                RTE_LOG(INFO, VROUTER,
+                        "    changing bond member eth device %" PRIu8 " MTU to %u\n",
+                        slave_port_id, mtu);
+
+                ret =  rte_eth_dev_set_mtu(slave_port_id, mtu);
+                if (ret < 0) {
+                    RTE_LOG(ERR, VROUTER,
+                            "    error changing bond member eth device %" PRIu8 " MTU: %s (%d)\n",
+                            slave_port_id, rte_strerror(-ret), -ret);
+                    return;
+                }
+            }
+        } else {
+            RTE_LOG(INFO, VROUTER, "Changing eth device MTU to %u\n", mtu);
+
+            ret =  rte_eth_dev_set_mtu(0, mtu);
+            if (ret < 0) {
+                RTE_LOG(ERR, VROUTER,
+                        "Error changing eth device MTU: %s (%d)\n",
+                        rte_strerror(-ret), -ret);
+                return;
+            }
+        }
+
+        /* On success, inform vrouter about new MTU */
+        for (i = 0; i < router->vr_max_interfaces; i++) {
+            vif = __vrouter_get_interface(router, i);
+            if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+               /* Ethernet header size */
+               mtu += sizeof(struct vr_eth);
+               if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+                   /* 802.1q header size */
+                   mtu += sizeof(uint32_t);
+               }
+               vif->vif_mtu = mtu;
+               if (vif->vif_bridge)
+                   vif->vif_bridge->vif_mtu = mtu;
+            }
+        }
+
+        /* Save the new MTU */
+        vhost_mtu = mtu;
+    }
+
+    if (vhost_if_status != if_up) {
+
+        ret = 0;
+
+        if (router->vr_eth_if)
+            ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
+
+        if (ethdev && (ethdev->ethdev_nb_slaves > 0))
+            port_id = ethdev->ethdev_port_id;
+
+        RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
+                        port_id, if_up ? "UP" : "DOWN");
+
+        if (if_up)
+            ret = rte_eth_dev_start(port_id);
+        else
+            rte_eth_dev_stop(port_id);
+
+        if (ret < 0) {
+            RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP "
+                        "failed (%d)\n", port_id, ret);
+        }
+
+        /* Save the new IF state */
+        vhost_if_status = if_up;
+    }
+}
+
+void vr_dpdk_tapdev_handle_notifications(void)
+{
+    int32_t status;
+    char buf[4096];
+    struct iovec iov = {buf, sizeof buf};
+    struct sockaddr_nl snl;
+    struct msghdr msg = {(void *) &snl, sizeof snl, &iov, 1, NULL, 0, 0};
+    struct nlmsghdr *h;
+    struct ifinfomsg *ifi;
+
+    status = recvmsg(vr_dpdk.tap_nl_fd, &msg, MSG_DONTWAIT);
+    if (status <= 0) {
+        /* Nothing to process */
+        return;
+    }
+
+    for (h = (struct nlmsghdr *) buf; NLMSG_OK (h, (unsigned int) status);
+         h = NLMSG_NEXT (h, status))
+    {
+        /* Finish reading */
+        if (h->nlmsg_type == NLMSG_DONE)
+          return;
+
+        /* Message is some kind of error */
+        if (h->nlmsg_type == NLMSG_ERROR) {
+            RTE_LOG(ERR, VROUTER, "read_netlink: Message error\n");
+            return; /* Error */
+        }
+
+        if (h->nlmsg_type == RTM_NEWLINK) {
+            int len;
+            struct rtattr *attribute;
+            char *ifname = NULL;
+            uint32_t mtu = 0;
+
+            ifi = NLMSG_DATA (h);
+
+            len = h->nlmsg_len - NLMSG_LENGTH(sizeof(*ifi));
+
+            /* loop over all attributes for the NEWLINK message */
+            for (attribute = IFLA_RTA(ifi); RTA_OK(attribute, len);
+                                           attribute = RTA_NEXT(attribute, len))
+            {
+                switch(attribute->rta_type) {
+                    case IFLA_IFNAME:
+                        ifname = (char*) RTA_DATA(attribute);
+                        break;
+                    case IFLA_MTU:
+                        mtu = *(uint32_t*) RTA_DATA(attribute);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            if (ifname && (strncmp(ifname, VHOST_IFNAME, (strlen(VHOST_IFNAME) + 1)) == 0)) {
+                RTE_LOG(INFO, VROUTER, "Notification received for vhost0\n");
+                vr_dpdk_handle_vhost0_notification
+                                 (mtu, (ifi->ifi_flags & IFF_UP));
+            }
+        }
+    }
 }
