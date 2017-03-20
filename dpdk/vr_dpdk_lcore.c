@@ -1795,6 +1795,9 @@ dpdk_lcore_tapdev_loop(void)
     RTE_LOG(DEBUG, VROUTER, "Hello from TAP lcore %u\n", lcore_id);
 
     while (1) {
+        /* Handle link up/down/mtu change */
+        vr_dpdk_tapdev_handle_notifications();
+
         total_pkts = vr_dpdk_tapdev_rxtx();
 
         /* make a short pause if no single packet received */
