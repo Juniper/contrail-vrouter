@@ -48,7 +48,7 @@ vrouter_get_nexthop(unsigned int rid, unsigned int index)
     router = vrouter_get(rid);
     nh = __vrouter_get_nexthop(router, index);
     if (nh)
-        nh->nh_users++;
+        (void)__sync_add_and_fetch(&nh->nh_users, 1);
 
     return nh;
 }
