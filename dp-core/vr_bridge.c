@@ -646,10 +646,12 @@ bridge_table_deinit(struct vr_rtable *rtable, struct rtable_fspec *fs,
 static void
 bridge_table_unlock(struct vr_interface *vif, uint8_t *mac, int cpu)
 {
-    if (cpu < 0 || !vif->vif_bridge_table_lock)
+    uint8_t *bridge_table_lock = vif->vif_bridge_table_lock;
+
+    if (cpu < 0 || !bridge_table_lock)
         return;
 
-    vif->vif_bridge_table_lock[cpu] = 0;
+    bridge_table_lock[cpu] = 0;
 
     return;
 }
@@ -657,11 +659,11 @@ bridge_table_unlock(struct vr_interface *vif, uint8_t *mac, int cpu)
 static int
 bridge_table_lock(struct vr_interface *vif, uint8_t *mac)
 {
-    uint8_t lock = 1;
+    uint8_t lock = 1, *bridge_table_lock = vif->vif_bridge_table_lock;
     uint32_t hash;
     unsigned long t1s, t1ns, t2s, t2ns, diff;
 
-    if (!vif->vif_bridge_table_lock)
+    if (!bridge_table_lock)
         return -EINVAL;
 
     hash = vr_hash(mac, VR_ETHER_ALEN, 0);
@@ -669,8 +671,7 @@ bridge_table_lock(struct vr_interface *vif, uint8_t *mac)
 
     vr_get_mono_time(&t1s, &t1ns);
     while (lock) {
-        lock = __sync_lock_test_and_set(&vif->vif_bridge_table_lock[hash],
-                lock);
+        lock = __sync_lock_test_and_set(&bridge_table_lock[hash], lock);
         if (lock) {
             vr_get_mono_time(&t2s, &t2ns);
             if (t2ns >= t1ns) {
