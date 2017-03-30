@@ -127,7 +127,7 @@ static struct option long_options[] = {
     [GET_OPT_INDEX]     =   {"get",     required_argument,  &get_set,       1},
     [DUMP_OPT_INDEX]    =   {"dump",    no_argument,        &dump_set,      1},
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
-    [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
+    [MAX_OPT_INDEX]     =   {NULL,    0,                  0,              0},
 };
 
 static void
@@ -152,8 +152,6 @@ parse_long_opts(int opt_index, char *opt_arg)
     switch (opt_index) {
     case GET_OPT_INDEX:
         vrf = strtol(opt_arg, NULL, 0);
-        if (errno)
-            Usage();
         stats_op = SANDESH_OP_GET;
 
         break;
@@ -162,11 +160,14 @@ parse_long_opts(int opt_index, char *opt_arg)
         stats_op = SANDESH_OP_DUMP;
         break;
 
+    case HELP_OPT_INDEX:
     default:
+        Usage();
         break;
     }
 
-
+    if (errno)
+        Usage();
     return;
 }
 
@@ -174,9 +175,7 @@ static void
 validate_options(void)
 {
     int options;
-
     options = get_set + dump_set + help_set;
-
     if (!options)
         Usage();
 
@@ -191,7 +190,6 @@ main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index;
-
     while (((opt = getopt_long(argc, argv, "",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
