@@ -581,7 +581,7 @@ vr_bridge_table_data_process(void *s_req)
     }
 
 generate_response:
-    vr_message_response(VR_BRIDGE_TABLE_DATA_OBJECT_ID, resp, ret);
+    vr_message_response(VR_BRIDGE_TABLE_DATA_OBJECT_ID, resp, ret, false);
     if (resp) {
         vr_bridge_table_data_destroy(resp);
         resp = NULL;

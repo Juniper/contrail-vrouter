@@ -715,6 +715,7 @@ struct host_os freebsd_host = {
 	.hos_set_log_type               = fh_set_log_type,
 	.hos_get_log_level              = fh_get_log_level,
 	.hos_get_enabled_log_types      = fh_get_enabled_log_types,
+	.hos_nl_broadcast_supported     = false,
 };
 
 struct host_os *

@@ -18,6 +18,7 @@
 #include "vr_message.h"
 #include "sandesh.h"
 #include "vr_response.h"
+#include "vrouter.h"
 
 static int netlink_trans_request(struct sk_buff *, struct genl_info *);
 
@@ -35,6 +36,10 @@ struct genl_family vrouter_genl_family = {
     .version    =   1,
     .maxattr    =   NL_ATTR_MAX - 1,
     .netnsok    =   true,
+};
+
+struct genl_multicast_group vrouter_genl_groups[] = {
+  { .name = "VRouterGroup" },
 };
 
 #define NETLINK_RESPONSE_HEADER_LEN       (NLMSG_HDRLEN + GENL_HDRLEN + \
@@ -93,6 +98,7 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
     struct vr_message request, *response;
     struct sk_buff *skb;
     uint32_t netlink_id;
+    void *msg_head;
 
     if (!aap || !(nla = aap[NL_ATTR_VR_MESSAGE_PROTOCOL]))
         return -EINVAL;
@@ -114,28 +120,51 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
 
     multi_flag = 0;
     while ((response = vr_message_dequeue_response())) {
-        if ((multi_flag == 0) && (!vr_response_queue_empty()))
-            multi_flag = NLM_F_MULTI;
+        if (!response->vr_message_broadcast) {
+            if ((multi_flag == 0) && (!vr_response_queue_empty()))
+                multi_flag = NLM_F_MULTI;
 
-        buf = response->vr_message_buf;
-        skb = netlink_skb(buf);
-        if (!skb)
-            continue;
+            buf = response->vr_message_buf;
+            skb = netlink_skb(buf);
+            if (!skb)
+                goto next;
 
-        len = response->vr_message_len;
-        len += GENL_HDRLEN + NLA_HDRLEN;
-        len = NLMSG_ALIGN(len);
-        rep = __nlmsg_put(skb, netlink_id, nlh->nlmsg_seq,
-                        nlh->nlmsg_type, len, multi_flag);
-        genlh = nlmsg_data(rep);
-        memcpy(genlh, info->genlhdr, sizeof(*genlh));
+            len = response->vr_message_len;
+            len += GENL_HDRLEN + NLA_HDRLEN;
+            len = NLMSG_ALIGN(len);
+            rep = __nlmsg_put(skb, netlink_id, nlh->nlmsg_seq,
+                            nlh->nlmsg_type, len, multi_flag);
+            genlh = nlmsg_data(rep);
+            memcpy(genlh, info->genlhdr, sizeof(*genlh));
 
-        nla = (struct nlattr *)((char *)genlh + GENL_HDRLEN);
-        nla->nla_len = response->vr_message_len;
-        nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
+            nla = (struct nlattr *)((char *)genlh + GENL_HDRLEN);
+            nla->nla_len = response->vr_message_len;
+            nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
 
-        netlink_unicast(in_skb->sk, skb, netlink_id, MSG_DONTWAIT);
+            netlink_unicast(in_skb->sk, skb, netlink_id, MSG_DONTWAIT);
+        } else {
+            // If there is no listener, we don't broadcast
+            if (!netlink_has_listeners(in_skb->sk, vrouter_genl_family.mcgrp_offset)) {
+                goto next;
+            }
 
+            skb = genlmsg_new(nla->nla_len, GFP_KERNEL);
+            if (!skb)
+                goto next;
+            msg_head = genlmsg_put(skb, 0, 0, &vrouter_genl_family, 0, SANDESH_REQUEST);
+            if (!msg_head) {
+                nlmsg_free(skb);
+                goto next;
+            }
+            if (nla_put(skb, NL_ATTR_VR_MESSAGE_PROTOCOL, response->vr_message_len, response->vr_message_buf) < 0) {
+                nlmsg_free(skb);
+                goto next;
+            }
+            genlmsg_end(skb, msg_head);
+
+            genlmsg_multicast(&vrouter_genl_family, skb, 0, 0, GFP_KERNEL);
+        }
+next:
         response->vr_message_buf = NULL;
         vr_message_free(response);
     }
@@ -181,7 +210,7 @@ vr_genetlink_init(void)
     return genl_register_family_with_ops(&vrouter_genl_family, vrouter_genl_ops,
         ARRAY_SIZE(vrouter_genl_ops));
 #else
-    return genl_register_family_with_ops(&vrouter_genl_family,
-                                         vrouter_genl_ops);
+    return genl_register_family_with_ops_groups(&vrouter_genl_family,
+             vrouter_genl_ops, vrouter_genl_groups);
 #endif
 }
