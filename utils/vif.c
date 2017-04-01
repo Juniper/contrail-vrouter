@@ -483,9 +483,9 @@ list_get_print(vr_interface_req *req)
             vr_get_if_type_string(req->vifr_type),
             MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
     vr_interface_print_head_space();
-    printf("Vrf:%d Flags:%s MTU:%d QOS:%d Ref:%d", req->vifr_vrf,
+    printf("Vrf:%d Flags:%s QOS:%d Ref:%d", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
-            req->vifr_mtu, req->vifr_qos_map_index, req->vifr_ref_cnt);
+            req->vifr_qos_map_index, req->vifr_ref_cnt);
     if (req->vifr_flags & (VIF_FLAG_MIRROR_TX | VIF_FLAG_MIRROR_RX)) {
         printf(" Mirror index %d\n", req->vifr_mir_id);
     } else {
