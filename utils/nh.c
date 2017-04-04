@@ -334,6 +334,9 @@ vr_nexthop_req_process(void *s_req)
     printf("\n\n");
     if (req->nhr_type == NH_COMPOSITE && command == SANDESH_OP_GET) {
         for (i = 0; i < req->nhr_nh_list_size; i++) {
+            // Skip expanding sub-nh for -1 index
+            if (req->nhr_nh_list[i] == -1)
+                continue;
             vr_nh_op(cl, command, type, req->nhr_nh_list[i], if_id, vrf_id,
                      dst_mac, src_mac, sip, dip, flags);
         }
