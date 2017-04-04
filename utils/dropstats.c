@@ -199,7 +199,7 @@ enum opt_index {
 static struct option long_options[] = {
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
     [CORE_OPT_INDEX]    =   {"core",    required_argument,  &core_set,      1},
-    [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
+    [MAX_OPT_INDEX]     =   {NULL,    0,                  0,              0},
 };
 
 static void
