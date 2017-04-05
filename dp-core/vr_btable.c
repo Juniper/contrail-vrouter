@@ -181,7 +181,7 @@ vr_btable_attach(struct iovec *iov, unsigned int iov_len,
     if (iov[0].iov_len % esize)
         return NULL;
 
-    alloc_size = sizeof(struct vr_btable *);
+    alloc_size = sizeof(struct vr_btable);
     alloc_size += (sizeof(void *) * iov_len);
     alloc_size += (sizeof(struct vr_btable_partition) * iov_len);
 
