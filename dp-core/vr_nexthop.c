@@ -1938,8 +1938,8 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    if (!vif->vif_set_rewrite(vif, pkt, fmd,
-                nh->nh_data, nh->nh_udp_tun_encap_len)) {
+    if (vif->vif_set_rewrite(vif, pkt, fmd,
+                nh->nh_data, nh->nh_udp_tun_encap_len) < 0) {
         goto send_fail;
     }
 
@@ -2020,7 +2020,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     uint16_t tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT;
     unsigned short reason = VP_DROP_PUSH;
 
-    unsigned char *tun_encap;
+    int tun_encap_rewrite;
     struct vr_forwarding_class_qos *qos;
     struct vr_interface *vif;
     struct vr_vrf_stats *stats;
@@ -2137,9 +2137,9 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    tun_encap = vif->vif_set_rewrite(vif, pkt, fmd,
+    tun_encap_rewrite = vif->vif_set_rewrite(vif, pkt, fmd,
             nh->nh_data, tun_encap_len);
-    if (!tun_encap) {
+    if (tun_encap_rewrite < 0) {
         goto send_fail;
     }
 
@@ -2171,7 +2171,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     unsigned short drop_reason = VP_DROP_INVALID_NH;
     unsigned int id;
 
-    unsigned char *tun_encap;
+    int tun_encap_rewrite;
     struct vr_forwarding_class_qos *qos;
     struct vr_gre *gre_hdr;
     struct vr_ip *ip;
@@ -2323,9 +2323,9 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
-    tun_encap = vif->vif_set_rewrite(vif, pkt, fmd,
+    tun_encap_rewrite = vif->vif_set_rewrite(vif, pkt, fmd,
             nh->nh_data, nh->nh_gre_tun_encap_len);
-    if (!tun_encap) {
+    if (tun_encap_rewrite < 0) {
         drop_reason = VP_DROP_PUSH;
         goto send_fail;
     }
@@ -2518,6 +2518,7 @@ static nh_processing_t
 nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
                     struct vr_forwarding_md *fmd)
 {
+    int rewrite_len;
     unsigned short *proto_p;
 
     struct vr_ip *ip;
@@ -2578,12 +2579,13 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
             return NH_PROCESSING_COMPLETE;
     }
 
-    if (!vif->vif_set_rewrite(vif, pkt, fmd, nh->nh_data, nh->nh_encap_len)) {
+    rewrite_len = vif->vif_set_rewrite(vif, pkt, fmd, nh->nh_data, nh->nh_encap_len);
+    if (rewrite_len < 0) {
         vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
         return NH_PROCESSING_COMPLETE;
     }
 
-    if (nh->nh_encap_len) {
+    if (rewrite_len) {
         proto_p = (unsigned short *)(pkt_data(pkt) + nh->nh_encap_len - 2);
         if (pkt->vp_type == VP_TYPE_IP6)
             *proto_p = htons(VR_ETH_PROTO_IP6);
