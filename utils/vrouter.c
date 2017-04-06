@@ -288,12 +288,14 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Flow Table limit                     %u\n"
         "    Flow Table overflow limit            %u\n"
         "    Mirror entries limit                 %u\n"
+        "    Memroy Allocation Checks             %u\n"
         "\n",
 
         req->vo_interfaces, req->vo_vrfs, req->vo_nexthops,
         req->vo_mpls_labels, req->vo_bridge_entries,
         req->vo_oflow_bridge_entries, req->vo_flow_entries,
-        req->vo_oflow_entries, req->vo_mirror_entries
+        req->vo_oflow_entries, req->vo_mirror_entries,
+        req->vo_memory_alloc_checks
     );
 
     printf("Runtime parameters\n"

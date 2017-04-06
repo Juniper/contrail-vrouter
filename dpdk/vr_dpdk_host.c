@@ -80,9 +80,24 @@ dpdk_printf(const char *format, ...)
 static void *
 dpdk_malloc(unsigned int size, unsigned int object)
 {
-    void *mem = rte_malloc(NULL, size, 0);
+    struct vr_malloc_md *md;
+    void *mem;
+
+    if (!size)
+        return NULL;
+
+    if (vr_memory_alloc_checks) {
+        size += sizeof(*md);
+    }
+
+    mem = rte_malloc(NULL, size, 0);
     if (likely(mem != NULL)) {
         vr_malloc_stats(size, object);
+
+        if (vr_memory_alloc_checks) {
+            vr_malloc_md_set(mem, object);
+            mem = (uint8_t *)mem + sizeof(*md);
+        }
     }
 
     return mem;
@@ -91,9 +106,24 @@ dpdk_malloc(unsigned int size, unsigned int object)
 static void *
 dpdk_zalloc(unsigned int size, unsigned int object)
 {
-    void *mem = rte_zmalloc(NULL, size, 0);
+    struct vr_malloc_md *md;
+    void *mem;
+
+    if (!size)
+        return NULL;
+
+    if (vr_memory_alloc_checks) {
+        size += sizeof(*md);
+    }
+
+    mem = rte_zmalloc(NULL, size, 0);
     if (likely(mem != NULL)) {
         vr_malloc_stats(size, object);
+
+        if (vr_memory_alloc_checks) {
+            vr_malloc_md_set(mem, object);
+            mem = (uint8_t *)mem + sizeof(*md);
+        }
     }
 
     return mem;
@@ -103,7 +133,16 @@ static void
 dpdk_free(void *mem, unsigned int object)
 {
     if (mem) {
+        if (vr_memory_alloc_checks) {
+            vr_malloc_md_check(mem, object);
+        }
+
         vr_free_stats(object);
+
+        if (vr_memory_alloc_checks) {
+            mem = (uint8_t *)mem - sizeof(struct vr_malloc_md);
+        }
+
         rte_free(mem);
     }
 
