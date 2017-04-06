@@ -777,6 +777,7 @@ drop:
 static int
 vlan_drv_del(struct vr_interface *vif)
 {
+    int ret = 0;
     struct vr_interface *pvif;
 
     pvif = vif->vif_parent;
@@ -784,9 +785,14 @@ vlan_drv_del(struct vr_interface *vif)
         return 0;
 
     if (pvif->vif_driver->drv_delete_sub_interface)
-        pvif->vif_driver->drv_delete_sub_interface(pvif, vif);
+        ret = pvif->vif_driver->drv_delete_sub_interface(pvif, vif);
 
-    return 0;
+    if (vif->vif_src_mac) {
+        vr_free(vif->vif_src_mac);
+        vif->vif_src_mac = NULL;
+    }
+
+    return ret;
 }
 
 static int
@@ -1124,11 +1130,11 @@ eth_drv_del_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
         }
     }
 
-    if (!ret) {
-        vrouter_put_interface(pvif);
+    if (vif->vif_parent == pvif) {
         vif->vif_parent = NULL;
-        hif_ops->hif_del(vif);
+        vrouter_put_interface(pvif);
     }
+    hif_ops->hif_del(vif);
 
     return ret;
 }
@@ -1372,7 +1378,7 @@ vrouter_get_interface(unsigned int rid, unsigned int idx)
 
     vif = __vrouter_get_interface(router, idx);
     if (vif)
-        vif->vif_users++;
+        (void)__sync_add_and_fetch(&vif->vif_users, 1);
 
     return vif;
 }
