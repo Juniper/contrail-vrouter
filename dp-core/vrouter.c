@@ -40,6 +40,7 @@ extern const char *ContrailBuildInfo;
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
+unsigned int vr_memory_alloc_checks = 0;
 
 struct vr_module {
     char *mod_name;

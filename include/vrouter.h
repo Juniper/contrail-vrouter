@@ -268,11 +268,59 @@ struct host_os {
 #define vr_soft_reset                   vrouter_host->hos_soft_reset
 #define vr_nl_broadcast_supported       vrouter_host->hos_nl_broadcast_supported
 
+extern struct host_os *vrouter_host;
+
 struct vr_malloc_stats {
     int64_t ms_size;
     int64_t ms_alloc;
     int64_t ms_free;
 };
+
+#define VMM_STATE_ALLOCED   1
+
+extern unsigned int vr_memory_alloc_checks;
+
+struct vr_malloc_md {
+    char vmm_magic[3];
+    uint8_t vmm_state;
+    unsigned int vmm_object;
+} __attribute__((packed));
+
+static inline void
+vr_malloc_md_set(void *mem, unsigned int object)
+{
+    struct vr_malloc_md *vmm;
+
+    vmm = (struct vr_malloc_md *)mem;
+    strncpy(vmm->vmm_magic, "MEM", sizeof(vmm->vmm_magic));
+    vmm->vmm_state = VMM_STATE_ALLOCED;
+    vmm->vmm_object = object;
+
+    return;
+}
+
+static inline void
+vr_malloc_md_check(void *mem, unsigned int object)
+{
+    struct vr_malloc_md *vmm;
+
+    vmm = (struct vr_malloc_md *)((uint8_t *)mem - sizeof(*vmm));
+    if (vmm->vmm_state != VMM_STATE_ALLOCED)
+        goto bug;
+    if (strncmp(vmm->vmm_magic, "MEM", sizeof(vmm->vmm_magic)))
+        goto bug;
+    if (vmm->vmm_object != object)
+        goto bug;
+
+    return;
+bug:
+    vr_printf("BUG: Inconsistent state of memory %p\n", mem);
+    vr_printf("BUG: state %u object %u expected %u\n",
+            vmm->vmm_state, vmm->vmm_object, object);
+    vr_printf("BUG: MAGIC %c%c%c\n",
+            vmm->vmm_magic[0], vmm->vmm_magic[1], vmm->vmm_magic[2]);
+    return;
+}
 
 struct vrouter {
     unsigned char vr_vrrp_mac[VR_ETHER_ALEN];
@@ -325,8 +373,6 @@ struct vr_defer_data {
 };
 
 extern volatile bool vr_not_ready;
-
-extern struct host_os *vrouter_host;
 
 extern struct vrouter *vrouter_get(unsigned int);
 extern unsigned int vrouter_generation_num_get(struct vrouter *router);
