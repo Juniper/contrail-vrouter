@@ -85,6 +85,8 @@ enum vr_opt_index {
     SOCKET_MEM_OPT_INDEX,
 #define LCORES_OPT              "lcores"
     LCORES_OPT_INDEX,
+#define MEMORY_ALLOC_CHECKS_OPT "vr_memory_alloc_checks"
+    MEMORY_ALLOC_CHECKS_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -898,6 +900,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [SOCKET_MEM_OPT_INDEX]          =   {SOCKET_MEM_OPT,        required_argument,
                                                     NULL,                   0},
+    [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
+                                                    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -929,6 +933,7 @@ Usage(void)
         "    --"MPLS_LABELS_OPT" NUM      MPLS table limit\n"
         "    --"NEXTHOPS_OPT" NUM         Nexthop table limit\n"
         "    --"VRFS_OPT" NUM             VRF tables limit\n"
+        "    --"MEMORY_ALLOC_CHECKS_OPT"  Enable memory checks\n"
         "    --"MEMPOOL_SIZE_OPT" NUM     Main packet pool size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
         );
@@ -1034,6 +1039,10 @@ parse_long_opts(int opt_flow_index, char *optarg)
              */
             vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
         }
+        break;
+
+    case MEMORY_ALLOC_CHECKS_OPT_INDEX:
+        vr_memory_alloc_checks = 1;
         break;
 
     case MPLS_LABELS_OPT_INDEX:
