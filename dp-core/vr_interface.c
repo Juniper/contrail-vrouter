@@ -2281,12 +2281,14 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         req->vifr_src_mac_size = 0;
     }
 
+    req->vifr_in_mirror_md_size = 0;
     if (intf->vif_in_mirror_md_len) {
         memcpy(req->vifr_in_mirror_md, intf->vif_in_mirror_md,
                 intf->vif_in_mirror_md_len);
         req->vifr_in_mirror_md_size = intf->vif_in_mirror_md_len;
     }
 
+    req->vifr_out_mirror_md_size = 0;
     if (intf->vif_out_mirror_md_len) {
         memcpy(req->vifr_out_mirror_md, intf->vif_out_mirror_md,
                 intf->vif_out_mirror_md_len);
