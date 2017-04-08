@@ -97,9 +97,24 @@ lh_printk(const char *format, ...)
 static void *
 lh_malloc(unsigned int size, unsigned int object)
 {
-    void *mem = kmalloc(size, GFP_ATOMIC);
+    struct vr_malloc_md *md;
+    void *mem;
+
+    if (!size)
+        return NULL;
+
+    if (vr_memory_alloc_checks) {
+        size += sizeof(*md);
+    }
+
+    mem = kmalloc(size, GFP_ATOMIC);
     if (mem != NULL) {
         vr_malloc_stats(size, object);
+
+        if (vr_memory_alloc_checks) {
+            vr_malloc_md_set(mem, object);
+            mem = (uint8_t *)mem + sizeof(*md);
+        }
     }
 
     return mem;
@@ -108,9 +123,24 @@ lh_malloc(unsigned int size, unsigned int object)
 static void *
 lh_zalloc(unsigned int size, unsigned int object)
 {
-    void *mem = kzalloc(size, GFP_ATOMIC);
+    struct vr_malloc_md *md;
+    void *mem;
+
+    if (!size)
+        return NULL;
+
+    if (vr_memory_alloc_checks) {
+        size += sizeof(*md);
+    }
+
+    mem = kzalloc(size, GFP_ATOMIC);
     if (mem != NULL) {
         vr_malloc_stats(size, object);
+
+        if (vr_memory_alloc_checks) {
+            vr_malloc_md_set(mem, object);
+            mem = (uint8_t *)mem + sizeof(*md);
+        }
     }
 
     return mem;
@@ -120,7 +150,16 @@ static void
 lh_free(void *mem, unsigned int object)
 {
     if (mem) {
+        if (vr_memory_alloc_checks) {
+            vr_malloc_md_check(mem, object);
+        }
+
         vr_free_stats(object);
+
+        if (vr_memory_alloc_checks) {
+            mem = (uint8_t *)mem - sizeof(struct vr_malloc_md);
+        }
+
         kfree(mem);
     }
 
@@ -2510,6 +2549,9 @@ module_param(vr_use_linux_br, int, 0);
 
 module_param(vrouter_dbg, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(vrouter_dbg, "Set 1 for pkt dumping and 0 to disable, default value is 0");
+
+module_param(vr_memory_alloc_checks, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_memory_alloc_checks, "Audit memory frees against allocs. Default is 0");
 
 module_init(vrouter_linux_init);
 module_exit(vrouter_linux_exit);

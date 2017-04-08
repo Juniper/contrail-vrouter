@@ -40,6 +40,7 @@ extern const char *ContrailBuildInfo;
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
+unsigned int vr_memory_alloc_checks = 0;
 
 struct vr_module {
     char *mod_name;
@@ -368,6 +369,8 @@ vrouter_ops_get_process(void *s_req)
 
     vr_flow_get_burst_params(router, &resp->vo_burst_tokens,
             &resp->vo_burst_interval, &resp->vo_burst_step);
+
+    resp->vo_memory_alloc_checks = vr_memory_alloc_checks;
 
     req = resp;
 generate_response:
