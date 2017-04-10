@@ -14,6 +14,7 @@
 #include <linux/if_arp.h>
 #include <linux/ip.h>
 #include <linux/jhash.h>
+#include <linux/pkt_sched.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
 #include <linux/if_bridge.h>
@@ -798,8 +799,16 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     if (pkt->vp_queue != VP_QUEUE_INVALID)
         skb->queue_mapping = pkt->vp_queue + 1;
 
-    if (pkt->vp_priority != VP_PRIORITY_INVALID)
-        skb->priority = pkt->vp_priority;
+    if (!vif_is_fabric(vif) ||
+            (vr_priority_tagging || is_vlan_dev(dev))) {
+        if (pkt->vp_priority != VP_PRIORITY_INVALID) {
+            skb->priority = pkt->vp_priority;
+        } else {
+            skb->priority = TC_PRIO_BESTEFFORT;
+        }
+    } else {
+        skb->priority = TC_PRIO_CONTROL;
+    }
 
     /*
      * Set the network header and trasport header of skb only if the type is

@@ -1850,7 +1850,8 @@ vr_send_vrouter_set_runtime_opts(struct nl_client *cl, unsigned int router_id,
         int perfr, int perfs, int from_vm_mss_adj, int to_vm_mss_adj,
         int perfr1, int perfr2, int perfr3, int perfp, int perfq1,
         int perfq2, int perfq3, int udp_coff, int flow_hold_limit,
-        int mudp, int btokens, int binterval, int bstep)
+        int mudp, int btokens, int binterval, int bstep,
+        unsigned int priority_tagging)
 {
     vrouter_ops req;
 
@@ -1881,6 +1882,7 @@ vr_send_vrouter_set_runtime_opts(struct nl_client *cl, unsigned int router_id,
     req.vo_burst_tokens = btokens;
     req.vo_burst_interval = binterval;
     req.vo_burst_step = bstep;
+    req.vo_priority_tagging = priority_tagging;
 
     /*
      * We create request to change runtime (sysctl) options only. Log level
