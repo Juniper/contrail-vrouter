@@ -51,13 +51,13 @@ static bool cmd_flood_set = false;
 
 static int cmd_set, dump_set, get_set;
 static int family_set, help_set, vrf_set;
-static int cust_flags;
+static int cust_flags, active_set;
 
 static int cmd_prefix_set;
 static int cmd_dst_mac_set;
 
 static int cmd_vrf_id = -1, cmd_family_id;
-static int cmd_op = -1;
+static int cmd_op = -1, cmd_active=0;
 
 static int cmd_nh_id = -1;
 static char *cmd_prefix_string, *cmd_plen_string;
@@ -195,7 +195,7 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
 void
 vr_route_req_process(void *s_req)
 {
-    int ret = 0, i;
+    int ret = 0, i, print;
     char addr[INET6_ADDRSTRLEN];
     char flags[32];
     vr_route_req *rt = (vr_route_req *)s_req;
@@ -204,6 +204,9 @@ vr_route_req_process(void *s_req)
         (rt->rtr_family == AF_INET6)) {
         memcpy(rt_marker, rt->rtr_prefix, RT_IP_ADDR_SIZE(rt->rtr_family));
 
+        if (cmd_active) {if (rt->rtr_nh_id>1) print=true; else print=false ;} else print=true;
+
+        if (print) {
         if (rt->rtr_prefix_size) {
             if (cmd_op == SANDESH_OP_GET)
                 address_mask(rt->rtr_prefix, rt->rtr_prefix_len, rt->rtr_family);
@@ -254,7 +257,7 @@ vr_route_req_process(void *s_req)
         }
 
         printf("\n");
-    } else {
+    } } else {
         memcpy(rt_marker, rt->rtr_mac, VR_ETHER_ALEN);
         vr_bridge_print_route(rt->rtr_mac, rt->rtr_index,
                 rt->rtr_label_flags, rt->rtr_label, rt->rtr_nh_id, 0);
@@ -597,6 +600,7 @@ enum opt_flow_index {
     GET_OPT_INDEX,
     VRF_OPT_INDEX,
     HELP_OPT_INDEX,
+    DUMP_ACTIVE,
     MAX_OPT_INDEX,
 };
 
@@ -607,19 +611,21 @@ static struct option long_options[] = {
     [GET_OPT_INDEX]           = {"get",    required_argument, &get_set,    1},
     [VRF_OPT_INDEX]           = {"vrf",    required_argument, &vrf_set,    1},
     [HELP_OPT_INDEX]          = {"help",   no_argument,       &help_set,   1},
+    [DUMP_ACTIVE]             = {"active", no_argument,       &active_set, 1},
     [MAX_OPT_INDEX]           = { NULL,    0,                 0,           0},
 };
 
 static void
 Usage(void)
 {
-    printf("Usage:   rt --dump <vrf_id> [--family <inet|inet6|bridge>]>\n");
+    printf("Usage:   rt --dump <vrf_id> [--family <inet|inet6|bridge>]> --active\n");
     printf("         rt --get <address/plen> --vrf <id> [--family <inet|inet6>]\n");
     printf("         rt --help\n");
     printf("\n");
     printf("--dump   Dumps the routing table corresponding to vrf_id\n");
     printf("--family Optional family specification to --dump command\n");
     printf("         Specification should be one of \"inet\" or \"bridge\"\n");
+    printf("--active Dumps only routes in forwarding state.\n");
     printf("--help   Prints this help message\n");
 
     exit(1);
@@ -635,6 +641,10 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     case COMMAND_OPT_INDEX:
         usage_internal();
         break;
+
+     case DUMP_ACTIVE:
+         cmd_active=1;
+         break;
 
     case DUMP_OPT_INDEX:
         cmd_op = SANDESH_OP_DUMP;
@@ -686,9 +696,12 @@ main(int argc, char *argv[])
     cmd_label = -1;
     cmd_family_id = AF_INET;
 
-    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:Fx:",
+    while ((opt = getopt_long(argc, argv, "TacdbmPn:p:l:v:t:s:e:f:r:Fx:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
+            case 'a':
+                cmd_active=1;
+                break;
             case 'c':
                 if (cmd_op >= 0) {
                     usage_internal();
