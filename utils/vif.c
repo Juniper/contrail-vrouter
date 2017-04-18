@@ -455,8 +455,11 @@ list_get_print(vr_interface_req *req)
         }
 
     } else {
-        printf("OS: %s", req->vifr_os_idx ?
-                if_indextoname(req->vifr_os_idx, name): "NULL");
+        if (req->vifr_os_idx > 0) {
+            printf("OS: %s", if_indextoname(req->vifr_os_idx, name));
+        } else {
+            printf("    %s", req->vifr_name);
+        }
     }
 
     if (req->vifr_type == VIF_TYPE_PHYSICAL) {
