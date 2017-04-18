@@ -422,6 +422,7 @@ list_get_print(vr_interface_req *req)
     uint16_t proto, port;
     bool print_zero = false;
 
+
     if (rate_set) {
         print_zero = true;
     }
@@ -455,8 +456,12 @@ list_get_print(vr_interface_req *req)
         }
 
     } else {
+    if (req->vifr_type == VIF_TYPE_VIRTUAL_VLAN) {
+        printf ("OS: %s", req->vifr_name);
+    } else {
         printf("OS: %s", req->vifr_os_idx ?
                 if_indextoname(req->vifr_os_idx, name): "NULL");
+    }
     }
 
     if (req->vifr_type == VIF_TYPE_PHYSICAL) {
