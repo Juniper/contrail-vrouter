@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 #define VHOST_KIND  "vhost"
+#define VHOST_IFNAME "vhost0"
 
 #ifdef __KERNEL__
 
