@@ -58,8 +58,10 @@ enum rt_type{
 #define VR_BE_FLOOD_DHCP_FLAG       0x04
 #define VR_BE_MAC_MOVED_FLAG        0x08
 #define VR_BE_L2_CONTROL_DATA_FLAG  0x10
+#define VR_BE_MAC_NEW_FLAG          0x20
 
-#define VR_BRIDGE_FLAG_MASK(flags)      ((flags) & ~VR_BE_VALID_FLAG)
+#define VR_BRIDGE_FLAG_MASK(flags)  \
+    ((flags) & ~(VR_BE_VALID_FLAG | VR_BE_MAC_NEW_FLAG))
 
 #define AGENT_PKT_HEAD_SPACE (sizeof(struct vr_eth) + \
         sizeof(struct agent_hdr))

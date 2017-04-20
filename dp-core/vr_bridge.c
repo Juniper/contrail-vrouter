@@ -733,6 +733,7 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
             return MAC_LEARN_FAILURE;
 
         be = bridge_add(0, fmd->fmd_dvrf, eth->eth_smac, nh->nh_id);
+        be->be_flags |= VR_BE_MAC_NEW_FLAG;
         bridge_table_unlock(pkt->vp_if, eth->eth_smac, lock);
         if (!be)
             return MAC_LEARN_FAILURE;
