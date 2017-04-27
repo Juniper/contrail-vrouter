@@ -231,10 +231,6 @@ exit_rx:
     return RX_HANDLER_CONSUMED;
 }
 
-struct vrouter_gso_cb {
-    void (*destructor)(struct sk_buff *skb);
-};
-
 static long
 linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
         unsigned short type)
@@ -305,7 +301,7 @@ linux_inet_fragment(struct vr_interface *vif, struct sk_buff *skb,
      *
      * and hence access to packet structure beyond this point is suicidal
      */
-    memset(skb->cb, 0, sizeof(struct vrouter_gso_cb));
+    memset(skb->cb, 0, sizeof(skb->cb));
     segs = skb_segment(skb, features);
     if (IS_ERR(segs))
         return PTR_ERR(segs);
