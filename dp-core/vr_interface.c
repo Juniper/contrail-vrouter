@@ -93,7 +93,7 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
  * in the rewrite case, we will assume the positive case of caller
  * passing us valid rewrite ptr and len and will not check for those
  */
-static unsigned char *
+static int
 vif_cmn_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
         unsigned short len)
@@ -101,20 +101,20 @@ vif_cmn_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
     unsigned char *head;
 
     if (!len)
-        return pkt_data(pkt);
+        return 0;
 
     if (pkt_head_space(pkt) < len) {
         pkt = vr_pexpand_head(pkt, len - pkt_head_space(pkt));
         if (!pkt)
-            return NULL;
+            return -ENOMEM;
     }
 
     head = pkt_push(pkt, len);
     if (!head)
-        return NULL;
+        return -ENOMEM;
 
     memcpy(head, rewrite, len);
-    return head;
+    return len;
 }
 
 static int
@@ -268,7 +268,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 /* agent driver */
-static unsigned char *
+static int
 agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
         unsigned short len)
@@ -283,12 +283,12 @@ agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
     if (pkt_head_space(pkt) < hdr_len) {
         pkt = vr_pexpand_head(pkt, hdr_len - pkt_head_space(pkt));
         if (!pkt)
-            return NULL;
+            return -ENOMEM;
     }
 
     head = pkt_push(pkt, hdr_len);
     if (!head)
-        return NULL;
+        return -ENOMEM;
 
     /* copy the rewrite first */
     memcpy(head, rewrite, len);
@@ -300,7 +300,7 @@ agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
     hdr->hdr_cmd = htons(AGENT_TRAP_NEXTHOP);
     hdr->hdr_cmd_param = 0;
 
-    return head;
+    return len;
 }
 
 static int
@@ -1034,18 +1034,18 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
     return 0;
 }
 
-static unsigned char *
+static int
 eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
         unsigned short len)
 {
     if (!len)
-        return pkt_data(pkt);
+        return 0;
 
     if ((pkt->vp_if->vif_type == VIF_TYPE_HOST) &&
             !(pkt->vp_flags & VP_FLAG_FROM_DP)) {
         vr_preset(pkt);
-        return pkt_data(pkt);
+        return 0;
     }
 
     return vif_cmn_rewrite(vif, pkt, fmd, rewrite, len);
