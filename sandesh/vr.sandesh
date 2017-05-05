@@ -116,6 +116,7 @@ buffer sandesh vr_interface_req {
     59: list<i16>   vifr_hw_queues;
     60: u32         vifr_isid;
     61: list<byte>  vifr_pbb_mac;
+    62: byte        vifr_vhostuser_mode;
 }
 
 buffer sandesh vr_vxlan_req {
