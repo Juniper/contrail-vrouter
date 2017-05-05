@@ -2085,6 +2085,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     vif->vif_idx = req->vifr_idx;
     vif->vif_transport = req->vifr_transport;
     vif->vif_os_idx = req->vifr_os_idx;
+    vif->vif_vhostuser_mode = req->vifr_vhostuser_mode;
     if (req->vifr_os_idx == -1)
         vif->vif_os_idx = 0;
     vif->vif_rid = req->vifr_rid;
@@ -2302,6 +2303,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     } else {
         req->vifr_pbb_mac_size = 0;
     }
+    req->vifr_vhostuser_mode = intf->vif_vhostuser_mode;
 
 
     /* vif counters */
