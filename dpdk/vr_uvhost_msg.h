@@ -24,12 +24,18 @@ typedef enum vrnu_msg_type {
     VRNU_MSG_MAX
 } vrnu_msg_type_t;
 
+typedef enum vrnu_vhostuser_mode_type {
+    VRNU_VIF_MODE_CLIENT = 0,
+    VRNU_VIF_MODE_SERVER
+} vrnu_vhostuser_mode_type_t;
+
 typedef struct vrnu_vif_add {
     char vrnu_vif_name[VR_INTERFACE_NAME_LEN];
     unsigned int vrnu_vif_idx;
     unsigned int vrnu_vif_nrxqs;
     unsigned int vrnu_vif_ntxqs;
     unsigned int vrnu_vif_gen;
+    vrnu_vhostuser_mode_type_t vrnu_vif_vhostuser_mode;
 } vrnu_vif_add_t;
 
 typedef struct vrnu_vif_del {
