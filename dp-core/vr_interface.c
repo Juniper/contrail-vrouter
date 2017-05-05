@@ -805,7 +805,7 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
     struct vr_interface *pvif;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
-    if (!(pkt->vp_flags & VP_FLAG_GRO)) {
+    if (!vr_pkt_is_gro(pkt)) {
         stats->vis_obytes += pkt_len(pkt);
         stats->vis_opackets++;
     }
@@ -1148,7 +1148,7 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
          * the absence of nh and the packet ingressed from agent interface,
          * the vlan id is set.
          */
-        if (pkt->vp_flags & VP_FLAG_GRO)
+        if (vr_pkt_is_gro(pkt))
             stats_count = false;
 
         if ((pkt->vp_nh && (pkt->vp_nh->nh_dev != vif)) ||

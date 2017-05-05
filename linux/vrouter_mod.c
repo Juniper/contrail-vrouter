@@ -299,8 +299,13 @@ lh_pclone(struct vr_packet *pkt)
     if (!skb_c)
         return NULL;
 
+    pkt->vp_clone = 1;
+    vr_pkt_unset_gro(pkt);
+
     pkt_clone = (struct vr_packet *)skb_c->cb;
     pkt_clone->vp_cpu = vr_get_cpu();
+    pkt_clone->vp_clone = 1;
+    vr_pkt_unset_gro(pkt_clone);
 
     return pkt_clone;
 }

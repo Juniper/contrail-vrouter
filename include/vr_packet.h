@@ -205,7 +205,8 @@ struct vr_packet {
     unsigned char vp_ttl;
     unsigned char vp_queue;
     unsigned char vp_priority:4,
-                  vp_notused:4;
+                  vp_clone:1,
+                  vp_notused:3;
 };
 
 
@@ -641,6 +642,29 @@ static inline void
 vr_pkt_set_diag(struct vr_packet *pkt)
 {
     pkt->vp_flags |= VP_FLAG_DIAG;
+    return;
+}
+
+static inline bool
+vr_pkt_is_gro(struct vr_packet *pkt)
+{
+    if (pkt->vp_flags & VP_FLAG_GRO)
+        return true;
+    return false;
+}
+
+static inline void
+vr_pkt_set_gro(struct vr_packet *pkt)
+{
+    if (!pkt->vp_clone)
+        pkt->vp_flags |= VP_FLAG_GRO;
+    return;
+}
+
+static inline void
+vr_pkt_unset_gro(struct vr_packet *pkt)
+{
+    pkt->vp_flags &= ~VP_FLAG_GRO;
     return;
 }
 
