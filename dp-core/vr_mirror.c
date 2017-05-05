@@ -385,7 +385,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 
     /* Set the GSO and partial checksum flag */
     pkt->vp_flags |= (VP_FLAG_FLOW_SET | VP_FLAG_GSO);
-    pkt->vp_flags &= ~VP_FLAG_GRO;
+    vr_pkt_unset_gro(pkt);
 
     if (mirror->mir_flags & VR_MIRROR_FLAG_DYNAMIC) {
 

@@ -2184,8 +2184,9 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* No GRO for multicast and user packets */
     if ((pkt->vp_flags & VP_FLAG_MULTICAST) ||
-            (fmd->fmd_vlan != VLAN_ID_INVALID))
-        pkt->vp_flags &= ~VP_FLAG_GRO;
+            (fmd->fmd_vlan != VLAN_ID_INVALID)) {
+        vr_pkt_unset_gro(pkt);
+    }
 
     vif = nh->nh_dev;
     if (!vif) {
@@ -2212,7 +2213,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
-    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif) &&
+    if (vr_pkt_is_gro(pkt) && vif_is_virtual(vif) &&
             (!(vif->vif_flags & VIF_FLAG_MIRROR_TX))) {
         if (vr_gro_input(pkt, nh)) {
             if (stats)
@@ -2283,24 +2284,19 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (vr_pkt_is_diag(pkt)) {
-        pkt->vp_flags &= ~VP_FLAG_GRO;
+        vr_pkt_unset_gro(pkt);
         if (stats)
             stats->vrf_diags++;
-    } else {
-        if (stats) {
-            if ((pkt->vp_flags & VP_FLAG_GRO) &&
-                    vif_is_virtual(vif)) {
-                stats->vrf_gros++;
-            } else {
-                stats->vrf_encaps++;
-            }
-        }
     }
 
-    if ((pkt->vp_flags & VP_FLAG_GRO) && vif_is_virtual(vif) &&
+    if (vr_pkt_is_gro(pkt) && vif_is_virtual(vif) &&
             (!(vif->vif_flags & VIF_FLAG_MIRROR_TX))) {
-        if (vr_gro_input(pkt, nh))
+        if (vr_gro_input(pkt, nh)) {
+            if (stats) {
+                stats->vrf_gros++;
+            }
             return 0;
+        }
     }
 
     if (!vif->vif_set_rewrite(vif, pkt, fmd, nh->nh_data, nh->nh_encap_len)) {
@@ -2323,6 +2319,10 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_if = vif;
         vr_pset_data(pkt, pkt->vp_data);
         return vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_DIAG, &vif->vif_idx);
+    }
+
+    if (stats) {
+        stats->vrf_encaps++;
     }
 
     vif->vif_tx(vif, pkt, fmd);
