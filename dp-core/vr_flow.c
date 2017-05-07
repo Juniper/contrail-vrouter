@@ -605,6 +605,7 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
     pnode->pl_dotonep = fmd->fmd_dotonep;
     pnode->pl_vrf = fmd->fmd_dvrf;
     pnode->pl_vlan = fmd->fmd_vlan;
+    pnode->pl_mirror_vlan = fmd->fmd_mirror_vlan;
 
     __sync_synchronize();
     pnode->pl_packet = pkt;
@@ -867,12 +868,17 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
             mirror_fmd.fmd_ecmp_nh_index = -1;
             vr_mirror(router, fe->fe_mirror_id, pkt, &mirror_fmd,
                     MIRROR_TYPE_ACL);
+            fmd->fmd_mirror_vlan = mirror_fmd.fmd_mirror_vlan;
         }
+
         if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES) {
             mirror_fmd = *fmd;
             mirror_fmd.fmd_ecmp_nh_index = -1;
             vr_mirror(router, fe->fe_sec_mirror_id, pkt, &mirror_fmd,
                     MIRROR_TYPE_ACL);
+            if (fmd->fmd_mirror_vlan == VLAN_ID_INVALID) {
+                fmd->fmd_mirror_vlan = mirror_fmd.fmd_mirror_vlan;
+            }
         }
     }
 
@@ -1620,6 +1626,9 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
 
     fmd->fmd_dscp = pnode->pl_dscp;
     fmd->fmd_dotonep = pnode->pl_dotonep;
+    fmd->fmd_vlan = pnode->pl_vlan;
+    fmd->fmd_mirror_vlan = pnode->pl_mirror_vlan;
+
     pnode->pl_packet = NULL;
     /*
      * this is only a security check and not a catch all check. one note

@@ -349,11 +349,14 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
         unsigned short type, int diag)
 {
     int err = -ENOMEM;
+    unsigned short iphlen, ethlen;
+    unsigned short eth_proto, reason = 0;
+    unsigned int num_vlan_hdrs = 0;
+
+    struct vr_eth *eth;
+    struct vr_vlan_hdr *vlan;
     struct vr_ip *iph, *i_iph = NULL;
-    unsigned short iphlen;
-    unsigned short ethlen;
     struct udphdr *udph;
-    unsigned short reason = 0;
 
     /* we will do tunnel header updates after the fragmentation */
     if (seg->len > seg->dev->mtu + seg->dev->hard_header_len
@@ -370,6 +373,27 @@ linux_xmit_segment(struct vr_interface *vif, struct sk_buff *seg,
     if (!pskb_may_pull(seg, ethlen + sizeof(struct vr_ip))) {
         reason = VP_DROP_PULL;
         goto exit_xmit;
+    }
+
+    if (ethlen) {
+        eth = (struct vr_eth *)(seg->data);
+        eth_proto = eth->eth_proto;
+        while (eth_proto == htons(VR_ETH_PROTO_VLAN)) {
+            if (num_vlan_hdrs > 3) {
+                reason = VP_DROP_INVALID_PROTOCOL;
+                goto exit_xmit;
+            }
+
+            num_vlan_hdrs++;
+            vlan = (struct vr_vlan_hdr *)(seg->data + ethlen);
+            eth_proto = vlan->vlan_proto;
+            ethlen += sizeof(struct vr_vlan_hdr);
+        }
+
+        if (!pskb_may_pull(seg, ethlen + sizeof(struct vr_ip))) {
+            reason = VP_DROP_PULL;
+            goto exit_xmit;
+        }
     }
 
     iph = (struct vr_ip *)(seg->data + ethlen);
