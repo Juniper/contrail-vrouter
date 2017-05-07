@@ -259,7 +259,8 @@ struct vr_packet_node {
     int8_t pl_dscp;
     int8_t pl_dotonep;
     uint32_t pl_vrf;
-    int32_t pl_vlan;
+    uint16_t pl_vlan;
+    uint16_t pl_mirror_vlan;
 };
 
 struct vr_flow_queue {
