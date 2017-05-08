@@ -345,8 +345,9 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
      * Mark it for GRO. Diag, L2 and multicast nexthops unmark if
      * required
      */
-    if (vr_perfr)
-        pkt->vp_flags |= VP_FLAG_GRO;
+    if (vr_perfr) {
+        vr_pkt_set_gro(pkt);
+    }
 
     /* Reset the flags which get defined below */
     pkt->vp_flags &= ~VP_FLAG_MULTICAST;
