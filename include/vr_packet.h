@@ -516,6 +516,28 @@ vr_pkt_set_diag(struct vr_packet *pkt)
 }
 
 static inline bool
+vr_pkt_is_gro(struct vr_packet *pkt)
+{
+    if (pkt->vp_flags & VP_FLAG_GRO)
+        return true;
+    return false;
+}
+
+static inline void
+vr_pkt_set_gro(struct vr_packet *pkt)
+{
+    pkt->vp_flags |= VP_FLAG_GRO;
+    return;
+}
+
+static inline void
+vr_pkt_unset_gro(struct vr_packet *pkt)
+{
+    pkt->vp_flags &= ~VP_FLAG_GRO;
+    return;
+}
+
+static inline bool
 vr_ip_fragment_head(struct vr_ip *iph)
 {
     unsigned short frag = ntohs(iph->ip_frag_off);

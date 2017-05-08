@@ -450,7 +450,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id,
     pkt->vp_flags |= VP_FLAG_FROM_DP;
     /* Set the GSO and partial checksum flag */
     pkt->vp_flags |= (VP_FLAG_FLOW_SET | VP_FLAG_GSO | VP_FLAG_CSUM_PARTIAL);
-    pkt->vp_flags &= ~VP_FLAG_GRO;
+    vr_pkt_unset_gro(pkt);
     buf = pkt_push(pkt, mirror_md_len);
     if (!buf)
         goto fail;

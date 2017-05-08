@@ -1949,12 +1949,16 @@ int
 lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
 {
     int handled = 1;
+
     struct sk_buff *skb = vp_os_packet(pkt);
 #ifdef XEN_HYPERVISOR
     unsigned char *data;
     if (l2_pkt)
         return !handled;
 #endif
+
+    if (skb_cloned(skb))
+        return !handled;
 
     skb->data = pkt_data(pkt);
     skb->len = pkt_len(pkt);
