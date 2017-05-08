@@ -54,6 +54,7 @@ enum opt_vrouter_index {
     SET_BURST_TOKENS_INDEX,
     SET_BURST_INTERVAL_INDEX,
     SET_BURST_STEP_INDEX,
+    SET_PRIORITY_TAGGING_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -121,6 +122,7 @@ static int perfr = -1, perfs = -1, from_vm_mss_adj = -1, to_vm_mss_adj = -1;
 static int perfr1 = -1, perfr2 = -1, perfr3 = -1, perfp = -1, perfq1 = -1;
 static int perfq2 = -1, perfq3 = -1, udp_coff = -1, flow_hold_limit = -1;
 static int mudp = -1, burst_tokens = -1, burst_interval = -1, burst_step = -1;
+static unsigned int priority_tagging = 0;
 
 static int platform, vrouter_op = -1;
 
@@ -324,6 +326,7 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Burst Total Tokens                   %u\n"
         "    Burst Interval                       %u\n"
         "    Burst Step                           %u\n"
+        "    NIC Priority Tagging                 %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -333,7 +336,8 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp,
         req->vo_flow_used_entries, req->vo_flow_used_oentries,
         req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
-        req->vo_burst_tokens, req->vo_burst_interval, req->vo_burst_step
+        req->vo_burst_tokens, req->vo_burst_interval, req->vo_burst_step,
+        req->vo_priority_tagging
     );
 
     return;
@@ -427,7 +431,8 @@ vr_vrouter_op(struct nl_client *cl)
                     perfr, perfs, from_vm_mss_adj, to_vm_mss_adj,
                     perfr1, perfr2, perfr3, perfp, perfq1,
                     perfq2, perfq3, udp_coff, flow_hold_limit,
-                    mudp, burst_tokens, burst_interval, burst_step);
+                    mudp, burst_tokens, burst_interval, burst_step,
+                    priority_tagging);
         }
         break;
 
@@ -515,6 +520,9 @@ static struct option long_options[] = {
     [SET_BURST_STEP_INDEX] = {
         "burst_step", required_argument, &opt[SET_BURST_STEP_INDEX], 1
     },
+    [SET_PRIORITY_TAGGING_INDEX] = {
+        "set-priority-tagging", required_argument, &opt[SET_PRIORITY_TAGGING_INDEX], 1
+    },
     [MAX_OPT_INDEX] = {NULL, 0, 0, 0}
 };
 
@@ -588,6 +596,7 @@ Usage(void)
                "--burst_tokens <int> total burst tokens \n"
                "--burst_interval <int> timer interval of burst tokens in ms\n"
                "--burst_step <int> burst tokens to add at every interval\n"
+               "--set-priority-tagging <1 | 0> priority tagging on the NIC\n"
                "--help Prints this message\n"
                "\n");
         break;
@@ -868,6 +877,16 @@ parse_long_opts(int opt_index, char *opt_arg)
                     strerror(errno), errno);
             Usage();
         }
+        break;
+
+    case SET_PRIORITY_TAGGING_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        priority_tagging = strtoul(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing priority tagging configuration");
+            Usage();
+        }
+
         break;
 
     case HELP_OPT_INDEX:

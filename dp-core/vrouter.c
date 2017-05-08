@@ -41,6 +41,7 @@ void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
 unsigned int vr_memory_alloc_checks = 0;
+unsigned int vr_priority_tagging = 0;
 
 struct vr_module {
     char *mod_name;
@@ -371,6 +372,7 @@ vrouter_ops_get_process(void *s_req)
             &resp->vo_burst_interval, &resp->vo_burst_step);
 
     resp->vo_memory_alloc_checks = vr_memory_alloc_checks;
+    resp->vo_priority_tagging = vr_priority_tagging;
 
     req = resp;
 generate_response:
@@ -442,6 +444,8 @@ vrouter_ops_add_process(void *s_req)
         vr_mudp = req->vo_mudp;
     vr_flow_set_burst_params(vrouter_get(req->vo_rid), req->vo_burst_tokens,
             req->vo_burst_interval, req->vo_burst_step);
+
+    vr_priority_tagging = req->vo_priority_tagging;
 
     /* Neither of currently called functions signals an error. Just send OK
      * response here for now. */

@@ -133,6 +133,7 @@ extern unsigned int vr_flow_hold_limit;
 extern int vr_use_linux_br;
 extern int hashrnd_inited;
 extern uint32_t vr_hashrnd;
+extern unsigned int vr_priority_tagging;
 
 #define CONTAINER_OF(member, struct_type, pointer) \
     ((struct_type *)((unsigned long)pointer - \
