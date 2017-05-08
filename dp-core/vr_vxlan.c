@@ -74,7 +74,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     }
 
     if (vr_perfr)
-        pkt->vp_flags |= VP_FLAG_GRO;
+        vr_pkt_set_gro(pkt);
 
     return nh_output(pkt, nh, fmd);
 
