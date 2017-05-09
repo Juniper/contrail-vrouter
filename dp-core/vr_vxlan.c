@@ -57,7 +57,10 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
         drop_reason = VP_DROP_INVALID_PACKET;
         goto fail;
     }
-    pkt->vp_flags |= VP_FLAG_GRO;
+
+    if (vr_perfr) {
+        vr_pkt_set_gro(pkt);
+    }
 
     if (nh->nh_vrf >= 0) {
         fmd->fmd_dvrf = nh->nh_vrf;
