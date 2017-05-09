@@ -21,9 +21,10 @@ well_known_mac(unsigned char *dmac)
 }
 
 unsigned int vr_virtual_input(unsigned short, struct vr_interface *,
-                              struct vr_packet *, unsigned short);
+                              struct vr_packet *, struct vr_forwarding_md *,
+                              unsigned short);
 unsigned int vr_fabric_input(struct vr_interface *, struct vr_packet *,
-                             unsigned short);
+                             struct vr_forwarding_md *, unsigned short);
 
 int vr_l3_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_l2_input(struct vr_packet *, struct vr_forwarding_md *);
