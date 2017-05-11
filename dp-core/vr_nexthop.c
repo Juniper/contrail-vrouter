@@ -2856,6 +2856,7 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         if (nh->nh_component_ecmp) {
             vr_free(nh->nh_component_ecmp, VR_NEXTHOP_COMPONENT_OBJECT);
             nh->nh_component_ecmp = NULL;
+            nh->nh_component_ecmp_cnt = 0;
         }
     }
 
