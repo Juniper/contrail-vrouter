@@ -506,8 +506,8 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
     }
 
     /* Frame size should be a multiple of page size. */
-    frame_size = (vr_packet_sz + getpagesize() - 1) /
-            getpagesize() * getpagesize();
+    frame_size = (vr_packet_sz / getpagesize()) * getpagesize();
+
     ret = snprintf(params, sizeof(params),
                     /* TODO: Optional af_packet mmap parameters
                      * "qpairs=%d,framecnt=%d", 16, 512);
