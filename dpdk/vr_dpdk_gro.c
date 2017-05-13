@@ -664,6 +664,10 @@ create:
     }
 
 func_exit:
+    if (ret != GRO_MERGED) {
+        pkt_push(pkt, 2*sizeof(unsigned short));
+        rte_pktmbuf_prepend(m, 2*sizeof(unsigned short));
+    }
     return (ret == GRO_MERGED)?1:0;
 }
 
