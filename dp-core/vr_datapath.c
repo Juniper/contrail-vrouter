@@ -815,32 +815,26 @@ vr_vlan_set_priority(struct vr_packet *pkt)
 int
 vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
 {
-    unsigned short *nh_id, *vif_id, push_len = 0;
+    unsigned short push_len = 0;
     int handled = 1;
+    struct vr_gro *gro;
 
     if (!vr_gro_process) {
         handled = 0;
         goto not_handled;
     }
 
-    nh_id = (unsigned short *)pkt_push(pkt, sizeof(*nh_id));
-    if (!nh_id) {
+    gro = (struct vr_gro *)pkt_push(pkt, sizeof(*gro));
+    if (!gro) {
         handled = 0;
         goto not_handled;
     }
-    push_len += sizeof(*nh_id);
-    *nh_id = nh->nh_id;
+    push_len += sizeof(*gro);
 
-    vif_id = (unsigned short *)pkt_push(pkt, sizeof(*vif_id));
-    if (!vif_id) {
-        handled = 0;
-        goto not_handled;
-    }
-    push_len += sizeof(*vif_id);
-    *vif_id = pkt->vp_if->vif_idx;
+    gro->vg_vif_id = pkt->vp_if->vif_idx;
+    gro->vg_nh_id = nh->nh_id;
 
     handled = vr_gro_process(pkt, nh->nh_dev, (nh->nh_family == AF_BRIDGE));
-
 not_handled:
     if (!handled) {
         pkt_pull(pkt, push_len);
