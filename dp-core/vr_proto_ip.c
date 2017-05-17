@@ -1034,6 +1034,17 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     }
 
 
+    if (vif_is_fabric(pkt->vp_if) && !fmd->fmd_outer_src_ip) {
+        if (flow_p->flow4_proto == VR_IP_PROTO_GRE) {
+            return FLOW_FORWARD;
+        } else if (flow_p->flow4_proto == VR_IP_PROTO_UDP) {
+            if (vr_mpls_udp_port(flow_p->flow4_dport) ||
+                    (flow_p->flow4_dport == htons(VR_VXLAN_UDP_DST_PORT))) {
+                return FLOW_FORWARD;
+            }
+        }
+    }
+
     if (vr_ip_fragment_head(ip)) {
         vr_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
                 flow_p->flow4_dport);
