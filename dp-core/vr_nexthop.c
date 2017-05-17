@@ -2516,6 +2516,12 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
+    /*
+     * If for some reason, we have GRO flag set and we have not invoked
+     * the GRO, we need to unset
+     */
+    vr_pkt_unset_gro(pkt);
+
     if (stats)
         stats->vrf_l2_encaps++;
 
@@ -2599,6 +2605,12 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
             return NH_PROCESSING_COMPLETE;
         }
     }
+
+    /*
+     * If for some reason, we have GRO flag set and we have not invoked
+     * the GRO, we need to unset
+     */
+    vr_pkt_unset_gro(pkt);
 
     rewrite_len = vif->vif_set_rewrite(vif, pkt, fmd, nh->nh_data, nh->nh_encap_len);
     if (rewrite_len < 0) {
