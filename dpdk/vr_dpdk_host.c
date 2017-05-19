@@ -33,6 +33,11 @@
 #include <rte_malloc.h>
 #include <rte_timer.h>
 
+struct dpdk_work_cb_data {
+    void (*dwc_fn)(void *);
+    void *dwc_data;
+};
+
 /* Max number of CPUs. We adjust it later in vr_dpdk_host_init() */
 unsigned int vr_num_cpus = VR_MAX_CPUS;
 
@@ -43,6 +48,7 @@ extern void vr_malloc_stats(unsigned int, unsigned int);
 extern void vr_free_stats(unsigned int);
 /* RCU callback */
 extern void vr_flow_defer_cb(struct vrouter *router, void *arg);
+extern void vr_htable_hentry_scheduled_delete(void *arg);
 
 
 static void *
@@ -504,11 +510,44 @@ dpdk_get_mono_time(unsigned int *sec, unsigned int *nsec)
     return;
 }
 
+static void
+dpdk_htable_work_cb(struct vrouter *router __attribute__((unused)), void *arg)
+{
+    struct dpdk_work_cb_data *defer = (struct dpdk_work_cb_data *)arg;
+    defer->dwc_fn(defer->dwc_data);
+
+    return;
+}
+
 /* Work callback called on NetLink lcore */
 static int
 dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 {
-    /* no RCU reader lock needed, just do the work */
+    struct dpdk_work_cb_data *defer;
+
+    if (!fn)
+        return -1;
+
+    /*
+     * Fix ME:
+     * Use RCU to defer the work only for hash tables. Rest all, invoke
+     * function as is
+     * This is a temporary fix to ensure that hash table deletion does
+     * not happen parrallely in different CPU's
+     */
+
+    if (fn == vr_htable_hentry_scheduled_delete) {
+        defer = vr_get_defer_data(sizeof(*defer));
+        if (!defer)
+            return -1;
+
+        defer->dwc_fn = fn;
+        defer->dwc_data = arg;
+        vr_defer(NULL, dpdk_htable_work_cb, defer);
+
+        return 0;
+    }
+
     fn(arg);
 
     return 0;

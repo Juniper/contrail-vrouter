@@ -208,7 +208,7 @@ vr_htable_hentry_defer_delete(struct vrouter *router, void *arg)
     return;
 }
 
-static void
+void
 vr_htable_hentry_scheduled_delete(void *arg)
 {
     unsigned int count;
