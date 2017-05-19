@@ -658,7 +658,6 @@ create:
             rte_pktmbuf_adj(m, pkt_get_network_header_off(pkt)- pkt_head_space(pkt));
             pkt_pull(pkt, pkt_get_network_header_off(pkt)- pkt_head_space(pkt));
         } else if (ret == GRO_ERROR) {
-            vr_dpdk_pfree(entry->mbuf_head, vif, VP_DROP_FLOW_TABLE_FULL);
             rte_free(entry);
         }
     }
