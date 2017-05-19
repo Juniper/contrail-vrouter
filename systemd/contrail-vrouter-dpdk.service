@@ -1,0 +1,20 @@
+[Unit]
+Description=Contrail vrouter dpdk service
+After=network.target contrail-vrouter-agent.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/contrail-vrouter-dpdk --no-daemon
+PIDFile=/var/run/contrail/contrail-vrouter-dpdk.pid
+TimeoutStopSec=0
+Restart=always
+ExecStop=/bin/kill -s TERM $MAINPID
+PrivateTmp=yes
+ProtectHome=yes
+ReadOnlyDirectories=/
+ReadWriteDirectories=-/var/log/contrail
+ReadWriteDirectories=-/var/lib/contrail
+ReadWriteDirectories=-/dev
+
+[Install]
+WantedBy=multi-user.target

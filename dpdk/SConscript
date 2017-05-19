@@ -31,6 +31,9 @@ env.Requires(dpdk_objs, dpdk_lib)
 env.Default(dpdk_vrouter)
 
 env.Alias('install', env.Install(env['INSTALL_BIN'], dpdk_vrouter))
+env.Alias('install',
+           env.InstallAs(env['INSTALL_SYSTEMD'] + '/contrail-vrouter-dpdk.service',
+           '#/vrouter/systemd/contrail-vrouter-dpdk.service'))
 vtest = Command(target = "all_tests.log",
                 source = "../utils/vtest/vtest",
                 action =
