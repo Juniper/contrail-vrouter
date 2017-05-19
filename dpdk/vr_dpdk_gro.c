@@ -238,6 +238,17 @@ dpdk_gro_flush(struct gro_ctrl *gro, void *key, struct gro_entry *entry)
         goto drop;
     }
     vif = nh->nh_dev;
+    if ((vif == NULL) || (!vif_is_virtual(vif))) {
+        drop_reason = VP_DROP_INVALID_IF;
+        goto drop;
+    }
+
+    /* Validate the gen_id of the vif */
+    if (unlikely((vif->vif_idx != entry->dst_vif_idx) ||
+                 (vif->vif_gen != entry->dst_vif_gen))) {
+        drop_reason = VP_DROP_INVALID_IF;
+        goto drop;
+    }
 
     if (nh->nh_family == AF_BRIDGE) {
         if (!rte_pktmbuf_prepend(m, VR_ETHER_HLEN)) {
@@ -623,6 +634,8 @@ create:
         entry->src_vif_idx = src_vif_idx;
         if (likely(src_vif != NULL))
             entry->src_vif_gen = src_vif->vif_gen;
+        entry->dst_vif_idx = nh->nh_dev->vif_idx;
+        entry->dst_vif_gen = nh->nh_dev->vif_gen;
         entry->nh_id = nh_id;
         entry->mtime = lcore->lcore_fwd_loops;
         entry->p_len = ip_pkt_len;
