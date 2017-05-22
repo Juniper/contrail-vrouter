@@ -600,11 +600,10 @@ dpdk_get_mono_time(unsigned long *sec, unsigned long *nsec)
 }
 
 static void
-dpdk_work_cb(struct vrouter *router __attribute__((unused)), void *arg)
+dpdk_htable_work_cb(struct vrouter *router __attribute__((unused)), void *arg)
 {
     struct dpdk_work_cb_data *defer = (struct dpdk_work_cb_data *)arg;
 
-    vr_printf("Vrouter: executing work cb\n");
     defer->dwc_fn(defer->dwc_data);
 
     return;
@@ -634,7 +633,7 @@ dpdk_schedule_work(unsigned int cpu, void (*fn)(void *), void *arg)
 
         defer->dwc_fn = fn;
         defer->dwc_data = arg;
-        vr_defer(NULL, dpdk_work_cb, defer);
+        vr_defer(NULL, dpdk_htable_work_cb, defer);
 
         return 0;
     }
