@@ -492,7 +492,7 @@ vr_pkt_type(struct vr_packet *pkt, unsigned short offset,
             return -1;
         vlan = (struct vr_vlan_hdr *)(eth + pull_len);
         if (fmd && (fmd->fmd_vlan == VLAN_ID_INVALID))
-            fmd->fmd_vlan = vlan->vlan_tag & 0xFFF;
+            fmd->fmd_vlan = ntohs(vlan->vlan_tag) & 0xFFF;
         eth_proto = ntohs(vlan->vlan_proto);
         pull_len += sizeof(*vlan);
     }
