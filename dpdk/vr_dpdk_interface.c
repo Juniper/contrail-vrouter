@@ -1465,6 +1465,11 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         return 0;
     }
 
+    if (tx_queue == NULL) {
+        vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
+        return 0;
+    }
+
     /* Set a flag indicating that the packet being processed is going to be
      * fragmented as after prepending outer header it exceeds the MTU size of
      * an interface. */
