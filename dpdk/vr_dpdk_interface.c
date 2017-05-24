@@ -57,6 +57,8 @@ dpdk_vif_queue_free(struct vr_interface *vif)
             lcore_p->lcore_hw_queue_to_dpdk_index[vif->vif_idx] = NULL;
         }
 
+        lcore_p->num_tx_queues_per_lcore[vif->vif_idx] = 0;
+
         i = rte_get_next_lcore(i, 1, 1);
     } while (i != lcore);
 
@@ -1847,7 +1849,7 @@ dpdk_port_stats_update(struct vr_interface *vif, unsigned lcore_id)
     /* TX queue */
     for (i = 0; i < lcore->num_tx_queues_per_lcore[vif->vif_idx]; i++) {
         queue = &lcore->lcore_tx_queues[vif->vif_idx][i];
-        if (queue->q_vif == vif) {
+        if (queue && (queue->q_vif == vif)) {
             /* update stats */
             if (queue->txq_ops.f_stats != NULL) {
                 if (queue->txq_ops.f_stats(queue->q_queue_h,
@@ -2005,7 +2007,7 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
             }
 
             queue = &lcore->lcore_tx_queues[vif->vif_idx][dpdk_queue_index];
-            if (queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx) {
+            if (queue && (queue->txq_ops.f_tx == rte_port_ethdev_writer_ops.f_tx)) {
                 queue_params = &lcore->lcore_tx_queue_params[vif->vif_idx][queue_id];
                 queue_id = queue_params->qp_ethdev.queue_id;
                 if (queue_id < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
