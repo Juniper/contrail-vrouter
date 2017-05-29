@@ -613,7 +613,8 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
         return pkt->vp_nh->nh_reach_nh(pkt, pkt->vp_nh, fmd);
     }
 
-    if (vif_is_vhost(vif)) {
+    if (vif_is_vhost(vif) ||
+            (vif_is_fabric(vif) && (fmd->fmd_label < 0))) {
         handled = vr_l3_input(pkt, fmd);
         if (!handled)
             vif_drop_pkt(vif, pkt, 1);
