@@ -30,6 +30,7 @@
 #include "vr_bridge.h"
 #include "vr_packet.h"
 #include "vr_flow.h"
+#include "vr_buildinfo.h"
 
 unsigned int vr_num_cpus = 1;
 
