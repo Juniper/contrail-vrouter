@@ -109,7 +109,7 @@ extern unsigned vr_packet_sz;
 /* Number of hardware RX ring descriptors per queue */
 #define VR_DPDK_NB_RXD              128
 /* Number of hardware TX ring descriptors per queue */
-#define VR_DPDK_NB_TXD              512 
+#define VR_DPDK_NB_TXD              128
 /* Offset to MPLS label for hardware filtering (in 16-bit word units) */
 #define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
                                     + sizeof(struct vr_ip)      \
