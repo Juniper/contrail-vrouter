@@ -1718,6 +1718,9 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         }
     }
 
+    if (unlikely(vif_is_virtual(pkt->vp_if) && vif_is_vhost(vif)))
+        dpdk_sw_checksum_at_offset(pkt, pkt_get_network_header_off(pkt));
+
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
     if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
