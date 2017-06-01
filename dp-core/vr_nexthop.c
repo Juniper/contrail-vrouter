@@ -1612,6 +1612,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 {
     int ret = -1;
     uint8_t *vif_ip = NULL;
+    uint16_t sport = 0;
     unsigned int head_space, hash;
     uint32_t sip = 0, port_range;
     struct vr_packet *tmp;
@@ -1642,7 +1643,6 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt = tmp;
     }
 
-    fmd->fmd_udp_src_port = ntohs(nh->nh_udp_tun_sport);
     if (pkt->vp_type == VP_TYPE_IP) {
         ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd,
                                      flowp, VR_FLOW_KEY_ALL);
@@ -1655,9 +1655,9 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (!ret) {
         hash = vr_hash(flowp, flowp->flow_key_len, 0);
         port_range = VR_UDP_PORT_RANGE_END - VR_UDP_PORT_RANGE_START;
-        fmd->fmd_udp_src_port = (uint16_t)
+        sport = (uint16_t)
             (((uint64_t ) hash * port_range) >> 32);
-        fmd->fmd_udp_src_port += VR_UDP_PORT_RANGE_START;
+        sport += VR_UDP_PORT_RANGE_START;
     }
 
     if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
@@ -1672,8 +1672,11 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (!sip)
             sip = nh->nh_udp_tun_sip;
 
+        if (!sport)
+            sport = ntohs(nh->nh_udp_tun_sport);
+
         qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-        if (nh_udp_tunnel_helper(pkt, htons(fmd->fmd_udp_src_port),
+        if (nh_udp_tunnel_helper(pkt, htons(sport),
                     nh->nh_udp_tun_dport, sip,
                     nh->nh_udp_tun_dip, qos) == false) {
             goto send_fail;
@@ -1687,9 +1690,14 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         udp->udp_csum = vr_ip_partial_csum(ip);
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
+        pkt->vp_type = VP_TYPE_IP;
+
     } else if (nh->nh_family == AF_INET6) {
-        if (nh_udp_tunnel6_helper(pkt, nh, vif_ip, htons(fmd->fmd_udp_src_port),
-                   nh->nh_udp_tun_dport) == false) {
+        if (!sport)
+            sport = ntohs(nh->nh_udp_tun6_sport);
+
+        if (nh_udp_tunnel6_helper(pkt, nh, vif_ip, htons(sport),
+                   nh->nh_udp_tun6_dport) == false) {
             goto send_fail;
         }
 
@@ -1697,7 +1705,11 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         udp = (struct vr_udp *)((char *)ip6 + sizeof(struct vr_ip6));
         udp->udp_csum = vr_ip6_partial_csum(ip6);
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
+
+        pkt->vp_type = VP_TYPE_IP6;
     }
+
+    fmd->fmd_udp_src_port = sport;
 
     pkt_set_network_header(pkt, pkt->vp_data);
 
@@ -1706,15 +1718,6 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
      * header so that this is fragmented and checksummed
      */
     pkt_set_inner_network_header(pkt, pkt->vp_data);
-
-    /* for now let the tunnel type be IP regardless of ip or ip6 */
-    if (pkt->vp_type == VP_TYPE_IP6)
-        pkt->vp_type = VP_TYPE_IP6OIP;
-    else if (pkt->vp_type == VP_TYPE_IP)
-        pkt->vp_type = VP_TYPE_IPOIP;
-    else
-        pkt->vp_type = VP_TYPE_IP;
-
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
