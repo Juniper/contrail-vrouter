@@ -16,8 +16,10 @@ ExecStartPost=/opt/contrail/bin/vrouter-post-start.sh
 ExecStopPost=/opt/contrail/bin/vrouter-post-stop.sh
 ReadWriteDirectories=-/var/log/contrail
 ReadWriteDirectories=-/var/lib/contrail
+ReadWriteDirectories=-/var/crashes
 ReadWriteDirectories=-/var/run
 ReadWriteDirectories=-/dev
+LimitCORE=infinity
 
 [Install]
 WantedBy=multi-user.target
