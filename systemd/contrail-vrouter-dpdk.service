@@ -14,7 +14,9 @@ ProtectHome=yes
 ReadOnlyDirectories=/
 ReadWriteDirectories=-/var/log/contrail
 ReadWriteDirectories=-/var/lib/contrail
+ReadWriteDirectories=-/var/crashes
 ReadWriteDirectories=-/dev
+LimitCORE=infinity
 
 [Install]
 WantedBy=multi-user.target
