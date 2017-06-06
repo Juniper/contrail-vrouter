@@ -104,7 +104,7 @@ extern unsigned vr_packet_sz;
 /* Maximum number of bond members per ethernet device */
 #define VR_DPDK_BOND_MAX_SLAVES     6
 /* Maximum RETA table size */
-#define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_128
+#define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_512
 #define VR_DPDK_MAX_RETA_ENTRIES    (VR_DPDK_MAX_RETA_SIZE/RTE_RETA_GROUP_SIZE)
 /* Number of hardware RX ring descriptors per queue */
 #define VR_DPDK_NB_RXD              128
