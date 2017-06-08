@@ -1,20 +1,23 @@
 [Unit]
 Description=Contrail vrouter dpdk service
-After=network.target contrail-vrouter-agent.service
+After=network.target
+Wants=contrail-vrouter-agent.service contrail-vrouter-nodemgr.service
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/contrail-vrouter-dpdk --no-daemon
-PIDFile=/var/run/contrail/contrail-vrouter-dpdk.pid
 TimeoutStopSec=0
 Restart=always
 ExecStop=/bin/kill -s TERM $MAINPID
 PrivateTmp=yes
 ProtectHome=yes
-ReadOnlyDirectories=/
+ExecStartPre=/opt/contrail/bin/vrouter-pre-start.sh
+ExecStartPost=/opt/contrail/bin/vrouter-post-start.sh
+ExecStopPost=/opt/contrail/bin/vrouter-post-stop.sh
 ReadWriteDirectories=-/var/log/contrail
 ReadWriteDirectories=-/var/lib/contrail
 ReadWriteDirectories=-/var/crashes
+ReadWriteDirectories=-/var/run
 ReadWriteDirectories=-/dev
 LimitCORE=infinity
 
