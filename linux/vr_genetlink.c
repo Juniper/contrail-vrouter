@@ -20,6 +20,9 @@
 #include "vr_response.h"
 #include "vrouter.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+#define GENL_ID_GENERATE 0
+#endif /* Linux 4.10.0 */
 static int netlink_trans_request(struct sk_buff *, struct genl_info *);
 
 static struct genl_ops vrouter_genl_ops[] = {
@@ -36,6 +39,9 @@ struct genl_family vrouter_genl_family = {
     .version    =   1,
     .maxattr    =   NL_ATTR_MAX - 1,
     .netnsok    =   true,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+    .genl_ops	=   vrouter_genl_ops,
+#endif /* Linux 4.10.0 */
 };
 
 struct genl_multicast_group vrouter_genl_groups[] = {
@@ -209,6 +215,8 @@ vr_genetlink_init(void)
      (!(defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7))))
     return genl_register_family_with_ops(&vrouter_genl_family, vrouter_genl_ops,
         ARRAY_SIZE(vrouter_genl_ops));
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+    return genl_register_family(&vrouter_genl_family);
 #else
     return genl_register_family_with_ops_groups(&vrouter_genl_family,
              vrouter_genl_ops, vrouter_genl_groups);
