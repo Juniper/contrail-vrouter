@@ -1137,7 +1137,7 @@ dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
             hw_queue = 0;
 
         tx_queue = &lcore->lcore_tx_queues[eth_vif->vif_idx][hw_queue];
-        if (tx_queue->txq_ops.f_tx) {
+        if (tx_queue && tx_queue->txq_ops.f_tx) {
             if (vr_dpdk.kni_state > 0)
                 nb_pkts = rte_kni_rx_burst(vr_dpdk.vlan_dev, pkts,
                         VR_DPDK_RX_BURST_SZ);
