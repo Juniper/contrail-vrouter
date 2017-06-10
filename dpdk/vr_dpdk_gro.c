@@ -678,6 +678,10 @@ create:
     }
 
 func_exit:
+    if (ret != GRO_MERGED) {
+        pkt_push(pkt, sizeof(struct vr_gro));
+        rte_pktmbuf_prepend(m, sizeof(struct vr_gro));
+    }
     return (ret == GRO_MERGED)?1:0;
 }
 
