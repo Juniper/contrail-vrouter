@@ -305,6 +305,18 @@ struct vr_interface {
     uint8_t vif_pbb_mac[VR_ETHER_ALEN];
 };
 
+#define VR_BOND_MAX_SLAVES 6
+struct vr_bond_slave_params {
+    uint8_t port_id;
+    uint8_t mac_addr[VR_ETHER_ALEN];
+    struct vr_interface_stats *vif_stats;
+};
+
+struct vr_bond_slaves_info {
+    int8_t nbr_bond_slaves;
+    struct vr_bond_slave_params bond_slaves[VR_BOND_MAX_SLAVES];
+};
+
 struct vr_interface_settings {
     uint32_t vis_speed;
     uint32_t vis_duplex;
@@ -324,6 +336,8 @@ struct vr_host_interface_ops {
     unsigned int (*hif_get_mtu)(struct vr_interface *);
     unsigned short (*hif_get_encap)(struct vr_interface *);
     void (*hif_stats_update)(struct vr_interface *, unsigned int);
+    int (*hif_get_slaves_info)(struct vr_interface *, unsigned int,
+                               struct vr_bond_slaves_info *);
 };
 
 extern int vr_interface_init(struct vrouter *);
