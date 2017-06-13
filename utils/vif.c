@@ -421,12 +421,20 @@ list_get_print(vr_interface_req *req)
     unsigned int i;
     uint16_t proto, port;
     bool print_zero = false;
+    char *slave_substr = NULL;
 
     if (rate_set) {
         print_zero = true;
     }
 
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
+
+    if (req->vifr_name) {
+        if (NULL != (slave_substr = strstr(req->vifr_name, "slave"))) {
+            printed += printf("/%s", slave_substr);
+        }
+    }
+
     for (; printed < 12; printed++)
         printf(" ");
 
@@ -435,6 +443,9 @@ list_get_print(vr_interface_req *req)
     } else if (platform == DPDK_PLATFORM) {
         switch (req->vifr_type) {
             case VIF_TYPE_PHYSICAL:
+                if (req->vifr_name && slave_substr) {
+                    printf("%s: %s", "Bond.slave", req->vifr_name);
+                }
                 printf("PCI: ""%.4" PRIx16 ":%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8,
                         (uint16_t)(req->vifr_os_idx >> 16),
                         (uint8_t)(req->vifr_os_idx >> 8) & 0xFF,
@@ -443,8 +454,14 @@ list_get_print(vr_interface_req *req)
                 break;
 
             case VIF_TYPE_MONITORING:
-                printf("Monitoring: %s for vif%d/%d", req->vifr_name,
-                        req->vifr_rid, req->vifr_os_idx);
+                if (slave_substr) {
+                    ((*(slave_substr-1)) != '_')?:(*(slave_substr-1) = '/');
+                    printf("Monitoring: %s for vif%d/%s", req->vifr_name,
+                            req->vifr_rid, &(req->vifr_name[3]));
+                } else {
+                    printf("Monitoring: %s for vif%d/%d", req->vifr_name,
+                    req->vifr_rid, req->vifr_os_idx);
+                }
                 break;
 
             default:
@@ -462,7 +479,7 @@ list_get_print(vr_interface_req *req)
         }
     }
 
-    if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+    if ((req->vifr_type == VIF_TYPE_PHYSICAL) && (!slave_substr)) {
         if (req->vifr_speed >= 0) {
             printf(" (Speed %d,", req->vifr_speed);
             if (req->vifr_duplex >= 0)
@@ -654,6 +671,7 @@ list_rate_print(vr_interface_req *req)
     uint64_t tx_errors = 0;
     uint64_t rx_errors = 0;
     unsigned int i = 0;
+    char *slave_substr = NULL;
 
     rx_errors = (req->vifr_dev_ierrors + req->vifr_port_ierrors + req->vifr_queue_ierrors
                  + req->vifr_ierrors);
@@ -665,6 +683,13 @@ list_rate_print(vr_interface_req *req)
     for (; printed < 30; printed++)
         printf(" ");
     printed = printf("vif%d/%d", req->vifr_rid, req->vifr_idx);
+
+    if (req->vifr_name) {
+        if (NULL != (slave_substr = strstr(req->vifr_name, "slave"))) {
+            printed += printf("/%s", slave_substr);
+        }
+    }
+
     for (; printed < 24; printed++)
         printf(" ");
 
