@@ -2198,9 +2198,13 @@ vr_interface_add_response(vr_interface_req *req,
     req->vifr_oerrors += stats->vis_oerrors;
 
     req->vifr_queue_ipackets += stats->vis_queue_ipackets;
-    for (i = 0; i < vr_num_cpus; i++)
-        req->vifr_queue_ierrors_to_lcore[i] += stats->vis_queue_ierrors_to_lcore[i];
-    req->vifr_queue_ierrors_to_lcore_size = vr_num_cpus;
+    if (stats->vis_queue_ierrors_to_lcore) {
+        for (i = 0; i < vr_num_cpus; i++)
+            req->vifr_queue_ierrors_to_lcore[i] += stats->vis_queue_ierrors_to_lcore[i];
+        req->vifr_queue_ierrors_to_lcore_size = vr_num_cpus;
+    } else {
+        req->vifr_queue_ierrors_to_lcore_size = 0;
+    }
     req->vifr_queue_ierrors += stats->vis_queue_ierrors;
     req->vifr_queue_opackets += stats->vis_queue_opackets;
     req->vifr_queue_oerrors += stats->vis_queue_oerrors;
@@ -2231,7 +2235,9 @@ vr_interface_get_drops(struct vr_interface *vif)
 
     total_drops = 0;
     for (stats_index = 0; stats_index < VP_DROP_MAX; stats_index++) {
-        total_drops += vif->vif_drop_stats[stats_index];
+        if (vif->vif_drop_stats) {
+            total_drops += vif->vif_drop_stats[stats_index];
+        }
         if (vif->vif_pcpu_drop_stats) {
             for (cpu = 0; cpu < vr_num_cpus; cpu++) {
                 count = vr_btable_get(vif->vif_pcpu_drop_stats,
@@ -2246,13 +2252,19 @@ vr_interface_get_drops(struct vr_interface *vif)
 
 static void
 __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
-        unsigned int core)
+        unsigned int core, int slave_index,
+        struct vr_bond_slaves_info *bond_slaves_info)
 {
     uint8_t proto;
     uint16_t port;
     unsigned int cpu, i, j, k = 0;
 
     struct vr_interface_settings settings;
+    struct vr_bond_slave_params *bond_slave_params = NULL;
+
+    if ( (slave_index >= 0) && bond_slaves_info ) {
+        bond_slave_params = &(bond_slaves_info->bond_slaves[slave_index]);
+    }
 
     req->vifr_core = core;
     req->vifr_type = intf->vif_type;
@@ -2272,7 +2284,19 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_ref_cnt = intf->vif_users;
 
     if (req->vifr_name) {
-        strncpy(req->vifr_name, intf->vif_name, VR_INTERFACE_NAME_LEN - 1);
+        if ( (NULL != bond_slave_params) && (slave_index >= 0) ) {
+            if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+                snprintf(req->vifr_name, VR_INTERFACE_NAME_LEN - 1, "vif%d/%d/slave%d",
+                         req->vifr_rid, req->vifr_idx, slave_index);
+            } else {
+                strncpy(req->vifr_name, intf->vif_name, VR_INTERFACE_NAME_LEN - 1);
+            }
+
+            memcpy(req->vifr_mac, bond_slave_params->mac_addr, VR_ETHER_ALEN);
+            req->vifr_os_idx = bond_slave_params->port_id;
+        } else {
+            strncpy(req->vifr_name, intf->vif_name, VR_INTERFACE_NAME_LEN - 1);
+        }
     }
 
     if (intf->vif_parent)
@@ -2352,21 +2376,51 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_dev_opackets = 0;
     req->vifr_dev_oerrors = 0;
 
-    /* call host callback if available */
-    if (hif_ops->hif_stats_update) {
-        hif_ops->hif_stats_update(intf, core);
-    }
-
-    if (core == (unsigned)-1) {
-        /* summed up stats */
-        for (cpu = 0; cpu < vr_num_cpus; cpu++) {
-            vr_interface_add_response(req, vif_get_stats(intf, cpu));
+    if ( (NULL == bond_slave_params) || (slave_index < 0) ) {
+        /* call host callback if available */
+        if (hif_ops->hif_stats_update) {
+            hif_ops->hif_stats_update(intf, core, -1, NULL);
         }
-    } else if (core < vr_num_cpus) {
-        /* stats for a specific core */
-        vr_interface_add_response(req, vif_get_stats(intf, core));
+
+        if (core == (unsigned)-1) {
+            /* summed up stats */
+            for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+                vr_interface_add_response(req, vif_get_stats(intf, cpu));
+            }
+        } else if (core < vr_num_cpus) {
+            /* stats for a specific core */
+            vr_interface_add_response(req, vif_get_stats(intf, core));
+        }
+        /* otherwise the conters will be zeros */
     }
-    /* otherwise the conters will be zeros */
+    else {
+        bond_slave_params->vif_stats = vr_zalloc(vr_num_cpus *
+                sizeof(struct vr_interface_stats), VR_INTERFACE_STATS_OBJECT);
+
+        if (!bond_slave_params->vif_stats) {
+            vr_printf("%s: unable to allocate memory for stats\n", req->vifr_name);
+        }
+        else {
+            /* call host callback if available */
+            if (hif_ops->hif_stats_update) {
+                hif_ops->hif_stats_update(intf, core, bond_slave_params->port_id,
+                                          bond_slave_params->vif_stats);
+            }
+
+            if (core == (unsigned)-1) {
+                /* summed up stats */
+                for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+                    vr_interface_add_response(req, bond_slave_params->vif_stats);
+                }
+            } else if (core < vr_num_cpus) {
+                /* stats for a specific core */
+                vr_interface_add_response(req, bond_slave_params->vif_stats);
+            }
+            /* otherwise the conters will be zeros */
+
+            vr_free(bond_slave_params->vif_stats, VR_INTERFACE_STATS_OBJECT);
+        }
+    }
 
     req->vifr_speed = -1;
     req->vifr_duplex = -1;
@@ -2418,7 +2472,8 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
 
 static int
 vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
-        unsigned int core)
+        unsigned int core, int slave_index,
+        struct vr_bond_slaves_info *bond_slaves_info)
 {
     unsigned int i, fat_flow_config_size;
 
@@ -2436,7 +2491,7 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
         req->vifr_fat_flow_protocol_port_size = fat_flow_config_size;
     }
 
-    __vr_interface_make_req(req, vif, core);
+    __vr_interface_make_req(req, vif, core, slave_index, bond_slaves_info);
 
     return 0;
 }
@@ -2574,6 +2629,10 @@ vr_interface_get(vr_interface_req *req)
     vr_interface_req *vif_resp = NULL;
     vr_drop_stats_req *drop_resp = NULL;
     struct vr_interface *vif = NULL;
+    char *slave_substr = NULL;
+    int slave_index = -1;
+    struct vr_interface *vif_os;
+    struct vr_bond_slaves_info bond_slaves_info;
 
     resp.h_op = SANDESH_OP_RESPONSE;
     mm.vr_mm_object_type[obj_cnt] = VR_RESPONSE_OBJECT_ID;
@@ -2602,7 +2661,34 @@ vr_interface_get(vr_interface_req *req)
         goto generate_response;
     }
 
-    ret = vr_interface_make_req(vif_resp, vif, (unsigned)(req->vifr_core - 1));
+    /* Check if interface to get is a slave interface. If yes then pass on its
+       eth_port_id to function. */
+    if (req->vifr_name) {
+        if (NULL != (slave_substr = strstr(req->vifr_name, "slave"))) {
+            sscanf(slave_substr, "%d", &slave_index);
+
+            if (vif->vif_type == VIF_TYPE_MONITORING) {
+                vif_os = router->vr_interfaces[vif->vif_os_idx];
+            } else {
+                vif_os = vif;
+            }
+
+            if ( vif_os && ((vif->vif_type == VIF_TYPE_PHYSICAL) &&
+                 (vif->vif_type == VIF_TYPE_MONITORING))
+                 && hif_ops->hif_get_slaves_info ) {
+                if ((ret = hif_ops->hif_get_slaves_info(vif_os,
+                                                        (unsigned)(req->vifr_core - 1),
+                                                        &bond_slaves_info))) {
+                    vr_printf("Error in fetching settings for vif: %u, vif_os: %u\n",
+                              vif->vif_idx, vif_os->vif_idx);
+                }
+            }
+        }
+    }
+
+    ret = vr_interface_make_req(vif_resp, vif, (unsigned)(req->vifr_core - 1),
+                                slave_index, &bond_slaves_info);
+
     if (ret < 0)
         goto generate_response;
 
@@ -2651,6 +2737,11 @@ vr_interface_dump(vr_interface_req *r)
     struct vrouter *router = vrouter_get(r->vifr_rid);
     struct vr_message_dumper *dumper = NULL;
     vr_drop_stats_req *drop_resp = NULL;
+    struct vr_bond_slaves_info bond_slaves_info;
+    int slave_idx = 0;
+    struct vr_interface *vif_os;
+    char *slave_substr = NULL;
+    int32_t slave_index = -1;
 
     if (!router && (ret = -ENODEV))
         goto generate_response;
@@ -2681,7 +2772,30 @@ vr_interface_dump(vr_interface_req *r)
         vif = router->vr_interfaces[i];
         if (vif) {
             /* zero vifr_core means to sum up all the per-core stats */
-            vr_interface_make_req(resp, vif, (unsigned)(r->vifr_core - 1));
+            if (vif->vif_type == VIF_TYPE_MONITORING) {
+                vif_os = router->vr_interfaces[vif->vif_os_idx];
+
+                if (NULL != (slave_substr = strstr(vif->vif_name, "slave"))) {
+                    sscanf(slave_substr, "%d", &slave_index);
+                }
+            } else {
+                vif_os = vif;
+            }
+
+            if ( vif_os && ((vif->vif_type == VIF_TYPE_PHYSICAL) ||
+                 (vif->vif_type == VIF_TYPE_MONITORING))
+                 && hif_ops->hif_get_slaves_info ) {
+                if (hif_ops->hif_get_slaves_info(vif_os,
+                                                    (unsigned)(r->vifr_core - 1),
+                                                    &bond_slaves_info)) {
+                    vr_printf("Error in fetching slave information for vif: %u, vif_os: %u\n",
+                              vif->vif_idx, vif_os->vif_idx);
+                }
+            }
+
+            /* zero vifr_core means to sum up all the per-core stats */
+            vr_interface_make_req(resp, vif, (unsigned)(r->vifr_core - 1), slave_index, &bond_slaves_info);
+
             ret = vr_message_dump_object(dumper, VR_INTERFACE_OBJECT_ID, resp);
             if (ret <= 0)
                 break;
