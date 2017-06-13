@@ -27,7 +27,7 @@
 #include <rte_eth_af_packet.h>
 #include <linux/if_tun.h>
 #include <sys/ioctl.h>
-
+#include <rte_eth_bond.h>
 #define ARPHRD_ETHER 1
 
 static void
@@ -880,6 +880,93 @@ dpdk_monitoring_stop(struct vr_interface *monitored_vif,
 #endif
 }
 
+/* Start slave interface monitoring */
+static void
+dpdk_slave_monitoring_start(struct vr_interface *monitored_vif,
+    struct vr_interface *monitoring_vif, uint8_t slave_port_id)
+{
+    /* set monitoring redirection */
+    vr_dpdk.slave_monitorings[slave_port_id].monitoring_vif = monitoring_vif->vif_idx;
+
+    if(vif_is_fabric(monitored_vif)) {
+        rte_eth_promiscuous_enable(slave_port_id);
+    }
+}
+
+/* Stop slave interface monitoring */
+static void
+dpdk_slave_monitoring_stop(struct vr_interface *monitored_vif,
+    struct vr_interface *monitoring_vif, uint8_t slave_port_id)
+{
+    /* check if the monitored vif was reused */
+    if (vr_dpdk.slave_monitorings[slave_port_id].monitoring_vif != monitoring_vif->vif_idx)
+        return;
+
+   /* clear monitoring redirection */
+    vr_dpdk.slave_monitorings[slave_port_id].monitoring_vif = VR_MAX_INTERFACES;
+#if !VR_DPDK_ENABLE_PROMISC
+    if(vif_is_fabric(monitored_vif)) {
+        rte_eth_promiscuous_disable(slave_port_id);
+    }
+#endif
+}
+
+uint16_t dpdk_if_tx_callback(uint8_t port_id, uint16_t queue, struct rte_mbuf *pkts[],
+                             uint16_t nb_pkts, void *user_param)
+{
+    const unsigned lcore_id = rte_lcore_id();
+    struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_interface *bond_vif = (struct vr_interface *)user_param;
+
+    struct vr_dpdk_queue *monitoring_tx_queue;
+    struct rte_mbuf *p_copy;
+    unsigned short pkt_index = 0;
+
+    RTE_LOG(DEBUG, VROUTER,"%s: TX_CallBack, TX packet to slave port %d of bond-interface %s\n",
+            __func__, port_id, bond_vif->vif_name);
+
+    monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.slave_monitorings[port_id].monitoring_vif][0];
+
+    if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
+        for (pkt_index = 0; pkt_index < nb_pkts; pkt_index++) {
+            p_copy = vr_dpdk_pktmbuf_copy_mon(pkts[pkt_index], vr_dpdk.rss_mempool);;
+            if (likely(p_copy != NULL)) {
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h, p_copy);
+            }
+        }
+    }
+
+    return nb_pkts;
+}
+
+uint16_t dpdk_if_rx_callback(uint8_t port_id, uint16_t queue, struct rte_mbuf *pkts[],
+                             uint16_t nb_pkts, uint16_t max_pkts, void *user_param)
+{
+    const unsigned lcore_id = rte_lcore_id();
+    struct vr_dpdk_lcore * const lcore = vr_dpdk.lcores[lcore_id];
+    struct vr_interface *bond_vif = (struct vr_interface *)user_param;
+
+    struct vr_dpdk_queue *monitoring_tx_queue;
+    struct rte_mbuf *p_copy;
+    unsigned short pkt_index = 0;
+
+    RTE_LOG(DEBUG, VROUTER,"%s: TX_CallBack, TX packet to slave port %d of bond-interface %s\n",
+            __func__, port_id, bond_vif->vif_name);
+
+    monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.slave_monitorings[port_id].monitoring_vif][0];
+
+    if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
+        for (pkt_index = 0; pkt_index < nb_pkts; pkt_index++) {
+            p_copy = vr_dpdk_pktmbuf_copy_mon(pkts[pkt_index], vr_dpdk.rss_mempool);;
+            if (likely(p_copy != NULL)) {
+                monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h, p_copy);
+            }
+        }
+    }
+
+    return nb_pkts;
+}
+
 /* Add monitoring interface */
 static int
 dpdk_monitoring_if_add(struct vr_interface *vif)
@@ -889,6 +976,12 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     struct vr_interface *monitored_vif;
     struct vrouter *router = vrouter_get(vif->vif_rid);
     uint16_t nb_txqs;
+    uint16_t q_id;
+    struct vr_dpdk_ethdev *bonded_ethdev = NULL;
+    char *slave_substr = NULL;
+    char *slave_port_str = NULL;
+    uint8_t slave_port_id = 0;
+    int slave_index = -1;
 
     RTE_LOG(INFO, VROUTER, "Adding monitoring vif %u (gen. %u) device %s"
                 " to monitor vif %u\n",
@@ -948,8 +1041,47 @@ dpdk_monitoring_if_add(struct vr_interface *vif)
     }
 
     if (ret == 0) {
-        /* Start monitoring. */
-        dpdk_monitoring_start(monitored_vif, vif);
+        /* Check if the monitored interface is a slave interface of some bond interface.
+           If yes then register Rx Tx call-back functions for the specified slave
+           interface per Rx Tx queues eac*/
+        if (NULL != (slave_substr = strstr((const char*)vif->vif_name, "slave"))) {
+            slave_index = strtol((slave_substr+5), &slave_port_str, 10);
+        }
+
+        bonded_ethdev = monitored_vif->vif_os;
+
+        bonded_ethdev->ethdev_nb_slaves =
+           rte_eth_bond_slaves_get(bonded_ethdev->ethdev_port_id,
+                                   bonded_ethdev->ethdev_slaves,
+                                   sizeof(bonded_ethdev->ethdev_slaves));
+
+        if ( (bonded_ethdev->ethdev_nb_slaves > 0) && (slave_index >=0) &&
+             (slave_index <= bonded_ethdev->ethdev_nb_slaves ) ) {
+            slave_port_id = bonded_ethdev->ethdev_slaves[slave_index];
+
+            for (q_id = 0; q_id < bonded_ethdev->ethdev_nb_rx_queues; q_id++) {
+                if (!(vr_dpdk.slave_monitorings[slave_port_id].rx_cb[q_id] =
+                        rte_eth_add_rx_callback(slave_port_id, q_id,
+                                                &dpdk_if_rx_callback,
+                                                (void*)monitored_vif))) {
+                    RTE_LOG(ERR, VROUTER, "    error registering a rx_callback with DPDK port: %u\n", slave_port_id);
+                    return -EINVAL;
+                }
+            }
+
+            for (q_id = 0; q_id < bonded_ethdev->ethdev_nb_tx_queues; q_id++) {
+                if (!(vr_dpdk.slave_monitorings[slave_port_id].tx_cb[q_id] = rte_eth_add_tx_callback(slave_port_id, q_id, &dpdk_if_tx_callback, (void*)monitored_vif) )) {
+                    RTE_LOG(ERR, VROUTER, "    error registering a tx_callback with DPDK: %u\n", slave_port_id);
+                    return -EINVAL;
+                }
+            }
+
+            dpdk_slave_monitoring_start(monitored_vif, vif, slave_port_id);
+        }
+        else {
+            /* Start monitoring. */
+            dpdk_monitoring_start(monitored_vif, vif);
+        }
     }
 
     return ret;
@@ -961,6 +1093,12 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
 {
     unsigned short monitored_vif_id = vif->vif_os_idx;
     struct vr_interface *monitored_vif;
+    uint16_t q_id;
+    struct vr_dpdk_ethdev *bonded_ethdev = NULL;
+    char *slave_substr = NULL;
+    char *slave_port_str = NULL;
+    uint8_t slave_port_id = 0;
+    int slave_index = -1;
 
     RTE_LOG(INFO, VROUTER, "Deleting monitoring vif %u device"
                 " to monitor vif %u\n",
@@ -973,8 +1111,39 @@ dpdk_monitoring_if_del(struct vr_interface *vif)
         RTE_LOG(ERR, VROUTER, "    error getting vif to monitor:"
             " vif %u does not exist\n", monitored_vif_id);
     } else {
-        /* stop monitoring */
-        dpdk_monitoring_stop(monitored_vif, vif);
+        /* Check if the monitored interface is a slave interface of some bond interface. If yes then de-register Rx Tx call-back functions for the specified slave interface per Rx Tx queues each */
+        if (NULL != (slave_substr = strstr((const char*)vif->vif_name, "slave"))) {
+            slave_index = strtol((slave_substr+5), &slave_port_str, 10);
+        }
+
+        bonded_ethdev = monitored_vif->vif_os;
+
+        bonded_ethdev->ethdev_nb_slaves = rte_eth_bond_slaves_get(bonded_ethdev->ethdev_port_id, bonded_ethdev->ethdev_slaves, sizeof(bonded_ethdev->ethdev_slaves));
+
+        if ( (bonded_ethdev->ethdev_nb_slaves > 0) && (slave_index >=0) &&
+             (slave_index <= bonded_ethdev->ethdev_nb_slaves ) ) {
+            slave_port_id = bonded_ethdev->ethdev_slaves[slave_index];
+
+            /* check if the monitored vif was reused */
+            if (vr_dpdk.slave_monitorings[slave_port_id].monitoring_vif == vif->vif_idx) {
+                for (q_id = 0; q_id < bonded_ethdev->ethdev_nb_rx_queues; q_id++) {
+                    if (!rte_eth_remove_rx_callback(slave_port_id, q_id, vr_dpdk.slave_monitorings[slave_port_id].rx_cb[q_id])) {
+                        RTE_LOG(ERR, VROUTER, "    error de-registering a rx_callback with DPDK: %u\n", slave_port_id);
+                    }
+                }
+
+                for (q_id = 0; q_id < bonded_ethdev->ethdev_nb_tx_queues; q_id++) {
+                    if (!rte_eth_remove_tx_callback(slave_port_id, q_id, vr_dpdk.slave_monitorings[slave_port_id].tx_cb[q_id])) {
+                        RTE_LOG(ERR, VROUTER, "    error de-registering a tx_callback with DPDK: %u\n", slave_port_id);
+                    }
+                }
+                dpdk_slave_monitoring_stop(monitored_vif, vif, slave_port_id);
+            }
+        }
+        else {
+            /* stop monitoring */
+            dpdk_monitoring_stop(monitored_vif, vif);
+        }
     }
 
     vr_dpdk_lcore_if_unschedule(vif);
@@ -1942,9 +2111,9 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
 
 /* Update device statistics */
 static void
-dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
+dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id,
+                      uint8_t port_id, struct vr_interface_stats *vif_stats)
 {
-    uint8_t port_id;
     uint16_t queue_id, dpdk_queue_index, num_queues, i;
 
     struct vr_interface_stats *stats;
@@ -1959,7 +2128,6 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
     if (!vif_is_fabric(vif) || vif->vif_os == NULL)
         return;
 
-    port_id = ((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id;
     if (rte_eth_stats_get(port_id, &eth_stats) != 0)
         return;
 
@@ -1972,11 +2140,11 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
     if (lcore == NULL)
         return;
 
-    stats = vif_get_stats(vif, lcore_id);
+    stats = &vif_stats[lcore_id & VR_CPU_MASK];
 
     /* get lcore RX queue index */
     queue = &lcore->lcore_rx_queues[vif->vif_idx];
-    if (queue->rxq_ops.f_rx == rte_port_ethdev_reader_ops.f_rx) {
+    if (queue && (queue->rxq_ops.f_rx == rte_port_ethdev_reader_ops.f_rx)) {
         queue_params = &lcore->lcore_rx_queue_params[vif->vif_idx];
         queue_id = queue_params->qp_ethdev.queue_id;
         if (queue_id < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
@@ -2040,22 +2208,61 @@ dpdk_dev_stats_update(struct vr_interface *vif, unsigned lcore_id)
 
 /* Update interface statistics */
 static void
-dpdk_if_stats_update(struct vr_interface *vif, unsigned core)
+dpdk_if_stats_update(struct vr_interface *vif, unsigned core,
+                     int port_id, struct vr_interface_stats *vif_stats)
 {
     int i;
+
+    if ((port_id < 0) && vif_is_fabric(vif) && (vif->vif_os != NULL)) {
+        port_id = ((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id;
+    }
+
+    if (!vif_stats) {
+        vif_stats = vif->vif_stats;
+    }
 
     if (core == (unsigned)-1) {
         /* update counters for all cores */
         for (i = 0; i < vr_num_cpus; i++) {
-            dpdk_dev_stats_update(vif, i);
+            dpdk_dev_stats_update(vif, i, port_id, vif_stats);
             dpdk_port_stats_update(vif, i);
         }
     } else if (core < vr_num_cpus) {
         /* update counters for a specific core */
-        dpdk_dev_stats_update(vif, core);
+        dpdk_dev_stats_update(vif, core, port_id, vif_stats);
         dpdk_port_stats_update(vif, core);
     }
     /* otherwise there is nothing to update */
+}
+
+/* Get slave interface information */
+static int
+dpdk_if_get_slaves_info(struct vr_interface *bond_vif, unsigned core,
+                        struct vr_bond_slaves_info *bond_slave_info)
+
+{
+    uint8_t bond_slaves[RTE_MAX_ETHPORTS];
+    uint8_t slave_index = 0;
+    struct ether_addr mac_addr;
+
+    memset(bond_slave_info->bond_slaves, 0, sizeof(bond_slave_info->bond_slaves));
+
+    /* check if bond vif is a PMD */
+    if (!vif_is_fabric(bond_vif) || bond_vif->vif_os == NULL)
+        return -EFAULT;
+
+    bond_slave_info->nbr_bond_slaves = rte_eth_bond_slaves_get(bond_vif->vif_idx,
+                                                               bond_slaves,
+                                                               sizeof(bond_slaves));
+
+    for (slave_index = 0; slave_index < bond_slave_info->nbr_bond_slaves; slave_index++) {
+        bond_slave_info->bond_slaves[slave_index].port_id = bond_slaves[slave_index];
+        rte_eth_macaddr_get(bond_slaves[slave_index], &mac_addr);
+        memcpy(bond_slave_info->bond_slaves[slave_index].mac_addr,
+               mac_addr.addr_bytes, ETHER_ADDR_LEN);
+    }
+
+    return 0;
 }
 
 struct vr_host_interface_ops dpdk_interface_ops = {
@@ -2071,6 +2278,7 @@ struct vr_host_interface_ops dpdk_interface_ops = {
     .hif_get_mtu        =    dpdk_if_get_mtu,
     .hif_get_encap      =    dpdk_if_get_encap, /* always returns VIF_ENCAP_TYPE_ETHER */
     .hif_stats_update   =    dpdk_if_stats_update,
+    .hif_get_slaves_info =   dpdk_if_get_slaves_info,
 };
 
 void
