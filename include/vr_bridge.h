@@ -101,5 +101,6 @@ void *vr_bridge_get_va(struct vrouter *, uint64_t);
 unsigned int vr_bridge_table_size(struct vrouter *);
 mac_learn_t vr_bridge_learn(struct vrouter *, struct vr_packet *,
         struct vr_eth *, struct vr_forwarding_md *);
+struct vr_nexthop * __vrouter_bridge_lookup(unsigned int, unsigned char *);
 
 #endif
