@@ -248,6 +248,25 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
     return rt->rtr_nh;
 }
 
+struct vr_nexthop *
+__vrouter_bridge_lookup(unsigned int vrf_id, unsigned char *mac)
+{
+    struct vr_route_req rt;
+
+    if (!mac)
+        return NULL;
+
+    rt.rtr_req.rtr_label_flags = 0;
+    rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
+    rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
+    rt.rtr_req.rtr_mac = mac;
+    /* If multicast L2 packet, use broadcast composite nexthop */
+    if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
+        rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
+   rt.rtr_req.rtr_vrf_id = vrf_id;
+
+    return vr_bridge_lookup(vrf_id,  &rt);
+}
 
 unsigned short
 vr_bridge_route_flags(unsigned int vrf_id, unsigned char *mac)

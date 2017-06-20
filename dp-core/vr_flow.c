@@ -18,6 +18,7 @@
 #include "vr_datapath.h"
 #include "vr_hash.h"
 #include "vr_ip_mtrie.h"
+#include "vr_bridge.h"
 
 #define VR_NUM_FLOW_TABLES          1
 #define VR_DEF_FLOW_ENTRIES         (512 * 1024)
@@ -1377,8 +1378,12 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
     if (!pkt->vp_nh) {
         if (vif_is_fabric(pkt->vp_if) && fmd &&
                 (fmd->fmd_label >= 0)) {
-            if (!vr_forwarding_md_label_is_vxlan_id(fmd))
+            if (!vr_forwarding_md_label_is_vxlan_id(fmd)) {
                 pkt->vp_nh = __vrouter_get_label(router, fmd->fmd_label);
+            }  else {
+                pkt->vp_nh = __vrouter_bridge_lookup(fmd->fmd_dvrf,
+                                                        pkt_data(pkt));
+            }
         }
     }
 
