@@ -41,4 +41,6 @@
 
 extern char vr_bcast_mac[];
 
+struct vr_nexthop * __vrouter_bridge_lookup(unsigned int, unsigned char *);
+
 #endif
