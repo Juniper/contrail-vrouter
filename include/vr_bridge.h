@@ -45,5 +45,6 @@ extern char vr_bcast_mac[];
 
 unsigned int vr_bridge_table_used_oflow_entries(struct vrouter *);
 unsigned int vr_bridge_table_used_total_entries(struct vrouter *);
+struct vr_nexthop * __vrouter_bridge_lookup(unsigned int, unsigned char *);
 
 #endif
