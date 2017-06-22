@@ -525,6 +525,8 @@ struct vr_dpdk_global {
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS] __rte_cache_aligned;
     /* Table of tapdevs. */
     struct vr_dpdk_tapdev tapdevs[VR_DPDK_MAX_TAP_INTERFACES] __rte_cache_aligned;
+    /* netlink socket to listen to link up/down and mtu change notifications */
+    volatile int tap_nl_fd;
     /* VLAN forwarding interface name */
     char vlan_name[VR_INTERFACE_NAME_LEN];
     /* VLAN forwarding interface ring */
@@ -725,6 +727,7 @@ unsigned vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
 /* Enqueue a burst of packets to the TAP device. */
 unsigned vr_dpdk_tapdev_enqueue_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
         unsigned num);
+void vr_dpdk_tapdev_handle_notifications(void);
 
 /*
  * vr_dpdk_knidev.c
