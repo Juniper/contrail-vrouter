@@ -25,6 +25,9 @@
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
 #include <rte_eth_af_packet.h>
+#include <linux/if_tun.h>
+#include <net/if_arp.h>
+#include <sys/ioctl.h>
 
 /*
  * dpdk_virtual_if_add - add a virtual (virtio) interface to vrouter.
@@ -612,6 +615,23 @@ dpdk_vhost_if_add(struct vr_interface *vif)
                 " MAC " MAC_FORMAT " (vif MAC " MAC_FORMAT ")\n",
                 vif->vif_idx, vif->vif_gen, vif->vif_name, port_id,
                 MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
+
+    /* If there is a tapdev VLAN device, assign vhost0 MAC address to it */
+    if (vr_dpdk.vlan_dev && (vr_dpdk.kni_state <= 0)) {
+        struct ifreq ifr;
+        struct vr_dpdk_tapdev *tapdev = vr_dpdk.vlan_dev;
+        memset(&ifr, 0, sizeof(ifr));
+        strncpy(ifr.ifr_name, vr_dpdk.vlan_name, sizeof(ifr.ifr_name) - 1);
+        rte_memcpy(ifr.ifr_hwaddr.sa_data, vif->vif_mac, ETHER_ADDR_LEN);
+        ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+        if (ioctl(tapdev->tapdev_fd, SIOCSIFHWADDR, &ifr) < 0) {
+            RTE_LOG(ERR, VROUTER, "    error assigning MAC address to %s: %s(%d)\n",
+                     vr_dpdk.vlan_name, rte_strerror(errno), errno);
+        } else {
+            RTE_LOG(INFO, VROUTER, "    Adding MAC " MAC_FORMAT " to %s\n",
+                    MAC_VALUE(vif->vif_mac), vr_dpdk.vlan_name);
+        }
+    }
 
     /*
      * KNI does not support bond interfaces and generate random MACs,
