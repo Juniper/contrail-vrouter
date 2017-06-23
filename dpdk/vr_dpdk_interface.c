@@ -26,9 +26,8 @@
 #include <rte_port_ethdev.h>
 #include <rte_eth_af_packet.h>
 #include <linux/if_tun.h>
+#include <net/if_arp.h>
 #include <sys/ioctl.h>
-
-#define ARPHRD_ETHER 1
 
 static void
 dpdk_vif_queue_free(struct vr_interface *vif)
