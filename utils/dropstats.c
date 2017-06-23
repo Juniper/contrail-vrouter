@@ -106,6 +106,8 @@ vr_drop_stats_req_process(void *s_req)
             stats->vds_rewrite_fail);
     printf("Invalid Mcast Source          %" PRIu64 "\n",
             stats->vds_invalid_mcast_source);
+    printf("Packet Loop                   %" PRIu64 "\n",
+            stats->vds_pkt_loop);
     printf("\n");
 
     printf("Push Fails                    %" PRIu64 "\n",

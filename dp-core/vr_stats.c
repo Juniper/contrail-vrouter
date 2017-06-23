@@ -70,9 +70,11 @@ vr_drop_stats_add_response(vr_drop_stats_req *response,
     response->vds_vlan_fwd_enq += stats->vds_vlan_fwd_enq;
     response->vds_drop_new_flow += stats->vds_drop_new_flow;
     response->vds_trap_original += stats->vds_trap_original;
+    response->vds_pkt_loop += stats->vds_pkt_loop;
 
     return;
 }
+
 
 static void
 vr_drop_stats_get(unsigned int core)
