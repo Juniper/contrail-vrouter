@@ -399,6 +399,7 @@ buffer sandesh vr_drop_stats_req {
     47: i64             vds_drop_new_flow;
     48: i64             vds_flow_evict;
     49: i64             vds_trap_original;
+    50: i64             vds_pkt_loop;
 }
 
 buffer sandesh vr_qos_map_req {

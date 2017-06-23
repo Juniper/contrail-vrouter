@@ -66,6 +66,7 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_drop_new_flow += stats[VP_DROP_NEW_FLOWS];
     response->vds_flow_evict += stats[VP_DROP_FLOW_EVICT];
     response->vds_trap_original += stats[VP_DROP_TRAP_ORIGINAL];
+    response->vds_pkt_loop += stats[VP_DROP_PKT_LOOP];
 
     return;
 }
@@ -104,6 +105,7 @@ vr_drop_stats_get_vif_stats(vr_drop_stats_req *response,
 
     return;
 }
+
 
 static void
 vr_drop_stats_get(unsigned int rid, short core)

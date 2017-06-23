@@ -179,7 +179,8 @@
 #define VP_DROP_NEW_FLOWS                   42
 #define VP_DROP_FLOW_EVICT                  43
 #define VP_DROP_TRAP_ORIGINAL               44
-#define VP_DROP_MAX                         45
+#define VP_DROP_PKT_LOOP                    45
+#define VP_DROP_MAX                         46
 
 
 struct vr_drop_stats {
@@ -228,6 +229,7 @@ struct vr_drop_stats {
     uint64_t vds_drop_new_flow;
     uint64_t vds_flow_evict;
     uint64_t vds_trap_original;
+    uint64_t vds_pkt_loop;
 };
 
 /*
