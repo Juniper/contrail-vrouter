@@ -414,11 +414,13 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
 static void
 list_get_print(vr_interface_req *req)
 {
-    char name[50] = {0};
+    char ip6_addr[INET6_ADDRSTRLEN], ip_addr[INET_ADDRSTRLEN],
+         name[50] = {0}, ip6_ip[16];
+    bool print_zero = false;
+    uint16_t proto, port;
     int printed = 0, len;
     unsigned int i;
-    uint16_t proto, port;
-    bool print_zero = false;
+    uint64_t *tmp;
 
     if (rate_set) {
         print_zero = true;
@@ -477,9 +479,18 @@ list_get_print(vr_interface_req *req)
     printf("\n");
 
     vr_interface_print_head_space();
-    printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%x\n",
+    printf("Type:%s HWaddr:"MAC_FORMAT" IPaddr:%s\n",
             vr_get_if_type_string(req->vifr_type),
-            MAC_VALUE((uint8_t *)req->vifr_mac), req->vifr_ip);
+            MAC_VALUE((uint8_t *)req->vifr_mac), inet_ntop(AF_INET,
+                &req->vifr_ip, ip_addr, INET_ADDRSTRLEN));
+    if (req->vifr_ip6_u || req->vifr_ip6_l) {
+        tmp = (uint64_t *)ip6_ip;
+        *tmp = req->vifr_ip6_u;
+        *(tmp + 1) = req->vifr_ip6_l;
+        vr_interface_print_head_space();
+        printf("IP6addr:%s\n", inet_ntop(AF_INET6, ip6_ip, ip6_addr,
+                                                    INET6_ADDRSTRLEN));
+    }
     vr_interface_print_head_space();
     printf("Vrf:%d Flags:%s QOS:%d Ref:%d", req->vifr_vrf,
             req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
@@ -509,8 +520,6 @@ list_get_print(vr_interface_req *req)
             req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors, 0);
-    vr_interface_print_head_space();
-    printf("Drops:%" PRIu64 "\n", req->vifr_dpackets);
 
 
     if (req->vifr_in_mirror_md_size) {
@@ -589,7 +598,8 @@ list_get_print(vr_interface_req *req)
             }
         }
     }
-    printf("\n");
+    vr_interface_print_head_space();
+    printf("Drops:%" PRIu64 "\n", req->vifr_dpackets);
 
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
         vr_vrf_assign_dump = true;
@@ -598,6 +608,7 @@ list_get_print(vr_interface_req *req)
         vr_ifindex = req->vifr_idx;
     }
 
+    printf("\n");
     return;
 }
 

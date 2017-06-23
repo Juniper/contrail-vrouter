@@ -283,8 +283,9 @@ struct vr_interface {
     unsigned char vif_in_mirror_md_size;
     unsigned char vif_out_mirror_md_len;
     unsigned char vif_out_mirror_md_size;
-    unsigned short vif_vrf_table_users;
     unsigned int  vif_ip;
+    unsigned short vif_vrf_table_users;
+    uint8_t vif_ip6[VR_IP6_ADDRESS_LEN];
 };
 
 struct vr_interface_settings {

@@ -1013,7 +1013,8 @@ dpdk_add_mpls(struct vrouter *router, unsigned mpls_label)
                     mpls_label);
                 continue;
             }
-            ret = vr_dpdk_lcore_mpls_schedule(eth_vif, eth_vif->vif_ip, mpls_label);
+            ret = vr_dpdk_lcore_mpls_schedule(eth_vif,
+                                    ntohs(eth_vif->vif_ip), mpls_label);
             if (ret != 0)
                 RTE_LOG(INFO, VROUTER, "    error accelerating MPLS %u: %s (%d)\n",
                     mpls_label, rte_strerror(-ret), -ret);
