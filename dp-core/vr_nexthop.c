@@ -258,6 +258,28 @@ vr_gateway_nexthop(struct vr_nexthop *nh)
     return false;
 }
 
+static int
+nh_tunnel_loop_detect_handle(struct vr_packet *pkt, struct vr_nexthop *nh,
+                                    struct vr_forwarding_md *fmd, uint32_t dip)
+{
+    if (!pkt || !nh || !fmd || !dip)
+        return 0;
+
+    if ((!fmd->fmd_outer_src_ip) || !vif_is_fabric(pkt->vp_if))
+        return 0;
+
+    if (nh->nh_type != NH_TUNNEL)
+        return 0;
+
+    if (fmd->fmd_outer_src_ip == dip) {
+        vr_pfree(pkt, VP_DROP_PKT_LOOP);
+        return 1;
+    }
+
+    return 0;
+}
+
+
 static nh_processing_t
 nh_resolve(struct vr_packet *pkt, struct vr_nexthop *nh,
            struct vr_forwarding_md *fmd)
@@ -1916,6 +1938,9 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (stats)
         stats->vrf_udp_mpls_tunnels++;
 
+    if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, nh->nh_udp_tun_dip))
+        return NH_PROCESSING_COMPLETE;
+
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
 
@@ -2082,6 +2107,9 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     vr_fmd_update_label_type(fmd, VR_LABEL_TYPE_MPLS);
 
+    if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, tun_dip))
+        return NH_PROCESSING_COMPLETE;
+
     if (fmd->fmd_udp_src_port)
         udp_src_port = fmd->fmd_udp_src_port;
 
@@ -2235,6 +2263,9 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     vr_fmd_update_label_type(fmd, VR_LABEL_TYPE_MPLS);
+
+    if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, nh->nh_gre_tun_dip))
+        return NH_PROCESSING_COMPLETE;
 
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;

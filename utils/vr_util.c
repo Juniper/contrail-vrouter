@@ -592,6 +592,8 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_rewrite_fail);
     printf("Invalid Mcast Source          %" PRIu64 "\n",
             stats->vds_invalid_mcast_source);
+    printf("Packet Loop                   %" PRIu64 "\n",
+            stats->vds_pkt_loop);
     printf("\n");
 
     printf("Push Fails                    %" PRIu64 "\n",
@@ -715,6 +717,7 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_vlan_fwd_enq;
     sum += req->vds_drop_new_flow;
     sum += req->vds_trap_original;
+    sum += req->vds_pkt_loop;
 
     return sum;
 }

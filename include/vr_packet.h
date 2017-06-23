@@ -183,7 +183,8 @@
 #define VP_DROP_TRAP_ORIGINAL               44
 #define VP_DROP_LEAF_TO_LEAF                45
 #define VP_DROP_BMAC_ISID_MISMATCH          46
-#define VP_DROP_MAX                         47
+#define VP_DROP_PKT_LOOP                    47
+#define VP_DROP_MAX                         48
 
 /*
  * NOTE: Please do not add any more fields without ensuring
