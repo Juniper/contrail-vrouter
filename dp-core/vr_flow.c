@@ -339,10 +339,8 @@ static struct vr_flow_entry *
 vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
         bool need_hold, unsigned int *fe_index)
 {
-    unsigned int i, index, hash;
+    unsigned int i, index, hash, free_index = 0;
     struct vr_flow_entry *tmp_fe, *fe = NULL;
-
-    *fe_index = 0;
 
     hash = vr_hash(key, key->key_len, 0);
 
@@ -374,18 +372,18 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
         }
 
         if (fe)
-            *fe_index += vr_flow_entries;
+            free_index += vr_flow_entries;
     }
 
     if (fe) {
-        *fe_index += index;
+        free_index += index;
         if (need_hold) {
             fe->fe_hold_list = vr_zalloc(sizeof(struct vr_flow_queue));
             if (!fe->fe_hold_list) {
-                vr_reset_flow_entry(router, fe, *fe_index);
+                vr_reset_flow_entry(router, fe, free_index);
                 fe = NULL;
             } else {
-                fe->fe_hold_list->vfq_index = *fe_index;
+                fe->fe_hold_list->vfq_index = free_index;
             }
         }
 
@@ -393,6 +391,7 @@ vr_find_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type,
             fe->fe_type = type;
             fe->fe_key.key_len = key->key_len;
             memcpy(&fe->fe_key, key, key->key_len);
+            *fe_index = free_index;
         }
     }
 
