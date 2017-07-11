@@ -22,6 +22,13 @@
 #include <rte_kni.h>
 #include <rte_malloc.h>
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+#define VROUTER_KNI_ADDR_CHECK 1
+#define vr_elt_va_start 0
+#define vr_elt_va_end 1
+#define vr_elt_va_status 2
+#endif
+
 /*
  * KNI Reader
  */
@@ -203,6 +210,67 @@ send_burst(struct dpdk_knidev_writer *p)
     p->tx_buf_count = 0;
 }
 
+#ifdef VROUTER_KNI_ADDR_CHECK
+/*
+ The rte_mempool_mem_iter callback routine for inspecting
+ mempool pointers to find a start/end address of a contiguous
+ memory region
+ */
+static void mempool_info_cb(struct rte_mempool *mp,
+       void *opaque, struct rte_mempool_memhdr *memhdr,
+       unsigned index)
+{
+       uintptr_t *info = opaque;
+
+       /* Stop iteration ...*/
+       if (info[vr_elt_va_status] || (memhdr == NULL))
+               return;
+
+       /* This is the first link */
+       if (info[vr_elt_va_start] == 0 && info[vr_elt_va_end] == 0) {
+               info[vr_elt_va_start] = (uintptr_t)memhdr->addr;
+               info[vr_elt_va_end] = (uintptr_t)(info[vr_elt_va_start] + memhdr->len);
+               return;
+       }
+
+       /* This is the link before head block */
+       if (info[vr_elt_va_end] == (uintptr_t)memhdr->addr) {
+               info[vr_elt_va_end] += memhdr->len;
+               return;
+       }
+
+       /* This is the link down last block */
+       if (info[vr_elt_va_start] == (uintptr_t)(memhdr->addr + memhdr->len)) {
+               info[vr_elt_va_start] -= memhdr->len;
+               return;
+       }
+
+
+       /* mempool is not contiguous. */
+       info[vr_elt_va_status] = (uintptr_t)1;
+}
+
+/**
+ * Check if the provided address is inside mempool memory region
+ *
+ * @return
+ *   1: (true) if the provided address is out of range
+     0: (false) if the provided address is in range
+ */
+static int addr_out_range(struct rte_mempool *mp, uintptr_t addr)
+{
+    uintptr_t info[vr_elt_va_status + 1];
+
+       memset(&info, 0, sizeof(info));
+       rte_mempool_mem_iter(mp, mempool_info_cb, &info);
+       if ((addr < info[vr_elt_va_start]) ||
+               (addr > info[vr_elt_va_end])) {
+               return true;
+       }
+       return false;
+}
+#endif
+
 static int
 dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
 {
@@ -229,11 +297,19 @@ dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
      * So we make sure the packet is from the RSS mempool. If not, we make
      * a copy to the RSS mempool.
      */
+#if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
     if (unlikely(pkt->pool != vr_dpdk.rss_mempool ||
             /* Check indirect mbuf's data is within the RSS mempool. */
             rte_pktmbuf_mtod(pkt, uintptr_t) < vr_dpdk.rss_mempool->elt_va_start ||
             rte_pktmbuf_mtod(pkt, uintptr_t) > vr_dpdk.rss_mempool->elt_va_end
             )) {
+#else
+    if (unlikely(pkt->pool != vr_dpdk.rss_mempool
+#ifdef VROUTER_KNI_ADDR_CHECK
+        || addr_out_range(vr_dpdk.rss_mempool, rte_pktmbuf_mtod(pkt, uintptr_t))
+#endif
+        )) {
+#endif
         struct vr_packet *vr_pkt = vr_dpdk_mbuf_to_pkt(pkt);
         pkt_copy = vr_dpdk_pktmbuf_copy(pkt, vr_dpdk.rss_mempool);
         /* The original mbuf is no longer needed. */

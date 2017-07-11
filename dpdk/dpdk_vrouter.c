@@ -618,6 +618,7 @@ dpdk_check_rx_mrgbuf_disable(void)
 
 /*
  * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
+ *               - Pin the lcore for SR-IOV vf I/O for eth devices. 
  */
 static void
 dpdk_check_sriov_vf(void)
@@ -630,6 +631,7 @@ dpdk_check_sriov_vf(void)
     {
         rte_eth_dev_info_get(i, &dev_info);
         /* Check PMD name suffix to detect SR-IOV virtual function. */
+        RTE_LOG(INFO, VROUTER,"[dbg]port #%d driver_name:%s\n", i, (dev_info.driver_name == NULL)?"EMPTY-STR":dev_info.driver_name);
         soff = strlen(dev_info.driver_name) - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
         if (soff > 0 &&
                 strncmp(dev_info.driver_name + soff, VR_DPDK_VF_PMD_SFX,
@@ -647,6 +649,7 @@ dpdk_check_sriov_vf(void)
         }
     }
 }
+
 
 /* Init DPDK EAL */
 static int
