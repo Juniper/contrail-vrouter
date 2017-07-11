@@ -93,6 +93,11 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_MAX_NB_RX_QUEUES    11
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_TX_QUEUES    16
+/*
+ * Special value for number of queues to indicate that each
+ * packet forwarding core should be assigned one queue
+ */
+#define VR_DPDK_ONE_QUEUE_PER_CORE  ((uint16_t)-1)
 /* Maximum number of hardware RX queues to use for RSS (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_RSS_QUEUES   16
 /* Maximum number of bond members per ethernet device */
@@ -629,11 +634,15 @@ int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
 int vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
 uint16_t vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
+
+#if VR_DPDK_USE_HW_FILTERING
 /* Add hardware filter */
 int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
     unsigned dst_ip, unsigned mpls_label);
 /* Init hardware filtering */
 int vr_dpdk_ethdev_filtering_init(struct vr_interface *vif, struct vr_dpdk_ethdev *ethdev);
+#endif
+
 /* Init RSS */
 int vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev);
 /*
@@ -847,5 +856,10 @@ void dpdk_fragment_assembler_exit(void);
 int dpdk_fragment_assembler_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd);
 void dpdk_fragment_assembler_table_scan(void *);
+
+/*
+ * Get bond interface port id by drv_name
+ */
+uint8_t dpdk_find_port_id_by_drv_name(void);
 
 #endif /*_VR_DPDK_H_ */
