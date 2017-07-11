@@ -37,7 +37,11 @@
 #include <rte_ip_frag.h>
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
+
+#if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
 #include <rte_eth_af_packet.h>
+#endif
+
 #include <rte_hash.h>
 #include <rte_cycles.h>
 #include <rte_malloc.h>

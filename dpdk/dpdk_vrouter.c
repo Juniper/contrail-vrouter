@@ -617,10 +617,11 @@ dpdk_check_rx_mrgbuf_disable(void)
 }
 
 /*
- * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
+ * dpdk_sriov_vf - check if any of eth devices is a virtual function.
+ *               - Pin the lcore for SR-IOV vf I/O for eth devices. 
  */
 static void
-dpdk_check_sriov_vf(void)
+dpdk_sriov_vf(void)
 {
     int i;
     struct rte_eth_dev_info dev_info;
@@ -630,7 +631,11 @@ dpdk_check_sriov_vf(void)
     {
         rte_eth_dev_info_get(i, &dev_info);
         /* Check PMD name suffix to detect SR-IOV virtual function. */
-        soff = strlen(dev_info.driver_name) - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
+        RTE_LOG(INFO, VROUTER,"[dbg]port #%d driver_name:%s\n", i, (dev_info.driver_name == NULL)?"EMPTY-STR":dev_info.driver_name);
+        if (dev_info.driver_name)
+            soff = strlen(dev_info.driver_name) - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
+        else
+            soff = 0 - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
         if (soff > 0 &&
                 strncmp(dev_info.driver_name + soff, VR_DPDK_VF_PMD_SFX,
                 sizeof(VR_DPDK_VF_PMD_SFX)) == 0) {
@@ -646,6 +651,34 @@ dpdk_check_sriov_vf(void)
             }
         }
     }
+}
+
+/*
+ * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
+ */
+uint8_t
+dpdk_check_sriov_vf(void)
+{
+    int i;
+    struct rte_eth_dev_info dev_info;
+    size_t soff;
+
+    for (i = 0; i < rte_eth_dev_count(); i++)
+    {
+        rte_eth_dev_info_get(i, &dev_info);
+        /* Check PMD name suffix to detect SR-IOV virtual function. */
+        RTE_LOG(INFO, VROUTER,"[dbg]port #%d driver_name:%s\n", i, (dev_info.driver_name == NULL)?"EMPTY-STR":dev_info.driver_name);
+        if (dev_info.driver_name)
+            soff = strlen(dev_info.driver_name) - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
+        else
+            soff = 0 - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
+        if (soff > 0 &&
+                strncmp(dev_info.driver_name + soff, VR_DPDK_VF_PMD_SFX,
+                sizeof(VR_DPDK_VF_PMD_SFX)) == 0) {
+            return true;
+        }    
+    }
+    return false;
 }
 
 /* Init DPDK EAL */
@@ -714,7 +747,7 @@ dpdk_init(void)
     rte_timer_subsystem_init();
 
     /* Check if any of eth devices is a SR-IOV virtual function. */
-    dpdk_check_sriov_vf();
+    dpdk_sriov_vf();
 
     /* Init the interface configuration mutex
      * ATM we use it just to synchronize access between the NetLink interface
