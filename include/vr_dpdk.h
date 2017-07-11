@@ -93,7 +93,7 @@ extern unsigned vr_packet_sz;
  * (limited by NIC and number of per queue TX/RX descriptors) */
 #define VR_DPDK_MAX_NB_RX_QUEUES    11
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
-#define VR_DPDK_MAX_NB_TX_QUEUES    128
+#define VR_DPDK_MAX_NB_TX_QUEUES    64
 /*
  * Special value for number of queues to indicate that each
  * packet forwarding core should be assigned one queue
@@ -104,7 +104,7 @@ extern unsigned vr_packet_sz;
 /* Maximum number of bond members per ethernet device */
 #define VR_DPDK_BOND_MAX_SLAVES     6
 /* Maximum RETA table size */
-#define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_128
+#define VR_DPDK_MAX_RETA_SIZE       ETH_RSS_RETA_SIZE_512
 #define VR_DPDK_MAX_RETA_ENTRIES    (VR_DPDK_MAX_RETA_SIZE/RTE_RETA_GROUP_SIZE)
 /* Number of hardware RX ring descriptors per queue */
 #define VR_DPDK_NB_RXD              128
@@ -676,11 +676,15 @@ int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
 int vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
 uint16_t vr_dpdk_ethdev_ready_queue_id_get(struct vr_interface *vif);
+
+#if VR_DPDK_USE_HW_FILTERING
 /* Add hardware filter */
 int vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
     unsigned dst_ip, unsigned mpls_label);
 /* Init hardware filtering */
 int vr_dpdk_ethdev_filtering_init(struct vr_interface *vif, struct vr_dpdk_ethdev *ethdev);
+#endif
+
 /* Init RSS */
 int vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev);
 /*
@@ -909,4 +913,10 @@ uint16_t dpdk_ipv6_udptcp_cksum(struct rte_mbuf *m,
                        const struct ipv6_hdr *ipv6_hdr,
                        uint8_t *l4_hdr);
 int dpdk_check_rx_mrgbuf_disable(void);
+
+/*
+ * Get bond interface port id by drv_name
+ */
+uint8_t dpdk_find_port_id_by_drv_name(void);
+
 #endif /*_VR_DPDK_H_ */

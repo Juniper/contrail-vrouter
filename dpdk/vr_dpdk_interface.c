@@ -24,7 +24,11 @@
 #include <rte_ip_frag.h>
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
+
+#if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
 #include <rte_eth_af_packet.h>
+#endif
+
 #include <linux/if_tun.h>
 #include <net/if_arp.h>
 #include <sys/ioctl.h>
@@ -268,9 +272,32 @@ dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
     struct rte_pci_addr *eth_pci_addr;
 
     for (i = 0; i < rte_eth_dev_count(); i++) {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+        if (rte_eth_devices[i].data == NULL)
+#else
         if (rte_eth_devices[i].pci_dev == NULL)
+#endif
             continue;
-
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+        if (rte_eth_devices[i].device != NULL) {
+            eth_pci_addr = &(RTE_DEV_TO_PCI(rte_eth_devices[i].device)->addr);
+            RTE_LOG(DEBUG, VROUTER, "count %d eth_pci_addr %x %x %x %x \n",
+                i, eth_pci_addr->bus, eth_pci_addr->devid,
+                eth_pci_addr->domain, eth_pci_addr->function);
+            RTE_LOG(DEBUG, VROUTER, "count %d addr %x %x %x %x \n",
+                i, addr->bus, addr->devid,
+                addr->domain, addr->function);
+            if (addr->bus == eth_pci_addr->bus &&
+                addr->devid == eth_pci_addr->devid &&
+                addr->domain == eth_pci_addr->domain &&
+                addr->function == eth_pci_addr->function) {
+                return i;
+            }
+        } else {
+            if (strcmp(rte_eth_devices[i].data->drv_name, "net_bonding") == 0)
+                return i;
+        }
+#else
         eth_pci_addr = &(rte_eth_devices[i].pci_dev->addr);
         if (addr->bus == eth_pci_addr->bus &&
             addr->devid == eth_pci_addr->devid &&
@@ -278,14 +305,38 @@ dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
             addr->function == eth_pci_addr->function) {
             return i;
         }
+#endif
     }
 
     return VR_DPDK_INVALID_PORT_ID;
 }
+
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+uint8_t
+dpdk_find_port_id_by_drv_name(void)
+{
+    uint8_t i;
+
+    for (i = 0; i < rte_eth_dev_count(); i++) {
+        if (rte_eth_devices[i].data == NULL)
+            continue;
+
+        if (strcmp(rte_eth_devices[i].data->drv_name, "net_bonding") == 0)
+            return i;
+    }
+
+    return VR_DPDK_INVALID_PORT_ID;
+}
+#endif
+
 static inline void
 dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, uint8_t port_id)
 {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+    rte_memcpy(addr, &(RTE_DEV_TO_PCI(rte_eth_devices[port_id].device)->addr), sizeof(struct rte_pci_addr));
+#else
     rte_memcpy(addr, &rte_eth_devices[port_id].pci_dev->addr, sizeof(struct rte_pci_addr));
+#endif
 }
 
 static inline void
@@ -582,7 +633,12 @@ dpdk_fabric_if_add(struct vr_interface *vif)
             return -ENOENT;
         }
 
-        port_id = vif->vif_os_idx;
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+        port_id = dpdk_find_port_id_by_drv_name();
+        if (port_id == VR_DPDK_INVALID_PORT_ID)
+#endif
+            port_id = vif->vif_os_idx;
+
         /* TODO: does not work for host interfaces
         dpdk_find_pci_addr_by_port(&pci_address, port_id);
         vif->vif_os_idx = dpdk_pci_to_dbdf(&pci_address);
@@ -705,7 +761,11 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
 
         rte_free(ethdev_ptr->data->dev_private);
         rte_free(ethdev_ptr->data);
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+        rte_free(ethdev_ptr->device);
+#else
         rte_free(ethdev_ptr->pci_dev);
+#endif
 
         rte_eth_dev_release_port(ethdev_ptr);
     }
@@ -1900,6 +1960,7 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
     port_id_ptr = (ethdev->ethdev_nb_slaves == -1)?
                    &ethdev->ethdev_port_id:ethdev->ethdev_slaves;
     do {
+#if (RTE_VERSION < RTE_VERSION_NUM(17, 2, 0, 0))
         struct rte_eth_xstats *eth_xstats = NULL;
         int nb_xstats, i;
         nb_xstats = rte_eth_xstats_get(*port_id_ptr, eth_xstats, 0);
@@ -1930,6 +1991,43 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
                 rte_free(eth_xstats);
             }
         }
+#else
+        struct rte_eth_xstat *eth_xstats = NULL;
+        struct rte_eth_xstat_name *xstats_names;
+        int nb_xstats, i;
+
+        nb_xstats = rte_eth_xstats_get(*port_id_ptr, eth_xstats, 0);
+        if (nb_xstats > 0) {
+            xstats_names = rte_malloc("stats_name", sizeof(struct rte_eth_xstat_name) * nb_xstats, 0);
+            if (xstats_names != NULL) {
+                if (nb_xstats != rte_eth_xstats_get_names(*port_id_ptr,
+                    xstats_names, nb_xstats)) {
+
+                    rte_free(xstats_names);
+                    return;
+                }
+            } else
+                return;
+
+            eth_xstats = rte_malloc("xstats",
+                sizeof(struct rte_eth_xstat)*nb_xstats, 0);
+            if (eth_xstats != NULL) {
+                if (rte_eth_xstats_get(*port_id_ptr, eth_xstats, nb_xstats)
+                        == nb_xstats) {
+                    /* look for XEC counter */
+                    for (i = 0; i < nb_xstats; i++) {
+                        if (strncmp(xstats_names[i].name, "l3_l4_xsum_error",
+                            sizeof(xstats_names[i].name)) == 0) {
+                            eth_stats->ierrors -= eth_xstats[i].value;
+                            break;
+                        }
+                    }
+                }
+                rte_free(eth_xstats);
+            }
+            rte_free(xstats_names);
+        }
+#endif
         port_num++;
         port_id_ptr++;
     } while (port_num < ethdev->ethdev_nb_slaves);
