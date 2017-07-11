@@ -618,6 +618,7 @@ dpdk_check_rx_mrgbuf_disable(void)
 
 /*
  * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
+ *               - Pin the lcore for SR-IOV vf I/O for eth devices. 
  */
 static void
 dpdk_check_sriov_vf(void)
@@ -647,6 +648,7 @@ dpdk_check_sriov_vf(void)
         }
     }
 }
+
 
 /* Init DPDK EAL */
 static int
