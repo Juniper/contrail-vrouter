@@ -448,7 +448,8 @@ vr_find_flow(struct vrouter *router, struct vr_flow *key,
     if (!flow_e) {
         flow_e = vr_flow_table_lookup(key, type, router->vr_oflow_table,
                 vr_oflow_entries, 0, hash, fe_index);
-        *fe_index += vr_flow_entries;
+        if (flow_e)
+            *fe_index += vr_flow_entries;
     }
 
     return flow_e;
