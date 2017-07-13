@@ -343,15 +343,13 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
             struct vr_forwarding_md *fmd, mirror_type_t mtype)
 {
     bool reset = true;
+    void *mirror_md;
+    unsigned char *buf, default_mme[2] = {0xff, 0x0};
     unsigned int captured_len, clone_len = 0;
     unsigned int mirror_md_len = 0, drop_reason;
-
-    void *mirror_md;
-    unsigned char *buf;
     struct vr_nexthop *nh, *pkt_nh;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
-    unsigned char default_mme[2] = {0xff, 0x0};
     struct vr_forwarding_md new_fmd;
 
     /* If the packet is already mirrored, dont mirror again */
@@ -366,20 +364,15 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
         return 0;
 
     if (mirror->mir_flags & VR_MIRROR_FLAG_HW_ASSISTED) {
-        if (fmd) {
-            fmd->fmd_mirror_vlan = mirror->mir_vlan_id;
-            return 0;
-        }
+        vr_fmd_put_mirror_vlan(fmd, mirror->mir_vlan_id);
+        return 0;
     }
 
-    /* in almost all the cases, fmd should be set */
-    if (fmd) {
-        memcpy(&new_fmd, fmd, sizeof(*fmd));
-        new_fmd.fmd_ecmp_nh_index = -1;
-    } else {
-        vr_init_forwarding_md(&new_fmd);
-    }
+    memcpy(&new_fmd, fmd, sizeof(*fmd));
+    new_fmd.fmd_ecmp_nh_index = -1;
     fmd = &new_fmd;
+
+    vr_fmd_put_mirror_type(fmd, mtype);
 
     nh = mirror->mir_nh;
     if (!nh || !(nh->nh_flags & NH_FLAG_VALID))
@@ -497,6 +490,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
      * mirror packet. hence, set the flow index to -1.
      */
     fmd->fmd_flow_index = -1;
+
+    fmd->fmd_outer_src_ip = 0;
 
     nh_output(pkt, nh, fmd);
     return 0;

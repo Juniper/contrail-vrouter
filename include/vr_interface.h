@@ -302,6 +302,7 @@ struct vr_interface {
     void *vif_queue_host_data;
     unsigned int  vif_ip;
     unsigned int vif_isid;
+    uint8_t vif_ip6[VR_IP6_ADDRESS_LEN];
     uint8_t vif_pbb_mac[VR_ETHER_ALEN];
 };
 
