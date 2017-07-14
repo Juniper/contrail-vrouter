@@ -2052,7 +2052,8 @@ vr_dpdk_set_virtq_ready(unsigned int vif_idx, unsigned int vring_idx,
     if (vq->vdv_hlen == 0) {
         struct vr_interface *vif;
         vif = __vrouter_get_interface(vrouter_get(0), vq->vdv_vif_idx);
-        if (vif && (vif->vif_flags & VIF_FLAG_MRG_RXBUF)) {
+        if (vif && (vif->vif_flags & VIF_FLAG_MRG_RXBUF) &&
+                (vif->vif_flags & VIF_FLAG_GRO_NEEDED)) {
             vq->vdv_send_func = dpdk_virtio_dev_to_vm_tx_burst_mergeable;
             vq->vdv_hlen = sizeof(struct virtio_net_hdr_mrg_rxbuf);
         } else {

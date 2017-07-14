@@ -273,7 +273,8 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
         }
     }
 
-    if (vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_MRG_RXBUF)) {
+    if ((vru_cl->vruc_msg.u64 & (1ULL << VIRTIO_NET_F_MRG_RXBUF)) &&
+            (vif->vif_flags & VIF_FLAG_GRO_NEEDED)) {
         vif->vif_flags |= VIF_FLAG_MRG_RXBUF;
         vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 1);
     } else {

@@ -103,8 +103,8 @@
 #define VIF_FLAG_MAC_PROXY          0x100000
 #define VIF_FLAG_ETREE_ROOT         0x200000
 
-#define VIF_FLAG_GRO_NEEDED         0x200000
-#define VIF_FLAG_MRG_RXBUF          0x400000
+#define VIF_FLAG_GRO_NEEDED         0x400000
+#define VIF_FLAG_MRG_RXBUF          0x800000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
