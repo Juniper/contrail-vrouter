@@ -11,6 +11,7 @@
 #include "vr_flow.h"
 #include "vrouter.h"
 #include "vr_btable.h"
+#include "vr_mirror.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -938,6 +939,15 @@ enum {
 #define FMD_FLAG_LABEL_IS_VXLAN_ID      0x01
 #define FMD_FLAG_MAC_IS_MY_MAC          0x02
 
+/*
+ * 16 bits of fmd_mirror_data constitutes the below
+ * MSB - 0 - last 12 bits indicate Vlan id
+ * MSB - 1 - Last 13 bits are interface id
+ *       2 bits after MSB - Mirror type
+ */
+
+#define FMD_MIRROR_INVALID_DATA 0xFFFF
+
 struct vr_forwarding_md {
     int32_t fmd_flow_index;
     int32_t fmd_label;
@@ -946,6 +956,7 @@ struct vr_forwarding_md {
     int16_t fmd_dvrf;
     uint32_t fmd_outer_src_ip;
     uint16_t fmd_vlan;
+    uint16_t fmd_mirror_data;
     uint16_t fmd_udp_src_port;
     uint8_t fmd_to_me;
     uint8_t fmd_src;
@@ -965,6 +976,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_dvrf = -1;
     fmd->fmd_outer_src_ip = 0;
     fmd->fmd_vlan = VLAN_ID_INVALID;
+    fmd->fmd_mirror_data = FMD_MIRROR_INVALID_DATA;
     fmd->fmd_udp_src_port = 0;
     fmd->fmd_to_me = 0;
     fmd->fmd_src = 0;
@@ -1001,6 +1013,50 @@ vr_forwarding_md_set_label(struct vr_forwarding_md *fmd, unsigned int label,
 {
     fmd->fmd_label = label;
     vr_forwarding_md_update_label_type(fmd, type);
+
+    return;
+}
+
+static inline mirror_type_t
+vr_fmd_get_mirror_type(struct vr_forwarding_md *fmd)
+{
+    if (fmd->fmd_mirror_data != FMD_MIRROR_INVALID_DATA) {
+        if (fmd->fmd_mirror_data & 0x8000)
+            return (((fmd->fmd_mirror_data & 0x6000) >> 13) & 0x0003);
+    }
+
+    return MIRROR_TYPE_UNKNOWN;
+}
+
+static inline uint16_t
+vr_fmd_get_mirror_if_id(struct vr_forwarding_md *fmd)
+{
+    uint16_t intf_id = FMD_MIRROR_INVALID_DATA;
+
+    if (fmd->fmd_mirror_data != FMD_MIRROR_INVALID_DATA) {
+        if (fmd->fmd_mirror_data & 0x8000) {
+            intf_id = fmd->fmd_mirror_data & 0x1FFF;
+            if (intf_id == 0x1FFF)
+                intf_id = FMD_MIRROR_INVALID_DATA;
+        }
+    }
+
+    return intf_id;
+}
+static inline void
+vr_fmd_put_mirror_type(struct vr_forwarding_md *fmd, mirror_type_t type)
+{
+    uint16_t intf_id = vr_fmd_get_mirror_if_id(fmd);
+    fmd->fmd_mirror_data = 0x8000 | ((type & 0x3) << 13) | (intf_id & 0x1FFF);
+
+    return;
+}
+
+static inline void
+vr_fmd_put_mirror_if_id(struct vr_forwarding_md *fmd, uint16_t if_id)
+{
+    mirror_type_t type = vr_fmd_get_mirror_type(fmd);
+    fmd->fmd_mirror_data = 0x8000 | ((type & 0x3) << 13) | (if_id & 0x1FFF);
 
     return;
 }

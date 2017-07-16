@@ -17,6 +17,7 @@
 #include "vr_datapath.h"
 #include "vr_route.h"
 #include "vr_hash.h"
+#include "vr_mirror.h"
 
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
@@ -452,36 +453,14 @@ nh_udp_tunnel_helper(struct vr_packet *pkt, unsigned short sport,
 }
 
 static bool
-nh_udp_tunnel6_helper(struct vr_packet *pkt,
-        struct vr_nexthop *nh, uint16_t sport, uint16_t dport)
+nh_udp_tunnel6_helper(struct vr_packet *pkt, struct vr_nexthop *nh,
+                        uint8_t *sip, uint16_t sport, uint16_t dport)
 {
-    unsigned int v4_ip;
-    uint8_t *sip = NULL;
-    uint8_t sip6[VR_IP6_ADDRESS_LEN];
-
     struct vr_ip6 *ip6;
-    struct vr_ip *ip;
     struct vr_udp *udp;
 
-    if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
-        if (pkt->vp_type == VP_TYPE_IP6) {
-            ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-
-            if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
-                sip = ip6->ip6_dst;
-            sip = ip6->ip6_src;
-
-        } else if (pkt->vp_type == VP_TYPE_IP) {
-            ip = (struct vr_ip *)pkt_network_header(pkt);
-
-            v4_ip = ip->ip_saddr;
-            if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
-                v4_ip = ip->ip_daddr;
-
-            vr_inet6_generate_ip6(sip6, v4_ip);
-            sip = sip6;
-        }
-    }
+    if (!sip)
+        sip = nh->nh_udp_tun6_sip;
 
     /* udp Header */
     udp = (struct vr_udp *)pkt_push(pkt, sizeof(struct vr_udp));
@@ -508,9 +487,6 @@ nh_udp_tunnel6_helper(struct vr_packet *pkt,
     ip6->ip6_plen = htons(pkt_len(pkt) - sizeof(struct vr_ip6));
     ip6->ip6_nxt = VR_IP_PROTO_UDP;
     ip6->ip6_hlim = 64;
-
-    if (!sip)
-        sip = nh->nh_udp_tun6_sip;
 
     memcpy(ip6->ip6_src, sip, VR_IP6_ADDRESS_LEN);
     memcpy(ip6->ip6_dst, nh->nh_udp_tun6_dip, VR_IP6_ADDRESS_LEN);
@@ -1601,25 +1577,33 @@ nh_discard(struct vr_packet *pkt, struct vr_nexthop *nh,
     return 0;
 }
 
-static int
-nh_generate_sip(struct vr_nexthop *nh, struct vr_packet *pkt)
+static uint8_t *
+nh_generate_mirroring_sip(struct vr_nexthop *nh,
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
-    struct vr_ip *iph;
+    uint16_t intf_id;
+    mirror_type_t mtype;
+    struct vr_interface *vif = NULL;
 
-    iph = (struct vr_ip *)pkt_network_header(pkt);
-    if (pkt->vp_type == VP_TYPE_IP) {
+    mtype = vr_fmd_get_mirror_type(fmd);
 
-        /*
-         * If the packet is from fabric, it must be destined to a VM on
-         * this compute, so lets use dest ip
-         */
-        if (pkt->vp_if->vif_type == VIF_TYPE_PHYSICAL)
-            return iph->ip_daddr;
-
-        return iph->ip_saddr;
+    if (mtype == MIRROR_TYPE_PORT_RX) {
+        vif = pkt->vp_if;
+    } else if (mtype == MIRROR_TYPE_PORT_TX) {
+        intf_id = vr_fmd_get_mirror_if_id(fmd);
+        if (intf_id != FMD_MIRROR_INVALID_DATA)
+            vif = __vrouter_get_interface(vrouter_get(nh->nh_rid), intf_id);
     }
 
-    return 0;
+    if (!vif)
+        return NULL;
+
+    if (nh->nh_family == AF_INET)
+        return (uint8_t *)&vif->vif_ip;
+    else if (nh->nh_family == AF_INET6)
+        return vif->vif_ip6;
+
+    return NULL;
 }
 
 static int
@@ -1627,6 +1611,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
               struct vr_forwarding_md *fmd)
 {
     int ret = -1;
+    uint8_t *vif_ip = NULL;
     unsigned int head_space, hash;
     uint32_t sip = 0, port_range;
     struct vr_packet *tmp;
@@ -1675,14 +1660,17 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         fmd->fmd_udp_src_port += VR_UDP_PORT_RANGE_START;
     }
 
-    if (nh->nh_family == AF_INET) {
-        if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
-            sip = nh_generate_sip(nh, pkt);
-        }
+    if (nh->nh_flags & NH_FLAG_TUNNEL_SIP_COPY) {
+        vif_ip = nh_generate_mirroring_sip(nh, pkt, fmd);
+    }
 
-        if (!sip) {
+    if (nh->nh_family == AF_INET) {
+
+        if (vif_ip)
+            sip = *(uint32_t *)vif_ip;
+
+        if (!sip)
             sip = nh->nh_udp_tun_sip;
-        }
 
         qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
         if (nh_udp_tunnel_helper(pkt, htons(fmd->fmd_udp_src_port),
@@ -1700,7 +1688,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
 
     } else if (nh->nh_family == AF_INET6) {
-        if (nh_udp_tunnel6_helper(pkt, nh, htons(fmd->fmd_udp_src_port),
+        if (nh_udp_tunnel6_helper(pkt, nh, vif_ip, htons(fmd->fmd_udp_src_port),
                    nh->nh_udp_tun_dport) == false) {
             goto send_fail;
         }
@@ -1768,6 +1756,9 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_udp_mpls_tunnels++;
+
+    if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, nh->nh_udp_tun_dip))
+        return 0;
 
     if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, nh->nh_udp_tun_dip))
         return 0;

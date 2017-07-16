@@ -111,6 +111,8 @@ buffer sandesh vr_interface_req {
     54: list<byte>  vifr_in_mirror_md;
     55: list<byte>  vifr_out_mirror_md;
     56: u64         vifr_dpackets;
+    57: u64         vifr_ip6_u;
+    58: u64         vifr_ip6_l;
 }
 
 buffer sandesh vr_vxlan_req {

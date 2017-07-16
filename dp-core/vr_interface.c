@@ -258,6 +258,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     mfmd.fmd_dvrf = vif->vif_vrf;
+    vr_fmd_put_mirror_if_id(&mfmd, vif->vif_idx);
 
     if (pkt->vp_type == VP_TYPE_NULL)
         vr_pkt_type(pkt, 0, &mfmd);
@@ -1925,6 +1926,7 @@ int
 vr_interface_add(vr_interface_req *req, bool need_response)
 {
     int i, ret = 0;
+    uint64_t *ip6;
     struct vr_interface *vif = NULL;
     struct vrouter *router = vrouter_get(req->vifr_rid);
 
@@ -2031,6 +2033,9 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     }
 
     vif->vif_ip = req->vifr_ip;
+    ip6 = (uint64_t *)(vif->vif_ip6);
+    *ip6 = req->vifr_ip6_u;
+    *(ip6 + 1) = req->vifr_ip6_l;
 
     if (req->vifr_name) {
         strncpy(vif->vif_name, req->vifr_name, sizeof(vif->vif_name) - 1);
@@ -2139,6 +2144,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     uint8_t proto;
     uint16_t port;
     unsigned int cpu, i, j, k = 0;
+    uint64_t *ip6;
 
     struct vr_interface_settings settings;
 
@@ -2155,6 +2161,9 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         memcpy(req->vifr_mac, intf->vif_mac,
                 MINIMUM(req->vifr_mac_size, sizeof(intf->vif_mac)));
     req->vifr_ip = intf->vif_ip;
+    ip6 = (uint64_t *)(intf->vif_ip6);
+    req->vifr_ip6_u = *ip6;
+    req->vifr_ip6_l = *(ip6 + 1);
     req->vifr_mir_id = intf->vif_mirror_id;
 
     req->vifr_ref_cnt = intf->vif_users;
