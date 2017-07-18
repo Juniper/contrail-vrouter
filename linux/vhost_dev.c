@@ -462,6 +462,9 @@ vhost_setup(struct net_device *dev)
     random_ether_addr(dev->dev_addr);
     ether_setup(dev);
 
+#ifdef ETH_MAX_MTU
+    dev->max_mtu = ETH_MAX_MTU;
+#endif
     dev->needed_headroom = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
     dev->netdev_ops = &vhost_dev_ops;
     dev->destructor = vhost_dev_destructor;
