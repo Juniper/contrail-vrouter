@@ -312,6 +312,7 @@ dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
     return VR_DPDK_INVALID_PORT_ID;
 }
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
 uint8_t
 dpdk_find_port_id_by_drv_name(void)
 {
@@ -327,6 +328,7 @@ dpdk_find_port_id_by_drv_name(void)
 
     return VR_DPDK_INVALID_PORT_ID;
 }
+#endif
 
 static inline void
 dpdk_find_pci_addr_by_port(struct rte_pci_addr *addr, uint8_t port_id)
@@ -632,10 +634,12 @@ dpdk_fabric_if_add(struct vr_interface *vif)
             return -ENOENT;
         }
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
         port_id = dpdk_find_port_id_by_drv_name();
-        if (port_id == VR_DPDK_INVALID_PORT_ID) {
+        if (port_id == VR_DPDK_INVALID_PORT_ID)
+#endif
             port_id = vif->vif_os_idx;
-        }
+
         /* TODO: does not work for host interfaces
         dpdk_find_pci_addr_by_port(&pci_address, port_id);
         vif->vif_os_idx = dpdk_pci_to_dbdf(&pci_address);
@@ -1957,7 +1961,7 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
     port_id_ptr = (ethdev->ethdev_nb_slaves == -1)?
                    &ethdev->ethdev_port_id:ethdev->ethdev_slaves;
     do {
-#if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
+#if (RTE_VERSION < RTE_VERSION_NUM(17, 2, 0, 0))
         struct rte_eth_xstats *eth_xstats = NULL;
         int nb_xstats, i;
         nb_xstats = rte_eth_xstats_get(*port_id_ptr, eth_xstats, 0);
@@ -2020,9 +2024,9 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
                         }
                     }
                 }
-                rte_free(xstats_names);
                 rte_free(eth_xstats);
             }
+            rte_free(xstats_names);
         }
 #endif
         port_num++;

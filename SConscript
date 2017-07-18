@@ -115,7 +115,18 @@ if sys.platform != 'darwin':
     subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', \
                         'utils', 'uvrouter', 'test']
     exports = ['VRouterEnv']
-
+    
+    rte_ver_filename = '../third_party/dpdk/lib/librte_eal/common/include/rte_version.h'
+    rte_ver_file = open(rte_ver_filename, 'r')
+    file_content = rte_ver_file.read()
+    rte_ver_file.close()
+    matches = re.findall("define RTE_VER_MAJOR 2", file_content)
+   
+    if matches:
+        rte_libs = '-lethdev', '-lrte_malloc'
+    else:
+        rte_libs = '-lrte_ethdev'
+  
     if dpdk_exists:
         subdirs.append('dpdk')
         exports.append('dpdk_lib')
@@ -155,8 +166,7 @@ if sys.platform != 'darwin':
             '-lrte_kvargs',
             '-lrte_mbuf',
             '-lrte_ip_frag',
-            '-lrte_ethdev',
-        #    '-lrte_malloc',
+            rte_libs,
             '-lrte_mempool',
             '-lrte_ring',
             '-lrte_eal',

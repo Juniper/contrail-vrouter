@@ -919,6 +919,4 @@ int dpdk_check_rx_mrgbuf_disable(void);
  */
 uint8_t dpdk_find_port_id_by_drv_name(void);
 
-uint8_t dpdk_check_sriov_vf(void);
-
 #endif /*_VR_DPDK_H_ */

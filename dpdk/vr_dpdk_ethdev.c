@@ -27,12 +27,16 @@
 #include <rte_udp.h>
 
 static struct rte_eth_conf ethdev_conf = {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
     .link_speeds = ETH_LINK_SPEED_AUTONEG,
+#else
+    .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
+    .link_duplex = 0,   /* ETH_LINK_[HALF_DUPLEX|FULL_DUPLEX], or 0 for autonegotation */
+#endif
     .rxmode = { /* Port RX configuration. */
         /* The multi-queue packet distribution mode to be used, e.g. RSS. */
         .mq_mode            = ETH_MQ_RX_RSS,
         .max_rx_pkt_len     = VR_DEF_MAX_PACKET_SZ, /* Only used if jumbo_frame enabled */
-       // .max_rx_pkt_len     = ETHER_MAX_LEN, /* Only used if jumbo_frame enabled */
         .header_split       = 0, /* Disable Header Split */
         .hw_ip_checksum     = 1, /* Enable IP/UDP/TCP checksum offload */
         .hw_vlan_filter     = 0, /* Disabel VLAN filter */

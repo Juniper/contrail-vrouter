@@ -221,8 +221,6 @@ static void mempool_info_cb(struct rte_mempool *mp,
        unsigned index)
 {
        uintptr_t *info = opaque;
-       (void)mp;
-       (void)index;
 
        /* Stop iteration ...*/
        if (info[vr_elt_va_status] || (memhdr == NULL))
