@@ -1469,6 +1469,14 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         }
     }
 
+    /* For tapdev, compute the checksum of packets originating in the
+     * VM and destined to the host. If offloads are enabled in the VM
+     * it would not compute the checksum and the host would drop it
+     */
+    if (unlikely((vr_dpdk.kni_state <= 0) && vif_is_virtual(pkt->vp_if)
+                  && vif_is_vhost(vif)))
+        dpdk_sw_checksum_at_offset(pkt, pkt_get_network_header_off(pkt));
+
 #ifdef VR_DPDK_TX_PKT_DUMP
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
     if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
