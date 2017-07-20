@@ -28,6 +28,7 @@ typedef struct vr_uvh_client_mem_region {
 
 typedef struct vr_uvh_client {
     int vruc_fd;
+    int vruc_timer_fd;
     char vruc_path[VR_UNIX_PATH_MAX];
     char vruc_cmsg[CMSG_SPACE(VHOST_MEMORY_MAX_NREGIONS * sizeof(int))];
     int vruc_msg_bytes_read;
@@ -41,6 +42,7 @@ typedef struct vr_uvh_client {
     unsigned int vruc_nrxqs;
     unsigned int vruc_ntxqs;
     unsigned int vruc_vif_gen;
+    unsigned int vruc_vhostuser_mode;
     pthread_t vruc_owner;
 } vr_uvh_client_t;
 

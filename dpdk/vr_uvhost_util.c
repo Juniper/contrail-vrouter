@@ -127,7 +127,7 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
     }
 
     for (i = 0; i < MAX_UVHOST_FDS; i++) {
-        if (fds[i].uvh_fd == -1) {
+        if (fds[i].uvh_fd == fd || fds[i].uvh_fd == -1) {
             fds[i].uvh_fd = fd;
             fds[i].uvh_fd_arg = fd_handler_arg;
             fds[i].uvh_fd_fn = fd_handler;
