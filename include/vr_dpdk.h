@@ -201,9 +201,9 @@ extern unsigned vr_packet_sz;
 /* Socket connection retry timeout in seconds (use power of 2) */
 #define VR_DPDK_RETRY_CONNECT_SECS  64
 /* Maximum number of KNI devices (vhost0 + monitoring) */
-#define VR_DPDK_MAX_KNI_INTERFACES  5
+#define VR_DPDK_MAX_KNI_INTERFACES  16
 /* Maximum number of TAP devices (vhost0 + monitoring) */
-#define VR_DPDK_MAX_TAP_INTERFACES  5
+#define VR_DPDK_MAX_TAP_INTERFACES  16
 /* String buffer size (for logs and EAL arguments) */
 #define VR_DPDK_STR_BUF_SZ          512
 /* Log timestamp format */
