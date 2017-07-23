@@ -132,6 +132,11 @@ typedef enum {
     MR_XCONNECT,
 } mac_response_t;
 
+typedef enum {
+    VHOSTUSER_CLIENT = 0,
+    VHOSTUSER_SERVER,
+}vhostuser_mode_t;
+
 struct vr_interface_stats {
     uint64_t vis_ibytes;
     uint64_t vis_ipackets;
@@ -303,6 +308,7 @@ struct vr_interface {
     unsigned int  vif_ip;
     unsigned int vif_isid;
     uint8_t vif_pbb_mac[VR_ETHER_ALEN];
+    vhostuser_mode_t vif_vhostuser_mode;
 };
 
 struct vr_interface_settings {

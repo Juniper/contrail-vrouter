@@ -19,6 +19,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <sys/timerfd.h>
 
 #include <rte_errno.h>
 #include <rte_hexdump.h>
@@ -42,6 +43,7 @@ static int vr_uvhm_get_vring_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_get_queue_num(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_enable(vr_uvh_client_t *vru_cl);
+static int vr_uvh_cl_timer_setup(vr_uvh_client_t *vru_cl);
 
 static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
@@ -908,6 +910,17 @@ cleanup:
     if (ret == -1) {
         /* We set VQ_NOT_READY state and reset the queues in uvhm_client_munmap() */
         uvhm_client_munmap(vru_cl);
+        if (vru_cl->vruc_vhostuser_mode == VRNU_VIF_MODE_SERVER) {
+            /* existing FD (stored in local variable in caller to
+             * this funcition) will be closed after return from this function
+             * reset the value to -1, so that new fd will be created
+             */
+            vru_cl->vruc_fd = -1;
+            if (vr_uvh_cl_timer_setup(vru_cl)) {
+                vr_uvhost_log("Client %s: timer creation failed\n",
+                        uvhm_client_name(vru_cl));
+            }
+        }
     }
     /* clear state for next message from this client. */
     vru_cl->vruc_msg_bytes_read = 0;
@@ -980,6 +993,97 @@ error:
 }
 
 /*
+ * vr_uvh_cl_timer_handler - handler for timer events for 
+ * clients when Qemu in server mode
+ *
+ * Returns 0 on success, -1 on error.
+ *
+ */
+static int
+vr_uvh_cl_timer_handler(int fd, void *arg)
+{
+    vr_uvh_client_t *vru_cl = (vr_uvh_client_t *) arg;
+    struct sockaddr_un sun;
+    int ret = 0;
+
+    memset(&sun, 0, sizeof(sun));
+    sun.sun_family = AF_UNIX;
+    strncpy(sun.sun_path, vru_cl->vruc_path, sizeof(sun.sun_path) - 1);
+
+    ret = connect(vru_cl->vruc_fd, (struct sockaddr *) &sun, sizeof(sun));
+    if (ret == -1) {
+        ret = vr_uvh_cl_timer_setup(vru_cl);
+    } else {
+        /*
+         * socket connected
+         * add to msg handler
+         */
+        ret = vr_uvhost_add_fd(vru_cl->vruc_fd, UVH_FD_READ, vru_cl,
+                                vr_uvh_cl_msg_handler);
+        if (ret == -1) {
+            vr_uvhost_log("    error adding vif %u socket FD %d\n",
+                            vru_cl->vruc_idx, vru_cl->vruc_fd);
+        }
+    }
+
+    return ret;
+}
+
+/*
+ * vr_uvh_cl_timer_setup - Setup timer to reconnect to the
+ * Qemu server.
+ *
+ * Returns 0 on success, -1 on error.
+ *
+ */
+static int
+vr_uvh_cl_timer_setup(vr_uvh_client_t *vru_cl)
+{
+    int ret = 0;
+    struct itimerspec cl_timer;
+
+    cl_timer.it_interval.tv_sec  = 0;
+    cl_timer.it_interval.tv_nsec = 0;
+    cl_timer.it_value.tv_sec  = 5;
+    cl_timer.it_value.tv_nsec = 0;
+
+    if (vru_cl->vruc_fd == -1) {
+        vru_cl->vruc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (vru_cl->vruc_fd == -1) {
+            vr_uvhost_log("    error creating vif %u socket: %s (%d)\n",
+                            vru_cl->vruc_idx, rte_strerror(errno), errno);
+            ret = -1;
+            goto error;
+        }
+    }
+
+    if (vru_cl->vruc_timer_fd == -1)
+        vru_cl->vruc_timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+
+    if (vru_cl->vruc_timer_fd == -1) {
+        ret = -1;
+    } else {
+        ret = timerfd_settime(vru_cl->vruc_timer_fd, 0, &cl_timer, NULL);
+        if (ret == -1) {
+            close(vru_cl->vruc_timer_fd);
+            vru_cl->vruc_timer_fd = -1;
+        } else {
+            if (vr_uvhost_add_fd(vru_cl->vruc_timer_fd, UVH_FD_READ, vru_cl,
+                        vr_uvh_cl_timer_handler)) {
+                ret = -1;
+                vr_uvhost_log("    error adding timer FD %d read handler\n",
+                      vru_cl->vruc_timer_fd);
+                close(vru_cl->vruc_timer_fd);
+                vru_cl->vruc_timer_fd = -1;
+            }
+        }
+    }
+
+error:
+    return ret;
+}
+
+/*
  * vr_uvh_nl_vif_del_handler - handle a message from the netlink thread
  * to delete a vif.
  *
@@ -1024,7 +1128,7 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
 static int
 vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
 {
-    int s = 0, ret = -1, err;
+    int s = 0, ret = -1, err, sock_connected = 0;
     struct sockaddr_un sun;
     int flags;
     vr_uvh_client_t *vru_cl = NULL;
@@ -1056,35 +1160,60 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
         sizeof(sun.sun_path) - strlen(sun.sun_path) - 1);
 
     mkdir(vr_socket_dir, VR_DEF_SOCKET_DIR_MODE);
-    unlink(sun.sun_path);
+    /* qemu in server mode needs rw access */
+    chmod(vr_socket_dir, 0777);
 
     /*
-     * Ensure RW permissions for the socket files such that QEMU process is
-     * able to connect.
+     * Client mode Qemu
+     * vrouter-dpdk listens on the socket path
      */
-    umask_mode = umask(~(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |
-            S_IWOTH));
+    if (msg->vrnu_vif_vhostuser_mode == VRNU_VIF_MODE_CLIENT) {
 
-    ret = bind(s, (struct sockaddr *) &sun, sizeof(sun));
-    if (ret == -1) {
-        vr_uvhost_log("    error binding vif %u FD %d to %s: %s (%d)\n",
-            msg->vrnu_vif_idx, s, sun.sun_path, rte_strerror(errno), errno);
-        goto error;
-    }
+        unlink(sun.sun_path);
 
-    umask(umask_mode);
+        /*
+         * Ensure RW permissions for the socket files such that QEMU process is
+         * able to connect.
+         */
+        umask_mode = umask(~(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |
+                S_IWOTH));
 
-    /*
-     * Set the socket to non-blocking
-     */
-    flags = fcntl(s, F_GETFL, 0);
-    fcntl(s, flags | O_NONBLOCK);
+        ret = bind(s, (struct sockaddr *) &sun, sizeof(sun));
+        if (ret == -1) {
+            vr_uvhost_log("    error binding vif %u FD %d to %s: %s (%d)\n",
+                msg->vrnu_vif_idx, s, sun.sun_path, rte_strerror(errno), errno);
+            goto error;
+        }
 
-    ret = listen(s, 1);
-    if (ret == -1) {
-        vr_uvhost_log("    error listening vif %u socket FD %d: %s (%d)\n",
-                        msg->vrnu_vif_idx, s, rte_strerror(errno), errno);
-        goto error;
+        umask(umask_mode);
+
+        /*
+         * Set the socket to non-blocking
+         */
+        flags = fcntl(s, F_GETFL, 0);
+        fcntl(s, flags | O_NONBLOCK);
+
+        ret = listen(s, 1);
+        if (ret == -1) {
+            vr_uvhost_log("    error listening vif %u socket FD %d: %s (%d)\n",
+                            msg->vrnu_vif_idx, s, rte_strerror(errno), errno);
+            goto error;
+        }
+
+    } else {
+        /*
+         * Server mode Qemu
+         * Connect to the socket
+         */
+        ret = connect(s, (struct sockaddr *) &sun, sizeof(sun));
+        if (ret == -1) {
+            vr_uvhost_log("    error connecting uvhost socket FD %d to %s:"
+                " %s (%d)\n", s, sun.sun_path, rte_strerror(errno), errno);
+        } else {
+            vr_uvhost_log("connected to sock    vif %u socket %s FD is %d\n",
+                            msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
+            sock_connected = 1;
+        }
     }
 
     vru_cl = vr_uvhost_new_client(s, sun.sun_path, msg->vrnu_vif_idx);
@@ -1098,12 +1227,40 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     vru_cl->vruc_nrxqs = msg->vrnu_vif_nrxqs;
     vru_cl->vruc_ntxqs = msg->vrnu_vif_ntxqs;
     vru_cl->vruc_vif_gen = msg->vrnu_vif_gen;
+    vru_cl->vruc_vhostuser_mode = msg->vrnu_vif_vhostuser_mode;
+    vru_cl->vruc_timer_fd = -1;
 
-    ret = vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_listen_handler);
-    if (ret == -1) {
-        vr_uvhost_log("    error adding vif %u socket FD %d\n",
-                        msg->vrnu_vif_idx, s);
-        goto error;
+    if (msg->vrnu_vif_vhostuser_mode == VRNU_VIF_MODE_CLIENT) {
+        /*
+         * Client mode Qemu
+         * add to listen handler
+         */
+        ret = vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_listen_handler);
+        if (ret == -1) {
+            vr_uvhost_log("    error adding vif %u socket FD %d\n",
+                            msg->vrnu_vif_idx, s);
+            goto error;
+        }
+    } else {
+        if (sock_connected) {
+            /*
+             * Server mode Qemu
+             * add to client handler
+             */
+            vr_uvhost_log("adding to msg handler    vif %u socket %s FD is %d\n",
+                                msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
+            if (vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_msg_handler)) {
+                vr_uvhost_log("    error adding client %s FD %d read handler\n",
+                              sun.sun_path, s);
+                goto error;
+            }
+        } else {
+            if (vr_uvh_cl_timer_setup(vru_cl)) {
+                vr_uvhost_log("    error adding vif %u socket %s to timer\n",
+                            msg->vrnu_vif_idx, sun.sun_path);
+                goto error;
+            }
+        }
     }
 
     vr_dpdk_virtio_set_vif_client(msg->vrnu_vif_idx, vru_cl);
