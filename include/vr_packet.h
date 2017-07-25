@@ -860,6 +860,11 @@ struct vr_gre {
     unsigned short gre_proto;
 } __attribute__((packed));
 
+struct vr_gre_key {
+    struct vr_gre gre_comm_hdr;
+    unsigned int gre_key;
+} __attribute__((packed));
+
 struct vr_pcap {
     /* timestamp seconds */
     unsigned int pcap_ts_sec;
