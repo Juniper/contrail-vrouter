@@ -769,6 +769,20 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
     case VR_IP_PROTO_UDP:
         hash = rte_hash_crc_4byte(*l4_ptr, hash);
         break;
+    case VR_IP_PROTO_GRE:
+        if (likely(l4_ptr != NULL))
+        {
+            struct vr_gre_key* gre_hdr = (struct vr_gre_key *)l4_ptr;
+
+            if (likely(gre_hdr->gre_comm_hdr.gre_flags & VR_GRE_FLAG_KEY))  {
+                hash = rte_hash_crc_4byte(gre_hdr->gre_key , hash);
+                RTE_LOG(DEBUG, VROUTER, "%s: GRE key %d, RSS hash: 0x%x (emulated)\n",
+                    __func__, gre_hdr->gre_key, hash);
+            } else
+                RTE_LOG(DEBUG, VROUTER, "%s: GRE without key, RSS hash: 0x%x (emulated)\n",
+                    __func__, hash);
+        }
+        break;
     }
 
     mbuf->ol_flags |= PKT_RX_RSS_HASH;
@@ -873,7 +887,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
                 mbuf->ol_flags &= ~PKT_RX_RSS_HASH;
                 /* Go to parsing. */
             } else {
-                return 0; /* Looks like GRE, but no MPLS. */
+                return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, NULL); /* Looks like GRE, but no MPLS. */
             }
         } else if (ipv4_hdr->ip_proto == VR_IP_PROTO_UDP) {
             /* At this point the packet may be:
