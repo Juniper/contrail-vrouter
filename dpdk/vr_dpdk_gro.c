@@ -388,23 +388,45 @@ dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     struct vr_dpdk_gro_flow_key_v4 flow4;
     struct vr_dpdk_gro_flow_key_v6 flow6;
     struct gro_entry *entry;
-    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
-    void *nw_hdr = m->buf_addr + pkt_get_network_header_off(pkt);
+    struct rte_mbuf *m;
+    void *nw_hdr;
     struct vr_tcp *tcph = NULL;
     uint16_t tcp_data_len, ip_pkt_len, l;
     uint32_t *ts_ptr;
     int32_t ret;
     unsigned short csum;
     unsigned short src_vif_idx = 0, nh_id = 0;
-    const unsigned lcore_id = rte_lcore_id();
-    struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
+    unsigned lcore_id;
+    struct vr_dpdk_lcore *lcore;
     uint8_t is_ipv6 = 0, flush = 0;
     void *key = NULL;
-    struct vrouter *router = vrouter_get(0);
+    struct vrouter *router;
     struct vr_interface *src_vif;
     struct vr_nexthop *nh;
     struct vr_gro *gro;
 
+    /* Normal processing for VMs if -
+     * => They dont require GRO (like DPDK VM's)
+     * => They dont support mergeable buffers
+     */
+    if ((vif->vif_flags &
+                (VIF_FLAG_GRO_NEEDED | VIF_FLAG_MRG_RXBUF)) !=
+                (VIF_FLAG_GRO_NEEDED | VIF_FLAG_MRG_RXBUF)) {
+        return 0;
+    }
+
+    lcore_id = rte_lcore_id();
+    lcore = vr_dpdk.lcores[lcore_id];
+
+    /* Packets arriving through non-Fwd cores - Normal processing */
+    if (unlikely((lcore->gro.gro_tbl_v4_handle == NULL) ||
+            (lcore->gro.gro_tbl_v6_handle == NULL))){
+        return 0;
+    }
+
+    m = vr_dpdk_pkt_to_mbuf(pkt);
+    nw_hdr = m->buf_addr + pkt_get_network_header_off(pkt);
+    router = vrouter_get(0);
     /* Adjust mbuf */
     m->data_off = pkt_head_space(pkt);
     m->pkt_len = pkt_len(pkt);
@@ -418,24 +440,6 @@ dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     pkt_pull(pkt, sizeof(struct vr_gro));
 
     src_vif = __vrouter_get_interface(router, src_vif_idx);
-
-    /* Normal processing for VMs if -
-     * => They dont require GRO (like DPDK VM's)
-     * => They dont support mergeable buffers
-     */
-    if ((vif->vif_flags &
-                (VIF_FLAG_GRO_NEEDED | VIF_FLAG_MRG_RXBUF)) !=
-                (VIF_FLAG_GRO_NEEDED | VIF_FLAG_MRG_RXBUF)) {
-        ret = GRO_NORMAL;
-        goto func_exit;
-    }
-
-    /* Packets arriving through non-Fwd cores - Normal processing */
-    if (unlikely((lcore->gro.gro_tbl_v4_handle == NULL) ||
-            (lcore->gro.gro_tbl_v6_handle == NULL))){
-        ret = GRO_NORMAL;
-        goto func_exit;
-    }
 
     /* Make sure nh points to a virtual vif */
     nh = __vrouter_get_nexthop(router, nh_id);
