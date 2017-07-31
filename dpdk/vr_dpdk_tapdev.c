@@ -134,6 +134,9 @@ vr_dpdk_tapdev_release(struct vr_interface *vif)
     struct vr_dpdk_tapdev *tapdev = vif->vif_os;
     int fd = tapdev->tapdev_fd;
 
+    if (unlikely(tapdev == NULL))
+        return 0;
+
     RTE_LOG(INFO, VROUTER, "    releasing vif %u TAP device %s\n",
             vif->vif_idx, vif->vif_name);
 
