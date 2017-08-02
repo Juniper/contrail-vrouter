@@ -55,6 +55,10 @@ MONITORED_VIF_ID=${ARG##vif0/}
 
 ## check if the monitoring interface is free
 MON_IF_ID=${MONITORED_VIF_ID}
+vif --get ${MON_IF_ID} | grep "vif0/${MON_VIF_ID}"
+if [ $? -ne 0 ]; then
+        error "Invalid Vif Id"
+fi
 if ifconfig ${MON_IF_NAME}${MON_IF_ID} >/dev/null 2>&1; then
     echo "monitoring interface ${MON_IF_NAME}${MON_IF_ID} is already in use"
     MON_VIF_ID=`sudo vif --list | grep -w ${MON_IF_NAME}${MON_IF_ID} \
