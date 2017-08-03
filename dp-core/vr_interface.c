@@ -621,20 +621,41 @@ vhost_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *dmac)
 {
     struct vr_arp *sarp;
+    mac_response_t mr = MR_XCONNECT;
 
+    /*
+     * Handle all the special cases here. Invoke vm_mac_request(), if
+     * the decision to respond is based on standard condittions of
+     * overloay
+     */
     if (pkt->vp_type == VP_TYPE_ARP) {
+
+        /* Grat ARP, cross connect */
         sarp = (struct vr_arp *)pkt_data(pkt);
+        if (vr_grat_arp(sarp))
+            return MR_XCONNECT;
+
         if (IS_LINK_LOCAL_IP(sarp->arp_dpa) ||
                 (vif->vif_type == VIF_TYPE_GATEWAY)) {
             VR_MAC_COPY(dmac, vif->vif_mac);
             return MR_PROXY;
         }
+
+        mr = vm_mac_request(vif, pkt, fmd, dmac);
+        if ((mr != MR_XCONNECT) && (mr != MR_PROXY)) {
+            vr_printf("Vrouter: Vhost arp request Mr %d Dst %x src %x"
+                    " converting to Xconnect\n", mr, sarp->arp_dpa,
+                    sarp->arp_spa);
+
+            mr = MR_XCONNECT;
+        }
+    } else {
+        /* Handle V6 */
+        if (vif->vif_type == VIF_TYPE_GATEWAY)
+            mr = MR_DROP;
     }
 
-    if (vif->vif_type == VIF_TYPE_GATEWAY)
-        return MR_DROP;
-
-    return MR_XCONNECT;
+    return mr;
 }
 
 static int
@@ -647,9 +668,15 @@ vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
-    /* please see the text on xconnect mode */
     vr_init_forwarding_md(&fmd);
     fmd.fmd_dvrf = vif->vif_vrf;
+
+    /*
+     * TODO: Xconnect mode: Ideally all the flow processing need to happen
+     * even in this mode. If there is no existing flow available, then
+     * it can be chosen to be cross connected. For the time being, all
+     * are cross connected
+     */
     if (vif_mode_xconnect(vif))
         return vif_xconnect(vif, pkt, &fmd);
 
@@ -1059,8 +1086,14 @@ eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
     if (!len)
         return 0;
 
+    /*
+     * Retain the original headerof the HostOs if the packet is not
+     * tunneled packet and not from Agent. Otherwise, apply the new
+     * rewrite data
+     */
     if ((pkt->vp_if->vif_type == VIF_TYPE_HOST) &&
-            !(pkt->vp_flags & VP_FLAG_FROM_DP)) {
+            (!(pkt->vp_flags & VP_FLAG_FROM_DP)) &&
+            ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6))) {
         vr_preset(pkt);
         return 0;
     }
@@ -1072,7 +1105,9 @@ static mac_response_t
 eth_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd, unsigned char *dmac)
 {
+    bool underlay_arp = false;
     struct vr_arp *sarp;
+    mac_response_t mr;
 
     if (vif_mode_xconnect(vif))
         return MR_XCONNECT;
@@ -1080,16 +1115,26 @@ eth_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
     /*
      * If there is a label or if the vrf is different, it is meant for VM's
      */
-    if ((fmd->fmd_label >= 0) || (fmd->fmd_dvrf != vif->vif_vrf))
-        return vm_mac_request(vif, pkt, fmd, dmac);
 
-    if (pkt->vp_type == VP_TYPE_ARP) {
-        sarp = (struct vr_arp *)pkt_data(pkt);
-        if (vr_grat_arp(sarp))
-            return MR_TRAP_X;
+    sarp = (struct vr_arp *)pkt_data(pkt);
+    if ((fmd->fmd_label == -1) && (fmd->fmd_dvrf == vif->vif_vrf)) {
+        if (pkt->vp_type == VP_TYPE_ARP) {
+            underlay_arp = true;
+            if (vr_grat_arp(sarp))
+                return MR_TRAP_X;
+        }
     }
 
-    return MR_XCONNECT;
+    mr = vm_mac_request(vif, pkt, fmd, dmac);
+    if (underlay_arp && (mr != MR_XCONNECT) && (mr != MR_PROXY)) {
+        vr_printf("Vrouter: Vhost arp request Mr %d Dst %x src %x"
+                    " converting to Xconnect\n",
+                    mr, sarp->arp_dpa, sarp->arp_spa);
+
+        mr = MR_XCONNECT;
+    }
+
+    return mr;
 }
 
 

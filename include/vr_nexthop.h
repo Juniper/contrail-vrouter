@@ -216,6 +216,7 @@ extern int vr_nexthop_add(vr_nexthop_req *);
 extern int vr_nexthop_get(vr_nexthop_req *);
 extern int vr_nexthop_dump(vr_nexthop_req *);
 extern bool vr_gateway_nexthop(struct vr_nexthop *);
+extern bool vr_hosted_nexthop(struct vr_nexthop *);
 extern unsigned int vr_nexthop_req_get_size(void *);
 
 extern struct vr_nexthop *vr_discard_nh;

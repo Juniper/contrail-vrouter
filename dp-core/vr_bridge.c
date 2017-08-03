@@ -873,7 +873,8 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
              * Unicast ARP packets on fabric interface would be handled
              * in plug routines of interface.
              */
-            if (!IS_MAC_BMCAST(dmac)) {
+            if ((!IS_MAC_BMCAST(dmac)) ||
+                    (pkt->vp_if->vif_flags & VIF_FLAG_MAC_PROXY)) {
                 handled = 0;
                 if (pkt->vp_type == VP_TYPE_ARP) {
                     handled = vr_arp_input(pkt, fmd, dmac);
