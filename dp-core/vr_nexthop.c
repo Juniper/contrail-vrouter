@@ -259,6 +259,21 @@ vr_gateway_nexthop(struct vr_nexthop *nh)
     return false;
 }
 
+
+bool
+vr_hosted_nexthop(struct vr_nexthop *nh)
+{
+    if (nh) {
+        if (!nh->nh_dev)
+            return false;
+
+        if ((nh->nh_type == NH_ENCAP) && vif_is_virtual(nh->nh_dev))
+            return true;
+    }
+
+    return false;
+}
+
 static int
 nh_tunnel_loop_detect_handle(struct vr_packet *pkt, struct vr_nexthop *nh,
                                     struct vr_forwarding_md *fmd, uint32_t dip)

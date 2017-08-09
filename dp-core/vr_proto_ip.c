@@ -1082,8 +1082,13 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
      * Garp coming from other compute nodes can be just flooded without
      * considering the route information
      */
-    if (vr_grat_arp(sarp) && vif_is_fabric(pkt->vp_if))
-        return MR_FLOOD;
+    if (vr_grat_arp(sarp)) {
+        if (vif_is_fabric(pkt->vp_if))
+            return MR_FLOOD;
+
+        if (vif->vif_flags & VIF_FLAG_MAC_PROXY)
+            return MR_DROP;
+    }
 
     memset(&rt, 0, sizeof(rt));
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
@@ -1136,6 +1141,13 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
 
     if (stats)
         stats->vrf_arp_virtual_flood++;
+
+    /*
+     * IF underlay ARP request on fabric or from Vhost, cross connect
+     */
+    if (vif_is_vhost(vif) || (vif_is_fabric(vif) && (fmd->fmd_label == -1) &&
+                (fmd->fmd_dvrf == vif->vif_vrf)))
+        return MR_XCONNECT;
 
     return MR_FLOOD;
 }

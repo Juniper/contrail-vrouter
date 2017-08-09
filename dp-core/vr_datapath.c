@@ -19,15 +19,16 @@ mac_response_t
 vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         struct vr_route_req *rt, unsigned char *dmac)
 {
-    bool from_fabric, stitched, flood;
+    bool from_fabric, stitched, flood, over_lay, hosted_vm;
     bool to_gateway, no_proxy, to_vcp, ecmp_src;
 
     unsigned char *resp_mac;
-    struct vr_nexthop *nh = NULL;
+    struct vr_nexthop *nh = NULL, *l3_nh = NULL;
     struct vr_interface *vif = pkt->vp_if;
     struct vr_vrf_stats *stats;
 
-    from_fabric = stitched = flood = false;
+    over_lay = true;
+    from_fabric = stitched = flood = hosted_vm = false;
     to_gateway = to_vcp = no_proxy = ecmp_src = false;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
@@ -47,6 +48,10 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     if (rt->rtr_req.rtr_label_flags & VR_RT_ARP_FLOOD_FLAG)
         flood = true;
 
+    if (vif_is_vhost(vif) || (from_fabric && (fmd->fmd_label == -1) &&
+                (fmd->fmd_dvrf == vif->vif_vrf)))
+        over_lay = false;
+
     if (vr_gateway_nexthop(rt->rtr_nh))
         to_gateway = true;
 
@@ -63,6 +68,8 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         }
     }
 
+
+    l3_nh = rt->rtr_nh;
     resp_mac = vif->vif_mac;
     if (rt->rtr_req.rtr_index != VR_BE_INVALID_INDEX) {
         if ((nh = vr_bridge_lookup(fmd->fmd_dvrf, rt))) {
@@ -70,6 +77,12 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             stitched = true;
         }
     }
+
+    if (!over_lay)
+        nh = l3_nh;
+
+    if (vr_hosted_nexthop(nh))
+        hosted_vm = true;
 
     /* If ECMP source, we force routing */
     if (fmd->fmd_ecmp_src_nh_index != -1) {
@@ -156,17 +169,20 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
          * i have the mac information (nh - (mostly tunnel)) and
          * the originator is a bare metal (fmd->fmd_src)
          */
-        if (to_vcp || to_gateway ||
-                (nh && ((nh->nh_type == NH_ENCAP) ||
-                (fmd->fmd_src == TOR_SOURCE)))) {
+        if (to_vcp || to_gateway || hosted_vm ||
+                (fmd->fmd_src == TOR_SOURCE)) {
             if (stats)
                 stats->vrf_arp_physical_stitch++;
         } else {
             if (stats)
                 stats->vrf_arp_physical_flood++;
+
+            if (!over_lay)
+                return MR_XCONNECT;
+
             return MR_FLOOD;
         }
-    } else {
+    } else if (!vif_is_vhost(vif)) {
 
 proxy_selected:
         if (!stitched && flood) {
@@ -454,7 +470,7 @@ vr_mac_reply_send(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
      * to go on the receiving VIF
      */
     if (vif_is_vhost(vif) ||
-            (vif->vif_flags & VIF_FLAG_NO_ARP_PROXY)) {
+            (vif->vif_flags & (VIF_FLAG_NO_ARP_PROXY | VIF_FLAG_MAC_PROXY))) {
         vif_tx = true;
     } else {
         rt.rtr_req.rtr_label_flags = 0;
