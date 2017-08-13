@@ -79,12 +79,12 @@ default_kernel_ver = shellCommand("uname -r").strip()
 kernel_build_dir = None
 if re.search('^4\.', default_kernel_ver):
     print "Warn: kernel version %s not supported for vrouter and dpdk" % default_kernel_ver
-    kernel_build_dir = '/lib/modules/3.13.0-106-generic/build'
+    kernel_build_dir = '/lib/modules/3.13.0-110-generic/build'
     if os.path.isdir(kernel_build_dir):
-        default_kernel_ver = "3.13.0-106-generic"
+        default_kernel_ver = "3.13.0-110-generic"
         print "info: libdpdk will be built against kernel version %s" % default_kernel_ver
     else:
-        print "*** Error: Cannot find kernel v3.13.0-106, build of vrouter will likely fail"
+        print "*** Error: Cannot find kernel v3.13.0-110, build of vrouter will likely fail"
         kernel_build_dir = '/lib/modules/%s/build' % default_kernel_ver
 
 kernel_dir = GetOption('kernel-dir')
