@@ -27,18 +27,22 @@
 #include <rte_udp.h>
 
 static struct rte_eth_conf ethdev_conf = {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+    .link_speeds = ETH_LINK_SPEED_AUTONEG,
+#else
     .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
     .link_duplex = 0,   /* ETH_LINK_[HALF_DUPLEX|FULL_DUPLEX], or 0 for autonegotation */
+#endif
     .rxmode = { /* Port RX configuration. */
         /* The multi-queue packet distribution mode to be used, e.g. RSS. */
         .mq_mode            = ETH_MQ_RX_RSS,
-        .max_rx_pkt_len     = ETHER_MAX_LEN, /* Only used if jumbo_frame enabled */
+        .max_rx_pkt_len     = VR_DEF_MAX_PACKET_SZ, /* Only used if jumbo_frame enabled */
         .header_split       = 0, /* Disable Header Split */
         .hw_ip_checksum     = 1, /* Enable IP/UDP/TCP checksum offload */
         .hw_vlan_filter     = 0, /* Disabel VLAN filter */
         .hw_vlan_strip      = 0, /* Disable VLAN strip (might be enabled with --vlan argument) */
         .hw_vlan_extend     = 0, /* Disable Extended VLAN */
-        .jumbo_frame        = 0, /* Disable Jumbo Frame Receipt */
+        .jumbo_frame        = 1, /* Enable Jumbo Frame Receipt */
         .hw_strip_crc       = 1, /* Enable CRC stripping by hardware */
         .enable_scatter     = 0, /* Disable scatter packets rx handler */
     },
@@ -110,6 +114,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
     .txq_flags = 0          /* Set flags for the Tx queue */
 };
 
+#if VR_DPDK_USE_HW_FILTERING
 /* Add hardware filter */
 int
 vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
@@ -150,6 +155,7 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
 
     return ret;
 }
+#endif
 
 /* Get a ready queue ID */
 uint16_t
@@ -537,6 +543,7 @@ dpdk_ethdev_mempools_free(struct vr_dpdk_ethdev *ethdev)
     }
 }
 
+#if VR_DPDK_USE_HW_FILTERING
 /* Init hardware filtering */
 int
 vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
@@ -576,6 +583,7 @@ vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
 
     return ret;
 }
+#endif
 
 /* Update device bond info */
 static void
@@ -608,7 +616,11 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
             }
             memset(&mac_addr, 0, sizeof(mac_addr));
             rte_eth_macaddr_get(slave_port_id, &mac_addr);
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
+            pci_addr = &(RTE_DEV_TO_PCI(rte_eth_devices[slave_port_id].device)->addr);
+#else
             pci_addr = &rte_eth_devices[slave_port_id].pci_dev->addr;
+#endif
             RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
                 " PCI " PCI_PRI_FMT " MAC " MAC_FORMAT "\n",
                 slave_port_id, pci_addr->domain, pci_addr->bus,
@@ -676,10 +688,15 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
         return ret;
     }
 
+#if (RTE_VERSION < RTE_VERSION_NUM(17, 2, 0, 0))
     /* update device bond information after the device has been configured */
-    if (ethdev->ethdev_ptr->driver) /* af_packet has no driver and no bond info */
+    if (ethdev->ethdev_ptr->driver) { /* af_packet has no driver and no bond info */
+#else
+    if (dpdk_find_port_id_by_drv_name() != VR_DPDK_INVALID_PORT_ID) {
+#endif
         dpdk_ethdev_bond_info_update(ethdev);
-
+    }
+  
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
         return ret;
