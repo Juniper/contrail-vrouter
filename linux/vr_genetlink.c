@@ -41,6 +41,7 @@ struct genl_family vrouter_genl_family = {
     .netnsok    =   true,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
     .ops        =   vrouter_genl_ops,
+    .n_ops      =   ARRAY_SIZE(vrouter_genl_ops),
 #endif /* Linux 4.10.0 */
 };
 
