@@ -529,6 +529,12 @@ list_get_print(vr_interface_req *req)
             req->vifr_ibytes, req->vifr_ierrors, 0);
     vr_interface_pbem_counters_print("TX", true, req->vifr_opackets,
             req->vifr_obytes, req->vifr_oerrors, 0);
+
+    if (req->vifr_flags & (VIF_FLAG_MIRROR_TX | VIF_FLAG_MIRROR_RX)) {
+        vr_interface_pbem_counters_print("Mirror", true, req->vifr_mir_packets,
+                req->vifr_mir_bytes, 0, 0);
+    }
+
     if (req->vifr_isid || req->vifr_pbb_mac_size) {
         vr_interface_print_head_space();
         printf("ISID: %d Bmac: "MAC_FORMAT"\n",
