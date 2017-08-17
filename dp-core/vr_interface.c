@@ -242,6 +242,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
 {
     unsigned int mirror_type;
     struct vr_forwarding_md mfmd;
+    struct vr_mirror_stats *mirror_stats;
     uint16_t vlan_id;
 
     if (!txrx_mirror)
@@ -264,7 +265,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
     if (pkt->vp_type == VP_TYPE_NULL)
         vr_pkt_type(pkt, 0, &mfmd);
 
-    vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd, mirror_type);
+    vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd, mirror_type, mirror_stats);
 
     vlan_id = vr_fmd_get_mirror_vlan(&mfmd);
     if (vlan_id != FMD_MIRROR_INVALID_DATA)

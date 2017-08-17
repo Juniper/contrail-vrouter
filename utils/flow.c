@@ -916,6 +916,10 @@ flow_dump_entry(struct vr_flow_entry *fe)
             flow_print_field_name("Secondary Mirror");
             flow_dump_mirror(mirror1_nh);
         }
+        flow_print_field_name("MStats");
+        printf("%u/%u (%d)\n", fe->fe_mirror_stats.mir_packets, fe->fe_mirror_stats.mir_bytes, fe->fe_mirror_id);
+        flow_print_field_name("SMStats");
+        printf("%u/%u (%d)\n", fe->fe_sec_mirror_stats.mir_packets, fe->fe_sec_mirror_stats.mir_bytes, fe->fe_sec_mirror_id);
     }
 
     printf("\n");
@@ -1438,12 +1442,24 @@ flow_dump_table(struct flow_table *ft)
             printed = print_new_line_if_required(printed, 70);
 
             if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
-                printed += printf(" Mirror Index :");
+                printed += printf(" Mirror Index:");
                 if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES)
-                    printed += printf(" %d", fe->fe_mirror_id);
+                    printed += printf("%d,", fe->fe_mirror_id);
                 if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES)
-                    printed += printf(", %d, ", fe->fe_sec_mirror_id);
+                    printed += printf("%d,", fe->fe_sec_mirror_id);
+
                 printed = print_new_line_if_required(printed, 70);
+                if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES) {
+                    printed += printf("  MStats:%u/%u (%d), ", fe->fe_mirror_stats.mir_packets,
+                            fe->fe_mirror_stats.mir_bytes, fe->fe_mirror_id);
+                    printed = print_new_line_if_required(printed, 70);
+                }
+
+                if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES) {
+                    printed += printf(" SMStats:%u/%u (%d), ", fe->fe_sec_mirror_stats.mir_packets,
+                            fe->fe_sec_mirror_stats.mir_bytes, fe->fe_sec_mirror_id);
+                    printed = print_new_line_if_required(printed, 70);
+                }
             }
             printed += printf(" SPort %d,", fe->fe_udp_src_port);
             printed = print_new_line_if_required(printed, 70);

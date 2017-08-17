@@ -27,6 +27,12 @@ typedef enum {
         VR_MPLS_HDR_LEN + sizeof(struct vr_udp) + sizeof(struct vr_ip) + \
         VR_ETHER_HLEN)
 
+struct vr_mirror_stats {
+    uint32_t mir_bytes;
+    uint32_t mir_packets;
+    uint16_t mir_bytes_oflow;
+    uint8_t mir_packets_oflow;
+} __attribute__((packed));;
 
 struct vr_mirror_entry {
     unsigned int mir_rid;
@@ -50,7 +56,7 @@ struct vr_forwarding_md;
 extern int vr_mirror_init(struct vrouter *);
 extern void vr_mirror_exit(struct vrouter *, bool);
 extern int vr_mirror(struct vrouter *, uint8_t, struct vr_packet *,
-        struct vr_forwarding_md *, mirror_type_t);
+        struct vr_forwarding_md *, mirror_type_t, struct vr_mirror_stats *);
 extern struct vr_mirror_entry *vrouter_get_mirror(unsigned int, unsigned int);
 extern int vrouter_put_mirror(struct vrouter *, unsigned int);
 extern int vr_mirror_meta_entry_set(struct vrouter *, unsigned int,
