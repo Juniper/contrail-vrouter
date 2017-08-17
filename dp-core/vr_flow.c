@@ -232,6 +232,8 @@ vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
 {
     __vr_flow_reset_entry(router, fe);
     memset(&fe->fe_stats, 0, sizeof(fe->fe_stats));
+    memset(&fe->fe_mirror_stats, 0, sizeof(fe->fe_mirror_stats));
+    memset(&fe->fe_sec_mirror_stats, 0, sizeof(fe->fe_sec_mirror_stats));
     fe->fe_type = VP_TYPE_NULL;
     fe->fe_flags = 0;
 
@@ -832,6 +834,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
 
     struct vr_forwarding_md mirror_fmd;
     struct vr_nexthop *src_nh;
+    struct vr_mirror_stats mirror_stats;
 
     fmd->fmd_dvrf = fe->fe_vrf;
     /*
@@ -869,20 +872,36 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         }
     }
 
+    if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW) {
+        memset(&fe->fe_mirror_stats, 0, sizeof(fe->fe_mirror_stats));
+        memset(&fe->fe_sec_mirror_stats, 0, sizeof(fe->fe_sec_mirror_stats));
+    }
+    memset(&mirror_stats, 0, sizeof(mirror_stats));
+
     if (fe->fe_flags & VR_FLOW_FLAG_MIRROR) {
         if (fe->fe_mirror_id < VR_MAX_MIRROR_INDICES) {
             mirror_fmd = *fmd;
             mirror_fmd.fmd_ecmp_nh_index = -1;
             vr_mirror(router, fe->fe_mirror_id, pkt, &mirror_fmd,
-                    MIRROR_TYPE_ACL);
+                    MIRROR_TYPE_ACL, &mirror_stats);
+            fe->fe_mirror_stats.mir_packets_oflow += mirror_stats.mir_packets_oflow;
+            fe->fe_mirror_stats.mir_bytes_oflow += mirror_stats.mir_bytes_oflow;
+            fe->fe_mirror_stats.mir_bytes += mirror_stats.mir_bytes;
+            fe->fe_mirror_stats.mir_packets += mirror_stats.mir_packets;
             fmd->fmd_mirror_data = mirror_fmd.fmd_mirror_data;
         }
+
+        memset(&mirror_stats, 0, sizeof(mirror_stats));
 
         if (fe->fe_sec_mirror_id < VR_MAX_MIRROR_INDICES) {
             mirror_fmd = *fmd;
             mirror_fmd.fmd_ecmp_nh_index = -1;
             vr_mirror(router, fe->fe_sec_mirror_id, pkt, &mirror_fmd,
-                    MIRROR_TYPE_ACL);
+                    MIRROR_TYPE_ACL, &mirror_stats);
+            fe->fe_sec_mirror_stats.mir_packets_oflow += mirror_stats.mir_packets_oflow;
+            fe->fe_sec_mirror_stats.mir_bytes_oflow += mirror_stats.mir_bytes_oflow;
+            fe->fe_sec_mirror_stats.mir_bytes +=  mirror_stats.mir_bytes;
+            fe->fe_sec_mirror_stats.mir_packets += mirror_stats.mir_packets;
             fmd->fmd_mirror_data = mirror_fmd.fmd_mirror_data;
         }
     }
@@ -1830,7 +1849,6 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
                 req->fr_mir_sip, req->fr_mir_sport,
                 req->fr_pcap_meta_data, req->fr_pcap_meta_data_size,
                 req->fr_mir_vrf);
-
     return;
 }
 

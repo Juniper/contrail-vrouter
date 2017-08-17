@@ -246,6 +246,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_INTERFACE_REQ_PBB_MAC_OBJECT].ms_free);
         response->vms_interface_stats_object += (stats_block[VR_INTERFACE_STATS_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_STATS_OBJECT].ms_free);
+        response->vms_interface_mirror_stats_object += (stats_block[VR_INTERFACE_MIRROR_STATS_OBJECT].ms_alloc -
+                stats_block[VR_INTERFACE_MIRROR_STATS_OBJECT].ms_free);
         response->vms_interface_table_object += (stats_block[VR_INTERFACE_TABLE_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_TABLE_OBJECT].ms_free);
         response->vms_interface_vrf_table_object += (stats_block[VR_INTERFACE_VRF_TABLE_OBJECT].ms_alloc -

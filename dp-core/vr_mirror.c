@@ -340,7 +340,7 @@ vr_mirror_meta_entry_del(struct vrouter *router, unsigned int index)
 
 int
 vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
-            struct vr_forwarding_md *fmd, mirror_type_t mtype)
+            struct vr_forwarding_md *fmd, mirror_type_t mtype, struct vr_mirror_stats *mstats)
 {
     bool reset = true;
     void *mirror_md;
@@ -351,6 +351,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
     struct vr_forwarding_md new_fmd;
+    uint32_t new_stats;
 
     /* If the packet is already mirrored, dont mirror again */
     if (pkt->vp_flags & VP_FLAG_FROM_DP)
@@ -492,6 +493,13 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
     fmd->fmd_flow_index = -1;
 
     fmd->fmd_outer_src_ip = 0;
+
+    new_stats = __sync_add_and_fetch(&mstats->mir_bytes, pkt_len(pkt));
+    if (new_stats < pkt_len(pkt))
+        mstats->mir_bytes_oflow++;
+    new_stats = __sync_add_and_fetch(&mstats->mir_packets, 1);
+    if (!new_stats)
+        mstats->mir_packets_oflow++;
 
     nh_output(pkt, nh, fmd);
     return 0;

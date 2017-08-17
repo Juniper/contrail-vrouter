@@ -118,6 +118,7 @@ enum vr_malloc_objects_t {
     VR_BITMAP_OBJECT,
     VR_QOS_MAP_OBJECT,
     VR_FC_OBJECT,
+    VR_INTERFACE_MIRROR_STATS_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 

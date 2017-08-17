@@ -35,6 +35,7 @@ void vif_attach(struct vr_interface *);
 void vif_detach(struct vr_interface *);
 int vr_gro_vif_add(struct vrouter *, unsigned int, char *, unsigned short);
 struct vr_interface_stats *vif_get_stats(struct vr_interface *, unsigned short);
+struct vr_mirror_stats *vif_get_mir_stats(struct vr_interface *, unsigned short);
 struct vr_interface *__vrouter_get_interface_os(struct vrouter *, unsigned int);
 
 extern struct vr_host_interface_ops *vr_host_interface_init(void);
@@ -60,6 +61,12 @@ struct vr_interface_stats *
 vif_get_stats(struct vr_interface *vif, unsigned short cpu)
 {
     return &vif->vif_stats[cpu & VR_CPU_MASK];
+}
+
+struct vr_mirror_stats *
+vif_get_mir_stats(struct vr_interface *vif, unsigned short cpu)
+{
+    return &vif->vif_mir_stats[cpu & VR_CPU_MASK];
 }
 
 static int
@@ -245,6 +252,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
 {
     unsigned int mirror_type;
     struct vr_forwarding_md mfmd;
+    struct vr_mirror_stats *mirror_stats = vif_get_mir_stats(vif, pkt->vp_cpu);
     uint16_t vlan_id;
 
     if (!txrx_mirror)
@@ -267,7 +275,7 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
     if (pkt->vp_type == VP_TYPE_NULL)
         vr_pkt_type(pkt, 0, &mfmd);
 
-    vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd, mirror_type);
+    vr_mirror(vif->vif_router, vif->vif_mirror_id, pkt, &mfmd, mirror_type, mirror_stats);
 
     vlan_id = vr_fmd_get_mirror_vlan(&mfmd);
     if (vlan_id != FMD_MIRROR_INVALID_DATA)
@@ -1527,6 +1535,9 @@ vif_free(struct vr_interface *vif)
     if (vif->vif_stats)
         vr_free(vif->vif_stats, VR_INTERFACE_STATS_OBJECT);
 
+    if (vif->vif_mir_stats)
+        vr_free(vif->vif_mir_stats, VR_INTERFACE_MIRROR_STATS_OBJECT);
+
     if (vif->vif_vrf_table) {
         vr_free(vif->vif_vrf_table, VR_INTERFACE_VRF_TABLE_OBJECT);
         vif->vif_vrf_table = NULL;
@@ -2172,6 +2183,13 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         goto error;
     }
 
+    vif->vif_mir_stats = vr_zalloc(vr_num_cpus *
+            sizeof(struct vr_mirror_stats), VR_INTERFACE_MIRROR_STATS_OBJECT);
+    if (!vif->vif_mir_stats) {
+        ret = -ENOMEM;
+        goto error;
+    }
+
     for (i = 0; i < vr_num_cpus; i++) {
         vif->vif_stats[i].vis_queue_ierrors_to_lcore = vr_zalloc(vr_num_cpus *
                 sizeof(uint64_t), VR_INTERFACE_TO_LCORE_ERRORS_OBJECT);
@@ -2309,7 +2327,7 @@ generate_resp:
 
 static void
 vr_interface_add_response(vr_interface_req *req,
-                            struct vr_interface_stats *stats)
+                            struct vr_interface_stats *stats, struct vr_mirror_stats *mir_stats)
 {
     int i;
 
@@ -2343,6 +2361,9 @@ vr_interface_add_response(vr_interface_req *req,
     req->vifr_dev_obytes += stats->vis_dev_obytes;
     req->vifr_dev_opackets += stats->vis_dev_opackets;
     req->vifr_dev_oerrors += stats->vis_dev_oerrors;
+
+    req->vifr_mir_bytes += mir_stats->mir_bytes;
+    req->vifr_mir_packets += mir_stats->mir_packets;
 }
 
 static uint64_t
@@ -2491,6 +2512,10 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_dev_opackets = 0;
     req->vifr_dev_oerrors = 0;
 
+    /* mirror counters */
+    req->vifr_mir_bytes = 0;
+    req->vifr_mir_packets = 0;
+
     /* call host callback if available */
     if (hif_ops->hif_stats_update) {
         hif_ops->hif_stats_update(intf, core);
@@ -2499,11 +2524,11 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     if (core == (unsigned)-1) {
         /* summed up stats */
         for (cpu = 0; cpu < vr_num_cpus; cpu++) {
-            vr_interface_add_response(req, vif_get_stats(intf, cpu));
+            vr_interface_add_response(req, vif_get_stats(intf, cpu), vif_get_mir_stats(intf, cpu));
         }
     } else if (core < vr_num_cpus) {
         /* stats for a specific core */
-        vr_interface_add_response(req, vif_get_stats(intf, core));
+        vr_interface_add_response(req, vif_get_stats(intf, core), vif_get_mir_stats(intf, core));
     }
     /* otherwise the conters will be zeros */
 

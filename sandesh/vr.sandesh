@@ -117,6 +117,8 @@ buffer sandesh vr_interface_req {
     60: u32         vifr_isid;
     61: list<byte>  vifr_pbb_mac;
     62: byte        vifr_vhostuser_mode;
+    63: i64         vifr_mir_bytes;
+    64: i64         vifr_mir_packets;
 }
 
 buffer sandesh vr_vxlan_req {
@@ -364,6 +366,7 @@ buffer sandesh vr_mem_stats_req {
    68:  i64             vms_interface_req_pbb_mac_object;
    69:  i64             vms_nexthop_req_bmac_object;
    70:  i64             vms_interface_req_bridge_id_object;
+   71:  i64             vms_interface_mirror_stats_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */
