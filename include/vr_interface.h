@@ -11,6 +11,7 @@
 #include "vr_htable.h"
 #include "vr_qos.h"
 #include "vr_flow.h"
+#include "vr_mirror.h"
 
 /*
  * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
@@ -310,6 +311,7 @@ struct vr_interface {
     uint8_t vif_ip6[VR_IP6_ADDRESS_LEN];
     uint8_t vif_pbb_mac[VR_ETHER_ALEN];
     vhostuser_mode_t vif_vhostuser_mode;
+    struct vr_mirror_stats *vif_mir_stats;
 };
 
 struct vr_interface_settings {

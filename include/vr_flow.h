@@ -8,6 +8,7 @@
 
 #include "vr_defs.h"
 #include "vr_htable.h"
+#include "vr_mirror.h"
 
 #define VR_FLOW_ACTION_DROP         0x0
 #define VR_FLOW_ACTION_HOLD         0x1
@@ -345,9 +346,11 @@ struct vr_dummy_flow_entry {
     uint8_t fe_type;
     unsigned short fe_udp_src_port;
     uint32_t fe_src_info;
+    struct vr_mirror_stats fe_mirror_stats;
+    struct vr_mirror_stats fe_sec_mirror_stats;
 } __attribute__((packed));
 
-#define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
+#define VR_FLOW_ENTRY_PACK (256 - sizeof(struct vr_dummy_flow_entry))
 
 /* do not change. any field positions as it might lead to incompatibility */
 struct vr_flow_entry {
@@ -379,6 +382,8 @@ struct vr_flow_entry {
      * component NH as this source
      */
     uint32_t fe_src_info;
+    struct vr_mirror_stats fe_mirror_stats;
+    struct vr_mirror_stats fe_sec_mirror_stats;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__((packed));
 
