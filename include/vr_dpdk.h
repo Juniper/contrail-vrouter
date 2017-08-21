@@ -251,7 +251,11 @@ extern unsigned vr_packet_sz;
  * SR-IOV virtual function PMD name suffix.
  * Note: only rte_ixgbevf_pmd was tested.
  */
+#if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
 #define VR_DPDK_VF_PMD_SFX "vf_pmd"
+#else
+#define VR_DPDK_VF_PMD_SFX "_vf"
+#endif
 
 /*
  * DPDK LCore IDs
