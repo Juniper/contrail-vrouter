@@ -420,7 +420,7 @@ op_retry:
 
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_send_nexthop_delete(cl, 0, nh_id);
         break;
 
@@ -714,7 +714,7 @@ validate_options(void)
     if (opt_set(CRT_OPT_IND)) {
         command = SANDESH_OP_ADD;
     } else if (opt_set(DEL_OPT_IND)) {
-        command = SANDESH_OP_DELETE;
+        command = SANDESH_OP_DEL;
     } else if (opt_set(GET_OPT_IND)) {
         command = SANDESH_OP_GET;
     } else if (opt_set(LST_OPT_IND)) {
@@ -864,7 +864,7 @@ validate_options(void)
 
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         if (!nh_set)
             cmd_usage();
 

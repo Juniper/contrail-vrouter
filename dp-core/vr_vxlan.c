@@ -231,7 +231,7 @@ vr_vxlan_req_process(void *s_req)
         vr_vxlan_dump(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         vr_vxlan_del(req);
         break;
 

@@ -2791,7 +2791,7 @@ vr_interface_req_process(void *s_req)
         ret = vr_interface_get(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_interface_delete(req, need_response);
         break;
 

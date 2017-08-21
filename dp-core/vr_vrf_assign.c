@@ -116,7 +116,7 @@ vr_vrf_assign_req_process(void *s_req)
         ret = vr_vrf_assign_dump(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         req->var_vif_vrf = -1;
         ret = vr_vrf_assign_set(req);
         break;
