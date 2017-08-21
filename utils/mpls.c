@@ -61,7 +61,7 @@ op_retry:
         ret = vr_send_mpls_add(cl, 0, mpls_label, mpls_nh);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_send_mpls_delete(cl, 0, mpls_label);
         break;
 
@@ -160,7 +160,7 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case DELETE_OPT_INDEX:
-        mpls_op = SANDESH_OP_DELETE;
+        mpls_op = SANDESH_OP_DEL;
         mpls_label = strtoul(opt_arg, NULL, 0);
         if (errno)
             usage_internal();
@@ -235,7 +235,7 @@ int main(int argc, char *argv[])
                 if (mpls_op >= 0)
                     Usage();
                 delete_set = 1;
-                mpls_op = SANDESH_OP_DELETE;
+                mpls_op = SANDESH_OP_DEL;
                 break;
 
             case 'g':

@@ -930,7 +930,7 @@ vr_send_interface_delete(struct nl_client *cl, unsigned int router_id,
 
     memset(&req, 0, sizeof(req));
 
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.vifr_rid = router_id;
     req.vifr_name = vif_name;
     req.vifr_idx = vif_index;
@@ -1050,7 +1050,7 @@ vr_send_mirror_delete(struct nl_client *cl, unsigned int router_id,
 {
     vr_mirror_req req;
 
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.mirr_rid = router_id;
     req.mirr_index = mirror_index;
 
@@ -1084,7 +1084,7 @@ vr_send_mpls_delete(struct nl_client *cl, unsigned int router_id,
     vr_mpls_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.mr_rid = router_id;
     req.mr_label = label;
 
@@ -1325,7 +1325,7 @@ vr_send_nexthop_delete(struct nl_client *cl, unsigned int router_id,
     vr_nexthop_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.nhr_rid = router_id;
     req.nhr_id = nh_index;
 
@@ -1712,7 +1712,7 @@ vr_send_route_delete(struct nl_client *cl,
         uint8_t *prefix, unsigned int prefix_len, unsigned int nh_index,
         int label, uint8_t *mac, uint32_t replace_len, unsigned int flags)
 {
-    return vr_send_route_common(cl, SANDESH_OP_DELETE, router_id, vrf,
+    return vr_send_route_common(cl, SANDESH_OP_DEL, router_id, vrf,
             family, prefix, prefix_len, nh_index, label,
             mac, replace_len, flags);
 }
@@ -1903,7 +1903,7 @@ vr_send_vxlan_delete(struct nl_client *cl, unsigned int router_id,
     vr_vxlan_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.vxlanr_vnid = vnid;
 
     return vr_sendmsg(cl, &req, "vr_vxlan_req");
@@ -1987,7 +1987,7 @@ vr_send_fc_map_delete(struct nl_client *cl, unsigned int router_id,
     int16_t id = fc_id;
 
     memset(&req, 0, sizeof(req));
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.fmr_rid = router_id;
     req.fmr_id = &id;
     req.fmr_id_size = 1;
@@ -2055,7 +2055,7 @@ vr_send_qos_map_delete(struct nl_client *cl, unsigned int router_id,
     vr_qos_map_req req;
 
     memset(&req, 0, sizeof(req));
-    req.h_op = SANDESH_OP_DELETE;
+    req.h_op = SANDESH_OP_DEL;
     req.qmr_rid = router_id;
     req.qmr_id = qos_map_id;
 

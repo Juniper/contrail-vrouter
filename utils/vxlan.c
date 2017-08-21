@@ -64,7 +64,7 @@ op_retry:
         ret = vr_send_vxlan_add(cl, 0, vxlan_vnid, vxlan_nh);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_send_vxlan_delete(cl, 0, vxlan_vnid);
         break;
 
@@ -162,7 +162,7 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case DELETE_OPT_INDEX:
-        vxlan_op = SANDESH_OP_DELETE;
+        vxlan_op = SANDESH_OP_DEL;
         vxlan_vnid = strtoul(opt_arg, NULL, 0);
         if (errno)
             usage_internal();
@@ -236,7 +236,7 @@ int main(int argc, char *argv[])
                 if (vxlan_op >= 0)
                     Usage();
 
-                vxlan_op = SANDESH_OP_DELETE;
+                vxlan_op = SANDESH_OP_DEL;
                 delete_set = 1;
                 break;
 

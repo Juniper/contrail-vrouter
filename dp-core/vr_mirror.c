@@ -231,7 +231,7 @@ vr_mirror_req_process(void *s_req)
         vr_mirror_dump(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         vr_mirror_del(req);
         break;
 

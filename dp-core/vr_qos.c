@@ -441,7 +441,7 @@ vr_qos_map_req_process(void *s_req)
         vr_qos_map_dump(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         vr_qos_map_delete(req);
         break;
 
@@ -726,7 +726,7 @@ vr_fc_map_req_process(void *s_req)
         vr_fc_map_dump(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         vr_fc_map_delete(req);
         break;
 

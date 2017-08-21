@@ -82,7 +82,7 @@ vr_route_delete(vr_route_req *req)
 
 error:
     vr_send_response(ret);
-    vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_DELETE, ret);
+    vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_DEL, ret);
 
     return ret;
 }
@@ -240,7 +240,7 @@ vr_route_req_process(void *s_req)
         vr_route_add(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         vr_route_delete(req);
         break;
 

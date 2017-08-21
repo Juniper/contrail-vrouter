@@ -81,7 +81,7 @@ op_retry:
                 mirror_nh, mirror_flags, vni_id);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_send_mirror_delete(cl, 0, mirror_index);
         break;
 
@@ -183,7 +183,7 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
 
     case DELETE_OPT_INDEX:
-        mirror_op = SANDESH_OP_DELETE;
+        mirror_op = SANDESH_OP_DEL;
         mirror_index = strtoul(opt_arg, NULL, 0);
         if (errno)
             usage_internal();
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
                     Usage();
 
                 delete_set = 1;
-                mirror_op = SANDESH_OP_DELETE;
+                mirror_op = SANDESH_OP_DEL;
                 break;
 
             case 'g':
