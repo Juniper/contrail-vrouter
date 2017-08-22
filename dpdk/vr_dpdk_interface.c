@@ -1515,8 +1515,13 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     /* reset mbuf data pointer and length */
     m->data_off = pkt_head_space(pkt);
     m->data_len = pkt_head_len(pkt);
+
+#if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
     /* TODO: we do not support mbuf chains */
     m->pkt_len = pkt_head_len(pkt);
+#else
+    m->pkt_len = pkt_len(pkt);
+#endif
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
