@@ -26,7 +26,7 @@
 #include <rte_port_ethdev.h>
 #include <rte_udp.h>
 
-static struct rte_eth_conf ethdev_conf = {
+struct rte_eth_conf ethdev_conf = {
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
     .link_speeds = ETH_LINK_SPEED_AUTONEG,
 #else
@@ -327,6 +327,37 @@ vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 }
 
+/*
+ * vr_max_tx_queues_adjust - bond devices always return dev_info indicating
+ * 512 TX queues are supported. vrouter clips down to a max of VR_DPDK_MAX_NB_TX_QUEUES.
+ * However, if any of the bond slaves does not support this many TX queues, the
+ * number needs to be reduced further to a value that the NIC can support. Also,
+ * bnxt report max_tx_queues of 170, but fails to configure more than 8 TX queues.
+ */
+static void
+vr_max_tx_queues_adjust(struct vr_dpdk_ethdev *ethdev, uint16_t *nb_tx_q)
+{
+    struct rte_eth_dev_info dev_info;
+    int i;
+
+    for (i = 0; i < rte_eth_dev_count(); i++)
+    {
+        rte_eth_dev_info_get(i, &dev_info);
+        if (dev_info.driver_name) {
+            if (strncmp(dev_info.driver_name, "net_bnxt",
+                         strlen("net_bnxt") + 1) == 0) {
+                if (*nb_tx_q > VR_DPDK_MAX_NB_TX_Q_BNXT) {
+                    RTE_LOG(INFO, VROUTER, "TX queues changed from %d to %d due to port %d\n",
+                        *nb_tx_q, VR_DPDK_MAX_NB_TX_Q_BNXT, i);
+                    *nb_tx_q = VR_DPDK_MAX_NB_TX_Q_BNXT;
+                }
+            }
+        }
+    }
+
+    return;
+}
+
 /* Update device info */
 static void
 dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
@@ -337,6 +368,14 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
 
     ethdev->ethdev_nb_rx_queues = RTE_MIN(dev_info.max_rx_queues,
         VR_DPDK_MAX_NB_RX_QUEUES);
+
+    /*
+     * If a device advertises max_tx_queues higher than it
+     * can actually support, reduce the value to a number
+     * that it can support.
+     */
+    vr_max_tx_queues_adjust(ethdev, &dev_info.max_tx_queues);
+
     /* [PAKCET_ID..FWD_ID) lcores have just TX queues, so we increase
      * the number of TX queues here */
     ethdev->ethdev_nb_tx_queues = RTE_MIN(RTE_MIN(dev_info.max_tx_queues,
@@ -352,6 +391,12 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
         vr_dpdk.nb_fwd_lcores), VR_DPDK_MAX_NB_RSS_QUEUES);
     ethdev->ethdev_reta_size = RTE_MIN(dev_info.reta_size,
         VR_DPDK_MAX_RETA_SIZE);
+
+    /*
+     * If the NIC driver sets reta_size to a value that is not a power of
+     * 2, align it as DPDK expects it to be a power of 2.
+     */
+    ethdev->ethdev_reta_size = RTE_ALIGN(ethdev->ethdev_reta_size, RTE_RETA_GROUP_SIZE);
 
     RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u"
             " max_rx_queues=%" PRIu16 " max_tx_queues=%" PRIu16
@@ -370,6 +415,10 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
     if (ethdev->ethdev_reta_size == 0)
         ethdev->ethdev_nb_rx_queues = ethdev->ethdev_nb_rss_queues;
 #endif
+
+    RTE_LOG(INFO, VROUTER, "Using %d TX queues, %d RX queues\n",
+            ethdev->ethdev_nb_tx_queues,
+            ethdev->ethdev_nb_rx_queues);
 
     return;
 }
@@ -669,7 +718,7 @@ vr_dpdk_ethdev_bond_port_match(uint8_t port_id, struct vr_dpdk_ethdev *ethdev)
 
 /* Init ethernet device */
 int
-vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
+vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf)
 {
     uint8_t port_id;
     int ret;
@@ -680,7 +729,7 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev)
     dpdk_ethdev_info_update(ethdev);
 
     ret = rte_eth_dev_configure(port_id, ethdev->ethdev_nb_rx_queues,
-        ethdev->ethdev_nb_tx_queues, &ethdev_conf);
+        ethdev->ethdev_nb_tx_queues, dev_conf);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER, "    error configuring eth dev %" PRIu8
                 ": %s (%d)\n",
