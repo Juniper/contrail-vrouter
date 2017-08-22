@@ -488,13 +488,21 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
 /*
  * vr_ethdev_conf_update - adjust the config for fabric interfaces
  * depending on the NIC. Broadcom 25G interfaces and enic only support
- * 9022 byte jumbo frames.
+ * 9022 byte jumbo frames.ixgbe VFs do not allow setting max packet
+ * length higher than 1518 if the PF hasn't been configured similarly,
+ * so the default is set to 1518 for VFs.
  */
 static void
 vr_ethdev_conf_update(struct rte_eth_conf *dev_conf)
 {
     int i;
     struct rte_eth_dev_info dev_info;
+
+    if (vr_dpdk.vf_lcore_id) {
+        if (dev_conf->rxmode.max_rx_pkt_len > ETHER_MAX_LEN) {
+            dev_conf->rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+        }
+    }
 
     for (i = 0; i < rte_eth_dev_count(); i++)
     {
