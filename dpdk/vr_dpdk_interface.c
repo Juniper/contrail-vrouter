@@ -405,6 +405,42 @@ dpdk_set_addr_vlan_filter_strip(uint32_t port_id, struct vr_interface *vif)
     } while (port_num < ethdev->ethdev_nb_slaves);
 }
 
+/*
+ * vr_ethdev_inner_ckcum_capable - check if the NIC is capable of calculating the
+ * inner checksum in an overlay packet. ixgbe and i40e (and their VFs)support it,
+ * so handle the cases where the physical interface is one of these or a bond with
+ * these NICs.
+ *
+ * Returns 1 if capable and 9 if not.
+ */
+static int
+vr_ethdev_inner_ckcum_capable(void)
+{
+    struct rte_eth_dev_info dev_info;
+    int i;
+
+    for (i = 0; i < rte_eth_dev_count(); i++)
+    {
+        rte_eth_dev_info_get(i, &dev_info);
+        if (dev_info.driver_name) {
+            if ((strncmp(dev_info.driver_name, "net_bonding",
+                        strlen("net_bonding") + 1) == 0) ||
+                (strncmp(dev_info.driver_name, "net_ixgbe",
+                        strlen("net_ixgbe")) == 0) ||
+                (strncmp(dev_info.driver_name, "net_i40e",
+                        strlen("net_i40e")) == 0)) {
+                continue;
+            } else {
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 void
 dpdk_vif_attach_ethdev(struct vr_interface *vif,
         struct vr_dpdk_ethdev *ethdev)
@@ -418,7 +454,8 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
     rte_eth_dev_info_get(ethdev->ethdev_port_id, &dev_info);
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM
         && dev_info.tx_offload_capa & DEV_TX_OFFLOAD_UDP_CKSUM
-        && dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM) {
+        && dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM
+        && vr_ethdev_inner_ckcum_capable()) {
         vif->vif_flags |= VIF_FLAG_TX_CSUM_OFFLOAD;
     } else {
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
