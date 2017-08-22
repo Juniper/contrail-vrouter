@@ -1804,8 +1804,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     /* reset mbuf data pointer and length */
     m->data_off = pkt_head_space(pkt);
     m->data_len = pkt_head_len(pkt);
-    /* TODO: we do not support mbuf chains */
-    m->pkt_len = pkt_head_len(pkt);
+    m->pkt_len = pkt_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue =
