@@ -31,6 +31,7 @@
 #include <rte_port.h>
 #include <rte_ip.h>
 #include <rte_port_ring.h>
+#include <rte_ethdev.h>
 
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
@@ -94,6 +95,10 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_MAX_NB_RX_QUEUES    11
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_TX_QUEUES    64
+/* bnxt NIC only supports 8 TX queues */
+#define VR_DPDK_MAX_NB_TX_Q_BNXT    8
+/* bnxt and enic only support 9022 size jumbo frames */
+#define VT_DPDK_MAX_RX_PKT_LEN_9022 9022
 /*
  * Special value for number of queues to indicate that each
  * packet forwarding core should be assigned one queue
@@ -598,6 +603,7 @@ struct vr_dpdk_global {
 };
 
 extern struct vr_dpdk_global vr_dpdk;
+extern struct rte_eth_conf ethdev_conf;
 
 /*
  * rte_mbuf <=> vr_packet conversion
@@ -675,7 +681,7 @@ struct vr_dpdk_queue *
 vr_dpdk_ethdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     unsigned tx_queue_id);
 /* Init ethernet device */
-int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *);
+int vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *, struct rte_eth_conf *);
 /* Release ethernet device */
 int vr_dpdk_ethdev_release(struct vr_dpdk_ethdev *);
 /* Get free queue ID */
