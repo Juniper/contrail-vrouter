@@ -50,30 +50,27 @@
 
 #define GRO_TABLE_NAME_LEN 45
 
-static char gro_v4_tbl_name[GRO_TABLE_NAME_LEN],
-            gro_v6_tbl_name[GRO_TABLE_NAME_LEN];
-
-/* Parameters used for hash table. Name is set later. */
-static struct rte_hash_parameters gro_tbl_params_v4 = {
-    .entries = 1<<3,
-    .key_len = sizeof(struct vr_dpdk_gro_flow_key_v4),
-    .hash_func = rte_jhash,
-    .hash_func_init_val = 0,
-    .socket_id = 0, /* TODO */
-};
-
-/* Parameters used for hash table. Name set later. */
-static struct rte_hash_parameters gro_tbl_params_v6 = {
-    .entries = 1<<3,
-    .key_len = sizeof(struct vr_dpdk_gro_flow_key_v6),
-    .hash_func = rte_jhash,
-    .hash_func_init_val = 0,
-    .socket_id = 0, /* TODO */
-};
-
 int
 vr_dpdk_gro_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
 {
+    /* Parameters used for hash tables. Name is set later. */
+    struct rte_hash_parameters gro_tbl_params_v4 = {
+        .entries = 1<<3,
+        .key_len = sizeof(struct vr_dpdk_gro_flow_key_v4),
+        .hash_func = rte_jhash,
+        .hash_func_init_val = 0,
+        .socket_id = 0, /* TODO */
+    };
+    struct rte_hash_parameters gro_tbl_params_v6 = {
+        .entries = 1<<3,
+        .key_len = sizeof(struct vr_dpdk_gro_flow_key_v6),
+        .hash_func = rte_jhash,
+        .hash_func_init_val = 0,
+        .socket_id = 0, /* TODO */
+    };
+
+    char gro_v4_tbl_name[GRO_TABLE_NAME_LEN], gro_v6_tbl_name[GRO_TABLE_NAME_LEN];
+
     snprintf(gro_v4_tbl_name, sizeof(gro_v4_tbl_name), "GRO_Table_v4_lcore_%d", lcore_id);
     gro_tbl_params_v4.name = gro_v4_tbl_name;
     lcore->gro.gro_tbl_v4_handle = rte_hash_create(&gro_tbl_params_v4);
@@ -233,9 +230,6 @@ dpdk_gro_flush(struct gro_ctrl *gro, void *key, struct gro_entry *entry)
         ret = rte_hash_del_key(gro->gro_tbl_v6_handle, key);
     ASSERT(ret >= 0);
 
-    /* Free the entry */
-    rte_free(entry);
-
     nh = __vrouter_get_nexthop(router, entry->nh_id);
     if (!nh) {
         drop_reason = VP_DROP_INVALID_NH;
@@ -309,10 +303,12 @@ dpdk_gro_flush(struct gro_ctrl *gro, void *key, struct gro_entry *entry)
 
     pkt->vp_flags |= VP_FLAG_FLOW_SET | VP_FLAG_GROED;
     nh_output(pkt, nh, &fmd);
+    rte_free(entry);
     return GRO_MERGED;
 
 drop:
     vr_dpdk_pfree(m, vif, drop_reason);
+    rte_free(entry);
     return 0;
 }
 
