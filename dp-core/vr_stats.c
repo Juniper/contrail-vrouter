@@ -302,6 +302,10 @@ vr_mem_stats_get(void)
         response->vms_interface_req_mirror_meta_object +=
             (stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_alloc -
             stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_free);
+        response->vms_interface_req_bridge_id_object +=
+            (stats_block[VR_INTERFACE_REQ_BRIDGE_ID_OBJECT].ms_alloc -
+            stats_block[VR_INTERFACE_REQ_BRIDGE_ID_OBJECT].ms_free);
+
         for (i = 0; i < VR_VROUTER_MAX_OBJECT; i++) {
             alloced += stats_block[i].ms_alloc;
             freed += stats_block[i].ms_free;
