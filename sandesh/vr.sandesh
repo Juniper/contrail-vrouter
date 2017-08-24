@@ -103,7 +103,7 @@ buffer sandesh vr_interface_req {
     46: i16         vifr_nh_id;
     47: i32         vifr_cross_connect_idx;
     48: list<byte>  vifr_src_mac;
-    49: i32         vifr_bridge_idx;
+    49: list<i32>   vifr_bridge_idx;
     50: i16         vifr_ovlan_id;
     51: byte        vifr_transport;
     52: list<i32>   vifr_fat_flow_protocol_port;

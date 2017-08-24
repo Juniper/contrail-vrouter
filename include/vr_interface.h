@@ -61,6 +61,8 @@
 #define VR_INTERFACE_NAME_LEN       64
 #define VIF_MAX_MIRROR_MD_SIZE      255
 
+#define VIF_SRC_MACS                4
+
 #define VIF_TRANSPORT_VIRTUAL       0
 #define VIF_TRANSPORT_ETH           1
 #define VIF_TRANSPORT_PMD           2
