@@ -105,7 +105,7 @@ buffer sandesh vr_interface_req {
     48: i16         vifr_nh_id;
     49: i32         vifr_cross_connect_idx;
     50: list<byte>  vifr_src_mac;
-    51: i32         vifr_bridge_idx;
+    51: list<i32>   vifr_bridge_idx;
     52: i16         vifr_ovlan_id;
     53: byte        vifr_transport;
     54: list<i32>   vifr_fat_flow_protocol_port;
@@ -363,6 +363,7 @@ buffer sandesh vr_mem_stats_req {
    67:  i64             vms_interface_queue_object;
    68:  i64             vms_interface_req_pbb_mac_object;
    69:  i64             vms_nexthop_req_bmac_object;
+   70:  i64             vms_interface_bridge_id_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */

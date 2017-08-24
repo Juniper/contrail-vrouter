@@ -81,6 +81,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_htable_object);
     printf("Interface                       %" PRIu64 "\n",
             stats->vms_interface_object);
+    printf("Interface Bridge ID             %" PRIu64 "\n",
+            stats->vms_interface_bridge_id_object);
     printf("Interface Bridge Lock           %" PRIu64 "\n",
             stats->vms_interface_bridge_lock_object);
     printf("Interface Fat Flow Config       %" PRIu64 "\n",
