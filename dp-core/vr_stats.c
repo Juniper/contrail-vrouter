@@ -225,6 +225,9 @@ vr_mem_stats_get(void)
         response->vms_interface_bridge_lock_object +=
             (stats_block[VR_INTERFACE_BRIDGE_LOCK_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_BRIDGE_LOCK_OBJECT].ms_free);
+        response->vms_interface_req_bridge_id_object +=
+            (stats_block[VR_INTERFACE_REQ_BRIDGE_ID_OBJECT].ms_alloc -
+                stats_block[VR_INTERFACE_REQ_BRIDGE_ID_OBJECT].ms_free);
         response->vms_interface_fat_flow_config_object +=
             (stats_block[VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT].ms_free);

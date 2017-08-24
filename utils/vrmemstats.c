@@ -95,6 +95,8 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_interface_req_mac_object);
     printf("Interface Request PBB MAC       %" PRIu64 "\n",
             stats->vms_interface_req_pbb_mac_object);
+    printf("Interface Req Bridge ID         %" PRIu64 "\n",
+            stats->vms_interface_req_bridge_id_object);
     printf("Interface Mirror Req Meta Objects   %" PRIu64 "\n",
             stats->vms_interface_req_mirror_meta_object);
     printf("Interface Queue                 %" PRIu64 "\n",
