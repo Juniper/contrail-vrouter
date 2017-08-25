@@ -31,15 +31,17 @@ env.Requires(dpdk_objs, dpdk_lib)
 env.Default(dpdk_vrouter)
 
 env.Alias('install', env.Install(env['INSTALL_BIN'], dpdk_vrouter))
-vtest = Command(target = "all_tests.log",
-                source = "../utils/vtest/vtest",
-                action =
-                    "./vrouter/utils/vtest/all_tests_run"
-                        + " -b " + Dir(env['TOP']).abspath
-                        + " -x vrouter/utils/vtest/tests"
-                        + " -l $TARGET"
-                )
-Depends(vtest, dpdk_vrouter)
+
+# Uncomment below lines to run unit tests
+#vtest = Command(target = "all_tests.log",
+#                source = "../utils/vtest/vtest",
+#                action =
+#                    "./vrouter/utils/vtest/all_tests_run"
+#                        + " -b " + Dir(env['TOP']).abspath
+#                        + " -x vrouter/utils/vtest/tests"
+#                        + " -l $TARGET"
+#                )
+#Depends(vtest, dpdk_vrouter)
 
 
 # Local Variables:
