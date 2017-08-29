@@ -15,6 +15,10 @@
     ((uint16_t *)(dst))[2] = ((uint16_t *)(src))[2]; \
 }
 
+#define VR_MAC_RESET(mac) {\
+       memset(mac, 0, VR_ETHER_ALEN);\
+}
+
 #define VR_ETH_COPY(dst, src) { \
     VR_MAC_COPY((unsigned char *)(dst), (unsigned char *)(src)); \
     VR_MAC_COPY(((unsigned char *)(dst) + 6), ((unsigned char *)(src) + 6)); \
