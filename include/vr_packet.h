@@ -905,6 +905,7 @@ extern unsigned short vr_ip6_partial_csum(struct vr_ip6 *);
 enum {
     UNKNOWN_SOURCE,
     TOR_SOURCE,
+    TOR_EVPN_SOURCE,
 };
 
 enum {
