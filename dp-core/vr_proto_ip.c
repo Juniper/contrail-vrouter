@@ -1107,7 +1107,8 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
      * ARP requests from Tor have to be flooded so that required nodes
      * will answer that
      */
-    if ((fmd->fmd_src != TOR_SOURCE) && !vr_grat_arp(sarp)) {
+    if (((fmd->fmd_src != TOR_SOURCE) &&
+                (fmd->fmd_src != TOR_EVPN_SOURCE)) && !vr_grat_arp(sarp)) {
         *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_spa);
         vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
 

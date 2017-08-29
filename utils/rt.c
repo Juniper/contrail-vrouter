@@ -97,6 +97,7 @@ struct vr_util_flags bridge_flags[] = {
     {VR_BE_MAC_MOVED_FLAG,        "Mm",   "Mac Moved"           },
     {VR_BE_L2_CONTROL_DATA_FLAG,  "L2c",  "L2 Evpn Control Word"},
     {VR_BE_MAC_NEW_FLAG,          "N",    "New Entry"           },
+    {VR_BE_EVPN_CONTROL_PROCESSING_FLAG, "Ec",    "EvpnControlProcessing" },
 };
 
 static void
@@ -165,6 +166,8 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
         strcat(flag_string, "L2c");
     if (flags & VR_BE_MAC_NEW_FLAG)
         strcat(flag_string, "N");
+    if (flags & VR_BE_EVPN_CONTROL_PROCESSING_FLAG)
+        strcat(flag_string, "Ec");
 
     ret = printf("%-9d", index);
     for (i = ret; i < 12; i++)

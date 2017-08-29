@@ -1065,7 +1065,15 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
         goto drop;
     }
 
+    rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf, eth->eth_smac);
+
     if (pkt->vp_type == VP_TYPE_ARP) {
+
+        if ((pkt_src == PKT_SRC_INGRESS_REPL_TREE) &&
+                (rt_flags & VR_BE_EVPN_CONTROL_PROCESSING_FLAG)) {
+            fmd->fmd_src = TOR_EVPN_SOURCE;
+        }
+
         VR_MAC_COPY(eth_dmac, eth->eth_dmac);
         handled = vr_arp_input(pkt, fmd, eth_dmac);
         if (handled)
@@ -1095,16 +1103,19 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
      * V6 Ndisc, router solictation packets are ICMP packets. So we need
      * to parse to identify the type, unlike V4 ARP
      */
-    if (pkt->vp_type == VP_TYPE_IP6)
+    if (pkt->vp_type == VP_TYPE_IP6) {
         l4_type = vr_ip6_well_known_packet(pkt);
-    else if (pkt_src == PKT_SRC_TOR_REPL_TREE)
+    } else if (pkt_src == (PKT_SRC_TOR_REPL_TREE) ||
+                (pkt_src == PKT_SRC_INGRESS_REPL_TREE)) {
         l4_type = vr_ip_well_known_packet(pkt);
-
+    }
 
     /*
      * Special control packets need to be handled only if BMS
      */
-    if ((pkt_src == PKT_SRC_TOR_REPL_TREE) || !pkt_src) {
+    if ((pkt_src == PKT_SRC_EDGE_REPL_TREE) ||
+            ((pkt_src == PKT_SRC_INGRESS_REPL_TREE) &&
+             (rt_flags & VR_BE_EVPN_CONTROL_PROCESSING_FLAG))) {
 
         /*
          * If packet is identified as known packet, we always trap
@@ -1116,7 +1127,6 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
             trap = true;
 
             if (l4_type == L4_TYPE_DHCP_REQUEST) {
-                rt_flags = vr_bridge_route_flags(fmd->fmd_dvrf, eth->eth_smac);
                 if (rt_flags & VR_BE_FLOOD_DHCP_FLAG)
                     trap = false;
             } else if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
