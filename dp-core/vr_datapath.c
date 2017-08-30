@@ -141,7 +141,8 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
          * true only for the DNS ip.
          */
         if (to_gateway) {
-            if (fmd->fmd_src != TOR_SOURCE) {
+            if ((fmd->fmd_src != TOR_SOURCE) && (fmd->fmd_src !=
+                        TOR_EVPN_SOURCE)) {
                 return MR_DROP;
             }
         }
@@ -158,7 +159,8 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
          */
         if (to_vcp || to_gateway ||
                 (nh && ((nh->nh_type == NH_ENCAP) ||
-                (fmd->fmd_src == TOR_SOURCE)))) {
+                (fmd->fmd_src == TOR_SOURCE) ||
+                (fmd->fmd_src == TOR_EVPN_SOURCE)))) {
             if (stats)
                 stats->vrf_arp_physical_stitch++;
         } else {
