@@ -54,15 +54,15 @@ vif_bridge_get_sub_interface(vr_htable_t htable, unsigned short vlan,
 }
 
 int
-vif_bridge_get_index(struct vr_interface *pvif, struct vr_interface *vif)
+vif_bridge_get_index(struct vr_interface *pvif, struct vr_interface
+        *vif, uint8_t *mac)
 {
     struct vif_bridge_entry *be;
 
     if (!pvif || !pvif->vif_btable || !vif)
         return -1;
 
-    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
-            vif->vif_src_mac);
+    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id, mac);
     if (!be)
         return -1;
 
@@ -106,15 +106,15 @@ vif_bridge_alloc(vr_htable_t htable, unsigned short vlan,
 }
 
 int
-vif_bridge_delete(struct vr_interface *pvif, struct vr_interface *vif)
+vif_bridge_delete(struct vr_interface *pvif, struct vr_interface *vif,
+        uint8_t *src_mac)
 {
     struct vif_bridge_entry *be;
 
     if (!pvif->vif_btable)
         return -EINVAL;
 
-    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
-            vif->vif_src_mac);
+    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id, src_mac);
     if (!be)
         return -ENOENT;
 
@@ -124,18 +124,17 @@ vif_bridge_delete(struct vr_interface *pvif, struct vr_interface *vif)
 }
 
 int
-vif_bridge_add(struct vr_interface *pvif, struct vr_interface *vif)
+vif_bridge_add(struct vr_interface *pvif, struct vr_interface *vif,
+        uint8_t *src_mac)
 {
     struct vif_bridge_entry *be;
 
     if (!pvif->vif_btable)
         return -EINVAL;
 
-    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id,
-            vif->vif_src_mac);
+    be = vif_bridge_get(pvif->vif_btable, vif->vif_vlan_id, src_mac);
     if (!be) {
-        be = vif_bridge_alloc(pvif->vif_btable, vif->vif_vlan_id,
-                vif->vif_src_mac);
+        be = vif_bridge_alloc(pvif->vif_btable, vif->vif_vlan_id, src_mac);
         if (!be)
             return -ENOMEM;
     }
