@@ -404,6 +404,15 @@ dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     struct vr_interface *src_vif;
     struct vr_nexthop *nh;
 
+    if (vif) {
+        struct vr_interface_stats *gro_vif_stats;
+        gro_vif_stats = vif_get_stats(vif, vr_get_cpu());
+        if (gro_vif_stats) {
+            gro_vif_stats->vis_opackets++;
+            gro_vif_stats->vis_obytes += pkt_len(pkt);
+        }
+    }
+
     /* Normal processing for VMs if -
      * => They dont require GRO (like DPDK VM's)
      * => They dont support mergeable buffers
