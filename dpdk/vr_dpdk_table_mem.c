@@ -201,7 +201,7 @@ vr_dpdk_table_mem_init(unsigned int table, unsigned int entries,
             hpi = &vr_hugepage_md[i];
             if (!hpi->mnt)
                 continue;
-            file_name = malloc(strlen(hpi->mnt) + strlen(hp_file_name) + 1);
+            file_name = malloc(strlen(hpi->mnt) + strlen(hp_file_name) + 2);
             sprintf(file_name, "%s/%s", hpi->mnt, hp_file_name);
             if (stat(file_name, &f_stat) == -1) {
                 if (!touse_file_name) {
