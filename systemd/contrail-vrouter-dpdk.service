@@ -6,6 +6,7 @@ Wants=contrail-vrouter-agent.service contrail-vrouter-nodemgr.service
 [Service]
 Type=simple
 ExecStart=/usr/bin/contrail-vrouter-dpdk --no-daemon
+TimeoutStartSec=240
 TimeoutStopSec=0
 Restart=always
 ExecStop=/bin/kill -s TERM $MAINPID
