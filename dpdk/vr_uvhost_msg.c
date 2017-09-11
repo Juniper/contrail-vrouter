@@ -525,18 +525,27 @@ vr_uvhm_set_vring_call(vr_uvh_client_t *vru_cl)
     vr_uvhost_log("    SET VRING CALL: vring %u FD %d\n", vring_idx,
                                                 vru_cl->vruc_fds_sent[0]);
 
-    if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
-        vr_uvhost_log("Client %s: error setting vring %u call: invalid vring index\n",
+    if (!(vring_idx & VHOST_USER_VRING_NOFD_MASK)) {
+        if (vring_idx >= VHOST_CLIENT_MAX_VRINGS) {
+            vr_uvhost_log(
+                "Client %s: error setting vring %u call: invalid vring index\n",
+                uvhm_client_name(vru_cl), vring_idx);
+            return -1;
+        }
+
+        if (vr_dpdk_set_ring_callfd(vru_cl->vruc_idx, vring_idx,
+                                    vru_cl->vruc_fds_sent[0])) {
+            vr_uvhost_log("Client %s: error setting vring %u call FD %d\n",
+                    uvhm_client_name(vru_cl), vring_idx, vru_cl->vruc_fds_sent[0]);
+            return -1;
+        }
+    } else {
+        vr_uvhost_log("Client %s: not setting call fd due to mask 0x%x\n",
                         uvhm_client_name(vru_cl), vring_idx);
-        return -1;
+
+        vring_idx &= (~VHOST_USER_VRING_NOFD_MASK);
     }
 
-    if (vr_dpdk_set_ring_callfd(vru_cl->vruc_idx, vring_idx,
-                                vru_cl->vruc_fds_sent[0])) {
-        vr_uvhost_log("Client %s: error setting vring %u call FD %d\n",
-                uvhm_client_name(vru_cl), vring_idx, vru_cl->vruc_fds_sent[0]);
-        return -1;
-    }
     /* set FD to -1, so we do not close it in vr_uvh_cl_msg_handler() */
     vru_cl->vruc_fds_sent[0] = -1;
 
