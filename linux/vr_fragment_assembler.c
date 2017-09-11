@@ -35,7 +35,6 @@ vr_linux_fragment_assembler(struct work_struct *work)
 {
     uint32_t hash, index;
 
-    struct vr_packet *pkt;
     struct vr_packet_node *pnode;
     struct vr_linux_fragment_bucket *vfb;
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
@@ -65,10 +64,8 @@ vr_linux_fragment_assembler(struct work_struct *work)
         tail->fqe_next = NULL;
 
         pnode = &tail->fqe_pnode;
-        pkt = pnode->pl_packet;
-        if (pkt) {
-            hash = __vr_fragment_get_hash(pnode->pl_vrf,
-                    pnode->pl_inner_src_ip, pnode->pl_inner_dst_ip, pkt);
+        if (pnode->pl_packet) {
+            hash = vr_fragment_get_hash(pnode);
             index = (hash % VR_LINUX_ASSEMBLER_BUCKETS);
             vfb = &vr_linux_assembler_table[index];
 
