@@ -94,11 +94,14 @@
 struct vr_timer *vr_assembler_table_scan_timer;
 
 static inline void
-__fragment_key(struct vr_fragment_key *key, unsigned short vrf, uint32_t sip,
-        uint32_t dip, uint16_t id)
+__fragment_key(struct vr_fragment_key *key, unsigned short vrf,
+        uint64_t sip_u, uint64_t sip_l, uint64_t dip_u, uint64_t dip_l,
+        uint32_t id)
 {
-    key->fk_sip = sip;
-    key->fk_dip = dip;
+    key->fk_sip_u = sip_u;
+    key->fk_sip_l = sip_l;
+    key->fk_dip_u = dip_u;
+    key->fk_dip_l = dip_l;
     key->fk_id = id;
     key->fk_vrf = vrf;
 
@@ -112,14 +115,6 @@ __fragment_key(struct vr_fragment_key *key, unsigned short vrf, uint32_t sip,
 
 #define VR_HENTRY_FROM_FRAGMENT(fe)        \
     (vr_hentry_t *)((fe) ? &fe->f_hentry : NULL)
-
-static inline void
-fragment_key(struct vr_fragment_key *key, unsigned short vrf,
-        struct vr_ip *iph)
-{
-    __fragment_key(key, vrf, iph->ip_saddr, iph->ip_daddr, iph->ip_id);
-    return;
-}
 
 static vr_hentry_key
 vr_fragment_get_entry_key(vr_htable_t table, vr_hentry_t *entry,
@@ -136,15 +131,17 @@ vr_fragment_get_entry_key(vr_htable_t table, vr_hentry_t *entry,
 }
 
 static inline void
-fragment_entry_set(struct vr_fragment *fe, unsigned short vrf, struct vr_ip *iph,
+fragment_entry_set(struct vr_fragment *fe, struct vr_fragment_key *key,
         unsigned short sport, unsigned short dport)
 {
     unsigned long sec, nsec;
 
-    fe->f_sip = iph->ip_saddr;
-    fe->f_dip = iph->ip_daddr;
-    fe->f_id = iph->ip_id;
-    fe->f_vrf = vrf;
+    fe->f_sip_u = key->fk_sip_u;
+    fe->f_sip_l = key->fk_sip_l;
+    fe->f_dip_u = key->fk_dip_u;
+    fe->f_dip_l = key->fk_dip_l;
+    fe->f_id = key->fk_id;
+    fe->f_vrf = key->fk_vrf;
     fe->f_sport = sport;
     fe->f_dport = dport;
     vr_get_mono_time(&sec, &nsec);
@@ -313,9 +310,12 @@ vr_fragment_assembler(struct vr_fragment **head_p,
     unsigned long sec, nsec;
     unsigned int list_length = 0, drop_reason;
     bool found = false, frag_head = false;
+    uint64_t *v6_addr;
 
     struct vrouter *router;
     struct vr_ip *ip;
+    struct vr_ip6 *ip6;
+    struct vr_ip6_frag *v6_frag;
     struct vr_packet *pkt;
     struct vr_packet_node *pnode;
     struct vr_fragment *frag, *frag_flow, **prev = NULL;
@@ -325,14 +325,21 @@ vr_fragment_assembler(struct vr_fragment **head_p,
 
     router = vfqe->fqe_router;
     pnode = &vfqe->fqe_pnode;
-    pkt = pnode->pl_packet;
-    ip = (struct vr_ip *)pkt_network_header(pkt);
-
     if (pnode->pl_flags & PN_FLAG_FRAGMENT_HEAD)
         frag_head = true;
 
-    __fragment_key(&vfk, pnode->pl_vrf, pnode->pl_inner_src_ip,
-            pnode->pl_inner_dst_ip, ip->ip_id);
+    pkt = pnode->pl_packet;
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (vr_ip_is_ip6(ip)) {
+       ip6 = (struct vr_ip6 *)ip;
+       v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+       v6_addr = (uint64_t *)(ip6->ip6_src);
+        __fragment_key(&vfk, pnode->pl_vrf, *v6_addr, *(v6_addr + 1),
+                *(v6_addr +2 ), *(v6_addr + 3), v6_frag->ip6_frag_id);
+    } else {
+        __fragment_key(&vfk, pnode->pl_vrf, 0, pnode->pl_inner_src_ip,
+            0, pnode->pl_inner_dst_ip, ip->ip_id);
+    }
 
     frag = *head_p;
     prev = head_p;
@@ -425,25 +432,44 @@ exit_assembly:
 }
 
 uint32_t
-__vr_fragment_get_hash(unsigned int vrf, uint32_t sip,
-        uint32_t dip, struct vr_packet *pkt)
+__vr_fragment_get_hash(unsigned int vrf, uint64_t sip_u, uint64_t sip_l,
+        uint64_t dip_u, uint64_t dip_l, uint32_t id)
 {
     struct vr_fragment_key vfk;
-    struct vr_ip *ip;
 
-    ip = (struct vr_ip *)pkt_network_header(pkt);
-    __fragment_key(&vfk, vrf, sip, dip, ip->ip_id);
+    __fragment_key(&vfk, vrf, sip_u, sip_l, dip_u, dip_l, id);
 
     return vr_hash(&vfk, sizeof(vfk), 0);
 }
 
 uint32_t
-vr_fragment_get_hash(unsigned int vrf, struct vr_packet *pkt)
+vr_fragment_get_hash(struct vr_packet_node *pnode)
 {
+    uint64_t *v6_addr;
     struct vr_ip *ip;
+    struct vr_ip6 *ip6;
+    struct vr_ip6_frag *v6_frag;
+    struct vr_packet *pkt;
+
+    if (!pnode || !pnode->pl_packet)
+        return (uint32_t)-1;
+
+    pkt = pnode->pl_packet;
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
-    return __vr_fragment_get_hash(vrf, ip->ip_saddr, ip->ip_daddr, pkt);
+    if (vr_ip_is_ip6(ip)) {
+        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+        v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+        v6_addr = (uint64_t *)(ip6->ip6_src);
+
+        return __vr_fragment_get_hash(pnode->pl_vrf, *v6_addr, *(v6_addr+ 1),
+                    *(v6_addr + 2), *(v6_addr + 3), v6_frag->ip6_frag_id);
+    } else if(vr_ip_is_ip4(ip)) {
+        return __vr_fragment_get_hash(pnode->pl_vrf, 0, pnode->pl_inner_src_ip,
+                0, pnode->pl_inner_dst_ip, ip->ip_id);
+    }
+
+    return (uint32_t)-1;
 }
 
 int
@@ -523,46 +549,92 @@ fail:
 void
 vr_fragment_del(vr_htable_t table, struct vr_fragment *fe)
 {
-    fe->f_dip = 0;
+    fe->f_dip_u = fe->f_dip_l =  0;
     fe->f_received = 0;
     vr_htable_release_hentry(table, VR_HENTRY_FROM_FRAGMENT(fe));
 
     return;
 }
 
-int
-vr_fragment_add(struct vrouter *router, unsigned short vrf, struct vr_ip *iph,
-        unsigned short sport, unsigned short dport)
+
+static int
+vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
+        unsigned short sport, unsigned short dport, unsigned short len)
 {
-    struct vr_fragment_key key;
     struct vr_fragment *fe;
     vr_htable_t ftable = router->vr_fragment_table;
 
-    fragment_key(&key, vrf, iph);
-    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, &key, 0));
+    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, key, 0));
     if (fe)
         return 0;
 
-    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_free_hentry(ftable, &key, 0));
+    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_free_hentry(ftable, key, 0));
     if (!fe)
         return -ENOMEM;
 
-    fragment_entry_set(fe, vrf, iph, sport, dport);
-    fe->f_received += (ntohs(iph->ip_len) - (iph->ip_hl * 4));
+    fragment_entry_set(fe, key, sport, dport);
+    fe->f_received += len;
 
     return 0;
 }
 
+int
+vr_v4_fragment_add(struct vrouter *router, unsigned short vrf,
+        struct vr_ip *iph, unsigned short sport, unsigned short dport)
+{
+    struct vr_fragment_key key;
+
+    __fragment_key(&key, vrf, 0, iph->ip_saddr, 0, iph->ip_daddr, iph->ip_id);
+
+    return vr_fragment_add(router, &key, sport, dport,
+                    (ntohs(iph->ip_len) - iph->ip_hl * 4));
+}
+
+int
+vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
+        struct vr_ip6 *ip6, unsigned short sport, unsigned short dport)
+{
+    uint64_t *v6_addr;
+    struct vr_fragment_key key;
+    struct vr_ip6_frag  *v6_frag;
+
+    v6_addr = (uint64_t *)(ip6->ip6_src);
+    v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+    __fragment_key(&key, vrf, *v6_addr, *(v6_addr + 1), *(v6_addr + 2),
+            *(v6_addr + 3), v6_frag->ip6_frag_id);
+
+    return vr_fragment_add(router, &key, sport, dport,
+            (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag)));
+}
+
 struct vr_fragment *
-vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *iph)
+vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
 {
     unsigned long sec, nsec;
-
-    struct vr_fragment_key key;
+    uint64_t *v6_addr;
+    struct vr_ip6 *ip6;
+    struct vr_ip6_frag *v6_frag;
     struct vr_fragment *fe;
-    vr_htable_t ftable = router->vr_fragment_table;
+    struct vr_fragment_key key;
+    vr_htable_t ftable;
 
-    fragment_key(&key, vrf, iph);
+    if (vr_ip_is_ip6(ip)) {
+        ip6 = (struct vr_ip6 *)ip;
+        if (ip6->ip6_nxt == VR_IP6_PROTO_FRAG) {
+            v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
+            v6_addr = (uint64_t *)(ip6->ip6_src);
+            __fragment_key(&key, vrf, *v6_addr, *(v6_addr+ 1),
+                    *(v6_addr + 2), *(v6_addr+ 3), v6_frag->ip6_frag_id);
+        }
+    } else if (vr_ip_is_ip4(ip)) {
+        __fragment_key(&key, vrf, 0, ip->ip_saddr, 0, ip->ip_daddr, ip->ip_id);
+    } else {
+        return NULL;
+    }
+
+
+    ftable = router->vr_fragment_table;
+
     fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, &key, 0));
     if (fe) {
         vr_get_mono_time(&sec, &nsec);
@@ -587,7 +659,7 @@ __fragment_reap(vr_htable_t table, vr_hentry_t *ent,
     struct vr_fragment *fe;
 
     fe = VR_FRAGMENT_FROM_HENTRY(ent);
-    if (!fe || !fe->f_dip)
+    if (!fe || ((!fe->f_dip_u) && !(fe->f_dip_l)))
         return;
 
     vr_get_mono_time(&sec, &nsec);
