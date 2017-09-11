@@ -558,6 +558,7 @@ vr_find_flow(struct vrouter *router, struct vr_flow *key,
     return fe;
 }
 
+
 void
 vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
@@ -587,19 +588,24 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
             pnode->pl_flags |= PN_FLAG_TO_ME;
     }
 
-    if (ip && vr_ip_is_ip4(ip)) {
-        /*
-         * Source IP & Dest IP can change while the packet is in the queue
-         * (NAT). For e.g.: when the cloned head of a fragment is enqueued
-         * to the assembler and subsequently dequeued by the assembler, the
-         * original packet might have undergone a NAT, resulting in wrong
-         * hash and thus a wrong search for other fragments of the packet.
-         * Hence, store them here for others interested in the original IPs
-         */
-        pnode->pl_inner_src_ip = ip->ip_saddr;
-        pnode->pl_inner_dst_ip = ip->ip_daddr;
-        if (vr_ip_fragment_head(ip))
-            pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+    if (ip) {
+        if (vr_ip_is_ip4(ip)) {
+            /*
+             * Source IP & Dest IP can change while the packet is in the queue
+             * (NAT). For e.g.: when the cloned head of a fragment is enqueued
+             * to the assembler and subsequently dequeued by the assembler, the
+             * original packet might have undergone a NAT, resulting in wrong
+             * hash and thus a wrong search for other fragments of the packet.
+             * Hence, store them here for others interested in the original IPs
+             */
+            pnode->pl_inner_src_ip = ip->ip_saddr;
+            pnode->pl_inner_dst_ip = ip->ip_daddr;
+            if (vr_ip_fragment_head(ip))
+                pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+        } else if (vr_ip_is_ip6(ip)) {
+            if (vr_ip6_fragment_head((struct vr_ip6 *)ip))
+                pnode->pl_flags |= PN_FLAG_FRAGMENT_HEAD;
+        }
     }
 
     pnode->pl_dscp = fmd->fmd_dscp;
@@ -1993,7 +1999,7 @@ vr_flow_set_req_is_invalid(struct vrouter *router, vr_flow_req *req,
 
                 key_type = VP_TYPE_IP;
             } else {
-                vr_inet6_fill_flow_from_req(&key, req);
+                vr_inet6_fill_rflow_from_req(&key, req);
                 key_type = VP_TYPE_IP6;
             }
 
