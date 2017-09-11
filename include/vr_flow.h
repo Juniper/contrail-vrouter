@@ -456,6 +456,8 @@ extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
        unsigned char *, uint8_t, uint16_t, uint16_t, uint8_t);
 extern void vr_inet6_fill_flow_from_req(struct vr_flow *,
         struct _vr_flow_req *);
+extern void vr_inet6_fill_rflow_from_req(struct vr_flow *,
+        struct _vr_flow_req *);
 extern void vr_fill_flow_common(struct vr_flow *, unsigned short,
                 uint8_t, uint16_t, uint16_t, uint8_t, uint8_t);
 extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
