@@ -1571,6 +1571,8 @@ dpdk_virtio_dev_to_vm_tx_burst_mergeable(struct dpdk_virtio_writer *p,
                         idx = vq->vdv_desc[idx].next;
                         next_desc = 1;
                     }
+                    if (len > pkt_len)
+                        break;
                 }while (next_desc);
                 if (len < pkt_len)
                     break;
@@ -1702,18 +1704,23 @@ static inline void
 dpdk_virtio_send_burst(struct dpdk_virtio_writer *p)
 {
     uint32_t nb_tx = 0;
+    int i;
 
-    if (likely(p->tx_virtioq->vdv_send_func != NULL)) {
-        nb_tx = p->tx_virtioq->vdv_send_func(p, p->tx_virtioq,
-                        p->tx_buf, p->tx_buf_count);
-    }
+    if (likely(p->tx_buf_count)) {
+        for (i=0;i<p->tx_buf_count;i++)
+            rte_prefetch0((void *)p->tx_buf[i]);
+        if (likely(p->tx_virtioq->vdv_send_func != NULL)) {
+            nb_tx = p->tx_virtioq->vdv_send_func(p, p->tx_virtioq,
+                            p->tx_buf, p->tx_buf_count);
+        }
 
-    DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
-    /* dpdk_virtio_dev_to_vm_tx_burst() does not free any mbufs */
-    while (likely(p->tx_buf_count)) {
-        p->tx_buf_count--;
-        p->tx_mbufs -= p->tx_buf[p->tx_buf_count]->nb_segs;
-        rte_pktmbuf_free(p->tx_buf[p->tx_buf_count]);
+        DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
+        /* dpdk_virtio_dev_to_vm_tx_burst() does not free any mbufs */
+        while (likely(p->tx_buf_count)) {
+            p->tx_buf_count--;
+            p->tx_mbufs -= p->tx_buf[p->tx_buf_count]->nb_segs;
+            rte_pktmbuf_free(p->tx_buf[p->tx_buf_count]);
+        }
     }
 }
 
