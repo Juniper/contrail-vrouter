@@ -455,7 +455,7 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
      * Neighbor requests from Tor have to be flooded so that required nodes
      * will answer that
      */
-    if (fmd->fmd_src != TOR_SOURCE) {
+    if ((fmd->fmd_src != TOR_SOURCE) && (fmd->fmd_src != TOR_EVPN_SOURCE)) {
         ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
         if (!ip6)
             return MR_DROP;
