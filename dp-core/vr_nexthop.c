@@ -1111,9 +1111,11 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
     }
 
     /*
-     * Special control packets need to be handled only if BMS
+     * Special control packets need to be handled only if VM or BMS
+     * behind OvsDB Tor or BMS behind Evpn Tor(which will have
+     * VR_BE_EVPN_CONTROL_PROCESSING_FLAG)
      */
-    if ((pkt_src == PKT_SRC_EDGE_REPL_TREE) ||
+    if ((!pkt_src) || (pkt_src == PKT_SRC_TOR_REPL_TREE) ||
             ((pkt_src == PKT_SRC_INGRESS_REPL_TREE) &&
              (rt_flags & VR_BE_EVPN_CONTROL_PROCESSING_FLAG))) {
 
