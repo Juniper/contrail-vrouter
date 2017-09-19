@@ -2073,6 +2073,7 @@ static int
 vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
 {
     int ret = 0;
+    uint64_t *ip6;
 
     if (req->vifr_flags & VIF_FLAG_SERVICE_IF &&
             !(vif->vif_flags & VIF_FLAG_SERVICE_IF)) {
@@ -2104,6 +2105,11 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
     vif->vif_isid = req->vifr_isid;
     if (req->vifr_pbb_mac_size)
         VR_MAC_COPY(vif->vif_pbb_mac, req->vifr_pbb_mac);
+
+    vif->vif_ip = req->vifr_ip;
+    ip6 = (uint64_t *)(vif->vif_ip6);
+    *ip6 = req->vifr_ip6_u;
+    *(ip6 + 1) = req->vifr_ip6_l;
 
     ret = vr_interface_mirror_md_set(vif, req);
     if (ret)
