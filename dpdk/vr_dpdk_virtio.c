@@ -266,7 +266,7 @@ vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
     if (!ret){
         *blksize = (uint64_t)fd_stat.st_blksize;
     } else {
-        RTE_LOG(DEBUG, UVHOST, "Error getting file status for FD %d: %s (%d)\n",
+        RTE_LOG_DP(DEBUG, UVHOST, "Error getting file status for FD %d: %s (%d)\n",
                 fd, strerror(errno), errno);
     }
 
@@ -842,7 +842,7 @@ dpdk_virtio_create_mss_sized_mbuf_chain(struct rte_mbuf *mbuf,
             append_addr += copy_len;
             new_mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
             if (unlikely(new_mbuf == NULL)) {
-                RTE_LOG(DEBUG, VROUTER, "%s: mbuf alloc failed\n",__func__);
+                RTE_LOG_DP(DEBUG, VROUTER, "%s: mbuf alloc failed\n",__func__);
                 return -1;
             }
             last_mbuf->next = new_mbuf;
@@ -881,7 +881,7 @@ dpdk_virtio_create_chained_mbuf(struct rte_mbuf *mbuf, char* pkt_addr, uint32_t 
         append_addr += pkt_tailroom;
         new_mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
         if (unlikely(new_mbuf == NULL)) {
-            RTE_LOG(DEBUG, VROUTER, "%s: mbuf alloc failed\n",__func__);
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: mbuf alloc failed\n",__func__);
             return -1;
         }
         rte_pktmbuf_lastseg(mbuf)->next = new_mbuf;
@@ -1069,7 +1069,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         vq->vdv_last_used_idx += i;
         rte_wmb();
         vq->vdv_used->idx += i;
-        RTE_LOG(DEBUG, VROUTER,
+        RTE_LOG_DP(DEBUG, VROUTER,
                 "%s: vif %d vq %p vdv_last_used_idx %d vdv_used->idx %u vdv_avail->idx %u\n",
                 __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx,
                 vq->vdv_used->idx, vq->vdv_avail->idx);
@@ -1125,7 +1125,7 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
         return 0;
 
     res_cur_idx = res_base_idx;
-    RTE_LOG(DEBUG, VROUTER, "%s: Current Index %d| End Index %d\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: Current Index %d| End Index %d\n",
             __func__, res_cur_idx, res_end_idx);
 
     /* Prefetch available ring to retrieve indexes. */
@@ -1253,7 +1253,7 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
 
     *(volatile uint16_t *)&vq->vdv_used->idx += count;
     vq->vdv_last_used_idx = res_end_idx;
-    RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
             __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx);
 
     /* flush used->idx update before we read avail->flags. */
@@ -1335,7 +1335,7 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
     if (pkt == NULL)
         return 0;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: Current Index %d| "
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: Current Index %d| "
         "End Index %d\n",
         __func__, cur_idx, res_end_idx);
 
@@ -1350,7 +1350,7 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
     /* Prefetch buffer address. */
     rte_prefetch0((void *)(uintptr_t)vb_addr);
 
-    RTE_LOG(DEBUG, VROUTER, "%s RX: Num merge buffers %d\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s RX: Num merge buffers %d\n",
         __func__, virtio_hdr->num_buffers);
 
     rte_memcpy((void *)(uintptr_t)vb_hdr_addr,
@@ -1554,7 +1554,7 @@ dpdk_virtio_dev_to_vm_tx_burst_mergeable(struct dpdk_virtio_writer *p,
         for (pkt_idx = 0; pkt_idx < count; pkt_idx++) {
             uint32_t pkt_len = pkts[pkt_idx]->pkt_len + vq->vdv_hlen;
             if (unlikely(res_cur_idx == avail_idx)) {
-                RTE_LOG(DEBUG, VROUTER,
+                RTE_LOG_DP(DEBUG, VROUTER,
                     "Failed "
                     "to get enough vdv_desc from "
                     "vring\n");
@@ -1618,7 +1618,7 @@ dpdk_virtio_dev_to_vm_tx_burst_mergeable(struct dpdk_virtio_writer *p,
             do {
                 avail_idx = *((volatile uint16_t *)&vq->vdv_avail->idx);
                 if (unlikely(res_cur_idx == avail_idx)) {
-                    RTE_LOG(DEBUG, VROUTER,
+                    RTE_LOG_DP(DEBUG, VROUTER,
                         "Failed "
                         "to get enough vdv_desc from "
                         "vring\n");
