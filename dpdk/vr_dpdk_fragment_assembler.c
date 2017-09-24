@@ -38,7 +38,6 @@ dpdk_fragment_assembler(void *arg)
 {
     uint32_t hash, index;
     unsigned int cpu;
-    struct vr_packet *pkt;
     struct fragment_bucket *bucket;
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
     struct per_cpu_fragment_queue *queue =
@@ -69,9 +68,8 @@ dpdk_fragment_assembler(void *arg)
         tail_n = tail->fqe_next;
         tail->fqe_next = NULL;
 
-        pkt = tail->fqe_pnode.pl_packet;
-        if (pkt) {
-            hash = vr_fragment_get_hash(tail->fqe_pnode.pl_vrf, pkt);
+        if (tail->fqe_pnode.pl_packet) {
+            hash = vr_fragment_get_hash(&tail->fqe_pnode);
             index = (hash % VR_LINUX_ASSEMBLER_BUCKETS);
             bucket = &assembler_table[cpu][index];
 
