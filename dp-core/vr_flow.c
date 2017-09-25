@@ -210,8 +210,11 @@ static void
 __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
 {
     if (fe->fe_hold_list) {
-		vr_printf("vrouter: Potential memory leak @ %s:%d\n",
-                __FILE__, __LINE__);
+        vr_printf("vrouter: Potential memory leak for flow %d tcp_flags 0x%x"
+                " action %d flags 0x%x with rflow id %d ecmp nh id %d"
+                " src nh %d\n", fe->fe_hentry.hentry_index, fe->fe_tcp_flags,
+                fe->fe_action, fe->fe_flags, fe->fe_rflow,
+                fe->fe_ecmp_nh_index, fe->fe_src_nh_index);
     }
 
     fe->fe_hold_list = NULL;
@@ -690,8 +693,14 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index)
 {
     bool evict_forward_flow = true;
-
     struct vr_flow_entry *rfe = NULL;
+
+    /*
+     * There can be a RST processing while we are in hold - atleast for
+     * Ecmp. Be paranoid and stop evicting
+     */
+    if ((fe->fe_action == VR_FLOW_ACTION_HOLD) || (fe->fe_hold_list))
+        return;
 
     /* start modifying the entry */
     if (!vr_flow_start_modify(router, fe)) {
@@ -707,9 +716,15 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe,
                     /* no modification. hence...*/
                     rfe = NULL;
                 } else {
-                    /* we do not want hold flows to be evicted, just yet */
+                    /*
+                     * we do not want hold flows to be evicted, just
+                     * yet. The flow can contain the holdq without
+                     * action as Hold for the Ecmp reasons. This also is
+                     * considered as Hold Flow
+                     */
                     if (((rfe->fe_rflow == index) || (rfe->fe_rflow < 0)) &&
-                            (rfe->fe_action != VR_FLOW_ACTION_HOLD)) {
+                            (rfe->fe_action != VR_FLOW_ACTION_HOLD) &&
+                            (!rfe->fe_hold_list)) {
                         evict_forward_flow = __vr_flow_mark_evict(router, rfe);
                     }
                 }
