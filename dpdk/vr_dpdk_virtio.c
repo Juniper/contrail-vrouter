@@ -259,7 +259,7 @@ vr_dpdk_virtio_uvh_get_blk_size(int fd, uint64_t *const blksize)
     if (!ret){
         *blksize = (uint64_t)fd_stat.st_blksize;
     } else {
-        RTE_LOG(DEBUG, UVHOST, "Error getting file status for FD %d: %s (%d)\n",
+        RTE_LOG_DP(DEBUG, UVHOST, "Error getting file status for FD %d: %s (%d)\n",
                 fd, strerror(errno), errno);
     }
 
@@ -870,7 +870,7 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
         vq->vdv_last_used_idx += i;
         rte_wmb();
         vq->vdv_used->idx += i;
-        RTE_LOG(DEBUG, VROUTER,
+        RTE_LOG_DP(DEBUG, VROUTER,
                 "%s: vif %d vq %p last_used_idx %d used->idx %u avail->idx %u\n",
                 __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx,
                 vq->vdv_used->idx, vq->vdv_avail->idx);
@@ -962,7 +962,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
                 res_base_idx, res_end_idx);
     } while (unlikely(success == 0));
     res_cur_idx = res_base_idx;
-    RTE_LOG(DEBUG, VROUTER, "%s: Current Index %d| End Index %d\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: Current Index %d| End Index %d\n",
             __func__, res_cur_idx, res_end_idx);
 
     /* Prefetch available ring to retrieve indexes. */
@@ -1087,7 +1087,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
 
     *(volatile uint16_t *)&vq->vdv_used->idx += count;
     vq->vdv_last_used_idx = res_end_idx;
-    RTE_LOG(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: vif %d vq %p last_used_idx %d used->idx %d\n",
             __func__, vq->vdv_vif_idx, vq, vq->vdv_last_used_idx, vq->vdv_used->idx);
 
     /* flush used->idx update before we read avail->flags. */

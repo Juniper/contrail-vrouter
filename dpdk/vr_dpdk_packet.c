@@ -61,7 +61,7 @@ dpdk_packet_io(void)
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[rte_lcore_id()];
 
 wait_for_connection:
-    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: waiting for packet transport\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s[%lx]: waiting for packet transport\n",
                 __func__, pthread_self());
 
     /* Set the thread offline while busy waiting for the
@@ -76,7 +76,7 @@ wait_for_connection:
     }
     rcu_thread_online();
 
-    RTE_LOG(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, VROUTER, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 ((struct vr_usocket *)vr_dpdk.packet_transport)->usock_fd);
     ret = vr_usocket_io(vr_dpdk.packet_transport);
     if (ret < 0) {

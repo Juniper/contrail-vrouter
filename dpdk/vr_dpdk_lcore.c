@@ -505,7 +505,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
     struct vr_interface_stats *stats;
     unsigned retry_lcores[nb_dst_lcores];
 
-    RTE_LOG(DEBUG, VROUTER, "%s: distributing %" PRIu32 " packet(s) from interface %s\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: distributing %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
     /* init the headers */
@@ -540,7 +540,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
         /* put the mbuf to the burst */
         lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0]
                                                  & LCORE_RX_RING_NB_PKTS_MASK;
-        RTE_LOG(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
+        RTE_LOG_DP(DEBUG, VROUTER, "%s: lcore %u RSS hash 0x%x packet %u dst lcore %u\n",
              __func__, lcore_id, hashval, lcore_nb_pkts, dst_fwd_lcore_idx);
         lcore_pkts[dst_lcore_idx][lcore_nb_pkts] = mbuf;
 
@@ -564,7 +564,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
             lcore_nb_pkts = (uintptr_t)lcore_pkts[dst_lcore_idx][0]
                                                   & LCORE_RX_RING_NB_PKTS_MASK;
             if (likely(lcore_nb_pkts > 1)) {
-                RTE_LOG(DEBUG, VROUTER, "%s: enqueueing %u packet(s) to lcore %u\n",
+                RTE_LOG_DP(DEBUG, VROUTER, "%s: enqueueing %u packet(s) to lcore %u\n",
                      __func__, lcore_nb_pkts - 1, dst_fwd_lcore_idx);
 
                 /* round up the number of packets to the chunk size */
@@ -592,13 +592,13 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
                                                           += lcore_nb_pkts - 1;
 
                         if (io_lcore) {
-                            RTE_LOG(DEBUG, VROUTER, "%s: lcore %u IO ring is full, dropping %u packets: %d/%d\n",
+                            RTE_LOG_DP(DEBUG, VROUTER, "%s: lcore %u IO ring is full, dropping %u packets: %d/%d\n",
                                     __func__, dst_fwd_lcore_idx,
                                     lcore_nb_pkts,
                                     rte_ring_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring),
                                     rte_ring_free_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring));
                         } else {
-                            RTE_LOG(DEBUG, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
+                            RTE_LOG_DP(DEBUG, VROUTER, "%s: lcore %u ring is full, dropping %u packets: %d/%d\n",
                                     __func__, dst_fwd_lcore_idx,
                                     lcore_nb_pkts,
                                     rte_ring_count(vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_rx_ring),
@@ -612,7 +612,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
                     } else {
                         /* mark the lcore to retry */
                         retry_lcores[nb_retry_lcores++] = dst_lcore_idx;
-                        RTE_LOG(DEBUG, VROUTER, "%s: retrying %d lcore %u...\n",
+                        RTE_LOG_DP(DEBUG, VROUTER, "%s: retrying %d lcore %u...\n",
                             __func__, retry, dst_fwd_lcore_idx);
 
                     }
@@ -646,7 +646,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     struct rte_mbuf *p_copy;
     unsigned short vlan_id = VLAN_ID_INVALID;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
@@ -1117,7 +1117,7 @@ dpdk_lcore_signals_init(unsigned lcore_id)
     /* Due to the extra threads we cant block signals on, our only
      * option is to handle the signals on master (KNI) lcore */
     if (lcore_id == rte_get_master_lcore()) {
-        RTE_LOG(DEBUG, VROUTER, "Unblocking signals for lcore %u\n",
+        RTE_LOG_DP(DEBUG, VROUTER, "Unblocking signals for lcore %u\n",
                     lcore_id);
         sigfillset(&set);
         if (pthread_sigmask(SIG_UNBLOCK, &set, NULL) != 0) {
@@ -1422,7 +1422,7 @@ dpdk_lcore_io_loop(void)
     const uint64_t tx_flush_cycles = VR_DPDK_TX_FLUSH_LOOPS;
 #endif
 
-    RTE_LOG(DEBUG, VROUTER, "Hello from IO lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from IO lcore %u\n", lcore_id);
 
     while (1) {
         rte_prefetch0(lcore);
@@ -1456,7 +1456,7 @@ dpdk_lcore_io_loop(void)
         } /* flush TX queues */
     } /* lcore loop */
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from IO lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from IO lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1489,7 +1489,7 @@ dpdk_lcore_fwd_loop(void)
     const uint64_t tx_flush_cycles = VR_DPDK_TX_FLUSH_LOOPS;
 #endif
 
-    RTE_LOG(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", lcore_id);
 
     while (1) {
         rte_prefetch0(lcore);
@@ -1564,7 +1564,7 @@ dpdk_lcore_fwd_loop(void)
         } /* flush TX queues */
     } /* lcore loop */
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from forwarding lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from forwarding lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1573,10 +1573,10 @@ static int
 dpdk_lcore_netlink_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from NetLink lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from NetLink lcore %u\n", lcore_id);
 
     while (1) {
-        RTE_LOG(DEBUG, VROUTER, "%s: NetLink IO on lcore %u\n",
+        RTE_LOG_DP(DEBUG, VROUTER, "%s: NetLink IO on lcore %u\n",
             __func__, lcore_id);
 
         /* init the communication socket with Agent */
@@ -1588,7 +1588,7 @@ dpdk_lcore_netlink_loop(void)
         usleep(VR_DPDK_SLEEP_SERVICE_US);
     } /* lcore loop */
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from NetLink lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from NetLink lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1597,10 +1597,10 @@ static int
 dpdk_lcore_packet_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from packet lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from packet lcore %u\n", lcore_id);
 
     while (1) {
-        RTE_LOG(DEBUG, VROUTER, "%s: packet IO on lcore %u\n",
+        RTE_LOG_DP(DEBUG, VROUTER, "%s: packet IO on lcore %u\n",
             __func__, lcore_id);
 
         dpdk_packet_io();
@@ -1610,7 +1610,7 @@ dpdk_lcore_packet_loop(void)
         usleep(VR_DPDK_SLEEP_SERVICE_US);
     } /* lcore loop */
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from packet lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from packet lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1621,7 +1621,7 @@ static int
 dpdk_lcore_knidev_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from KNI lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from KNI lcore %u\n", lcore_id);
 
     rcu_thread_offline();
 
@@ -1635,7 +1635,7 @@ dpdk_lcore_knidev_loop(void)
         usleep(VR_DPDK_SLEEP_KNI_US);
     };
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from KNI lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from KNI lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1647,7 +1647,7 @@ dpdk_lcore_tapdev_loop(void)
 {
     uint64_t total_pkts;
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from TAP lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from TAP lcore %u\n", lcore_id);
 
     while (1) {
         /* Handle link up/down/mtu change */
@@ -1671,7 +1671,7 @@ dpdk_lcore_tapdev_loop(void)
             break;
     };
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from TAP lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from TAP lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1685,7 +1685,7 @@ static int
 dpdk_lcore_knitap_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from KNI and TAP lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from KNI and TAP lcore %u\n", lcore_id);
 
     rcu_thread_offline();
     while (vr_dpdk.kni_state == 0) {
@@ -1703,7 +1703,7 @@ dpdk_lcore_knitap_loop(void)
         dpdk_lcore_tapdev_loop();
     }
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from KNI and TAP lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from KNI and TAP lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1712,7 +1712,7 @@ static int
 dpdk_lcore_timer_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from timer lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from timer lcore %u\n", lcore_id);
 
     rcu_thread_offline();
 
@@ -1726,7 +1726,7 @@ dpdk_lcore_timer_loop(void)
         usleep(VR_DPDK_SLEEP_TIMER_US);
     };
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from timer lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from timer lcore %u\n", lcore_id);
     return 0;
 }
 
@@ -1738,7 +1738,7 @@ static int
 dpdk_lcore_uvhost_loop(void)
 {
     unsigned lcore_id = rte_lcore_id();
-    RTE_LOG(DEBUG, VROUTER, "Hello from UVHost lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Hello from UVHost lcore %u\n", lcore_id);
 
     vr_uvhost_exit_fn = vr_dpdk_exit_trigger;
 
@@ -1750,7 +1750,7 @@ dpdk_lcore_uvhost_loop(void)
             break;
     };
 
-    RTE_LOG(DEBUG, VROUTER, "Bye-bye from UVHost lcore %u\n", lcore_id);
+    RTE_LOG_DP(DEBUG, VROUTER, "Bye-bye from UVHost lcore %u\n", lcore_id);
     return 0;
 }
 
