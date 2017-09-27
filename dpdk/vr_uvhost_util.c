@@ -51,7 +51,7 @@ vr_uvhost_del_fd(int fd, uvh_fd_type_t fd_type)
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, UVHOST, "Deleting FD %d...\n", fd);
+    RTE_LOG_DP(DEBUG, UVHOST, "Deleting FD %d...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {
@@ -117,7 +117,7 @@ vr_uvhost_add_fd(int fd, uvh_fd_type_t fd_type, void *fd_handler_arg,
     int i;
     uvh_fd_t *fds;
 
-    RTE_LOG(DEBUG, UVHOST, "Adding FD %d...\n", fd);
+    RTE_LOG_DP(DEBUG, UVHOST, "Adding FD %d...\n", fd);
     if (fd_type == UVH_FD_READ) {
         fds = uvh_rfds;
     } else if (fd_type == UVH_FD_WRITE) {

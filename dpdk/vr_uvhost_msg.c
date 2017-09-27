@@ -814,13 +814,13 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
                    read_len);
 #ifdef VR_DPDK_RX_PKT_DUMP
         if (ret > 0) {
-            RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read %d bytes\n", __func__,
+            RTE_LOG_DP(DEBUG, UVHOST, "%s[%lx]: FD %d read %d bytes\n", __func__,
                 pthread_self(), fd, ret);
             rte_hexdump(stdout, "uvhost full message dump:",
                 (((char *)&vru_cl->vruc_msg)),
                     ret + vru_cl->vruc_msg_bytes_read);
         } else if (ret < 0) {
-            RTE_LOG(DEBUG, UVHOST, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
+            RTE_LOG_DP(DEBUG, UVHOST, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
                 pthread_self(), fd, ret, rte_strerror(errno), errno);
         }
 #endif

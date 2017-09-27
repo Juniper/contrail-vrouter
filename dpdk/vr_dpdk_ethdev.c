@@ -139,7 +139,7 @@ vr_dpdk_ethdev_filter_add(struct vr_interface *vif, uint16_t queue_id,
     filter.port_dst = rte_cpu_to_be_16((uint16_t)VR_MPLS_OVER_UDP_DST_PORT);
     filter.flex_bytes = rte_cpu_to_be_16((uint16_t)mpls_label);
 
-    RTE_LOG(DEBUG, VROUTER, "%s: ip_dst=0x%x port_dst=%d flex_bytes=%d\n", __func__,
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: ip_dst=0x%x port_dst=%d flex_bytes=%d\n", __func__,
         (unsigned)dst_ip, (unsigned)VR_MPLS_OVER_UDP_DST_PORT, (unsigned)mpls_label);
 
     if (queue_id >= 0xFF) {
@@ -398,7 +398,7 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
      */
     ethdev->ethdev_reta_size = RTE_ALIGN(ethdev->ethdev_reta_size, RTE_RETA_GROUP_SIZE);
 
-    RTE_LOG(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u"
+    RTE_LOG_DP(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u"
             " max_rx_queues=%" PRIu16 " max_tx_queues=%" PRIu16
             " max_vfs=%" PRIu16 " max_vmdq_pools=%" PRIu16
             " rx_offload_capa=%" PRIx32 " tx_offload_capa=%" PRIx32 "\n",
@@ -432,7 +432,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
     struct rte_mempool *mempool;
 
     /* configure RX queues */
-    RTE_LOG(DEBUG, VROUTER, "%s: nb_rx_queues=%u nb_tx_queues=%u\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: nb_rx_queues=%u nb_tx_queues=%u\n",
         __func__, (unsigned)ethdev->ethdev_nb_rx_queues,
             (unsigned)ethdev->ethdev_nb_tx_queues);
 
@@ -518,7 +518,7 @@ dpdk_ethdev_reta_show(uint8_t port_id, uint16_t reta_size)
         shift = i % RTE_RETA_GROUP_SIZE;
         if (!(reta_entries[idx].mask & (1ULL << shift)))
             continue;
-        RTE_LOG(DEBUG, VROUTER, "        hash index=%u, queue=%u\n",
+        RTE_LOG_DP(DEBUG, VROUTER, "        hash index=%u, queue=%u\n",
                     i, reta_entries[idx].reta[shift]);
     }
 }
@@ -540,7 +540,7 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
     if (ethdev->ethdev_reta_size == 0)
         return 0;
 
-    RTE_LOG(DEBUG, VROUTER, "%s: RSS RETA BEFORE:\n", __func__);
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: RSS RETA BEFORE:\n", __func__);
     dpdk_ethdev_reta_show(port_id, ethdev->ethdev_reta_size);
 
     for (entry = 0; entry < nb_entries; entry++) {
@@ -569,7 +569,7 @@ vr_dpdk_ethdev_rss_init(struct vr_dpdk_ethdev *ethdev)
             port_id, rte_strerror(-ret), -ret);
     }
 
-    RTE_LOG(DEBUG, VROUTER, "%s: RSS RETA AFTER:\n", __func__);
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: RSS RETA AFTER:\n", __func__);
     dpdk_ethdev_reta_show(port_id, ethdev->ethdev_reta_size);
 
     return ret;
@@ -848,7 +848,7 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
 
     mbuf->ol_flags |= PKT_RX_RSS_HASH;
     mbuf->hash.rss = hash;
-    RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n",
+    RTE_LOG_DP(DEBUG, VROUTER, "%s: RSS hash: 0x%x (emulated)\n",
             __func__, mbuf->hash.rss);
 
     return 1;
@@ -992,7 +992,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             /* Looks like no tunneling, perhaps a packet from a VM. */
             return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
         } else {
-            RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
                     __func__, mbuf->hash.rss);
             return 0; /* Not MPLS-over-GRE, not MPLS-over-UDP, not anything from VM. */
         }
@@ -1020,7 +1020,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
 
         /* Packet may already be hashed by the NIC */
         if (mbuf->ol_flags & PKT_RX_RSS_HASH) {
-            RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
                     __func__, mbuf->hash.rss);
             return 0;
         } else {
@@ -1048,7 +1048,7 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
         if ((mbuf->ol_flags & PKT_RX_RSS_HASH) == 0) {
             return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, ipv6_hdr);
         } else {
-            RTE_LOG(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: RSS hash: 0x%x (from NIC)\n",
                     __func__, mbuf->hash.rss);
             return 0;
         }
