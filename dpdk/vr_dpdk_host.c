@@ -672,7 +672,7 @@ dpdk_rcu_cb(struct rcu_head *rh)
             for (i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
                 pnode = &vfq->vfq_pnodes[i];
                 if (pnode->pl_packet) {
-                    RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing RCU callback "
+                    RTE_LOG_DP(DEBUG, VROUTER, "%s: lcore %u passing RCU callback "
                             "to lcore %u\n", __func__, rte_lcore_id(),
                             VR_DPDK_PACKET_LCORE_ID);
                     vr_dpdk_lcore_cmd_post(VR_DPDK_PACKET_LCORE_ID,
@@ -680,7 +680,7 @@ dpdk_rcu_cb(struct rcu_head *rh)
                     return;
                 }
             }
-            RTE_LOG(DEBUG, VROUTER, "%s: lcore %u passing RCU callback to lcore %u\n",
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: lcore %u passing RCU callback to lcore %u\n",
                     __func__, rte_lcore_id(), VR_DPDK_PACKET_LCORE_ID);
         }
     }

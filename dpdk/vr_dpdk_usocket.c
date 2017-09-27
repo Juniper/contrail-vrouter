@@ -47,7 +47,7 @@ uint16_t vr_netlink_port = VR_DEF_NETLINK_PORT;
 static void
 usock_set_error(struct vr_usocket *usockp, int error)
 {
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d error %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d error %d\n", __func__, pthread_self(),
             usockp->usock_fd, error);
     usockp->usock_error = error;
     usockp->usock_errno = errno;
@@ -64,7 +64,7 @@ usock_deinit_poll(struct vr_usocket *usockp)
     if (!usockp)
         return;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
     if (usockp->usock_pfds) {
         vr_free(usockp->usock_pfds, VR_USOCK_POLL_OBJECT);
         usockp->usock_pfds = NULL;
@@ -92,7 +92,7 @@ usock_init_poll(struct vr_usocket *usockp)
     if (!usockp)
         return -EINVAL;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
     proto = usockp->usock_proto;
     if ((proto != NETLINK) && (proto != PACKET)) {
         usock_set_error(usockp, -EINVAL);
@@ -143,7 +143,7 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
     if (parent->usock_state == LIMITED)
         return -ENOSPC;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: parent FD %d child FD %d\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: parent FD %d child FD %d\n", __func__,
             pthread_self(), parent->usock_fd, child->usock_fd);
 
     if (child->usock_proto == EVENT) {
@@ -151,7 +151,7 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
         if (!child_pair)
             return -ENOMEM;
 
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: parent FD %d closing child FD %d\n",
+        RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: parent FD %d closing child FD %d\n",
                     __func__, pthread_self(), parent->usock_fd, child->usock_fd);
         close(child->usock_fd);
         child->usock_fd = child_pair->usock_fd;
@@ -200,7 +200,7 @@ vr_usocket_bind_usockets(void *usock1, void *usock2)
     struct vr_usocket *parent = (struct vr_usocket *)usock1;
     struct vr_usocket *child = (struct vr_usocket *)usock2;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: usock1 FD %d usock2 FD %d\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: usock1 FD %d usock2 FD %d\n", __func__,
             pthread_self(), parent->usock_fd, child->usock_fd);
     return usock_bind_usockets(parent, child);
 }
@@ -210,7 +210,7 @@ usock_clone(struct vr_usocket *parent, int cfd)
 {
     struct vr_usocket *child;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: parent FD %d cfd %d\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: parent FD %d cfd %d\n", __func__,
             pthread_self(), parent->usock_fd, cfd);
     child = vr_zalloc(sizeof(struct vr_usocket), VR_USOCK_OBJECT);
     if (!child) {
@@ -254,7 +254,7 @@ usock_unbind(struct vr_usocket *child)
         return;
 
     parent = child->usock_parent;
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: child FD %d parent %p\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: child FD %d parent %p\n", __func__,
             pthread_self(), child->usock_fd, parent);
     if (!parent)
         return;
@@ -282,7 +282,7 @@ usock_close(struct vr_usocket *usockp)
     if (!usockp)
         return;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
     usock_unbind(usockp);
     usock_deinit_poll(usockp);
 
@@ -290,7 +290,7 @@ usock_close(struct vr_usocket *usockp)
         usock_close(usockp->usock_children[i]);
     }
 
-    RTE_LOG(DEBUG, USOCK, "%s: closing FD %d\n", __func__, usockp->usock_fd);
+    RTE_LOG_DP(DEBUG, USOCK, "%s: closing FD %d\n", __func__, usockp->usock_fd);
     close(usockp->usock_fd);
 
     if (!usockp->usock_mbuf_pool && usockp->usock_rx_buf) {
@@ -308,7 +308,7 @@ usock_close(struct vr_usocket *usockp)
     }
 
     if (usockp->usock_proto == PACKET) {
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: unlinking %s\n", __func__,
+        RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: unlinking %s\n", __func__,
             pthread_self(), vr_packet_unix_file);
         unlink(vr_packet_unix_file);
     }
@@ -345,7 +345,7 @@ __usock_write(struct vr_usocket *usockp)
 
 retry_write:
 #ifdef VR_DPDK_USOCK_DUMP
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d writing %d bytes\n",
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d writing %d bytes\n",
                 __func__, pthread_self(), usockp->usock_fd, len);
     rte_hexdump(stdout, "usock buffer dump:", buf, len);
 #endif
@@ -369,7 +369,7 @@ retry_write:
                 parent->usock_pfds[usockp->usock_child_index].events = POLLOUT;
         }
     } else if (ret < 0) {
-        RTE_LOG(DEBUG, VROUTER, "%s[%lx]: write error FD %d\n", __func__, pthread_self(),
+        RTE_LOG_DP(DEBUG, VROUTER, "%s[%lx]: write error FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
         usock_set_error(usockp, ret);
 
@@ -394,7 +394,7 @@ usock_netlink_write_responses(struct vr_usocket *usockp)
     int ret;
     struct vr_message *resp;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(), usockp->usock_fd);
     while ((resp =
                 (struct vr_message *)vr_queue_dequeue(&usockp->usock_nl_responses))) {
         usockp->usock_tx_buf = (unsigned char *)dpdk_nl_message_hdr(resp);
@@ -449,7 +449,7 @@ usock_mbuf_write(struct vr_usocket *usockp, struct rte_mbuf *mbuf)
     mhdr.msg_flags = 0;
 
 #ifdef VR_DPDK_USOCK_DUMP
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d sending message\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d sending message\n", __func__,
             pthread_self(), usockp->usock_fd);
     rte_hexdump(stdout, "usock message dump:", &mhdr, sizeof(mhdr));
 #endif
@@ -463,7 +463,7 @@ vr_dpdk_packet_receive(struct vr_usocket *usockp)
     struct vr_dpdk_lcore *lcore = vr_dpdk.lcores[lcore_id];
     struct vr_interface_stats *stats;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     /**
      * Packets is read from the agent's socket here. On success, a counter for
@@ -507,7 +507,7 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
     const unsigned lcore_id = rte_lcore_id();
     struct vr_interface_stats *stats;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: draining packet ring...\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: draining packet ring...\n", __func__,
             pthread_self());
 
     if (unlikely(usockp->usock_parent->usock_vif == NULL))
@@ -524,7 +524,7 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
                 stats->vis_port_opackets++;
             else {
                 stats->vis_port_oerrors++;
-                RTE_LOG(DEBUG, USOCK,
+                RTE_LOG_DP(DEBUG, USOCK,
                         "%s: Error writing mbuf to packet socket: %s (%d)\n",
                         __func__, rte_strerror(errno), errno);
             }
@@ -634,11 +634,11 @@ retry_read:
     ret = read(usockp->usock_fd, buf + offset, toread);
 #ifdef VR_DPDK_USOCK_DUMP
     if (ret > 0) {
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read %d bytes\n", __func__,
+        RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d read %d bytes\n", __func__,
             pthread_self(), usockp->usock_fd, ret);
         rte_hexdump(stdout, "usock buffer dump:", buf + offset, ret);
     } else if (ret < 0) {
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
+        RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d read returned error %d: %s (%d)\n", __func__,
             pthread_self(), usockp->usock_fd, ret, rte_strerror(errno), errno);
     }
 #endif
@@ -710,7 +710,7 @@ usock_alloc(unsigned short proto, unsigned short type)
 
     RTE_SET_USED(child);
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
                 pthread_self(), proto, type);
     switch (type) {
     case TCP:
@@ -731,7 +731,7 @@ usock_alloc(unsigned short proto, unsigned short type)
     if (proto == EVENT) {
         is_socket = false;
         sock_fd = eventfd(0, 0);
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: new event FD %d\n", __func__,
+        RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: new event FD %d\n", __func__,
                 pthread_self(), sock_fd);
         if (sock_fd < 0)
             return NULL;
@@ -842,13 +842,13 @@ usock_alloc(unsigned short proto, unsigned short type)
         usock_read_init(usockp);
     }
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d F_GETFL\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d F_GETFL\n", __func__, pthread_self(),
                 usockp->usock_fd);
     flags = fcntl(usockp->usock_fd, F_GETFL);
     if (flags == -1)
         goto error_exit;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d F_SETFL\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d F_SETFL\n", __func__, pthread_self(),
                 usockp->usock_fd);
     error = fcntl(usockp->usock_fd, F_SETFL, flags | O_NONBLOCK);
     if (error == -1)
@@ -881,7 +881,7 @@ error_exit:
 static bool
 valid_usock(int proto, int type)
 {
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
             pthread_self(), proto, type);
     if ((proto != PACKET) &&
             (proto != NETLINK) &&
@@ -901,7 +901,7 @@ valid_usock(int proto, int type)
 void
 vr_usocket_detach_vif(void *usockp)
 {
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                         ((struct vr_usocket *)usockp)->usock_fd);
     ((struct vr_usocket *)usockp)->usock_vif = NULL;
     return;
@@ -913,7 +913,7 @@ vr_usocket_attach_vif(void *usockp, struct vr_interface *vif)
     if (!vif)
         return;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                         ((struct vr_usocket *)usockp)->usock_fd);
     ((struct vr_usocket *)usockp)->usock_vif = vif;
     return;
@@ -922,7 +922,7 @@ vr_usocket_attach_vif(void *usockp, struct vr_interface *vif)
 void
 vr_usocket_non_blocking(struct vr_usocket *usockp)
 {
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     usockp->usock_poll_block = 0;
     return;
@@ -959,7 +959,7 @@ vr_usocket_message_write(struct vr_usocket *usockp,
     unsigned int len;
     unsigned char *buf;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     if ((usockp->usock_proto != NETLINK) && (usockp->usock_type != TCP))
         return -EINVAL;
@@ -1002,7 +1002,7 @@ vr_usocket_read(struct vr_usocket *usockp)
     case READING_FAULTY_DATA:
         ret = __usock_read(usockp);
         if (ret < 0) {
-            RTE_LOG(DEBUG, USOCK, "%s[%lx]: read error FD %d\n", __func__, pthread_self(),
+            RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: read error FD %d\n", __func__, pthread_self(),
                         usockp->usock_fd);
             usock_close(usockp);
             return ret;
@@ -1028,7 +1028,7 @@ vr_usocket_connect(struct vr_usocket *usockp)
 {
     struct sockaddr_un sun;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     if (usockp->usock_proto != PACKET)
         return -EINVAL;
@@ -1040,7 +1040,7 @@ vr_usocket_connect(struct vr_usocket *usockp)
         - strlen(sun.sun_path) - 1);
 
 #ifdef VR_DPDK_USOCK_DUMP
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d retry connecting\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d retry connecting\n", __func__,
             pthread_self(), usockp->usock_fd);
     rte_hexdump(stdout, "usock address dump:", &sun, sizeof(sun));
 #endif
@@ -1053,10 +1053,10 @@ vr_usocket_accept(struct vr_usocket *usockp)
 {
     int ret;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     ret = accept(usockp->usock_fd, NULL, NULL);
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d accepted %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d accepted %d\n", __func__, pthread_self(),
                     usockp->usock_fd, ret);
     if (ret < 0) {
         usock_set_error(usockp, ret);
@@ -1082,7 +1082,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
     bool server;
 
     optval = 1;
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d setting option\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d setting option\n", __func__,
             pthread_self(), usockp->usock_fd);
     if (setsockopt(usockp->usock_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
                 sizeof(optval)))
@@ -1136,7 +1136,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
     }
 
 #ifdef VR_DPDK_USOCK_DUMP
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d binding\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d binding\n", __func__, pthread_self(),
             usockp->usock_fd);
     rte_hexdump(stdout, "usock address dump:", addr, addrlen);
 #endif
@@ -1145,7 +1145,7 @@ vr_usocket_bind(struct vr_usocket *usockp)
         return error;
 
     if (server) {
-        RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d listening\n", __func__,
+        RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d listening\n", __func__,
                 pthread_self(),  usockp->usock_fd);
         error = listen(usockp->usock_fd, 1);
         if (error < 0)
@@ -1164,7 +1164,7 @@ vr_usocket_close(void *sock)
     if (usockp == NULL)
         return;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     if (usockp->usock_io_in_progress) {
         usockp->usock_should_close = 1;
@@ -1183,7 +1183,7 @@ vr_usocket_close(void *sock)
 void *
 vr_usocket(int proto, int type)
 {
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: proto %u type %u\n", __func__,
                 pthread_self(), proto, type);
 
     if (!valid_usock(proto, type))
@@ -1232,7 +1232,7 @@ vr_usocket_io(void *transport)
     if (!usockp)
         return -1;
 
-    RTE_LOG(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
+    RTE_LOG_DP(DEBUG, USOCK, "%s[%lx]: FD %d\n", __func__, pthread_self(),
                 usockp->usock_fd);
     if ((ret = usock_init_poll(usockp)))
         goto return_from_io;
