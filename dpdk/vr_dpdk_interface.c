@@ -281,10 +281,10 @@ dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
         if (rte_eth_devices[i].device != NULL) {
             eth_pci_addr = &(RTE_DEV_TO_PCI(rte_eth_devices[i].device)->addr);
-            RTE_LOG(DEBUG, VROUTER, "count %d eth_pci_addr %x %x %x %x \n",
+            RTE_LOG_DP(DEBUG, VROUTER, "count %d eth_pci_addr %x %x %x %x \n",
                 i, eth_pci_addr->bus, eth_pci_addr->devid,
                 eth_pci_addr->domain, eth_pci_addr->function);
-            RTE_LOG(DEBUG, VROUTER, "count %d addr %x %x %x %x \n",
+            RTE_LOG_DP(DEBUG, VROUTER, "count %d addr %x %x %x %x \n",
                 i, addr->bus, addr->devid,
                 addr->domain, addr->function);
             if (addr->bus == eth_pci_addr->bus &&
@@ -1558,7 +1558,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     int num_of_frags = 1, num_of_segs = 1;
     bool will_fragment, will_segment;
 
-    RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
+    RTE_LOG_DP(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
 
     if (pkt->vp_queue != VP_QUEUE_INVALID) {
@@ -1687,13 +1687,13 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         if (unlikely((vif->vif_flags & VIF_FLAG_VLAN_OFFLOAD) == 0)) {
             /* Software VLAN TCI insert. */
             if (unlikely(pkt_push(pkt, sizeof(struct vlan_hdr)) == NULL)) {
-                RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
+                RTE_LOG_DP(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
                 vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
                 return -1;
             }
             m->l2_len += sizeof(struct vlan_hdr);
             if (unlikely(rte_vlan_insert(&m))) {
-                RTE_LOG(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
+                RTE_LOG_DP(DEBUG, VROUTER,"%s: Error inserting VLAN tag\n", __func__);
                 vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
                 return -1;
             }
@@ -1715,7 +1715,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 VR_DPDK_FRAG_MAX_IP_SEGS, m->tso_segsz, 
                 (vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD));
         if (num_of_segs < 0) {
-            RTE_LOG(DEBUG, VROUTER, "%s: error %d during GSO of an "
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: error %d during GSO of an "
                     "IP packet for interface %s on lcore %u\n", __func__,
                     num_of_segs, vif->vif_name, lcore_id);
             vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
@@ -1726,7 +1726,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 VR_DPDK_FRAG_MAX_IP_FRAGS, vif->vif_mtu,
                 !(vif->vif_flags & VIF_FLAG_TX_CSUM_OFFLOAD), lcore_id);
         if (num_of_frags < 0) {
-            RTE_LOG(DEBUG, VROUTER, "%s: error %d during fragmentation of an "
+            RTE_LOG_DP(DEBUG, VROUTER, "%s: error %d during fragmentation of an "
                     "IP packet for interface %s on lcore %u\n", __func__,
                     num_of_frags, vif->vif_name, lcore_id);
             vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
@@ -1782,7 +1782,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
              * fragmented) */
             rte_pktmbuf_free(m);
         } else {
-            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
+            RTE_LOG_DP(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
                     "for lcore %u\n", __func__, vif->vif_name, lcore_id);
             /* Can not do vif_drop_pkt() on fragments as mbufs after IP
              * fragmentation does not have pkt structure. It is because we do
@@ -1799,7 +1799,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
         } else {
-            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
+            RTE_LOG_DP(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
                     "for lcore %u\n", __func__, vif->vif_name, lcore_id);
             /* Can not do vif_drop_pkt() on segments as mbufs after
              * segmentation does not have pkt structure */
@@ -1815,7 +1815,7 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
                 tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
         } else {
-            RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
+            RTE_LOG_DP(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
                     "for lcore %u\n", __func__, vif->vif_name, lcore_id);
             vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
             return -1;
@@ -1836,7 +1836,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct rte_mbuf *p_copy;
 
-    RTE_LOG(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
+    RTE_LOG_DP(DEBUG, VROUTER,"%s: TX packet to interface %s\n", __func__,
         vif->vif_name);
 
     tx_queue = &lcore->lcore_tx_queues[vif_idx][0];
@@ -1881,7 +1881,7 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
     if (likely(tx_queue->txq_ops.f_tx != NULL)) {
         tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, m);
     } else {
-        RTE_LOG(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
+        RTE_LOG_DP(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue for lcore %u\n",
                 __func__, vif->vif_name, lcore_id);
         vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
         return -1;

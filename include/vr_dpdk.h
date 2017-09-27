@@ -260,6 +260,7 @@ extern unsigned vr_packet_sz;
  */
 #if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
 #define VR_DPDK_VF_PMD_SFX "vf_pmd"
+#define RTE_LOG_DP RTE_LOG
 #else
 #define VR_DPDK_VF_PMD_SFX "_vf"
 #endif
