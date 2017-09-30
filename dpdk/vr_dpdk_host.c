@@ -54,7 +54,7 @@ extern void vr_htable_hentry_scheduled_delete(void *arg);
 static void *
 dpdk_page_alloc(unsigned int size)
 {
-    return rte_malloc(0, size, PAGE_SIZE);
+    return rte_zmalloc(0, size, PAGE_SIZE);
 }
 
 static void
