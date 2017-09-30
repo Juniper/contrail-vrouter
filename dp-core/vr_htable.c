@@ -744,6 +744,7 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
         ent = vr_btable_get(table->ht_htable, i);
         ent->hentry_index = i;
         ent->hentry_next_index = VR_INVALID_HENTRY_INDEX;
+        ent->hentry_next = NULL;
     }
 
 
@@ -759,6 +760,7 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
 
         ent->hentry_flags |= VR_HENTRY_FLAG_IN_FREE_LIST;
         prev = ent;
+        ent->hentry_next = NULL;
     }
 
     table->ht_hentries = entries;
