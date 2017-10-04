@@ -60,9 +60,7 @@ int vr_fragment_table_init(struct vrouter *);
 void vr_fragment_table_exit(struct vrouter *);
 struct vr_fragment *vr_fragment_get(struct vrouter *, unsigned short,
         struct vr_ip *);
-int vr_v4_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
-                unsigned short, unsigned short);
-int vr_v6_fragment_add(struct vrouter *, unsigned short, struct vr_ip6 *,
+int vr_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
                 unsigned short, unsigned short);
 void vr_fragment_del(vr_htable_t, struct vr_fragment *);
 uint32_t vr_fragment_get_hash(struct vr_packet_node *);
