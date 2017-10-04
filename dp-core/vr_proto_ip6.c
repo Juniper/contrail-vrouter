@@ -340,7 +340,6 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     bool lookup = false;
     struct vr_flow flow, *flow_p = &flow;
     struct vr_ip6 *ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-    struct vr_packet *pkt_c;
 
     /*
      * if the packet has already done one round of flow lookup, there
@@ -374,16 +373,6 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
 
     if (pkt->vp_flags & VP_FLAG_FLOW_SET)
         return FLOW_FORWARD;
-
-    if (vr_ip6_fragment_head(ip6)) {
-        vr_v6_fragment_add(router, fmd->fmd_dvrf, ip6, flow_p->flow6_sport, flow_p->flow6_dport);
-        if (vr_enqueue_to_assembler) {
-            pkt_c = vr_pclone(pkt);
-            if (pkt_c) {
-                vr_enqueue_to_assembler(router, pkt_c, fmd);
-            }
-        }
-    }
 
     return vr_flow_lookup(router, flow_p, pkt, fmd);
 }
