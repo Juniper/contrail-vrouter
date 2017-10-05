@@ -561,14 +561,17 @@ __vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
         unsigned short sport, unsigned short dport, unsigned short len)
 
 {
+    void *fe_ent;
     struct vr_fragment *fe;
     vr_htable_t ftable = router->vr_fragment_table;
 
-    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, key, 0));
+    fe_ent = (void *) vr_htable_find_hentry(ftable, key, 0);
+    fe = VR_FRAGMENT_FROM_HENTRY(fe_ent);
     if (fe)
         return 0;
 
-    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_free_hentry(ftable, key, 0));
+    fe_ent = (void *) vr_htable_find_free_hentry(ftable, key, 0);
+    fe = VR_FRAGMENT_FROM_HENTRY(fe_ent);
     if (!fe)
         return -ENOMEM;
 
@@ -633,6 +636,7 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
     struct vr_fragment *fe;
     struct vr_fragment_key key;
     vr_htable_t ftable;
+    void *fe_ent;
 
     if (vr_ip_is_ip6(ip)) {
         ip6 = (struct vr_ip6 *)ip;
@@ -651,7 +655,8 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
 
     ftable = router->vr_fragment_table;
 
-    fe = VR_FRAGMENT_FROM_HENTRY(vr_htable_find_hentry(ftable, &key, 0));
+    fe_ent = (void *) vr_htable_find_hentry(ftable, &key, 0);
+    fe = VR_FRAGMENT_FROM_HENTRY(fe_ent);
     if (fe) {
         vr_get_mono_time(&sec, &nsec);
         fe->f_time = sec;
