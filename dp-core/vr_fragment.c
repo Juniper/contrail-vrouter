@@ -557,7 +557,7 @@ vr_fragment_del(vr_htable_t table, struct vr_fragment *fe)
 
 
 static int
-__vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
+vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
         unsigned short sport, unsigned short dport, unsigned short len)
 {
     void *fe_ent;
@@ -580,7 +580,7 @@ __vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
     return 0;
 }
 
-static int
+int
 vr_v4_fragment_add(struct vrouter *router, unsigned short vrf,
         struct vr_ip *iph, unsigned short sport, unsigned short dport)
 {
@@ -588,11 +588,11 @@ vr_v4_fragment_add(struct vrouter *router, unsigned short vrf,
 
     __fragment_key(&key, vrf, 0, iph->ip_saddr, 0, iph->ip_daddr, iph->ip_id);
 
-    return __vr_fragment_add(router, &key, sport, dport,
+    return vr_fragment_add(router, &key, sport, dport,
                     (ntohs(iph->ip_len) - iph->ip_hl * 4));
 }
 
-static int
+int
 vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
         struct vr_ip6 *ip6, unsigned short sport, unsigned short dport)
 {
@@ -605,23 +605,8 @@ vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
     __fragment_key(&key, vrf, *v6_addr, *(v6_addr + 1), *(v6_addr + 2),
             *(v6_addr + 3), v6_frag->ip6_frag_id);
 
-    return __vr_fragment_add(router, &key, sport, dport,
+    return vr_fragment_add(router, &key, sport, dport,
             (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag)));
-}
-
-int
-vr_fragment_add(struct vrouter *router, unsigned short vrf,
-        struct vr_ip *ip, unsigned short sport, unsigned short dport)
-{
-    if (vr_ip_is_ip4(ip))
-        return vr_v4_fragment_add(router, vrf, ip, sport, dport);
-
-    if (vr_ip_is_ip6(ip)) {
-        return vr_v6_fragment_add(router, vrf, (struct vr_ip6 *)ip,
-                sport, dport);
-    }
-
-    return -1;
 }
 
 struct vr_fragment *

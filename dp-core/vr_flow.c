@@ -1320,82 +1320,6 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
     return vr_flow_vif_allow_new_flow(router, pkt, drop_reason);
 }
 
-static void
-vr_flow_enqueue_non_hold_head_fragment(struct vrouter *router,
-                    struct vr_flow_entry *fe, struct vr_packet *pkt,
-                    struct vr_forwarding_md *fmd)
-{
-    bool frag_head = false;
-    struct vr_packet *pkt_c;
-    struct vr_ip *ip;
-
-    if (!vr_enqueue_to_assembler)
-        return;
-
-    if (fe->fe_action == VR_FLOW_ACTION_HOLD)
-        return;
-
-    ip = (struct vr_ip *)pkt_network_header(pkt);
-    if (!ip)
-        return;
-
-    if (vr_ip_is_ip4(ip))
-        frag_head = vr_ip_fragment_head(ip);
-    else if (vr_ip_is_ip6(ip))
-        frag_head = vr_ip6_fragment_head((struct vr_ip6 *)ip);
-
-    if (!frag_head)
-        return;
-
-    vr_fragment_add(router, fmd->fmd_dvrf, ip,
-                      fe->fe_key.flow_sport, fe->fe_key.flow_dport);
-
-    pkt_c = vr_pclone(pkt);
-    if (pkt_c)
-        vr_enqueue_to_assembler(router, pkt_c, fmd);
-
-    return;
-}
-
-static void
-vr_flow_enqueue_hold_head_fragment(struct vrouter *router, struct vr_flow_entry *fe)
-{
-    int i, label_type = VR_LABEL_TYPE_MPLS;
-    struct vr_packet_node *pnode;
-    struct vr_flow_queue *vfq = fe->fe_hold_list;
-    struct vr_forwarding_md fmd;
-
-    if (!vfq)
-        return;
-
-    for (i = 0; i < VR_MAX_FLOW_QUEUE_ENTRIES; i++) {
-
-        pnode = &vfq->vfq_pnodes[i];
-
-        if (!(pnode->pl_flags & PN_FLAG_FRAGMENT_HEAD))
-            continue;
-
-        if (!pnode->pl_packet)
-            continue;
-
-        vr_init_forwarding_md(&fmd);
-        fmd.fmd_outer_src_ip = pnode->pl_outer_src_ip;
-        if (pnode->pl_flags & PN_FLAG_TO_ME)
-            fmd.fmd_to_me = 1;
-        if (pnode->pl_flags & PN_FLAG_LABEL_IS_VXLAN_ID)
-            label_type = VR_LABEL_TYPE_VXLAN_ID;
-        vr_forwarding_md_set_label(&fmd, pnode->pl_label,
-                label_type);
-        fmd.fmd_dvrf = pnode->pl_vrf;
-        fmd.fmd_vlan = pnode->pl_vlan;
-
-        vr_flow_enqueue_non_hold_head_fragment(router, fe,
-                                    pnode->pl_packet, &fmd);
-    }
-
-    return;
-}
-
 flow_result_t
 vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
                struct vr_packet *pkt, struct vr_forwarding_md *fmd)
@@ -1445,14 +1369,6 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 
     vr_flow_set_forwarding_md(router, flow_e, fe_index, fmd);
     vr_flow_tcp_digest(router, flow_e, pkt, fmd);
-
-    /*
-     * If the action is hold, the head fragemnt gets enqued to assembler
-     * as part of flow setup by Agent. Lets enqueue to to assembler now, if it
-     * is not hold flow
-     */
-    if (flow_e->fe_action != VR_FLOW_ACTION_HOLD)
-        vr_flow_enqueue_non_hold_head_fragment(router, flow_e, pkt, fmd);
 
     return vr_do_flow_action(router, flow_e, fe_index, pkt, fmd);
 }
@@ -2206,8 +2122,6 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
     } else {
         fe->fe_action = req->fr_action;
     }
-
-    vr_flow_enqueue_hold_head_fragment(router, fe);
 
     fe->fe_ttl = req->fr_ttl;
 

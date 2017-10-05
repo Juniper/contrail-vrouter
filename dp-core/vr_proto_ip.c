@@ -977,7 +977,7 @@ vr_inet_get_flow_key(struct vrouter *router, struct vr_packet *pkt,
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
     if (vr_ip_fragment_head(ip)) {
-        vr_fragment_add(router, fmd->fmd_dvrf, ip, flow->flow4_sport,
+        vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow->flow4_sport,
                 flow->flow4_dport);
     }
 
@@ -992,6 +992,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     bool lookup = false;
     struct vr_flow flow, *flow_p = &flow;
     struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
+    struct vr_packet *pkt_c;
 
     /*
      * if the packet has already done one round of flow lookup, there
@@ -1033,6 +1034,17 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         return FLOW_CONSUMED;
     }
 
+
+    if (vr_ip_fragment_head(ip)) {
+        vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
+                flow_p->flow4_dport);
+        if (vr_enqueue_to_assembler) {
+            pkt_c = vr_pclone(pkt);
+            if (pkt_c) {
+                vr_enqueue_to_assembler(router, pkt_c, fmd);
+            }
+        }
+    }
 
     return vr_flow_lookup(router, flow_p, pkt, fmd);
 }
