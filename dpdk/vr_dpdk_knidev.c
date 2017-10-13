@@ -202,9 +202,8 @@ send_burst(struct dpdk_knidev_writer *p)
 
     DPDK_KNIDEV_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
     for ( ; nb_tx < p->tx_buf_count; nb_tx++) {
-        struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(p->tx_buf[nb_tx]);
         /* TODO: a separate counter for this drop */
-        vr_dpdk_pfree(p->tx_buf[nb_tx], pkt->vp_if, VP_DROP_INTERFACE_DROP);
+        vr_dpdk_pfree(p->tx_buf[nb_tx], NULL, VP_DROP_INTERFACE_DROP);
     }
 
     p->tx_buf_count = 0;
