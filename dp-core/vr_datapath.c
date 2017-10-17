@@ -643,6 +643,87 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     return vr_bridge_input(vif->vif_router, pkt, fmd);
 }
 
+static void
+vr_mark_diag_pkts(struct vr_packet *pkt)
+{
+    uint8_t proto = 0;
+    int len = 0;
+    struct vr_ip *ip;
+    struct vr_ip6 *ip6;
+    struct vr_ip6_frag *frag;
+    struct vr_icmp *icmp;
+    struct vr_udp *udp;
+
+    /* Mark the packets only if they are coming from Agent or VM */
+    if (!vif_is_tap(pkt->vp_if))
+        return;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (!ip)
+        return;
+
+    if (vr_ip_is_ip6(ip)) {
+        ip6 = (struct vr_ip6 *)ip;
+        if (!vr_ip6_transport_header_valid(ip6))
+            return;
+        proto = ip6->ip6_nxt;
+        len = sizeof(struct vr_ip6);
+        if (proto == VR_IP6_PROTO_FRAG) {
+            frag = (struct vr_ip6_frag *)(ip6 + 1);
+            proto = frag->ip6_frag_nxt;
+            len += sizeof(struct vr_ip6_frag);
+        }
+    } else {
+        if (!vr_ip_transport_header_valid(ip))
+            return;
+        len = ip->ip_hl * 4;
+        proto = ip->ip_proto;
+    }
+
+    if (proto == VR_IP_PROTO_UDP) {
+        udp = (struct vr_udp *)((unsigned char *)ip + len);
+        if (ntohs(udp->udp_dport) == VR_BFD_SHOP_PORT ||
+                ntohs(udp->udp_dport) == VR_BFD_MHOP_PORT) {
+            pkt->vp_flags |= VP_FLAG_FLOW_SET;
+            vr_pkt_set_diag(pkt);
+            return;
+        }
+    }
+
+    if (!vr_ip_is_ip4(ip) || (proto != VR_IP_PROTO_ICMP))
+        return;
+
+    if (!vr_transport_csum_validate)
+        return;
+
+    if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)
+        return;
+
+    icmp = (struct vr_icmp *)((unsigned char *)ip + len);
+    if (icmp->icmp_csum != VR_DIAG_CSUM)
+        return;
+
+    len = (unsigned char *)ip - pkt_data(pkt);
+
+    /* len can be -ve here*/
+    if (!pkt_pull(pkt, len))
+        return;
+
+    if (pkt_len(pkt) < ntohs(ip->ip_len)) {
+        pkt_push(pkt, len);
+        return;
+    }
+
+    if (vr_transport_csum_validate(pkt)) {
+        pkt->vp_flags |= VP_FLAG_FLOW_SET;
+        vr_pkt_set_diag(pkt);
+    }
+
+    pkt_push(pkt, len);
+
+    return;
+}
+
 /*
  * vr_interface_input() is invoked if a packet ingresses an interface.
  * This function demultiplexes the packet to right input
@@ -676,6 +757,8 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         vif_drop_pkt(vif, pkt, 1);
         return 0;
     }
+
+    vr_mark_diag_pkts(pkt);
 
     if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd))
         return 0;
