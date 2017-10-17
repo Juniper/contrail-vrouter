@@ -36,6 +36,8 @@
 
 #define VR_DHCP_SRC_PORT        68
 #define VR_DHCP6_SRC_PORT       546
+#define VR_BFD_SHOP_PORT        3784
+#define VR_BFD_MHOP_PORT        4784
 
 /* Size of basic GRE header */
 #define VR_GRE_BASIC_HDR_LEN    4

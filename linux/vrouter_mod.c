@@ -1012,17 +1012,30 @@ lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
     uint32_t size;
     struct ipv6hdr *ip6;
 
+    /*
+     * For V4 tcp, udp - pseudo header valid
+     * For v6 tcp, udp and Icmp - pseudo header valid
+     */
     if (vr_ip_is_ip4(iph)) {
         proto = iph->ip_proto;
         size = ntohs(iph->ip_len) - (iph->ip_hl * 4);
-        skb->csum = csum_tcpudp_nofold(iph->ip_saddr, iph->ip_daddr, size,
-                proto, 0);
+        if ((proto == VR_IP_PROTO_TCP) || (proto == VR_IP_PROTO_UDP)) {
+            skb->csum = csum_tcpudp_nofold(iph->ip_saddr,
+                                iph->ip_daddr, size, proto, 0);
+        } else {
+            skb->csum = 0;
+        }
     } else if (vr_ip_is_ip6(iph)) {
         ip6 = (struct ipv6hdr *)iph;
         proto = ip6->nexthdr;
         size = ntohs(ip6->payload_len);
-        skb->csum = ~csum_unfold(csum_ipv6_magic(&ip6->saddr, &ip6->daddr,
-                     size, proto, 0));
+        if ((proto == VR_IP_PROTO_TCP) || (proto == VR_IP_PROTO_UDP) ||
+                proto == VR_IP_PROTO_ICMP6) {
+            skb->csum = ~csum_unfold(csum_ipv6_magic(&ip6->saddr,
+                                        &ip6->daddr, size, proto, 0));
+        } else {
+            skb->csum = 0;
+        }
     } else {
         return -1;
     }
@@ -2274,6 +2287,33 @@ lh_soft_reset(struct vrouter *router)
     return;
 }
 
+static int
+lh_transport_csum_validate(struct vr_packet *pkt)
+{
+    struct vr_ip *ip;
+    struct vr_ip6 *ip6;
+    struct sk_buff *skb;
+
+    skb = vp_os_packet(pkt);
+
+    if (skb_csum_unnecessary(skb))
+        return 0;
+
+    ip = (struct vr_ip *)skb->data;
+    if (vr_ip_is_ip4(ip)) {
+        if (vr_ip_fragment(ip))
+            return 0;
+    } else if (vr_ip_is_ip6(ip)) {
+        ip6 = (struct vr_ip6 *)ip;
+        if (vr_ip6_fragment(ip6))
+            return 0;
+    } else {
+        return 0;
+    }
+
+    return lh_csum_verify(skb, ip);
+}
+
 struct host_os linux_host = {
     .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
@@ -2325,6 +2365,7 @@ struct host_os linux_host = {
     .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
     .hos_soft_reset                 =       lh_soft_reset,
     .hos_nl_broadcast_supported     =       true,
+    .hos_transport_csum_validate    =       lh_transport_csum_validate
 };
     
 struct host_os *

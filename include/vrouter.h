@@ -219,6 +219,7 @@ struct host_os {
     unsigned int *(*hos_get_enabled_log_types)(int *);
     void (*hos_soft_reset)(struct vrouter *);
     int (*hos_is_frag_limit_exceeded)(void);
+    int (*hos_transport_csum_validate)(struct vr_packet *);
     bool hos_nl_broadcast_supported;
 };
 
@@ -269,6 +270,7 @@ struct host_os {
 #define vr_get_enabled_log_types        vrouter_host->hos_get_enabled_log_types
 #define vr_soft_reset                   vrouter_host->hos_soft_reset
 #define vr_nl_broadcast_supported       vrouter_host->hos_nl_broadcast_supported
+#define vr_transport_csum_validate      vrouter_host->hos_transport_csum_validate
 
 extern struct host_os *vrouter_host;
 
