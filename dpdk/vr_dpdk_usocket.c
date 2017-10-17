@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <stdint.h>
+#include <netinet/tcp.h>
 
 #include "nl_util.h"
 #include "vr_dpdk.h"
@@ -707,6 +708,7 @@ usock_alloc(unsigned short proto, unsigned short type)
     struct vr_usocket *usockp = NULL, *child;
     bool is_socket = true;
     unsigned short sock_type;
+    int flag = 1;
 
     RTE_SET_USED(child);
 
@@ -743,6 +745,17 @@ usock_alloc(unsigned short proto, unsigned short type)
                 pthread_self(), sock_fd);
         if (sock_fd < 0)
             return NULL;
+
+        if (type == TCP) {
+            RTE_LOG(INFO, USOCK, "%s[%lx]: setting socket FD %d nodelay.\n"
+                        , __func__, pthread_self(), sock_fd);
+            ret = setsockopt(sock_fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag,
+                             sizeof(int));
+            if (ret != 0) {
+                RTE_LOG(ERR, USOCK, "%s[%lx]: setting socket FD %d nodelay failed (%d).\n"
+                        , __func__, pthread_self(), sock_fd, errno);
+            }
+        }
 
         /* set socket send buffer size */
         ret = setsockopt(sock_fd, SOL_SOCKET, SO_SNDBUF, &setsocksndbuff,
