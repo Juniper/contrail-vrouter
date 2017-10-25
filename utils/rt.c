@@ -49,7 +49,7 @@ static bool cmd_proxy_set = false;
 static bool cmd_trap_set = false;
 static bool cmd_flood_set = false;
 
-static int cmd_set, dump_set, get_set;
+static int cmd_set, dump_set, get_set, monitor_set;
 static int family_set, help_set, vrf_set;
 static int cust_flags;
 
@@ -67,6 +67,8 @@ static int32_t cmd_label;
 static uint32_t cmd_replace_plen = 0xFFFFFFFF;
 static char cmd_dst_mac[6];
 static bool dump_pending;
+
+static int monitor = 0;
 
 static void Usage(void);
 static void usage_internal(void);
@@ -198,6 +200,59 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
     return;
 }
 
+static void
+vr_print_route_json(vr_route_req *rt)
+{
+    char addr[INET6_ADDRSTRLEN];
+
+    printf("{");
+    printf("\"operation\":");
+    if (rt->h_op == SANDESH_OP_ADD)
+        printf("\"add\"");
+    else if (rt->h_op == SANDESH_OP_DELETE)
+        printf("\"delete\"");
+    else
+        printf("\"unknown\"");
+
+    printf(",\"family\":");
+    if (rt->rtr_family == AF_INET)
+        printf("\"AF_INET\"");
+    else if (rt->rtr_family == AF_INET6)
+        printf("\"AF_INET6\"");
+    else if (rt->rtr_family == AF_BRIDGE)
+        printf("\"AF_BRIDGE\"");
+    else
+        printf("\"unknown\"");
+
+    if ((rt->rtr_family == AF_INET) ||
+        (rt->rtr_family == AF_INET6)) {
+        printf(",\"vrf_id\":%d", rt->rtr_vrf_id);
+
+        if (rt->rtr_prefix_size) {
+            inet_ntop(rt->rtr_family, rt->rtr_prefix, addr, sizeof(addr));
+            printf(",\"prefix\":%d", rt->rtr_prefix_len);
+            printf(",\"address\":\"%s\"", addr);
+            printf(",\"nh_id\":%d", rt->rtr_nh_id);
+        }
+
+        printf(",\"flags\":{\"label_valid\":%s, \"arp_proxy\":%s, \"arp_trap\":%s, \"arp_flood\":%s}",
+            rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG ? "true" : "false",
+            rt->rtr_label_flags & VR_RT_ARP_PROXY_FLAG ? "true" : "false",
+            rt->rtr_label_flags & VR_RT_ARP_TRAP_FLAG ? "true" : "false",
+            rt->rtr_label_flags & VR_RT_ARP_FLOOD_FLAG ? "true" : "false");
+
+        if (rt->rtr_label_flags & VR_RT_LABEL_VALID_FLAG)
+            printf(",\"label\":%d", rt->rtr_label);
+
+        if (rt->rtr_mac_size) {
+            printf(",\"mac_address\":\"%s\"", ether_ntoa((struct ether_addr *)(rt->rtr_mac)));
+            printf(",\"mac_index\":%d", rt->rtr_index);
+        }
+    }
+    printf("}\n");
+    fflush(stdout);
+}
+
 void
 vr_route_req_process(void *s_req)
 {
@@ -205,6 +260,11 @@ vr_route_req_process(void *s_req)
     char addr[INET6_ADDRSTRLEN];
     char flags[32];
     vr_route_req *rt = (vr_route_req *)s_req;
+
+    if (monitor) {
+        vr_print_route_json(rt);
+        return;
+    }
 
     if ((rt->rtr_family == AF_INET) ||
         (rt->rtr_family == AF_INET6)) {
@@ -389,7 +449,7 @@ op_retry:
         return ret;
 
 
-    ret = vr_recvmsg(cl, dump);
+    ret = vr_recvmsg(cl, dump, false);
     if (ret <= 0)
         return ret;
 
@@ -436,7 +496,7 @@ vr_bridge_table_setup(struct nl_client *cl)
     if (!ret)
         return ret;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return -1;
 
@@ -479,10 +539,13 @@ usage_internal()
 static void
 validate_options(void)
 {
-    unsigned int set = dump_set + family_set + cmd_set + help_set;
+    unsigned int set = dump_set + family_set + cmd_set + help_set + monitor_set;
 
     char addr[INET6_ADDRSTRLEN];
     struct ether_addr *eth;
+
+    if (monitor)
+        return;
 
     if (cmd_op < 0)
         goto usage;
@@ -599,6 +662,7 @@ usage_internal:
 enum opt_flow_index {
     COMMAND_OPT_INDEX,
     DUMP_OPT_INDEX,
+    MONITOR_OPT_INDEX,
     FAMILY_OPT_INDEX,
     GET_OPT_INDEX,
     VRF_OPT_INDEX,
@@ -607,26 +671,29 @@ enum opt_flow_index {
 };
 
 static struct option long_options[] = {
-    [COMMAND_OPT_INDEX]       = {"cmd",    no_argument,       &cmd_set,    1},
-    [DUMP_OPT_INDEX]          = {"dump",   required_argument, &dump_set,   1},
-    [FAMILY_OPT_INDEX]        = {"family", required_argument, &family_set, 1},
-    [GET_OPT_INDEX]           = {"get",    required_argument, &get_set,    1},
-    [VRF_OPT_INDEX]           = {"vrf",    required_argument, &vrf_set,    1},
-    [HELP_OPT_INDEX]          = {"help",   no_argument,       &help_set,   1},
-    [MAX_OPT_INDEX]           = { NULL,    0,                 0,           0},
+    [COMMAND_OPT_INDEX]       = {"cmd",     no_argument,       &cmd_set,     1},
+    [DUMP_OPT_INDEX]          = {"dump",    required_argument, &dump_set,    1},
+    [MONITOR_OPT_INDEX]       = {"monitor", no_argument,       &monitor_set, 1},
+    [FAMILY_OPT_INDEX]        = {"family",  required_argument, &family_set,  1},
+    [GET_OPT_INDEX]           = {"get",     required_argument, &get_set,     1},
+    [VRF_OPT_INDEX]           = {"vrf",     required_argument, &vrf_set,     1},
+    [HELP_OPT_INDEX]          = {"help",    no_argument,       &help_set,    1},
+    [MAX_OPT_INDEX]           = { NULL,     0,                 0,            0},
 };
 
 static void
 Usage(void)
 {
-    printf("Usage:   rt --dump <vrf_id> [--family <inet|inet6|bridge>]>\n");
-    printf("         rt --get <address/plen> --vrf <id> [--family <inet|inet6>]\n");
-    printf("         rt --help\n");
+    printf("Usage:    rt --dump <vrf_id> [--family <inet|inet6|bridge>]>\n");
+    printf("          rt --get <address/plen> --vrf <id> [--family <inet|inet6>]\n");
+    printf("          rt --monitor\n");
+    printf("          rt --help\n");
     printf("\n");
-    printf("--dump   Dumps the routing table corresponding to vrf_id\n");
-    printf("--family Optional family specification to --dump command\n");
-    printf("         Specification should be one of \"inet\" or \"bridge\"\n");
-    printf("--help   Prints this help message\n");
+    printf("--dump    Dumps the routing table corresponding to vrf_id\n");
+    printf("--family  Optional family specification to --dump command\n");
+    printf("          Specification should be one of \"inet\" or \"bridge\"\n");
+    printf("--monitor Watch for netlink broadcasted messages\n");
+    printf("--help    Prints this help message\n");
 
     exit(1);
 }
@@ -671,6 +738,10 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     case VRF_OPT_INDEX:
         cmd_vrf_id = strtoul(opt_arg, NULL, 0);
         break;
+
+    case MONITOR_OPT_INDEX:
+        monitor = 1;
+            break;
 
     case HELP_OPT_INDEX:
     default:
@@ -803,6 +874,10 @@ main(int argc, char *argv[])
     if (!cl) {
         exit(1);
     }
+
+    if (monitor)
+        while (1)
+            vr_recvmsg(cl, false, true);
 
     if (cmd_family_id == AF_BRIDGE) {
         if (cmd_op == SANDESH_OP_DUMP || cmd_op == SANDESH_OP_GET) {
