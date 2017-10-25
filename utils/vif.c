@@ -834,7 +834,7 @@ vhost_create(void)
     if (ret <= 0)
         return ret;
 
-    if ((ret = nl_recvmsg(cl)) > 0) {
+    if ((ret = nl_recvmsg(cl, false)) > 0) {
         resp = nl_parse_reply(cl);
         if (resp && resp->nl_op)
             printf("%s: %s\n", __func__, strerror(resp->nl_op));
@@ -964,7 +964,7 @@ op_retry:
         return ret;
 
 
-    ret = vr_recvmsg(cl, dump);
+    ret = vr_recvmsg(cl, dump, false);
     if (ret <= 0)
         return ret;
 
@@ -973,7 +973,7 @@ op_retry:
         if (ret < 0)
             return ret;
 
-        return vr_recvmsg(cl, dump);
+        return vr_recvmsg(cl, dump, false);
     }
 
     if (dump_pending) {
