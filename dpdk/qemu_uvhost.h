@@ -82,6 +82,7 @@ typedef struct VhostUserMsg {
 
 #define VHOST_USER_F_PROTOCOL_FEATURES	30
 #define VHOST_USER_PROTOCOL_F_MQ	0
+#define VHOST_USER_PROTOCOL_F_LOG_SHMFD	1
 
 #endif /* __QEMU_UVHOST_H__ */
 

@@ -40,6 +40,7 @@ static int vr_uvmh_set_features(vr_uvh_client_t *vru_cl);
 static int vr_uvmh_get_protocol_features(vr_uvh_client_t *vru_cl);
 static int vr_uvmh_set_protocol_features(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl);
+static int vr_uvhm_set_log_base(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_num(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_addr(vr_uvh_client_t *vru_cl);
 static int vr_uvhm_set_vring_base(vr_uvh_client_t *vru_cl);
@@ -56,7 +57,7 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     NULL,
     NULL,
     vr_uvhm_set_mem_table,
-    NULL,
+    vr_uvhm_set_log_base,
     NULL,
     vr_uvhm_set_vring_num,
     vr_uvhm_set_vring_addr,
@@ -398,7 +399,8 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
 static int
 vr_uvmh_get_protocol_features(vr_uvh_client_t *vru_cl)
 {
-    vru_cl->vruc_msg.u64 = (1ULL << VHOST_USER_PROTOCOL_F_MQ);
+    vru_cl->vruc_msg.u64 = ((1ULL << VHOST_USER_PROTOCOL_F_MQ) |
+                            (1ULL << VHOST_USER_PROTOCOL_F_LOG_SHMFD));
     vr_uvhost_log("    GET PROTOCOL FEATURES: returns 0x%"PRIx64"\n",
                   vru_cl->vruc_msg.u64);
 
@@ -430,6 +432,21 @@ vr_uvhm_set_mem_table(vr_uvh_client_t *vru_cl)
     /* Unmap previously mmaped guest memory. */
     uvhm_client_munmap(vru_cl);
     return uvhm_client_mmap(vru_cl);
+}
+
+/*
+ * vr_uvhm_set_log_base - handles VHOST_USER_SET_LOG_BASE message from
+ * user space vhost client to learn the memory map of the guest.
+ *
+ * Returns 0 on success, -1 otherwise.
+ */
+static int
+vr_uvhm_set_log_base(vr_uvh_client_t *vru_cl)
+{
+    vr_uvhost_log("    SET LOG BASE: 0x%"PRIx64"\n",
+                  vru_cl->vruc_msg.u64);
+
+    return 0;
 }
 
 /*
