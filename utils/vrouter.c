@@ -451,7 +451,7 @@ vr_vrouter_op(struct nl_client *cl)
     if (ret < 0)
         return ret;
 
-    return vr_recvmsg(cl, false);
+    return vr_recvmsg(cl, false, false);
 }
 
 static struct option long_options[] = {

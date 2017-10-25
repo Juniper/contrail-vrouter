@@ -249,7 +249,7 @@ flow_get_dropstats(void)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -267,7 +267,7 @@ flow_get_nexthop(int id)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -283,7 +283,7 @@ flow_get_mirror_nh(int id)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -299,7 +299,7 @@ flow_get_vif(int vif_index)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -341,7 +341,7 @@ flow_get_route(unsigned int family, unsigned int vrf, uint8_t *prefix)
     if (ret < 0)
         return NULL;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return NULL;
 
@@ -1810,7 +1810,7 @@ flow_make_flow_req(void *req, char *flow_str)
     if (ret <= 0)
         return ret;
 
-    ret = vr_recvmsg(cl, false);
+    ret = vr_recvmsg(cl, false, false);
     if (ret <= 0)
         return ret;
 
