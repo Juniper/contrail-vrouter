@@ -202,7 +202,7 @@ vr_proto_string(unsigned short proto)
 
 /* send and receive */
 int
-vr_recvmsg(struct nl_client *cl, bool dump)
+vr_recvmsg_generic(struct nl_client *cl, bool dump, bool msg_wait)
 {
     int ret = 0;
     bool pending = true;
@@ -210,7 +210,12 @@ vr_recvmsg(struct nl_client *cl, bool dump)
     struct nlmsghdr *nlh;
 
     while (pending) {
-        if ((ret = nl_recvmsg(cl)) > 0) {
+        if (msg_wait) {
+            ret = nl_recvmsg_waitall(cl);
+        } else {
+            ret = nl_recvmsg(cl);
+        }
+        if (ret > 0) {
             if (dump) {
                 pending = true;
             } else {
@@ -234,6 +239,18 @@ vr_recvmsg(struct nl_client *cl, bool dump)
     }
 
     return ret;
+}
+
+int
+vr_recvmsg(struct nl_client *cl, bool dump)
+{
+    return vr_recvmsg_generic(cl, dump, false);
+}
+
+int
+vr_recvmsg_waitall(struct nl_client *cl, bool dump)
+{
+    return vr_recvmsg_generic(cl, dump, true);
 }
 
 int

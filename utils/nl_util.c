@@ -21,6 +21,10 @@
 #include <linux/genetlink.h>
 #include <linux/sockios.h>
 #include <linux/dcbnl.h>
+#include <linux/socket.h>
+#else
+/* This is declarated in linux kernel headers (linux/socket.h) */
+#define SOL_NETLINK 270
 #endif
 
 #include <stdint.h>
@@ -32,6 +36,7 @@
 #include "vr_os.h"
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
+#define VROUTER_GENETLINK_VROUTER_GROUP_ID 0x4
 #define GENL_ID_VROUTER         (NLMSG_MIN_TYPE + 0x10)
 
 extern struct nl_response *nl_parse_gen(struct nl_client *);
@@ -542,6 +547,9 @@ nl_socket(struct nl_client *cl, int domain, int type, int protocol)
 int
 nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
 {
+    int group = VROUTER_GENETLINK_VROUTER_GROUP_ID;
+    int ret;
+
     if (cl->cl_socket_domain == AF_NETLINK) {
         struct sockaddr_nl *sa = malloc(sizeof(struct sockaddr_nl));
 
@@ -554,7 +562,18 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
         cl->cl_sa = (struct sockaddr *)sa;
         cl->cl_sa_len = sizeof(*sa);
 
-        return bind(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+	ret = bind(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+	if (ret < 0) {
+	  return ret;
+	}
+
+	/* We join the vrouter netlink broadcast group */
+	ret = setsockopt(cl->cl_sock, SOL_NETLINK, NETLINK_ADD_MEMBERSHIP, &group, sizeof(group));
+	if (ret  < 0) {
+	  return ret;
+	}
+
+	return 0;
     }
 
     if (cl->cl_socket_domain == AF_INET) {
@@ -577,7 +596,7 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
 }
 
 int
-nl_client_datagram_recvmsg(struct nl_client *cl)
+nl_client_datagram_recvmsg(struct nl_client *cl, bool msg_wait)
 {
     int ret;
     struct msghdr msg;
@@ -594,7 +613,10 @@ nl_client_datagram_recvmsg(struct nl_client *cl)
 
     cl->cl_buf_offset = 0;
 
-    ret = recvmsg(cl->cl_sock, &msg, MSG_DONTWAIT);
+    if (msg_wait)
+        ret = recvmsg(cl->cl_sock, &msg, MSG_WAITALL);
+    else
+        ret = recvmsg(cl->cl_sock, &msg, MSG_DONTWAIT);
     if (ret < 0) {
         return ret;
     }
@@ -607,7 +629,7 @@ nl_client_datagram_recvmsg(struct nl_client *cl)
 }
 
 int
-nl_client_stream_recvmsg(struct nl_client *cl) {
+nl_client_stream_recvmsg(struct nl_client *cl, bool msg_wait) {
     int ret;
     struct msghdr msg;
     struct iovec iov;
@@ -652,7 +674,13 @@ nl_client_stream_recvmsg(struct nl_client *cl) {
 int
 nl_recvmsg(struct nl_client *cl)
 {
-    return cl->cl_recvmsg(cl);
+    return cl->cl_recvmsg(cl, false);
+}
+
+int
+nl_recvmsg_waitall(struct nl_client *cl)
+{
+    return cl->cl_recvmsg(cl, true);
 }
 
 int
