@@ -63,7 +63,7 @@ struct nl_client {
     int cl_socket_domain;
     int cl_socket_type;
     int cl_socket_proto;
-    int (*cl_recvmsg)(struct nl_client *);
+    int (*cl_recvmsg)(struct nl_client *, bool);
     struct sockaddr *cl_sa;
     uint32_t cl_sa_len;
 };
@@ -115,9 +115,10 @@ extern void nl_free_client(struct nl_client *cl);
 extern int nl_socket(struct nl_client *, int, int , int);
 extern int nl_connect(struct nl_client *, uint32_t, uint16_t);
 extern int nl_sendmsg(struct nl_client *);
-extern int nl_client_datagram_recvmsg(struct nl_client *);
-extern int nl_client_stream_recvmsg(struct nl_client *);
+extern int nl_client_datagram_recvmsg(struct nl_client *, bool);
+extern int nl_client_stream_recvmsg(struct nl_client *, bool);
 extern int nl_recvmsg(struct nl_client *);
+extern int nl_recvmsg_waitall(struct nl_client *);
 extern struct nl_response *nl_parse_reply(struct nl_client *);
 extern struct nl_response *nl_parse_gen_nh(struct nl_client *);
 extern struct nl_response *nl_parse_gen_mpls(struct nl_client *);
@@ -173,6 +174,7 @@ extern bool vr_valid_mac_address(const char *);
 extern char *vr_proto_string(unsigned short);
 
 extern int vr_recvmsg(struct nl_client *cl, bool dump);
+extern int vr_recvmsg_waitall(struct nl_client *cl, bool dump);
 extern int vr_sendmsg(struct nl_client *, void *, char *);
 extern struct nl_client *vr_get_nl_client(int);
 
