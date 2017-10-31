@@ -204,6 +204,7 @@ vr_nexthop_is_vcp(struct vr_nexthop *nh)
 }
 
 extern int vr_nexthop_init(struct vrouter *);
+extern int vr_nexthop_mem(struct vrouter *);
 extern void vr_nexthop_exit(struct vrouter *, bool);
 extern struct vr_nexthop *__vrouter_get_nexthop(struct vrouter *, unsigned int);
 extern struct vr_nexthop *vrouter_get_nexthop(unsigned int, unsigned int);
