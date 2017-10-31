@@ -610,7 +610,7 @@ vr_fib_exit(struct vrouter *router, bool soft_reset)
 }
 
 int
-vr_fib_init(struct vrouter *router)
+vr_fib_mem(struct vrouter *router)
 {
     int i = 0, ret, size;
     struct rtable_fspec *fs;
@@ -643,5 +643,11 @@ exit_init:
     }
 
     return ret;
+}
+
+int
+vr_fib_init(struct vrouter *router)
+{
+    return 0;
 }
 

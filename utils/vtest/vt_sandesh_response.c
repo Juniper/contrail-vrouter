@@ -195,3 +195,15 @@ vr_mem_stats_req_process(void *s) {
     (memcpy(buf, s, sizeof(vr_mem_stats_req)));
 }
 
+void
+vr_hugepage_config_process(void *s) {
+    void *buf = calloc(1, sizeof(vr_hugepage_config));
+    if (!buf) {
+        fprintf(stderr, "Cannot alloc memory \n");
+        exit(ENOMEM);
+    }
+
+    expect_msg.expected_ptr_num++;
+    expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
+    (memcpy(buf, s, sizeof(vr_hugepage_config)));
+}

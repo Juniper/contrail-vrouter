@@ -90,6 +90,10 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_bridge_table_data),
         .obj_type_string        =       "vr_bridge_table_data",
     },
+    [VR_HPAGE_CFG_OBJECT_ID] = {
+        .obj_len                =       4 * sizeof(vr_hugepage_config),
+        .obj_type_string        =       "vr_hugepage_config",
+    },
 };
 
 static unsigned int

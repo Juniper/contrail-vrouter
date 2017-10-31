@@ -12,6 +12,7 @@
 #include <linux/mm.h>
 #include <asm/page.h>
 #include <linux/netdevice.h>
+#include <linux/pagemap.h>
 
 #include "vrouter.h"
 #include "vr_mem.h"
@@ -19,12 +20,167 @@
 #define MEM_DEV_MINOR_START         0
 #define MEM_DEV_NUM_DEVS            2
 
+struct vr_mem_config {
+    void *vr_mcfg_uspace_vmem[VR_MAX_MEM_SEGMENTS];
+    void *vr_mcfg_mem[VR_MAX_MEM_SEGMENTS];
+    struct page **vr_mcfg_pages[VR_MAX_MEM_SEGMENTS];
+    unsigned int vr_mcfg_npages[VR_MAX_MEM_SEGMENTS];
+    unsigned int vr_mcfg_free_size[VR_MAX_MEM_SEGMENTS];
+    unsigned int vr_mcfg_mem_inited;
+};
 
 short vr_flow_major = -1;
 short vr_bridge_table_major = -1;
 
 static dev_t mem_dev;
 struct cdev *mem_cdev;
+
+static struct vr_mem_config *vr_mcfg;
+
+void *
+vr_huge_mem_get(int size)
+{
+    int i,offset;
+    void *mptr;
+
+    if ((!vr_mcfg) || (vr_mcfg->vr_mcfg_mem_inited == 0))
+        return NULL;
+
+    /* Align it to be a multiple of 8 bytes */
+    size = ((size + 7) / 8) * 8;
+
+    for (i = 0; i < VR_MAX_MEM_SEGMENTS; i++) {
+        if (!vr_mcfg->vr_mcfg_mem[i])
+            continue;
+
+        if (vr_mcfg->vr_mcfg_free_size[i] < size)
+            continue;
+
+        offset = VR_MEM_1G - vr_mcfg->vr_mcfg_free_size[i];
+        mptr = vr_mcfg->vr_mcfg_mem[i] + offset;
+        vr_mcfg->vr_mcfg_free_size[i] -= size;
+
+        /* Zero the requested memory*/
+        memset(mptr, 0, size);
+
+        return mptr;
+    }
+
+    return NULL;
+}
+
+
+int
+vr_huge_pages_config(u64 *hpages, int npages)
+{
+    int i, spages;
+
+    /* If memory is already inited, nothing to do further */
+    if (vr_mcfg && vr_mcfg->vr_mcfg_mem_inited)
+        return -EEXIST;
+
+    /* Hold the user provided virtual memory address */
+    for (i = 0; i < npages; i++)
+        vr_mcfg->vr_mcfg_uspace_vmem[i] = (void *)hpages[i];
+
+    for (i = 0; i < VR_MAX_MEM_SEGMENTS; i++) {
+
+        if (!vr_mcfg->vr_mcfg_uspace_vmem[i])
+            continue;
+
+        /* Allocate the memory for required number of pages */
+        vr_mcfg->vr_mcfg_npages[i] =  1 + (VR_MEM_1G - 1) / PAGE_SIZE;
+        vr_mcfg->vr_mcfg_pages[i] = (struct page **)
+            kzalloc((vr_mcfg->vr_mcfg_npages[i] * sizeof(struct page *)),
+                       GFP_ATOMIC);
+        if (!vr_mcfg->vr_mcfg_pages[i])
+            goto err;
+
+        /*
+         * Get the kernel pages corresponding to the 1G memory.
+         * Expectation is that the pages are pinned in the physical
+         * memory and are not going to be faulted
+         */
+        down_read(&current->mm->mmap_sem);
+        spages = get_user_pages(current, current->mm,
+                (unsigned long)vr_mcfg->vr_mcfg_uspace_vmem[i],
+                vr_mcfg->vr_mcfg_npages[i], 1, 0, vr_mcfg->vr_mcfg_pages[i], NULL);
+        up_read(&current->mm->mmap_sem);
+
+        /* If the pages are pinned are not the requested, flag the error */
+        if (spages != vr_mcfg->vr_mcfg_npages[i])
+            goto err;
+
+        /* Hold the first page virtual address as it is contiguous memory */
+        vr_mcfg->vr_mcfg_mem[i] = page_address(vr_mcfg->vr_mcfg_pages[i][0]);
+        vr_mcfg->vr_mcfg_free_size[i] = VR_MEM_1G;
+    }
+
+    vr_mcfg->vr_mcfg_mem_inited = 1;
+    return 0;
+
+err:
+    vr_huge_pages_exit();
+    return -ENOMEM;
+}
+
+void
+vr_huge_pages_exit(void)
+{
+    int i, j;
+
+    if (!vr_mcfg)
+        return ;
+
+    for (i = 0; i < VR_MAX_MEM_SEGMENTS; i++) {
+        if (!vr_mcfg->vr_mcfg_uspace_vmem[i])
+            continue;
+
+        vr_mcfg->vr_mcfg_free_size[i] = 0;
+        vr_mcfg->vr_mcfg_mem[i] = 0;
+
+        /* Put back the pages after marking dirty */
+        for (j = 0; j < vr_mcfg->vr_mcfg_npages[i]; j++) {
+            if (vr_mcfg->vr_mcfg_pages[i][j]) {
+                if (!PageReserved(vr_mcfg->vr_mcfg_pages[i][j]))
+                    SetPageDirty(vr_mcfg->vr_mcfg_pages[i][j]);
+                page_cache_release(vr_mcfg->vr_mcfg_pages[i][j]);
+                vr_mcfg->vr_mcfg_pages[i][j] = NULL;
+            }
+        }
+
+        if (vr_mcfg->vr_mcfg_pages[i]) {
+            kfree(vr_mcfg->vr_mcfg_pages[i]);
+            vr_mcfg->vr_mcfg_pages[i] = NULL;
+        }
+        vr_mcfg->vr_mcfg_npages[i] = 0;
+    }
+    vr_mcfg->vr_mcfg_mem_inited = 0;
+    kfree(vr_mcfg);
+    vr_mcfg = NULL;
+
+    return;
+}
+
+/*
+ * The huge page memory is meat for large allocations and is meant to
+ * present in Vrouter for its complete life time.  The memory received
+ * using vr_huge_mem_get() is not going to be returned to the pool till
+ * the module is removed. Hence no calls to put the memory back to the
+ * huge pages
+ */
+int
+vr_huge_pages_init()
+{
+    if (!vr_mcfg) {
+        vr_mcfg = kzalloc(sizeof(*vr_mcfg), GFP_ATOMIC);
+        if (!vr_mcfg)
+            return -ENOMEM;
+    }
+
+    return 0;
+}
+
 
 static int
 mem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
@@ -154,6 +310,8 @@ struct file_operations mdev_ops = {
     .release    =       mem_dev_release,
     .mmap       =       mem_dev_mmap,
 };
+
+
 
 void
 vr_mem_exit(void)

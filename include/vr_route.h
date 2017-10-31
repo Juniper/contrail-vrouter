@@ -106,10 +106,10 @@ struct rtable_fspec {
 };
 
 extern int vr_fib_init(struct vrouter *);
+extern int vr_fib_mem(struct vrouter *);
 extern void vr_fib_exit(struct vrouter *, bool);
 extern int vr_route_add(vr_route_req *);
-extern struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int,
-               struct vr_route_req *);
+extern struct vr_nexthop *vr_inet_route_lookup(unsigned int, struct vr_route_req *);
 extern int bridge_entry_add(struct rtable_fspec *, struct vr_route_req *);
 
 #ifdef __cplusplus
