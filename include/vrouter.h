@@ -22,6 +22,7 @@ extern "C" {
 #include "vr_response.h"
 #include "vr_mpls.h"
 #include "vr_index_table.h"
+#include "vr_mem.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -68,6 +69,9 @@ enum vr_malloc_objects_t {
     VR_FRAGMENT_SCANNER_OBJECT,
     VR_HPACKET_POOL_OBJECT,
     VR_HTABLE_OBJECT,
+    VR_HPAGE_CONFIG_OBJECT,
+    VR_HPAGE_PAGES_OBJECT,
+    VR_HPAGE_REQ_OBJECT,
     VR_INTERFACE_OBJECT,
     VR_INTERFACE_BRIDGE_LOCK_OBJECT,
     VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT,
@@ -220,6 +224,8 @@ struct host_os {
     void (*hos_soft_reset)(struct vrouter *);
     int (*hos_is_frag_limit_exceeded)(void);
     bool hos_nl_broadcast_supported;
+    int (*hos_huge_page_config)(uint64_t *, int, int *, int);
+    void *(*hos_huge_page_mem_get)(int);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -269,6 +275,8 @@ struct host_os {
 #define vr_get_enabled_log_types        vrouter_host->hos_get_enabled_log_types
 #define vr_soft_reset                   vrouter_host->hos_soft_reset
 #define vr_nl_broadcast_supported       vrouter_host->hos_nl_broadcast_supported
+#define vr_huge_page_config             vrouter_host->hos_huge_page_config
+#define vr_huge_page_mem_get            vrouter_host->hos_huge_page_mem_get
 
 extern struct host_os *vrouter_host;
 
@@ -342,6 +350,7 @@ struct vrouter {
     struct vr_rtable *vr_inet_rtable;
     struct vr_rtable *vr_inet_mcast_rtable;
     struct vr_rtable *vr_bridge_rtable;
+    vr_mem_config_t vr_mcfg;
 
     vr_htable_t vr_flow_table;
     struct vr_flow_table_info *vr_flow_table_info;

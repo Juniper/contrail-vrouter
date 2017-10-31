@@ -317,6 +317,12 @@ vr_mem_stats_get(void)
         response->vms_interface_req_mirror_meta_object +=
             (stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_alloc -
             stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_free);
+        response->vms_hpage_config_object +=
+            (stats_block[VR_HPAGE_CONFIG_OBJECT].ms_alloc -
+                stats_block[VR_HPAGE_CONFIG_OBJECT].ms_free);
+        response->vms_hpage_pages_object +=
+            (stats_block[VR_HPAGE_PAGES_OBJECT].ms_alloc -
+                stats_block[VR_HPAGE_PAGES_OBJECT].ms_free);
         for (i = 0; i < VR_VROUTER_MAX_OBJECT; i++) {
             alloced += stats_block[i].ms_alloc;
             freed += stats_block[i].ms_free;

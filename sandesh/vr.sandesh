@@ -364,6 +364,8 @@ buffer sandesh vr_mem_stats_req {
    68:  i64             vms_interface_req_pbb_mac_object;
    69:  i64             vms_nexthop_req_bmac_object;
    70:  i64             vms_interface_req_bridge_id_object;
+   71:  i64             vms_hpage_config_object;
+   72:  i64             vms_hpage_pages_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */
@@ -483,4 +485,12 @@ buffer sandesh vr_bridge_table_data {
     3: u32          btable_size;
     4: u16          btable_dev;
     5: string       btable_file_path;
+}
+
+buffer sandesh vr_hugepage_config {
+    1: sandesh_op   vhp_op;
+    2: u16          vhp_rid;
+    3: list<u64>    vhp_mem;
+    4: list<u32>    vhp_msize;
+    5: u32          vhp_resp;
 }

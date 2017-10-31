@@ -79,6 +79,10 @@ vr_mem_stats_req_process(void *s_req)
             stats->vms_hpacket_pool_object);
     printf("Hash Table                      %" PRIu64 "\n",
             stats->vms_htable_object);
+    printf("Huge Page Config                %" PRIu64 "\n",
+            stats->vms_hpage_config_object);
+    printf("Huge Page Pages                 %" PRIu64 "\n",
+            stats->vms_hpage_pages_object);
     printf("Interface                       %" PRIu64 "\n",
             stats->vms_interface_object);
     printf("Interface Bridge Lock           %" PRIu64 "\n",

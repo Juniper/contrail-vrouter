@@ -2407,6 +2407,9 @@ vr_flow_table_data_process(void *s_req)
     if (vr_flow_path)
         strncpy(resp->ftable_file_path, vr_flow_path, VR_UNIX_PATH_MAX - 1);
 
+    if (!infop)
+        goto send_response;
+
     resp->ftable_used_entries = vr_flow_table_used_total_entries(router);
     resp->ftable_deleted = infop->vfti_deleted;
     resp->ftable_changed = infop->vfti_changed;
@@ -2582,6 +2585,17 @@ vr_flow_table_init(struct vrouter *router)
         if (!vr_oflow_entries)
             vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
 
+        if (!vr_flow_table && vr_huge_page_mem_get) {
+
+            vr_flow_table = vr_huge_page_mem_get(VR_FLOW_TABLE_SIZE +
+                    VR_OFLOW_TABLE_SIZE);
+            if (vr_flow_table) {
+                vr_oflow_table = vr_flow_table + VR_FLOW_TABLE_SIZE;
+                vr_printf("Vrouter: flow_table %p flow_otable %p\n",
+                        vr_flow_table, vr_oflow_table);
+            }
+        }
+
         router->vr_flow_table = vr_htable_attach(router, vr_flow_entries,
                 vr_flow_table, vr_oflow_entries, vr_oflow_table,
                 sizeof(struct vr_flow_entry), 0, 0, vr_flow_get_key);
@@ -2657,7 +2671,7 @@ vr_flow_exit(struct vrouter *router, bool soft_reset)
 }
 
 int
-vr_flow_init(struct vrouter *router)
+vr_flow_mem(struct vrouter *router)
 {
     int ret;
 
@@ -2670,5 +2684,11 @@ vr_flow_init(struct vrouter *router)
     if ((ret = vr_link_local_ports_init(router)))
         return ret;
 
+    return 0;
+}
+
+int
+vr_flow_init(struct vrouter *router)
+{
     return 0;
 }
