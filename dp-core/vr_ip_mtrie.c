@@ -20,7 +20,6 @@ extern struct vr_nexthop *ip4_default_nh;
 static struct vr_vrf_stats **mtrie_vrf_stats;
 static struct vr_vrf_stats *invalid_vrf_stats;
 
-struct vr_nexthop *(*vr_inet_route_lookup)(unsigned int, struct vr_route_req *);
 struct vr_vrf_stats *(*vr_inet_vrf_stats)(int, unsigned int);
 
 static struct ip_mtrie *mtrie_alloc_vrf(unsigned int, unsigned int);
@@ -1219,6 +1218,14 @@ cleanup:
     return ret;
 }
 
+struct vr_nexthop *
+vr_inet_route_lookup(unsigned int vrf_id, struct vr_route_req *rt)
+{
+    if (!vn_rtable[0] || !vn_rtable[1])
+        return NULL;
+    return mtrie_lookup(vrf_id, rt);
+}
+
 int
 mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
 {
@@ -1249,7 +1256,6 @@ mtrie_algo_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     rtable->algo_stats_get = mtrie_stats_get;
     rtable->algo_stats_dump = mtrie_stats_dump;
 
-    vr_inet_route_lookup = mtrie_lookup;
     vr_inet_vrf_stats = mtrie_stats;
     /* local cache */
     /* ipv4 table */

@@ -23,7 +23,6 @@ unsigned int vr_bridge_oentries = 0;
 static vr_htable_t vn_rtable;
 char vr_bcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-struct vr_nexthop *(*vr_bridge_lookup)(unsigned int, struct vr_route_req *);
 int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
 void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
@@ -293,6 +292,15 @@ bridge_table_lookup(unsigned int vrf_id, struct vr_route_req *rt)
         bridge_update_route_req(be, rt);
 
     return rt->rtr_nh;
+}
+
+struct vr_nexthop *
+vr_bridge_lookup(unsigned int vrf_id, struct vr_route_req *rt)
+{
+    if (!vn_rtable)
+        return NULL;
+
+    return bridge_table_lookup(vrf_id, rt);
 }
 
 static struct vr_bridge_entry *
@@ -622,6 +630,13 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     if (!vr_bridge_oentries)
         vr_bridge_oentries = ((vr_bridge_entries / 5) + 1023) & ~1023;
 
+    if (!vr_bridge_table && vr_huge_page_mem_get) {
+        vr_bridge_table = vr_huge_page_mem_get(VR_BRIDGE_TABLE_SIZE +
+                VR_BRIDGE_OFLOW_TABLE_SIZE);
+        if (vr_bridge_table)
+            vr_bridge_otable = vr_bridge_table + VR_BRIDGE_TABLE_SIZE;
+    }
+
     rtable->algo_data = vr_htable_attach(vrouter_get(0), vr_bridge_entries,
                 vr_bridge_table, vr_bridge_oentries, vr_bridge_otable,
                 sizeof(struct vr_bridge_entry),
@@ -641,7 +656,6 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     rtable->algo_get = bridge_table_get;
     rtable->algo_dump = bridge_table_dump;
 
-    vr_bridge_lookup = bridge_table_lookup;
     vn_rtable = rtable->algo_data;
 
     return 0;
