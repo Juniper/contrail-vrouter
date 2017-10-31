@@ -31,6 +31,7 @@
 #include "vr_packet.h"
 #include "vr_flow.h"
 #include "vr_buildinfo.h"
+#include "vr_mem.h"
 
 unsigned int vr_num_cpus = 1;
 
@@ -2274,6 +2275,36 @@ lh_soft_reset(struct vrouter *router)
     return;
 }
 
+
+static int
+lh_huge_page_config(uint64_t *hpages, int n_hpages,
+                int *hpage_size, int n_hpage_sizes)
+{
+    int i;
+
+    if (!hpages || !n_hpages || !hpage_size || !n_hpage_sizes)
+        return -EINVAL;
+
+    if ((n_hpages != n_hpage_sizes) && (n_hpages > VR_MAX_HUGE_PAGES))
+        return -EINVAL;
+
+    for (i = 0; i < n_hpages; i++) {
+        if (!hpages[i])
+            return -EINVAL;
+
+        if ((hpage_size[i] != VR_MEM_1G) && (hpage_size[i] != VR_MEM_2M))
+            return -EINVAL;
+    }
+
+    return vr_huge_pages_config(hpages, n_hpages, hpage_size);
+}
+
+static void *
+lh_huge_mem_get(int size)
+{
+    return vr_huge_mem_get(size);
+}
+
 struct host_os linux_host = {
     .hos_printf                     =       lh_printk,
     .hos_malloc                     =       lh_malloc,
@@ -2325,6 +2356,8 @@ struct host_os linux_host = {
     .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
     .hos_soft_reset                 =       lh_soft_reset,
     .hos_nl_broadcast_supported     =       true,
+    .hos_huge_page_config           =       lh_huge_page_config,
+    .hos_huge_page_mem_get          =       lh_huge_mem_get,
 };
     
 struct host_os *
@@ -2515,6 +2548,7 @@ vrouter_linux_exit(void)
     vr_assembler_exit();
     vr_mem_exit();
     vrouter_exit(false);
+    vr_huge_pages_exit();
     return;
 }
 
@@ -2532,6 +2566,8 @@ vrouter_linux_init(void)
                 __FUNCTION__, __LINE__);
         return -1;
     }
+
+    vr_huge_pages_init();
 
     ret = vrouter_init();
     if (ret)

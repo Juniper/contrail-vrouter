@@ -54,6 +54,7 @@ extern void vr_fc_map_req_process(void *s_req) __attribute__((weak));
 extern void vr_qos_map_req_process(void *s_req) __attribute__((weak));
 extern void vr_flow_table_data_process(void *s_req) __attribute__((weak));
 extern void vr_bridge_table_data_process(void *s_req) __attribute__((weak));
+extern void vr_hugepage_config_process(void *s_req) __attribute__((weak));
 
 void
 vrouter_ops_process(void *s_req)
@@ -161,6 +162,12 @@ vr_fc_map_req_process(void *s_req)
 
 void
 vr_bridge_table_data_process(void *s_req)
+{
+    return;
+}
+
+void
+vr_hugepage_config_process(void *s_req)
 {
     return;
 }
