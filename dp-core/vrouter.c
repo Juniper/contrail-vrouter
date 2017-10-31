@@ -52,6 +52,7 @@ struct vr_module {
     int (*init)(struct vrouter *);
     void (*exit)(struct vrouter *, bool);
     void (*shut)(struct vrouter *);
+    int (*mem)(struct vrouter *);
 };
 
 struct vr_module *module_under_init;
@@ -76,6 +77,7 @@ static struct vr_module modules[] = {
     {
         .mod_name       =       "Fib",
         .init           =       vr_fib_init,
+        .mem            =       vr_fib_mem,
         .exit           =       vr_fib_exit,
     },
     {
@@ -86,6 +88,7 @@ static struct vr_module modules[] = {
     {
         .mod_name       =       "Flow",
         .init           =       vr_flow_init,
+        .mem            =       vr_flow_mem,
         .exit           =       vr_flow_exit,
     },
     {
@@ -492,6 +495,15 @@ vrouter_init(void)
             vr_printf("vrouter module %u init error (%d)\n", i, ret);
             goto init_fail;
         }
+        if (!vr_huge_page_config) {
+            if (modules[i].mem) {
+                ret = modules[i].mem(&router);
+                if (ret) {
+                    vr_printf("vrouter module %u mem error (%d)\n", i, ret);
+                    goto init_fail;
+                }
+            }
+        }
     }
 
     module_under_init = NULL;
@@ -540,6 +552,95 @@ vrouter_ops_process(void *s_req)
     }
 
     vr_send_response(ret);
+
+    return;
+}
+
+void
+vr_hugepage_config_process(void *s_req)
+{
+    int i, ret = -EEXIST, mret = 0;
+    vr_hugepage_config hcfg_resp;
+    vr_hugepage_config *req= (vr_hugepage_config *)s_req;
+    struct vrouter *router = vrouter_get(0);
+
+    /* Only addition of huge pages is supported */
+    if (req->vhp_op != SANDESH_OP_ADD) {
+        vr_send_response(-EOPNOTSUPP);
+        return;
+    }
+
+    /* Invoke huge page configuration only if a segment exists */
+    if (vr_huge_page_config) {
+        ret = vr_huge_page_config(req->vhp_mem, req->vhp_mem_size,
+                                    req->vhp_msize, req->vhp_msize_size);
+    }
+
+    if (ret != -EEXIST) {
+        for (i = 0; i < (int)VR_NUM_MODULES; i++) {
+            if (modules[i].mem)  {
+                mret = modules[i].mem(router);
+                if (mret)
+                    break;
+            }
+        }
+    }
+
+    memset(&hcfg_resp, 0, sizeof(hcfg_resp));
+    hcfg_resp.vhp_op = req->vhp_op;
+
+    /*
+     * If we fail to allocate memory both in huge pages and as well
+     * regular respond with VR_HPAGE_CFG_RESP_MEM_FAILURE. Return status
+     * in vrouter_response would be an error value. If memory allocation
+     * succeds in either the huge pages or regular, return status is
+     * going to be "0" and response code gives the details of the
+     * allocation
+     */
+
+    switch (ret)  {
+    case 0:
+        if (!mret)
+            hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_HPAGE_SUCCESS;
+        break;
+
+    case -EINVAL:
+        if (!mret) {
+            hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_INVALID_ARG_MEM_INITED;
+            ret = 0;
+        }
+        break;
+
+    case -EEXIST:
+        hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_MEM_ALREADY_INITED;
+        break;
+
+    case -ENOMEM:
+        if (!mret) {
+            hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_HPAGE_FAILURE_MEM_INITED;
+            ret = 0;
+        }
+        break;
+
+    case -E2BIG:
+        if (!mret) {
+            hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_HPAGE_PARTIAL_SUCCESS;
+            ret = 0;
+        }
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    if (mret) {
+        hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_MEM_FAILURE;
+        ret = mret;
+    }
+
+    vr_message_response(VR_HPAGE_CFG_OBJECT_ID, &hcfg_resp, ret,
+                false);
 
     return;
 }

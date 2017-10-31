@@ -92,4 +92,12 @@ struct vr_list_head {
         struct vr_list_node *node_p;
 };
 
+
+#define VR_HPAGE_CFG_RESP_HPAGE_SUCCESS              0
+#define VR_HPAGE_CFG_RESP_MEM_FAILURE               -1
+#define VR_HPAGE_CFG_RESP_INVALID_ARG_MEM_INITED    -2
+#define VR_HPAGE_CFG_RESP_HPAGE_FAILURE_MEM_INITED  -3
+#define VR_HPAGE_CFG_RESP_MEM_ALREADY_INITED        -4
+#define VR_HPAGE_CFG_RESP_HPAGE_PARTIAL_SUCCESS     -5
+
 #endif /* __VR_DEFS_H__ */
