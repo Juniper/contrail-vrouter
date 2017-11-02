@@ -10,24 +10,24 @@ DpSandeshFilesSrc = env.ExtractC(DpSandeshFiles)
 libdp_sandesh = env.Library('dp_sandesh_c', DpSandeshFilesSrc)
 
 sandesh_sources = [
-                    '#tools/sandesh/library/c/sandesh.c',
-                    '#tools/sandesh/library/c/sandesh.h',
-                    '#tools/sandesh/library/c/thrift.h',
+                    '#src/contrail-common/sandesh/library/c/sandesh.c',
+                    '#src/contrail-common/sandesh/library/c/sandesh.h',
+                    '#src/contrail-common/sandesh/library/c/thrift.h',
                   ]
 
 sandesh_protocol_sources = [
-                    '#tools/sandesh/library/c/protocol/thrift_binary_protocol.c',
-                    '#tools/sandesh/library/c/protocol/thrift_binary_protocol.h',
-                    '#tools/sandesh/library/c/protocol/thrift_protocol.c',
-                    '#tools/sandesh/library/c/protocol/thrift_protocol.h',
+                    '#src/contrail-common/sandesh/library/c/protocol/thrift_binary_protocol.c',
+                    '#src/contrail-common/sandesh/library/c/protocol/thrift_binary_protocol.h',
+                    '#src/contrail-common/sandesh/library/c/protocol/thrift_protocol.c',
+                    '#src/contrail-common/sandesh/library/c/protocol/thrift_protocol.h',
                   ]
 
 sandesh_transport_sources = [
-                    '#tools/sandesh/library/c/transport/thrift_fake_transport.h',
-                    '#tools/sandesh/library/c/transport/thrift_fake_transport.c',
-                    '#tools/sandesh/library/c/transport/thrift_memory_buffer.c',
-                    '#tools/sandesh/library/c/transport/thrift_memory_buffer.h',
-                    '#tools/sandesh/library/c/transport/thrift_transport.h',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_fake_transport.h',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_fake_transport.c',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_memory_buffer.c',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_memory_buffer.h',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_transport.h',
                  ]
 
 sandesh_generateds = [

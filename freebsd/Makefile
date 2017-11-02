@@ -1,5 +1,5 @@
 # Variables
-SANDESH_ROOT := ${.CURDIR}/../../tools/sandesh
+SANDESH_ROOT := ${.CURDIR}/../../src/contrail-common/sandesh
 BUILD_DIR := ../../build/debug
 
 # Additional sources paths
@@ -58,7 +58,7 @@ SRCS += vr_message.c \
 
 CFLAGS += -I${.CURDIR}/../include
 CFLAGS += -I$(BUILD_DIR)/vrouter/sandesh/gen-c
-CFLAGS += -I$(.CURDIR)/../../tools
+CFLAGS += -I$(.CURDIR)/../../src/contrail-common
 CFLAGS += -I$(SANDESH_ROOT)/library/c
 CFLAGS += -g
 CFLAGS += -D__KERNEL__

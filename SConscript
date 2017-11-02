@@ -29,8 +29,8 @@ DPDK_LIB_DIR = DPDK_DST_DIR + '/lib'
 # Include paths
 env.Replace(CPPPATH = '#vrouter/include')
 env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
-env.Append(CPPPATH = ['#tools'])
-env.Append(CPPPATH = ['#tools/sandesh/library/c'])
+env.Append(CPPPATH = ['#src/contrail-common'])
+env.Append(CPPPATH = ['#src/contrail-common/sandesh/library/c'])
 
 # Make Sandesh quiet for production
 if 'production' in env['OPT']:
@@ -250,7 +250,7 @@ if sys.platform != 'darwin':
     if kernel_dir: make_cmd += ' KERNELDIR=' + kernel_dir
     make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
     make_cmd += ' SANDESH_SRC_ROOT=' + '../build/kbuild/'
-    make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#tools/').abspath
+    make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#src/contrail-common/').abspath
     if 'vrouter' in COMMAND_LINE_TARGETS:
         BUILD_TARGETS.append('vrouter/uvrouter')
         if dpdk_exists:
