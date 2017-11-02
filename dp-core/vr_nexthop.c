@@ -2077,6 +2077,16 @@ nh_mpls_udp_tunnel_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_SOURCE_INVALID;
 }
 
+static int
+nh_vxlan_tunnel_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
+                                struct vr_forwarding_md *fmd, void *ret_data)
+{
+    if (fmd->fmd_outer_src_ip == nh->nh_udp_tun_dip)
+        return NH_SOURCE_VALID;
+
+    return NH_SOURCE_INVALID;
+}
+
 
 /*
  * nh_mpls_udp_tunnel - tunnel packet with MPLS label in UDP.
@@ -3093,6 +3103,7 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_sip = req->nhr_tun_sip;
         nh->nh_udp_tun_dip = req->nhr_tun_dip;
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
+        nh->nh_validate_src = nh_vxlan_tunnel_validate_src;
         nh->nh_dev = vif;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
         if (!(nh->nh_flags & NH_FLAG_INDIRECT)) {
