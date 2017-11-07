@@ -62,27 +62,36 @@ typedef enum {
 #define VR_FLOW_BGP_SERVICE         0x80
 
 /* Flow Action Reason code */
-#define VR_FLOW_DR_UNKNOWN              0x00
-#define VR_FLOW_DR_UNAVIALABLE_INTF     0x01
-#define VR_FLOW_DR_IPv4_FWD_DIS         0x02
-#define VR_FLOW_DR_UNAVAILABLE_VRF      0x03
-#define VR_FLOW_DR_NO_SRC_ROUTE         0x04
-#define VR_FLOW_DR_NO_DST_ROUTE         0x05
-#define VR_FLOW_DR_AUDIT_ENTRY          0x06
-#define VR_FLOW_DR_VRF_CHANGE           0x07
-#define VR_FLOW_DR_NO_REVERSE_FLOW      0x08
-#define VR_FLOW_DR_REVERSE_FLOW_CHANGE  0x09
-#define VR_FLOW_DR_NAT_CHANGE           0x0a
-#define VR_FLOW_DR_FLOW_LIMIT           0x0b
-#define VR_FLOW_DR_LINKLOCAL_SRC_NAT    0x0c
-#define VR_FLOW_DR_POLICY               0x0d
-#define VR_FLOW_DR_OUT_POLICY           0x0e
-#define VR_FLOW_DR_SG                   0x0f
-#define VR_FLOW_DR_OUT_SG               0x10
-#define VR_FLOW_DR_REVERSE_SG           0x11
-#define VR_FLOW_DR_REVERSE_OUT_SG       0x12
-#define VR_FLOW_DR_SAME_FLOW_RFLOW_KEY  0x13
-#define VR_FLOW_DR_NO_MIRROR_ENTRY      0x14
+#define VR_FLOW_DR_UNKNOWN                0x00
+#define VR_FLOW_DR_UNAVIALABLE_INTF       0x01
+#define VR_FLOW_DR_IPv4_FWD_DIS           0x02
+#define VR_FLOW_DR_UNAVAILABLE_VRF        0x03
+#define VR_FLOW_DR_NO_SRC_ROUTE           0x04
+#define VR_FLOW_DR_NO_DST_ROUTE           0x05
+#define VR_FLOW_DR_AUDIT_ENTRY            0x06
+#define VR_FLOW_DR_VRF_CHANGE             0x07
+#define VR_FLOW_DR_NO_REVERSE_FLOW        0x08
+#define VR_FLOW_DR_REVERSE_FLOW_CHANGE    0x09
+#define VR_FLOW_DR_NAT_CHANGE             0x0a
+#define VR_FLOW_DR_FLOW_LIMIT             0x0b
+#define VR_FLOW_DR_LINKLOCAL_SRC_NAT      0x0c
+#define VR_FLOW_DR_FAILED_VROUTER_INSTALL 0x0d
+#define VR_FLOW_DR_INVALID_L2_FLOW        0x0e
+#define VR_FLOW_DR_FLOW_ON_TSN            0x0f
+#define VR_FLOW_DR_NO_MIRROR_ENTRY        0x10
+#define VR_FLOW_DR_SAME_FLOW_RFLOW_KEY    0x11
+#define VR_FLOW_DR_PORT_MAP_DROP          0x12
+#define VR_FLOW_DR_NO_SRC_ROUTE_L2RPF     0x13
+#define VR_FLOW_DR_POLICY                 0x14
+#define VR_FLOW_DR_OUT_POLICY             0x15
+#define VR_FLOW_DR_SG                     0x16
+#define VR_FLOW_DR_OUT_SG                 0x17
+#define VR_FLOW_DR_REVERSE_SG             0x18
+#define VR_FLOW_DR_REVERSE_OUT_SG         0x19
+#define VR_FLOW_DR_FW_POLICY              0x1a
+#define VR_FLOW_DR_OUT_FW_POLICY          0x1b
+#define VR_FLOW_DR_REVERSE_FW_POLICY      0x1c
+#define VR_FLOW_DR_REVERSE_OUT_FW_POLICY  0x1d
 
 #define VR_IP6_ADDRESS_LEN               16
 
