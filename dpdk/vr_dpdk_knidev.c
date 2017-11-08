@@ -566,10 +566,14 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 
             ret =  rte_eth_dev_set_mtu(slave_port_id, new_mtu);
             if (ret < 0) {
-                RTE_LOG(ERR, VROUTER,
+                /*
+                 * Do not return error as some NICs (such as X710) do not allow setting 
+                 * the MTU while the NIC is up and running. The max_rx_pkt_len is anyway
+                 * set to support jumbo frames, so continue further here to set vif_mtu.
+                 */
+                RTE_LOG(DEBUG, VROUTER,
                         "    error changing bond member eth device %" PRIu8 " MTU: %s (%d)\n",
                         slave_port_id, rte_strerror(-ret), -ret);
-                return ret;
             }
         }
     } else {
@@ -578,10 +582,14 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 
         ret =  rte_eth_dev_set_mtu(port_id, new_mtu);
         if (ret < 0) {
-            RTE_LOG(ERR, VROUTER,
+            /*
+             * Do not return error as some NICs (such as X710) do not allow setting 
+             * the MTU while the NIC is up and running. The max_rx_pkt_len is anyway
+             * set to support jumbo frames, so continue further here to set vif_mtu.
+             */
+            RTE_LOG(DEBUG, VROUTER,
                     "Error changing eth device %" PRIu8 " MTU: %s (%d)\n",
                     port_id, rte_strerror(-ret), -ret);
-            return ret;
         }
     }
 
