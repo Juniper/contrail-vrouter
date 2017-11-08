@@ -366,6 +366,16 @@ flow_get_drop_reason(uint8_t drop_code)
         return "FlowLim";
     case VR_FLOW_DR_LINKLOCAL_SRC_NAT:
         return "LinkSrcNatErr";
+    case VR_FLOW_DR_FAILED_VROUTER_INSTALL:
+        return "VrouterInstallFail";
+    case VR_FLOW_DR_INVALID_L2_FLOW:
+        return "InvalidL2Flow";
+    case VR_FLOW_DR_FLOW_ON_TSN:
+        return "TSNFlow";
+    case VR_FLOW_DR_PORT_MAP_DROP:
+        return "NoFipPortMap";
+    case VR_FLOW_DR_NO_SRC_ROUTE_L2RPF:
+        return "NoSrcRtRpfNh";
     case VR_FLOW_DR_POLICY:
         return "Policy";
     case VR_FLOW_DR_OUT_POLICY:
