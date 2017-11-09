@@ -544,3 +544,8 @@ vrouter_ops_process(void *s_req)
     return;
 }
 
+void
+vr_hugepage_config_process(void *s_req)
+{
+    vr_send_response(0);
+}
