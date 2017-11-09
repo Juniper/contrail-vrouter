@@ -102,6 +102,7 @@
  */
 #define VIF_FLAG_DROP_NEW_FLOWS     0x40000
 #define VIF_FLAG_MAC_PROXY          0x100000
+#define VIF_FLAG_MRG_RXBUF          0x200000
 
 #define VIF_FLAG_MIRROR_NOTAG       0x800000
 
