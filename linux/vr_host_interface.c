@@ -2391,6 +2391,40 @@ linux_if_notifier(struct notifier_block * __unused,
 
         /* quite possible that there was no vif */
         vhost_attach_phys(dev);
+    } else if (event == NETDEV_CHANGEMTU) {
+        if ((eth_if = vif_find(router, dev->name))) {
+            if (eth_if == router->vr_host_if) {
+                int ret;
+                /* vhost0 interface MTU is changed, so change fabric MTU also */
+                struct net_device *host_dev =
+                    (struct net_device *)router->vr_host_if->vif_os;
+                struct net_device *eth_dev =
+                    (struct net_device *)router->vr_eth_if->vif_os;
+                struct net_device *eth_real_dev =
+                    vlan_dev_real_dev(
+                            (struct net_device *)router->vr_eth_if->vif_os);
+                printk("VROUTER: %s MTU changed to %d\n", dev->name, dev->mtu);
+                if ((ret = dev_set_mtu(eth_dev, dev->mtu)) < 0) {
+                    printk("VROUTER: %s MTU change to %d failed. Error %d\n",
+                            eth_dev->name, dev->mtu, ret);
+                } else {
+                    printk("VROUTER: %s MTU changed to %d\n",
+                            eth_dev->name, eth_dev->mtu);
+                }
+                if (eth_dev != eth_real_dev) {
+                    if ((ret = dev_set_mtu(eth_real_dev, dev->mtu)) < 0) {
+                    printk("VROUTER: %s MTU change to %d failed. Error %d\n",
+                            eth_real_dev->name, dev->mtu, ret);
+                    } else {
+                        printk("VROUTER: %s MTU changed to %d\n",
+                                eth_real_dev->name, eth_real_dev->mtu);
+                    }
+                }
+                /* Set the vif MTU */
+                router->vr_eth_if->vif_mtu = router->vr_host_if->vif_mtu
+                                                                 = dev->mtu;
+            }
+        }
     }
 
     return NOTIFY_DONE;
