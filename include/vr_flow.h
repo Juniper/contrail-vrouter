@@ -436,6 +436,7 @@ struct vrouter;
 struct vr_ip6;
 
 extern int vr_flow_init(struct vrouter *);
+extern int vr_flow_mem(struct vrouter *);
 extern void vr_flow_exit(struct vrouter *, bool);
 
 extern bool vr_flow_forward(struct vrouter *,
