@@ -923,7 +923,7 @@ op_retry:
                 if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac, vr_transport);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_send_interface_delete(cl, 0, if_name, vr_ifindex);
         break;
 
@@ -1108,7 +1108,7 @@ parse_long_opts(int option_index, char *opt_arg)
             break;
 
         case DELETE_OPT_INDEX:
-            vr_op = SANDESH_OP_DELETE;
+            vr_op = SANDESH_OP_DEL;
             if (isdigit(opt_arg[0]))
                 vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
             else

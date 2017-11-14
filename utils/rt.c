@@ -369,7 +369,7 @@ op_retry:
 
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_send_route_delete(cl, 0, cmd_vrf_id, cmd_family_id,
                 cmd_prefix, cmd_plen, cmd_nh_id, cmd_label, cmd_dst_mac,
                 cmd_replace_plen, flags);
@@ -497,7 +497,7 @@ validate_options(void)
 
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         if ((cmd_family_id == AF_INET) || (cmd_family_id == AF_INET6)) {
 
             if (cmd_replace_plen == 0xFFFFFFFF)
@@ -706,7 +706,7 @@ main(int argc, char *argv[])
                 if (cmd_op >= 0) {
                     usage_internal();
                 }
-                cmd_op = SANDESH_OP_DELETE;
+                cmd_op = SANDESH_OP_DEL;
                 break;
 
             case 'b':

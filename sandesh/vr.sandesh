@@ -7,7 +7,7 @@
 enum sandesh_op {
     ADD,
     GET,
-    DELETE,
+    DEL,
     DUMP,
     RESPONSE,
     RESET,

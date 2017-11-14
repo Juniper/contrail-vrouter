@@ -238,7 +238,7 @@ vr_mpls_req_process(void *s_req)
         vr_mpls_dump(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         vr_mpls_del(req);
         break;
 

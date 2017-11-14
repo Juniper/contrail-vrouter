@@ -152,7 +152,7 @@ vt_gen_op_compare(int op, unsigned char *string)
     } else if (!strncasecmp(string, "Get", strlen("Get"))) {
         expected_op = SANDESH_OP_GET;
     } else if (!strncasecmp(string, "Delete", strlen("Delete"))) {
-        expected_op = SANDESH_OP_DELETE;
+        expected_op = SANDESH_OP_DEL;
     } else if (!strncasecmp(string, "Dump", strlen("Dump"))) {
         expected_op = SANDESH_OP_DUMP;
     } else if (!strncasecmp(string, "Reset", strlen("Reset"))) {
@@ -173,7 +173,7 @@ vt_gen_op(unsigned char *string)
     } else if (!strncasecmp(string, "Get", strlen("Get"))) {
         return SANDESH_OP_GET;
     } else if (!strncasecmp(string, "Delete", strlen("Delete"))) {
-        return SANDESH_OP_DELETE;
+        return SANDESH_OP_DEL;
     } else if (!strncasecmp(string, "Dump", strlen("Dump"))) {
         return SANDESH_OP_DUMP;
     } else if (!strncasecmp(string, "Reset", strlen("Reset"))) {

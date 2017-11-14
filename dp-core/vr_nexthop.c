@@ -3818,7 +3818,7 @@ vr_nexthop_req_process(void *s_req)
         ret = vr_nexthop_get(req);
         break;
 
-    case SANDESH_OP_DELETE:
+    case SANDESH_OP_DEL:
         ret = vr_nexthop_delete(req);
         break;
 
