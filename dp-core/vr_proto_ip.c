@@ -1020,12 +1020,16 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         return FLOW_FORWARD;
 
     /*
-     * if the interface is policy enabled, or if somebody else (eg:nexthop)
-     * has requested for a policy lookup, packet has to go through a lookup
+     * Force the flow lookup, if some one has requested a flow lookup
+     * using VP_FLAG_FLOW_GET, if not make a flow lookup if interface
+     * has policy bit set. For link local packets on vhost interfaces,
+     * there is no flow processing even if policy is enabled
      */
-    if ((pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) ||
-            (pkt->vp_flags & VP_FLAG_FLOW_GET)) {
+    if (pkt->vp_flags & VP_FLAG_FLOW_GET) {
         lookup = true;
+    } else if (pkt->vp_if->vif_flags & VIF_FLAG_POLICY_ENABLED) {
+        if (!vif_is_vhost(pkt->vp_if) || (!IS_LINK_LOCAL_IP(ip->ip_daddr)))
+            lookup = true;
     }
 
     if (!lookup)
