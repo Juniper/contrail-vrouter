@@ -501,8 +501,9 @@ list_get_print(vr_interface_req *req)
                                                     INET6_ADDRSTRLEN));
     }
     vr_interface_print_head_space();
-    printf("Vrf:%d Flags:%s QOS:%d Ref:%d", req->vifr_vrf,
-            req->vifr_flags ? vr_if_flags(req->vifr_flags) : "NULL" ,
+    printf("Vrf:%d Mcast Vrf:%d Flags:%s QOS:%d Ref:%d", req->vifr_vrf,
+            req->vifr_mcast_vrf, req->vifr_flags ?
+            vr_if_flags(req->vifr_flags) : "NULL" ,
             req->vifr_qos_map_index, req->vifr_ref_cnt);
     if (req->vifr_flags & (VIF_FLAG_MIRROR_TX | VIF_FLAG_MIRROR_RX)) {
         printf(" Mirror index %d\n", req->vifr_mir_id);

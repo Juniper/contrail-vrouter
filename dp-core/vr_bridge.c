@@ -901,6 +901,9 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
         }
 
+        if (IS_MAC_BMCAST(dmac) && (pkt->vp_if->vif_mcast_vrf != 65535))
+            fmd->fmd_dvrf = pkt->vp_if->vif_mcast_vrf;
+
         be = bridge_lookup(dmac, fmd);
         if (be)
             nh = be->be_nh;
