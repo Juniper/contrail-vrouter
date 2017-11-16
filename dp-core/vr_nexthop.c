@@ -811,7 +811,7 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         struct vr_forwarding_md *fmd)
 {
     int ret = -1, ecmp_index = -1;
-    unsigned int hash, hash_ecmp, count, rflow_src_info;
+    unsigned int hash, hash_ecmp = 0, count, rflow_src_info;
 
     struct vr_flow flow, *flowp = &flow;
     struct vr_flow_entry *fe = NULL;
@@ -861,14 +861,20 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (ret < 0)
                 return ret;
         } else {
-            return ret;
+            /*
+             * packet can be hashed on ethernet header and VRF to identify
+             * the component
+             */
+            hash_ecmp = vr_hash(pkt_data(pkt), VR_ETHER_HLEN, 0);
+            hash_ecmp = vr_hash_2words(hash_ecmp, fmd->fmd_dvrf, 0);
         }
     }
 
 
     if (ecmp_index == -1) {
-        hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
-        hash %= count;
+        if (!hash_ecmp)
+            hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
+        hash = hash_ecmp % count;
         ecmp_index = cnhp[hash].cnh_ecmp_index;
         cnh = cnhp[hash].cnh;
         if (!cnh) {
