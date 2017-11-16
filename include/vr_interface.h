@@ -108,6 +108,8 @@
 #define VIF_FLAG_GRO_NEEDED         0x200000
 #define VIF_FLAG_MRG_RXBUF          0x400000
 
+#define VIF_FLAG_MIRROR_NOTAG       0x800000
+
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
                          VIF_FLAG_VLAN_OFFLOAD)
