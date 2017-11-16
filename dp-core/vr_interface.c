@@ -782,7 +782,8 @@ vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
     stats->vis_ibytes += pkt_len(pkt);
     stats->vis_ipackets++;
 
-    vif_mirror(vif, pkt, NULL, vif->vif_flags & VIF_FLAG_MIRROR_RX);
+    if (!(vif->vif_flags & VIF_FLAG_MIRROR_NOTAG))
+        vif_mirror(vif, pkt, NULL, vif->vif_flags & VIF_FLAG_MIRROR_RX);
 
     tos = vr_vlan_get_tos(pkt_data(pkt));
     if (tos >= 0)
@@ -795,6 +796,9 @@ vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     vr_pset_data(pkt, pkt->vp_data);
+
+    if (vif->vif_flags & VIF_FLAG_MIRROR_NOTAG)
+        vif_mirror(vif, pkt, NULL, vif->vif_flags & VIF_FLAG_MIRROR_RX);
 
     return vr_virtual_input(vif->vif_vrf, vif, pkt, VLAN_ID_INVALID);
 }
@@ -814,7 +818,11 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
         stats->vis_opackets++;
     }
 
+    if (vif->vif_flags & VIF_FLAG_MIRROR_NOTAG)
+        vif_mirror(vif, pkt, fmd, vif->vif_flags & VIF_FLAG_MIRROR_TX);
+
     fmd->fmd_vlan = vif->vif_vlan_id;
+
     if (vif_is_vlan(vif)) {
         if (vif->vif_ovlan_id) {
             fmd->fmd_vlan = vif->vif_ovlan_id;
@@ -827,7 +835,8 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
         }
     }
 
-    vif_mirror(vif, pkt, fmd, vif->vif_flags & VIF_FLAG_MIRROR_TX);
+    if (!(vif->vif_flags & VIF_FLAG_MIRROR_NOTAG))
+        vif_mirror(vif, pkt, fmd, vif->vif_flags & VIF_FLAG_MIRROR_TX);
 
     pvif = vif->vif_parent;
     if (!pvif)

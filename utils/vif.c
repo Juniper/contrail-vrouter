@@ -152,6 +152,7 @@ static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_VLAN_OFFLOAD,     "Vof",  "VLAN insert/strip offload"},
     {VIF_FLAG_DROP_NEW_FLOWS,   "Df",   "Drop New Flows"},
     {VIF_FLAG_MAC_PROXY,        "Proxy", "MAC Requests Proxied Always"},
+    {VIF_FLAG_MIRROR_NOTAG,     "Mn",    "Mirror without Vlan Tag"},
 };
 
 static char *
