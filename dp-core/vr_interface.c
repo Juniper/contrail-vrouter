@@ -2097,6 +2097,9 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
     if (req->vifr_vrf >= 0)
         vif->vif_vrf = req->vifr_vrf;
 
+    if (req->vifr_mcast_vrf >= 0)
+        vif->vif_mcast_vrf = req->vifr_mcast_vrf;
+
     if (req->vifr_mtu)
         vif->vif_mtu = req->vifr_mtu;
 
@@ -2222,6 +2225,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         goto error;
 
     vif->vif_vrf = req->vifr_vrf;
+    vif->vif_mcast_vrf = req->vifr_mcast_vrf;
     vif->vif_vlan_id = VLAN_ID_INVALID;
     vif->vif_mtu = req->vifr_mtu;
     vif->vif_idx = req->vifr_idx;
@@ -2388,6 +2392,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     req->vifr_type = intf->vif_type;
     req->vifr_flags = intf->vif_flags;
     req->vifr_vrf = intf->vif_vrf;
+    req->vifr_mcast_vrf = intf->vif_mcast_vrf;
     req->vifr_idx = intf->vif_idx;
     req->vifr_rid = intf->vif_rid;
     req->vifr_transport = intf->vif_transport;
@@ -3381,6 +3386,7 @@ vr_gro_vif_add(struct vrouter *router, unsigned int os_idx, char *name,
     req->vifr_type = VIF_TYPE_STATS;
     req->vifr_flags = 0;
     req->vifr_vrf = 65535;
+    req->vifr_mcast_vrf = 65535;
     req->vifr_idx = idx;
     req->vifr_rid = 0;
     req->vifr_transport = VIF_TRANSPORT_ETH;
