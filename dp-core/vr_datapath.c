@@ -20,7 +20,7 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         struct vr_route_req *rt, unsigned char *dmac)
 {
     bool from_fabric, stitched, flood, over_lay, hosted_vm;
-    bool to_gateway, no_proxy, to_vcp, ecmp_src;
+    bool to_gateway, no_proxy, to_vcp;
 
     unsigned char *resp_mac;
     struct vr_nexthop *nh = NULL, *l3_nh = NULL;
@@ -29,7 +29,7 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     over_lay = true;
     from_fabric = stitched = flood = hosted_vm = false;
-    to_gateway = to_vcp = no_proxy = ecmp_src = false;
+    to_gateway = to_vcp = no_proxy = false;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     /* here we will not check for stats, but will check before use */
@@ -84,13 +84,6 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     if (vr_hosted_nexthop(nh))
         hosted_vm = true;
 
-    /* If ECMP source, we force routing */
-    if (fmd->fmd_ecmp_src_nh_index != -1) {
-        resp_mac = vif->vif_mac;
-        fmd->fmd_ecmp_src_nh_index = -1;
-        ecmp_src = true;
-    }
-
 
     /*
      * situations that are handled here (from_fabric)
@@ -107,38 +100,6 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
      * . arp request from the uplink port of a vcp
      */
     if (from_fabric) {
-        if (ecmp_src) {
-
-            /*
-             * If a Multicast ARP request, it is not answered on Fabric
-             * side
-             */
-            if (IS_MAC_BMCAST(dmac))
-                return MR_DROP;
-
-            /*
-             * If unicast and not stiched, we do not have enough
-             * information what to respond. We can not even flood,
-             * probably because this need to be answered with Vrouter
-             * Mac in source Vrouter itself. So we drop this
-             */
-            if (!stitched)
-                return MR_DROP;
-
-            /*
-             * If our stiched mac does not match, we will let the VM
-             * decide what to do with request
-             */
-            if (!VR_MAC_CMP(dmac, rt->rtr_req.rtr_mac))
-                return MR_FLOOD;
-
-            /*
-             * Very likely response need to go with stiched mac. But
-             * below conditions might override
-             */
-            resp_mac = rt->rtr_req.rtr_mac;
-        }
-
         if (flood && !stitched) {
             if (stats)
                 stats->vrf_arp_physical_flood++;
