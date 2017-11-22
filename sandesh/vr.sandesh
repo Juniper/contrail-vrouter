@@ -485,3 +485,10 @@ buffer sandesh vr_bridge_table_data {
     4: u16          btable_dev;
     5: string       btable_file_path;
 }
+
+buffer sandesh vr_hugepage_config {
+    1: sandesh_op   vhp_op;
+    2: list<u64>    vhp_mem;
+    3: list<u32>    vhp_msize;
+    4: u32          vhp_resp;
+}
