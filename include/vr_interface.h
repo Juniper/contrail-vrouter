@@ -313,6 +313,7 @@ struct vr_interface {
     unsigned int vif_isid;
     uint8_t vif_ip6[VR_IP6_ADDRESS_LEN];
     uint8_t vif_pbb_mac[VR_ETHER_ALEN];
+    uint16_t vif_mcast_vrf;
     vhostuser_mode_t vif_vhostuser_mode;
 };
 
