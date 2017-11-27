@@ -7,6 +7,8 @@
 #ifndef __VR_QOS_H__
 #define __VR_QOS_H__
 
+#include "vr_os.h"
+
 #define VR_DEF_QOS_MAP_ENTRIES      4096
 #define VR_DEF_FC_MAP_ENTRIES       256
 #define VR_DSCP_QOS_ENTRIES         64
@@ -22,6 +24,7 @@
  * fields here should mean change in the location of the entry in
  * the flow structure
  */
+__attribute__packed__open__
 struct vr_forwarding_class_qos {
     uint8_t     vfcq_dscp;
     uint8_t     vfcq_mpls_qos:3,
@@ -29,12 +32,13 @@ struct vr_forwarding_class_qos {
                 vfcq_untrusted:1,
                 vfcq_valid:1;
     uint8_t     vfcq_queue_id;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
+__attribute__packed__open__
 struct vr_forwarding_class {
     uint8_t vfc_id;
     struct vr_forwarding_class_qos vfc_qos;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
 /* for easy access */
 #define vfc_dscp        vfc_qos.vfcq_dscp

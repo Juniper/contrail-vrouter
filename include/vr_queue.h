@@ -6,9 +6,11 @@
 #ifndef __VR_QUEUE_H__
 #define __VR_QUEUE_H__
 
+#include "vr_os.h"
+
 #define CONTAINER_OF(member, struct_type, pointer) \
-    ((struct_type *)((unsigned long)pointer - \
-        (size_t)&(((struct_type *)0)->member)))
+    ((struct_type *)((uintptr_t)pointer - \
+                (uintptr_t)&(((struct_type *)0)->member)))
 
 struct vr_qelem {
     struct vr_qelem *q_next;

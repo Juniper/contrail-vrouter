@@ -167,7 +167,7 @@ extern int vr_send_interface_get(struct nl_client *, unsigned int,
 extern int vr_send_interface_delete(struct nl_client *, unsigned int,
         char *, int);
 extern int vr_send_interface_add(struct nl_client *, int, char *, int,
-        int, int, int, unsigned int, unsigned int, int8_t *, int8_t);
+        int, int, int, unsigned int, unsigned int, int8_t *, int8_t, const char *);
 extern vr_interface_req *vr_interface_req_get_copy(vr_interface_req *);
 extern void vr_interface_req_destroy(vr_interface_req *);
 

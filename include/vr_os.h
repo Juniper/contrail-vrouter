@@ -7,6 +7,13 @@
 #ifndef __VR_OS_H__
 #define __VR_OS_H__
 
+#ifndef _WIN32
+#define __attribute__packed__open__                     /* do nothing */
+#define __attribute__packed__close__                    __attribute__((__packed__))
+#define __attribute__format__(...)                      __attribute__((format(__VA_ARGS__)))
+#define __attribute__unused__                           __attribute__((unused))
+#endif
+
 #if defined(__linux__)
 #ifdef __KERNEL__
 
