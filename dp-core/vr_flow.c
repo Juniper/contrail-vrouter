@@ -828,7 +828,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     int valid_src, modified_index = -1;
     unsigned int ip_inc_diff_cksum = 0;
     struct vr_ip *ip;
-    flow_result_t result;
+    flow_result_t result = FLOW_CONSUMED;
 
     struct vr_forwarding_md mirror_fmd;
     struct vr_nexthop *src_nh;
@@ -841,14 +841,14 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     src_nh = __vrouter_get_nexthop(router, fe->fe_src_nh_index);
     if (!src_nh) {
         vr_pfree(pkt, VP_DROP_INVALID_NH);
-        return FLOW_CONSUMED;
+        goto res;
     }
 
     if (src_nh->nh_validate_src) {
         valid_src = src_nh->nh_validate_src(pkt, src_nh, fmd, &modified_index);
         if (valid_src == NH_SOURCE_INVALID) {
             vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
-            return FLOW_CONSUMED;
+            goto res;
         }
 
         if (valid_src == NH_SOURCE_MISMATCH) {
@@ -856,7 +856,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
                                             modified_index, fmd);
             if (valid_src == -1) {
                 vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
-                return FLOW_CONSUMED;
+                goto res;
             }
         }
     }
@@ -922,7 +922,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         }
     }
 
-
+res:
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe, index);
 
