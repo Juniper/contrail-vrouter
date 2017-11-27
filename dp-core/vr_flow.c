@@ -284,7 +284,7 @@ vr_flow_get_rflow_src_info(struct vrouter *router,
 static inline bool
 vr_flow_set_active(struct vr_flow_entry *fe)
 {
-    return __sync_bool_compare_and_swap(&fe->fe_flags,
+    return vr_sync_bool_compare_and_swap_16u(&fe->fe_flags,
             fe->fe_flags & ~VR_FLOW_FLAG_ACTIVE,
             VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_NEW_FLOW);
 }
@@ -334,7 +334,7 @@ vr_flow_stop_modify(struct vrouter *router, struct vr_flow_entry *fe)
     if (!fe)
         return;
 
-    (void)__sync_and_and_fetch(&fe->fe_flags, ~VR_FLOW_FLAG_MODIFIED);
+    (void)vr_sync_and_and_fetch_16u(&fe->fe_flags, ~VR_FLOW_FLAG_MODIFIED);
     return;
 }
 
@@ -346,7 +346,7 @@ vr_flow_start_modify(struct vrouter *router, struct vr_flow_entry *fe)
     flags = fe->fe_flags;
     if (!(flags & (VR_FLOW_FLAG_MODIFIED | VR_FLOW_FLAG_EVICTED |
                     VR_FLOW_FLAG_NEW_FLOW))) {
-        if (__sync_bool_compare_and_swap(&fe->fe_flags, flags,
+        if (vr_sync_bool_compare_and_swap_16u(&fe->fe_flags, flags,
                     flags | VR_FLOW_FLAG_MODIFIED)) {
             return true;
         }
@@ -384,7 +384,7 @@ vr_flow_evict_flow(struct vrouter *router, struct vr_flow_entry *fe)
             (fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
         flags = fe->fe_flags | VR_FLOW_FLAG_ACTIVE |
             VR_FLOW_FLAG_EVICT_CANDIDATE;
-        if (__sync_bool_compare_and_swap(&fe->fe_flags, flags,
+        if (vr_sync_bool_compare_and_swap_16u(&fe->fe_flags, flags,
                 (flags ^ VR_FLOW_FLAG_EVICT_CANDIDATE) |
                 VR_FLOW_FLAG_EVICTED)) {
             vr_flow_stop_modify(router, fe);
@@ -443,7 +443,7 @@ vr_flow_reset_evict(struct vrouter *router, struct vr_flow_entry *fe)
 
     flags = fe->fe_flags;
     if (flags & VR_FLOW_FLAG_EVICT_CANDIDATE) {
-        (void)__sync_bool_compare_and_swap(&fe->fe_flags, flags,
+        (void)vr_sync_bool_compare_and_swap_16u(&fe->fe_flags, flags,
                 (flags ^ VR_FLOW_FLAG_EVICT_CANDIDATE));
     }
 
@@ -614,7 +614,7 @@ vr_flow_fill_pnode(struct vr_packet_node *pnode, struct vr_packet *pkt,
     pnode->pl_vlan = fmd->fmd_vlan;
     pnode->pl_mirror_vlan = fmd->fmd_mirror_data;
 
-    __sync_synchronize();
+    vr_sync_synchronize();
     pnode->pl_packet = pkt;
 
     return;
@@ -636,7 +636,7 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
         goto drop;
     }
 
-    i = __sync_fetch_and_add(&vfq->vfq_entries, 1);
+    i = vr_sync_fetch_and_add_32u(&vfq->vfq_entries, 1);
     if (i >= VR_MAX_FLOW_QUEUE_ENTRIES) {
         drop_reason = VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED;
         goto drop;
@@ -689,7 +689,7 @@ __vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe)
 
     flags = fe->fe_flags;
     if (flags & VR_FLOW_FLAG_ACTIVE) {
-        flags = __sync_fetch_and_or(&fe->fe_flags,
+        flags = vr_sync_fetch_and_or_16u(&fe->fe_flags,
                 VR_FLOW_FLAG_EVICT_CANDIDATE);
         if (!(flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
             return true;
@@ -812,7 +812,7 @@ vr_flow_update_ecmp_index(struct vrouter *router, struct vr_flow_entry *fe,
         return -1;
 
     /* If RPF verification is manipulating this flow, let it succeed */
-    (void)__sync_bool_compare_and_swap(&fe->fe_ecmp_nh_index,
+    (void)vr_sync_bool_compare_and_swap_8s(&fe->fe_ecmp_nh_index,
                                 fmd->fmd_ecmp_nh_index, new_ecmp_index);
 
     fmd->fmd_ecmp_nh_index = fe->fe_ecmp_nh_index;
@@ -998,11 +998,11 @@ vr_do_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         stats_p = &stats;
     }
 
-    new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_bytes, pkt_len(pkt));
+    new_stats = vr_sync_add_and_fetch_32u(&fe->fe_stats.flow_bytes, pkt_len(pkt));
     if (new_stats < pkt_len(pkt))
         fe->fe_stats.flow_bytes_oflow++;
 
-    new_stats = __sync_add_and_fetch(&fe->fe_stats.flow_packets, 1);
+    new_stats = vr_sync_add_and_fetch_32u(&fe->fe_stats.flow_packets, 1);
     if (!new_stats)
         fe->fe_stats.flow_packets_oflow++;
 
@@ -1092,7 +1092,7 @@ vr_flow_start_burst_processing(struct vrouter *router)
         if (!infop->vfti_timer->vt_stop_timer)
             return;
 
-        if (__sync_bool_compare_and_swap(
+        if (vr_sync_bool_compare_and_swap_32u(
                  &infop->vfti_timer->vt_stop_timer, 1, 0)) {
             infop->vfti_timer->vt_msecs = infop->vfti_burst_interval_configured;
             vr_restart_timer(infop->vfti_timer);
@@ -1120,15 +1120,15 @@ vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry
     flow_e->fe_action = VR_FLOW_ACTION_HOLD;
 
     if (infop->vfti_hold_count[cpu] + 1 < infop->vfti_hold_count[cpu]) {
-        (void)__sync_add_and_fetch(&infop->vfti_oflows, 1);
+        (void)vr_sync_add_and_fetch_32u(&infop->vfti_oflows, 1);
         act_count = infop->vfti_action_count;
         if (act_count > infop->vfti_hold_count[cpu]) {
-           (void)__sync_sub_and_fetch(&infop->vfti_action_count,
+           (void)vr_sync_sub_and_fetch_64u(&infop->vfti_action_count,
                     infop->vfti_hold_count[cpu]);
             infop->vfti_hold_count[cpu] = 0;
         } else {
             infop->vfti_hold_count[cpu] -= act_count;
-            (void)__sync_sub_and_fetch(&infop->vfti_action_count,
+            (void)vr_sync_sub_and_fetch_64u(&infop->vfti_action_count,
                     act_count);
         }
     }
@@ -1136,7 +1136,7 @@ vr_flow_entry_set_hold(struct vrouter *router, struct vr_flow_entry
     infop->vfti_hold_count[cpu]++;
 
     if (burst == true) {
-        (void)__sync_add_and_fetch(&infop->vfti_burst_used, 1);
+        (void)vr_sync_add_and_fetch_64u(&infop->vfti_burst_used, 1);
         vr_flow_start_burst_processing(router);
     }
 
@@ -1149,10 +1149,10 @@ vr_flow_init_close(struct vrouter *router, struct vr_flow_entry *flow_e,
 {
     struct vr_flow_entry *rfe;
 
-    (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags, VR_FLOW_TCP_DEAD);
+    (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags, VR_FLOW_TCP_DEAD);
     rfe = vr_flow_get_entry(router, flow_e->fe_rflow);
     if (rfe) {
-        (void)__sync_fetch_and_or(&rfe->fe_tcp_flags, VR_FLOW_TCP_DEAD);
+        (void)vr_sync_fetch_and_or_16u(&rfe->fe_tcp_flags, VR_FLOW_TCP_DEAD);
     }
 
     return;
@@ -1187,7 +1187,7 @@ vr_flow_tcp_rflow_set(struct vrouter *router, struct vr_flow_entry *fe,
         flags |= (VR_FLOW_TCP_ESTABLISHED | VR_FLOW_TCP_ESTABLISHED_R);
     }
 
-    (void)__sync_fetch_and_or(&fe->fe_tcp_flags, flags);
+    (void)vr_sync_fetch_and_or_16u(&fe->fe_tcp_flags, flags);
     return;
 }
 
@@ -1247,12 +1247,12 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
         tcp_offset_flags = ntohs(tcph->tcp_offset_r_flags);
         /* if we get a reset, session has to be closed */
         if (tcp_offset_flags & VR_TCP_FLAG_RST) {
-            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags,
+            (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags,
                     VR_FLOW_TCP_RST);
             if (flow_e->fe_flags & VR_RFLOW_VALID) {
                 rflow_e = vr_flow_get_entry(router, flow_e->fe_rflow);
                 if (rflow_e) {
-                    (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                    (void)vr_sync_fetch_and_or_16u(&rflow_e->fe_tcp_flags,
                             VR_FLOW_TCP_RST);
                 }
             }
@@ -1261,18 +1261,18 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
         } else if (tcp_offset_flags & VR_TCP_FLAG_SYN) {
             /* if only a SYN... */
             flow_e->fe_tcp_seq = ntohl(tcph->tcp_seq);
-            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags, VR_FLOW_TCP_SYN);
+            (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags, VR_FLOW_TCP_SYN);
             if (flow_e->fe_flags & VR_RFLOW_VALID) {
                 rflow_e = vr_flow_get_entry(router, flow_e->fe_rflow);
                 if (rflow_e) {
-                    (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                    (void)vr_sync_fetch_and_or_16u(&rflow_e->fe_tcp_flags,
                             VR_FLOW_TCP_SYN_R);
                     if ((flow_e->fe_tcp_flags & VR_FLOW_TCP_SYN_R) &&
                             (tcp_offset_flags & VR_TCP_FLAG_ACK)) {
                         if (ntohl(tcph->tcp_ack) == (rflow_e->fe_tcp_seq + 1)) {
-                            (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                            (void)vr_sync_fetch_and_or_16u(&rflow_e->fe_tcp_flags,
                                     VR_FLOW_TCP_ESTABLISHED);
-                            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags,
+                            (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags,
                                      VR_FLOW_TCP_ESTABLISHED_R);
                         }
                     }
@@ -1287,7 +1287,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
              */
             length -= (((tcp_offset_flags) >> 12) * 4);
             flow_e->fe_tcp_seq = ntohl(tcph->tcp_seq) + length;
-            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags, VR_FLOW_TCP_FIN);
+            (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags, VR_FLOW_TCP_FIN);
             /*
              * when an ack for a FIN is sent, we need to take some actions
              * on the reverse flow (since FIN came in the reverse flow). to
@@ -1299,7 +1299,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
             if (flow_e->fe_flags & VR_RFLOW_VALID) {
                 rflow_e = vr_flow_get_entry(router, flow_e->fe_rflow);
                 if (rflow_e) {
-                    (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                    (void)vr_sync_fetch_and_or_16u(&rflow_e->fe_tcp_flags,
                             VR_FLOW_TCP_FIN_R);
                 }
             }
@@ -1327,7 +1327,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
                 if (rflow_e) {
                     if ((ntohl(tcph->tcp_ack) == (rflow_e->fe_tcp_seq + 1)) &&
                             (flow_e->fe_tcp_flags & VR_FLOW_TCP_FIN_R)) {
-                        (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                        (void)vr_sync_fetch_and_or_16u(&rflow_e->fe_tcp_flags,
                                 VR_FLOW_TCP_HALF_CLOSE);
                         /*
                          * both the forward and the reverse flows are
@@ -1339,9 +1339,9 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
                     } else if (ntohl(tcph->tcp_ack) != rflow_e->fe_tcp_seq) {
                         if (!(flow_e->fe_tcp_flags &
                                     VR_FLOW_TCP_ESTABLISHED_R)) {
-                            (void)__sync_fetch_and_or(&rflow_e->fe_tcp_flags,
+                            (void)vr_sync_fetch_and_or_16u(&rflow_e->fe_tcp_flags,
                                     VR_FLOW_TCP_ESTABLISHED);
-                            (void)__sync_fetch_and_or(&flow_e->fe_tcp_flags,
+                            (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags,
                                      VR_FLOW_TCP_ESTABLISHED_R);
                         }
                     }
@@ -1713,7 +1713,7 @@ vr_flush_entry(struct vrouter *router, struct vr_flow_entry *fe,
         if (fe->fe_action == VR_FLOW_ACTION_HOLD)
             return;
 
-        swapped = __sync_bool_compare_and_swap(&fe->fe_hold_list, vfq, NULL);
+        swapped = vr_sync_bool_compare_and_swap_p(&fe->fe_hold_list, vfq, NULL);
         if (swapped) {
             __vr_flow_flush_hold_queue(router, fe, fmd, vfq);
             if (!vdd || !vdd->vdd_data)
@@ -2183,7 +2183,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
         if ((fe->fe_action == VR_FLOW_ACTION_HOLD) &&
             ((req->fr_action != fe->fe_action) ||
              !(req->fr_flags & VR_FLOW_FLAG_ACTIVE))) {
-            __sync_fetch_and_add(&infop->vfti_action_count, 1);
+            vr_sync_fetch_and_add_64u(&infop->vfti_action_count, 1);
         } else {
             infop->vfti_changed++;
         }
@@ -2260,7 +2260,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
     vr_flow_update_link_local_port(router, req, fe);
 
     if (fe->fe_ecmp_nh_index == -1)
-        (void)__sync_bool_compare_and_swap(&fe->fe_ecmp_nh_index, -1,
+        (void)vr_sync_bool_compare_and_swap_8s(&fe->fe_ecmp_nh_index, -1,
                 req->fr_ecmp_nh_index);
 
     fe->fe_src_nh_index = req->fr_src_nh_index;

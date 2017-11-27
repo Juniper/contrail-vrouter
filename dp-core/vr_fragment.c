@@ -522,7 +522,7 @@ vr_fragment_enqueue(struct vrouter *router,
         tail = *tailp;
         fqe->fqe_next = tail;
         vfq->vfq_length++;
-        swapped = __sync_bool_compare_and_swap(tailp, tail, fqe);
+        swapped = vr_sync_bool_compare_and_swap_p(tailp, tail, fqe);
         if (swapped) {
             if (tail == NULL)
                 vfq->vfq_length = 1;

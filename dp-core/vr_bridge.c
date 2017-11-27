@@ -156,7 +156,7 @@ __bridge_table_add(struct vr_route_req *rt)
     ret = -EAGAIN;
     for (i = 0; i < 10; i++) {
         flags = be->be_flags;
-        if (__sync_bool_compare_and_swap(&be->be_flags, flags,
+        if (vr_sync_bool_compare_and_swap_16u(&be->be_flags, flags,
                 VR_BE_VALID_FLAG | rt->rtr_req.rtr_label_flags)) {
             ret = 0;
             break;
@@ -378,7 +378,7 @@ vr_bridge_set_route_flags(struct vr_bridge_entry *be, unsigned short flags)
                 return -EEXIST;
 
             flags = VR_BRIDGE_FLAG_MASK(flags);
-            be_flags = __sync_val_compare_and_swap(&be->be_flags, be_flags,
+            be_flags = vr_sync_val_compare_and_swap_16u(&be->be_flags, be_flags,
                     flags | be_flags);
 
             if ((be_flags & flags) == flags)
@@ -706,7 +706,7 @@ bridge_table_lock(struct vr_interface *vif, uint8_t *mac)
 
     vr_get_mono_time(&t1s, &t1ns);
     while (lock) {
-        lock = __sync_lock_test_and_set(&bridge_table_lock[hash], lock);
+        lock = vr_sync_lock_test_and_set_8u(&bridge_table_lock[hash], lock);
         if (lock) {
             vr_get_mono_time(&t2s, &t2ns);
             if (t2ns >= t1ns) {
@@ -792,7 +792,7 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
             ml_res = MAC_MOVED;
     }
 
-    __sync_fetch_and_add(&be->be_packets, 1);
+    vr_sync_fetch_and_add_64u(&be->be_packets, 1);
 
     if (trap) {
         pkt_c = pkt_cow(pkt, 0);
@@ -931,7 +931,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         }
 
         if (be)
-            __sync_fetch_and_add(&be->be_packets, 1);
+            vr_sync_fetch_and_add_64u(&be->be_packets, 1);
 
         if (nh->nh_type != NH_L2_RCV)
             overlay_len = VROUTER_L2_OVERLAY_LEN;
