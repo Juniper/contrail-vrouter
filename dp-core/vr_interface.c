@@ -1611,7 +1611,7 @@ vif_free(struct vr_interface *vif)
 void
 vrouter_put_interface(struct vr_interface *vif)
 {
-    if (!__sync_sub_and_fetch(&vif->vif_users, 1))
+    if (!vr_sync_sub_and_fetch_32u(&vif->vif_users, 1))
         vif_free(vif);
 
     return;
@@ -1650,7 +1650,7 @@ vrouter_get_interface(unsigned int rid, unsigned int idx)
 
     vif = __vrouter_get_interface(router, idx);
     if (vif)
-        (void)__sync_add_and_fetch(&vif->vif_users, 1);
+        (void)vr_sync_add_and_fetch_32u(&vif->vif_users, 1);
 
     return vif;
 }

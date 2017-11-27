@@ -7,6 +7,31 @@
 #ifndef __VR_OS_H__
 #define __VR_OS_H__
 
+#ifndef _WIN32
+#define vr_sync_sub_and_fetch_16u(a, b)                 __sync_sub_and_fetch((uint16_t*)(a), (uint16_t)(b))
+#define vr_sync_sub_and_fetch_32u(a, b)                 __sync_sub_and_fetch((uint32_t*)(a), (uint32_t)(b))
+#define vr_sync_sub_and_fetch_32s(a, b)                 __sync_sub_and_fetch((int32_t*)(a), (int32_t)(b))
+#define vr_sync_sub_and_fetch_64u(a, b)                 __sync_sub_and_fetch((uint64_t*)(a), (uint64_t)(b))
+#define vr_sync_sub_and_fetch_64s(a, b)                 __sync_sub_and_fetch((int64_t*)(a), (int64_t)(b))
+#define vr_sync_add_and_fetch_16u(a, b)                 __sync_add_and_fetch((uint16_t*)(a), (uint16_t)(b))
+#define vr_sync_add_and_fetch_32u(a, b)                 __sync_add_and_fetch((uint32_t*)(a), (uint32_t)(b))
+#define vr_sync_add_and_fetch_64u(a, b)                 __sync_add_and_fetch((uint64_t*)(a), (uint64_t)(b))
+#define vr_sync_fetch_and_add_32u(a, b)                 __sync_fetch_and_add((uint32_t*)(a), (uint32_t)(b))
+#define vr_sync_fetch_and_add_64u(a, b)                 __sync_fetch_and_add((uint64_t*)(a), (uint64_t)(b))
+#define vr_sync_fetch_and_or_16u(a, b)                  __sync_fetch_and_or((uint16_t*)(a), (uint16_t)(b))
+#define vr_sync_and_and_fetch_16u(a, b)                 __sync_and_and_fetch((uint16_t*)(a), (uint16_t)(b))
+#define vr_sync_and_and_fetch_32u(a, b)                 __sync_and_and_fetch((uint32_t*)(a), (uint32_t)(b))
+#define vr_sync_bool_compare_and_swap_8s(a, b, c)       __sync_bool_compare_and_swap((int8_t*)(a), (int8_t)(b), (int8_t)(c))
+#define vr_sync_bool_compare_and_swap_8u(a, b, c)       __sync_bool_compare_and_swap((uint8_t*)(a), (uint8_t)(b), (uint8_t)(c))
+#define vr_sync_bool_compare_and_swap_16u(a, b, c)      __sync_bool_compare_and_swap((uint16_t*)(a), (uint16_t)(b), (uint16_t)(c))
+#define vr_sync_bool_compare_and_swap_32u(a, b, c)      __sync_bool_compare_and_swap((uint32_t*)(a), (uint32_t)(b), (uint32_t)(c))
+#define vr_sync_bool_compare_and_swap_p(a, b, c)        __sync_bool_compare_and_swap((void**)(a), (void*)(b), (void*)(c))
+#define vr_sync_val_compare_and_swap_16u(a, b, c)       __sync_val_compare_and_swap((uint16_t*)(a), (uint16_t)(b), (uint16_t)(c))
+#define vr_sync_lock_test_and_set_8u(a, b)              __sync_lock_test_and_set((uint8_t*)(a), (uint8_t)(b))
+#define vr_sync_synchronize                             __sync_synchronize
+#define vr_ffs_32(a)                                    __builtin_ffs(a)
+#endif
+
 #if defined(__linux__)
 #ifdef __KERNEL__
 
@@ -58,9 +83,6 @@ typedef unsigned short __u16;
 
 typedef __signed__ int __s32;
 typedef unsigned int __u32;
-
-#define true 1
-#define false 0
 
 #endif /* __KERNEL__ */
 #endif /* __linux__ */

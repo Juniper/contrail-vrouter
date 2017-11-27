@@ -53,7 +53,7 @@ vrouter_get_nexthop(unsigned int rid, unsigned int index)
     router = vrouter_get(rid);
     nh = __vrouter_get_nexthop(router, index);
     if (nh)
-        (void)__sync_add_and_fetch(&nh->nh_users, 1);
+        (void)vr_sync_add_and_fetch_32u(&nh->nh_users, 1);
 
     return nh;
 }
@@ -172,7 +172,7 @@ vrouter_put_nexthop(struct vr_nexthop *nh)
     /* This function might get invoked with zero ref_cnt */
     ref_cnt = nh->nh_users;
     if (ref_cnt) {
-        ref_cnt = __sync_sub_and_fetch(&nh->nh_users, 1);
+        ref_cnt = vr_sync_sub_and_fetch_32u(&nh->nh_users, 1);
     }
 
     if (!ref_cnt ) {
