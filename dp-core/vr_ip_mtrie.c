@@ -118,7 +118,7 @@ set_entry_to_bucket(struct ip_bucket_entry *ent, struct ip_bucket *bkt)
     /* save old... */
     tmp_nh = ent->entry_nh_p;
     /* update... */
-    ent->entry_long_i = (unsigned long)bkt | 0x1ul;
+    ent->entry_long_i = (uintptr_t)bkt | 0x1ul;
     /* release old */
     if (tmp_nh)
         vrouter_put_nexthop(tmp_nh);
@@ -157,7 +157,7 @@ set_entry_to_nh(struct ip_bucket_entry *entry, struct vr_nexthop *nh)
     entry->entry_nh_p = nh;
 
     /* ...and then take steps to release original */
-    if (tmp_nh && PTR_IS_NEXTHOP((unsigned long)(tmp_nh))) {
+    if (tmp_nh && PTR_IS_NEXTHOP((uintptr_t)(tmp_nh))) {
         vrouter_put_nexthop(tmp_nh);
     }
 
@@ -167,10 +167,10 @@ set_entry_to_nh(struct ip_bucket_entry *entry, struct vr_nexthop *nh)
 static inline struct ip_bucket *
 entry_to_bucket(struct ip_bucket_entry *ent)
 {
-    unsigned long long_i = ent->entry_long_i;
+    uintptr_t long_i = ent->entry_long_i;
 
     if (PTR_IS_BUCKET(long_i))
-        return (struct ip_bucket *)(long_i & ~0x1UL);
+        return (struct ip_bucket *)(long_i & ~(uintptr_t)0x1);
 
     return NULL;
 }
@@ -847,7 +847,7 @@ static struct vr_nexthop *
 __mtrie_lookup(struct vr_route_req *rt, struct ip_bucket *bkt, unsigned int level)
 {
     unsigned int i, limit, index;
-    unsigned long ptr;
+    uintptr_t ptr;
 
     struct ip_bucket_entry *ent;
     struct mtrie_bkt_info *ip_bkt_info;
@@ -921,7 +921,7 @@ static struct vr_nexthop *
 mtrie_lookup(unsigned int vrf_id, struct vr_route_req *rt)
 {
     unsigned int level = 0;
-    unsigned long ptr;
+    uinptr_t ptr;
 
     struct ip_mtrie *table;
     struct ip_bucket *bkt;
@@ -980,7 +980,7 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     int ret;
     struct vr_route_req tmp_req;
 
-    mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id, rt->rtr_req.rtr_family));
+    mtrie = (mtrie ? mtrie : mtrie_alloc_vrf(vrf_id, rt->rtr_req.rtr_family));
     if (!mtrie)
         return -ENOMEM;
 

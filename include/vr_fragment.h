@@ -13,6 +13,7 @@
 #define VR_MAX_FRAGMENTS_PER_CPU_QUEUE          256
 #define VR_FRAG_ENQUEUE_ATTEMPTS                3
 
+__attribute__packed__open__
 struct vr_fragment_key {
     uint64_t fk_sip_u;
     uint64_t fk_sip_l;
@@ -20,7 +21,7 @@ struct vr_fragment_key {
     uint64_t fk_dip_l;
     uint32_t fk_id;
     unsigned short fk_vrf;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
 struct vr_fragment_queue_element {
     struct vrouter *fqe_router;
@@ -33,6 +34,7 @@ struct vr_fragment_queue {
     struct vr_fragment_queue_element *vfq_tail;
 };
 
+__attribute__packed__open__
 struct vr_fragment {
     vr_hentry_t f_hentry;
     /* packing to make sure that members are aligned */
@@ -46,7 +48,7 @@ struct vr_fragment {
     uint16_t f_expected;
     uint16_t f_received;
     bool f_port_info_valid;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
 #define f_sip_u f_key.fk_sip_u
 #define f_sip_l f_key.fk_sip_l

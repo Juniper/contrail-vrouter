@@ -8,10 +8,11 @@
 
 #include "vr_packet.h"
 
+__attribute__packed__open__
 struct vr_gro {
     uint16_t vg_vif_id;
     uint16_t vg_nh_id;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
 static inline bool
 well_known_mac(unsigned char *dmac)
