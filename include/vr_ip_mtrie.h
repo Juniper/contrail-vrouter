@@ -15,19 +15,19 @@ struct ip_bucket;
  * Override the least significant bit of a pointer to indicate whether it
  * points to a bucket or nexthop.
  */
-#define ENTRY_IS_BUCKET(EPtr)        (((EPtr)->entry_long_i) & 0x1ul)
+#define ENTRY_IS_BUCKET(EPtr)        (((EPtr)->entry_long_i) & (uinptr_t)0x1)
 #define ENTRY_IS_NEXTHOP(EPtr)       !ENTRY_IS_BUCKET(EPtr)
 
-#define PTR_IS_BUCKET(ptr)           ((ptr) & 0x1ul)
+#define PTR_IS_BUCKET(ptr)           ((ptr) & (uinptr_t)0x1)
 #define PTR_IS_NEXTHOP(ptr)          !PTR_IS_BUCKET(ptr)
-#define PTR_TO_BUCKET(ptr)           ((struct ip_bucket *)((ptr) ^ 0x1ul))
+#define PTR_TO_BUCKET(ptr)           ((struct ip_bucket *)((ptr) ^ (uinptr_t)0x1))
 #define PTR_TO_NEXTHOP(ptr)          ((struct vr_nexthop *)(ptr))
 
 struct ip_bucket_entry {
     union {
         struct vr_nexthop *nexthop_p;
         struct ip_bucket  *bucket_p;
-        unsigned long      long_i;
+        uinptr_t           long_i;
     } entry_data;                  
 
     unsigned int entry_prefix_len:8;

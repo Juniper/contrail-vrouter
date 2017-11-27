@@ -138,8 +138,8 @@ extern uint32_t vr_hashrnd;
 extern unsigned int vr_priority_tagging;
 
 #define CONTAINER_OF(member, struct_type, pointer) \
-    ((struct_type *)((unsigned long)pointer - \
-                (size_t)&(((struct_type *)0)->member)))
+    ((struct_type *)((uinptr_t)pointer - \
+                (uinptr_t)&(((struct_type *)0)->member)))
 
 
 typedef void(*vr_defer_cb)(struct vrouter *router, void *user_data);
@@ -155,8 +155,7 @@ struct vr_timer {
 };
 
 struct host_os {
-    int (*hos_printf)(const char *, ...)
-            __attribute__((format(printf, 1, 2)));
+    int (*hos_printf)(const char *, ...) __attribute__format__(printf, 1, 2);
     void *(*hos_malloc)(unsigned int, unsigned int);
     void *(*hos_zalloc)(unsigned int, unsigned int);
     void (*hos_free)(void *, unsigned int);
@@ -287,11 +286,12 @@ struct vr_malloc_stats {
 
 extern unsigned int vr_memory_alloc_checks;
 
+__attribute__packed__open__
 struct vr_malloc_md {
     char vmm_magic[3];
     uint8_t vmm_state;
     unsigned int vmm_object;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
 static inline void
 vr_malloc_md_set(void *mem, unsigned int object)
