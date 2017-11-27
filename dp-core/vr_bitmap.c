@@ -56,16 +56,16 @@ vr_bitmap_alloc_bit(vr_bmap_t b)
                     (j < VR_BITMAP_STRIDE_LEN)); j++) {
             data = bmap->bmap_data[stride_num];
 
-            free_bit = __builtin_ffs(~data);
+            free_bit = vr_ffs_32(~data);
             /* If there is no free bit goto next byte */
             if (!free_bit)
                 break;
 
             free_bit -= 1;
-            if (__sync_bool_compare_and_swap(&bmap->bmap_data[stride_num],
+            if (vr_sync_bool_compare_and_swap_32u(&bmap->bmap_data[stride_num],
                                 data, (data | (1 << free_bit)))) {
                 bmap->bmap_last_free_stride = stride_num;
-                (void)__sync_add_and_fetch(&bmap->bmap_used_bits, 1);
+                (void)vr_sync_add_and_fetch_32u(&bmap->bmap_used_bits, 1);
                 return ((stride_num * VR_BITMAP_STRIDE_LEN) + free_bit);
             }
         }
@@ -95,9 +95,9 @@ vr_bitmap_clear_bit(vr_bmap_t b, unsigned int bit)
     if (!bmap || bit >= bmap->bmap_bits)
         return false;
 
-    (void)__sync_and_and_fetch(&bmap->bmap_data[(bit / VR_BITMAP_STRIDE_LEN)],
+    (void)vr_sync_and_and_fetch_32u(&bmap->bmap_data[(bit / VR_BITMAP_STRIDE_LEN)],
                             (~(1 << (bit % VR_BITMAP_STRIDE_LEN))));
-    (void)__sync_sub_and_fetch(&bmap->bmap_used_bits, 1);
+    (void)vr_sync_sub_and_fetch_32u(&bmap->bmap_used_bits, 1);
 
     return true;
 }

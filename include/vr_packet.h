@@ -13,6 +13,7 @@
 #include "vr_btable.h"
 #include "vr_bridge.h"
 #include "vr_mirror.h"
+#include "vr_os.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -1435,7 +1436,7 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
      * over
      */
     if (vif->vif_drop_stats) {
-        (void)__sync_add_and_fetch(vif->vif_drop_stats + reason, count);
+        (void)vr_sync_add_and_fetch_64u(vif->vif_drop_stats + reason, count);
     }
 
     return;
