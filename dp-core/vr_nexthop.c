@@ -1037,7 +1037,7 @@ nh_handle_unknown_unicast(struct vr_packet *pkt, struct vr_eth *eth,
         return !handled;
 
     /* Get the packet to eth header */
-    pull_len = (unsigned long)eth - (unsigned long)pkt_data(pkt);
+    pull_len = (uintptr_t)eth - (uintptr_t)pkt_data(pkt);
     if (pull_len)
         pkt_pull(pkt, pull_len);
 

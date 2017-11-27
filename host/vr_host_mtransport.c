@@ -7,6 +7,7 @@
 #include "vr_types.h"
 #include "vr_queue.h"
 #include "vr_message.h"
+#include "vrouter.h"
 
 #define VR_HTRANSPORT_MAX_REQUESTS        1
 
