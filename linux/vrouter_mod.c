@@ -2275,6 +2275,13 @@ lh_soft_reset(struct vrouter *router)
     return;
 }
 
+static void
+lh_register_nic(struct vr_interface* vif __attribute__((unused)),
+                vr_interface_req* vifr __attribute__((unused)))
+{
+    // This callback is Windows-specific and does not need to be implemented on Linux
+}
+
 
 /*
  * This functions configures the huge pages in kernel based Vrouter
@@ -2364,6 +2371,7 @@ struct host_os linux_host = {
     .hos_get_log_level              =       lh_get_log_level,
     .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
     .hos_soft_reset                 =       lh_soft_reset,
+    .hos_register_nic               =       lh_register_nic,
     .hos_nl_broadcast_supported     =       true,
     .hos_huge_page_config           =       lh_huge_page_config,
     .hos_huge_page_mem_get          =       lh_huge_mem_get,
