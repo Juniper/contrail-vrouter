@@ -551,7 +551,6 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
     unsigned char mac[VR_ETHER_ALEN];
     struct vr_icmp *icmph;
     struct vr_route_req rt;
-    struct vr_ip6 *ip6;
 
     if (fmd->fmd_vlan != VLAN_ID_INVALID)
         return MR_FLOOD;
@@ -568,35 +567,6 @@ vm_neighbor_request(struct vr_interface *vif, struct vr_packet *pkt,
     rt.rtr_req.rtr_prefix_size = 16;
     rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
     rt.rtr_req.rtr_mac = mac;
-    /*
-     * If request is coming from other compute nodes, and if that
-     * particular compute node is part of ECMP, we need to route these
-     * packets though we have stiched mac for VM, as packets from VM to
-     * that ECMP are routed packets
-     * Neighbor requests from Tor have to be flooded so that required nodes
-     * will answer that
-     */
-    if ((fmd->fmd_src != TOR_SOURCE) && (fmd->fmd_src != TOR_EVPN_SOURCE)) {
-        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-        if (!ip6)
-            return MR_DROP;
-
-        memcpy(rt.rtr_req.rtr_prefix, ip6->ip6_src, 16);
-        vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
-
-        if (rt.rtr_nh->nh_type == NH_COMPOSITE) {
-            /* The source of ARP request can not be anything other than ECMP */
-            if (!(rt.rtr_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))
-                return MR_DROP;
-
-            /* Mark it as ecmp source. -1 is invalid */
-            fmd->fmd_ecmp_src_nh_index = 0;
-        }
-
-        rt.rtr_nh = NULL;
-        rt.rtr_req.rtr_prefix_len = IP6_PREFIX_LEN;
-        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    }
 
     icmph = (struct vr_icmp *)pkt_data(pkt);
     memcpy(rt.rtr_req.rtr_prefix, icmph->icmp_data, 16);

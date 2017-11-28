@@ -1120,35 +1120,6 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
     rt.rtr_req.rtr_prefix_size = 4;
     rt.rtr_req.rtr_prefix_len = 32;
     rt.rtr_req.rtr_mac = mac;
-
-    /*
-     * If ARP request is coming from other compute nodes, and if that
-     * particular compute node is part of ECMP, we need to route these
-     * packets though we have stiched mac for VM, as packets from VM to
-     * that ECMP are routed packets
-     * ARP requests from Tor have to be flooded so that required nodes
-     * will answer that
-     */
-    if (((fmd->fmd_src != TOR_SOURCE) &&
-                (fmd->fmd_src != TOR_EVPN_SOURCE)) && !vr_grat_arp(sarp)) {
-        *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_spa);
-        vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
-
-        if (rt.rtr_nh->nh_type == NH_COMPOSITE) {
-            /* The source of ARP request can not be anything other than ECMP */
-            if (!(rt.rtr_nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))
-                return MR_DROP;
-
-            /* Mark it as ecmp source. -1 is invalid */
-            fmd->fmd_ecmp_src_nh_index = 0;
-        }
-
-        rt.rtr_nh = NULL;
-        rt.rtr_req.rtr_prefix_len = 32;
-        rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
-    }
-
-
     *(uint32_t *)rt.rtr_req.rtr_prefix = (sarp->arp_dpa);
     vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
 
