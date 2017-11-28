@@ -36,140 +36,160 @@
 
 extern struct nl_response *nl_parse_gen(struct nl_client *);
 
-extern void vrouter_ops_process (void *a) __attribute__((weak));
-extern void vr_flow_req_process(void *s_req) __attribute__((weak));
-extern void vr_flow_response_process(void *s_req) __attribute__((weak));
-extern void vr_route_req_process(void *s_req) __attribute__((weak));
-extern void vr_interface_req_process(void *s_req) __attribute__((weak));
-extern void vr_mpls_req_process(void *s_req) __attribute__((weak));
-extern void vr_mirror_req_process(void *s_req) __attribute__((weak));
-extern void vr_response_process(void *s_req) __attribute__((weak));
-extern void vr_nexthop_req_process(void *s_req) __attribute__((weak));
-extern void vr_vrf_assign_req_process(void *s_req) __attribute__((weak));
-extern void vr_vrf_stats_req_process(void *s_req) __attribute__((weak));
-extern void vr_drop_stats_req_process(void *s_req) __attribute__((weak));
-extern void vr_vxlan_req_process(void *s_req) __attribute__((weak));
-extern void vr_mem_stats_req_process(void *s_req) __attribute__((weak));
-extern void vr_fc_map_req_process(void *s_req) __attribute__((weak));
-extern void vr_qos_map_req_process(void *s_req) __attribute__((weak));
-extern void vr_flow_table_data_process(void *s_req) __attribute__((weak));
-extern void vr_bridge_table_data_process(void *s_req) __attribute__((weak));
-extern void vr_hugepage_config_process(void *s_req) __attribute__((weak));
+struct nl_sandesh_callbacks nl_cb;
 
 void
 vrouter_ops_process(void *s_req)
 {
-    return;
+    if (nl_cb.vrouter_ops_process) {
+        nl_cb.vrouter_ops_process(s_req);
+    }
 }
 
 void
 vr_nexthop_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_nexthop_req_process) {
+        nl_cb.vr_nexthop_req_process(s_req);
+    }
 }
 
 
 void
 vr_flow_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_flow_req_process) {
+        nl_cb.vr_flow_req_process(s_req);
+    }
 }
 
 void
-vr_flow_response_process(void *s__req)
+vr_flow_response_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_flow_response_process) {
+        nl_cb.vr_flow_response_process(s_req);
+    }
 }
 
 void
-vr_flow_table_data_process(void *s__req)
+vr_flow_table_data_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_flow_table_data_process) {
+        nl_cb.vr_flow_table_data_process(s_req);
+    }
 }
 
 void
 vr_route_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_route_req_process) {
+        nl_cb.vr_route_req_process(s_req);
+    }
 }
 
 void
 vr_interface_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_interface_req_process) {
+        nl_cb.vr_interface_req_process(s_req);
+    }
 }
 
 void
 vr_mpls_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_mpls_req_process) {
+        nl_cb.vr_mpls_req_process(s_req);
+    }
 }
 
 void
 vr_mirror_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_mirror_req_process) {
+        nl_cb.vr_mirror_req_process(s_req);
+    }
 }
 
 void
 vr_response_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_response_process) {
+        nl_cb.vr_response_process(s_req);
+    }
 }
 
 
 void
 vr_vrf_assign_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_vrf_assign_req_process) {
+        nl_cb.vr_vrf_assign_req_process(s_req);
+    }
 }
 
 void
 vr_vrf_stats_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_vrf_stats_req_process) {
+        nl_cb.vr_vrf_stats_req_process(s_req);
+    }
 }
 
 void
 vr_drop_stats_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_drop_stats_req_process) {
+        nl_cb.vr_drop_stats_req_process(s_req);
+    }
 }
 
 void
 vr_vxlan_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_vxlan_req_process) {
+        nl_cb.vr_vxlan_req_process(s_req);
+    }
 }
 
 void
 vr_mem_stats_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_mem_stats_req_process) {
+        nl_cb.vr_mem_stats_req_process(s_req);
+    }
 }
 
 void
 vr_qos_map_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_qos_map_req_process) {
+        nl_cb.vr_qos_map_req_process(s_req);
+    }
 }
 
 void
 vr_fc_map_req_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_fc_map_req_process) {
+        nl_cb.vr_fc_map_req_process(s_req);
+    }
 }
 
 void
 vr_bridge_table_data_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_bridge_table_data_process) {
+        nl_cb.vr_bridge_table_data_process(s_req);
+    }
 }
 
 void
 vr_hugepage_config_process(void *s_req)
 {
-    return;
+    if (nl_cb.vr_hugepage_config_process) {
+        nl_cb.vr_hugepage_config_process(s_req);
+    }
 }
 
 struct nl_response *

@@ -246,8 +246,8 @@ nh_print_newline_header(void)
     return;
 }
 
-void
-vr_nexthop_req_process(void *s_req)
+static void
+nexthop_req_process(void *s_req)
 {
     unsigned int i, printed = 0;
     struct in_addr a;
@@ -387,11 +387,18 @@ vr_nexthop_req_process(void *s_req)
     }
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+nh_fill_nl_callbacks()
+{
+    nl_cb.vr_response_process = response_process;
+    nl_cb.vr_nexthop_req_process = nexthop_req_process;
 }
 
 static int
@@ -887,6 +894,8 @@ int
 main(int argc, char *argv[])
 {
     int opt, ind;
+
+    nh_fill_nl_callbacks();
 
     while ((opt = getopt_long(argc, argv, "",
                     long_options, &ind)) >= 0) {

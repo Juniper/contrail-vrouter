@@ -30,13 +30,19 @@ static struct nl_client *cl;
 static int help_set, core_set;
 static unsigned int core = (unsigned)-1;
 
-void
-vr_drop_stats_req_process(void *s_req)
+static void
+drop_stats_req_process(void *s_req)
 {
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
 
     vr_print_drop_stats(stats, core);
     return;
+}
+
+static void
+dropstats_fill_nl_callbacks()
+{
+    nl_cb.vr_drop_stats_req_process = drop_stats_req_process;
 }
 
 static int
@@ -121,6 +127,8 @@ main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index;
+
+    dropstats_fill_nl_callbacks();
 
     while (((opt = getopt_long(argc, argv, "h:c:",
                         long_options, &option_index)) >= 0)) {

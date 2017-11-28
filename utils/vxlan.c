@@ -33,8 +33,8 @@ static int get_set, nh_set, vnid_set;
 static int help_set, cmd_set;
 static int vxlan_op = -1;
 
-void
-vr_vxlan_req_process(void *s_req)
+static void
+vxlan_req_process(void *s_req)
 {
    vr_vxlan_req *req = (vr_vxlan_req *)s_req;
 
@@ -45,11 +45,18 @@ vr_vxlan_req_process(void *s_req)
    return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+vxlan_fill_nl_callbacks()
+{
+    nl_cb.vr_vxlan_req_process = vxlan_req_process;
+    nl_cb.vr_response_process = response_process;
 }
 
 static int
@@ -220,6 +227,8 @@ validate_options(void)
 int main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+
+    vxlan_fill_nl_callbacks();
 
     while ((opt = getopt_long(argc, argv, "bcdgn:l:",
                     long_options, &option_index)) >= 0) {

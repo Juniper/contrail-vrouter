@@ -71,6 +71,8 @@ static bool dump_pending;
 static void Usage(void);
 static void usage_internal(void);
 
+static void bridge_table_data_process(void *s_req);
+
 #define INET_FAMILY_STRING      "inet"
 #define BRIDGE_FAMILY_STRING    "bridge"
 #define INET6_FAMILY_STRING     "inet6"
@@ -198,8 +200,8 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
     return;
 }
 
-void
-vr_route_req_process(void *s_req)
+static void
+route_req_process(void *s_req)
 {
     int ret = 0, i;
     char addr[INET6_ADDRSTRLEN];
@@ -269,11 +271,19 @@ vr_route_req_process(void *s_req)
     return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+rt_fill_nl_callbacks()
+{
+    nl_cb.vr_response_process = response_process;
+    nl_cb.vr_route_req_process = route_req_process;
+    nl_cb.vr_bridge_table_data_process = bridge_table_data_process;
 }
 
 
@@ -417,8 +427,8 @@ bridge_table_map(vr_bridge_table_data *table)
     return 0;
 }
 
-void
-vr_bridge_table_data_process(void *s_req)
+static void
+bridge_table_data_process(void *s_req)
 {
     vr_bridge_table_data *req = (vr_bridge_table_data *)s_req;
 
@@ -687,6 +697,8 @@ main(int argc, char *argv[])
     int opt;
     int option_index;
     struct ether_addr *cmd_eth;
+
+    rt_fill_nl_callbacks();
 
     cmd_nh_id = -255;
     cmd_label = -1;

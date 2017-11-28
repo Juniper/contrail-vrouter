@@ -143,8 +143,8 @@ static vr_nexthop_req *flow_get_nexthop(int);
 static int flow_table_map(vr_flow_table_data *);
 static int flow_table_get(void);
 
-void
-vr_response_process(void *sresp)
+static void
+response_process(void *sresp)
 {
     vr_response *resp = (vr_response *)sresp;
 
@@ -156,8 +156,8 @@ vr_response_process(void *sresp)
     return;
 }
 
-void
-vr_flow_response_process(void *sresp)
+static void
+flow_response_process(void *sresp)
 {
     if (array_index == -1)
         return;
@@ -169,8 +169,8 @@ vr_flow_response_process(void *sresp)
 }
 
 
-void
-vr_flow_table_data_process(void *sreq)
+static void
+flow_table_data_process(void *sreq)
 {
     vr_flow_table_data *ftable = (vr_flow_table_data *)sreq;
 
@@ -179,8 +179,8 @@ vr_flow_table_data_process(void *sreq)
     return;
 }
 
-void
-vr_interface_req_process(void *arg)
+static void
+interface_req_process(void *arg)
 {
     vr_interface_req *req = (vr_interface_req *)arg;
 
@@ -189,8 +189,8 @@ vr_interface_req_process(void *arg)
     return;
 }
 
-void
-vr_nexthop_req_process(void *arg)
+static void
+nexthop_req_process(void *arg)
 {
     vr_nexthop_req *req = (vr_nexthop_req *)arg;
 
@@ -199,8 +199,8 @@ vr_nexthop_req_process(void *arg)
     return;
 }
 
-void
-vr_route_req_process(void *arg)
+static void
+route_req_process(void *arg)
 {
     vr_route_req *req = (vr_route_req *)arg;
 
@@ -209,14 +209,26 @@ vr_route_req_process(void *arg)
     return;
 }
 
-void
-vr_drop_stats_req_process(void *arg)
+static void
+drop_stats_req_process(void *arg)
 {
     vr_drop_stats_req *req = (vr_drop_stats_req *)arg;
 
     resp_ds = vr_drop_stats_req_get_copy(req);
 
     return;
+}
+
+static void
+flow_fill_nl_callbacks()
+{
+    nl_cb.vr_response_process = response_process;
+    nl_cb.vr_flow_response_process = flow_response_process;
+    nl_cb.vr_flow_table_data_process = flow_table_data_process;
+    nl_cb.vr_interface_req_process = interface_req_process;
+    nl_cb.vr_nexthop_req_process = nexthop_req_process;
+    nl_cb.vr_route_req_process = route_req_process;
+    nl_cb.vr_drop_stats_req_process = drop_stats_req_process;
 }
 
 struct vr_flow_entry *
@@ -2494,6 +2506,8 @@ main(int argc, char *argv[])
     char opt;
     int ret;
     int option_index;
+
+    flow_fill_nl_callbacks();
 
     while ((opt = getopt_long(argc, argv, "d:f:g:i:p:b:lrsF",
                     long_options, &option_index)) >= 0) {
