@@ -672,6 +672,13 @@ fh_get_enabled_log_types(int *size)
 	return NULL;
 }
 
+static void
+fh_register_nic(struct vr_interface* vif __attribute__unused__,
+                vr_interface_req* vifr __attribute__unused__)
+{
+    // This callback is Windows-specific and does not need to be implemented on FreeBSD
+}
+
 struct host_os freebsd_host = {
 	.hos_malloc			= fh_malloc,
 	.hos_zalloc			= fh_zalloc,
@@ -715,6 +722,7 @@ struct host_os freebsd_host = {
 	.hos_set_log_type               = fh_set_log_type,
 	.hos_get_log_level              = fh_get_log_level,
 	.hos_get_enabled_log_types      = fh_get_enabled_log_types,
+	.hos_register_nic				= fh_register_nic, /* not used on FreeBSD */
 	.hos_nl_broadcast_supported     = false,
 };
 

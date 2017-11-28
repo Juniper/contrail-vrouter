@@ -2311,8 +2311,10 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         vif = NULL;
     }
 
-    if (!ret)
+    if (!ret) {
         vrouter_setup_vif(vif);
+        vr_register_nic(vif, req);
+    }
 
 error:
     if (ret && vif)
