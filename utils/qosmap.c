@@ -131,8 +131,8 @@ dump_priority(void)
     return;
 }
 
-void
-vr_fc_map_req_process(void *s)
+static void
+fc_map_req_process(void *s)
 {
     unsigned int i;
     vr_fc_map_req *req = (vr_fc_map_req *)s;
@@ -155,8 +155,8 @@ vr_fc_map_req_process(void *s)
     return;
 }
 
-void
-vr_qos_map_req_process(void *s)
+static void
+qos_map_req_process(void *s)
 {
     unsigned int i;
     vr_qos_map_req *req = (vr_qos_map_req *)s;
@@ -197,11 +197,19 @@ vr_qos_map_req_process(void *s)
     return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+qosmap_fill_nl_callbacks()
+{
+    nl_cb.vr_fc_map_req_process = fc_map_req_process;
+    nl_cb.vr_qos_map_req_process = qos_map_req_process;
+    nl_cb.vr_response_process = response_process;
 }
 
 static int
@@ -777,6 +785,8 @@ main(int argc, char *argv[])
     char opt;
     int ret, option_index;
     unsigned int sock_proto;
+
+    qosmap_fill_nl_callbacks();
 
     while ((opt = getopt_long(argc, argv, "", long_options,
                     &option_index)) >= 0) {

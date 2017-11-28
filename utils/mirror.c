@@ -33,8 +33,8 @@ static int dynamic_set, help_set, cmd_set, vni_set;
 static int mirror_op = -1, mirror_nh;
 static int mirror_index = -1, mirror_flags, vni_id = -1;
 
-void
-vr_mirror_req_process(void *s_req)
+static void
+mirror_req_process(void *s_req)
 {
     vr_mirror_req *req = (vr_mirror_req *)s_req;
     char flags[12];
@@ -61,11 +61,18 @@ vr_mirror_req_process(void *s_req)
     return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+mirror_fill_nl_callbacks()
+{
+    nl_cb.vr_mirror_req_process = mirror_req_process;
+    nl_cb.vr_response_process = response_process;
 }
 
 static int
@@ -251,6 +258,8 @@ validate_options(void)
 int main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+
+    mirror_fill_nl_callbacks();
 
     while ((opt = getopt_long(argc, argv, "bcdgn:m:",
                     long_options, &option_index)) >= 0) {

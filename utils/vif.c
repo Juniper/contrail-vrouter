@@ -285,8 +285,8 @@ vr_interface_print_header(void)
     return;
 }
 
-void
-vr_drop_stats_req_process(void *s_req)
+static void
+drop_stats_req_process(void *s_req)
 {
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
     vr_print_drop_stats(stats, core);
@@ -294,8 +294,8 @@ vr_drop_stats_req_process(void *s_req)
     return;
 }
 
-void
-vr_vrf_assign_req_process(void *s)
+static void
+vrf_assign_req_process(void *s)
 {
     vr_vrf_assign_req *req = (vr_vrf_assign_req *)s;
 
@@ -759,8 +759,8 @@ rate_process(vr_interface_req *req, vr_interface_req *prev_req)
  * For SANDESH_OP_DUMP msg we SHOULD change variable dump_marker;
  * Otherwise we can be in infinity loop.
  */
-void
-vr_interface_req_process(void *s)
+static void
+interface_req_process(void *s)
 {
     vr_interface_req *req = (vr_interface_req *)s;
 
@@ -806,11 +806,20 @@ vr_interface_req_process(void *s)
     return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+vif_fill_nl_callbacks()
+{
+    nl_cb.vr_drop_stats_req_process = drop_stats_req_process;
+    nl_cb.vr_vrf_assign_req_process = vrf_assign_req_process;
+    nl_cb.vr_interface_req_process = interface_req_process;
+    nl_cb.vr_response_process = response_process;
 }
 
 /*
@@ -1488,6 +1497,8 @@ main(int argc, char *argv[])
      * interface in linux or doing an operation in vrouter
      */
     unsigned int sock_proto = NETLINK_GENERIC;
+
+    vif_fill_nl_callbacks();
 
     parse_ini_file();
     platform = get_platform();
