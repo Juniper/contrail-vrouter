@@ -460,6 +460,7 @@ vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
         }
     }
 
+    RTE_LOG(ERR, VROUTER, "Warning! Invalid address %p\n", (void*)paddr);
     return NULL;
 }
 
@@ -675,7 +676,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
     uint64_t buff_addr = 0;
     uint64_t buff_hdr_addr = 0;
     uint32_t head[VR_DPDK_VIRTIO_TX_BURST_SZ];
-    uint32_t head_idx, packet_success = 0;
+    uint32_t head_idx, packet_success = 0, pkt_idx = 0;
     uint16_t avail_idx, res_cur_idx;
     uint16_t res_base_idx, res_end_idx;
     uint16_t free_entries;
@@ -726,6 +727,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
     /* Prefetch descriptor index. */
     rte_prefetch0(&vq->vdv_desc[head[packet_success]]);
 
+enqueue_loop:
     while (res_cur_idx != res_end_idx) {
         uint32_t offset = 0, vb_offset = 0;
         uint32_t pkt_len, len_to_cpy, data_len, total_copied = 0;
@@ -734,10 +736,15 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         /* Get descriptor from available ring */
         desc = &vq->vdv_desc[head[packet_success]];
 
-        buff = pkts[packet_success];
+        buff = pkts[pkt_idx];
 
         /* Convert from gpa to vva (guest physical addr -> vhost virtual addr) */
         buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+        if (unlikely(buff_addr == (uint64_t)NULL)) {
+            /* Retry with next descriptor */
+            packet_success++;
+            continue;
+        }
         /* Prefetch buffer address. */
         rte_prefetch0((void *)(uintptr_t)buff_addr);
 
@@ -756,6 +763,14 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
             desc = &vq->vdv_desc[desc->next];
             /* Buffer address translation. */
             buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+            if (unlikely(buff_addr == (uint64_t)NULL)) {
+                /* Retry with next descriptor */
+                vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].len =
+                            sizeof(struct virtio_net_hdr);
+                packet_success++;
+                res_cur_idx++;
+                continue;
+            }
         } else {
             vb_offset += sizeof(struct virtio_net_hdr);
             hdr = 1;
@@ -791,6 +806,14 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
                 if (desc->flags & VRING_DESC_F_NEXT) {
                     desc = &vq->vdv_desc[desc->next];
                     buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+                    if (unlikely(buff_addr == (uint64_t)NULL)) {
+                        /* Retry with next descriptor */
+                        vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].len =
+                                    sizeof(struct virtio_net_hdr);
+                        packet_success++;
+                        res_cur_idx++;
+                        goto enqueue_loop;
+                    }
                     vb_offset = 0;
                 } else {
                     /* Room in vring buffer is not enough */
@@ -815,6 +838,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
 
         res_cur_idx++;
         packet_success++;
+        pkt_idx++;
 
         /* TODO: in DPDK 2.1 we do not copy the header
         if (unlikely(uncompleted_pkt == 1))
@@ -848,7 +872,7 @@ dpdk_virtio_dev_to_vm_tx_burst(struct dpdk_virtio_writer *p,
         p->nb_syscalls++;
         eventfd_write(vq->vdv_callfd, 1);
     }
-    return count;
+    return pkt_idx;
 }
 
 static inline void
