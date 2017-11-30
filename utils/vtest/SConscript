@@ -2,6 +2,8 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 import os
+import sys
+
 Import('VRutilsEnv')
 env = VRutilsEnv.Clone()
 VTestEnv = env;
@@ -28,6 +30,11 @@ libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'),
                   env.Object('udp_util.lo', '../udp_util.c'),
                   env.Object('ini_parser.lo', '../ini_parser.c'),
                   env.Object('vr_util.lo', '../vr_util.c')]
+
+if sys.platform.startswith('win'):
+    libvrutil_objs.append(env.Object('windows_util.lo', '../windows_util.c'))
+else:
+    libvrutil_objs.append(env.Object('unix_util.lo', '../unix_util.c'))
 
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
