@@ -26,8 +26,8 @@
 static struct nl_client *cl;
 static int help_set;
 
-void
-vr_mem_stats_req_process(void *s_req)
+static void
+mem_stats_req_process(void *s_req)
 {
     vr_mem_stats_req *stats = (vr_mem_stats_req *)s_req;
 
@@ -172,11 +172,18 @@ vr_mem_stats_req_process(void *s_req)
     return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, NULL);
     return;
+}
+
+static void
+vrmemstats_fill_nl_callbacks()
+{
+    nl_cb.vr_mem_stats_req_process = mem_stats_req_process;
+    nl_cb.vr_response_process = response_process;
 }
 
 
@@ -214,6 +221,8 @@ main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index;
+
+    vrmemstats_fill_nl_callbacks();
 
     while (((opt = getopt_long(argc, argv, "",
                         long_options, &option_index)) >= 0)) {

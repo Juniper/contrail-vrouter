@@ -44,6 +44,8 @@ enum vr_opt_index {
 extern struct expect_vrouter expect_msg;
 extern struct return_vrouter return_msg;
 
+extern void vt_fill_nl_callbacks();
+
 struct vtest_module vt_modules[] = {
     {   .vt_name        =   "test_name",
         .vt_node        =   vt_test_name,
@@ -164,6 +166,8 @@ main(int argc, char *argv[])
 
     struct stat stat_buf;
     struct vtest vtest;
+
+    vt_fill_nl_callbacks();
 
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {

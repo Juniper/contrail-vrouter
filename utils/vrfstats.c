@@ -35,8 +35,8 @@ static int get_set, dump_set;
 static int help_set;
 static bool dump_pending = false;
 
-void
-vr_vrf_stats_req_process(void *s_req)
+static void
+vrf_stats_req_process(void *s_req)
 {
     vr_vrf_stats_req *stats = (vr_vrf_stats_req *)s_req;
 
@@ -75,11 +75,18 @@ vr_vrf_stats_req_process(void *s_req)
     return;
 }
 
-void
-vr_response_process(void *s)
+static void
+response_process(void *s)
 {
     vr_response_common_process((vr_response *)s, &dump_pending);
     return;
+}
+
+static void
+vrfstats_fill_nl_callbacks()
+{
+    nl_cb.vr_vrf_stats_req_process = vrf_stats_req_process;
+    nl_cb.vr_response_process = response_process;
 }
 
 
@@ -192,6 +199,9 @@ main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index;
+
+    vrfstats_fill_nl_callbacks();
+
     while (((opt = getopt_long(argc, argv, "",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
