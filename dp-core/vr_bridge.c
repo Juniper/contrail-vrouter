@@ -634,7 +634,7 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
         vr_bridge_table = vr_huge_page_mem_get(VR_BRIDGE_TABLE_SIZE +
                 VR_BRIDGE_OFLOW_TABLE_SIZE);
         if (vr_bridge_table)
-            vr_bridge_otable = vr_bridge_table + VR_BRIDGE_TABLE_SIZE;
+            vr_bridge_otable = (unsigned char *)vr_bridge_table + VR_BRIDGE_TABLE_SIZE;
     }
 
     rtable->algo_data = vr_htable_attach(vrouter_get(0), vr_bridge_entries,
@@ -696,7 +696,7 @@ bridge_table_lock(struct vr_interface *vif, uint8_t *mac)
 {
     uint8_t lock = 1, *bridge_table_lock = vif->vif_bridge_table_lock;
     uint32_t hash;
-    unsigned long t1s, t1ns, t2s, t2ns, diff;
+    uint64_t t1s, t1ns, t2s, t2ns, diff;
 
     if (!bridge_table_lock)
         return -EINVAL;

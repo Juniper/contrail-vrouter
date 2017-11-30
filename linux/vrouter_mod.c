@@ -397,7 +397,7 @@ lh_phead_len(struct vr_packet *pkt)
 }
 
 static void
-lh_get_time(unsigned long *sec, unsigned long *usec)
+lh_get_time(uint64_t *sec, uint64_t *usec)
 {
     struct timeval t;
 
@@ -429,7 +429,7 @@ lh_pfree_skb(struct sk_buff *skb, struct vr_interface *vif,
 
 
 static void
-lh_get_mono_time(unsigned long *sec, unsigned long *nsec)
+lh_get_mono_time(uint64_t *sec, uint64_t *nsec)
 {
     struct timespec t;
     uint64_t jiffies = get_jiffies_64();

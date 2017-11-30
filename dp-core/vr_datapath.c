@@ -413,7 +413,7 @@ vr_mac_reply_send(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     bool vif_tx = false;
     struct vr_forwarding_md fmd_new;
     struct vr_route_req rt;
-    struct vr_nexthop *nh;
+    struct vr_nexthop *nh = NULL;
     struct vr_interface *vif = pkt->vp_if;
 
     vr_init_forwarding_md(&fmd_new);

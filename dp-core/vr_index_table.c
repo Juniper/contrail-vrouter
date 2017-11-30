@@ -4,7 +4,7 @@
 #include <vr_index_table.h>
 #include <vr_os.h>
 #include <vrouter.h>
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
 #include <stdarg.h>
 #elif defined(__FreeBSD__)
 #include <machine/stdarg.h>
