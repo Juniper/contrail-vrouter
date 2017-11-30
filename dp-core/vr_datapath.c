@@ -738,36 +738,36 @@ vr_untag_pkt(struct vr_packet *pkt)
  * modify the data pointer of skb
  */
 int
-vr_tag_pkt(struct vr_packet *pkt, unsigned short vlan_id, bool force_tag)
+vr_tag_pkt(struct vr_packet **pkt, unsigned short vlan_id, bool force_tag)
 {
     uint8_t priority = 0;
     struct vr_packet *tmp_pkt;
     struct vr_eth *new_eth, *eth;
     unsigned short *vlan_tag;
 
-    eth = (struct vr_eth *)pkt_data(pkt);
+    eth = (struct vr_eth *)pkt_data(*pkt);
     if (!force_tag) {
         if (eth->eth_proto == htons(VR_ETH_PROTO_VLAN))
             return 0;
     }
 
-    if (pkt_head_space(pkt) < VR_VLAN_HLEN) {
-        tmp_pkt = vr_pexpand_head(pkt, VR_VLAN_HLEN - pkt_head_space(pkt));
+    if (pkt_head_space(*pkt) < VR_VLAN_HLEN) {
+        tmp_pkt = vr_pexpand_head(*pkt, VR_VLAN_HLEN - pkt_head_space(*pkt));
         if (!tmp_pkt) {
             return -1;
         }
-        pkt = tmp_pkt;
+        *pkt = tmp_pkt;
     }
 
-    new_eth = (struct vr_eth *)pkt_push(pkt, VR_VLAN_HLEN);
+    new_eth = (struct vr_eth *)pkt_push(*pkt, VR_VLAN_HLEN);
     if (!new_eth)
         return -1;
 
     memmove(new_eth, eth, (2 * VR_ETHER_ALEN));
     new_eth->eth_proto = htons(VR_ETH_PROTO_VLAN);
     vlan_tag = (unsigned short *)(new_eth + 1);
-    if (pkt->vp_priority != VP_PRIORITY_INVALID)
-        priority = pkt->vp_priority;
+    if ((*pkt)->vp_priority != VP_PRIORITY_INVALID)
+        priority = (*pkt)->vp_priority;
 
     *vlan_tag = htons((priority << VR_VLAN_PRIORITY_SHIFT) | vlan_id);
 

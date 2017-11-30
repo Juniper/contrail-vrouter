@@ -97,22 +97,24 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
  * passing us valid rewrite ptr and len and will not check for those
  */
 static int
-vif_cmn_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
+vif_cmn_rewrite(struct vr_interface *vif, struct vr_packet **pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
         unsigned short len)
 {
     unsigned char *head;
+    struct vr_packet *expanded_pkt;
 
     if (!len)
         return 0;
 
-    if (pkt_head_space(pkt) < len) {
-        pkt = vr_pexpand_head(pkt, len - pkt_head_space(pkt));
-        if (!pkt)
+    if (pkt_head_space(*pkt) < len) {
+        expanded_pkt = vr_pexpand_head(*pkt, len - pkt_head_space(*pkt));
+        if (!expanded_pkt)
             return -ENOMEM;
+        *pkt = expanded_pkt;
     }
 
-    head = pkt_push(pkt, len);
+    head = pkt_push(*pkt, len);
     if (!head)
         return -ENOMEM;
 
@@ -278,24 +280,26 @@ vif_mirror(struct vr_interface *vif, struct vr_packet *pkt,
 
 /* agent driver */
 static int
-agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
+agent_set_rewrite(struct vr_interface *vif, struct vr_packet **pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
         unsigned short len)
 {
     unsigned char *head;
     unsigned int hdr_len;
     struct agent_hdr *hdr;
+    struct vr_packet *expanded_pkt;
 
-    vr_preset(pkt);
+    vr_preset(*pkt);
 
     hdr_len = sizeof(struct agent_hdr) + len;
-    if (pkt_head_space(pkt) < hdr_len) {
-        pkt = vr_pexpand_head(pkt, hdr_len - pkt_head_space(pkt));
-        if (!pkt)
+    if (pkt_head_space(*pkt) < hdr_len) {
+        expanded_pkt = vr_pexpand_head(*pkt, hdr_len - pkt_head_space(*pkt));
+        if (!expanded_pkt)
             return -ENOMEM;
+        *pkt = expanded_pkt;
     }
 
-    head = pkt_push(pkt, hdr_len);
+    head = pkt_push(*pkt, hdr_len);
     if (!head)
         return -ENOMEM;
 
@@ -303,7 +307,7 @@ agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
     memcpy(head, rewrite, len);
 
     hdr = (struct agent_hdr *)(head + len);
-    hdr->hdr_ifindex = htons(pkt->vp_if->vif_idx);
+    hdr->hdr_ifindex = htons((*pkt)->vp_if->vif_idx);
     hdr->hdr_vrf = htons(fmd->fmd_dvrf);
     /* this needs some thought */
     hdr->hdr_cmd = htons(AGENT_TRAP_NEXTHOP);
@@ -866,7 +870,7 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
             if (fmd->fmd_vlan != VLAN_ID_INVALID)
                 force_tag = true;
 
-            if (vr_tag_pkt(pkt, vif->vif_ovlan_id, force_tag)) {
+            if (vr_tag_pkt(&pkt, vif->vif_ovlan_id, force_tag)) {
                 goto drop;
             }
             vr_pset_data(pkt, pkt->vp_data);
@@ -1199,7 +1203,7 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 static int
-eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
+eth_set_rewrite(struct vr_interface *vif, struct vr_packet **pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
         unsigned short len)
 {
@@ -1211,10 +1215,10 @@ eth_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
      * tunneled packet and not from Agent. Otherwise, apply the new
      * rewrite data
      */
-    if ((pkt->vp_if->vif_type == VIF_TYPE_HOST) &&
-            (!(pkt->vp_flags & VP_FLAG_FROM_DP)) &&
-            ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6))) {
-        vr_preset(pkt);
+    if (((*pkt)->vp_if->vif_type == VIF_TYPE_HOST) &&
+            (!((*pkt)->vp_flags & VP_FLAG_FROM_DP)) &&
+            (((*pkt)->vp_type == VP_TYPE_IP) || ((*pkt)->vp_type == VP_TYPE_IP6))) {
+        vr_preset(*pkt);
         return 0;
     }
 
@@ -1345,7 +1349,7 @@ eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
     } else if (vif_is_fabric(vif)) {
         vlan_id = vr_fmd_get_mirror_vlan(fmd);
         if (vlan_id != FMD_MIRROR_INVALID_DATA) {
-            vr_tag_pkt(pkt, vlan_id, force_tag);
+            vr_tag_pkt(&pkt, vlan_id, force_tag);
         }
     }
 
