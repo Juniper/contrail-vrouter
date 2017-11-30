@@ -72,7 +72,7 @@ vif_discard_tx(struct vr_interface *vif, struct vr_packet *pkt,
 
 static int
 vif_discard_rx(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned short vlan_id __attribute__((unused)))
+        unsigned short vlan_id __attribute__unused__)
 {
     vr_pfree(pkt, VP_DROP_INTERFACE_RX_DISCARD);
     return 0;
@@ -314,7 +314,7 @@ agent_set_rewrite(struct vr_interface *vif, struct vr_packet *pkt,
 
 static int
 agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned short vlan_id __attribute__((unused)))
+        unsigned short vlan_id __attribute__unused__)
 {
     unsigned short cmd;
 
@@ -586,7 +586,7 @@ agent_drv_del(struct vr_interface *vif)
 
 static int
 agent_drv_add(struct vr_interface *vif,
-        vr_interface_req *vifr __attribute__((unused)))
+        vr_interface_req *vifr __attribute__unused__)
 {
     int ret;
 
@@ -663,7 +663,7 @@ vhost_mac_request(struct vr_interface *vif, struct vr_packet *pkt,
 
 static int
 vhost_rx(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned short vlan_id __attribute__((unused)))
+        unsigned short vlan_id __attribute__unused__)
 {
     struct vr_forwarding_md fmd;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -774,7 +774,7 @@ vhost_drv_del(struct vr_interface *vif)
 
 static int
 vhost_drv_add(struct vr_interface *vif,
-        vr_interface_req *vifr __attribute__((unused)))
+        vr_interface_req *vifr __attribute__unused__)
 {
     int ret = 0;
 
@@ -806,7 +806,7 @@ vhost_drv_add(struct vr_interface *vif,
 /* vlan driver */
 static int
 vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
-        unsigned short vlan_id __attribute__((unused)))
+        unsigned short vlan_id __attribute__unused__)
 {
     int8_t tos;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
@@ -1404,7 +1404,7 @@ eth_drv_add_sub_interface(struct vr_interface *pvif, struct vr_interface *vif)
 
 static int
 eth_drv_add(struct vr_interface *vif,
-        vr_interface_req *vifr __attribute__((unused)))
+        vr_interface_req *vifr __attribute__unused__)
 {
     int ret = 0;
 

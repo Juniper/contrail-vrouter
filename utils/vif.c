@@ -91,6 +91,9 @@ static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, drop_set;
+#ifdef _WIN32
+static int guid_set;
+#endif
 
 static unsigned int vr_op, vr_if_type;
 static bool dump_pending = false;
@@ -101,6 +104,11 @@ static int platform;
 
 static int8_t vr_ifmac[6];
 static struct ether_addr *mac_opt;
+
+/*
+ * GUID used on Windows to identify Hyper-V VMs' interfaces
+ */
+static char vr_if_guid[256];
 
 static vr_interface_req prev_req[VR_MAX_INTERFACES];
 static struct timeval last_time;
@@ -930,8 +938,20 @@ op_retry:
         if (vr_ifindex < 0)
             vr_ifindex = if_kindex;
 
+#ifdef _WIN32
+        if (!guid_set) {
+            ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
+                    if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac,
+                    vr_transport, NULL);
+        } else {
+            ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
+                    if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac,
+                    vr_transport, vr_if_guid);
+        }
+#else
         ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
-                if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac, vr_transport);
+                if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac, vr_transport, NULL);
+#endif
         break;
 
     case SANDESH_OP_DEL:
@@ -1004,6 +1024,9 @@ Usage()
     printf("\t   \t--xconnect <physical interface name>\n");
     printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
     printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci]\n");
+#ifdef _WIN32
+    printf("\t   \t--guid <GUID>\n");
+#endif
     printf("\t   [--delete <intf_id>|<intf_name>]\n");
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate] [--get-drop-stats]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -1067,6 +1090,9 @@ static struct option long_options[] = {
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
     [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,        1},
     [CORE_OPT_INDEX]        =   {"core",        required_argument,  &core_set,          1},
+#ifdef _WIN32
+    [GUID_OPT_INDEX]        =   {"guid",        required_argument,  &guid_set,          1},
+#endif
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -1223,6 +1249,12 @@ parse_long_opts(int option_index, char *opt_arg)
         case VHOST_PHYS_OPT_INDEX:
             vr_ifflags |= VIF_FLAG_VHOST_PHYS;
             break;
+
+#ifdef _WIN32
+        case GUID_OPT_INDEX:
+            strcpy_s(vr_if_guid, 256, opt_arg);
+            break;
+#endif
 
         default:
             break;
