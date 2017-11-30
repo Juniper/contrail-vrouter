@@ -2,6 +2,8 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
+import sys
+
 Import('VRouterEnv')
 
 env = VRouterEnv.Clone()
@@ -14,7 +16,8 @@ if system_header_path:
     env.Append(CPPPATH = system_header_path + '/include/')
 
 # CFLAGS
-env.Append(CCFLAGS = '-g')
+if not sys.platform.startswith('win'):
+    env.Append(CCFLAGS = '-g')
 
 if 'install' in COMMAND_LINE_TARGETS:
     VRutilsEnv.Append(SRC_INSTALL_TARGET = '/utils/')
@@ -29,11 +32,20 @@ for sdir in  subdirs:
 libvrutil = 'vrutil'
 libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo', 'udp_util.c'),
                   env.Object('ini_parser.lo', 'ini_parser.c'), env.Object('vr_util.lo', 'vr_util.c')]
+
+if sys.platform.startswith('win'):
+    libvrutil_objs.append(env.Object('windows_util.lo', 'windows_util.c'))
+else:
+    libvrutil_objs.append(env.Object('unix_util.lo', 'unix_util.c'))
+
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
+
+if sys.platform.startswith('win'):
+    env.Append(LIBS = ['windowsstubs', 'ws2_32', 'Iphlpapi'])
 
 # Build individual utils
 vif_sources = ['vif.c']
@@ -44,9 +56,6 @@ rt = env.Program(target = 'rt', source = rt_sources)
 
 nh_sources = ['nh.c']
 nh = env.Program(target = 'nh', source = nh_sources)
-
-mirror_sources = ['mirror.c']
-mirror = env.Program(target = 'mirror', source = mirror_sources)
 
 mpls_sources = ['mpls.c']
 mpls = env.Program(target = 'mpls', source = mpls_sources)
@@ -66,18 +75,34 @@ vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 vrouter_sources = ['vrouter.c']
 vrouter = env.Program(target = 'vrouter', source = vrouter_sources)
 
-vrmemstats_sources = ['vrmemstats.c']
-vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
-
-qosmap_sources = ['qosmap.c']
-qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
-
 # to make sure that all are built when you do 'scons' @ the top level
-binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats,
-             vxlan, vrouter, vrmemstats, qosmap]
+binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, vxlan,
+             vrouter]
+
+if not sys.platform.startswith('win'):
+    # 'mirror', 'vrmemstats', 'qosmap' utilities are not yet ported for Windows
+    mirror_sources = ['mirror.c']
+    mirror = env.Program(target = 'mirror', source = mirror_sources)
+
+    vrmemstats_sources = ['vrmemstats.c']
+    vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
+
+    qosmap_sources = ['qosmap.c']
+    qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
+
+    binaries.append([mirror, vrmemstats, qosmap])
 
 scripts  = ['vifdump']
 env.Default(binaries)
+
+if sys.platform.startswith('win'):
+    # Use WiX for MSI generation
+    utils_msi = env.WiX('utils.msi', ['windows/utils_msi.wxs'])
+
+    Import('vtest')
+    env.Depends(utils_msi, binaries + vtest)
+    env.Default(utils_msi)
+
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))
 # Local Variables:
 # mode: python
