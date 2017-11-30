@@ -369,7 +369,7 @@ fh_set_defer_data(void *data)
 }
 
 static void
-fh_get_time(unsigned long *sec, unsigned long *usec)
+fh_get_time(uint64_t *sec, uint64_t *usec)
 {
 	struct timespec tsp;
 
@@ -382,7 +382,7 @@ fh_get_time(unsigned long *sec, unsigned long *usec)
 }
 
 static void
-fh_get_mono_time(unsigned int *sec, unsigned int *nsec)
+fh_get_mono_time(uint64_t *sec, uint64_t *nsec)
 {
 	struct timespec tsp;
 

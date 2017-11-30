@@ -245,6 +245,7 @@ struct vr_vlan_hdr {
     unsigned short vlan_proto;
 } __attribute__packed__close__;
 
+__attribute__packed__open__
 struct vr_pbb_itag {
     uint8_t    pbbi_pcp:3,
                pbbi_dei:1,

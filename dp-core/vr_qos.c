@@ -630,7 +630,7 @@ vr_fc_map_get(vr_fc_map_req *req)
 {
     int ret = 0;
 
-    vr_fc_map_req *resp;
+    vr_fc_map_req *resp = NULL;
     struct vrouter *router = vrouter_get(req->fmr_rid);
     struct vr_forwarding_class *fc_p;
 
