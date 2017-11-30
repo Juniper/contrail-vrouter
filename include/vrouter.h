@@ -220,6 +220,7 @@ struct host_os {
     unsigned int *(*hos_get_enabled_log_types)(int *);
     void (*hos_soft_reset)(struct vrouter *);
     int (*hos_is_frag_limit_exceeded)(void);
+    void (*hos_register_nic)(struct vr_interface* vif, vr_interface_req* vifr);
     bool hos_nl_broadcast_supported;
     int (*hos_huge_page_config)(uint64_t *, int, int *, int);
     void *(*hos_huge_page_mem_get)(int);
@@ -271,6 +272,7 @@ struct host_os {
 #define vr_get_log_level                vrouter_host->hos_get_log_level
 #define vr_get_enabled_log_types        vrouter_host->hos_get_enabled_log_types
 #define vr_soft_reset                   vrouter_host->hos_soft_reset
+#define vr_register_nic                 vrouter_host->hos_register_nic
 #define vr_nl_broadcast_supported       vrouter_host->hos_nl_broadcast_supported
 #define vr_huge_page_config             vrouter_host->hos_huge_page_config
 #define vr_huge_page_mem_get            vrouter_host->hos_huge_page_mem_get
