@@ -4,6 +4,8 @@
 #ifndef __VR_MIRROR_H__
 #define __VR_MIRROR_H__
 
+#include "vr_os.h"
+
 #define VR_MAX_MIRROR_INDICES           255
 #define VR_MIRROR_FLAG_DYNAMIC          0x1
 /* This can be deleted after Agent's references are gone */

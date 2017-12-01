@@ -390,6 +390,7 @@ extern struct vrouter *vrouter_get(unsigned int);
 extern unsigned int vrouter_generation_num_get(struct vrouter *router);
 
 extern int vrouter_init(void);
+extern void vrouter_exit(bool);
 extern int vr_module_error(int, const char *, int, int);
 extern int vhost_init(void);
 
