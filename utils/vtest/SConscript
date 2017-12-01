@@ -15,13 +15,13 @@ system_header_path = GetOption('system-header-path')
 if system_header_path:
     env.Append(CPPPATH = system_header_path + '/include/')
 
-env.Append(CPPPATH = ['./include', build_dir, '/usr/include/libxml2', build_root+'/../include'])
-xml_cpppath = os.popen('xml2-config --cflags | sed \'s/\-I//g\'').read()
-#env.Append(CPPPATH = xml_cpppath)
-
-# CFLAGS
-env.Append(CCFLAGS = '-g -std=gnu99')
-
+env.Append(CPPPATH = ['./include', build_dir, build_root+'/../include'])
+if sys.platform.startswith('win'):
+    env.Append(CPPPATH = '#/build/include/libxml2')
+    env.Append(LINKFLAGS = '/STACK:"10000000"')
+else:
+    env.Append(CPPPATH = '/usr/include/libxml2')
+    env.Append(CCFLAGS = '-g -std=gnu99')
 
 libvrutil = 'vrutil'
 libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'), 
@@ -33,7 +33,11 @@ env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh', './vhost/lib/'])
-env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'jnprvnet', 'xml2', 'pcap', 'rt', 'nl-3', 'nl-genl-3' ])
+env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'xml2'])
+if sys.platform.startswith('win'):
+    env.Append(LIBS = ['windowsstubs', 'ws2_32', 'Iphlpapi'])
+else:
+    env.Append(LIBS = ['jnprvnet', 'pcap', 'rt', 'nl-3', 'nl-genl-3'])
 
 sandesh_gen = env.Program('sandesh_gen.c')
 
@@ -53,9 +57,13 @@ vtest_src = [
                 'vt_process_xml.c',
             ]
 
+if not sys.platform.startswith('win'):
+    vtest_src.append('vt_packet.c')
 
-env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
+    env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
+
 vtest = env.Program('vtest', vtest_src)
+Export('vtest')
 env.Requires(vtest, sandesh_gen_output)
 
 # Local Variables:

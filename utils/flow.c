@@ -14,6 +14,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -31,8 +32,13 @@
 #endif
 
 #include <net/if.h>
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
 #include <netinet/ether.h>
+#endif
+
+#ifdef _WIN32
+#include <winioctl.h>
+#include "windows_flow_ioctl.h"
 #endif
 
 #include "vr_types.h"
@@ -513,7 +519,7 @@ flow_print_vif(vr_interface_req *vif, char *vif_name, bool ingress)
                 vif->vifr_idx, vif->vifr_vrf, vif_name);
 
         flow_print_spaces();
-        printf("Interface Statistics(Out, In, Errors): %lu, %lu, %lu\n",
+        printf("Interface Statistics(Out, In, Errors): %" PRIu64 ", %" PRIu64 ", %" PRIu64 "\n",
                 vif->vifr_opackets, vif->vifr_ipackets,
                 vif->vifr_ierrors + vif->vifr_oerrors);
     }
@@ -663,10 +669,10 @@ flow_dump_mirror(vr_nexthop_req *req)
 }
 
 
-static unsigned long
+static uint64_t
 flow_sum_drops_stats(vr_drop_stats_req *req)
 {
-    unsigned long sum = 0;
+    uint64_t sum = 0;
 
     sum += req->vds_flow_queue_limit_exceeded;
     sum += req->vds_flow_no_memory;
@@ -691,7 +697,7 @@ flow_dump_entry(struct vr_flow_entry *fe)
 
     struct vr_flow_entry *rfe;
 
-    system("clear");
+    system(CLEAN_SCREEN_CMD);
     flow_print_field_name("Flow Index");
     printf("%lu\n", flow_index);
 
@@ -952,11 +958,11 @@ flow_dump_entry(struct vr_flow_entry *fe)
     flow_print_field_name("Flow Statistics");
     printf("%u/%u\n", fe->fe_stats.flow_packets, fe->fe_stats.flow_bytes);
     flow_print_field_name("System Wide Packet Drops");
-    printf("%lu\n", vr_sum_drop_stats(global_ds));
+    printf("%" PRIu64 "\n", vr_sum_drop_stats(global_ds));
     flow_print_spaces();
-    printf("Reverse Path Failures: %lu\n", global_ds->vds_invalid_source);
+    printf("Reverse Path Failures: %" PRIu64 "\n", global_ds->vds_invalid_source);
     flow_print_spaces();
-    printf("Flow Block Drops: %lu\n", flow_sum_drops_stats(global_ds));
+    printf("Flow Block Drops: %" PRId64 "\n", flow_sum_drops_stats(global_ds));
 
     return;
 }
@@ -1174,9 +1180,9 @@ flow_dump_table(struct flow_table *ft)
     char addr[INET6_ADDRSTRLEN];
     bool smatch, dmatch;
 
-    printf("Flow table(size %lu, entries %u)\n\n", ft->ft_span,
+    printf("Flow table(size %" PRIu64 ", entries %u)\n\n", ft->ft_span,
             ft->ft_num_entries);
-    printf("Entries: Created %lu Added %lu Deleted %lu Changed %lu Processed %lu Used Overflow entries %u\n",
+    printf("Entries: Created %" PRIu64 " Added %" PRIu64 " Deleted %" PRIu64 " Changed %" PRIu64 "Processed %" PRIu64 " Used Overflow entries %u\n",
             ft->ft_created, ft->ft_added, ft->ft_deleted, ft->ft_changed,
             ft->ft_processed, ft->ft_oflow_entries);
 
@@ -1251,7 +1257,7 @@ flow_dump_table(struct flow_table *ft)
     printf("-----------------------------------------------------------------");
     printf("------------------\n");
     for (i = 0; i < ft->ft_num_entries; i++) {
-        bzero(flag_string, sizeof(flag_string));
+        memset(flag_string, 0, sizeof(flag_string));
         need_flag_print = 0;
         need_drop_reason = 0;
         fe = (struct vr_flow_entry *)((char *)ft->ft_entries + (i * sizeof(*fe)));
@@ -1609,7 +1615,7 @@ flow_stats(void)
         /* On Ubuntu system() is declared with warn_unused_result
          * attribute, so we suppress the warning
          */
-        if (system("clear") == -1) {
+        if (system(CLEAN_SCREEN_CMD) == -1) {
             printf("Error: system() failed\n");
         }
 
@@ -1760,6 +1766,32 @@ flow_table_map(vr_flow_table_data *table)
         return ft->ft_num_entries;
     }
 
+#ifdef _WIN32
+    HANDLE flowPipe = CreateFile(FLOW_PATH, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (flowPipe == INVALID_HANDLE_VALUE) {
+        DWORD lastError = GetLastError();
+        printf("Error: CreateFile on flow pipe: %d\n", lastError);
+        exit(lastError);
+    }
+
+    PVOID outBuffer;
+    DWORD outBytes;
+    BOOL transactionResult = DeviceIoControl(flowPipe, IOCTL_FLOW_GET_ADDRESS,
+                                             NULL, 0,
+                                             &outBuffer, sizeof(outBuffer),
+                                             &outBytes, NULL);
+    if (!transactionResult) {
+        DWORD lastError = GetLastError();
+        printf("Error: DeviceIoControl on flow pipe: %d\n", lastError);
+        exit(lastError);
+    } else if (outBytes != sizeof(outBuffer)) {
+        printf("Error: DeviceIoControl on flow pipe: outBuffer was not filled\n");
+        exit(ERROR_INVALID_DATA);
+    }
+
+    ft->ft_entries = outBuffer;
+#else
+
     ft->ft_entries = (struct vr_flow_entry *)vr_table_map(table->ftable_dev,
             VR_MEM_FLOW_TABLE_OBJECT, table->ftable_file_path,
             table->ftable_size);
@@ -1767,6 +1799,7 @@ flow_table_map(vr_flow_table_data *table)
         printf("flow table: %s\n", strerror(errno));
         exit(errno);
     }
+#endif
 
     ft->ft_span = table->ftable_size;
     ft->ft_num_entries = ft->ft_span / sizeof(struct vr_flow_entry);
@@ -1833,6 +1866,7 @@ flow_table_setup(void)
 {
     int ret;
 
+#ifndef _WIN32
     cl = nl_register_client();
     if (!cl)
         return -ENOMEM;
@@ -1845,6 +1879,11 @@ flow_table_setup(void)
     ret = nl_connect(cl, get_ip(), get_port());
     if (ret < 0)
         return ret;
+#else
+    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (cl == NULL)
+        return -ENOMEM;
+#endif
 
     ret = vrouter_get_family_id(cl);
     if (ret <= 0)
@@ -1957,6 +1996,10 @@ flow_process_response()
 static int
 flow_make_flow_req_perf(vr_flow_req *req)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for Windows
+    return -1;
+#else
     int ret, attr_len, error;
     struct nl_response *resp;
     static count = 0;
@@ -2027,6 +2070,7 @@ flow_make_flow_req_perf(vr_flow_req *req)
     cl->cl_buf_offset = 0;
 
     return ret;
+#endif
 }
 
 void

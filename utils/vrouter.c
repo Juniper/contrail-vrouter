@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
