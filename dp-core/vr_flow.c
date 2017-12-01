@@ -2573,17 +2573,24 @@ vr_flow_table_reset(struct vrouter *router)
     return;
 }
 
+void
+vr_compute_size_oflow_table(int *oentries, int entries)
+{
+    /*
+    * Overflow entries is 20% of the main flow table
+    * adjusted to next 1k
+    */
+    if (oentries != NULL && *oentries == 0) {
+        *oentries = ((entries / 5) + 1023) & ~1023;
+    }
+}
+
 static int
 vr_flow_table_init(struct vrouter *router)
 {
     if (!router->vr_flow_table) {
 
-        /*
-         * Overflow entries is 20% of the main flow table
-         * adjusted to next 1k
-         */
-        if (!vr_oflow_entries)
-            vr_oflow_entries = ((vr_flow_entries / 5) + 1023) & ~1023;
+        vr_compute_size_oflow_table(&vr_oflow_entries, vr_flow_entries);
 
         if (!vr_flow_table && vr_huge_page_mem_get) {
 
