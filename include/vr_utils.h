@@ -9,6 +9,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "vr_os.h"
+#include <net/if.h> /* For IFNAMSIZ */
+
 struct vn_if {
     char if_name[IFNAMSIZ];
     char if_kind[IFNAMSIZ];

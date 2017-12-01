@@ -18,7 +18,7 @@
 
 #include <net/if.h>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
 #include <netinet/ether.h>
 #elif defined(__FreeBSD__)
 #include <net/ethernet.h>
