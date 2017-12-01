@@ -32,6 +32,12 @@ extern "C" {
 #define BRIDGE_TABLE_DEV            "/dev/vr_bridge"
 #define FLOW_TABLE_DEV              "/dev/flow"
 
+#ifdef _WIN32
+#define CLEAN_SCREEN_CMD        "cls"
+#else
+#define CLEAN_SCREEN_CMD        "clear"
+#endif
+
 struct nl_response {
     uint8_t *nl_data;
     unsigned int nl_type;
@@ -66,6 +72,11 @@ struct nl_client {
     int (*cl_recvmsg)(struct nl_client *);
     struct sockaddr *cl_sa;
     uint32_t cl_sa_len;
+
+#ifdef _WIN32
+    // Handle for named pipe used by Ksync
+    HANDLE cl_win_pipe;
+#endif
 };
 
 
@@ -179,7 +190,7 @@ extern struct nl_client *vr_get_nl_client(int);
 extern int vr_response_common_process(vr_response *, bool *);
 
 extern void *vr_table_map(int, unsigned int, char *, size_t);
-extern unsigned long vr_sum_drop_stats(vr_drop_stats_req *);
+extern uint64_t vr_sum_drop_stats(vr_drop_stats_req *);
 extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
 extern int vr_send_drop_stats_get(struct nl_client *, unsigned int,
@@ -291,6 +302,15 @@ extern int vr_send_set_ieee_ets(struct nl_client *, uint8_t *,
 extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
 extern void vr_print_drop_stats(vr_drop_stats_req *, int);
+
+#ifdef _WINDOWS
+extern int win_setup_nl_client(struct nl_client *, unsigned int);
+extern int win_nl_sendmsg(struct nl_client *);
+extern int win_nl_client_recvmsg(struct nl_client *);
+
+extern const LPCTSTR KSYNC_PATH;
+extern const LPCTSTR FLOW_PATH;
+#endif
 
 #ifdef __cplusplus
 }

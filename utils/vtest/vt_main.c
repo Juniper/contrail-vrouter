@@ -22,13 +22,17 @@
 #include <vtest.h>
 #include <vt_main.h>
 #include <vt_message.h>
-#include <vt_packet.h>
 #include <vt_process_xml.h>
 
 #include <vr_dpdk_usocket.h>
 
 #include <net/if.h>
 #include <nl_util.h>
+#include <vr_defs.h>
+
+#ifndef _WIN32
+#include <vt_packet.h>
+#endif
 
 /* vTest command-line options. */
 enum vr_opt_index {
@@ -54,12 +58,15 @@ struct vtest_module vt_modules[] = {
         .vt_name        =   "message",
         .vt_node        =   vt_message,
     },
+#ifndef _WIN32
     {
         .vt_name        =   "packet",
         .vt_node        =   vt_packet,
     },
+#endif
 };
 
+const size_t VTEST_NUM_MODULES = ARRAYSIZE(vt_modules);
 
 static void
 vt_dealloc_test(struct vtest *test) {
@@ -68,12 +75,11 @@ vt_dealloc_test(struct vtest *test) {
     vt_safe_free(test->vtest_error_module);
     int i = 0;
 
-    for (i = -1; i < test->message_ptr_num; ++i) {
+    for (i = 0; i <= test->message_ptr_num; ++i) {
         vt_safe_free(test->messages.data[i].mem);
-        vt_safe_free(test->messages.data[i].xml_data.element_expect_ptr);
     }
 
-    for(i = -1; i <= test->messages.expect_vrouter_msg->expected_ptr_num; ++i) {
+    for(i = 0; i <= test->messages.expect_vrouter_msg->expected_ptr_num; ++i) {
         vt_safe_free(test->messages.expect_vrouter_msg->mem_expected_msg[i]);
     }
 

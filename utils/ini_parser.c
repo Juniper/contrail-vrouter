@@ -14,6 +14,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#include "vr_os.h"
 #include "ini_parser.h"
 #include "nl_util.h"
 
@@ -122,7 +123,7 @@ read_value(const char *section, const char *key)
         return false;
     }
 
-    bzero(value, sizeof(value));
+    memset(value, 0, sizeof(value));
     buffer[sizeof(buffer) - 1] = '\0';
     strncpy(buffer, key_start, sizeof(buffer) - 1);
     value_start = strtok(buffer, "=");
