@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <ctype.h>
+#include <strings.h>
 
 #include <vr_types.h>
 #include <vt_gen_lib.h>

@@ -12,11 +12,14 @@
 #include <vtest.h>
 #include <vt_main.h>
 #include <vt_message.h>
-#include <vt_packet.h>
 #include <vt_process_xml.h>
 
 #include <net/if.h>
 #include <nl_util.h>
+
+#ifndef _WIN32
+#include <vt_packet.h>
+#endif
 
 extern struct vtest_module vt_modules[];
 #define SKIP_TEST_PFX "SKIP"
@@ -187,9 +190,13 @@ vt_post_process_node(xmlNodePtr node, struct vtest *test) {
     if (!strncmp((char *) node->name, "message", sizeof("message"))) {
         ret = vt_post_process_message(test);
 
-    } else if(!strncmp((char *) node->name, "packet", sizeof("packet"))) {
+    }
+
+#ifndef _WIN32
+    if(!strncmp((char *) node->name, "packet", sizeof("packet"))) {
         ret = vt_post_process_packet(test);
     }
+#endif
 
     return ret;
 }

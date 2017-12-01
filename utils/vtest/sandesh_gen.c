@@ -543,7 +543,7 @@ gen(FILE *fp)
             } else if (!strncmp(type, "string", strlen("string"))) {
                 gen_write(ofp, 0, "vt_gen_string(node->children->content);\n");
 
-                gen_write(fp_expect, 0, "result = strcmp(");
+                gen_write(fp_expect, 0, "result = !strcmp(");
                 gen_write(fp_expect, 0, "req->");
                 gen_raw_write(fp_expect, 0, var, var_len);
                 gen_write(fp_expect, 0, ", node->children->content);\n");
