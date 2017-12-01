@@ -12,7 +12,9 @@
 #define MAC_FORMAT     "%02x:%02x:%02x:%02x:%02x:%02x"
 #define MAC_VALUE(x)   (x)[0],(x)[1],(x)[2],(x)[3],(x)[4],(x)[5]
 
+#ifndef _WIN32
 #define ARRAYSIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 
 #define VR_ETHER_HLEN           14
 #define VR_ETHER_ALEN            6

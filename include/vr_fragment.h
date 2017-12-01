@@ -7,6 +7,8 @@
 #ifndef __VR_FRAGMENT_H__
 #define __VR_FRAGMENT_H__
 
+#include "vr_os.h"
+
 #define VR_ASSEMBLER_TIMEOUT_TIME               5
 #define VR_LINUX_ASSEMBLER_BUCKETS              1024
 #define VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE    256
