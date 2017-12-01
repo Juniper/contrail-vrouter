@@ -6,6 +6,8 @@
 #ifndef __VR_MPLS_H__
 #define __VR_MPLS_H__
 
+#include "vr_types.h"
+
 #define VR_MPLS_LABEL_SHIFT         12
 #define VR_MPLS_EXP_QOS_SHIFT       9
 #define VR_MPLS_HDR_LEN             4

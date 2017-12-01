@@ -6,6 +6,8 @@
 #ifndef __VR_VXLAN_H__
 #define __VR_VXLAN_H__
 
+#include "vr_os.h"
+
 #define VR_VXLAN_VNID_SHIFT             8
 
 struct vrouter;

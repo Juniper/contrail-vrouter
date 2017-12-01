@@ -95,6 +95,19 @@ typedef unsigned int __u32;
 #define ASSERT(x) assert((x));
 #endif
 #endif /* __FreeBSD__ */
+#if defined(_WIN32)
+#include "windows_types.h"
+#include "windows_builtins.h"
+#include "netlink.h"
+#include "genetlink.h"
+#ifdef __KERNEL__
+
+#pragma warning(disable : 4018)     // '<': signed/unsigned mismatch
+#pragma warning(disable : 4242)     // '=': conversion, possible loss of data
+#pragma warning(disable : 4244)     // same as above
+
+#endif /* __KERNEL__ */
+#endif
 
 extern int vrouter_dbg;
 

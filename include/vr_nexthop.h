@@ -12,6 +12,9 @@
 extern "C" {
 #endif
 
+#include "vr_os.h"
+#include "vr_types.h"
+
 /*
  * nexthop id is also part of the flow key and is only 16 bits. Hence, you
  * know where you are getting into if you want to increase this limit
