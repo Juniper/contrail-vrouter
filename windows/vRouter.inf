@@ -1,0 +1,81 @@
+[version]
+Signature   = "$Windows NT$"
+Class       = NetService
+ClassGUID   = {4D36E974-E325-11CE-BFC1-08002BE10318}
+Provider    = %ProviderString%
+CatalogFile = vRouter.cat
+DriverVer   = 07/29/2011,2.0
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTx86,NTia64,NTamd64
+
+[Standard.NTx86]
+%vRouter_Desc%=Install, vRouter
+
+[Standard.NTia64]
+%vRouter_Desc%=Install, vRouter
+
+[Standard.NTamd64]
+%vRouter_Desc%=Install, vRouter
+
+;-------------------------------------------------------------------------
+; Installation Section
+;-------------------------------------------------------------------------
+[Install]
+AddReg=Inst_Ndi
+Characteristics=0x40000
+NetCfgInstanceId="{56553588-1538-4be6-b8e0-cb46402dc205}"
+Copyfiles = vRouter.copyfiles.sys
+
+[SourceDisksNames]
+1=%vRouter_Desc%,"",,
+
+[SourceDisksFiles]
+vRouter.sys=1
+
+[DestinationDirs]
+DefaultDestDir=12
+vRouter.copyfiles.sys=12
+
+[vRouter.copyfiles.sys]
+vRouter.sys,,,2
+
+
+;-------------------------------------------------------------------------
+; Ndi installation support
+;-------------------------------------------------------------------------
+[Inst_Ndi]
+HKR, Ndi,Service,,"vRouter"
+HKR, Ndi,CoServices,0x00010000,"vRouter"
+HKR, Ndi,HelpText,,%vRouter_HelpText%
+HKR, Ndi,FilterClass,,"ms_switch_forward"
+HKR, Ndi,FilterType,0x00010001,0x00000002
+HKR, Ndi\Interfaces,UpperRange,,"noupper"
+HKR, Ndi\Interfaces,LowerRange,,"nolower"
+HKR, Ndi\Interfaces, FilterMediaTypes,,"vmnetextension"
+HKR, Ndi,FilterRunType, 0x00010001, 2 ; optional
+
+;-------------------------------------------------------------------------
+; Service installation support, common.EventLog here is to demonstrate how to
+; write an enent log 
+;-------------------------------------------------------------------------
+[Install.Services]
+AddService=vRouter,,vRouter_Service_Inst;, common.EventLog
+
+[vRouter_Service_Inst]
+DisplayName     = %vRouter_Desc%
+ServiceType     = 1 ;SERVICE_KERNEL_DRIVER
+StartType       = 1 ;SERVICE_SYSTEM_START
+ErrorControl    = 1 ;SERVICE_ERROR_NORMAL
+ServiceBinary   = %12%\vRouter.sys
+LoadOrderGroup  = NDIS
+Description     = %vRouter_Desc%
+
+[Install.Remove.Services]
+DelService=vRouter,0x200
+
+[Strings]
+ProviderString = "OpenContrail team"
+ManufacturerName = "OpenContrail team"
+vRouter_Desc = "vRouter forwarding extension"
+vRouter_HelpText = "Low-level OpenContrail's vRouter"
