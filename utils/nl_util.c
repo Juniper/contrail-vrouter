@@ -701,7 +701,7 @@ nl_register_client(void)
 
 exit_register:
     if (cl)
-        nl_free(cl);
+        nl_free_client(cl);
 
     return NULL;
 }
@@ -1553,7 +1553,7 @@ int
 nl_dcb_parse_reply(struct nl_client *cl, uint8_t cmd, void *resp_buf)
 {
     int ret = 0;
-    uint8_t attr;
+    uint8_t attr = DCB_ATTR_UNDEFINED;
     struct nl_response *resp;
 
     resp = nl_parse_reply(cl);
