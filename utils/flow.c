@@ -2379,7 +2379,7 @@ flow_set_tuple(char *ip_port)
 static int
 flow_set_ip(char *match_string)
 {
-    int ret;
+    int ret = 0;
     unsigned int length = strlen(match_string), token_length;
 
     char *token, *string = match_string;
@@ -2400,7 +2400,9 @@ flow_set_ip(char *match_string)
             }
         }
 
-        match_string = token + token_length;
+        if (token)
+          match_string = token + token_length;
+
     } while (!ret && token && ((match_string - string) < length));
 
     return 0;
@@ -2463,8 +2465,8 @@ flow_set_match(char *match_string)
             } else {
                 ret = flow_set_ip(token);
             }
+            match_string = token + token_length;
         }
-        match_string = token + token_length;
     } while (!ret && token && ((match_string - string) < length));
 
     return ret;

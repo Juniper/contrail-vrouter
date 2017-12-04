@@ -923,7 +923,7 @@ ending:
 static int
 vr_intf_op(struct nl_client *cl, unsigned int op)
 {
-    int ret, vrf;
+    int ret = -EINVAL, vrf;
     bool dump = false;
 
     if (create_set)

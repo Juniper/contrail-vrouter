@@ -578,7 +578,7 @@ nl_register_client(void)
 
 exit_register:
     if (cl)
-        nl_free(cl);
+        nl_free_client(cl);
 
     return NULL;
 }
