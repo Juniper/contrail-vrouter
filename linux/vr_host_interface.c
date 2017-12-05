@@ -811,7 +811,7 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     skb->data = pkt_data(pkt);
     skb->len = pkt_len(pkt);
     skb_set_tail_pointer(skb, pkt_head_len(pkt));
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0) && LINUX_VERSION_CODE < KERNEL_VERSION(4,6,0))
     skb_sender_cpu_clear(skb);
 #endif
 
