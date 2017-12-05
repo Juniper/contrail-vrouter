@@ -5,6 +5,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <linux/init.h>
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -129,8 +130,12 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, struct page *
      * memory and are not going to be faulted
      */
     down_read(&current->mm->mmap_sem);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0))
+    spages = get_user_pages(uspace_vmem, npages, FOLL_WRITE, pmem, NULL);
+#else
     spages = get_user_pages(current, current->mm, uspace_vmem,
                                         npages, 1, 0, pmem, NULL);
+#endif
     up_read(&current->mm->mmap_sem);
 
     /*
@@ -141,7 +146,7 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, struct page *
         for (i = 0; i < spages; i++) {
             if (!PageReserved(pmem[i]))
                 SetPageDirty(pmem[i]);
-            page_cache_release(pmem[i]);
+            put_page(pmem[i]);
         }
         if (size)
             free_pages((unsigned long)pmem, get_order(size));
@@ -263,7 +268,7 @@ vr_huge_pages_exit(void)
             for (j = 0; j < hcfg->hcfg_npages; j++) {
                 if (!PageReserved(hcfg->hcfg_pages[j]))
                     SetPageDirty(hcfg->hcfg_pages[j]);
-                page_cache_release(hcfg->hcfg_pages[j]);
+                put_page(hcfg->hcfg_pages[j]);
                 hcfg->hcfg_pages[j] = NULL;
             }
 
