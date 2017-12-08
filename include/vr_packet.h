@@ -1044,6 +1044,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_flags = 0;
     fmd->fmd_dscp = -1;
     fmd->fmd_dotonep = -1;
+    fmd->fmd_queue = -1;
     return;
 }
 
