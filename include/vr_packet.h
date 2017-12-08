@@ -1024,7 +1024,6 @@ struct vr_forwarding_md {
     uint8_t fmd_flags;
     int8_t fmd_dscp;
     int8_t fmd_dotonep;
-    int8_t fmd_queue;
 };
 
 static inline void
