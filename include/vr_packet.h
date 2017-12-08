@@ -1034,7 +1034,6 @@ struct vr_forwarding_md {
     uint8_t fmd_flags;
     int8_t fmd_dscp;
     int8_t fmd_dotonep;
-    int8_t fmd_queue;
     int8_t fmd_dmac[VR_ETHER_ALEN];
     int8_t fmd_smac[VR_ETHER_ALEN];
 };

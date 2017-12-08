@@ -574,8 +574,10 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
 
         ret = fs->algo_init(table, fs);
-        if (ret)
+        if (ret) {
+            vr_free(table, VR_ROUTE_TABLE_OBJECT);
             return vr_module_error(ret, __FUNCTION__, __LINE__, 0);
+        }
     }
 
     router->vr_bridge_rtable = table;
