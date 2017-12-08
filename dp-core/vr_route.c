@@ -184,6 +184,7 @@ vr_route_dump(vr_route_req *req)
     int ret;
     uint32_t rt_prefix[4], rt_marker[4];
 
+
     vr_req.rtr_req = *req;
     vr_req.rtr_req.rtr_prefix_size = req->rtr_prefix_size;
     if (req->rtr_prefix_size) {
@@ -533,8 +534,10 @@ bridge_rtb_family_init(struct rtable_fspec *fs, struct vrouter *router)
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
 
         ret = fs->algo_init(table, fs);
-        if (ret)
+        if (ret) {
+            vr_free(table, VR_ROUTE_TABLE_OBJECT);
             return vr_module_error(ret, __FUNCTION__, __LINE__, 0);
+        }
     }
 
     router->vr_bridge_rtable = table;
