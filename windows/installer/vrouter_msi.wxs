@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="CB877445-6E69-4BA8-9C8F-DDA1C92539B3" UpgradeCode="54C1DE83-002C-4040-B6C6-93C649CF3BBA" Name="vRouter" Version="1.0.0" Manufacturer="Juniper Networks" Language="1033">
+        <Package InstallerVersion="200" Compressed="yes" Comments="Windows Installer Package" Platform="x64"/>
+        <Media Id="1" Cabinet="product.cab" EmbedCab="yes"/>
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="ManufacturerFolder" Name="Juniper Networks">
+                    <Directory Id="INSTALLDIR" Name="vRouter">
+                        <Component Id="CatFiles" Guid="833C429C-BCEC-4CBB-BB8D-8E0C9AB09F95" Win64="yes">
+                            <File Id="CatFile" Source="build/$(var.optimization)/vrouter/extension/vRouter/vrouter.cat"/>
+                        </Component>
+                        <Component Id="InfFiles" Guid="661F72B0-4030-4402-9E86-7E6021B72FE1" Win64="yes">
+                            <File Id="InfFile" Source="build/$(var.optimization)/vrouter/extension/vRouter/vRouter.inf"/>
+                        </Component>
+                        <Component Id="SysFiles" Guid="AE7D4293-7B00-4E4D-8990-77C6BBF414D9" Win64="yes">
+                            <File Id="SysFile" Source="build/$(var.optimization)/vrouter/extension/vRouter/vRouter.sys"/>
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature Id="DefaultFeature" Level="1">
+            <ComponentRef Id="CatFiles"/>
+            <ComponentRef Id="InfFiles"/>
+            <ComponentRef Id="SysFiles"/>
+        </Feature>
+
+        <CustomAction Id="InstallCmd"
+        Property="InstallCmdProperty"
+        Value="&quot;C:\Windows\System32\netcfg.exe&quot; -l &quot;C:\Program Files\Juniper Networks\vRouter\vRouter.inf&quot; -c s -i vRouter"
+        Execute="immediate"/>
+
+        <CustomAction Id="UninstallCmd"
+        Property="UninstallCmdProperty"
+        Value="&quot;C:\Windows\System32\netcfg.exe&quot; -u vRouter"
+        Execute="immediate"/>
+
+        <CustomAction Id="InstallCmdProperty"
+        BinaryKey="WixCA"
+        DllEntry="CAQuietExec64"
+        Execute="deferred"
+        Return="check"
+        Impersonate="no"/>
+
+        <CustomAction Id="UninstallCmdProperty"
+        BinaryKey="WixCA"
+        DllEntry="CAQuietExec64"
+        Execute="deferred"
+        Return="check"
+        Impersonate="no"/>
+
+        <InstallExecuteSequence>
+            <Custom Action="InstallCmd" After="CostFinalize">NOT Installed</Custom>
+            <Custom Action="InstallCmdProperty" After="InstallFiles">NOT Installed</Custom>
+            <Custom Action='UninstallCmd' Before='CostInitialize'>(NOT UPGRADINGPRODUCTCODE) AND (REMOVE="ALL")</Custom>
+            <Custom Action='UninstallCmdProperty' Before='RemoveFiles'>(NOT UPGRADINGPRODUCTCODE) AND (REMOVE="ALL")</Custom>
+        </InstallExecuteSequence>
+
+    </Product>
+</Wix>
+
