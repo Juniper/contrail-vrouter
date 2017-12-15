@@ -523,6 +523,12 @@ struct vr_dpdk_tapdev {
     struct vr_interface *tapdev_vif;
 };
 
+struct vr_dpdk_slave_monitoring {
+    uint16_t monitoring_vif;
+    struct rte_eth_rxtx_callback *tx_cb[RTE_MAX_QUEUES_PER_PORT];
+    struct rte_eth_rxtx_callback *rx_cb[RTE_MAX_QUEUES_PER_PORT];
+};
+
 struct vr_dpdk_global {
     /**********************************************************************/
     /* Frequently used fields */
@@ -578,6 +584,8 @@ struct vr_dpdk_global {
     struct rte_kni *knis[VR_DPDK_MAX_KNI_INTERFACES] __rte_cache_aligned;
     /* Table of monitoring redirections (for vifdump) */
     uint16_t monitorings[VR_MAX_INTERFACES] __rte_cache_aligned;
+    /* Table of slave port monitoring redirections (for vifdump) */
+    struct vr_dpdk_slave_monitoring slave_monitorings[RTE_MAX_ETHPORTS] __rte_cache_aligned;
     /* Table of ethdevs */
     struct vr_dpdk_ethdev ethdevs[RTE_MAX_ETHPORTS] __rte_cache_aligned;
     /* Table of tapdevs. */
