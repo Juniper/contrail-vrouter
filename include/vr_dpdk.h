@@ -867,6 +867,7 @@ void dpdk_fragment_assembler_exit(void);
 int dpdk_fragment_assembler_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd);
 void dpdk_fragment_assembler_table_scan(void *);
+int dpdk_check_rx_mrgbuf_disable(void);
 
 /*
  * Get bond interface port id by drv_name
