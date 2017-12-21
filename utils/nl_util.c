@@ -826,10 +826,12 @@ nl_parse_reply(struct nl_client *cl)
     } else if (nlh->nlmsg_type == cl->cl_genl_family_id) {
         resp->nl_type = NL_MSG_TYPE_FMLY;
         resp = nl_parse_gen(cl);
+#ifndef _WIN32
     } else if ((nlh->nlmsg_type == RTM_SETDCB) ||
             (nlh->nlmsg_type == RTM_GETDCB)) {
         resp->nl_type = nlh->nlmsg_type;
         resp->nl_data = nl_get_buf_ptr(cl);
+#endif
     } else {
         err = (struct nlmsgerr *)nl_get_buf_ptr(cl);
         return nl_set_resp_err(cl, err->error);
@@ -873,9 +875,10 @@ vrouter_get_family_id(struct nl_client *cl)
 
     msg = (struct genl_ctrl_message *)resp->nl_data;
     nl_set_genl_family_id(cl, msg->family_id);
-#elif defined(__FreeBSD__)
-    /* BSD doesn't check the value of family id, so set it to one */
-    nl_set_genl_family_id(cl, 1);
+#elif defined(__FreeBSD__) || defined(_WIN32)
+    /* On platforms other than Linux value of family id is not checked,
+       so it is set to FAKE_NETLINK_FAMILY */
+    nl_set_genl_family_id(cl, FAKE_NETLINK_FAMILY);
 #endif
 
     return cl->cl_genl_family_id;

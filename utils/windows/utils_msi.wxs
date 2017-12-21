@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<!--
+    utils_msi.wxs.c
+
+    Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="299D687A-3C91-4202-92D2-47C83FD7122D" UpgradeCode="F115A1D2-B722-44FA-9375-A9D4F3CE8E4D" Name="vRouter utilities" Version="0.0.1" Manufacturer="Juniper Networks" Language="1033">
+        <Package InstallerVersion="200" Compressed="yes" Comments="Windows Installer Package" Platform="x64"/>
+        <Media Id="1" Cabinet="product.cab" EmbedCab="yes"/>
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder">
+                <Directory Id="ManufacturerFolder" Name="Juniper Networks">
+                    <Directory Id="INSTALLDIR" Name="vRouter utilities">
+                        <Component Id="VifFiles" Guid="28A4316D-7216-4818-B2EF-8A3A9C9CF717" Win64="yes">
+                            <File Id="VifExe" Source="../vif.exe"/>
+                        </Component>
+                        <Component Id="RtFiles" Guid="975CFEFB-0AF0-42A8-87FB-9E5ACC9272FF" Win64="yes">
+                            <File Id="RtExe" Source="../rt.exe"/>
+                        </Component>
+                        <Component Id="NhFiles" Guid="5CFD6201-BF29-46FA-9AC5-5B19C0C86A0F" Win64="yes">
+                            <File Id="NhExe" Source="../nh.exe"/>
+                        </Component>
+                        <Component Id="MplsFiles" Guid="7F7E9D6A-3F4E-431C-A7B6-9C395DF823D9" Win64="yes">
+                            <File Id="MplsExe" Source="../mpls.exe"/>
+                        </Component>
+                        <Component Id="FlowFiles" Guid="7DFC49B8-962E-4E10-86BC-FE4627383B31" Win64="yes">
+                            <File Id="FlowExe" Source="../flow.exe"/>
+                        </Component>
+                        <Component Id="VrfstatsFiles" Guid="F56D8256-02E0-44D2-BBB8-0318615C3FDB" Win64="yes">
+                            <File Id="VrfstatsExe" Source="../vrfstats.exe"/>
+                        </Component>
+                        <Component Id="DropstatsFiles" Guid="CB895D26-EC64-498E-8FA4-E578A3C6EA49" Win64="yes">
+                            <File Id="DropstatsExe" Source="../dropstats.exe"/>
+                        </Component>
+                        <Component Id="VxlanFiles" Guid="E726A1C1-070A-4E3C-B45D-A5A48D4D65C8" Win64="yes">
+                            <File Id="VxlanExe" Source="../vxlan.exe"/>
+                        </Component>
+                        <Component Id="VrouterFiles" Guid="A7761417-38C9-4F79-83F4-7579B817EA3D" Win64="yes">
+                            <File Id="VrouterExe" Source="../vrouter.exe"/>
+                        </Component>
+                        <Component Id="VtestFiles" Guid="13BFC527-4B1B-44F4-80E7-975FA16EA99A" Win64="yes">
+                            <File Id="VtestExe" Source="../vtest/vtest.exe"/>
+                        </Component>
+                        <Component Id="Libxml2DLL" Guid="611FF57B-D728-4F23-8D2A-7F80509A9606" Win64="yes">
+                            <File Id="Libxml" Source="../../../../../build/bin/libxml2.dll"/>
+                        </Component>
+                        <Component Id="VRouterUtilsPath" Guid="C1341B97-2801-4C4E-8938-D1693FAA843B" Win64="yes" KeyPath="yes">
+                            <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]" Permanent="no" Part="last" Action="set" System="yes" />
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+
+        <Feature Id="DefaultFeature" Level="1">
+            <ComponentRef Id="VifFiles"/>
+            <ComponentRef Id="RtFiles"/>
+            <ComponentRef Id="NhFiles"/>
+            <ComponentRef Id="MplsFiles"/>
+            <ComponentRef Id="FlowFiles"/>
+            <ComponentRef Id="VrfstatsFiles"/>
+            <ComponentRef Id="DropstatsFiles"/>
+            <ComponentRef Id="VxlanFiles"/>
+            <ComponentRef Id="VrouterFiles"/>
+            <ComponentRef Id="VtestFiles"/>
+            <ComponentRef Id="Libxml2DLL"/>
+            <ComponentRef Id="VRouterUtilsPath"/>
+        </Feature>
+    </Product>
+</Wix>

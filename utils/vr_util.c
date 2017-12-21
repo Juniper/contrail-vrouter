@@ -294,6 +294,7 @@ vr_get_nl_client(int proto)
     if (!cl)
         return NULL;
 
+#ifndef _WIN32
     /* Do not use ini file if we are in a test mode. */
     if (proto == VR_NETLINK_PROTO_TEST) {
         ret = nl_socket(cl, AF_INET, SOCK_STREAM, 0);
@@ -319,6 +320,16 @@ vr_get_nl_client(int proto)
     ret = nl_connect(cl, get_ip(), get_port());
     if (ret < 0)
         goto fail;
+#else
+    DWORD access_flags = GENERIC_READ | GENERIC_WRITE;
+    DWORD attrs = OPEN_EXISTING;
+
+    cl->cl_win_pipe = CreateFile(KSYNC_PATH, access_flags, 0, NULL, attrs, 0, NULL);
+    if (cl->cl_win_pipe == INVALID_HANDLE_VALUE)
+        goto fail;
+
+    cl->cl_recvmsg = win_nl_client_recvmsg;
+#endif
 
     if ((proto == VR_NETLINK_PROTO_DEFAULT) &&
             (vrouter_get_family_id(cl) <= 0))
@@ -333,6 +344,8 @@ fail:
     return NULL;
 }
 
+#ifndef _WIN32
+// TODO(Windows): Implement general memory mapping mechanism
 void *
 vr_table_map(int major, unsigned int table,
         char *table_path, size_t size)
@@ -382,6 +395,7 @@ vr_table_map(int major, unsigned int table,
 
     return mem;
 }
+#endif
 
 int
 vr_send_get_bridge_table_data(struct nl_client *cl)
@@ -399,6 +413,10 @@ vr_send_get_bridge_table_data(struct nl_client *cl)
 int
 vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_set_dcb_state_msg(cl, ifname, state);
@@ -416,11 +434,16 @@ vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)
     }
 
     return 0;
+#endif
 }
 
 int
 vr_send_get_dcb_state(struct nl_client *cl, uint8_t *ifname)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_get_dcb_state_msg(cl, ifname);
@@ -428,11 +451,16 @@ vr_send_get_dcb_state(struct nl_client *cl, uint8_t *ifname)
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_GSTATE, NULL);
+#endif
 }
 
 int
 vr_send_set_dcbx(struct nl_client *cl, uint8_t *ifname, uint8_t dcbx)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_set_dcbx(cl, ifname, dcbx);
@@ -450,11 +478,16 @@ vr_send_set_dcbx(struct nl_client *cl, uint8_t *ifname, uint8_t dcbx)
     }
 
     return 0;
+#endif
 }
 
 int
 vr_send_get_dcbx(struct nl_client *cl, uint8_t *ifname)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_get_dcbx(cl, ifname);
@@ -462,12 +495,17 @@ vr_send_get_dcbx(struct nl_client *cl, uint8_t *ifname)
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_GDCBX, NULL);
+#endif
 }
 
 int
 vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_get_priority_config_msg(cl, ifname);
@@ -479,12 +517,17 @@ vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return 0;
+#endif
 }
 
 int
 vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_set_priority_config_msg(cl, ifname, p);
@@ -496,11 +539,16 @@ vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return 0;
+#endif
 }
 
 int
 vr_send_set_dcb_all(struct nl_client *cl, uint8_t *ifname)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_set_dcb_all(cl, ifname);
@@ -508,12 +556,17 @@ vr_send_set_dcb_all(struct nl_client *cl, uint8_t *ifname)
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_SET_ALL, NULL);
+#endif
 }
 
 int
 vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_get_ieee_ets(cl, ifname, p);
@@ -521,12 +574,17 @@ vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_IEEE_GET, p);
+#endif
 }
 
 int
 vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
+#ifdef _WIN32
+    // TODO(Windows): Implement for windows
+    return -1;
+#else
     int ret;
 
     ret = nl_build_set_ieee_ets(cl, ifname, p);
@@ -534,6 +592,7 @@ vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_IEEE_SET, NULL);
+#endif
 }
 
 void
@@ -685,10 +744,10 @@ vr_response_common_process(vr_response *resp, bool *dump_pending)
 }
 
 /* dropstats start */
-unsigned long
+uint64_t
 vr_sum_drop_stats(vr_drop_stats_req *req)
 {
-    unsigned long sum = 0;
+    uint64_t sum = 0;
 
     sum += req->vds_discard;
     sum += req->vds_pull;

@@ -21,7 +21,7 @@
 
 #include <net/if.h>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
 #include <netinet/ether.h>
 #else
 #include <net/ethernet.h>
@@ -159,7 +159,7 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
     int ret, i;
     char flag_string[32];
 
-    bzero(flag_string, sizeof(flag_string));
+    memset(flag_string, 0, sizeof(flag_string));
     if (flags & VR_BE_LABEL_VALID_FLAG)
         strcat(flag_string, "L");
     if (flags & VR_BE_FLOOD_DHCP_FLAG)
@@ -197,7 +197,7 @@ vr_bridge_print_route(uint8_t *mac, unsigned int index,
 
     for (i = 0; i < 4; i++)
         printf(" ");
-    printf("%12lu\n", packets);
+    printf("%12" PRIu64 "\n", packets);
 
     return;
 }
@@ -476,6 +476,10 @@ bridge_table_map(vr_bridge_table_data *table)
     vr_bridge_table.bt_num_entries =
         table->btable_size / sizeof(struct vr_bridge_entry);
 
+#ifdef _WIN32
+    // TODO(Windows): Implement bridge table mapping
+    vr_bridge_table.bt_entries = NULL;
+#else
     vr_bridge_table.bt_entries =
         vr_table_map(table->btable_dev, VR_MEM_BRIDGE_TABLE_OBJECT,
             table->btable_file_path, table->btable_size);
@@ -483,6 +487,7 @@ bridge_table_map(vr_bridge_table_data *table)
         printf("bridge table: %s\n", strerror(errno));
         exit(errno);
     }
+#endif
 
     return 0;
 }

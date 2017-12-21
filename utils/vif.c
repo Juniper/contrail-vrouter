@@ -4,6 +4,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <stdio.h>
+#include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -13,12 +14,10 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
-#include <termios.h>
 
 #include "vr_os.h"
 
 #include <sys/types.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 
@@ -28,8 +27,9 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_ether.h>
+#endif
 
-
+#if defined(__linux__) || defined(_WIN32)
 #include <net/if.h>
 #include <net/ethernet.h>
 #include <netinet/ether.h>
@@ -37,6 +37,11 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <net/ethernet.h>
+#endif
+
+#ifndef _WIN32
+#include <termios.h>
+#include <sys/select.h>
 #endif
 
 #include "vr_types.h"
@@ -256,7 +261,7 @@ vr_if_flags(int flags)
 {
     unsigned int i, array_size;
 
-    bzero(flag_string, sizeof(flag_string));
+    memset(flag_string, 0, sizeof(flag_string));
 
     array_size = sizeof(flag_metadata) / sizeof(flag_metadata[0]);
     for (i = 0; i < array_size; i++) {
@@ -899,6 +904,11 @@ ending:
 
     if (s >=0)
         close(s);
+#elif defined(_WIN32)
+    /*  Interface used as vhost on Windows is automatically created when
+        Hyper-V switch is enabled. */
+    fprintf(stderr, "vhost_create: Not supported on Windows.\n");
+    return 0;
 #else
 #error "Unsupported platform"
 #endif
@@ -1062,6 +1072,9 @@ enum if_opt_index {
     HELP_OPT_INDEX,
     VINDEX_OPT_INDEX,
     CORE_OPT_INDEX,
+#ifdef _WIN32
+    GUID_OPT_INDEX,
+#endif
     MAX_OPT_INDEX
 };
 
@@ -1448,7 +1461,7 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
                 first_rate_iter = true;
                 continue;
             }
-            ret = system("clear");
+            ret = system(CLEAN_SCREEN_CMD);
             if (ret == -1) {
                 fprintf(stderr, "Error: system() failed.\n");
                 exit(1);
@@ -1472,6 +1485,10 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
             dump_marker = -1;
             first_rate_iter = false;
         }
+
+#ifdef _WIN32
+        kb_input[0] = _getch();
+#else
         /*
          * We must get minimum 2 characters,
          * otherwise we will be in outer loop, always.
@@ -1479,6 +1496,7 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
         /* To suppress the warning return if EOF. */
         if (fgets(kb_input, 2, stdin) == NULL)
             return;
+#endif
 
         switch (tolower(kb_input[0])) {
             case 'q':
@@ -1506,6 +1524,9 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
 static int
 is_stdin_hit()
 {
+#ifdef _WIN32
+    return _kbhit();
+#else
     struct timeval tv;
     fd_set fds;
 
@@ -1516,6 +1537,7 @@ is_stdin_hit()
     FD_SET(STDIN_FILENO, &fds);
     select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
     return FD_ISSET(STDIN_FILENO, &fds);
+#endif
 }
 
 int
@@ -1523,7 +1545,11 @@ main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     unsigned int i = 0;
+
+#ifndef _WIN32
     static struct termios old_term_set, new_term_set;
+#endif
+
     /*
      * the proto of the socket changes based on whether we are creating an
      * interface in linux or doing an operation in vrouter
@@ -1651,6 +1677,7 @@ main(int argc, char *argv[])
         vr_intf_op(cl, vr_op);
 
     } else {
+#ifndef _WIN32
         fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
         /*
          * tc[get/set]attr functions are for changing terminal behavior.
@@ -1664,6 +1691,9 @@ main(int argc, char *argv[])
 
         rate_stats(cl, vr_op);
         tcsetattr(STDIN_FILENO, TCSANOW, &old_term_set);
+#else
+        rate_stats(cl, vr_op);
+#endif
         for (i = 0; i < VR_MAX_INTERFACES; i++) {
             if (prev_req[i].vifr_queue_ierrors_to_lcore) {
                 free(prev_req[i].vifr_queue_ierrors_to_lcore);
