@@ -1329,6 +1329,8 @@ update_secure_len(vr_dpdk_virtioq_t *vq, uint32_t id,
     uint32_t vec_id = *vec_idx;
 
     do {
+        if (vec_id >= VR_BUF_VECTOR_MAX)
+            break;
         next_desc = 0;
         len += vq->vdv_desc[idx].len;
         buf_vec[vec_id].buf_addr = vq->vdv_desc[idx].addr;
@@ -1737,7 +1739,11 @@ vr_dpdk_virtio_recover_vring_base(unsigned int vif_idx, unsigned int vring_idx)
         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx/2];
     }
 
+    RTE_LOG(INFO, UVHOST, "    recovering vring base vdv_used = %p\n",
+                                              vq->vdv_used);
     if (vq->vdv_used) {
+        RTE_LOG(INFO, UVHOST, "    recovering vring base idx %d -> %d\n",
+                                       vq->vdv_last_used_idx, vq->vdv_used->idx);
         /* Reading base index from the shared memory. */
         if (vq->vdv_last_used_idx != vq->vdv_used->idx) {
             RTE_LOG(INFO, UVHOST, "    recovering vring base %d -> %d\n",
