@@ -92,10 +92,10 @@ vr_htable_get_free_oentry(struct vr_htable *table)
         if (!ent)
             return NULL;
 
-        if (__sync_bool_compare_and_swap(&table->ht_free_oentry_head,
+        if (vr_sync_bool_compare_and_swap_p(&table->ht_free_oentry_head,
                     ent, ent->hentry_next)) {
             ent->hentry_next = NULL;
-            (void)__sync_add_and_fetch(&table->ht_used_oentries, 1);
+            (void)vr_sync_add_and_fetch_32u(&table->ht_used_oentries, 1);
             ent->hentry_flags &= ~VR_HENTRY_FLAG_IN_FREE_LIST;
             return ent;
         }
@@ -128,9 +128,9 @@ vr_htable_put_free_oentry(struct vr_htable *table, vr_hentry_t *ent)
         tmp = table->ht_free_oentry_head;
         ent->hentry_next = tmp;
 
-        if (__sync_bool_compare_and_swap(&table->ht_free_oentry_head,
+        if (vr_sync_bool_compare_and_swap_p(&table->ht_free_oentry_head,
                                                             tmp, ent)) {
-            (void)__sync_sub_and_fetch(&table->ht_used_oentries, 1);
+            (void)vr_sync_sub_and_fetch_32u(&table->ht_used_oentries, 1);
             return;
         }
 
@@ -226,7 +226,7 @@ vr_htable_hentry_scheduled_delete(void *arg)
     if (!head_ent)
         return;
 
-    (void)__sync_bool_compare_and_swap(&delete_data->hd_scheduled, 1, 0);
+    (void)vr_sync_bool_compare_and_swap_16u(&delete_data->hd_scheduled, 1, 0);
 
     /*
      * We attempt to delete only those many entries that have been
@@ -234,7 +234,7 @@ vr_htable_hentry_scheduled_delete(void *arg)
      * processing these, they will get scheduled in new work item
      */
     count = delete_data->hd_count;
-    (void)__sync_sub_and_fetch(&delete_data->hd_count, count);
+    (void)vr_sync_sub_and_fetch_16u(&delete_data->hd_count, count);
 
     prev = head_ent;
     ent = head_ent->hentry_next;
@@ -254,7 +254,7 @@ vr_htable_hentry_scheduled_delete(void *arg)
              * get hold of the new previous
              */
             if (prev == head_ent) {
-                if (!__sync_bool_compare_and_swap(&prev->hentry_next,
+                if (!vr_sync_bool_compare_and_swap_p(&prev->hentry_next,
                                                       ent, ent->hentry_next)) {
                     prev = head_ent;
                     ent = head_ent->hentry_next;
@@ -332,7 +332,7 @@ vr_htable_reset(vr_htable_t htable, htable_trav_cb cb, void *data)
 
         if (ent->hentry_flags & VR_HENTRY_FLAG_VALID) {
             ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
-            (void)__sync_sub_and_fetch(&table->ht_used_entries, 1);
+            (void)vr_sync_sub_and_fetch_32u(&table->ht_used_entries, 1);
         }
 
 
@@ -347,7 +347,7 @@ vr_htable_reset(vr_htable_t htable, htable_trav_cb cb, void *data)
 
                 if (ent->hentry_flags & VR_HENTRY_FLAG_VALID) {
                     ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
-                    (void)__sync_sub_and_fetch(&table->ht_used_entries, 1);
+                    (void)vr_sync_sub_and_fetch_32u(&table->ht_used_entries, 1);
                 }
 
                 vr_htable_oentry_invalidate(table, ent);
@@ -372,7 +372,7 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
         return;
 
-    (void)__sync_sub_and_fetch(&table->ht_used_entries, 1);
+    (void)vr_sync_sub_and_fetch_32u(&table->ht_used_entries, 1);
 
     /* Mark it as Invalid */
     ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
@@ -389,10 +389,10 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     delete_index = head_ent->hentry_index / table->ht_bucket_size;
     delete_data = vr_btable_get(table->ht_dtable, delete_index);
 
-    (void)__sync_add_and_fetch(&delete_data->hd_count, 1);
+    (void)vr_sync_add_and_fetch_16u(&delete_data->hd_count, 1);
 
     /* Schedule the deltion only if it is not already scheduled */
-    if (__sync_bool_compare_and_swap(&delete_data->hd_scheduled, 0, 1)) {
+    if (vr_sync_bool_compare_and_swap_16u(&delete_data->hd_scheduled, 0, 1)) {
 
         delete_data->hd_table = (struct vr_htable *)htable;
         delete_data->hd_index = head_ent->hentry_index;
@@ -408,7 +408,7 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
              * scheduled. These marked entries would be deleted only if
              * this hash bucket is revisisted
              */
-            (void)__sync_bool_compare_and_swap(&delete_data->hd_scheduled,1, 0);
+            (void)vr_sync_bool_compare_and_swap_16u(&delete_data->hd_scheduled,1, 0);
         }
     }
 
@@ -442,11 +442,11 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
         ind = tmp_hash + i;
         ent = vr_btable_get(table->ht_htable, ind);
         if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID)) {
-            if (__sync_bool_compare_and_swap(&ent->hentry_flags,
+            if (vr_sync_bool_compare_and_swap_8u(&ent->hentry_flags,
                         (ent->hentry_flags & ~VR_HENTRY_FLAG_VALID),
                         VR_HENTRY_FLAG_VALID)) {
                 ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
-                (void)__sync_add_and_fetch(&table->ht_used_entries, 1);
+                (void)vr_sync_add_and_fetch_32u(&table->ht_used_entries, 1);
                 return ent;
             }
         }
@@ -473,7 +473,7 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
             if (o_ent->hentry_next)
                 o_ent->hentry_next_index = o_ent->hentry_next->hentry_index;
 
-            if (__sync_bool_compare_and_swap(&ent->hentry_next,
+            if (vr_sync_bool_compare_and_swap_p(&ent->hentry_next,
                                                 o_ent->hentry_next, o_ent)) {
 
                 /*
@@ -483,7 +483,7 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
                  * pointer should still do the right thing
                  */
                 ent->hentry_next_index = ent->hentry_next->hentry_index;
-                (void)__sync_add_and_fetch(&table->ht_used_entries, 1);
+                (void)vr_sync_add_and_fetch_32u(&table->ht_used_entries, 1);
                 return o_ent;
             }
         } while (1);
