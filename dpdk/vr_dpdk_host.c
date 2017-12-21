@@ -570,7 +570,7 @@ dpdk_delete_timer(struct vr_timer *vtimer)
 }
 
 static void
-dpdk_get_time(unsigned long *sec, unsigned long *usec)
+dpdk_get_time(uint64_t *sec, uint64_t *usec)
 {
     struct timespec ts;
 
@@ -585,7 +585,7 @@ dpdk_get_time(unsigned long *sec, unsigned long *usec)
 }
 
 static void
-dpdk_get_mono_time(unsigned long *sec, unsigned long *nsec)
+dpdk_get_mono_time(uint64_t *sec, uint64_t *nsec)
 {
     struct timespec ts;
 

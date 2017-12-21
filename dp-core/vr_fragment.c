@@ -134,7 +134,7 @@ static inline void
 fragment_entry_set(struct vr_fragment *fe, struct vr_fragment_key *key,
         unsigned short sport, unsigned short dport)
 {
-    unsigned long sec, nsec;
+    uint64_t sec, nsec;
 
     fe->f_sip_u = key->fk_sip_u;
     fe->f_sip_l = key->fk_sip_l;
@@ -208,7 +208,7 @@ unsigned int
 vr_assembler_table_scan(struct vr_fragment **head)
 {
     unsigned int scanned = 0;
-    unsigned long sec, nsec, dest;
+    uint64_t sec, nsec, dest;
     struct vr_fragment *frag = *head, *next, **prev;
 
     prev = head;
@@ -307,7 +307,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
         struct vr_fragment_queue_element *vfqe)
 {
     int ret = 0;
-    unsigned long sec, nsec;
+    uint64_t sec, nsec;
     unsigned int list_length = 0, drop_reason;
     bool found = false, frag_head = false;
     uint64_t *v6_addr;
@@ -613,7 +613,7 @@ vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
 struct vr_fragment *
 vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
 {
-    unsigned long sec, nsec;
+    uint64_t sec, nsec;
     uint64_t *v6_addr;
     struct vr_ip6 *ip6;
     struct vr_ip6_frag *v6_frag;
@@ -660,7 +660,7 @@ static void
 __fragment_reap(vr_htable_t table, vr_hentry_t *ent,
         unsigned int index, void *data)
 {
-    unsigned long sec, nsec;
+    uint64_t sec, nsec;
     struct vr_fragment *fe;
 
     fe = VR_FRAGMENT_FROM_HENTRY(ent);

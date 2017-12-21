@@ -343,8 +343,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
             struct vr_forwarding_md *fmd, mirror_type_t mtype)
 {
     bool reset = true;
-    void *mirror_md;
-    unsigned char *buf, default_mme[2] = {0xff, 0x0};
+    void *mirror_md = NULL;
+    unsigned char *buf = NULL, default_mme[2] = {0xff, 0x0};
     unsigned int captured_len, clone_len = 0;
     unsigned int mirror_md_len = 0, drop_reason;
     struct vr_nexthop *nh, *pkt_nh;

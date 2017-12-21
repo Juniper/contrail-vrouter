@@ -62,7 +62,7 @@ vr_message_request(struct vr_message *message)
         return -ENETRESET;
 
     if (vr_not_ready)
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(_WIN32)
         return -EBADF;
 #else
         return -EBADFD;
@@ -189,8 +189,8 @@ vr_message_multi_response(struct vr_message_multi *objects)
     char *buf = NULL;
     int ret = 0;
     unsigned int i, buf_len = 0, len = 0;
-    struct vr_mproto *proto;
-    struct vr_mtransport *trans;
+    struct vr_mproto *proto = NULL;
+    struct vr_mtransport *trans = NULL;
 
     if ((!objects) ||
             (objects->vr_mm_object_count >= VR_MESSAGE_MULTI_MAX_OBJECTS))
@@ -228,7 +228,7 @@ vr_message_multi_response(struct vr_message_multi *objects)
     return vr_message_queue_response(buf, len, false);
 
 response_fail:
-    if (buf)
+    if (trans && buf)
         trans->mtrans_free(buf);
     vr_send_response(ret);
 
