@@ -55,7 +55,6 @@ sandesh_gen_output = env.Command('sandesh_gen_output', sandesh_gen,
 vtest_src = [
                 'vt_main.c',
                 'vt_message.c',
-                'vt_packet.c',
                 'vt_gen_lib.c',
                 'vt_gen_message_modules.c',
                 'vt_gen_sandesh.c',
