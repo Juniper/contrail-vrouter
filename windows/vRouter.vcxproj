@@ -208,7 +208,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>..;.;..\..\tools;..\..\tools\sandesh\library\c;..\..\build\debug\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\debug\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
       <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
       <PreCompiledHeaderFile>precomp.h</PreCompiledHeaderFile>
@@ -226,7 +226,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>..;.;..\..\tools;..\..\tools\sandesh\library\c;..\..\build\production\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\production\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
       <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
       <PreCompiledHeaderFile>precomp.h</PreCompiledHeaderFile>
@@ -375,10 +375,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_transport.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
