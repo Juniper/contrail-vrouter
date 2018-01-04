@@ -10,7 +10,6 @@
 #include "vr_defs.h"
 #include "nl_util.h"
 
-#define ETHER_ADDR_LEN     (ETH_ALEN)
 #define ETHER_ADDR_STR_LEN (ETHER_ADDR_LEN * 3)
 
 const LPCTSTR KSYNC_PATH = TEXT("\\\\.\\vrouterKsync");
