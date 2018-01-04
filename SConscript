@@ -32,6 +32,9 @@ env.Append(CPPPATH = [env['TOP'] + '/vrouter/sandesh/gen-c'])
 env.Append(CPPPATH = ['#src/contrail-common'])
 env.Append(CPPPATH = ['#src/contrail-common/sandesh/library/c'])
 
+if sys.platform.startswith('win'):
+    env.Append(CPPPATH = '#vrouter/windows')
+
 # Make Sandesh quiet for production
 if 'production' in env['OPT']:
     DefaultEnvironment().Append(CPPDEFINES='SANDESH_QUIET')
@@ -93,38 +96,40 @@ if sys.platform.startswith('freebsd'):
 # This approach always uses --kernel-dir, which works for vrouter, but
 # libdpdk still defaults to installed version and thus will fail.
 #
-default_kernel_ver = shellCommand("uname -r").strip()
-kernel_build_dir = None
-(PLATFORM, VERSION, EXTRA) = platform.linux_distribution()
-if (PLATFORM.lower() == 'ubuntu' and VERSION.find('14.') == 0):
-    if re.search('^4\.', default_kernel_ver):
-        print "Warn: kernel version %s not supported for vrouter and dpdk" % default_kernel_ver
-        kernel_build_dir = '/lib/modules/3.13.0-110-generic/build'
-        if os.path.isdir(kernel_build_dir):
-            default_kernel_ver = "3.13.0-110-generic"
-            print "info: libdpdk will be built against kernel version %s" % default_kernel_ver
-        else:
-            print "*** Error: Cannot find kernel v3.13.0-110, build of vrouter will likely fail"
-            kernel_build_dir = '/lib/modules/%s/build' % default_kernel_ver
+if not sys.platform.startswith('win'):
+    default_kernel_ver = shellCommand("uname -r").strip()
+    kernel_build_dir = None
+    (PLATFORM, VERSION, EXTRA) = platform.linux_distribution()
+    if (PLATFORM.lower() == 'ubuntu' and VERSION.find('14.') == 0):
+        if re.search('^4\.', default_kernel_ver):
+            print "Warn: kernel version %s not supported for vrouter and dpdk" % default_kernel_ver
+            kernel_build_dir = '/lib/modules/3.13.0-110-generic/build'
+            if os.path.isdir(kernel_build_dir):
+                default_kernel_ver = "3.13.0-110-generic"
+                print "info: libdpdk will be built against kernel version %s" % default_kernel_ver
+            else:
+                print "*** Error: Cannot find kernel v3.13.0-110, build of vrouter will likely fail"
+                kernel_build_dir = '/lib/modules/%s/build' % default_kernel_ver
 
-kernel_dir = GetOption('kernel-dir')
-if kernel_dir:
-    kern_version = shellCommand('cat %s/include/config/kernel.release' % kernel_dir)
-else:
-    kern_version = default_kernel_ver
-    if kernel_build_dir: kernel_dir = kernel_build_dir
-kern_version = kern_version.strip()
+    kernel_dir = GetOption('kernel-dir')
+    if kernel_dir:
+        kern_version = shellCommand('cat %s/include/config/kernel.release' % kernel_dir)
+    else:
+        kern_version = default_kernel_ver
+        if kernel_build_dir: kernel_dir = kernel_build_dir
+    kern_version = kern_version.strip()
 
 if sys.platform != 'darwin':
 
-    install_root = GetOption('install_root')
-    if install_root == None:
-        install_root = ''
+    if not sys.platform.startswith('win'):
+        install_root = GetOption('install_root')
+        if install_root == None:
+            install_root = ''
 
-    src_root = install_root + '/usr/src/vrouter/'
-    env.Replace(SRC_INSTALL_TARGET = src_root)
-    env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
-    env.Alias('install', src_root)
+        src_root = install_root + '/usr/src/vrouter/'
+        env.Replace(SRC_INSTALL_TARGET = src_root)
+        env.Install(src_root, ['LICENSE', 'Makefile', 'GPL-2.0.txt'])
+        env.Alias('install', src_root)
 
     buildinfo = env.GenerateBuildInfoCCode(target = ['vr_buildinfo.c'],
             source = [], path = dp_dir + 'dp-core')
@@ -246,18 +251,34 @@ if sys.platform != 'darwin':
                        variant_dir = env['TOP'] + '/vrouter/' + sdir,
                        duplicate = 0)
 
-    make_cmd = 'cd ' + make_dir + ' && make'
-    if kernel_dir: make_cmd += ' KERNELDIR=' + kernel_dir
-    make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
-    make_cmd += ' SANDESH_SRC_ROOT=' + '../build/kbuild/'
-    make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#src/contrail-common/').abspath
+    if sys.platform.startswith('win'):
+        def make_cmd(target, source, env):
+            msbuild = [os.environ['MSBUILD'], 'windows/vRouter.sln', '/p:Platform=x64']
+
+            if env['OPT'] == 'debug':
+                msbuild.append('/p:Configuration=Debug')
+            elif env['OPT'] == 'production':
+                msbuild.append('/p:Configuration=Release')
+
+            subprocess.call(msbuild, cwd=Dir('#/vrouter').abspath)
+        vrouter_target = File('#/build/debug/vrouter/extension/vRouter/vRouter.sys')
+    else:
+        make_cmd = 'cd ' + make_dir + ' && make'
+        if kernel_dir: make_cmd += ' KERNELDIR=' + kernel_dir
+        make_cmd += ' SANDESH_HEADER_PATH=' + Dir(env['TOP'] + '/vrouter/').abspath
+        make_cmd += ' SANDESH_SRC_ROOT=' + '../build/kbuild/'
+        make_cmd += ' SANDESH_EXTRA_HEADER_PATH=' + Dir('#src/contrail-common/').abspath
+        vrouter_target = 'vrouter.ko'
     if 'vrouter' in COMMAND_LINE_TARGETS:
-        BUILD_TARGETS.append('vrouter/uvrouter')
+        if not sys.platform.startswith('win'):
+            BUILD_TARGETS.append('vrouter/uvrouter')
+        else:
+            BUILD_TARGETS.append('vrouter.msi')
         if dpdk_exists:
             BUILD_TARGETS.append('vrouter/dpdk')
         BUILD_TARGETS.append('vrouter/utils')
 
-    kern = env.Command('vrouter.ko', None, make_cmd)
+    kern = env.Command(vrouter_target, None, make_cmd)
     env.Default(kern)
     env.AlwaysBuild(kern)
 
@@ -280,12 +301,19 @@ if sys.platform != 'darwin':
                     '#build/kbuild/sandesh/library/c/' + dirname,
                     env['TOP'] + '/tools/sandesh/library/c/' + src))
 
-    if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
-        os.system(make_cmd + ' clean')
+    if not sys.platform.startswith('win'):
+        if GetOption('clean') and (not COMMAND_LINE_TARGETS or 'vrouter' in COMMAND_LINE_TARGETS):
+            os.system(make_cmd + ' clean')
 
-    libmod_dir = install_root
-    libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
-    env.Alias('build-kmodule', env.Install(libmod_dir, kern))
+        libmod_dir = install_root
+        libmod_dir += '/lib/modules/%s/extra/net/vrouter' % kern_version
+        env.Alias('build-kmodule', env.Install(libmod_dir, kern))
+    else:
+        env.Append(WIXCANDLEFLAGS = ['-doptimization=' + env['OPT']])
+        env.Append(WIXLIGHTFLAGS = ['-ext', 'WixUtilExtension.dll'])
+        msi_command = env.WiX(File('#/build/' + env['OPT'] + '/vrouter/extension/vRouter.msi'), ['windows/installer/vrouter_msi.wxs'])
+        env.Depends(msi_command, kern)
+        env.Alias('vrouter.msi', msi_command)
 
 # Local Variables:
 # mode: python
