@@ -10,6 +10,9 @@
 extern "C" {
 #endif
 
+#include "vr_os.h"
+#include "vr_types.h"
+
 #define VR_NUM_ROUTES_PER_DUMP  20
 #define VR_DEF_VRFS             4096
 #define VR_MAX_VRFS             65536

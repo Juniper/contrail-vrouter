@@ -42,9 +42,6 @@ extern int vr_gro_vif_add(struct vrouter *, unsigned int, char *, unsigned short
 extern struct vr_interface_stats *vif_get_stats(struct vr_interface *,
         unsigned short);
 
-extern void vif_attach(struct vr_interface *);
-extern void vif_detach(struct vr_interface *);
-
 static int vr_napi_poll(struct napi_struct *, int);
 static rx_handler_result_t pkt_gro_dev_rx_handler(struct sk_buff **);
 static int linux_xmit_segments(struct vr_interface *, struct sk_buff *,

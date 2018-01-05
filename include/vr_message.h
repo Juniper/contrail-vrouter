@@ -6,6 +6,7 @@
 #ifndef __VR_MESSAGE_H__
 #define __VR_MESSAGE_H__
 
+#include "vr_response.h"
 #include "vr_queue.h"
 
 #define VR_MESSAGE_DUMP_INCOMPLETE      (0x1 << 30)

@@ -31,8 +31,6 @@ static int vif_fat_flow_add(struct vr_interface *, vr_interface_req *);
 static bool vif_fat_flow_port_is_set(struct vr_interface *, uint8_t,
                 uint16_t);
 
-void vif_attach(struct vr_interface *);
-void vif_detach(struct vr_interface *);
 int vr_gro_vif_add(struct vrouter *, unsigned int, char *, unsigned short);
 struct vr_interface_stats *vif_get_stats(struct vr_interface *, unsigned short);
 struct vr_interface *__vrouter_get_interface_os(struct vrouter *, unsigned int);
@@ -1929,12 +1927,16 @@ vr_interface_delete(vr_interface_req *req, bool need_response)
      * index
      */
     if (req->vifr_name) {
+#ifdef _WIN32
+        vif = vif_find(router, req->vifr_name);
+#else
         if (2 == sscanf(req->vifr_name, "vif%u/%u", &req->vifr_rid,
                     &req->vifr_idx))
             vif = __vrouter_get_interface(vrouter_get(req->vifr_rid),
                     req->vifr_idx);
         else
             vif = vif_find(router, req->vifr_name);
+#endif
     } else {
         vif = __vrouter_get_interface(router, req->vifr_idx);
     }

@@ -7,6 +7,8 @@
 #ifndef _VR_HASH_H
 #define _VR_HASH_H
 
+#include "vr_os.h"
+
 /* vr_hash.h: Jenkins hash support.
  *
  * Copyright (C) 2006. Bob Jenkins (bob_jenkins@burtleburtle.net)

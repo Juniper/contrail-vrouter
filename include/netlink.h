@@ -10,7 +10,7 @@
 
 /* Only supported via "fake implementation" */
 #define NETLINK_GENERIC 0
-
+#define AF_NETLINK 0
 
 /*
  * Most of below structures and definitions have similar structures and
@@ -78,5 +78,14 @@ struct nlattr {
 #define NLA_ALIGNTO 4
 #define NLA_ALIGN(len)  (((len) + NLA_ALIGNTO - 1) & ~(NLA_ALIGNTO - 1))
 #define NLA_HDRLEN  ((int) NLA_ALIGN(sizeof(struct nlattr)))
+
+#define NETLINK_HEADER_LEN     (NLMSG_HDRLEN + GENL_HDRLEN + NLA_HDRLEN)
+
+#define FAKE_NETLINK_FAMILY (1)
+
+struct nlmsgerr {
+    int             error;
+    struct nlmsghdr msg;
+};
 
 #endif /* FAKE_NETLINK_H */
