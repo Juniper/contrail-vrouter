@@ -3,6 +3,11 @@ dp-core/*.o
 dp-core/*.o.cmd
 linux/*.o.cmd
 linux/*.o
+*obj
+*tlog
+*pdb
+*idb
+*.log
 
 # Not sure where this is generated
 .tmp_versions
@@ -16,5 +21,15 @@ vrouter.mod.c
 vrouter.mod.o
 vrouter.o
 
+include/vr_buildinfo.h
+dp-core/vr_buildinfo.c
+
 Module.symvers
 modules.order
+.vs
+*.VC.db
+*.VC.VC.opendb
+/ipch/
+/sandesh/gen-c/*
+/test/cmocka
+/test/atomic-test/x64
