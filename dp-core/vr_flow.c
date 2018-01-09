@@ -2592,7 +2592,7 @@ vr_flow_table_init(struct vrouter *router)
             vr_flow_table = vr_huge_page_mem_get(VR_FLOW_TABLE_SIZE +
                     VR_OFLOW_TABLE_SIZE);
             if (vr_flow_table)
-                vr_oflow_table = vr_flow_table + VR_FLOW_TABLE_SIZE;
+                vr_oflow_table = (char*)vr_flow_table + VR_FLOW_TABLE_SIZE;
         }
 
         router->vr_flow_table = vr_htable_attach(router, vr_flow_entries,

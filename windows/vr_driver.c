@@ -5,6 +5,7 @@
 #include "vr_windows.h"
 #include "windows_devices.h"
 #include "windows_mem.h"
+#include "windows_nbl.h"
 
 #include "vrouter.h"
 #include "vr_packet.h"

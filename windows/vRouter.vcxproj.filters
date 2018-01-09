@@ -270,9 +270,6 @@
     <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_transport.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\build\kbuild\sandesh\library\c\sandesh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
