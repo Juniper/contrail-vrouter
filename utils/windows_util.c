@@ -51,7 +51,7 @@ nl_sendmsg(struct nl_client *cl)
 }
 
 int
-win_nl_client_recvmsg(struct nl_client *cl)
+win_nl_client_recvmsg(struct nl_client *cl, bool msg_wait)
 {
     DWORD read_bytes = 0;
 

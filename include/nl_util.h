@@ -305,14 +305,14 @@ extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
 extern void vr_print_drop_stats(vr_drop_stats_req *, int);
 
-#ifdef _WINDOWS
+#ifdef _WIN32
 extern int win_setup_nl_client(struct nl_client *, unsigned int);
 extern int win_nl_sendmsg(struct nl_client *);
-extern int win_nl_client_recvmsg(struct nl_client *);
+extern int win_nl_client_recvmsg(struct nl_client *cl, bool msg_wait);
 
 extern const LPCTSTR KSYNC_PATH;
 extern const LPCTSTR FLOW_PATH;
-#endif
+#endif /* _WIN32 */
 
 #ifdef __cplusplus
 }
