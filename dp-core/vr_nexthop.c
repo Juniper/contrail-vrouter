@@ -315,7 +315,7 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
     data = pkt_data(pkt);
     fmd->fmd_to_me = 1;
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-    if (pkt_pull(pkt, pull_len) < 0) {
+    if (!pkt_pull(pkt, pull_len)) {
         vr_pfree(pkt, VP_DROP_PULL);
         return 0;
     }
@@ -939,7 +939,7 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
         return !handled;
 
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-    if (pkt_pull(pkt, pull_len) < 0) {
+    if (!pkt_pull(pkt, pull_len)) {
         drop_reason = VP_DROP_PULL;
         goto drop;
     }
