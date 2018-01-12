@@ -19,6 +19,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 
 #include <rte_errno.h>
 #include <rte_hexdump.h>
@@ -65,6 +67,103 @@ static vr_uvh_msg_handler_fn vr_uvhost_cl_msg_handlers[] = {
     vr_uvhm_set_vring_enable,
     NULL,
 };
+
+/*
+ * Return the basename given a full path
+ * Note: Dont use posix library function
+ * as it could change the original string
+ */
+static char *basename(char *string)
+{
+    char *tmp = &string[strlen(string)-1];
+    /* find basename */
+    while (tmp > string && *(tmp-1) != '/')
+        tmp--;
+    if (tmp == string)
+        return NULL;
+    return tmp+8; /* remove the uvh_vif_ */
+}
+
+/*
+ * Function to send interface state to Agent
+ * state 0 - down
+ * state 1 - up
+ * Called when the VM goes down or comes up
+ */
+static void
+vr_uvh_nl_send_intf_state(int state, int intf_index, char *intf_name)
+{
+    int nl_fd;
+    char buf[1024];
+    struct nlmsghdr *nlh;
+    struct ifinfomsg *ifinfo;
+    struct nlattr *nla;
+    int len, n;
+    char *if_name_buf;
+    struct sockaddr_nl sa;
+
+    if (intf_name == NULL)
+        return;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+    sa.nl_pid = 0;
+    sa.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_IFADDR;
+
+
+
+    nl_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (nl_fd < 0) {
+        printf("    error creating netlink socket\n");
+        goto error;
+    }
+    bind(nl_fd, (struct sockaddr *)&sa, sizeof(sa));
+    nlh = (struct nlmsghdr *)buf;
+
+    nlh->nlmsg_len = NLMSG_HDRLEN + sizeof(struct ifinfomsg);
+    nlh->nlmsg_type = RTM_NEWLINK;
+    nlh->nlmsg_flags = NLM_F_REQUEST;
+    nlh->nlmsg_seq = 1;
+    nlh->nlmsg_pid = 0;
+    ifinfo = (struct ifinfomsg *)(buf + NLMSG_HDRLEN);
+
+    ifinfo->ifi_family = 0;
+    ifinfo->ifi_type = 0;
+    ifinfo->ifi_type = 0;
+    /* Set index to -1 as agent needs only the interface name */
+    ifinfo->ifi_index = -1;
+    if (state)
+        ifinfo->ifi_flags = 0x11043; //IFF_LOWER_UP|IFF_MULTICAST|IFF_RUNNING|IFF_BROADCAST|IFF_UP;
+    else
+        ifinfo->ifi_flags = 0x03; // IFF_UP|IFF_BROADCAST;
+    /* ifi_change needs to be set to 0xFFFFFFFF by default 
+     * as its a reserved field
+     */
+    ifinfo->ifi_change = 0xFFFFFFFF;
+
+    nla = (struct nlattr *)(buf + NLMSG_HDRLEN + sizeof(struct ifinfomsg));
+
+    len = NLA_HDRLEN + NLA_ALIGN(strlen(intf_name) + 1);
+
+    nla->nla_len = len;
+    nla->nla_type = IFLA_IFNAME;
+
+    if_name_buf = (char *)nla + NLA_HDRLEN;
+    strcpy(if_name_buf, intf_name);
+
+    len += (NLMSG_HDRLEN + sizeof(struct ifinfomsg));
+
+    nlh->nlmsg_len = len;
+
+    n = sendto(nl_fd, buf, len, 0, (struct sockaddr *)&sa, sizeof(sa));
+    if (n != len) {
+        printf("    error sending netlink interface message\n");
+    }
+
+    close(nl_fd);
+error:
+    return;
+}
 
 /*
  * uvhm_mem_table_mmap - mmaps guest memory regions.
@@ -176,6 +275,8 @@ uvhm_client_munmap(vr_uvh_client_t *vru_cl)
     int i, ret;
     vr_uvh_client_mem_region_t *region;
 
+    /* Send netlink interface down message to agent */
+    vr_uvh_nl_send_intf_state(0, vru_cl->vruc_idx, basename(vru_cl->vruc_path));
     /* Make sure the device has stopped before the munmap. */
     vr_dpdk_virtio_stop(vru_cl->vruc_idx);
 
@@ -941,6 +1042,9 @@ vr_uvh_cl_listen_handler(int fd, void *arg)
     }
     vr_uvhost_log("    FD %d accepted new client connection FD %d\n", fd, s);
 
+    /* Send netlink interface up message to agent */
+    vr_uvh_nl_send_intf_state(1, vru_cl->vruc_idx, basename(vru_cl->vruc_path));
+
     /* We still need to listen for the original socket to support VM
      * shut off/restart, since we create the socket at vif --add
      * and we get vif --add at the VM spawning, not VM (re)starting
@@ -1093,6 +1197,9 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     vru_cl->vruc_nrxqs = msg->vrnu_vif_nrxqs;
     vru_cl->vruc_ntxqs = msg->vrnu_vif_ntxqs;
     vru_cl->vruc_vif_gen = msg->vrnu_vif_gen;
+
+    /* Send netlink interface down message to agent */
+    vr_uvh_nl_send_intf_state(0, vru_cl->vruc_idx, basename(vru_cl->vruc_path));
 
     ret = vr_uvhost_add_fd(s, UVH_FD_READ, vru_cl, vr_uvh_cl_listen_handler);
     if (ret == -1) {
