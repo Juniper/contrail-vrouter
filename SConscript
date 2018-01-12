@@ -253,12 +253,12 @@ if sys.platform != 'darwin':
 
     if sys.platform.startswith('win'):
         def make_cmd(target, source, env):
-            msbuild = [os.environ['MSBUILD'], 'windows/vRouter.sln', '/p:Platform=x64']
-
-            if env['OPT'] == 'debug':
-                msbuild.append('/p:Configuration=Debug')
-            elif env['OPT'] == 'production':
-                msbuild.append('/p:Configuration=Release')
+            msbuild = [
+                os.environ['MSBUILD'],
+                'windows/vRouter.sln',
+                '/p:Platform=x64',
+                '/p:Configuration=' + env['VS_BUILDMODE']
+            ]
 
             subprocess.call(msbuild, cwd=Dir('#/vrouter').abspath)
         vrouter_target = File('#/build/debug/vrouter/extension/vRouter/vRouter.sys')
