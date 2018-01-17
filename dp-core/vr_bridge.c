@@ -627,8 +627,7 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     if (rtable->algo_data)
         return 0;
 
-    if (!vr_bridge_oentries)
-        vr_bridge_oentries = ((vr_bridge_entries / 5) + 1023) & ~1023;
+    vr_compute_size_bridge_otable();
 
     if (!vr_bridge_table && vr_huge_page_mem_get) {
         vr_bridge_table = vr_huge_page_mem_get(VR_BRIDGE_TABLE_SIZE +
@@ -974,4 +973,10 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
     nh_output(pkt, nh, fmd);
     return 0;
+}
+
+void vr_compute_size_bridge_otable(void)
+{
+    if (!vr_bridge_oentries)
+        vr_bridge_oentries = ((vr_bridge_entries / 5) + 1023) & ~1023;
 }

@@ -28,8 +28,8 @@ VOID Pkt0Init(VOID);
 NTSTATUS Pkt0CreateDevice(NDIS_HANDLE DriverHandle);
 VOID Pkt0DestroyDevice(VOID);
 
-NTSTATUS FlowCreateDevice(NDIS_HANDLE DriverHandle);
-VOID FlowDestroyDevice(VOID);
+NTSTATUS ShmemCreateDevices(NDIS_HANDLE DriverHandle);
+VOID ShmemDestroyDevices(VOID);
 
 NTSTATUS VRouterSetUpNamedDevice(NDIS_HANDLE DriverHandle,
                                  PCWSTR DeviceName,
@@ -53,12 +53,12 @@ int pkt0_if_tx(struct vr_interface *vif, struct vr_packet *pkt);
 /*
  * Flow device related definitions
  */
-struct _FLOW_DEVICE_CONTEXT {
+struct _SHMEM_DEVICE_CONTEXT {
     PVOID UserVirtualAddress;
-    PMDL FlowMemoryMdl;
+    PMDL MemoryMdl;
 };
 
-typedef struct _FLOW_DEVICE_CONTEXT   FLOW_DEVICE_CONTEXT;
-typedef struct _FLOW_DEVICE_CONTEXT *PFLOW_DEVICE_CONTEXT;
+typedef struct _SHMEM_DEVICE_CONTEXT   SHMEM_DEVICE_CONTEXT;
+typedef struct _SHMEM_DEVICE_CONTEXT *PSHMEM_DEVICE_CONTEXT;
 
 #endif /* __WINDOWS_DEVICES_H__ */
