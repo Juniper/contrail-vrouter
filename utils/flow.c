@@ -38,7 +38,7 @@
 
 #ifdef _WIN32
 #include <winioctl.h>
-#include "windows_flow_ioctl.h"
+#include "windows_shmem_ioctl.h"
 #endif
 
 #include "vr_types.h"
