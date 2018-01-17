@@ -7,13 +7,17 @@
 #include <strsafe.h>
 #include <stdbool.h>
 #include <netinet/ether.h>
-#include "vr_defs.h"
-#include "nl_util.h"
+
+#include <vr_defs.h>
+#include <vr_mem.h>
+#include <nl_util.h>
+#include <windows_shmem_ioctl.h>
 
 #define ETHER_ADDR_STR_LEN (ETHER_ADDR_LEN * 3)
 
 const LPCTSTR KSYNC_PATH = TEXT("\\\\.\\vrouterKsync");
 const LPCTSTR FLOW_PATH  = TEXT("\\\\.\\vrouterFlow");
+const LPCTSTR BRIDGE_PATH  = TEXT("\\\\.\\vrouterBridge");
 
 static DWORD
 print_and_get_error_code()
@@ -35,6 +39,45 @@ print_and_get_error_code()
     }
 
     return error;
+}
+
+bool
+vr_table_map(int major, unsigned int table, char *table_path, size_t size, void **mem)
+{
+    LPCTSTR path;
+    switch(table) {
+    case VR_MEM_BRIDGE_TABLE_OBJECT:
+        path = BRIDGE_PATH;
+        break;
+    case VR_MEM_FLOW_TABLE_OBJECT:
+        path = FLOW_PATH;
+        break;
+    default:
+        return false;
+    }
+
+    HANDLE flowPipe = CreateFile(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (flowPipe == INVALID_HANDLE_VALUE) {
+        DWORD lastError = GetLastError();
+        printf("Error: CreateFile on shmem pipe: %d\n", lastError);
+        return false;
+    }
+
+    PVOID outBuffer;
+    DWORD outBytes;
+    BOOL transactionResult = DeviceIoControl(flowPipe, IOCTL_SHMEM_GET_ADDRESS, NULL, 0, mem,
+        sizeof(*mem), &outBytes, NULL);
+
+    if (!transactionResult) {
+        DWORD lastError = GetLastError();
+        printf("Error: DeviceIoControl on shmem pipe: %d\n", lastError);
+        return false;
+    } else if (outBytes != sizeof(*mem)) {
+        printf("Error: DeviceIoControl on shmem pipe: pointer wasn't fully filled\n");
+        return false;
+    }
+
+    return true;
 }
 
 int

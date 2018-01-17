@@ -344,59 +344,6 @@ fail:
     return NULL;
 }
 
-#ifndef _WIN32
-// TODO(Windows): Implement general memory mapping mechanism
-void *
-vr_table_map(int major, unsigned int table,
-        char *table_path, size_t size)
-{
-    int fd, ret;
-    uint16_t dev;
-
-    void *mem;
-    char *path;
-    const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
-
-    if (major < 0)
-        return NULL;
-
-    if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
-                (strcmp(platform, PLATFORM_NIC) == 0))) {
-        path = table_path;
-    } else {
-        switch (table) {
-        case VR_MEM_BRIDGE_TABLE_OBJECT:
-            path = BRIDGE_TABLE_DEV;
-            break;
-
-        case VR_MEM_FLOW_TABLE_OBJECT:
-            path = FLOW_TABLE_DEV;
-            break;
-
-        default:
-            return NULL;
-        }
-
-        ret = mknod(path, S_IFCHR | O_RDWR, makedev(major, table));
-        if (ret && errno != EEXIST) {
-            perror(path);
-            return NULL;
-        }
-    }
-
-    fd = open(path, O_RDONLY | O_SYNC);
-    if (fd <= 0) {
-        perror(path);
-        return NULL;
-    }
-
-    mem = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
-    close(fd);
-
-    return mem;
-}
-#endif
-
 int
 vr_send_get_bridge_table_data(struct nl_client *cl)
 {
@@ -1034,6 +981,7 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
         req.vifr_mac = vif_mac;
     }
     req.vifr_vrf = vrf;
+    req.vifr_mcast_vrf = (uint16_t)(-1);
 
     if (os_index > 0)
         req.vifr_os_idx = os_index;
