@@ -63,10 +63,10 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     Pkt0Init();
 
     /*
-     * Memory for the flow table is allocated here, because it must be valid
-     * when IRP_MJ_CLOSE is sent on the flow device
+     * Memory for the shmem tables is allocated here, because it must be valid
+     * when IRP_MJ_CLOSE is sent on the shmem devices
      */
-    status = FlowMemoryInit();
+    status = ShmemInit();
     if (status != STATUS_SUCCESS) {
         return status;
     }
@@ -121,7 +121,7 @@ DriverUnload(PDRIVER_OBJECT DriverObject)
 {
     NdisFDeregisterFilterDriver(VrDriverHandle);
 
-    FlowMemoryExit();
+    ShmemExit();
 }
 
 static NDIS_HANDLE
@@ -160,8 +160,8 @@ UninitializeVRouter(pvr_switch_context ctx)
     if (ctx->message_up)
         vr_message_exit();
 
-    if (ctx->flow_up)
-        FlowDestroyDevice();
+    if (ctx->shmem_devices_up)
+        ShmemDestroyDevices();
 
     if (ctx->pkt0_up)
         Pkt0DestroyDevice();
@@ -192,12 +192,12 @@ InitializeVRouter(pvr_switch_context ctx)
 {
     ASSERT(!ctx->ksync_up);
     ASSERT(!ctx->pkt0_up);
-    ASSERT(!ctx->flow_up);
+    ASSERT(!ctx->shmem_devices_up);
     ASSERT(!ctx->message_up);
     ASSERT(!ctx->vrouter_up);
-
-    /* Before any initialization happens, clean the flow table */
-    FlowMemoryClean();
+    
+    /* Before any initialization happens, clean the shared memory tables */
+    ShmemClean();
 
     ctx->ksync_up = NT_SUCCESS(KsyncCreateDevice(VrDriverHandle));
     if (!ctx->ksync_up)
@@ -207,8 +207,8 @@ InitializeVRouter(pvr_switch_context ctx)
     if (!ctx->pkt0_up)
         goto cleanup;
 
-    ctx->flow_up = NT_SUCCESS(FlowCreateDevice(VrDriverHandle));
-    if (!ctx->flow_up)
+    ctx->shmem_devices_up = NT_SUCCESS(ShmemCreateDevices(VrDriverHandle));
+    if (!ctx->shmem_devices_up)
         goto cleanup;
 
     ctx->message_up = !vr_message_init();

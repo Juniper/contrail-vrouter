@@ -1776,7 +1776,7 @@ flow_table_map(vr_flow_table_data *table)
 
     PVOID outBuffer;
     DWORD outBytes;
-    BOOL transactionResult = DeviceIoControl(flowPipe, IOCTL_FLOW_GET_ADDRESS,
+    BOOL transactionResult = DeviceIoControl(flowPipe, IOCTL_SHMEM_GET_ADDRESS,
                                              NULL, 0,
                                              &outBuffer, sizeof(outBuffer),
                                              &outBytes, NULL);
