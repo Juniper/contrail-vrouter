@@ -36,11 +36,6 @@
 #include <netinet/ether.h>
 #endif
 
-#ifdef _WIN32
-#include <winioctl.h>
-#include "windows_flow_ioctl.h"
-#endif
-
 #include "vr_types.h"
 #include "vr_qos.h"
 #include "vr_flow.h"
@@ -1753,6 +1748,7 @@ get_flow_table_map_counts(vr_flow_table_data *table, struct flow_table *ft)
 static int
 flow_table_map(vr_flow_table_data *table)
 {
+    bool mmap_success;
     int ret;
     unsigned int i;
     struct flow_table *ft = &main_table;
@@ -1766,40 +1762,13 @@ flow_table_map(vr_flow_table_data *table)
         return ft->ft_num_entries;
     }
 
-#ifdef _WIN32
-    HANDLE flowPipe = CreateFile(FLOW_PATH, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-    if (flowPipe == INVALID_HANDLE_VALUE) {
-        DWORD lastError = GetLastError();
-        printf("Error: CreateFile on flow pipe: %d\n", lastError);
-        exit(lastError);
-    }
-
-    PVOID outBuffer;
-    DWORD outBytes;
-    BOOL transactionResult = DeviceIoControl(flowPipe, IOCTL_FLOW_GET_ADDRESS,
-                                             NULL, 0,
-                                             &outBuffer, sizeof(outBuffer),
-                                             &outBytes, NULL);
-    if (!transactionResult) {
-        DWORD lastError = GetLastError();
-        printf("Error: DeviceIoControl on flow pipe: %d\n", lastError);
-        exit(lastError);
-    } else if (outBytes != sizeof(outBuffer)) {
-        printf("Error: DeviceIoControl on flow pipe: outBuffer was not filled\n");
-        exit(ERROR_INVALID_DATA);
-    }
-
-    ft->ft_entries = outBuffer;
-#else
-
-    ft->ft_entries = (struct vr_flow_entry *)vr_table_map(table->ftable_dev,
-            VR_MEM_FLOW_TABLE_OBJECT, table->ftable_file_path,
-            table->ftable_size);
-    if (ft->ft_entries == MAP_FAILED) {
-        printf("flow table: %s\n", strerror(errno));
+    mmap_success =
+        vr_table_map(table->ftable_dev, VR_MEM_FLOW_TABLE_OBJECT, table->ftable_file_path,
+            table->ftable_size, &ft->ft_entries);
+    if (!mmap_success) {
+        printf("flow table mapping failed\n");
         exit(errno);
     }
-#endif
 
     ft->ft_span = table->ftable_size;
     ft->ft_num_entries = ft->ft_span / sizeof(struct vr_flow_entry);
