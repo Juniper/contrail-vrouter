@@ -1,5 +1,5 @@
 /*
- * windows_shmem.h -- definitions used in shared memmory handling on Windows
+ * windows_shmem.h -- definitions used in shared memory handling on Windows
  *
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
@@ -9,10 +9,10 @@
 #include "vr_windows.h"
 
 PMDL GetFlowMemoryMdl(VOID);
+PMDL GetBridgeMemoryMdl(VOID);
 
-NTSTATUS FlowMemoryInit(VOID);
-VOID FlowMemoryExit(VOID);
+NTSTATUS ShmemInit(VOID);
+VOID ShmemExit(VOID);
+VOID ShmemClean(VOID);
 
-VOID FlowMemoryClean(VOID);
-
-#endif /* __WINDOWS_MEM_H__ */
+#endif /* __WINDOWS_SHMEM_H__ */
