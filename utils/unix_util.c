@@ -1,6 +1,12 @@
 #include <stdint.h>
 #include <stdio.h>
+
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
+
 #if defined(__linux__)
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
@@ -13,7 +19,9 @@
 #include <net/ethernet.h>
 #endif
 
-#include "nl_util.h"
+#include <vr_mem.h>
+#include <nl_util.h>
+#include <ini_parser.h>
 
 /* This is defined in linux kernel headers (linux/socket.h) */
 #if !defined(SOL_NETLINK)
@@ -21,6 +29,58 @@
 #endif
 
 #define VROUTER_GENETLINK_VROUTER_GROUP_ID 0x4
+
+bool
+vr_table_map(int major, unsigned int table, char *table_path, size_t size, void **mem)
+{
+    int fd, ret;
+    uint16_t dev;
+
+    char *path;
+    const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
+
+    if (major < 0)
+        return false;
+
+    if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
+                (strcmp(platform, PLATFORM_NIC) == 0))) {
+        path = table_path;
+    } else {
+        switch (table) {
+        case VR_MEM_BRIDGE_TABLE_OBJECT:
+            path = BRIDGE_TABLE_DEV;
+            break;
+
+        case VR_MEM_FLOW_TABLE_OBJECT:
+            path = FLOW_TABLE_DEV;
+            break;
+
+        default:
+            return false;
+        }
+
+        ret = mknod(path, S_IFCHR | O_RDWR, makedev(major, table));
+        if (ret && errno != EEXIST) {
+            perror(path);
+            return false;
+        }
+    }
+
+    fd = open(path, O_RDONLY | O_SYNC);
+    if (fd <= 0) {
+        perror(path);
+        return false;
+    }
+
+    *mem = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+    close(fd);
+
+    if (*mem == MAP_FAILED)
+        printf("mmap failed: %s\n", strerror(errno));
+        return false;
+
+    return true;
+}
 
 int
 nl_socket(struct nl_client *cl, int domain, int type, int protocol)
