@@ -2,88 +2,122 @@
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
 #include "precomp.h"
-#include "windows_mem.h"
+#include "windows_shmem.h"
 
 #include "vrouter.h"
 #include "vr_flow.h"
 
-static ULONG FlowMemoryAllocationTag = 'MEMS';
+static ULONG FlowMemoryAllocationTag = 'MSRV';
 
-/* `FlowMemoryInit` need to populate these pointers in vRouter with pointers to
-   allocated the flow table
-*/
-extern void *vr_flow_table;
-extern void *vr_oflow_table;
+extern void *vr_flow_table, *vr_oflow_table;
+static PVOID  FlowShmemBlock = NULL;
+static size_t FlowShmemSize = 0;
+static PMDL FlowShmemMdl = NULL;
 
-static PVOID  FlowTable = NULL;
-static size_t FlowTableSize = 0;
+extern void *vr_bridge_table, *vr_bridge_otable;
+static PVOID  BridgeShmemBlock = NULL;
+static size_t BridgeShmemSize = 0;
+static PMDL BridgeShmemMdl = NULL;
 
-static PMDL  FlowMemoryMdl = NULL;
+static NTSTATUS SingularShmemInit(const size_t, const size_t, size_t *, PVOID *, PMDL *, PVOID *, PVOID *);
+static VOID SingularShmemExit(PVOID *, PMDL *, PVOID *, PVOID *);
+static VOID SingularShmemClean(PVOID, size_t);
 
-PMDL
-GetFlowMemoryMdl(VOID)
+static NTSTATUS
+SingularShmemInit(const size_t VrouterTableSize, const size_t VrouterOtableSize, size_t *ShmemSize, PVOID *ShmemBlock, PMDL *ShmemMdl, PVOID *VrouterTable, PVOID *VrouterOtable)
 {
-    return FlowMemoryMdl;
-}
-
-NTSTATUS
-FlowMemoryInit(VOID)
-{
-    ASSERT(FlowTable == NULL);
-    ASSERT(FlowMemoryMdl == NULL);
+    ASSERT(*ShmemBlock == NULL);
+    ASSERT(*ShmemMdl == NULL);
 
     NDIS_STATUS status;
 
-    /* `vr_oflow_entries` and `vr_flow_entries` are defined in dp-core/vr_flow.c */
-    vr_compute_size_oflow_table(&vr_oflow_entries, vr_flow_entries);
-
-    FlowTableSize = VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE;
-    FlowTable = ExAllocatePoolWithTag(NonPagedPoolNx, FlowTableSize, FlowMemoryAllocationTag);
-    if (FlowTable == NULL) {
+    *ShmemSize = VrouterTableSize + VrouterOtableSize;
+    *ShmemBlock = ExAllocatePoolWithTag(NonPagedPoolNx, *ShmemSize, FlowMemoryAllocationTag);
+    if (*ShmemBlock == NULL) {
         status = STATUS_INSUFFICIENT_RESOURCES;
         goto Cleanup;
     }
-    FlowMemoryClean();
+    SingularShmemClean(*ShmemBlock, *ShmemSize);
 
-    FlowMemoryMdl = IoAllocateMdl(FlowTable, FlowTableSize, FALSE, FALSE, NULL);
-    if (FlowMemoryMdl == NULL) {
+    *ShmemMdl = IoAllocateMdl(*ShmemBlock, *ShmemSize, FALSE, FALSE, NULL);
+    if (*ShmemMdl == NULL) {
         status = STATUS_INSUFFICIENT_RESOURCES;
         goto Cleanup;
     }
-    MmBuildMdlForNonPagedPool(FlowMemoryMdl);
+    MmBuildMdlForNonPagedPool(*ShmemMdl);
 
-    vr_flow_table = FlowTable;
-    vr_oflow_table = (uint8_t *)FlowTable + VR_FLOW_TABLE_SIZE;
+    *VrouterTable = *ShmemBlock;
+    *VrouterOtable = (uint8_t *)*ShmemBlock + VrouterTableSize;
 
     return STATUS_SUCCESS;
 
 Cleanup:
-    FlowMemoryExit();
+    SingularShmemExit(ShmemBlock, ShmemMdl, VrouterTable, VrouterOtable);
     return status;
 }
 
-VOID
-FlowMemoryExit(VOID)
+static VOID
+SingularShmemExit(PVOID *ShmemBlock, PMDL *ShmemMdl, PVOID *VrouterTable, PVOID *VrouterOtable)
 {
-    vr_oflow_table = NULL;
-    vr_flow_table = NULL;
+    *VrouterTable = NULL;
+    *VrouterOtable = NULL;
 
-    if (FlowMemoryMdl != NULL) {
-        IoFreeMdl(FlowMemoryMdl);
-        FlowMemoryMdl = NULL;
+    if (*ShmemMdl != NULL) {
+        IoFreeMdl(*ShmemMdl);
+        *ShmemMdl = NULL;
     }
 
-    if (FlowTable != NULL) {
-        ExFreePool(FlowTable);
-        FlowTable = NULL;
+    if (*ShmemBlock != NULL) {
+        ExFreePool(*ShmemBlock);
+        *ShmemBlock = NULL;
     }
 }
 
-VOID
-FlowMemoryClean(VOID)
+static VOID
+SingularShmemClean(PVOID ShmemBlock, size_t ShmemSize)
 {
-    ASSERT(FlowTable != NULL);
-    ASSERT(FlowTableSize > 0);
+    ASSERT(ShmemBlock != NULL);
+    ASSERT(ShmemSize > 0);
 
-    RtlZeroMemory(FlowTable, FlowTableSize);
+    RtlZeroMemory(ShmemBlock, ShmemSize);
+}
+
+PMDL
+GetFlowMemoryMdl(VOID)
+{
+    return FlowShmemMdl;
+}
+
+PMDL
+GetBridgeMemoryMdl(VOID)
+{
+    return BridgeShmemMdl;
+}
+
+NTSTATUS
+ShmemInit(VOID)
+{
+    NDIS_STATUS status;
+
+    vr_compute_size_oflow_table();
+    status = SingularShmemInit(VR_FLOW_TABLE_SIZE, VR_OFLOW_TABLE_SIZE, &FlowShmemSize, &FlowShmemBlock, &FlowShmemMdl, &vr_flow_table, &vr_oflow_table);
+    if (status != STATUS_SUCCESS)
+        return status;
+
+    vr_compute_size_bridge_otable();
+    return SingularShmemInit(VR_BRIDGE_TABLE_SIZE, VR_BRIDGE_OFLOW_TABLE_SIZE, &BridgeShmemSize, &BridgeShmemBlock, &BridgeShmemMdl, &vr_bridge_table, &vr_bridge_otable);
+}
+
+VOID
+ShmemExit(VOID)
+{
+    SingularShmemExit(&FlowShmemBlock, &FlowShmemMdl,  &vr_flow_table, &vr_oflow_table);
+    SingularShmemExit(&BridgeShmemBlock, &BridgeShmemMdl,  &vr_bridge_table, &vr_bridge_otable);
+}
+
+VOID
+ShmemClean(VOID)
+{
+    SingularShmemClean(FlowShmemBlock, FlowShmemSize);
+    SingularShmemClean(BridgeShmemBlock, BridgeShmemSize);
 }
