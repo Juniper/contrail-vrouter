@@ -1,5 +1,5 @@
 /*
- * windows_flow_ioctl.h -- definitions used in flow device DeviceIoControl calls
+ * windows_shmem_ioctl.h -- definitions used in flow device DeviceIoControl calls
  *
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */

@@ -2,7 +2,7 @@
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
 #include "precomp.h"
-#include "windows_mem.h"
+#include "windows_shmem.h"
 
 #include "vrouter.h"
 #include "vr_flow.h"

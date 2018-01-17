@@ -1,5 +1,5 @@
 /*
- * windows_mem.h -- definitions used in shared memmory handling on Windows
+ * windows_shmem.h -- definitions used in shared memmory handling on Windows
  *
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */

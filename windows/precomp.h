@@ -7,5 +7,5 @@
 #include <wdmsec.h>
 
 #include "vr_windows.h"
-#include "windows_mem.h"
+#include "windows_shmem.h"
 #include "windows_devices.h"

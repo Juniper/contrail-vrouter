@@ -4,9 +4,9 @@
 #include "precomp.h"
 
 #include "windows_devices.h"
-#include "windows_flow_ioctl.h"
+#include "windows_shmem_ioctl.h"
 #include "windows_ksync.h"
-#include "windows_mem.h"
+#include "windows_shmem.h"
 
 static const WCHAR FlowDeviceName[]    = L"\\Device\\vrouterFlow";
 static const WCHAR FlowDeviceSymLink[] = L"\\DosDevices\\vrouterFlow";
