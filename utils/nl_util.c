@@ -37,6 +37,7 @@
 
 extern struct nl_response *nl_parse_gen(struct nl_client *);
 
+uint16_t vr_netlink_port = VR_DEF_NETLINK_PORT;
 struct nl_sandesh_callbacks nl_cb;
 
 void
