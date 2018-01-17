@@ -1,4 +1,5 @@
 #pragma once
+
 #include <ndis.h>
 #include <netiodef.h>
 #include <intsafe.h>

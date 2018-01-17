@@ -8,20 +8,24 @@
 #include "windows_ksync.h"
 #include "windows_shmem.h"
 
-static const WCHAR FlowDeviceName[]    = L"\\Device\\vrouterFlow";
-static const WCHAR FlowDeviceSymLink[] = L"\\DosDevices\\vrouterFlow";
+static const WCHAR ShmemFlowDeviceName[]    = L"\\Device\\vrouterFlow";
+static const WCHAR ShmemFlowDeviceSymLink[] = L"\\DosDevices\\vrouterFlow";
+static PDEVICE_OBJECT ShmemFlowDeviceObject   = NULL;
+static NDIS_HANDLE    ShmemFlowDeviceHandle   = NULL;
 
-static PDEVICE_OBJECT FlowDeviceObject   = NULL;
-static NDIS_HANDLE    FlowDeviceHandle   = NULL;
+static const WCHAR ShmemBridgeDeviceName[]    = L"\\Device\\vrouterBridge";
+static const WCHAR ShmemBridgeDeviceSymLink[] = L"\\DosDevices\\vrouterBridge";
+static PDEVICE_OBJECT ShmemBridgeDeviceObject   = NULL;
+static NDIS_HANDLE    ShmemBridgeDeviceHandle   = NULL;
 
-static ULONG FlowAllocationTag = 'LFRV';
+static ULONG ShmemDeviceAllocationTag = 'DSRV';
 
-static PFLOW_DEVICE_CONTEXT
-FlowAllocateContext()
+static PSHMEM_DEVICE_CONTEXT
+ShmemAllocateContext()
 {
-    PFLOW_DEVICE_CONTEXT ctx;
+    PSHMEM_DEVICE_CONTEXT ctx;
 
-    ctx = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*ctx), FlowAllocationTag);
+    ctx = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*ctx), ShmemDeviceAllocationTag);
     if (ctx == NULL)
         return NULL;
 
@@ -31,7 +35,7 @@ FlowAllocateContext()
 }
 
 static VOID
-FlowFreeContext(PFLOW_DEVICE_CONTEXT ctx)
+ShmemFreeContext(PSHMEM_DEVICE_CONTEXT ctx)
 {
     if (ctx != NULL) {
         ExFreePool(ctx);
@@ -39,15 +43,15 @@ FlowFreeContext(PFLOW_DEVICE_CONTEXT ctx)
 }
 
 static VOID
-FlowAttachContextToFileContext(PFLOW_DEVICE_CONTEXT ctx, PIRP irp)
+ShmemAttachContextToFileContext(PSHMEM_DEVICE_CONTEXT ctx, PIRP irp)
 {
     PIO_STACK_LOCATION ioStack = IoGetCurrentIrpStackLocation(irp);
     PFILE_OBJECT fileObj = ioStack->FileObject;
     fileObj->FsContext = ctx;
 }
 
-static PFLOW_DEVICE_CONTEXT
-FlowGetContextFromFileContext(PIRP irp)
+static PSHMEM_DEVICE_CONTEXT
+ShmemGetContextFromFileContext(PIRP irp)
 {
     PIO_STACK_LOCATION ioStack = IoGetCurrentIrpStackLocation(irp);
     PFILE_OBJECT fileObj = ioStack->FileObject;
@@ -55,7 +59,7 @@ FlowGetContextFromFileContext(PIRP irp)
 }
 
 static NTSTATUS
-FlowCompleteIrp(PIRP Irp, NTSTATUS Status, ULONG_PTR Information)
+ShmemCompleteIrp(PIRP Irp, NTSTATUS Status, ULONG_PTR Information)
 {
     Irp->IoStatus.Status = Status;
     Irp->IoStatus.Information = Information;
@@ -64,67 +68,72 @@ FlowCompleteIrp(PIRP Irp, NTSTATUS Status, ULONG_PTR Information)
 }
 
 static NTSTATUS
-FlowDispatchCreate(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+ShmemMapAddressForUserspace(PIRP Irp, PMDL MemoryMdl)
 {
-    PFLOW_DEVICE_CONTEXT ctx = FlowAllocateContext();
+    PSHMEM_DEVICE_CONTEXT ctx = NULL;
+
+    if (MemoryMdl == NULL)
+        goto Failure;
+
+    ctx = ShmemAllocateContext();
     if (ctx == NULL)
         goto Failure;
-    FlowAttachContextToFileContext(ctx, Irp);
-
-    PMDL flowMemoryMdl = GetFlowMemoryMdl();
-    if (flowMemoryMdl == NULL)
-        goto Failure;
+    ShmemAttachContextToFileContext(ctx, Irp);
 
     MM_PAGE_PRIORITY pagePriority = NormalPagePriority | MdlMappingNoExecute;
-    PVOID userVirtualAddress = MmMapLockedPagesSpecifyCache(flowMemoryMdl,
-                                                            UserMode,
-                                                            MmNonCached,
-                                                            NULL,
-                                                            FALSE,
-                                                            pagePriority);
+    PVOID userVirtualAddress = MmMapLockedPagesSpecifyCache(MemoryMdl, UserMode, MmNonCached, NULL,
+        FALSE, pagePriority);
     if (userVirtualAddress == NULL)
         goto Failure;
 
     ctx->UserVirtualAddress = userVirtualAddress;
-    ctx->FlowMemoryMdl = flowMemoryMdl;
-
-    return FlowCompleteIrp(Irp, STATUS_SUCCESS, (ULONG_PTR)(FILE_OPENED));
+    ctx->MemoryMdl = MemoryMdl;
+    return ShmemCompleteIrp(Irp, STATUS_SUCCESS, (ULONG_PTR)(FILE_OPENED));
 
 Failure:
     if (ctx != NULL) {
-        FlowAttachContextToFileContext(NULL, Irp);
-        FlowFreeContext(ctx);
+        ShmemAttachContextToFileContext(NULL, Irp);
+        ShmemFreeContext(ctx);
     }
-
-    return FlowCompleteIrp(Irp, STATUS_INSUFFICIENT_RESOURCES, (ULONG_PTR)(0));
+    return ShmemCompleteIrp(Irp, STATUS_INSUFFICIENT_RESOURCES, (ULONG_PTR)(0));
 }
 
 static NTSTATUS
-FlowDispatchClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+FlowShmemDispatchCreate(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-    PFLOW_DEVICE_CONTEXT ctx = FlowGetContextFromFileContext(Irp);
+    return ShmemMapAddressForUserspace(Irp, GetFlowMemoryMdl());
+}
+
+static NTSTATUS
+BridgeShmemDispatchCreate(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+    return ShmemMapAddressForUserspace(Irp, GetBridgeMemoryMdl());
+}
+
+static NTSTATUS
+ShmemDispatchClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+    PSHMEM_DEVICE_CONTEXT ctx = ShmemGetContextFromFileContext(Irp);
 
     ASSERT(ctx != NULL);
     ASSERT(ctx->UserVirtualAddress != NULL);
-    ASSERT(ctx->FlowMemoryMdl != NULL);
+    ASSERT(ctx->MemoryMdl != NULL);
 
-    MmUnmapLockedPages(ctx->UserVirtualAddress, ctx->FlowMemoryMdl);
-    FlowAttachContextToFileContext(NULL, Irp);
-    FlowFreeContext(ctx);
+    MmUnmapLockedPages(ctx->UserVirtualAddress, ctx->MemoryMdl);
+    ShmemAttachContextToFileContext(NULL, Irp);
+    ShmemFreeContext(ctx);
 
-    return FlowCompleteIrp(Irp, STATUS_SUCCESS, (ULONG_PTR)(0));
+    return ShmemCompleteIrp(Irp, STATUS_SUCCESS, (ULONG_PTR)(0));
 }
 
 static NTSTATUS
-FlowDispatchCleanup(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+ShmemDispatchCleanup(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-    return FlowCompleteIrp(Irp, STATUS_SUCCESS, (ULONG_PTR)(0));
+    return ShmemCompleteIrp(Irp, STATUS_SUCCESS, (ULONG_PTR)(0));
 }
 
 static NTSTATUS
-FlowHandleGetAddress(PDEVICE_OBJECT DeviceObject,
-                     PIRP Irp,
-                     PFLOW_DEVICE_CONTEXT ctx)
+ShmemHandleGetAddress(PDEVICE_OBJECT DeviceObject, PIRP Irp, PSHMEM_DEVICE_CONTEXT ctx)
 {
     NTSTATUS status;
 
@@ -144,61 +153,69 @@ FlowHandleGetAddress(PDEVICE_OBJECT DeviceObject,
     }
     RtlCopyMemory(buffer, &ctx->UserVirtualAddress, expectedLength);
 
-    return FlowCompleteIrp(Irp, STATUS_SUCCESS, expectedLength);
+    return ShmemCompleteIrp(Irp, STATUS_SUCCESS, expectedLength);
 
 Failure:
-    return FlowCompleteIrp(Irp, status, (ULONG_PTR)(0));
+    return ShmemCompleteIrp(Irp, status, (ULONG_PTR)(0));
 }
 
 static NTSTATUS
-FlowDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+ShmemDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     PIO_STACK_LOCATION ioStack;
-    PFLOW_DEVICE_CONTEXT ctx;
+    PSHMEM_DEVICE_CONTEXT ctx;
     PVOID buffer;
 
-    ctx = FlowGetContextFromFileContext(Irp);
+    ctx = ShmemGetContextFromFileContext(Irp);
     ASSERT(ctx != NULL);
 
     ioStack = IoGetCurrentIrpStackLocation(Irp);
     switch (ioStack->Parameters.DeviceIoControl.IoControlCode) {
-        case IOCTL_FLOW_GET_ADDRESS:
-            return FlowHandleGetAddress(DeviceObject, Irp, ctx);
+        case IOCTL_SHMEM_GET_ADDRESS:
+            return ShmemHandleGetAddress(DeviceObject, Irp, ctx);
         default:
-            return FlowCompleteIrp(Irp, STATUS_INVALID_DEVICE_REQUEST, (ULONG_PTR)(0));
+            return ShmemCompleteIrp(Irp, STATUS_INVALID_DEVICE_REQUEST, (ULONG_PTR)(0));
     }
 }
 
 static NTSTATUS
-FlowDispatchRead(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+ShmemDispatchRead(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-    return FlowCompleteIrp(Irp, STATUS_INVALID_DEVICE_REQUEST, (ULONG_PTR)(0));
+    return ShmemCompleteIrp(Irp, STATUS_INVALID_DEVICE_REQUEST, (ULONG_PTR)(0));
 }
 
 static NTSTATUS
-FlowDispatchWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+ShmemDispatchWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-    return FlowCompleteIrp(Irp, STATUS_INVALID_DEVICE_REQUEST, (ULONG_PTR)(0));
+    return ShmemCompleteIrp(Irp, STATUS_INVALID_DEVICE_REQUEST, (ULONG_PTR)(0));
 }
 
 NTSTATUS
-FlowCreateDevice(NDIS_HANDLE DriverHandle)
+ShmemCreateDevices(NDIS_HANDLE DriverHandle)
 {
+    NTSTATUS status;
     VR_DEVICE_DISPATCH_CALLBACKS callbacks = {
-        .create         = FlowDispatchCreate,
-        .cleanup        = FlowDispatchCleanup,
-        .close          = FlowDispatchClose,
-        .write          = FlowDispatchWrite,
-        .read           = FlowDispatchRead,
-        .device_control = FlowDispatchDeviceControl,
+        .cleanup        = ShmemDispatchCleanup,
+        .close          = ShmemDispatchClose,
+        .write          = ShmemDispatchWrite,
+        .read           = ShmemDispatchRead,
+        .device_control = ShmemDispatchDeviceControl,
     };
 
-    return VRouterSetUpNamedDevice(DriverHandle, FlowDeviceName, FlowDeviceSymLink,
-                                   &callbacks, &FlowDeviceObject, &FlowDeviceHandle);
+    callbacks.create = FlowShmemDispatchCreate;
+    status = VRouterSetUpNamedDevice(DriverHandle, ShmemFlowDeviceName, ShmemFlowDeviceSymLink,
+        &callbacks, &ShmemFlowDeviceObject, &ShmemFlowDeviceHandle);
+    if (!NT_SUCCESS(status))
+        return status;
+
+    callbacks.create = BridgeShmemDispatchCreate;
+    return VRouterSetUpNamedDevice(DriverHandle, ShmemBridgeDeviceName, ShmemBridgeDeviceSymLink,
+        &callbacks, &ShmemBridgeDeviceObject, &ShmemBridgeDeviceHandle);
 }
 
 VOID
-FlowDestroyDevice(VOID)
+ShmemDestroyDevices(VOID)
 {
-    VRouterTearDownNamedDevice(&FlowDeviceHandle);
+    VRouterTearDownNamedDevice(&ShmemFlowDeviceHandle);
+    VRouterTearDownNamedDevice(&ShmemBridgeDeviceHandle);
 }
