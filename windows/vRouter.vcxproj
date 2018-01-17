@@ -495,12 +495,12 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="vr_driver.c" />
-    <ClCompile Include="vr_flow_device.c" />
+    <ClCompile Include="vr_shmem_devices.c" />
     <ClCompile Include="vr_ksync.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="vr_host_interface.c" />
-    <ClCompile Include="vr_mem.c">
+    <ClCompile Include="vr_shmem.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="vr_nbl.c" />

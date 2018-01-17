@@ -243,7 +243,7 @@
     <ClCompile Include="dp-core\vr_bitmap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_mem.c">
+    <ClCompile Include="windows\vr_shmem.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\vr_pkt0.c">
@@ -285,7 +285,7 @@
     <ClCompile Include="windows\vr_nbl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_flow_device.c">
+    <ClCompile Include="windows\vr_shmem_devices.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

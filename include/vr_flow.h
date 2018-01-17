@@ -510,6 +510,6 @@ unsigned int vr_flow_table_burst_step_configured(struct vrouter *);
 unsigned int vr_flow_table_burst_tokens_configured(struct vrouter *);
 unsigned int vr_flow_table_burst_time_configured(struct vrouter *);
 
-void vr_compute_size_oflow_table(int *oentries, int entries);
+void vr_compute_size_oflow_table(void);
 
 #endif /* __VR_FLOW_H__ */
