@@ -467,7 +467,12 @@ vhost_setup(struct net_device *dev)
 #endif
     dev->needed_headroom = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
     dev->netdev_ops = &vhost_dev_ops;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,9))
+    dev->priv_destructor = vhost_dev_destructor;
+    dev->needs_free_netdev = true;
+#else
     dev->destructor = vhost_dev_destructor;
+#endif /*KERNEL_4.11*/
 #ifdef CONFIG_XEN
     dev->ethtool_ops = &vhost_ethtool_ops;
     dev->features |= NETIF_F_GRO;
@@ -518,8 +523,15 @@ vhost_dellink(struct net_device *dev, struct list_head *head)
     return;
 }
 
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0))
+static int
+vhost_validate(struct nlattr *tb[], struct nlattr *data[],
+    struct netlink_ext_ack *extack)
+#else
 static int
 vhost_validate(struct nlattr *tb[], struct nlattr *data[])
+#endif /*KERNEL_4.13*/
 {
     if (vhost_num_interfaces >= VHOST_MAX_INTERFACES)
         return -ENOMEM;
@@ -534,7 +546,6 @@ static struct rtnl_link_ops vhost_link_ops = {
     .validate   =   vhost_validate,
     .dellink    =   vhost_dellink,
 };
-
 
 static void
 vhost_netlink_exit(void)
