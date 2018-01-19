@@ -143,6 +143,10 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_TX_BURST_SZ         32
 /* Default Number of mbufs in RSS mempool */
 #define VR_DEF_MEMPOOL_SZ           (16 * 1024)
+/* Default Number of Tx Descriptors */
+#define VR_DEF_TXD_SZ               128
+/* Default Number of Rx Descriptors */
+#define VR_DEF_RXD_SZ               128
 /* How many objects (mbufs) to keep in per-lcore RSS mempool cache */
 #define VR_DPDK_RSS_MEMPOOL_CACHE_SZ    (VR_DPDK_RX_BURST_SZ*8)
 /* Number of mbufs in FRAG_DIRECT mempool */
