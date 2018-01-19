@@ -5,6 +5,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <linux/init.h>
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -26,11 +27,19 @@ short vr_bridge_table_major = -1;
 static dev_t mem_dev;
 struct cdev *mem_cdev;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0))
 static int
 mem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-    void *va;
     struct vr_mem_object *vmo = (struct vr_mem_object *)vma->vm_private_data;
+#else
+static int
+mem_fault(struct vm_fault *vmf)
+{
+    struct vr_mem_object *vmo =
+        (struct vr_mem_object *)vmf->vma->vm_private_data;
+#endif /*KERNEL_4.11*/
+    void *va;
     struct vrouter *router = vmo->vmo_router;
     struct page *page;
     pgoff_t offset;
