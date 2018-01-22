@@ -816,7 +816,6 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     struct vr_flow flow, *flowp = &flow;
     struct vr_flow_entry *fe = NULL;
-    struct vr_ip6 *ip6;
     struct vr_nexthop *cnh = NULL;
     struct vr_component_nh *cnhp = nh->nh_component_nh;
 
@@ -856,9 +855,8 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (ret < 0)
                 return ret;
         } else if (pkt->vp_type == VP_TYPE_IP6) {
-            ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-            ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                     fmd->fmd_vlan, ip6, flowp, hash);
+            ret = vr_inet6_get_flow_key(nh->nh_router, fmd->fmd_dvrf, pkt,
+                                     fmd->fmd_vlan, flowp, hash);
             if (ret < 0)
                 return ret;
         } else {
@@ -1847,9 +1845,8 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd,
                                      flowp, VR_FLOW_KEY_ALL);
     } else if (pkt->vp_type == VP_TYPE_IP6) {
-        ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-        ret = vr_inet6_form_flow(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                 fmd->fmd_vlan, ip6, flowp, VR_FLOW_KEY_ALL);
+        ret = vr_inet6_get_flow_key(nh->nh_router, fmd->fmd_dvrf, pkt,
+                                 fmd->fmd_vlan, flowp, VR_FLOW_KEY_ALL);
     }
 
     if (!ret) {
