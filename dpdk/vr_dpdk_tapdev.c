@@ -132,7 +132,12 @@ vr_dpdk_tapdev_release(struct vr_interface *vif)
     unsigned lcore_id;
     struct rte_mbuf *mbuf;
     struct vr_dpdk_tapdev *tapdev = vif->vif_os;
-    int fd = tapdev->tapdev_fd;
+    int fd;
+
+    if (tapdev != NULL)
+        fd = tapdev->tapdev_fd;
+    else
+        return 0;
 
     if (unlikely(tapdev == NULL))
         return 0;
