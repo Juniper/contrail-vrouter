@@ -328,6 +328,10 @@ vr_get_nl_client(int proto)
         goto fail;
 
     cl->cl_recvmsg = win_nl_client_recvmsg;
+
+    if (proto == VR_NETLINK_PROTO_TEST) {
+        vrouter_get_family_id(cl);
+    }
 #endif
 
     if ((proto == VR_NETLINK_PROTO_DEFAULT) &&

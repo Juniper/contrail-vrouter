@@ -10,6 +10,7 @@
 #include <linux/un.h>
 #include <linux/limits.h>
 #include <limits.h>
+#include <libxml/xmlmemory.h>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -44,6 +45,7 @@ struct expect_vrouter {
 struct return_vrouter {
     int return_val[VT_MESSAGES_MAX];
     int returned_ptr_num;
+    bool has_returned;
 };
 
 struct message_xml {

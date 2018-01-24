@@ -58,12 +58,10 @@ struct vtest_module vt_modules[] = {
         .vt_name        =   "message",
         .vt_node        =   vt_message,
     },
-#ifndef _WIN32
     {
         .vt_name        =   "packet",
         .vt_node        =   vt_packet,
     },
-#endif
 };
 
 const size_t VTEST_NUM_MODULES = ARRAYSIZE(vt_modules);
