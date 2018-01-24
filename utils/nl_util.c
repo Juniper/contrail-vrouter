@@ -653,7 +653,7 @@ nl_parse_reply(struct nl_client *cl)
 }
 
 int
-vrouter_get_family_id(struct nl_client *cl)
+vrouter_obtain_family_id(struct nl_client *cl)
 {
     int ret;
     struct nl_response *resp;

@@ -63,9 +63,10 @@ vtest_src = [
                 'vt_process_xml.c',
             ]
 
-if not sys.platform.startswith('win'):
+if sys.platform.startswith('win'):
+    vtest_src.append('windows/vt_packet.c')
+else:
     vtest_src.append('vt_packet.c')
-
     env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
 
 vtest = env.Program('vtest', vtest_src)

@@ -58,29 +58,29 @@ struct vtest_module vt_modules[] = {
         .vt_name        =   "message",
         .vt_node        =   vt_message,
     },
-#ifndef _WIN32
     {
         .vt_name        =   "packet",
         .vt_node        =   vt_packet,
     },
-#endif
 };
 
 const size_t VTEST_NUM_MODULES = ARRAYSIZE(vt_modules);
 
 static void
 vt_dealloc_test(struct vtest *test) {
+    int i = 0;
+    struct expect_mem_handle *handles = test->messages.expect_vrouter_msg->mem_expected_msg;
 
     vt_safe_free(test->vtest_name);
     vt_safe_free(test->vtest_error_module);
-    int i = 0;
 
     for (i = 0; i <= test->message_ptr_num; ++i) {
         vt_safe_free(test->messages.data[i].mem);
     }
 
+
     for(i = 0; i <= test->messages.expect_vrouter_msg->expected_ptr_num; ++i) {
-        vt_safe_free(test->messages.expect_vrouter_msg->mem_expected_msg[i]);
+        handles[i].free_mem(handles[i].mem);
     }
 
     return;

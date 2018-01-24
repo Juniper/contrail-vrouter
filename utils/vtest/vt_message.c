@@ -37,7 +37,7 @@ vt_expect_node(xmlNodePtr node, struct vtest *test)
     if (!test || !node){
         return E_MESSAGE_ERR_FARG ;
     }
-    void *buf = test->messages.expect_vrouter_msg->mem_expected_msg[test->messages.expect_vrouter_msg->expected_ptr_num];
+    void *buf = test->messages.expect_vrouter_msg->mem_expected_msg[test->messages.expect_vrouter_msg->expected_ptr_num].mem;
 
     if (!buf) {
         return E_MESSAGE_ERR;

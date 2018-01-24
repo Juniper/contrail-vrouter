@@ -10,6 +10,7 @@
 #include <linux/un.h>
 #include <linux/limits.h>
 #include <limits.h>
+#include <libxml/xmlmemory.h>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -36,14 +37,20 @@ struct packet {
     size_t rx_client_num;
 };
 
+struct expect_mem_handle {
+    void *mem;
+    void (*free_mem)(void *);
+};
+
 struct expect_vrouter {
-    void *mem_expected_msg[VT_MESSAGES_MAX];
+    struct expect_mem_handle mem_expected_msg[VT_MESSAGES_MAX];
     int expected_ptr_num;
 };
 
 struct return_vrouter {
     int return_val[VT_MESSAGES_MAX];
     int returned_ptr_num;
+    bool has_returned;
 };
 
 struct message_xml {
