@@ -23,7 +23,8 @@ interface_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_interface_req)));
+        (memcpy(buf, s, sizeof(vr_interface_req)));
+    memset(s, 0, sizeof(vr_interface_req));
 }
 
 static void
@@ -36,7 +37,8 @@ nexthop_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_nexthop_req)));
+        (memcpy(buf, s, sizeof(vr_nexthop_req)));
+    memset(s, 0, sizeof(vr_nexthop_req));
 }
 
 static void
@@ -50,7 +52,7 @@ route_req_process(void *s) {
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
         (memcpy(buf, s, sizeof(vr_route_req)));
-
+    memset(s, 0, sizeof(vr_route_req));
 }
 
 static void
@@ -59,6 +61,7 @@ response_process(void *s) {
 
     return_msg.returned_ptr_num++;
     return_msg.return_val[return_msg.returned_ptr_num] = buf->resp_code;
+    return_msg.has_returned = true;
 }
 
 static void
@@ -72,6 +75,7 @@ vrf_stats_req_process(void *s) {
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
         (memcpy(buf, s, sizeof(vr_vrf_stats_req)));
+    memset(s, 0, sizeof(vr_vrf_stats_req));
 }
 
 static void
@@ -85,6 +89,7 @@ vt_vrouter_ops_process(void *s) {
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
         (memcpy(buf, s, sizeof(vrouter_ops)));
+    memset(s, 0, sizeof(vrouter_ops));
 }
 
 static void
@@ -97,8 +102,8 @@ vrf_assign_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_vrf_assign_req)));
-
+        (memcpy(buf, s, sizeof(vr_vrf_assign_req)));
+    memset(s, 0, sizeof(vr_vrf_assign_req));
 }
 
 static void
@@ -111,8 +116,8 @@ flow_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_flow_req)));
-
+        (memcpy(buf, s, sizeof(vr_flow_req)));
+    memset(s, 0, sizeof(vr_flow_req));
 }
 
 static void
@@ -125,8 +130,8 @@ flow_response_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_flow_response)));
-
+        (memcpy(buf, s, sizeof(vr_flow_response)));
+    memset(s, 0, sizeof(vr_flow_response));
 }
 
 static void
@@ -139,8 +144,8 @@ vxlan_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_vxlan_req)));
-
+        (memcpy(buf, s, sizeof(vr_vxlan_req)));
+    memset(s, 0, sizeof(vr_vxlan_req));
 }
 
 static void
@@ -153,8 +158,8 @@ drop_stats_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_drop_stats_req)));
-
+        (memcpy(buf, s, sizeof(vr_drop_stats_req)));
+    memset(s, 0, sizeof(vr_drop_stats_req));
 }
 
 static void
@@ -167,7 +172,8 @@ mpls_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_mpls_req)));
+        (memcpy(buf, s, sizeof(vr_mpls_req)));
+    memset(s, 0, sizeof(vr_mpls_req));
 }
 
 static void
@@ -180,7 +186,8 @@ mirror_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_mirror_req)));
+        (memcpy(buf, s, sizeof(vr_mirror_req)));
+    memset(s, 0, sizeof(vr_mirror_req));
 }
 
 static void
@@ -193,7 +200,8 @@ mem_stats_req_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_mem_stats_req)));
+        (memcpy(buf, s, sizeof(vr_mem_stats_req)));
+    memset(s, 0, sizeof(vr_mem_stats_req));
 }
 
 static void
@@ -206,7 +214,8 @@ hugepage_config_process(void *s) {
 
     expect_msg.expected_ptr_num++;
     expect_msg.mem_expected_msg[expect_msg.expected_ptr_num] =
-    (memcpy(buf, s, sizeof(vr_hugepage_config)));
+        (memcpy(buf, s, sizeof(vr_hugepage_config)));
+    memset(s, 0, sizeof(vr_hugepage_config));
 }
 
 void
