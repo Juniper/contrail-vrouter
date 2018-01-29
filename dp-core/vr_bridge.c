@@ -492,14 +492,15 @@ bridge_table_dump(struct vr_rtable * __unsued, struct vr_route_req *rt)
     struct vr_message_dumper *dumper;
     char *mac;
 
+    if (rt->rtr_req.rtr_mac_size != VR_ETHER_ALEN)
+        return -EINVAL;
+
     dumper = vr_message_dump_init(&rt->rtr_req);
     if (!dumper) {
         ret = -ENOMEM;
         goto generate_response;
     }
 
-    if (rt->rtr_req.rtr_mac_size != VR_ETHER_ALEN)
-        return -EINVAL;
 
     mac = (char *)(((vr_route_req *)(dumper->dump_req))->rtr_mac);
     if (!mac) {
