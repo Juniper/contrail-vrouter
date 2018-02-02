@@ -461,7 +461,9 @@ flow_result_t vr_inet_flow_lookup(struct vrouter *, struct vr_packet *,
 flow_result_t vr_inet6_flow_lookup(struct vrouter *, struct vr_packet *,
                                   struct vr_forwarding_md *);
 int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
-        uint16_t, struct vr_ip6 *, struct vr_flow *, uint8_t);
+        uint16_t, struct vr_ip6 *, struct vr_flow *, uint8_t, bool);
+int vr_inet6_get_flow_key(struct vrouter *, unsigned short, struct vr_packet *,
+        uint16_t, struct vr_flow *, uint8_t);
 
 extern unsigned short vr_inet_flow_nexthop(struct vr_packet *, unsigned short);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
@@ -491,7 +493,8 @@ extern void vr_flow_get_burst_params(struct vrouter *,int *,int *,int *);
 
 bool vr_valid_link_local_port(struct vrouter *, int, int, int);
 int vr_inet_form_flow(struct vrouter *, unsigned short,
-                struct vr_packet *, uint16_t, struct vr_flow *, uint8_t);
+                struct vr_packet *, uint16_t, struct vr_flow *, uint8_t,
+                bool);
 int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
