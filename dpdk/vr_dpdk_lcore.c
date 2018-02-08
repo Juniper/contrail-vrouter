@@ -1629,7 +1629,7 @@ dpdk_lcore_fwd_loop(void)
         * VR_DPDK_TX_FLUSH_US / US_PER_S;
     const uint64_t gro_flush_cycles = 100 * tx_flush_cycles;
 #else
-    const uint64_t tx_flush_cycles = VR_DPDK_TX_FLUSH_LOOPS;
+    const uint64_t tx_flush_cycles = VR_DPDK_TX_FLUSH_LOOPS * 2;
     const uint64_t gro_flush_cycles = 100 * tx_flush_cycles;
 #endif
 
