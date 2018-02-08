@@ -173,7 +173,7 @@ dpdk_mempools_create(void)
 {
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool",
-            vr_mempool_sz,
+            vr_mempool_sz - 1,
             VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
@@ -186,7 +186,7 @@ dpdk_mempools_create(void)
 
     /* Create the mbuf pool used for IP fragmentation (direct mbufs) */
     vr_dpdk.frag_direct_mempool = rte_mempool_create("frag_direct_mempool",
-            VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ, VR_DPDK_FRAG_DIRECT_MBUF_SZ,
+            VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ - 1, VR_DPDK_FRAG_DIRECT_MBUF_SZ,
             VR_DPDK_FRAG_DIRECT_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init,
             NULL, rte_pktmbuf_init, NULL, rte_socket_id(), 0);
@@ -198,7 +198,7 @@ dpdk_mempools_create(void)
 
     /* Create the mbuf pool used for IP fragmentation (indirect mbufs) */
     vr_dpdk.frag_indirect_mempool = rte_mempool_create("frag_indirect_mempool",
-            VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ, VR_DPDK_FRAG_INDIRECT_MBUF_SZ,
+            VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ - 1, VR_DPDK_FRAG_INDIRECT_MBUF_SZ,
             VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, 0, NULL, NULL,
             rte_pktmbuf_init, NULL, rte_socket_id(), 0);
     if (vr_dpdk.frag_indirect_mempool == NULL) {
@@ -220,7 +220,7 @@ dpdk_mempools_create(void)
             return -ENOMEM;
         }
         vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
-                VR_DPDK_VM_MEMPOOL_SZ, VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
+                VR_DPDK_VM_MEMPOOL_SZ - 1, VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
                 sizeof(struct rte_pktmbuf_pool_private),
                 vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                 rte_socket_id(), 0);
@@ -583,7 +583,7 @@ dpdk_argv_update(void)
     RTE_LOG(INFO, VROUTER, "VRF tables limit:            %" PRIu32 "\n",
                 vr_vrfs);
     RTE_LOG(INFO, VROUTER, "Packet pool size:            %" PRIu32 "\n",
-                vr_mempool_sz);
+                vr_mempool_sz - 1);
     RTE_LOG(INFO, VROUTER, "Maximum packet size:         %" PRIu32 "\n",
                 vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
@@ -690,10 +690,10 @@ dpdk_init(void)
     rte_openlog_stream(timestamp_log_stream);
 
     /* disable unwanted logtypes for debug purposes */
-    rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
+    rte_log_set_level(VR_DPDK_LOGTYPE_DISABLE, 0);
 
     /* set default log level to INFO */
-    rte_set_log_level(RTE_LOG_INFO);
+    rte_log_set_global_level(RTE_LOG_INFO);
 
     ret = dpdk_mempools_create();
     if (ret < 0)

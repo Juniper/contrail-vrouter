@@ -245,7 +245,7 @@ dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
 {
     dst->data_off = src->data_off;
     dst->port = src->port;
-    dst->ol_flags = src->ol_flags;
+    dst->ol_flags = src->ol_flags & (~IND_ATTACHED_MBUF);
     dst->packet_type = src->packet_type;
     dst->data_len = src->data_len;
     dst->pkt_len = src->pkt_len;
@@ -1214,7 +1214,7 @@ dpdk_set_log_level(unsigned int log_level)
     }
 
     if (level > 0)
-        rte_set_log_level(level);
+        rte_log_set_global_level(level);
     else
         RTE_LOG(ERR, VROUTER, "Error: wrong log level (%u) specified\n",
                 level);
@@ -1223,7 +1223,7 @@ dpdk_set_log_level(unsigned int log_level)
 static unsigned int
 dpdk_get_log_level(void)
 {
-    unsigned int level = rte_get_log_level();
+    unsigned int level = rte_log_get_global_level();
 
     switch(level) {
     case RTE_LOG_EMERG:
@@ -1283,7 +1283,8 @@ dpdk_set_log_type(unsigned int log_type, int enable)
     }
 
     if (type > 0)
-        rte_set_log_type(type, enable);
+        rte_log_set_level(type, enable);
+
     else
         RTE_LOG(ERR, VROUTER, "Error: wrong log type (0x%x) specified\n",
                 type);
@@ -1313,23 +1314,20 @@ dpdk_log_type_to_vr_type(unsigned int type)
 static unsigned int *
 dpdk_get_enabled_log_types(int *size)
 {
-    unsigned int enabled_flags = rte_get_log_type() & ~(RTE_LOGTYPE_USER1 - 1);
-
-    /* Count number of enabled types (set bits in a number) */
-    int num = __builtin_popcount(enabled_flags);
+    int num = rte_logs.dynamic_types_len;
 
     unsigned int *enabled_array =
             vr_malloc(sizeof(int) * num, VR_LOG_TYPES_OBJECT);
     int i;
-    unsigned int shift = 1;
 
-    for (i = 0; i < num; shift <<= 1) {
-        if (enabled_flags & shift) {
-            enabled_array[i++] = dpdk_log_type_to_vr_type(shift);
+    *size = 0;
+    for (i = 0; i < num; i++) {
+        if (rte_log_get_level(i) > 0) {
+            enabled_array[i] = dpdk_log_type_to_vr_type(i);
+            (*size)++;
         }
     }
 
-    *size = i;
     return enabled_array;
 }
 

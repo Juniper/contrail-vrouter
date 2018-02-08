@@ -151,9 +151,10 @@ if sys.platform != 'darwin':
         matches = re.findall("define RTE_VER_MAJOR 2", file_content)
    
         if matches:
-            rte_libs = '-lethdev', '-lrte_malloc'
+            rte_libs = ('-lethdev', '-lrte_malloc')
         else:
-            rte_libs = '-lrte_ethdev'
+            rte_libs = ('-lrte_ethdev',)
+        rte_libs = rte_libs + ('-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
   
         #
         # DPDK libraries need to be linked as a whole archive, otherwise some
@@ -193,6 +194,7 @@ if sys.platform != 'darwin':
             '-lrte_ip_frag',
             rte_libs,
             '-lrte_mempool',
+            '-lrte_mempool_ring',
             '-lrte_ring',
             '-lrte_eal',
             '-lrte_cmdline',
@@ -213,7 +215,8 @@ if sys.platform != 'darwin':
         #    '-lrte_pmd_pcap',
             '-lrte_pmd_af_packet',
             '-Wl,--end-group',
-            '-Wl,--no-whole-archive'
+            '-Wl,--no-whole-archive',
+            '-Wl,-lnuma'
         ]
 
         # Pass -g and -O flags if present to DPDK

@@ -20,10 +20,13 @@
 #include "vr_dpdk_virtio.h"
 
 #include <rte_errno.h>
+#include <rte_ethdev_pci.h>
+#include <rte_ethdev_vdev.h>
 #include <rte_ethdev.h>
 #include <rte_ip_frag.h>
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
+#include <rte_pci.h>
 
 #if (RTE_VERSION == RTE_VERSION_NUM(2, 1, 0, 0))
 #include <rte_eth_af_packet.h>
@@ -294,7 +297,7 @@ dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
                 return i;
             }
         } else {
-            if (strcmp(rte_eth_devices[i].data->drv_name, "net_bonding") == 0)
+            if (strcmp(rte_eth_devices[i].device->driver->name, "net_bonding") == 0)
                 return i;
         }
 #else
@@ -318,10 +321,10 @@ dpdk_find_port_id_by_drv_name(void)
     uint8_t i;
 
     for (i = 0; i < rte_eth_dev_count(); i++) {
-        if (rte_eth_devices[i].data == NULL)
+        if (rte_eth_devices[i].device == NULL)
             continue;
 
-        if (strcmp(rte_eth_devices[i].data->drv_name, "net_bonding") == 0)
+        if (strcmp(rte_eth_devices[i].device->driver->name, "net_bonding") == 0)
             return i;
     }
 
@@ -343,7 +346,7 @@ static inline void
 dpdk_set_addr_vlan_filter_strip(uint32_t port_id, struct vr_interface *vif)
 {
     uint32_t i, ret;
-    uint8_t *port_id_ptr;
+    uint16_t *port_id_ptr;
     int port_num = 0;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
 
@@ -417,7 +420,7 @@ static int
 vr_ethdev_inner_cksum_capable(struct vr_dpdk_ethdev *ethdev)
 {
     struct rte_eth_dev_info dev_info;
-    uint8_t *port_id_ptr;
+    uint16_t *port_id_ptr;
     int port_num = 0;
 
     port_id_ptr = (ethdev->ethdev_nb_slaves == -1)?
@@ -611,7 +614,7 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
         return ret;
     }
 
-    ret = rte_eal_vdev_init(name, params);
+    ret = rte_vdev_init(name, params);
     if (ret < 0) {
         RTE_LOG(ERR, VROUTER,
                 "    error initializing af_packet device %s\n", name);
@@ -2040,7 +2043,7 @@ vr_dpdk_eth_xstats_get(uint32_t port_id, struct rte_eth_stats *eth_stats)
      * we count out the XEC from ierrors using rte_eth_xstats_get()
      */
 
-    uint8_t *port_id_ptr;
+    uint16_t *port_id_ptr;
     int port_num = 0;
     struct vr_dpdk_ethdev *ethdev = &vr_dpdk.ethdevs[port_id];
     port_id_ptr = (ethdev->ethdev_nb_slaves == -1)?
