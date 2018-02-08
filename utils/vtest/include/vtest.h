@@ -10,6 +10,7 @@
 #include <linux/un.h>
 #include <linux/limits.h>
 #include <limits.h>
+#include <libxml/xmlmemory.h>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -36,14 +37,20 @@ struct packet {
     size_t rx_client_num;
 };
 
-struct expect_vrouter {
-    void *mem_expected_msg[VT_MESSAGES_MAX];
-    int expected_ptr_num;
+struct received_mem_handle {
+    void *mem;
+    void (*free_mem)(void *);
+};
+
+struct received_vrouter {
+    struct received_mem_handle mem_handles[VT_MESSAGES_MAX];
+    int ptr_num;
 };
 
 struct return_vrouter {
     int return_val[VT_MESSAGES_MAX];
-    int returned_ptr_num;
+    int ptr_num;
+    bool has_returned;
 };
 
 struct message_xml {
@@ -66,7 +73,7 @@ struct message {
     struct message_element data[VT_MESSAGES_MAX];
     /* Following pointers are for reponse and process callbacks from vRouter
      * Cause, we are using global variables. */
-    struct expect_vrouter *expect_vrouter_msg;
+    struct received_vrouter *received_vrouter_msg;
     struct return_vrouter *return_vrouter_msg;
 };
 

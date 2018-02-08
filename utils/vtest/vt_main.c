@@ -45,7 +45,7 @@ enum vr_opt_index {
     MAX_OPT_INDEX
 };
 
-extern struct expect_vrouter expect_msg;
+extern struct received_vrouter received_msg;
 extern struct return_vrouter return_msg;
 
 extern void vt_fill_nl_callbacks();
@@ -58,29 +58,30 @@ struct vtest_module vt_modules[] = {
         .vt_name        =   "message",
         .vt_node        =   vt_message,
     },
-#ifndef _WIN32
     {
         .vt_name        =   "packet",
         .vt_node        =   vt_packet,
     },
-#endif
 };
 
 const size_t VTEST_NUM_MODULES = ARRAYSIZE(vt_modules);
 
 static void
 vt_dealloc_test(struct vtest *test) {
+    int i = 0;
+    struct received_mem_handle *handles = test->messages.received_vrouter_msg->mem_handles;
 
     vt_safe_free(test->vtest_name);
     vt_safe_free(test->vtest_error_module);
-    int i = 0;
 
     for (i = 0; i <= test->message_ptr_num; ++i) {
         vt_safe_free(test->messages.data[i].mem);
     }
 
-    for(i = 0; i <= test->messages.expect_vrouter_msg->expected_ptr_num; ++i) {
-        vt_safe_free(test->messages.expect_vrouter_msg->mem_expected_msg[i]);
+
+    for(i = 0; i <= test->messages.received_vrouter_msg->ptr_num; ++i) {
+        handles[i].free_mem(handles[i].mem);
+        vt_safe_free(handles[i].mem);
     }
 
     return;
@@ -91,15 +92,15 @@ vt_init(struct vtest *test)
 {
 
     memset(test, 0, sizeof(struct vtest));
-    memset(&expect_msg, 0, sizeof(expect_msg));
+    memset(&received_msg, 0, sizeof(received_msg));
     memset(&return_msg, 0, sizeof(return_msg));
 
-    test->messages.expect_vrouter_msg = &expect_msg;
+    test->messages.received_vrouter_msg = &received_msg;
     test->messages.return_vrouter_msg = &return_msg;
     test->message_ptr_num = -1;
 
-    expect_msg.expected_ptr_num = test->message_ptr_num;
-    return_msg.returned_ptr_num = test->message_ptr_num;
+    received_msg.ptr_num = test->message_ptr_num;
+    return_msg.ptr_num = test->message_ptr_num;
 
     test->vtest_name = calloc(VT_MAX_TEST_NAME_LEN, 1);
     if (!test->vtest_name) {

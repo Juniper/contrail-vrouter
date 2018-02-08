@@ -1854,7 +1854,7 @@ flow_table_setup(void)
         return -ENOMEM;
 #endif
 
-    ret = vrouter_get_family_id(cl);
+    ret = vrouter_obtain_family_id(cl);
     if (ret <= 0)
         return ret;
 

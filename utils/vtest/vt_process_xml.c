@@ -71,16 +71,19 @@ vt_search_vt_modules_by_name(char *vt_name) {
 static int
 vt_check_return_val(struct vtest *test) {
 
+    bool has_returned;
     int xml_return_val = 0;
     int returned_msg_val = 0;
 
     if (!test || !test->messages.return_vrouter_msg) {
         return E_PROCESS_XML_ERR_FARG;
     }
-    xml_return_val = test->messages.data[test->message_ptr_num].xml_data.return_value;
-    returned_msg_val = test->messages.return_vrouter_msg->return_val[test->messages.return_vrouter_msg->returned_ptr_num];
 
-    if (xml_return_val == returned_msg_val) {
+    has_returned = test->messages.return_vrouter_msg->has_returned;
+    xml_return_val = test->messages.data[test->message_ptr_num].xml_data.return_value;
+    returned_msg_val = test->messages.return_vrouter_msg->return_val[test->messages.return_vrouter_msg->ptr_num];
+
+    if (has_returned && xml_return_val == returned_msg_val) {
         return E_PROCESS_XML_OK;
     }
 
@@ -103,6 +106,7 @@ vt_recv_vRouter_msg( struct vtest *test) {
     if (!test) {
         return E_PROCESS_XML_ERR_FARG;
     }
+    test->messages.return_vrouter_msg->has_returned = false;
     ret = vr_recvmsg(test->vrouter_cl, false);
     test->messages.data[test->message_ptr_num].recv_ret_value = ret;
     return ret;
@@ -282,6 +286,7 @@ vt_parse_file(char *file, struct vtest *test)
 {
     xmlDocPtr doc = NULL;
     xmlNodePtr node = NULL;
+    int ret;
 
 
     doc = xmlParseFile(file);
@@ -297,9 +302,9 @@ vt_parse_file(char *file, struct vtest *test)
         return E_PROCESS_XML_ERR;
     }
 
-    vt_tree_traverse(node->xmlChildrenNode, test);
+    ret = vt_tree_traverse(node->xmlChildrenNode, test);
 
     xmlFreeDoc(doc);
 
-    return E_PROCESS_XML_OK;
+    return ret;
 }
