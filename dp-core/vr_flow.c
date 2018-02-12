@@ -2270,6 +2270,7 @@ vr_flow_table_data_process(void *s_req)
 
     resp->ftable_created = hold_count;
     resp->ftable_oflow_entries = vr_flow_table_used_oflow_entries(router);
+    resp->ftable_hold_entries = vr_flow_table_hold_count(router);
 
 send_response:
     vr_message_response(VR_FLOW_TABLE_DATA_OBJECT_ID, resp, ret);
