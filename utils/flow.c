@@ -117,6 +117,7 @@ struct flow_table {
     unsigned int ft_hold_oflows;
     unsigned int ft_hold_stat_count;
     unsigned int ft_oflow_entries;
+    unsigned int ft_hold_entries;
     u_int32_t ft_hold_stat[128];
     char flow_table_path[256];
 } main_table;
@@ -1537,8 +1538,6 @@ flow_stats(void)
                 total_entries++;
                 if (fe->fe_action != VR_FLOW_ACTION_HOLD) {
                     active_entries++;
-                } else {
-                    hold_entries++;
                 }
                 if (fe->fe_action == VR_FLOW_ACTION_DROP) {
                     flow_action_drop++;
@@ -1549,6 +1548,7 @@ flow_stats(void)
                 }
             }
         }
+        hold_entries = ft->ft_hold_entries;
         gettimeofday(&now, NULL);
         /* calc time difference and rate */
         diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
@@ -1662,7 +1662,7 @@ flow_rate(void)
         diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
         assert(diff_ms > 0 );
 
-        hold_count = ft->ft_created - hold_count_old;
+        hold_count = ft->ft_hold_entries;
         hold_rate = hold_count * 1000 / diff_ms;
 
         processed_count = ft->ft_processed - processed_count_old;
@@ -1690,7 +1690,7 @@ flow_rate(void)
         }
 
         last_time = now;
-        hold_count_old = ft->ft_created;
+        hold_count_old = hold_count;
         processed_count_old = ft->ft_processed;
         added_count_old = ft->ft_added;
         deleted_count_old = ft->ft_deleted;
@@ -1708,6 +1708,7 @@ get_flow_table_map_counts(vr_flow_table_data *table, struct flow_table *ft)
     ft->ft_deleted = table->ftable_deleted;
     ft->ft_changed = table->ftable_changed;
     ft->ft_total_entries = table->ftable_used_entries;
+    ft->ft_hold_entries = table->ftable_hold_entries;
 
     return 0;
 }
@@ -1767,6 +1768,7 @@ flow_table_map(vr_flow_table_data *table)
     ft->ft_oflow_entries = table->ftable_oflow_entries;
     ft->ft_deleted = table->ftable_deleted;
     ft->ft_changed = table->ftable_changed;
+    ft->ft_hold_entries = table->ftable_hold_entries;
 
     if (table->ftable_hold_stat && table->ftable_hold_stat_size) {
         ft->ft_hold_stat_count = table->ftable_hold_stat_size;
