@@ -52,6 +52,9 @@ buffer sandesh vr_nexthop_req {
     22: list<byte>  nhr_tun_dip6;
     23: byte        nhr_ecmp_config_hash;
     24: list<byte>  nhr_pbb_mac;
+    25: i32         nhr_encap_crypt_oif_id;
+    26: i32         nhr_crypt_traffic;
+    27: i32         nhr_crypt_path_available
 }
 
 buffer sandesh vr_interface_req {
@@ -422,6 +425,7 @@ buffer sandesh vr_drop_stats_req {
     50: i64             vds_leaf_to_leaf;
     51: i64             vds_bmac_isid_mismatch;
     52: i64             vds_pkt_loop;
+    53: i64             vds_no_crypt_path;
 }
 
 buffer sandesh vr_qos_map_req {

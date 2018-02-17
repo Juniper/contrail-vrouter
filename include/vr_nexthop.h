@@ -69,6 +69,7 @@ enum nexthop_type {
 #define NH_FLAG_ETREE_ROOT                  0x200000
 #define NH_FLAG_INDIRECT                    0x400000
 #define NH_FLAG_L2_CONTROL_DATA             0x800000
+#define NH_FLAG_CRYPT_TRAFFIC             0x01000000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
@@ -164,6 +165,7 @@ struct vr_nexthop {
                                        struct vr_nexthop *,
                                        struct vr_forwarding_md *);
     struct vr_interface *nh_dev;
+    struct vr_interface *nh_crypt_dev;
     void                (*nh_destructor)(struct vr_nexthop *);
     uint8_t             nh_data[0];
 };
