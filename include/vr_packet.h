@@ -186,7 +186,9 @@
 #define VP_DROP_LEAF_TO_LEAF                45
 #define VP_DROP_BMAC_ISID_MISMATCH          46
 #define VP_DROP_PKT_LOOP                    47
-#define VP_DROP_MAX                         48
+#define VP_DROP_NO_CRYPT_PATH               48
+#define VP_DROP_MAX                         49
+
 
 /*
  * NOTE: Please do not add any more fields without ensuring

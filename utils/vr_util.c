@@ -661,7 +661,8 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_no_memory);
     printf("Fragment Queueing Failures    %" PRIu64 "\n",
             stats->vds_fragment_queue_fail);
-
+    printf("No Encrypt Path Failures      %" PRIu64 "\n",
+            stats->vds_no_crypt_path);
     printf("\n");
     if (platform == DPDK_PLATFORM) {
         printf("VLAN fwd intf failed TX       %" PRIu64 "\n",
@@ -746,6 +747,7 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_drop_new_flow;
     sum += req->vds_trap_original;
     sum += req->vds_pkt_loop;
+    sum += req->vds_no_crypt_path;
 
     return sum;
 }

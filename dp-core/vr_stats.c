@@ -69,7 +69,7 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_leaf_to_leaf += stats[VP_DROP_LEAF_TO_LEAF];
     response->vds_bmac_isid_mismatch += stats[VP_DROP_BMAC_ISID_MISMATCH];
     response->vds_pkt_loop += stats[VP_DROP_PKT_LOOP];
-
+    response->vds_no_crypt_path += stats[VP_DROP_NO_CRYPT_PATH];
     return;
 }
 
