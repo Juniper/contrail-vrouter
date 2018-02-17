@@ -233,6 +233,10 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
         case NH_FLAG_L2_CONTROL_DATA:
             strcat(ptr, "Evpn Control Word, ");
             break;
+
+        case NH_FLAG_CRYPT_TRAFFIC:
+            strcat(ptr, "Encrypt Traffic, ");
+            break;
         }
     }
 
@@ -332,6 +336,11 @@ nexthop_req_process(void *s_req)
                 i = req->nhr_label_list[0];
             printf("Bmac:"MAC_FORMAT " Label:%d",
                     MAC_VALUE((uint8_t *)req->nhr_pbb_mac), i);
+        }
+        if (req->nhr_encap_crypt_oif_id != (int)-1 &&
+            req->nhr_encap_crypt_oif_id != 0) {
+            nh_print_newline_header();
+            printf("CryptOif:%d\n", req->nhr_encap_crypt_oif_id);            
         }
     } else if (req->nhr_type == NH_VRF_TRANSLATE) {
         nh_print_newline_header();
