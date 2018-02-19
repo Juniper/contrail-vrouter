@@ -136,8 +136,8 @@ if sys.platform != 'darwin':
 
     buildversion = genBuildVersion()
 
-    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh', \
-                        'utils', 'uvrouter', 'test']
+    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh',
+               'windows', 'utils', 'uvrouter', 'test']
     exports = ['VRouterEnv']
   
     if dpdk_exists:
