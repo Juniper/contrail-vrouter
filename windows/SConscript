@@ -1,0 +1,19 @@
+#
+# Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv.Clone()
+
+env.Append(CPPPATH = [env['TOP_INCLUDE'], '../test/windows/kernel_impl/include'])
+env.Append(CPPDEFINES = '__KERNEL__')
+
+# Treat warnings as errors
+env.Append(CPPFLAGS = '/WX')
+
+# Files should be added when needed to this list
+sources = [
+    'vr_host_interface.c',
+]
+
+env.StaticLibrary('windows_vrouter', source = sources)
