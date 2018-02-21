@@ -923,12 +923,10 @@ dpdk_lcore_tx_rings_push(struct vr_dpdk_lcore *lcore)
     uint64_t total_pkts = 0;
     struct rte_ring *ring;
     struct vr_dpdk_ring_to_push *rtp;
-    struct vr_interface_stats *stats;
     int i;
     uint32_t nb_pkts;
     uint16_t nb_rtp;
     struct rte_mbuf *pkts[VR_DPDK_TX_BURST_SZ];
-    const unsigned lcore_id = rte_lcore_id();
 
     /* for all TX rings to push */
     rtp = &lcore->lcore_rings_to_push[0];
@@ -955,8 +953,6 @@ dpdk_lcore_tx_rings_push(struct vr_dpdk_lcore *lcore)
                 }
             } else {
                 /* TX queue has been deleted, so just drop the packets */
-                stats = vif_get_stats(rtp->rtp_tx_queue->q_vif, lcore_id);
-                stats->vis_port_oerrors += nb_pkts;
                 for (i = 0; i < nb_pkts; i++)
                     /* TODO: a separate counter for this drop */
                     vr_dpdk_pfree(pkts[i], NULL, VP_DROP_INTERFACE_DROP);
