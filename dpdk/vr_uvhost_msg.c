@@ -1316,9 +1316,6 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
             goto error;
         }
 
-        /* Send netlink interface down message to agent */
-        vr_uvh_nl_send_intf_state(0, vru_cl->vruc_idx, basename(vru_cl->vruc_path));
-
     } else {
         /*
          * Server mode Qemu
@@ -1350,6 +1347,9 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
     vru_cl->vruc_timer_fd = -1;
 
     if (msg->vrnu_vif_vhostuser_mode == VRNU_VIF_MODE_CLIENT) {
+        /* Send netlink interface down message to agent */
+        vr_uvh_nl_send_intf_state(0, vru_cl->vruc_idx, basename(vru_cl->vruc_path));
+
         /*
          * Client mode Qemu
          * add to listen handler
