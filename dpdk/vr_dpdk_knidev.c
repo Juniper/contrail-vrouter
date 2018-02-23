@@ -18,6 +18,7 @@
 #include "vr_packet.h"
 
 #include <rte_errno.h>
+#include <rte_ethdev_pci.h>
 #include <rte_ethdev.h>
 #include <rte_kni.h>
 #include <rte_malloc.h>
@@ -529,7 +530,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
 /* Change KNI MTU size callback */
 static int
-dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
+dpdk_knidev_change_mtu(uint16_t port_id, unsigned new_mtu)
 {
     struct vrouter *router = vrouter_get(0);
     struct vr_interface *vif;
@@ -613,7 +614,7 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
 
 /* Configure KNI state callback */
 static int
-dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
+dpdk_knidev_config_network_if(uint16_t port_id, uint8_t if_up)
 {
     struct vrouter *router = vrouter_get(0);
     struct vr_dpdk_ethdev *ethdev = NULL;

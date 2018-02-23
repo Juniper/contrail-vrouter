@@ -404,7 +404,7 @@ vr_dpdk_tapdev_dequeue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mb
     /* Try to RX from the TAP. */
     if (likely(tapdev->tapdev_rx_ring != NULL)) {
         return rte_ring_sc_dequeue_burst(tapdev->tapdev_rx_ring,
-                (void **)mbufs, num);
+                (void **)mbufs, num, NULL);
     }
     return 0;
 }
@@ -472,7 +472,7 @@ vr_dpdk_tapdev_enqueue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mb
 
     if (likely(tapdev->tapdev_tx_rings[lcore_id] != NULL)) {
         return rte_ring_sp_enqueue_burst(tapdev->tapdev_tx_rings[lcore_id],
-            (void **)mbufs, num);
+            (void **)mbufs, num, NULL);
     }
 
    return 0;

@@ -1703,10 +1703,10 @@ vr_dpdk_set_vhost_send_func(unsigned int vif_idx, uint32_t mrg)
 static inline void
 dpdk_virtio_send_burst(struct dpdk_virtio_writer *p)
 {
-    uint32_t nb_tx = 0;
     int i;
 
     if (likely(p->tx_buf_count)) {
+
         /*
          * prefetch the tx buffer to be sent
          * This will avoid large cpu cycles in the
@@ -1715,11 +1715,11 @@ dpdk_virtio_send_burst(struct dpdk_virtio_writer *p)
         for (i=0;i<p->tx_buf_count;i++)
             rte_prefetch0((void *)p->tx_buf[i]);
         if (likely(p->tx_virtioq->vdv_send_func != NULL)) {
-            nb_tx = p->tx_virtioq->vdv_send_func(p, p->tx_virtioq,
+            p->tx_virtioq->vdv_send_func(p, p->tx_virtioq,
                             p->tx_buf, p->tx_buf_count);
         }
 
-        DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count - nb_tx);
+        DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(p, p->tx_buf_count);
         /* dpdk_virtio_dev_to_vm_tx_burst() does not free any mbufs */
         while (likely(p->tx_buf_count)) {
             p->tx_buf_count--;
