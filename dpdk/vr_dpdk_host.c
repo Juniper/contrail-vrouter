@@ -246,6 +246,9 @@ dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
     dst->data_off = src->data_off;
     dst->port = src->port;
     dst->ol_flags = src->ol_flags;
+#ifdef IND_ATTACHED_MBUF
+    dst->ol_flags &= (~IND_ATTACHED_MBUF);
+#endif
     dst->packet_type = src->packet_type;
     dst->data_len = src->data_len;
     dst->pkt_len = src->pkt_len;
@@ -1213,9 +1216,13 @@ dpdk_set_log_level(unsigned int log_level)
         break;
     }
 
-    if (level > 0)
+    if (level > 0) {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        rte_log_set_global_level(level);
+#else
         rte_set_log_level(level);
-    else
+#endif
+    } else
         RTE_LOG(ERR, VROUTER, "Error: wrong log level (%u) specified\n",
                 level);
 }
@@ -1223,7 +1230,11 @@ dpdk_set_log_level(unsigned int log_level)
 static unsigned int
 dpdk_get_log_level(void)
 {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    unsigned int level = rte_log_get_global_level();
+#else
     unsigned int level = rte_get_log_level();
+#endif
 
     switch(level) {
     case RTE_LOG_EMERG:
@@ -1282,9 +1293,13 @@ dpdk_set_log_type(unsigned int log_type, int enable)
         break;
     }
 
-    if (type > 0)
+    if (type > 0) {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        rte_log_set_level(type, enable);
+#else
         rte_set_log_type(type, enable);
-    else
+#endif
+    } else
         RTE_LOG(ERR, VROUTER, "Error: wrong log type (0x%x) specified\n",
                 type);
 }
@@ -1310,6 +1325,27 @@ dpdk_log_type_to_vr_type(unsigned int type)
     return 0;
 }
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+static unsigned int *
+dpdk_get_enabled_log_types(int *size)
+{
+    int num = rte_logs.dynamic_types_len;
+
+    unsigned int *enabled_array =
+            vr_malloc(sizeof(int) * num, VR_LOG_TYPES_OBJECT);
+    int i;
+
+    *size = 0;
+    for (i = 0; i < num; i++) {
+        if (rte_log_get_level(i) > 0) {
+            enabled_array[i] = dpdk_log_type_to_vr_type(i);
+            (*size)++;
+        }
+    }
+
+    return enabled_array;
+}
+#else
 static unsigned int *
 dpdk_get_enabled_log_types(int *size)
 {
@@ -1332,6 +1368,7 @@ dpdk_get_enabled_log_types(int *size)
     *size = i;
     return enabled_array;
 }
+#endif
 
 static void
 dpdk_soft_reset(struct vrouter *router)

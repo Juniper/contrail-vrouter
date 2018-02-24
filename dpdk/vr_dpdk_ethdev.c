@@ -20,6 +20,9 @@
 
 #include <rte_eth_bond.h>
 #include <rte_errno.h>
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+#include <rte_ethdev_pci.h>
+#endif
 #include <rte_ethdev.h>
 #include <rte_hash_crc.h>
 #include <rte_ip.h>
@@ -416,7 +419,11 @@ dpdk_ethdev_info_update(struct vr_dpdk_ethdev *ethdev)
     RTE_LOG_DP(DEBUG, VROUTER, "dev_info: driver_name=%s if_index=%u"
             " max_rx_queues=%" PRIu16 " max_tx_queues=%" PRIu16
             " max_vfs=%" PRIu16 " max_vmdq_pools=%" PRIu16
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+            " rx_offload_capa=%" PRIx64 " tx_offload_capa=%" PRIx64 "\n",
+#else
             " rx_offload_capa=%" PRIx32 " tx_offload_capa=%" PRIx32 "\n",
+#endif
             dev_info.driver_name, dev_info.if_index,
             dev_info.max_rx_queues, dev_info.max_tx_queues,
             dev_info.max_vfs, dev_info.max_vmdq_pools,
@@ -664,7 +671,7 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
         ethdev->ethdev_nb_slaves = -1;
     } else {
         ethdev->ethdev_nb_slaves = rte_eth_bond_slaves_get(port_id,
-            ethdev->ethdev_slaves, sizeof(ethdev->ethdev_slaves));
+            ethdev->ethdev_slaves, VR_DPDK_BOND_MAX_SLAVES);
 
         memset(&mac_addr, 0, sizeof(bond_mac));
         rte_eth_macaddr_get(port_id, &bond_mac);
@@ -869,6 +876,10 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
     return 1;
 }
 
+#ifdef PKT_RX_VLAN_PKT
+#define PKT_RX_VLAN PKT_RX_VLAN_PKT
+#endif
+
 /* dpdk_mbuf_parse_and_hash_packets
  *
  * Parse incoming packet. Check L2, L3 headers, encapsulation type, perform
@@ -912,9 +923,9 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
             return -1;
 
         /* Store the first VLAN TCI for further use. */
-        if (likely((mbuf->ol_flags & PKT_RX_VLAN_PKT) == 0)) {
+        if (likely((mbuf->ol_flags & PKT_RX_VLAN) == 0)) {
             vlan_hdr = (struct vlan_hdr *)(eth_hdr + 1);
-            mbuf->ol_flags |= PKT_RX_VLAN_PKT;
+            mbuf->ol_flags |= PKT_RX_VLAN;
             mbuf->vlan_tci = rte_be_to_cpu_16(vlan_hdr->vlan_tci);
         }
 

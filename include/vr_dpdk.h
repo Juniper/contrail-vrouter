@@ -500,11 +500,19 @@ struct vr_dpdk_ethdev {
     /* Actual size of ethdev RETA */
     uint16_t ethdev_reta_size;
     /* DPDK port ID */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    uint16_t ethdev_port_id;
+#else
     uint8_t ethdev_port_id;
+#endif
     /* The device is a bond if the number of slaves is > 0 */
     int8_t ethdev_nb_slaves;
     /* List of slaves port IDs */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    uint16_t ethdev_slaves[VR_DPDK_BOND_MAX_SLAVES];
+#else
     uint8_t ethdev_slaves[VR_DPDK_BOND_MAX_SLAVES];
+#endif
     /* Hardware RX queue states */
     uint8_t ethdev_queue_states[VR_DPDK_MAX_NB_RX_QUEUES];
     /* Pointers to memory pools */

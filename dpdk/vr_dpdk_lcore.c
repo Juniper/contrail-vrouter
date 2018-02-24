@@ -700,16 +700,30 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
                         /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
                 if (io_lcore) {
                     /* IO lcore enqueue packets. */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+                    ret = rte_ring_sp_enqueue_bulk(
+                            vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring,
+                            (void **)&lcore_pkts[dst_lcore_idx][0],
+                            chunk_nb_pkts, NULL);
+#else
                     ret = rte_ring_sp_enqueue_bulk(
                             vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_io_rx_ring,
                             (void **)&lcore_pkts[dst_lcore_idx][0],
                             chunk_nb_pkts);
+#endif
                 } else {
                     /* Other forwarding lcores enqueue packets. */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+                    ret = rte_ring_mp_enqueue_bulk(
+                            vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_rx_ring,
+                            (void **)&lcore_pkts[dst_lcore_idx][0],
+                            chunk_nb_pkts, NULL);
+#else
                     ret = rte_ring_mp_enqueue_bulk(
                             vr_dpdk.lcores[dst_fwd_lcore_idx]->lcore_rx_ring,
                             (void **)&lcore_pkts[dst_lcore_idx][0],
                             chunk_nb_pkts);
+#endif
                 }
                 if (unlikely(ret == -ENOBUFS)) {
                     /* drop packets if it's the last retry */
@@ -759,6 +773,10 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
         nb_dst_lcores = nb_retry_lcores;
     } /* for all tries */
 }
+
+#ifdef PKT_RX_VLAN_PKT
+#define PKT_RX_VLAN PKT_RX_VLAN_PKT
+#endif
 
 /*
  * vr_dpdk_lcore_vroute - pass mbufs to dp-core.
@@ -828,7 +846,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
                  * clean ethernet frames from fabric interface. If we did not
                  * do this, the VLAN tag would be passed to dp-core processing
                  * and vhost connectivity would be corrupted. */
-                mbuf->ol_flags &= ~PKT_RX_VLAN_PKT;
+                mbuf->ol_flags &= ~PKT_RX_VLAN;
             }
         }
 
@@ -839,7 +857,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
         rte_pktmbuf_dump(stdout, mbuf, 0x60);
 #endif
 
-        if ((mbuf->ol_flags & PKT_RX_VLAN_PKT) != 0) {
+        if ((mbuf->ol_flags & PKT_RX_VLAN) != 0) {
             vlan_id = mbuf->vlan_tci & 0xFFF;
         }
 
@@ -1008,9 +1026,24 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ + VR_DPDK_RX_RING_CHUNK_SZ];
 
     /* dequeue the first chunk */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    ret = rte_ring_sc_dequeue_bulk(ring, (void **)pkts,
+            VR_DPDK_RX_RING_CHUNK_SZ, NULL);
+#else
     ret = rte_ring_sc_dequeue_bulk(ring, (void **)pkts,
             VR_DPDK_RX_RING_CHUNK_SZ);
+#endif
+
+    /* From DPDK 17.11 on, return value of rte_ring_sc_dequeue_bulk
+     * is different from the previous one, 0 means dequeue failure,
+     * non-zero means success, return value should be equal to the
+     * third parameter VR_DPDK_RX_RING_CHUNK_SZ if success.
+     */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    if (ret != 0) {
+#else
     if (likely(ret == 0)) {
+#endif
         header = (uintptr_t)pkts[0];
         RTE_VERIFY((header & (1ULL << LCORE_RX_RING_HEADER_OFF)) != 0);
         nb_pkts = header & LCORE_RX_RING_NB_PKTS_MASK;
@@ -1025,11 +1058,21 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
             /* round up to the chunk size */
             chunk_nb_pkts = (nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
                     /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+            ret = rte_ring_sc_dequeue_bulk(ring,
+                    (void **)(pkts + VR_DPDK_RX_RING_CHUNK_SZ),
+                    chunk_nb_pkts - VR_DPDK_RX_RING_CHUNK_SZ, NULL);
+#else
             ret = rte_ring_sc_dequeue_bulk(ring,
                     (void **)(pkts + VR_DPDK_RX_RING_CHUNK_SZ),
                     chunk_nb_pkts - VR_DPDK_RX_RING_CHUNK_SZ);
+#endif
             /* we always should be able to dequeue the mbufs */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+            RTE_VERIFY(ret != 0);
+#else
             RTE_VERIFY(ret == 0);
+#endif
         }
         vif = __vrouter_get_interface(router, vif_idx);
         if (likely(vif != NULL) && vif->vif_gen == vif_gen) {
@@ -1068,7 +1111,11 @@ dpdk_lcore_tx_rings_push(struct vr_dpdk_lcore *lcore)
             continue;
         }
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        nb_pkts = rte_ring_sc_dequeue_burst(ring, (void **)pkts, VR_DPDK_TX_BURST_SZ, NULL);
+#else
         nb_pkts = rte_ring_sc_dequeue_burst(ring, (void **)pkts, VR_DPDK_TX_BURST_SZ);
+#endif
         if (likely(nb_pkts != 0)) {
             total_pkts += nb_pkts;
 
@@ -1149,8 +1196,13 @@ dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
         }
     }
     /* Get packets from VLAN ring and forward them to kernel. */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.vlan_ring, (void**) &pkts,
+            VR_DPDK_RX_BURST_SZ, NULL);
+#else
     nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.vlan_ring, (void**) &pkts,
             VR_DPDK_RX_BURST_SZ);
+#endif
     if (vr_dpdk.kni_state > 0)
         i = rte_kni_tx_burst(vr_dpdk.vlan_dev, pkts, nb_pkts);
     else
