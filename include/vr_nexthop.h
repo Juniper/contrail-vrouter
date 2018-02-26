@@ -70,6 +70,7 @@ enum nexthop_type {
 #define NH_FLAG_INDIRECT                    0x400000
 #define NH_FLAG_L2_CONTROL_DATA             0x800000
 #define NH_FLAG_CRYPT_TRAFFIC             0x01000000
+#define NH_FLAG_L3_VXLAN                  0x02000000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
