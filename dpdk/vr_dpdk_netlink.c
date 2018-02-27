@@ -306,7 +306,11 @@ vr_dpdk_netlink_init(void)
     if (ret)
         return ret;
 
+#ifdef AGENT_DPDK_TCP
     vr_dpdk.netlink_sock = vr_usocket(NETLINK, TCP);
+#else
+    vr_dpdk.netlink_sock = vr_usocket(NETLINK, UNIX);
+#endif
     if (!vr_dpdk.netlink_sock) {
         RTE_LOG(ERR, VROUTER, "    error creating NetLink server socket:"
             " %s (%d)\n", rte_strerror(errno), errno);

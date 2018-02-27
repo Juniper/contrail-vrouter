@@ -177,7 +177,11 @@ get_domain()
     if (platform &&
        (strcmp(platform, PLATFORM_DPDK) == 0 ||
         strcmp(platform, PLATFORM_NIC) == 0)) {
+#ifdef AGENT_DPDK_TCP
         return AF_INET;
+#else
+        return AF_UNIX;
+#endif
     }
     return AF_NETLINK;
 }
