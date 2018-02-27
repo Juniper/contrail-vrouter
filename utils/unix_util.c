@@ -18,6 +18,8 @@
 #elif defined(__FreeBSD__)
 #include <net/ethernet.h>
 #endif
+#include <netinet/tcp.h>
+#include <sys/un.h>
 
 #include <vr_mem.h>
 #include <nl_util.h>
@@ -164,6 +166,19 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
 
         return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
     }
+    if (cl->cl_socket_domain == AF_UNIX) {
+        struct sockaddr_un *sa = malloc(sizeof(struct sockaddr_un));
+        if (!sa)
+            return -1;
+
+        memset(sa, 0, sizeof(*sa));
+        sa->sun_family = cl->cl_socket_domain;
+        strcpy(sa->sun_path, VR_DEF_NETLINK_PATH);
+        cl->cl_sa = (struct sockaddr *)sa;
+        cl->cl_sa_len = sizeof(*sa);
+
+        return connect(cl->cl_sock, cl->cl_sa, cl->cl_sa_len);
+    }
     return 0;
 }
 
@@ -208,8 +223,10 @@ nl_client_stream_recvmsg(struct nl_client *cl, bool msg_wait) {
 
     memset(&msg, 0, sizeof(msg));
 
-    msg.msg_name = cl->cl_sa;
-    msg.msg_namelen = sizeof(cl->cl_sa_len);
+    if (cl->cl_socket_domain != AF_UNIX) {
+        msg.msg_name = cl->cl_sa;
+        msg.msg_namelen = sizeof(cl->cl_sa_len);
+    }
 
     iov.iov_base = (void *)(cl->cl_buf);
     iov.iov_len = NLMSG_HDRLEN;
@@ -251,8 +268,10 @@ nl_sendmsg(struct nl_client *cl)
 
     memset(&msg, 0, sizeof(msg));
 #if defined (__linux__)
-    msg.msg_name = cl->cl_sa;
-    msg.msg_namelen = cl->cl_sa_len;
+    if (cl->cl_socket_domain != AF_UNIX) {
+        msg.msg_name = cl->cl_sa;
+        msg.msg_namelen = cl->cl_sa_len;
+    }
 #endif
 
     iov.iov_base = (void *)(cl->cl_buf);
