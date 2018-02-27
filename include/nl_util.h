@@ -17,6 +17,7 @@ extern "C" {
 
 #define VR_DEF_NETLINK_PORT         20914
 #define VR_DEF_SOCKET_DIR           "/var/run/vrouter"
+#define VR_DEF_NETLINK_PATH         "/var/run/vrouter/dpdk_netlink"
 
 #define NL_RESP_DEFAULT_SIZE        512
 #define NL_MSG_DEFAULT_SIZE         4096

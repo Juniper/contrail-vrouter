@@ -721,6 +721,10 @@ usock_alloc(unsigned short proto, unsigned short type)
         break;
 
     case UNIX:
+        domain = AF_UNIX;
+        sock_type = SOCK_STREAM;
+        break;
+
     case RAW:
         domain = AF_UNIX;
         sock_type = SOCK_DGRAM;
