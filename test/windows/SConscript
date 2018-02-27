@@ -1,0 +1,28 @@
+#
+# Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
+#
+
+Import('VRouterEnv')
+env = VRouterEnv.Clone()
+
+env.Append(CPPPATH = [env['TOP_INCLUDE'], 'kernel_impl/include'])
+env.Append(CPPDEFINES = '__KERNEL__')
+
+# Treat warnings as errors
+env.Append(CPPFLAGS = '/WX')
+
+env.Replace(LIBPATH = env['TOP_LIB'])
+env.Append(LIBPATH = ['.', '../../windows', '../../dp-core', '../../sandesh'])
+
+vrouter_stubs = env.Object('vrouter_stubs.c')
+env.StaticLibrary('kernel_stubs', ['kernel_impl/src/wdm.c', 'kernel_impl/src/ndis.c'])
+
+# vRouter code
+env.Replace(LIBS = ['windows_vrouter', 'dp_core', 'dp_sandesh_c', 'kernel_stubs'])
+# 3rd party libs
+env.Append(LIBS = 'cmocka')
+# OS libs
+env.Append(LIBS = ['ws2_32.lib', 'ntdll.lib'])
+
+example_test = env.UnitTest('example_test', ['test.c', vrouter_stubs])
+env.TestSuite('kernel-tests', [example_test])
