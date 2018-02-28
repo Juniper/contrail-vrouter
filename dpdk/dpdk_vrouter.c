@@ -247,19 +247,27 @@ dpdk_mempools_create(void)
  *      VR_DPDK_DEF_LCORE_MASK on failure
  *      0 if the system does not have enough cores
  */
-static uint64_t
+static cpu_set_t
 dpdk_core_mask_get(long system_cpus_count)
 {
     cpu_set_t cs;
-    uint64_t cpu_core_mask = 0;
+    cpu_set_t cpu_core_mask;
+    cpu_set_t def_cpu_core_mask;
     int i;
     long core_mask_count;
 
+    for (i = 0; (1 << i) < VR_DPDK_DEF_LCORE_MASK; i++) {
+        if ((1 << i) & VR_DPDK_DEF_LCORE_MASK) {
+            CPU_SET(i, &def_cpu_core_mask);
+        }
+    }
+
+    CPU_ZERO(&cpu_core_mask);
     if (sched_getaffinity(0, sizeof(cs), &cs) < 0) {
         RTE_LOG(ERR, VROUTER, "Error getting affinity."
             " Falling back do the default core mask 0x%" PRIx64 "\n",
                 (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
-        return VR_DPDK_DEF_LCORE_MASK;
+        return def_cpu_core_mask;
     }
 
     /*
@@ -270,28 +278,29 @@ dpdk_core_mask_get(long system_cpus_count)
      *
      * Due to size of uint64_t, maximum number of supported CPUs is 64.
      */
-    for (i = 0; i < RTE_MIN(CPU_SETSIZE, 64); i++) {
+    for (i = 0; i < CPU_SETSIZE; i++) {
         if (CPU_ISSET(i, &cs))
-            cpu_core_mask |= (uint64_t)1 << i;
+            CPU_SET(i, &cpu_core_mask);
     }
 
-    if (!cpu_core_mask) {
+    core_mask_count = CPU_COUNT(&cpu_core_mask);
+    if (core_mask_count == 0) {
         RTE_LOG(ERR, VROUTER, "Error: core mask is zero."
             " Falling back do the default core mask 0x%" PRIx64 "\n",
                 (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
-        return VR_DPDK_DEF_LCORE_MASK;
+        return def_cpu_core_mask;
     }
 
     /*
      * Do not allow to run vRouter on all the cores available, as some have
      * to be spared for virtual machines.
      */
-    core_mask_count = __builtin_popcountll((unsigned long long)cpu_core_mask);
+    core_mask_count = CPU_COUNT(&cpu_core_mask);
     if (core_mask_count == system_cpus_count) {
         RTE_LOG(NOTICE, VROUTER, "Use taskset(1) to set the core mask."
             " Falling back do the default core mask 0x%" PRIx64 "\n",
                 (uint64_t)(VR_DPDK_DEF_LCORE_MASK));
-        return VR_DPDK_DEF_LCORE_MASK;
+        return def_cpu_core_mask;
     }
 
     return cpu_core_mask;
@@ -304,7 +313,7 @@ dpdk_core_mask_get(long system_cpus_count)
  *          and 2 shared IO lcores: 3@(0,1),4@(2,3)
  */
 static char *
-dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
+dpdk_shared_io_core_mask_stringify(cpu_set_t core_set_mask)
 {
     int cpu_id = 0;
     int io_lcore_id = VR_DPDK_IO_LCORE_ID;
@@ -317,8 +326,8 @@ dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
     if (!VR_DPDK_USE_IO_LCORES || !VR_DPDK_SHARED_IO_LCORES)
         return "";
 
-    while (core_mask) {
-        if (core_mask & 1) {
+    while (cpu_id < CPU_SETSIZE) {
+        if (CPU_ISSET(cpu_id, &core_set_mask)) {
             /* add CPU ID to IO lcore string */
             if (iop != io_cpus_string)
                 *iop++ = ',';
@@ -333,7 +342,7 @@ dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
 
             nb_fwd_cores++;
             if (nb_fwd_cores >= VR_DPDK_FWD_LCORES_PER_IO
-                || (core_mask >> 1) == 0) {
+                || cpu_id + 1 >= CPU_SETSIZE) {
                 if (io_lcore_id > VR_DPDK_LAST_IO_LCORE_ID) {
                     RTE_LOG(WARNING, VROUTER,
                         "Warning: IO lcores limit exceeded (%d > %d)\n",
@@ -354,7 +363,6 @@ dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
                 nb_fwd_cores = 0;
             }
         }
-        core_mask >>= 1;
         cpu_id++;
     }
     *p = '\0';
@@ -369,7 +377,7 @@ dpdk_shared_io_core_mask_stringify(uint64_t core_mask)
  *             and 2 dedicated IO lcores: 3@0,4@3
  */
 static char *
-dpdk_fwd_core_mask_stringify(uint64_t core_mask)
+dpdk_fwd_core_mask_stringify(cpu_set_t core_set_mask)
 {
     int cpu_id = 0;
     int fwd_lcore_id = VR_DPDK_FWD_LCORE_ID;
@@ -378,8 +386,8 @@ dpdk_fwd_core_mask_stringify(uint64_t core_mask)
     int io_lcore_id = VR_DPDK_IO_LCORE_ID;
     int nb_fwd_cores = 0;
 
-    while (core_mask) {
-        if (core_mask & 1) {
+    while (cpu_id < CPU_SETSIZE) {
+        if (CPU_ISSET(cpu_id, &core_set_mask)) {
             if (p != core_mask_string)
                 *p++ = ',';
 
@@ -419,7 +427,6 @@ dpdk_fwd_core_mask_stringify(uint64_t core_mask)
                 nb_fwd_cores = 0;
 
         }
-        core_mask >>= 1;
         cpu_id++;
     }
     *p = '\0';
@@ -476,7 +483,8 @@ dpdk_argv_update(void)
 {
     long int system_cpus_count;
     int i;
-    uint64_t core_mask, mask_lm_bit;
+    cpu_set_t core_mask;
+    uint64_t old_core_bit_mask = 0, new_core_bit_mask = 0;
     char *io_core_mask_str;
     char *fwd_core_mask_str;
     static char lcores_string[VR_DPDK_STR_BUF_SZ];
@@ -493,7 +501,7 @@ dpdk_argv_update(void)
     core_mask = dpdk_core_mask_get(system_cpus_count);
 
     /* calculate number of forwarding and IO lcores */
-    vr_dpdk.nb_fwd_lcores = __builtin_popcountll(core_mask);
+    vr_dpdk.nb_fwd_lcores = CPU_COUNT(&core_mask);
     vr_dpdk.nb_io_lcores = 0;
     if (VR_DPDK_USE_IO_LCORES) {
         if (VR_DPDK_SHARED_IO_LCORES) {
@@ -525,17 +533,21 @@ dpdk_argv_update(void)
             vr_dpdk.nb_io_lcores, vr_dpdk.nb_io_lcores - 1);
         vr_dpdk.nb_io_lcores--;
         /* remove the leftmost bit from the core mask */
-        mask_lm_bit = core_mask;
-        mask_lm_bit |= mask_lm_bit >> 32;
-        mask_lm_bit |= mask_lm_bit >> 16;
-        mask_lm_bit |= mask_lm_bit >> 8;
-        mask_lm_bit |= mask_lm_bit >> 4;
-        mask_lm_bit |= mask_lm_bit >> 2;
-        mask_lm_bit |= mask_lm_bit >> 1;
-        mask_lm_bit ^= mask_lm_bit >> 1;
+        for (i = 0; i < 64; i++) {
+            if (CPU_ISSET(i, &core_mask)) {
+                old_core_bit_mask |= 1 << i;
+            }
+        }
+        for (i = 32; i < 64; i++) {
+            CPU_CLR(i, &core_mask);
+        }
+        for (i = 0; i < 32; i++) {
+            if (CPU_ISSET(i, &core_mask)) {
+                new_core_bit_mask |= 1 << i;
+            }
+        }
         RTE_LOG(INFO, VROUTER, "Adjusting core mask: 0x%"PRIx64" -> 0x%"PRIx64"\n",
-            core_mask, core_mask ^ mask_lm_bit);
-        core_mask ^= mask_lm_bit;
+            old_core_bit_mask, new_core_bit_mask);
     }
 
     io_core_mask_str = dpdk_shared_io_core_mask_stringify(core_mask);
