@@ -403,8 +403,13 @@ vr_dpdk_tapdev_dequeue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mb
 
     /* Try to RX from the TAP. */
     if (likely(tapdev->tapdev_rx_ring != NULL)) {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        return rte_ring_sc_dequeue_burst(tapdev->tapdev_rx_ring,
+                (void **)mbufs, num, NULL);
+#else
         return rte_ring_sc_dequeue_burst(tapdev->tapdev_rx_ring,
                 (void **)mbufs, num);
+#endif
     }
     return 0;
 }
@@ -471,8 +476,13 @@ vr_dpdk_tapdev_enqueue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mb
         return 0;
 
     if (likely(tapdev->tapdev_tx_rings[lcore_id] != NULL)) {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        return rte_ring_sp_enqueue_burst(tapdev->tapdev_tx_rings[lcore_id],
+            (void **)mbufs, num, NULL);
+#else
         return rte_ring_sp_enqueue_burst(tapdev->tapdev_tx_rings[lcore_id],
             (void **)mbufs, num);
+#endif
     }
 
    return 0;
