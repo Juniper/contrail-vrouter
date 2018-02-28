@@ -92,7 +92,7 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_ENABLE_PROMISC      false
 /* Maximum number of hardware RX queues to use for RSS and filtering
  * (limited by NIC and number of per queue TX/RX descriptors) */
-#define VR_DPDK_MAX_NB_RX_QUEUES    11
+#define VR_DPDK_MAX_NB_RX_QUEUES    16
 /* Maximum number of hardware TX queues to use (limited by the number of lcores) */
 #define VR_DPDK_MAX_NB_TX_QUEUES    64
 /* bnxt NIC only supports 8 TX queues */
