@@ -18,6 +18,10 @@
 #ifndef __VRDPDKCOMPAT_H__
 #define __VRDPDKCOMPAT_H__
 
+#ifdef PKT_RX_VLAN_PKT
+#define PKT_RX_VLAN PKT_RX_VLAN_PKT
+#endif
+
 /*
  * DPDK 2.1
  */

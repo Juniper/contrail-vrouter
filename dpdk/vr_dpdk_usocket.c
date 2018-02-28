@@ -518,8 +518,13 @@ vr_dpdk_packet_ring_drain(struct vr_usocket *usockp)
 
     stats = vif_get_stats(usockp->usock_parent->usock_vif, lcore_id);
     do {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
+            (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ, NULL);
+#else
         nb_pkts = rte_ring_sc_dequeue_burst(vr_dpdk.packet_ring,
             (void **)&mbuf_arr, VR_DPDK_RX_BURST_SZ);
+#endif
         for (i = 0; i < nb_pkts; i++) {
             if (usock_mbuf_write(usockp->usock_parent, mbuf_arr[i]) >= 0)
                 stats->vis_port_opackets++;
@@ -698,6 +703,11 @@ retry_read:
 static struct vr_usocket *
 usock_alloc(unsigned short proto, unsigned short type)
 {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    unsigned int pkt0_mempool_sz = PKT0_MBUF_POOL_SIZE - 1;
+#else
+    unsigned int pkt0_mempool_sz = PKT0_MBUF_POOL_SIZE;
+#endif
     int sock_fd = -1, domain, ret;
     /* socket TX buffer size = (hold flow table entries * size of jumbo frame) */
     int setsocksndbuff = vr_flow_hold_limit * vr_packet_sz;
@@ -839,7 +849,7 @@ usock_alloc(unsigned short proto, unsigned short type)
         usockp->usock_mbuf_pool = rte_mempool_lookup("packet_mbuf_pool");
         if (!usockp->usock_mbuf_pool) {
             usockp->usock_mbuf_pool = rte_mempool_create("packet_mbuf_pool",
-                    PKT0_MBUF_POOL_SIZE, PKT0_MBUF_PACKET_SIZE,
+                    pkt0_mempool_sz, PKT0_MBUF_PACKET_SIZE,
                     PKT0_MBUF_POOL_CACHE_SZ, sizeof(struct rte_pktmbuf_pool_private),
                     vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                     rte_socket_id(), 0);
