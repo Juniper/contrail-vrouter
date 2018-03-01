@@ -140,7 +140,7 @@ if sys.platform != 'darwin':
                'windows', 'utils', 'uvrouter', 'test']
     exports = ['VRouterEnv']
   
-    if dpdk_exists:
+    if dpdk_exists and not GetOption('without-dpdk'):
         subdirs.append('dpdk')
         exports.append('dpdk_lib')
 
