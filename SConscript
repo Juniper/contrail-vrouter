@@ -151,9 +151,14 @@ if sys.platform != 'darwin':
         matches = re.findall("define RTE_VER_MAJOR 2", file_content)
    
         if matches:
-            rte_libs = '-lethdev', '-lrte_malloc'
+            rte_libs = ('-lethdev', '-lrte_malloc')
         else:
-            rte_libs = '-lrte_ethdev'
+            rte_libs = ('-lrte_ethdev',)
+
+        year_matches = re.findall("define RTE_VER_YEAR 17", file_content)
+        month_matches = re.findall("define RTE_VER_MONTH 11", file_content)
+        if year_matches and month_matches:
+            rte_libs = rte_libs + ('-lrte_mempool_ring', '-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
   
         #
         # DPDK libraries need to be linked as a whole archive, otherwise some
@@ -215,6 +220,9 @@ if sys.platform != 'darwin':
             '-Wl,--end-group',
             '-Wl,--no-whole-archive'
         ]
+
+        if year_matches and month_matches:
+            DPDK_LIBS.append('-Wl,-lnuma')
 
         # Pass -g and -O flags if present to DPDK
         DPDK_FLAGS = ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
