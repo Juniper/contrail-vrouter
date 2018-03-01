@@ -171,9 +171,18 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
 static int
 dpdk_mempools_create(void)
 {
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    unsigned int rss_mempool_sz = vr_mempool_sz - 1;
+    unsigned int frag_direct_mempool_sz = VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ - 1;
+    unsigned int frag_indirect_mempool_sz = VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ - 1;
+#else
+    unsigned int rss_mempool_sz = vr_mempool_sz;
+    unsigned int frag_direct_mempool_sz = VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ;
+    unsigned int frag_indirect_mempool_sz = VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ;
+#endif
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool",
-            vr_mempool_sz,
+            rss_mempool_sz,
             VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_RSS_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private),
             vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
@@ -186,7 +195,7 @@ dpdk_mempools_create(void)
 
     /* Create the mbuf pool used for IP fragmentation (direct mbufs) */
     vr_dpdk.frag_direct_mempool = rte_mempool_create("frag_direct_mempool",
-            VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ, VR_DPDK_FRAG_DIRECT_MBUF_SZ,
+            frag_direct_mempool_sz, VR_DPDK_FRAG_DIRECT_MBUF_SZ,
             VR_DPDK_FRAG_DIRECT_MEMPOOL_CACHE_SZ,
             sizeof(struct rte_pktmbuf_pool_private), rte_pktmbuf_pool_init,
             NULL, rte_pktmbuf_init, NULL, rte_socket_id(), 0);
@@ -198,7 +207,7 @@ dpdk_mempools_create(void)
 
     /* Create the mbuf pool used for IP fragmentation (indirect mbufs) */
     vr_dpdk.frag_indirect_mempool = rte_mempool_create("frag_indirect_mempool",
-            VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ, VR_DPDK_FRAG_INDIRECT_MBUF_SZ,
+            frag_indirect_mempool_sz, VR_DPDK_FRAG_INDIRECT_MBUF_SZ,
             VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, 0, NULL, NULL,
             rte_pktmbuf_init, NULL, rte_socket_id(), 0);
     if (vr_dpdk.frag_indirect_mempool == NULL) {
@@ -210,6 +219,11 @@ dpdk_mempools_create(void)
 #if VR_DPDK_USE_HW_FILTERING
     int ret, i;
     char mempool_name[RTE_MEMPOOL_NAMESIZE];
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    unsigned int vm_mempool_sz = VR_DPDK_VM_MEMPOOL_SZ - 1;
+#else
+    unsigned int vm_mempool_sz = VR_DPDK_VM_MEMPOOL_SZ;
+#endif
 
     /* Create a list of free mempools */
     vr_dpdk.nb_free_mempools = 0;
@@ -220,7 +234,7 @@ dpdk_mempools_create(void)
             return -ENOMEM;
         }
         vr_dpdk.free_mempools[i] = rte_mempool_create(mempool_name,
-                VR_DPDK_VM_MEMPOOL_SZ, VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
+                vm_mempool_sz, VR_DPDK_MBUF_HDR_SZ + vr_packet_sz, VR_DPDK_VM_MEMPOOL_CACHE_SZ,
                 sizeof(struct rte_pktmbuf_pool_private),
                 vr_dpdk_pktmbuf_pool_init, NULL, vr_dpdk_pktmbuf_init, NULL,
                 rte_socket_id(), 0);
@@ -488,6 +502,11 @@ dpdk_argv_update(void)
     char *io_core_mask_str;
     char *fwd_core_mask_str;
     static char lcores_string[VR_DPDK_STR_BUF_SZ];
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    unsigned int rss_mempool_sz = vr_mempool_sz - 1;
+#else
+    unsigned int rss_mempool_sz = vr_mempool_sz;
+#endif
 
     /* get number of available CPUs */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
@@ -595,7 +614,7 @@ dpdk_argv_update(void)
     RTE_LOG(INFO, VROUTER, "VRF tables limit:            %" PRIu32 "\n",
                 vr_vrfs);
     RTE_LOG(INFO, VROUTER, "Packet pool size:            %" PRIu32 "\n",
-                vr_mempool_sz);
+                rss_mempool_sz);
     RTE_LOG(INFO, VROUTER, "Maximum packet size:         %" PRIu32 "\n",
                 vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
@@ -702,10 +721,18 @@ dpdk_init(void)
     rte_openlog_stream(timestamp_log_stream);
 
     /* disable unwanted logtypes for debug purposes */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    rte_log_set_level(VR_DPDK_LOGTYPE_DISABLE, 0);
+#else
     rte_set_log_type(VR_DPDK_LOGTYPE_DISABLE, 0);
+#endif
 
     /* set default log level to INFO */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    rte_log_set_global_level(RTE_LOG_INFO);
+#else
     rte_set_log_level(RTE_LOG_INFO);
+#endif
 
     ret = dpdk_mempools_create();
     if (ret < 0)
