@@ -104,10 +104,8 @@
 #define VIF_FLAG_MAC_LEARN          0x80000
 #define VIF_FLAG_MAC_PROXY          0x100000
 #define VIF_FLAG_ETREE_ROOT         0x200000
-
 #define VIF_FLAG_GRO_NEEDED         0x200000
 #define VIF_FLAG_MRG_RXBUF          0x400000
-
 #define VIF_FLAG_MIRROR_NOTAG       0x800000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
@@ -203,9 +201,10 @@ struct vr_vrf_assign {
     unsigned int va_nh_id;
 };
 
-#define VIF_FAT_FLOW_NUM_BITMAPS    (64)
-#define VIF_FAT_FLOW_BITMAP_SIZE    (1024)
-#define VIF_FAT_FLOW_BITMAP_BYTES   (VIF_FAT_FLOW_BITMAP_SIZE / 8)
+#define VIF_FAT_FLOW_NUM_BITMAPS        (128)
+#define VIF_FAT_FLOW_BITMAP_SIZE        (1024)
+#define VIF_FAT_FLOW_PORTS_PER_BITMAP   (1024 / 2)
+#define VIF_FAT_FLOW_BITMAP_BYTES       (VIF_FAT_FLOW_BITMAP_SIZE / 8)
 
 #define VIF_FAT_FLOW_NOPROTO_INDEX  0
 #define VIF_FAT_FLOW_TCP_INDEX      1
@@ -213,8 +212,17 @@ struct vr_vrf_assign {
 #define VIF_FAT_FLOW_SCTP_INDEX     3
 #define VIF_FAT_FLOW_MAXPROTO_INDEX 4
 
-#define VIF_FAT_FLOW_PORT(p_p)      ((p_p) & 0xFFFF)
-#define VIF_FAT_FLOW_PROTOCOL(p_p)  (((p_p) >> 16) & 0xFF)
+
+#define VIF_FAT_FLOW_PROTOCOL_SHIFT     16
+#define VIF_FAT_FLOW_PORT_DATA_SHIFT    24
+#define VIF_FAT_FLOW_DATA_MASK           3
+#define VIF_FAT_FLOW_PORT(p_p)          ((p_p) & 0xFFFF)
+#define VIF_FAT_FLOW_PROTOCOL(p_p)      (((p_p) >> VIF_FAT_FLOW_PROTOCOL_SHIFT) & 0xFF)
+#define VIF_FAT_FLOW_PORT_DATA(p_p)     (((p_p) >> VIF_FAT_FLOW_PORT_DATA_SHIFT) & 0x3)
+
+#define VIF_FAT_FLOW_PORT_SET           3
+#define VIF_FAT_FLOW_PORT_SIP_IGNORE    1
+#define VIF_FAT_FLOW_PORT_DIP_IGNORE    2
 
 struct vr_interface {
     unsigned int vif_flags;
@@ -255,7 +263,7 @@ struct vr_interface {
      * one for tcp, another for udp, one for sctp and one for
      * everything else
      */
-    uint16_t *vif_fat_flow_config[VIF_FAT_FLOW_MAXPROTO_INDEX];
+    uint32_t *vif_fat_flow_config[VIF_FAT_FLOW_MAXPROTO_INDEX];
     uint16_t vif_fat_flow_config_size[VIF_FAT_FLOW_MAXPROTO_INDEX];
 
     unsigned char vif_mac[VR_ETHER_ALEN];
@@ -369,7 +377,7 @@ extern unsigned int vr_interface_req_get_size(void *);
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
-extern fat_flow_port_mask_t vif_fat_flow_lookup(struct vr_interface *,
+extern uint16_t vif_fat_flow_lookup(struct vr_interface *,
         uint8_t, uint16_t, uint16_t);
 extern unsigned int vr_interface_req_get_size(void *);
 #endif /* __VR_INTERFACE_H__ */
