@@ -703,12 +703,6 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
                     ": unable to add MAC addresses\n", slave_port_id);
             }
         }
-        /* In LACP mode all the bond members are in the promisc mode
-         * by default (see bond_mode_8023ad_activate_slave()
-         * But we need also to put the bond interface in promisc to get
-         * the broadcasts. Seems to be a bug in bond_ethdev_rx_burst_8023ad()?
-         */
-        rte_eth_promiscuous_enable(port_id);
     }
 }
 
