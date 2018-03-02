@@ -430,12 +430,12 @@ struct vr_flow_trap_arg {
     uint8_t vfta_gen_id;
 };
 
-typedef enum {
-    NO_PORT_MASK,
-    SOURCE_PORT_MASK,
-    DESTINATION_PORT_MASK,
-    ALL_PORT_MASK,
-} fat_flow_port_mask_t;
+#define VR_FAT_FLOW_NO_MASK        0x0
+#define VR_FAT_FLOW_SRC_PORT_MASK  0x1
+#define VR_FAT_FLOW_DST_PORT_MASK  0x2
+#define VR_FAT_FLOW_SRC_IP_MASK    0x4
+#define VR_FAT_FLOW_DST_IP_MASK    0x8
+#define VR_FAT_FLOW_MAX_MASK       0x9
 
 struct vr_packet;
 struct vrouter;
@@ -499,7 +499,7 @@ int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
-fat_flow_port_mask_t vr_flow_fat_flow_lookup(struct vrouter *,
+uint16_t vr_flow_fat_flow_lookup(struct vrouter *,
         struct vr_packet *, uint16_t, uint16_t, uint16_t);
 extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
