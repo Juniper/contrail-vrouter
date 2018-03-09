@@ -1305,6 +1305,9 @@ vr_ip_well_known_packet(struct vr_packet *pkt)
         }
     }
 
+    if (iph->ip_proto == VR_IP_PROTO_IGMP)
+        return L4_TYPE_IGMP;
+
     return L4_TYPE_UNKNOWN;
 }
 

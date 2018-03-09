@@ -879,6 +879,13 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                 }
             }
 
+            if (l4_type == L4_TYPE_IGMP) {
+                if (pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED) {
+                    vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+                    return 0;
+                }
+            }
+
             /*
              * Handle the unicast ARP, coming from VM, not
              * destined to us. Broadcast ARP requests would be handled

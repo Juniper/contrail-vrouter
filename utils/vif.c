@@ -168,6 +168,7 @@ static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_MAC_PROXY,        "Proxy",    "MAC Requests Proxied Always"},
     {VIF_FLAG_ETREE_ROOT,       "Er",       "Etree Root"},
     {VIF_FLAG_MIRROR_NOTAG,     "Mn",       "Mirror without Vlan Tag"},
+    {VIF_FLAG_IGMP_ENABLED,     "Ig",       "Igmp Trap Enabled"},
 };
 
 static char *

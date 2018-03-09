@@ -232,7 +232,8 @@ extern int vr_send_nexthop_delete(struct nl_client *, unsigned int,
 extern int vr_send_nexthop_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_nexthop_get(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_nexthop_composite_add(struct nl_client *, unsigned int,
-        int, unsigned int, int, unsigned int, unsigned int *, unsigned int *);
+        int, unsigned int, int, unsigned int, unsigned int *, unsigned
+        int *, unsigned int);
 extern int vr_send_nexthop_encap_tunnel_add(struct nl_client *, unsigned int,
         unsigned int, int, unsigned int, int, int, int8_t *, int8_t *,
         struct in_addr, struct in_addr, int, int);
