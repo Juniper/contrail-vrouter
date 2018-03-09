@@ -24,6 +24,10 @@
 #include <linux/socket.h>
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include <stdint.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -496,6 +500,13 @@ nl_free(struct nl_client *cl)
 
     if (cl->cl_sa)
         free(cl->cl_sa);
+
+#ifdef _WIN32
+    if (cl->cl_win_pipe) {
+        CloseHandle(cl->cl_win_pipe);
+        cl->cl_win_pipe = NULL;
+    }
+#endif
 
     cl->cl_buf = NULL;
     cl->cl_resp_buf = NULL;
