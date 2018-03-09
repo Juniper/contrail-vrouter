@@ -1466,7 +1466,7 @@ int
 vr_send_nexthop_composite_add(struct nl_client *cl, unsigned int router_id,
         int nh_index, unsigned int flags, int vrf_index,
         unsigned int num_components, unsigned int *component_nh_indices,
-        unsigned int *component_labels)
+        unsigned int *component_labels, unsigned int family)
 {
     int ret = 0;
     unsigned int i;
@@ -1500,10 +1500,7 @@ vr_send_nexthop_composite_add(struct nl_client *cl, unsigned int router_id,
     }
 
 
-    if (flags & NH_FLAG_COMPOSITE_L2)
-        req.nhr_family = AF_BRIDGE;
-    else
-        req.nhr_family = AF_INET;
+    req.nhr_family = family;
 
     ret = vr_sendmsg(cl, &req, "vr_nexthop_req");
 fail:
@@ -1562,10 +1559,8 @@ vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
         }
     }
 
-    if ((type == NH_ENCAP) && (flags & NH_FLAG_ENCAP_L2))
+    if (type == NH_ENCAP)
         req.nhr_family = AF_BRIDGE;
-    else
-        req.nhr_family = AF_INET;
 
     return vr_sendmsg(cl, &req, "vr_nexthop_req");
 }

@@ -43,7 +43,7 @@ enum nexthop_type {
 
 #define NH_FLAG_VALID                       0x000001
 #define NH_FLAG_POLICY_ENABLED              0x000002
-#define NH_FLAG_ENCAP_L2                    0x000004
+/* 0x000004 is free */
 #define NH_FLAG_TUNNEL_GRE                  0x000008
 #define NH_FLAG_TUNNEL_UDP                  0x000010
 /*
@@ -56,7 +56,7 @@ enum nexthop_type {
 #define NH_FLAG_RELAXED_POLICY              0x000100
 #define NH_FLAG_COMPOSITE_FABRIC            0x000200
 #define NH_FLAG_COMPOSITE_ECMP              0x000400
-#define NH_FLAG_COMPOSITE_L2                0x000800
+/* 0x000800 is free */
 #define NH_FLAG_COMPOSITE_EVPN              0x001000
 #define NH_FLAG_COMPOSITE_ENCAP             0x002000
 #define NH_FLAG_COMPOSITE_TOR               0x004000
