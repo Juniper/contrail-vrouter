@@ -870,13 +870,9 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip *ip,
         struct vr_flow *flow_p, uint8_t valid_fkey_params)
 {
-    int ret = 0;
-
-    unsigned short *t_hdr, sport, dport;
-    unsigned short nh_id;
-
+    int i, ret = 0;
+    unsigned short *t_hdr, sport, dport, nh_id, fat_flow_mask;
     struct vr_icmp *icmph;
-    fat_flow_port_mask_t port_mask;
 
     t_hdr = (unsigned short *)((char *)ip + (ip->ip_hl * 4));
 
@@ -915,24 +911,33 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         dport = 0;
     }
 
-    port_mask = vr_flow_fat_flow_lookup(router, pkt, ip->ip_proto,
+    fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, ip->ip_proto,
             sport, dport);
-    switch (port_mask) {
-    case SOURCE_PORT_MASK:
-        sport = 0;
-        break;
 
-    case DESTINATION_PORT_MASK:
-        dport = 0;
-        break;
+    for (i = 1; i < VR_FAT_FLOW_MAX_MASK; i = i << 1) {
+        switch (fat_flow_mask & i) {
+        case VR_FAT_FLOW_SRC_PORT_MASK:
+            valid_fkey_params &= ~VR_FLOW_KEY_SRC_PORT;
+            break;
 
-    case ALL_PORT_MASK:
-        sport = dport = 0;
-        break;
+        case VR_FAT_FLOW_DST_PORT_MASK:
+            valid_fkey_params &= ~VR_FLOW_KEY_DST_PORT;
+            break;
 
-    default:
-        break;
+        case VR_FAT_FLOW_SRC_IP_MASK:
+            valid_fkey_params &= ~VR_FLOW_KEY_SRC_IP;
+            break;
+
+        case VR_FAT_FLOW_DST_IP_MASK:
+            valid_fkey_params &= ~VR_FLOW_KEY_DST_IP;
+            break;
+
+        default:
+            break;
+        }
     }
+
+    valid_fkey_params &= VR_FLOW_KEY_ALL;
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
     vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,

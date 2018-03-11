@@ -1560,10 +1560,11 @@ vr_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
     return false;
 }
 
-fat_flow_port_mask_t
+uint16_t
 vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         uint16_t l4_proto, uint16_t sport, uint16_t dport)
 {
+    uint8_t fat_flow_mask, tmp_mask = 0;
     struct vr_nexthop *nh;
     struct vr_interface *vif_l = NULL;
 
@@ -1576,9 +1577,26 @@ vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     }
 
     if (!vif_l)
-        return NO_PORT_MASK;
+        return VR_FAT_FLOW_NO_MASK;
 
-    return vif_fat_flow_lookup(vif_l, l4_proto, sport, dport);
+    fat_flow_mask = vif_fat_flow_lookup(vif_l, l4_proto, sport, dport);
+    if (pkt->vp_if != vif_l) {
+
+        if (fat_flow_mask & VR_FAT_FLOW_SRC_IP_MASK)
+            tmp_mask |= VR_FAT_FLOW_DST_IP_MASK;
+
+        if (fat_flow_mask & VR_FAT_FLOW_DST_IP_MASK)
+            tmp_mask |= VR_FAT_FLOW_SRC_IP_MASK;
+
+        fat_flow_mask &= ~(VR_FAT_FLOW_DST_IP_MASK |
+                VR_FAT_FLOW_SRC_IP_MASK);
+
+
+        fat_flow_mask |= tmp_mask;
+
+    }
+
+    return fat_flow_mask;
 }
 
 static flow_result_t

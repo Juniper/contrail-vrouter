@@ -433,7 +433,7 @@ list_get_print(vr_interface_req *req)
     char ip6_addr[INET6_ADDRSTRLEN], ip_addr[INET_ADDRSTRLEN],
          name[50] = {0}, ip6_ip[16];
     bool print_zero = false;
-    uint16_t proto, port;
+    uint16_t proto, port, port_data;
     int printed = 0, len;
     unsigned int i;
     uint64_t *tmp;
@@ -604,6 +604,7 @@ list_get_print(vr_interface_req *req)
         for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
             proto = VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]);
             port = VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]);
+            port_data = VIF_FAT_FLOW_PORT_DATA(req->vifr_fat_flow_protocol_port[i]);
             if (!proto) {
                 proto = port;
                 port = 0;
@@ -611,10 +612,14 @@ list_get_print(vr_interface_req *req)
 
             printed += printf("%d:", proto);
             if (port) {
-                printed += printf("%d", port);
+                printed += printf("%d ", port);
             } else {
                 printed += printf("%c", '*');
             }
+            if (port_data == VIF_FAT_FLOW_PORT_SIP_IGNORE)
+                printed += printf(" - Sip");
+            if (port_data == VIF_FAT_FLOW_PORT_DIP_IGNORE)
+                printed += printf(" - Dip");
 
             if (i == (req->vifr_fat_flow_protocol_port_size - 1)) {
                 printf("\n");
