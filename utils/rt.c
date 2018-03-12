@@ -472,17 +472,17 @@ op_retry:
 static int
 bridge_table_map(vr_bridge_table_data *table)
 {
-    bool mmap_success;
+    const char *mmap_error_msg;
 
     vr_bridge_table.bt_size = table->btable_size;
     vr_bridge_table.bt_num_entries =
         table->btable_size / sizeof(struct vr_bridge_entry);
 
-    mmap_success =
-        vr_table_map(table->btable_dev, VR_MEM_BRIDGE_TABLE_OBJECT,
-            table->btable_file_path, table->btable_size, &vr_bridge_table.bt_entries);
-    if (!mmap_success) {
-        printf("bridge table mapping failed\n");
+    mmap_error_msg = vr_table_map(table->btable_dev, VR_MEM_BRIDGE_TABLE_OBJECT,
+        table->btable_file_path, table->btable_size, &vr_bridge_table.bt_entries);
+
+    if (mmap_error_msg) {
+        printf("%s\n", mmap_error_msg);
         exit(1);
     }
 

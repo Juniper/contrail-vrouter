@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -30,17 +31,22 @@
 
 #define VROUTER_GENETLINK_VROUTER_GROUP_ID 0x4
 
-bool
+const char *
 vr_table_map(int major, unsigned int table, char *table_path, size_t size, void **mem)
 {
+    enum { ERROR_LEN = 1024 };
+    static char error_msg[ERROR_LEN];
+
     int fd, ret;
     uint16_t dev;
 
     char *path;
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
 
-    if (major < 0)
-        return false;
+    if (major < 0) {
+        snprintf(error_msg, ERROR_LEN, "Error: Invalid 'major' value: %d", major);
+        return error_msg;
+    }
 
     if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
                 (strcmp(platform, PLATFORM_NIC) == 0))) {
@@ -56,31 +62,33 @@ vr_table_map(int major, unsigned int table, char *table_path, size_t size, void 
             break;
 
         default:
-            return false;
+            snprintf(error_msg, ERROR_LEN, "Error: Invalid 'table' value: %u", table);
+            return error_msg;
         }
 
         ret = mknod(path, S_IFCHR | O_RDWR, makedev(major, table));
         if (ret && errno != EEXIST) {
-            perror(path);
-            return false;
+            goto fail;
         }
     }
 
     fd = open(path, O_RDONLY | O_SYNC);
     if (fd <= 0) {
-        perror(path);
-        return false;
+        goto fail;
     }
 
     *mem = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
 
     if (*mem == MAP_FAILED) {
-        perror(path);
-        return false;
+        goto fail;
     }
 
-    return true;
+    return NULL;
+
+fail:
+    snprintf(error_msg, ERROR_LEN, "%s: %s", path, strerror(errno));
+    return error_msg;
 }
 
 int

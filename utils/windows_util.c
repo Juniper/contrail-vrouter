@@ -41,9 +41,12 @@ print_and_get_error_code()
     return error;
 }
 
-bool
+const char *
 vr_table_map(int major, unsigned int table, char *table_path, size_t size, void **mem)
 {
+    enum { ERROR_LEN = 1024 };
+    static char error_msg[ERROR_LEN];
+
     LPCTSTR path;
     switch(table) {
     case VR_MEM_BRIDGE_TABLE_OBJECT:
@@ -53,14 +56,15 @@ vr_table_map(int major, unsigned int table, char *table_path, size_t size, void 
         path = FLOW_PATH;
         break;
     default:
-        return false;
+        snprintf(error_msg, ERROR_LEN, "Error: Invalid 'table' value: %u", table);
+        return error_msg;
     }
 
     HANDLE shmemPipe = CreateFile(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0,
         NULL);
     if (shmemPipe == INVALID_HANDLE_VALUE) {
-        printf("Error: CreateFile on shmem pipe: %d\n", GetLastError());
-        return false;
+        snprintf(error_msg, ERROR_LEN, "Error: CreateFile on shmem pipe: %d", GetLastError());
+        return error_msg;
     }
 
     DWORD outBytes;
@@ -68,14 +72,15 @@ vr_table_map(int major, unsigned int table, char *table_path, size_t size, void 
         sizeof(*mem), &outBytes, NULL);
 
     if (!transactionResult) {
-        printf("Error: DeviceIoControl on shmem pipe: %d\n", GetLastError());
-        return false;
+        snprintf(error_msg, ERROR_LEN, "Error: DeviceIoControl on shmem pipe: %d", GetLastError());
+        return error_msg;
     } else if (outBytes != sizeof(*mem)) {
-        printf("Error: DeviceIoControl on shmem pipe: pointer wasn't fully filled\n");
-        return false;
+        snprintf(error_msg, ERROR_LEN,
+            "Error: DeviceIoControl on shmem pipe: pointer wasn't fully filled");
+        return error_msg;
     }
 
-    return true;
+    return NULL;
 }
 
 int
