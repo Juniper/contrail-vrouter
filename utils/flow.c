@@ -1564,8 +1564,6 @@ flow_stats(void)
                 total_entries++;
                 if (fe->fe_action != VR_FLOW_ACTION_HOLD) {
                     active_entries++;
-                } else {
-                    hold_entries++;
                 }
                 if (fe->fe_action == VR_FLOW_ACTION_DROP) {
                     flow_action_drop++;
@@ -1576,6 +1574,7 @@ flow_stats(void)
                 }
             }
         }
+        hold_entries = ft->ft_hold_entries;
         gettimeofday(&now, NULL);
         /* calc time difference and rate */
         diff_ms = (now.tv_sec - last_time.tv_sec) * 1000;
@@ -1689,7 +1688,7 @@ flow_rate(void)
         diff_ms += (now.tv_usec - last_time.tv_usec) / 1000;
         assert(diff_ms > 0 );
 
-        hold_count = ft->ft_created - hold_count_old;
+        hold_count = ft->ft_hold_entries;
         hold_rate = hold_count * 1000 / diff_ms;
 
         processed_count = ft->ft_processed - processed_count_old;
@@ -1720,7 +1719,7 @@ flow_rate(void)
         }
 
         last_time = now;
-        hold_count_old = ft->ft_created;
+        hold_count_old = hold_count;
         processed_count_old = ft->ft_processed;
         added_count_old = ft->ft_added;
         deleted_count_old = ft->ft_deleted;
