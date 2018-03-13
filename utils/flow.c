@@ -1747,7 +1747,7 @@ get_flow_table_map_counts(vr_flow_table_data *table, struct flow_table *ft)
 static int
 flow_table_map(vr_flow_table_data *table)
 {
-    bool mmap_success;
+    const char *mmap_error_msg;
     int ret;
     unsigned int i;
     struct flow_table *ft = &main_table;
@@ -1761,11 +1761,11 @@ flow_table_map(vr_flow_table_data *table)
         return ft->ft_num_entries;
     }
 
-    mmap_success =
-        vr_table_map(table->ftable_dev, VR_MEM_FLOW_TABLE_OBJECT, table->ftable_file_path,
-            table->ftable_size, &ft->ft_entries);
-    if (!mmap_success) {
-        printf("flow table mapping failed\n");
+    mmap_error_msg = vr_table_map(table->ftable_dev, VR_MEM_FLOW_TABLE_OBJECT,
+        table->ftable_file_path, table->ftable_size, &ft->ft_entries);
+
+    if (mmap_error_msg) {
+        printf("%s\n", mmap_error_msg);
         exit(1);
     }
 
