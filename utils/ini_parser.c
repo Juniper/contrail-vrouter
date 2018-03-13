@@ -171,7 +171,7 @@ read_ip(const char *section, const char *key)
 }
 
 int
-get_domain()
+get_domain(void)
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
     if (platform &&
@@ -183,7 +183,7 @@ get_domain()
 }
 
 int
-get_type()
+get_type(void)
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
     if (platform &&
@@ -195,7 +195,7 @@ get_type()
 }
 
 uint16_t
-get_port()
+get_port(void)
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
     if (platform &&
@@ -207,13 +207,13 @@ get_port()
 }
 
 uint32_t
-get_ip()
+get_ip(void)
 {
     return 0x7f000001;
 }
 
 int
-get_protocol()
+get_protocol(void)
 {
     const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
     if (platform &&

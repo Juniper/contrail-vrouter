@@ -191,7 +191,7 @@ extern struct nl_client *vr_get_nl_client(int);
 
 extern int vr_response_common_process(vr_response *, bool *);
 
-extern const char *vr_table_map(int, unsigned int, char *, size_t, void **);
+extern const char *vr_table_map(int, unsigned int, const char *, size_t, void **);
 extern uint64_t vr_sum_drop_stats(vr_drop_stats_req *);
 extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
@@ -311,7 +311,6 @@ extern int win_nl_sendmsg(struct nl_client *);
 extern int win_nl_client_recvmsg(struct nl_client *, bool);
 
 extern const LPCTSTR KSYNC_PATH;
-extern const LPCTSTR FLOW_PATH;
 #endif /* _WIN32 */
 
 #ifdef __cplusplus

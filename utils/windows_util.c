@@ -42,7 +42,7 @@ print_and_get_error_code()
 }
 
 const char *
-vr_table_map(int major, unsigned int table, char *table_path, size_t size, void **mem)
+vr_table_map(int major, unsigned int table, const char *table_path, size_t size, void **mem)
 {
     enum { ERROR_LEN = 1024 };
     static char error_msg[ERROR_LEN];
