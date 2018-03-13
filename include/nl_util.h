@@ -192,6 +192,7 @@ extern struct nl_client *vr_get_nl_client(int);
 extern int vr_response_common_process(vr_response *, bool *);
 
 extern const char *vr_table_map(int, unsigned int, const char *, size_t, void **);
+extern const char *vr_table_unlink(const char *);
 extern uint64_t vr_sum_drop_stats(vr_drop_stats_req *);
 extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
