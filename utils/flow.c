@@ -53,8 +53,6 @@
 #define MAX_FLOW_NL_MSG_BUNCH   15
 #define MAX_FLOWS               4000000
 
-#define MEM_DEV                 "/dev/flow"
-
 static int mem_fd;
 
 static int dvrf_set, mir_set, show_evicted_set;

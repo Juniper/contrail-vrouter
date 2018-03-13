@@ -32,7 +32,7 @@
 #define VROUTER_GENETLINK_VROUTER_GROUP_ID 0x4
 
 const char *
-vr_table_map(int major, unsigned int table, char *table_path, size_t size, void **mem)
+vr_table_map(int major, unsigned int table, const char *table_path, size_t size, void **mem)
 {
     enum { ERROR_LEN = 1024 };
     static char error_msg[ERROR_LEN];
@@ -40,16 +40,15 @@ vr_table_map(int major, unsigned int table, char *table_path, size_t size, void 
     int fd, ret;
     uint16_t dev;
 
-    char *path;
-    const char *platform = read_string(DEFAULT_SECTION, PLATFORM_KEY);
+    const char *path;
+    const int platform = get_platform();
 
     if (major < 0) {
         snprintf(error_msg, ERROR_LEN, "Error: Invalid 'major' value: %d", major);
         return error_msg;
     }
 
-    if (platform && ((strcmp(platform, PLATFORM_DPDK) == 0) ||
-                (strcmp(platform, PLATFORM_NIC) == 0))) {
+    if (platform != LINUX_PLATFORM) {
         path = table_path;
     } else {
         switch (table) {
