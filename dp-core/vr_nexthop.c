@@ -1193,7 +1193,7 @@ drop:
 }
 
 static nh_processing_t
-nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
+nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
                      struct vr_forwarding_md *fmd)
 {
 
@@ -1242,7 +1242,8 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (tun_src & NH_FLAG_COMPOSITE_FABRIC) {
         pkt_src = PKT_SRC_EDGE_REPL_TREE;
-        pull_len = VR_VXLAN_HDR_LEN;
+        if (nh->nh_family == AF_BRIDGE)
+            pull_len = VR_VXLAN_HDR_LEN;
     }
 
     if (tun_src & NH_FLAG_COMPOSITE_TOR) {
@@ -1250,40 +1251,76 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         fmd->fmd_src = TOR_SOURCE;
     }
 
-    eth = (struct vr_eth *)pkt_data_at_offset(pkt,
-                            pkt->vp_data + pull_len);
+    if (nh->nh_family == AF_BRIDGE) {
+        eth = (struct vr_eth *)pkt_data_at_offset(pkt,
+                                pkt->vp_data + pull_len);
 
-    if (ntohs(eth->eth_proto) == VR_ETH_PROTO_PBB) {
+        if (ntohs(eth->eth_proto) == VR_ETH_PROTO_PBB) {
+            pbb_pull_len = __vr_pbb_decode(eth, pkt_head_len(pkt) - pull_len, fmd);
+            if (pbb_pull_len <= 0) {
+                drop_reason = VP_DROP_INVALID_PACKET;
+                goto drop;
+            }
 
-        pbb_pull_len = __vr_pbb_decode(eth, pkt_head_len(pkt) - pull_len, fmd);
-        if (pbb_pull_len <= 0) {
-            drop_reason = VP_DROP_INVALID_PACKET;
-            goto drop;
+            if (vr_pkt_type(pkt, pbb_pull_len + pull_len, fmd) < 0) {
+                drop_reason = VP_DROP_INVALID_PACKET;
+                goto drop;
+            }
+
+            eth = (struct vr_eth *)(((char *)eth) + pbb_pull_len);
+            if (nh->nh_flags & NH_FLAG_MAC_LEARN) {
+                ml_res = vr_bridge_learn(nh->nh_router, pkt, eth, fmd);
+                if (ml_res == MAC_TRAPPED)
+                    return NH_PROCESSING_COMPLETE;
+            }
         }
 
-        if (vr_pkt_type(pkt, pbb_pull_len + pull_len, fmd) < 0) {
-            drop_reason = VP_DROP_INVALID_PACKET;
-            goto drop;
-        }
+        handled = nh_handle_mcast_control_pkt(pkt, eth, fmd,
+                                        pkt_src, &flood_to_vms);
+        if (handled)
+            return NH_PROCESSING_COMPLETE;
 
-        eth = (struct vr_eth *)(((char *)eth) + pbb_pull_len);
-        if (nh->nh_flags & NH_FLAG_MAC_LEARN) {
-            ml_res = vr_bridge_learn(nh->nh_router, pkt, eth, fmd);
-            if (ml_res == MAC_TRAPPED)
+        if (flood_to_vms && !IS_MAC_BMCAST(eth->eth_dmac)) {
+            handled = nh_handle_unknown_unicast(pkt, eth, fmd, pkt_src);
+            if (handled)
                 return NH_PROCESSING_COMPLETE;
         }
 
-    }
 
-    handled = nh_handle_mcast_control_pkt(pkt, eth, fmd,
-                                    pkt_src, &flood_to_vms);
-    if (handled)
-        return NH_PROCESSING_COMPLETE;
+        /*
+         * The packet can come to this nexthp either from Fabric or from VM.
+         * Incase of Fabric, the packet would contain the Vxlan header and
+         * control information. From VM, it contains neither of them
+         */
 
-    if (flood_to_vms && !IS_MAC_BMCAST(eth->eth_dmac)) {
-        handled = nh_handle_unknown_unicast(pkt, eth, fmd, pkt_src);
-        if (handled)
-            return NH_PROCESSING_COMPLETE;
+        if (!fmd->fmd_udp_src_port) {
+            if (hashrnd_inited == 0) {
+                get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
+                hashrnd_inited = 1;
+            }
+            hashval = vr_hash(eth, sizeof(struct vr_eth), vr_hashrnd);
+            /* Include the VRF to calculate the hash */
+            hashval = vr_hash_2words(hashval, fmd->fmd_dvrf, vr_hashrnd);
+
+            /*
+             * Convert the hash value to a value in the port range that we want
+             * for dynamic UDP ports
+             */
+            port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
+            fmd->fmd_udp_src_port = (uint16_t) (((uint64_t) hashval * port_range) >> 32);
+
+            if (fmd->fmd_udp_src_port > port_range) {
+               /*
+                * Shouldn't happen...
+                */
+                fmd->fmd_udp_src_port = 0;
+            }
+
+            fmd->fmd_udp_src_port += VR_MUDP_PORT_RANGE_START;
+        }
+
+        if (vr_fmd_l2_control_data_is_enabled(fmd))
+            l2_control_data = true;
     }
 
     if (!nh->nh_component_cnt) {
@@ -1291,42 +1328,7 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
         goto drop;
     }
 
-    /*
-     * The packet can come to this nexthp either from Fabric or from VM.
-     * Incase of Fabric, the packet would contain the Vxlan header and
-     * control information. From VM, it contains neither of them
-     */
-
-    if (!fmd->fmd_udp_src_port) {
-        if (hashrnd_inited == 0) {
-            get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
-            hashrnd_inited = 1;
-        }
-        hashval = vr_hash(eth, sizeof(struct vr_eth), vr_hashrnd);
-        /* Include the VRF to calculate the hash */
-        hashval = vr_hash_2words(hashval, fmd->fmd_dvrf, vr_hashrnd);
-
-        /*
-         * Convert the hash value to a value in the port range that we want
-         * for dynamic UDP ports
-         */
-        port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
-        fmd->fmd_udp_src_port = (uint16_t) (((uint64_t) hashval * port_range) >> 32);
-
-        if (fmd->fmd_udp_src_port > port_range) {
-           /*
-            * Shouldn't happen...
-            */
-            fmd->fmd_udp_src_port = 0;
-        }
-
-        fmd->fmd_udp_src_port += VR_MUDP_PORT_RANGE_START;
-    }
-
     label = fmd->fmd_label;
-
-    if (vr_fmd_l2_control_data_is_enabled(fmd))
-        l2_control_data = true;
 
     for (i = 0; i < nh->nh_component_cnt; i++) {
         clone_size = 0;
@@ -1354,7 +1356,8 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             }
 
             pull_len = pbb_pull_len;
-            if (pkt_src == PKT_SRC_EDGE_REPL_TREE)
+            if (nh->nh_family == AF_BRIDGE &&
+                    (pkt_src == PKT_SRC_EDGE_REPL_TREE))
                 pull_len += VR_VXLAN_HDR_LEN;
 
             if (pull_len && !pkt_pull(new_pkt, pull_len)) {
@@ -1366,9 +1369,13 @@ nh_composite_mcast_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
                 continue;
 
             if (pkt_src != PKT_SRC_EDGE_REPL_TREE) {
-                clone_size += VR_L2_MCAST_PKT_HEAD_SPACE;
-                if (dir_nh->nh_flags & NH_FLAG_TUNNEL_PBB)
-                    clone_size += VR_ETHER_HLEN + sizeof(struct vr_pbb_itag);
+                if (nh->nh_family == AF_BRIDGE) {
+                    clone_size += VR_L2_MCAST_PKT_HEAD_SPACE;
+                    if (dir_nh->nh_flags & NH_FLAG_TUNNEL_PBB)
+                        clone_size += VR_ETHER_HLEN + sizeof(struct vr_pbb_itag);
+                } else {
+                    clone_size += VR_L3_MCAST_PKT_HEAD_SPACE;
+                }
             }
 
             /* Create head space for L2 Mcast header */
@@ -1732,25 +1739,28 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
                 }
             }
 
-            /*
-             * Add vxlan encapsulation. The vxlan id need to be taken
-             * from Bridge entry
-             */
-            vr_fmd_set_label(fmd, label, VR_LABEL_TYPE_UNKNOWN);
-            fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
-            if (nh_vxlan_tunnel_helper(nh->nh_router, &new_pkt,
-                        fmd, sip, sip) == false) {
+            if (nh->nh_family == AF_BRIDGE) {
+                /*
+                 * Add vxlan encapsulation. The vxlan id need to be taken
+                 * from Bridge entry
+                 */
+                vr_fmd_set_label(fmd, label, VR_LABEL_TYPE_UNKNOWN);
+                fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
+                if (nh_vxlan_tunnel_helper(nh->nh_router, &new_pkt,
+                                        fmd, sip, sip) == false) {
+                    vr_pfree(new_pkt, VP_DROP_PUSH);
+                    break;
+                }
+            }
+        }
+
+        if (nh->nh_family == AF_BRIDGE) {
+            if (vr_l2_control_data_add(&new_pkt) == false) {
                 vr_pfree(new_pkt, VP_DROP_PUSH);
                 break;
             }
-
+            vr_fmd_update_l2_control_data(fmd, false);
         }
-
-        if (vr_l2_control_data_add(&new_pkt) == false) {
-            vr_pfree(new_pkt, VP_DROP_PUSH);
-            break;
-        }
-        vr_fmd_update_l2_control_data(fmd, false);
 
         /* MPLS label for outer header encapsulation */
         vr_fmd_set_label(fmd, nh->nh_component_nh[i].cnh_label,
@@ -2616,6 +2626,54 @@ nh_encap_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
 }
 
 static nh_processing_t
+nh_encap_l3_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
+                    struct vr_forwarding_md *fmd)
+{
+    uint8_t *ptr;
+    unsigned short dreason = VP_DROP_INVALID_IF;
+    struct vr_interface *vif;
+    struct vr_ip *ip;
+    struct vr_eth *eth;
+
+    vif = nh->nh_dev;
+    if (!vif)
+        goto drop;
+
+    ip = (struct vr_ip *)pkt_network_header(pkt);
+    if (vr_ip_is_ip4(ip)) {
+        pkt->vp_type = VP_TYPE_IP;
+        eth = (struct vr_eth *)pkt_push(pkt, sizeof(struct vr_eth));
+        if (!eth) {
+            dreason = VP_DROP_PUSH;
+            goto drop;
+        }
+
+        VR_MAC_COPY(eth->eth_smac, vif->vif_mac);
+        eth->eth_proto = htons(VR_ETH_PROTO_IP);
+        ptr = (uint8_t *)eth->eth_dmac;
+        *(unsigned int *)(ptr + 2) = ip->ip_daddr;
+
+        ptr[0] = 1;
+        ptr[1] = 0;
+        ptr[2] = 0x5E;
+        ptr[3] = 0x07F & ptr[3];
+
+
+        vif->vif_tx(vif, pkt, fmd);
+
+    } else {
+        dreason = VP_DROP_INVALID_PROTOCOL;
+        goto drop;
+    }
+
+    return NH_PROCESSING_COMPLETE;
+
+drop:
+    vr_pfree(pkt, dreason);
+    return NH_PROCESSING_COMPLETE;
+}
+
+static nh_processing_t
 nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
                     struct vr_forwarding_md *fmd)
 {
@@ -2792,9 +2850,18 @@ nh_composite_mcast_validate(struct vr_component_nh *component_nh,
     bool l2_seen = false, l3_seen = false;
     struct vr_nexthop *tmp_nh;
 
+    if (req->nhr_family == AF_INET)
+        l3_seen = true;
+    else if (req->nhr_family == AF_BRIDGE)
+        l2_seen = true;
+
     /* Fabric and EVPN nexthop*/
     if (req->nhr_flags & (NH_FLAG_COMPOSITE_FABRIC |
                 NH_FLAG_COMPOSITE_EVPN | NH_FLAG_COMPOSITE_TOR)) {
+
+        if (!l3_seen && !l2_seen)
+            return -1;
+
         for (i = 0; i < req->nhr_nh_list_size; i++) {
             tmp_nh = component_nh[i].cnh;
             if (!tmp_nh)
@@ -2807,13 +2874,16 @@ nh_composite_mcast_validate(struct vr_component_nh *component_nh,
             /* Tor nexthop can only have Vxlan encap tunnels */
             if (req->nhr_flags & NH_FLAG_COMPOSITE_TOR) {
                 if ((tmp_nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) == 0)
-                return -1;
+                    return -1;
+                if (l3_seen)
+                    return -1;
             }
         }
     }
 
     /* Composite Encap */
     if (req->nhr_flags & NH_FLAG_COMPOSITE_ENCAP) {
+
         for (i = 0; i < req->nhr_nh_list_size; i++) {
             tmp_nh = component_nh[i].cnh;
             if (!tmp_nh)
@@ -2822,23 +2892,28 @@ nh_composite_mcast_validate(struct vr_component_nh *component_nh,
             if (tmp_nh->nh_type != NH_ENCAP)
                 return -1;
 
-            if (tmp_nh->nh_flags & NH_FLAG_COMPOSITE_L2) {
-                if (tmp_nh->nh_flags & NH_FLAG_MCAST)
-                    return -1;
-                if (l3_seen)
-                    return -1;
-                l2_seen = true;
-            } else {
+            if (tmp_nh->nh_family == AF_INET) {
                 if (l2_seen)
                     return -1;
-                l3_seen = true;
+
+                if (!(tmp_nh->nh_flags & NH_FLAG_MCAST))
+                    return -1;
+            } else if (tmp_nh->nh_family == AF_BRIDGE) {
+                if (l3_seen)
+                    return -1;
+
+                if (tmp_nh->nh_flags & NH_FLAG_MCAST)
+                    return -1;
+            } else {
+                return -1;
             }
         }
     }
 
-    /* L2 multicast */
-    if (req->nhr_flags & NH_FLAG_COMPOSITE_L2) {
-        if (!(req->nhr_flags & NH_FLAG_MCAST))
+    /* L2 and L3 multicast */
+    if (req->nhr_flags & NH_FLAG_MCAST) {
+
+        if (!l3_seen && !l2_seen)
             return -1;
 
         for (i = 0; i < req->nhr_nh_list_size; i++) {
@@ -2853,8 +2928,10 @@ nh_composite_mcast_validate(struct vr_component_nh *component_nh,
 
             if (!(tmp_nh->nh_flags &
                    (NH_FLAG_COMPOSITE_FABRIC | NH_FLAG_COMPOSITE_EVPN |
-                    NH_FLAG_COMPOSITE_TOR | NH_FLAG_COMPOSITE_ENCAP)))
+                    NH_FLAG_COMPOSITE_TOR | NH_FLAG_COMPOSITE_ENCAP))) {
                 return -1;
+            }
+
         }
     }
 
@@ -2953,8 +3030,8 @@ nh_composite_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 
 exit_add:
     /* This needs to be the last */
-    if (req->nhr_flags & NH_FLAG_COMPOSITE_L2) {
-        nh->nh_reach_nh = nh_composite_mcast_l2;
+    if (req->nhr_flags & NH_FLAG_MCAST) {
+        nh->nh_reach_nh = nh_composite_mcast;
         nh->nh_validate_src = nh_composite_mcast_validate_src;
     } else if (req->nhr_flags & NH_FLAG_COMPOSITE_ECMP) {
         nh->nh_reach_nh = nh_composite_ecmp;
@@ -3193,10 +3270,21 @@ static int
 nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
     int ret = 0;
-    struct vr_interface *vif, *old_vif;;
+    struct vr_interface *vif, *old_vif;
 
     old_vif = nh->nh_dev;
-    if (req->nhr_flags & NH_FLAG_ENCAP_L2) {
+
+    if ((req->nhr_family != AF_INET) && (req->nhr_family != AF_BRIDGE)) {
+        ret = -EINVAL;
+        goto exit_add;
+    }
+
+    if ((req->nhr_family == AF_BRIDGE) && (req->nhr_flags & NH_FLAG_MCAST)) {
+        ret = -EINVAL;
+        goto exit_add;
+    }
+
+    if ((req->nhr_family == AF_INET) && !(req->nhr_flags & NH_FLAG_MCAST)) {
         if (req->nhr_encap_size < VR_ETHER_ALEN) {
             ret = -EINVAL;
             goto exit_add;
@@ -3222,8 +3310,10 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 exit_add:
     if (nh->nh_dev) {
         nh->nh_validate_src = nh_encap_validate_src;
-        if (req->nhr_flags & NH_FLAG_ENCAP_L2) {
+        if (req->nhr_family == AF_BRIDGE) {
             nh->nh_reach_nh = nh_encap_l2;
+        } else if (nh->nh_flags & NH_FLAG_MCAST) {
+            nh->nh_reach_nh = nh_encap_l3_mcast;
         } else {
             nh->nh_reach_nh = nh_encap_l3;
         }

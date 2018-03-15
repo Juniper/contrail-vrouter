@@ -33,6 +33,7 @@ static int8_t src_mac[6], dst_mac[6];
 static uint16_t sport, dport;
 static uint32_t nh_id, if_id, vrf_id, flags;
 static int nh_set, command, type, dump_marker = -1;
+static int family = AF_INET;
 
 static bool dump_pending = false;
 static int comp_nh[32], lbl[32];
@@ -163,11 +164,6 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
         case NH_FLAG_TUNNEL_UDP:
             if (type == NH_TUNNEL)
                 strcat(ptr, "Udp, ");
-            break;
-
-        case NH_FLAG_COMPOSITE_L2:
-            if (type == NH_COMPOSITE)
-                strcat(ptr, "L2, ");
             break;
 
         case NH_FLAG_COMPOSITE_ECMP:
@@ -420,7 +416,7 @@ op_retry:
                     flags, vrf_id, if_id, src, dst, sip, dip, sport, dport);
         } else if (type == NH_COMPOSITE) {
             ret = vr_send_nexthop_composite_add(cl, 0, nh_id, flags, vrf_id,
-                    comp_nh_ind, comp_nh, lbl);
+                    comp_nh_ind, comp_nh, lbl, family);
         } else {
             ret = vr_send_nexthop_add(cl, 0, type, nh_id, flags, vrf_id, if_id);
         }
@@ -465,6 +461,7 @@ cmd_usage()
            "       [--vrf <vrf_id> ]\n"
            "       [--pol NH with policy]\n"
            "       [--rpol NH with relaxed policy]\n"
+           "       [--l2 NH with family bridge]\n"
            "       [--root NH is an Etree Root]\n"
            "       [--rlkup Force Route Lookup]\n"
            "       [--type <type> type of the tunnel 1 - rcv, 2 - encap \n"
@@ -475,8 +472,6 @@ cmd_usage()
            "                [L2RCV_NH options]\n"
            "                    [--oif <if_id> out going interface index]\n"
            "                [ENCAP_NH optionsi - default L3]\n"
-           "                    [--el2 encap L2 ]\n"
-           "                        [--oif <if_id> out going interface index]\n"
            "                    [--mc multicast nh]\n"
            "                    [--smac <xx:xx:xx:xx:xx:xx> source mac ]\n"
            "                    [--dmac <xx:xx:xx:xx:xx:xx> destination mac ]\n"
@@ -502,7 +497,7 @@ cmd_usage()
            "                [DISCARD_NH options]\n"
            "                [COMPOSITE_NH options]\n"
            "                    [--cni <nh_id> composite nexthop member id]\n"
-           "                    [--cl2 composite l2 nexhop]\n"
+           "                    [--cmc composite multicast nexhop]\n"
            "                    [--cfa composit fabric ]\n"
            "                    [--cen composit encap ]\n"
            "                    [--cevpn composit evpn ]\n"
@@ -538,15 +533,15 @@ enum opt_index {
     DIP_OPT_IND,
     POL_OPT_IND,
     RPOL_OPT_IND,
+    L2_OPT_IND,
     SPORT_OPT_IND,
     DPORT_OPT_IND,
     UDP_OPT_IND,
     VXLAN_OPT_IND,
     CNI_OPT_IND,
-    CL2_OPT_IND,
+    CMC_OPT_IND,
     CFA_OPT_IND,
     MC_OPT_IND,
-    EL2_OPT_IND,
     CEN_OPT_IND,
     CEVPN_OPT_IND,
     TOR_OPT_IND,
@@ -592,15 +587,15 @@ static struct option long_options[] = {
     [DIP_OPT_IND]       = {"dip",   required_argument,  &opt[DIP_OPT_IND],      1},
     [POL_OPT_IND]       = {"pol",   no_argument,        &opt[POL_OPT_IND],      1},
     [RPOL_OPT_IND]      = {"rpol",  no_argument,        &opt[RPOL_OPT_IND],     1},
+    [L2_OPT_IND]        = {"l2",    no_argument,        &opt[L2_OPT_IND],       1},
     [SPORT_OPT_IND]     = {"sport", required_argument,  &opt[SPORT_OPT_IND],    1},
     [DPORT_OPT_IND]     = {"dport", required_argument,  &opt[DPORT_OPT_IND],    1},
     [UDP_OPT_IND]       = {"udp",   no_argument,        &opt[UDP_OPT_IND],      1},
     [VXLAN_OPT_IND]     = {"vxlan", no_argument,        &opt[VXLAN_OPT_IND],    1},
     [CNI_OPT_IND]       = {"cni",   required_argument,  &opt[CNI_OPT_IND],      1},
-    [CL2_OPT_IND]       = {"cl2",   no_argument,        &opt[CL2_OPT_IND],      1},
+    [CMC_OPT_IND]       = {"cmc",   no_argument,        &opt[CMC_OPT_IND],      1},
     [CFA_OPT_IND]       = {"cfa",   no_argument,        &opt[CFA_OPT_IND],      1},
     [MC_OPT_IND]        = {"mc",    no_argument,        &opt[MC_OPT_IND],       1},
-    [EL2_OPT_IND]       = {"el2",   no_argument,        &opt[EL2_OPT_IND],      1},
     [CEN_OPT_IND]       = {"cen",   no_argument,        &opt[CEN_OPT_IND],      1},
     [CEVPN_OPT_IND]     = {"cevpn", no_argument,        &opt[CEVPN_OPT_IND],    1},
     [TOR_OPT_IND]       = {"tor",   no_argument,        &opt[TOR_OPT_IND],      1},
@@ -756,6 +751,12 @@ validate_options(void)
         if (opt_set(RPOL_OPT_IND))
             flags |= NH_FLAG_RELAXED_POLICY;
 
+        if (opt_set(L2_OPT_IND))
+            family = AF_BRIDGE;
+
+        if (opt_set(L2_OPT_IND))
+            flags |= AF_BRIDGE;
+
         if (opt_set(RLKUP_OPT_IND))
             flags |= NH_FLAG_ROUTE_LOOKUP;
 
@@ -778,14 +779,12 @@ validate_options(void)
             if (!opt_set(OIF_OPT_IND))
                 cmd_usage();
 
-            if (!opt_set(EL2_OPT_IND)) {
+            if (family == AF_INET) {
                 if (!opt_set(SMAC_OPT_IND) || !opt_set(DMAC_OPT_IND))
                     cmd_usage();
 
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
-            } else {
-                flags |= NH_FLAG_ENCAP_L2;
             }
 
         } else if (type == NH_TUNNEL) {
@@ -836,8 +835,9 @@ validate_options(void)
             if (!opt_set(CNI_OPT_IND))
                 cmd_usage();
 
-            if (opt_set(CL2_OPT_IND))
-                flags |= NH_FLAG_COMPOSITE_L2;
+            if (opt_set(CMC_OPT_IND)) {
+                flags |= NH_FLAG_MCAST;
+            }
 
             if (opt_set(CFA_OPT_IND))
                 flags |= NH_FLAG_COMPOSITE_FABRIC;

@@ -231,6 +231,7 @@ typedef enum {
     L4_TYPE_ROUTER_SOLICITATION,
     L4_TYPE_NEIGHBOUR_SOLICITATION,
     L4_TYPE_NEIGHBOUR_ADVERTISEMENT,
+    L4_TYPE_IGMP,
 } l4_pkt_type_t;
 
 __attribute__packed__open__
