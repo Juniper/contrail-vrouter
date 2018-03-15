@@ -78,7 +78,6 @@ static void bridge_table_data_process(void *s_req);
 #define INET_FAMILY_STRING      "inet"
 #define BRIDGE_FAMILY_STRING    "bridge"
 #define INET6_FAMILY_STRING     "inet6"
-#define BRIDGE_TABLE_DEV        "/dev/vr_bridge"
 
 static int mem_fd = -1;
 static struct bridge_table {
