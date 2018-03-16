@@ -1145,4 +1145,52 @@ nl_dcb_sendmsg(struct nl_client *cl, uint8_t cmd, void *resp_buf)
 
     return ret;
 }
+
+int
+vrouter_obtain_family_id(struct nl_client *cl)
+{
+    int ret;
+    struct nl_response *resp;
+    struct genl_ctrl_message *msg;
+
+    if (cl->cl_socket_domain != AF_NETLINK) {
+        nl_set_genl_family_id(cl, GENL_ID_VROUTER);
+        return GENL_ID_VROUTER;
+    }
+
+    if ((ret = nl_build_get_family_id(cl, VROUTER_GENETLINK_FAMILY_NAME)))
+        return ret;
+
+    if (nl_sendmsg(cl) <= 0)
+        return -errno;
+
+    while (1) {
+        ret = nl_recvmsg(cl);
+        if (ret == EAGAIN)
+            continue;
+        else if (ret > 0)
+            break;
+
+        return -errno;
+    }
+
+    resp = nl_parse_reply(cl);
+    if (!resp || resp->nl_type != NL_MSG_TYPE_GEN_CTRL ||
+            resp->nl_op != CTRL_CMD_NEWFAMILY)
+        return -EINVAL;
+
+    msg = (struct genl_ctrl_message *)resp->nl_data;
+    nl_set_genl_family_id(cl, msg->family_id);
+
+    return cl->cl_genl_family_id;
+}
+#elif defined(__FreeBSD__)
+int
+vrouter_obtain_family_id(struct nl_client *cl)
+{
+    /* On platforms other than Linux value of family id is not checked,
+       so it is set to FAKE_NETLINK_FAMILY */
+    nl_set_genl_family_id(cl, FAKE_NETLINK_FAMILY);
+    return cl->cl_genl_family_id;
+}
 #endif  /* __linux__ */
