@@ -35,7 +35,8 @@
             <nhr_encap_oif_id>2</nhr_encap_oif_id>
             <nhr_encap>de:ad:be:ef:00:01:de:ad:be:ef:00:02:08:00</nhr_encap>
             <nhr_vrf>0</nhr_vrf>
-            <nhr_flags>5</nhr_flags>
+            <nhr_flags>1</nhr_flags>
+            <nhr_family>7</nhr_family>
         </vr_nexthop_req>
         <return>0</return>
     </message>
