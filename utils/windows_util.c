@@ -117,6 +117,15 @@ win_nl_client_recvmsg(struct nl_client *cl, bool msg_wait)
     return read_bytes;
 }
 
+int
+vrouter_obtain_family_id(struct nl_client *cl)
+{
+    /* On platforms other than Linux value of family id is not checked,
+       so it is set to FAKE_NETLINK_FAMILY */
+    nl_set_genl_family_id(cl, FAKE_NETLINK_FAMILY);
+    return cl->cl_genl_family_id;
+}
+
 static inline int
 xdigit(char c) {
     unsigned d;
