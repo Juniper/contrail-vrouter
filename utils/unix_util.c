@@ -273,6 +273,39 @@ nl_sendmsg(struct nl_client *cl)
     return sendmsg(cl->cl_sock, &msg, 0);
 }
 
+void
+nl_free_os_specific(struct nl_client *cl)
+{
+    if (cl->cl_sock >= 0) {
+        close(cl->cl_sock);
+        cl->cl_sock = -1;
+    }
+
+    cl->cl_sa_len = 0;
+    if (cl->cl_sa) {
+        free(cl->cl_sa);
+        cl->cl_sa = NULL;
+    }
+}
+
+void
+nl_reset_cl_sock(struct nl_client *cl)
+{
+    cl->cl_sock = -1;
+}
+
+int
+nl_parse_reply_os_specific(struct nlmsghdr *nlh, struct nl_response *resp)
+{
+    if ((nlh->nlmsg_type == RTM_SETDCB) || (nlh->nlmsg_type == RTM_GETDCB)) {
+        resp->nl_type = nlh->nlmsg_type;
+        resp->nl_data = nl_get_buf_ptr(cl);
+        return 1;
+    }
+
+    return 0;
+}
+
 #if defined(__linux__)
 int
 nl_build_attr_linkinfo(struct nl_client *cl, struct vn_if *ifp)

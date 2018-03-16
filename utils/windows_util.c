@@ -117,6 +117,26 @@ win_nl_client_recvmsg(struct nl_client *cl, bool msg_wait)
     return read_bytes;
 }
 
+void
+nl_free_os_specific(struct nl_client *cl)
+{
+    if (cl->cl_win_pipe) {
+        CloseHandle(cl->cl_win_pipe);
+        cl->cl_win_pipe = NULL;
+    }
+}
+
+void
+nl_reset_cl_sock(struct nl_client *cl)
+{
+}
+
+int
+nl_parse_reply_os_specific(struct nlmsghdr *nlh, struct nl_response *resp)
+{
+    return 0;
+}
+
 int
 vrouter_obtain_family_id(struct nl_client *cl)
 {
