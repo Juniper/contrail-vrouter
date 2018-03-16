@@ -2138,4 +2138,3 @@ vr_send_qos_map_add(struct nl_client *cl, unsigned int router_id,
 
     return vr_sendmsg(cl, &req, "vr_qos_map_req");
 }
-
