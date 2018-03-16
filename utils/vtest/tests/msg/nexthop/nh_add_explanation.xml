@@ -67,12 +67,17 @@
             <nhr_vrf>0</nhr_vrf>
 
 <!--
-        For this message (L2_ENCAP) nhr_flags is set to 5 = NH_FLAG_VALID | NH_FLAG_ENCAP_L2
+        For this message (L2_ENCAP) nhr_flags is set to 1 = NH_FLAG_VALID
 
         for more info see: include/vr_nexthop.h
 -->
 
-            <nhr_flags>5</nhr_flags>
+            <nhr_flags>1</nhr_flags>
+
+<!--
+        Family is set to 2 = AF_INET
+-->
+            <nhr_family>2</nhr_family>
         </vr_nexthop_req>
         <return>0</return>
     </message>
@@ -84,7 +89,8 @@
             <nhr_encap_oif_id>2</nhr_encap_oif_id>
             <nhr_encap>de:ad:be:ef:00:01:de:ad:be:ef:00:02:08:00</nhr_encap>
             <nhr_vrf>0</nhr_vrf>
-            <nhr_flags>5</nhr_flags>
+            <nhr_flags>1</nhr_flags>
+            <nhr_family>2</nhr_family>
         </vr_nexthop_req>
         <return>0</return>
     </message>

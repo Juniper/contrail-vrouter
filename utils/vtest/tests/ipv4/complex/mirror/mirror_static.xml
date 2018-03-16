@@ -65,7 +65,7 @@
             <h_op>Add</h_op>
             <nhr_type>2</nhr_type>
             <nhr_id>13</nhr_id>
-            <nhr_family>7</nhr_family>
+            <nhr_family>2</nhr_family>
             <nhr_encap_oif_id>3</nhr_encap_oif_id>
             <nhr_encap>de:ad:be:ef:00:03:de:ad:be:ef:00:01:08:00</nhr_encap>
             <nhr_vrf>0</nhr_vrf>
