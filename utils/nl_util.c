@@ -411,10 +411,7 @@ void
 nl_update_nlh(struct nl_client *cl)
 {
     struct nlmsghdr *nlh = (struct nlmsghdr *)cl->cl_buf;
-
     nlh->nlmsg_len = cl->cl_msg_len = cl->cl_buf_offset;
-
-    return;
 }
 
 int
@@ -443,7 +440,6 @@ nl_update_attr_len(struct nl_client *cl, int len)
     nla = (struct nlattr *)cl->cl_attr;
     nla->nla_len += len;
     cl->cl_buf_offset += len;
-    return;
 }
 
 void
@@ -505,8 +501,6 @@ nl_free(struct nl_client *cl)
     cl->cl_sa = NULL;
     cl->cl_sa_len = 0;
     cl->cl_recvmsg = NULL;
-
-    return;
 }
 
 int
@@ -531,8 +525,6 @@ nl_set_buf(struct nl_client *cl, char *buf, unsigned int len)
     cl->cl_buf_offset = 0;
     cl->cl_buf_len = len;
     cl->cl_msg_len = 0;
-
-    return;
 }
 
 void
@@ -541,16 +533,12 @@ nl_set_rcv_len(struct nl_client *cl, unsigned int rcv_len)
     cl->cl_recv_len = rcv_len;
     cl->cl_buf_offset = 0;
     cl->cl_msg_len = 0;
-
-    return;
 }
 
 void
 nl_set_genl_family_id(struct nl_client *cl, unsigned int family_id)
 {
     cl->cl_genl_family_id = family_id;
-
-    return;
 }
 
 struct nl_client *
@@ -588,8 +576,6 @@ nl_free_client(struct nl_client *cl)
 {
     nl_free(cl);
     free(cl);
-
-    return;
 }
 
 int

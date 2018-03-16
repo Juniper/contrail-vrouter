@@ -139,8 +139,7 @@ extern struct nl_response *nl_set_resp_err(struct nl_client *, int);
 
 extern int nl_init_generic_client_req(struct nl_client *nl, int family);
 extern void nl_free(struct nl_client *nl);
-extern void nl_init_generic_client_resp(struct nl_client *cl, char *resp,
-                                        int resp_len);
+extern void nl_init_generic_client_resp(struct nl_client *cl, char *resp, int resp_len);
 extern int nl_build_nlh(struct nl_client *, uint32_t, uint32_t);
 extern void nl_update_nlh(struct nl_client *);
 extern int nl_build_genlh(struct nl_client *, uint8_t, uint8_t);
@@ -153,16 +152,13 @@ extern int nl_build_get_family_id(struct nl_client *, char *);
 
 extern int nl_build_set_dcb_state_msg(struct nl_client *, uint8_t *, uint8_t);
 extern int nl_build_get_dcb_state_msg(struct nl_client *, uint8_t *);
-extern int nl_build_set_priority_config_msg(struct nl_client *, uint8_t *,
-        struct priority *);
+extern int nl_build_set_priority_config_msg(struct nl_client *, uint8_t *, struct priority *);
 extern int nl_build_get_priority_config_msg(struct nl_client *, uint8_t *);
 extern int nl_build_set_dcb_all(struct nl_client *, uint8_t *);
 extern int nl_build_set_dcbx(struct nl_client *, uint8_t *,  uint8_t);
 extern int nl_build_get_dcbx(struct nl_client *, uint8_t *);
-extern int nl_build_set_ieee_ets(struct nl_client *, uint8_t *,
-        struct priority *);
-extern int nl_build_get_ieee_ets(struct nl_client *, uint8_t *,
-        struct priority *);
+extern int nl_build_set_ieee_ets(struct nl_client *, uint8_t *, struct priority *);
+extern int nl_build_get_ieee_ets(struct nl_client *, uint8_t *, struct priority *);
 extern int nl_dcb_parse_reply(struct nl_client *, uint8_t, void *);
 extern int nl_dcb_sendmsg(struct nl_client *, uint8_t, void *);
 extern int nl_parse_dcb_state(uint8_t *);
@@ -193,14 +189,11 @@ extern const char *vr_table_map(int, unsigned int, const char *, size_t, void **
 extern uint64_t vr_sum_drop_stats(vr_drop_stats_req *);
 extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
-extern int vr_send_drop_stats_get(struct nl_client *, unsigned int,
-        short);
+extern int vr_send_drop_stats_get(struct nl_client *, unsigned int, short);
 
 extern int vr_send_interface_dump(struct nl_client *, unsigned int, int, int);
-extern int vr_send_interface_get(struct nl_client *, unsigned int,
-                int, int, int, int);
-extern int vr_send_interface_delete(struct nl_client *, unsigned int,
-        char *, int);
+extern int vr_send_interface_get(struct nl_client *, unsigned int, int, int, int, int);
+extern int vr_send_interface_delete(struct nl_client *, unsigned int, char *, int);
 extern int vr_send_interface_add(struct nl_client *, int, char *, int,
         int, int, int, unsigned int, unsigned int, int8_t *, int8_t, const char *);
 extern vr_interface_req *vr_interface_req_get_copy(vr_interface_req *);
@@ -210,28 +203,24 @@ extern int vr_send_mem_stats_get(struct nl_client *, unsigned intid);
 
 extern int vr_send_mirror_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_mirror_get(struct nl_client *, unsigned int, unsigned int);
-extern int vr_send_mirror_delete(struct nl_client *,
-        unsigned int, unsigned int);
+extern int vr_send_mirror_delete(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_mirror_add(struct nl_client *, unsigned int,
         unsigned int, int, unsigned int, int);
 extern void vr_mirror_req_destroy(vr_mirror_req *);
 extern vr_mirror_req *vr_mirror_get_req_copy(vr_mirror_req *);
 
-extern int vr_send_mpls_add(struct nl_client *, unsigned int, unsigned int,
-        unsigned int);
+extern int vr_send_mpls_add(struct nl_client *, unsigned int, unsigned int, unsigned int);
 extern int vr_send_mpls_get(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_mpls_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_mpls_delete(struct nl_client *, unsigned int, unsigned int);
 
 extern char *vr_nexthop_type_string(vr_nexthop_req *);
 extern bool vr_nexthop_req_has_vif(vr_nexthop_req *);
-extern int vr_send_nexthop_delete(struct nl_client *, unsigned int,
-        unsigned int);
+extern int vr_send_nexthop_delete(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_nexthop_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_nexthop_get(struct nl_client *, unsigned int, unsigned int);
-extern int vr_send_nexthop_composite_add(struct nl_client *, unsigned int,
-        int, unsigned int, int, unsigned int, unsigned int *, unsigned
-        int *, unsigned int);
+extern int vr_send_nexthop_composite_add(struct nl_client *, unsigned int, int, unsigned int,
+        int, unsigned int, unsigned int *, unsigned int *, unsigned int);
 extern int vr_send_nexthop_encap_tunnel_add(struct nl_client *, unsigned int,
         unsigned int, int, unsigned int, int, int, int8_t *, int8_t *,
         struct in_addr, struct in_addr, int, int);
@@ -257,21 +246,18 @@ extern int vr_send_route_add(struct nl_client *, unsigned int, unsigned int,
 extern vr_route_req *vr_route_req_get_copy(vr_route_req *);
 extern void vr_route_req_destroy(vr_route_req *);
 
-extern int vr_send_vrf_assign_dump(struct nl_client *, unsigned int,
-        unsigned int, int);
+extern int vr_send_vrf_assign_dump(struct nl_client *, unsigned int, unsigned int, int);
 extern int vr_send_vrf_assign_set(struct nl_client *, unsigned int,
-                unsigned int, unsigned int, unsigned int);
+        unsigned int, unsigned int, unsigned int);
 
 extern int vr_send_vrf_stats_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_vrf_stats_get(struct nl_client *, unsigned int, unsigned int);
 
 extern int vr_send_vrouter_get(struct nl_client *, unsigned int);
-extern int vr_send_vrouter_set_logging(struct nl_client *, unsigned int,
-        unsigned int, unsigned int *, unsigned int,
-        unsigned int *, unsigned int);
+extern int vr_send_vrouter_set_logging(struct nl_client *, unsigned int, unsigned int,
+        unsigned int *, unsigned int, unsigned int *, unsigned int);
 
-extern int vr_send_vxlan_add(struct nl_client *, unsigned int,
-        unsigned int, unsigned int);
+extern int vr_send_vxlan_add(struct nl_client *, unsigned int, unsigned int, unsigned int);
 extern int vr_send_vxlan_get(struct nl_client *, unsigned int, unsigned int);
 extern int vr_send_vxlan_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_vxlan_delete(struct nl_client *, unsigned int, unsigned int);
@@ -287,21 +273,16 @@ extern int vr_send_fc_map_dump(struct nl_client *, unsigned int, int);
 extern int vr_send_fc_map_add(struct nl_client *, unsigned int, int16_t *,
         uint8_t, uint8_t *, uint8_t *, uint8_t *, uint8_t *);
 
-
 extern int vr_send_set_dcb_state(struct nl_client *, uint8_t *, uint8_t);
 extern int vr_send_set_dcbx(struct nl_client *, uint8_t *, uint8_t);
-extern int vr_send_set_priority_config(struct nl_client *, uint8_t *,
-        struct priority *);
+extern int vr_send_set_priority_config(struct nl_client *, uint8_t *, struct priority *);
 
 extern int vr_send_get_dcb_state(struct nl_client *, uint8_t *);
 extern int vr_send_get_dcbx(struct nl_client *, uint8_t *);
-extern int vr_send_get_priority_config(struct nl_client *, uint8_t *,
-        struct priority *);
+extern int vr_send_get_priority_config(struct nl_client *, uint8_t *, struct priority *);
 extern int vr_send_set_dcb_all(struct nl_client *, uint8_t *);
-extern int vr_send_set_ieee_ets(struct nl_client *, uint8_t *,
-        struct priority *);
-extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
-        struct priority *);
+extern int vr_send_set_ieee_ets(struct nl_client *, uint8_t *, struct priority *);
+extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *, struct priority *);
 extern void vr_print_drop_stats(vr_drop_stats_req *, int);
 
 #ifdef _WIN32
