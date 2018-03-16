@@ -50,8 +50,15 @@ struct nl_client {
     /* length of the buffer in cl_buf */
     unsigned int cl_buf_len;
 
+#ifdef _WIN32
+    HANDLE cl_win_pipe;
+#else
     int cl_sock;
     int cl_socket_domain;
+
+    struct sockaddr *cl_sa;
+    uint32_t cl_sa_len;
+#endif
 
     unsigned int cl_genl_family_id;
 
@@ -68,13 +75,6 @@ struct nl_client {
     uint8_t *cl_resp_buf;
     uint8_t *cl_attr;
     int (*cl_recvmsg)(struct nl_client *, bool);
-    struct sockaddr *cl_sa;
-    uint32_t cl_sa_len;
-
-#ifdef _WIN32
-    // Handle for named pipe used by Ksync
-    HANDLE cl_win_pipe;
-#endif
 };
 
 
@@ -129,6 +129,7 @@ extern int nl_client_stream_recvmsg(struct nl_client *, bool);
 extern int nl_recvmsg(struct nl_client *);
 extern int nl_recvmsg_waitall(struct nl_client *);
 extern struct nl_response *nl_parse_reply(struct nl_client *);
+extern struct nl_response *nl_parse_reply_os_specific(struct nl_client *);
 extern struct nl_response *nl_parse_gen_nh(struct nl_client *);
 extern struct nl_response *nl_parse_gen_mpls(struct nl_client *);
 extern struct nl_response *nl_parse_gen_ctrl(struct nl_client *);
@@ -139,6 +140,8 @@ extern struct nl_response *nl_set_resp_err(struct nl_client *, int);
 
 extern int nl_init_generic_client_req(struct nl_client *nl, int family);
 extern void nl_free(struct nl_client *nl);
+extern void nl_free_os_specific(struct nl_client *cl);
+extern void nl_reset_cl_sock(struct nl_client *cl);
 extern void nl_init_generic_client_resp(struct nl_client *cl, char *resp,
                                         int resp_len);
 extern int nl_build_nlh(struct nl_client *, uint32_t, uint32_t);
