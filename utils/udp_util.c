@@ -173,7 +173,7 @@ udp_register_client(void)
     return cl;
 exit_register:
     if (cl)
-        udp_free(cl);
+        udp_free_client(cl);
 
     return NULL;
 }
