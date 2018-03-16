@@ -109,9 +109,7 @@ nl_socket(struct nl_client *cl, int domain, int type, int protocol)
     if (cl->cl_sock < 0)
         return cl->cl_sock;
 
-    cl->cl_sock_protocol = protocol;
     cl->cl_socket_domain = domain;
-    cl->cl_socket_type = type;
 
     if (type == SOCK_STREAM) {
         cl->cl_recvmsg = nl_client_stream_recvmsg;
