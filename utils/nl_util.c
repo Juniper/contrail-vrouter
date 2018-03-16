@@ -479,27 +479,21 @@ nl_build_nlh(struct nl_client *cl, uint32_t type, uint32_t flags)
 void
 nl_free(struct nl_client *cl)
 {
-    if (cl->cl_sock >= 0) {
-        close(cl->cl_sock);
-        cl->cl_sock = -1;
-    }
+    nl_free_os_specific(cl);
 
-    if (cl->cl_buf)
-        free(cl->cl_buf);
-
-    if (cl->cl_resp_buf)
-        free(cl->cl_resp_buf);
-
-    if (cl->cl_sa)
-        free(cl->cl_sa);
-
-    cl->cl_buf = NULL;
-    cl->cl_resp_buf = NULL;
     cl->cl_buf_offset = 0;
     cl->cl_buf_len = 0;
+    if (cl->cl_buf) {
+        free(cl->cl_buf);
+        cl->cl_buf = NULL;
+    }
+
     cl->cl_resp_buf_len = 0;
-    cl->cl_sa = NULL;
-    cl->cl_sa_len = 0;
+    if (cl->cl_resp_buf) {
+        free(cl->cl_resp_buf);
+        cl->cl_resp_buf = NULL;
+    }
+
     cl->cl_recvmsg = NULL;
 }
 
@@ -560,7 +554,7 @@ nl_register_client(void)
     cl->cl_resp_buf_len = NL_RESP_DEFAULT_SIZE;
 
     cl->cl_id = 0;
-    cl->cl_sock = -1;
+    nl_reset_cl_sock(cl);
 
     return cl;
 
@@ -587,21 +581,20 @@ nl_init_generic_client_req(struct nl_client *cl, int family)
         goto exit_register;
     cl->cl_buf_len = NL_MSG_DEFAULT_SIZE;
     cl->cl_genl_family_id = family;
-    cl->cl_sock = -1;
+    nl_reset_cl_sock(cl);
+
     return 1;
 
 exit_register:
     return 0;
 }
 
-
 struct nl_response *
 nl_parse_reply(struct nl_client *cl)
 {
-    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf +
-            cl->cl_buf_offset);
+    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf + cl->cl_buf_offset);
     struct nlmsgerr *err;
-    struct nl_response *resp =  &cl->resp;
+    struct nl_response *resp = &cl->resp;
 
     memset(resp, 0, sizeof(*resp));
     resp->nl_type = NL_MSG_TYPE_ERROR;
@@ -610,7 +603,7 @@ nl_parse_reply(struct nl_client *cl)
 
     cl->cl_msg_len = nlh->nlmsg_len;
     cl->cl_msg_start = cl->cl_buf_offset;
-    if (cl->cl_msg_len + cl->cl_buf_offset  > cl->cl_recv_len)
+    if (cl->cl_msg_len + cl->cl_buf_offset > cl->cl_recv_len)
         return nl_set_resp_err(cl, -ENOMEM);
 
     cl->cl_buf_offset += NLMSG_HDRLEN;
@@ -618,21 +611,23 @@ nl_parse_reply(struct nl_client *cl)
     if (nlh->nlmsg_type == NLMSG_DONE) {
         resp->nl_type = NL_MSG_TYPE_DONE;
         return resp;
-    } else if (nlh->nlmsg_type == NETLINK_GENERIC) {
+    }
+
+    if (nlh->nlmsg_type == NETLINK_GENERIC) {
         resp->nl_type = NL_MSG_TYPE_GEN_CTRL;
         resp = nl_parse_gen(cl);
-    } else if (nlh->nlmsg_type == cl->cl_genl_family_id) {
+        return resp;
+    }
+
+    if (nlh->nlmsg_type == cl->cl_genl_family_id) {
         resp->nl_type = NL_MSG_TYPE_FMLY;
         resp = nl_parse_gen(cl);
-#ifndef _WIN32
-    } else if ((nlh->nlmsg_type == RTM_SETDCB) ||
-            (nlh->nlmsg_type == RTM_GETDCB)) {
-        resp->nl_type = nlh->nlmsg_type;
-        resp->nl_data = nl_get_buf_ptr(cl);
-#endif
-    } else {
-        err = (struct nlmsgerr *)nl_get_buf_ptr(cl);
-        return nl_set_resp_err(cl, err->error);
+        return resp;
     }
-    return resp;
+
+    if (nl_parse_reply_os_specific(nlh, resp))
+        return resp;
+
+    err = (struct nlmsgerr *)nl_get_buf_ptr(cl);
+    return nl_set_resp_err(cl, err->error);
 }
