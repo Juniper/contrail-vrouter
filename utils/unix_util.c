@@ -90,6 +90,23 @@ fail:
     return error_msg;
 }
 
+const char *
+vr_table_unlink(const char *path)
+{
+    enum { ERROR_LEN = 1024 };
+    static char error_msg[ERROR_LEN];
+
+    if (unlink(path) != 0) {
+        if (errno != ENOENT) {
+            snprintf(error_msg, ERROR_LEN,
+                     "Error deleting %s. Error <%d>: %s", path, errno, strerror(errno));
+            return error_msg;
+        }
+    }
+
+    return NULL;
+}
+
 int
 nl_socket(struct nl_client *cl, int domain, int type, int protocol)
 {

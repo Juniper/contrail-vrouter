@@ -83,6 +83,12 @@ vr_table_map(int major, unsigned int table, const char *table_path, size_t size,
     return NULL;
 }
 
+const char *
+vr_table_unlink(const char *path)
+{
+    return NULL;
+}
+
 int
 nl_sendmsg(struct nl_client *cl)
 {
