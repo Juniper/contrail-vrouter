@@ -527,6 +527,8 @@ struct vr_dpdk_ethdev {
 struct vr_dpdk_tapdev {
     /* Tapdev file descriptor. */
     volatile int tapdev_fd;
+    /* Tapdev file descriptor for vhost0. */
+    int tapdev_vhost_fd;
     /* RX ring. */
     struct rte_ring *tapdev_rx_ring;
     /* TX rings (single-producer single-consumer) */
