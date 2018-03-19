@@ -754,9 +754,6 @@ validate_options(void)
         if (opt_set(L2_OPT_IND))
             family = AF_BRIDGE;
 
-        if (opt_set(L2_OPT_IND))
-            flags |= AF_BRIDGE;
-
         if (opt_set(RLKUP_OPT_IND))
             flags |= NH_FLAG_ROUTE_LOOKUP;
 
