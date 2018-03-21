@@ -71,6 +71,7 @@ parse_ini_file(void)
      */
     ini_data = calloc(size, sizeof(char));
     if (ini_data == NULL) {
+        fclose(fp);
         return -1;
     }
 
