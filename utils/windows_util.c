@@ -90,6 +90,29 @@ vr_table_unlink(const char *path)
 }
 
 int
+nl_socket(struct nl_client *cl, int domain, int type, int protocol)
+{
+    DWORD access_flags = GENERIC_READ | GENERIC_WRITE;
+    DWORD attrs = OPEN_EXISTING;
+
+    HANDLE pipe = CreateFile(KSYNC_PATH, access_flags, 0, NULL, attrs, 0, NULL);
+    if (pipe == INVALID_HANDLE_VALUE)
+        return -1;
+
+    cl->cl_win_pipe = pipe;
+    cl->cl_recvmsg = win_nl_client_recvmsg;
+
+    return 1;
+}
+
+int
+nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
+{
+    vrouter_obtain_family_id(cl);
+    return 0;
+}
+
+int
 nl_sendmsg(struct nl_client *cl)
 {
     DWORD written = 0;
