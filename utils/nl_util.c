@@ -596,7 +596,6 @@ int
 nl_init_generic_client_req(struct nl_client *cl, int family)
 {
     memset(cl, 0, sizeof(*cl));
-    cl->cl_sock_protocol = NETLINK_GENERIC;
     cl->cl_buf = malloc(NL_MSG_DEFAULT_SIZE);
     if (!cl->cl_buf)
         goto exit_register;

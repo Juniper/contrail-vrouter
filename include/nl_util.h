@@ -51,7 +51,8 @@ struct nl_client {
     unsigned int cl_buf_len;
 
     int cl_sock;
-    unsigned int cl_sock_protocol;
+    int cl_socket_domain;
+
     unsigned int cl_genl_family_id;
 
     uint32_t cl_buf_offset;
@@ -66,9 +67,6 @@ struct nl_client {
     unsigned int cl_resp_buf_len;
     uint8_t *cl_resp_buf;
     uint8_t *cl_attr;
-    int cl_socket_domain;
-    int cl_socket_type;
-    int cl_socket_proto;
     int (*cl_recvmsg)(struct nl_client *, bool);
     struct sockaddr *cl_sa;
     uint32_t cl_sa_len;
