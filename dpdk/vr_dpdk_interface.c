@@ -560,7 +560,7 @@ dpdk_vlan_forwarding_if_add(void)
     }
 
     strncpy((char *)vr_dpdk.vlan_vif->vif_name, vr_dpdk.vlan_name,
-        sizeof(vr_dpdk.vlan_vif->vif_name));
+        sizeof(vr_dpdk.vlan_vif->vif_name) - 1);
     vr_dpdk.vlan_vif->vif_type = VIF_TYPE_VLAN;
 
     /* Probe KNI. */

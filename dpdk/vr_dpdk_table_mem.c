@@ -121,6 +121,7 @@ vr_hugepage_info_init(void)
                     goto exit_func;
                 hp->num_pages = strtoul(nr_pages, NULL, 0);
                 hp->size = hp->num_pages * hp->page_size;
+		fclose(sys_fp);
             }
 
         }
