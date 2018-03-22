@@ -136,6 +136,9 @@ error:
         vr_dpdk.tap_nl_fd = -1;
     }
 
+    if (fd >= 0)
+        close(fd);
+
     return -EINVAL;
 }
 

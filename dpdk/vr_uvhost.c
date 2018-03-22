@@ -80,7 +80,7 @@ vr_uvhost_wakeup(void)
 void *
 vr_uvhost_start(void *arg)
 {
-    int s = 0, ret, err;
+    int s = -1, ret, err;
     struct sockaddr_un sun;
     nfds_t nfds;
 
@@ -157,7 +157,7 @@ vr_uvhost_start(void *arg)
 error:
 
     err = errno;
-    if (s) {
+    if (s >= 0) {
         close(s);
         unlink(sun.sun_path);
     }

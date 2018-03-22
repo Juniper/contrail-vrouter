@@ -271,6 +271,7 @@ dpdk_core_mask_get(long system_cpus_count)
     int i;
     long core_mask_count;
 
+    CPU_ZERO(&def_cpu_core_mask);
     for (i = 0; (1 << i) < VR_DPDK_DEF_LCORE_MASK; i++) {
         if ((1 << i) & VR_DPDK_DEF_LCORE_MASK) {
             CPU_SET(i, &def_cpu_core_mask);
