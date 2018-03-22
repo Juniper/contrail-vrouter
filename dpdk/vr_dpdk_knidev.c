@@ -715,10 +715,11 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     /*
      * Due to DPDK commit 41a6ebd, now to prevent packet reordering in KNI
      * we have to bind KNI kernel thread to a first online unused CPU.
+     * TODO: What if there isn't any?
      */
-    for (i = 0; i < RTE_MAX_LCORE; i++) {
+    for (i = VR_DPDK_FWD_LCORE_ID; i < RTE_MAX_LCORE; i++) {
         if (lcore_config[i].detected
-                && rte_conf->lcore_role[VR_DPDK_FWD_LCORE_ID + i] == ROLE_OFF) {
+                && rte_conf->lcore_role[i] == ROLE_OFF) {
             kni_conf.force_bind = 1;
             kni_conf.core_id = i;
             RTE_LOG(INFO, VROUTER, "    bind KNI kernel thread to CPU %d\n", i);
