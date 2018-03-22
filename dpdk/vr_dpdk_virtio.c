@@ -1991,7 +1991,7 @@ vr_dpdk_set_ring_num_desc(unsigned int vif_idx, unsigned int vring_idx,
 {
     vr_dpdk_virtioq_t *vq;
 
-    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx > 2 * VR_DPDK_VIRTIO_MAX_QUEUES)) {
+    if ((vif_idx >= VR_MAX_INTERFACES) || (vring_idx >= 2 * VR_DPDK_VIRTIO_MAX_QUEUES)) {
         return -1;
     }
 

@@ -286,7 +286,7 @@ vr_nl_uvhost_connect(void)
 error:
 
     err = errno;
-    if (s > 0) {
+    if (s >= 0) {
         close(s);
     }
     errno = err;
