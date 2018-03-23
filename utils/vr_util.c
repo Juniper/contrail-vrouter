@@ -293,7 +293,6 @@ vr_get_nl_client(int proto)
     if (!cl)
         return NULL;
 
-#ifndef _WIN32
     /* Do not use ini file if we are in a test mode. */
     if (proto == VR_NETLINK_PROTO_TEST) {
         ret = nl_socket(cl, AF_INET, SOCK_STREAM, 0);
@@ -319,22 +318,6 @@ vr_get_nl_client(int proto)
     ret = nl_connect(cl, get_ip(), get_port());
     if (ret < 0)
         goto fail;
-#else
-    DWORD access_flags = GENERIC_READ | GENERIC_WRITE;
-    DWORD attrs = OPEN_EXISTING;
-
-    cl->cl_win_pipe = CreateFile(KSYNC_PATH, access_flags, 0, NULL, attrs, 0, NULL);
-    if (cl->cl_win_pipe == INVALID_HANDLE_VALUE)
-        goto fail;
-
-    cl->cl_recvmsg = win_nl_client_recvmsg;
-
-    if (proto == VR_NETLINK_PROTO_TEST) {
-        vrouter_obtain_family_id(cl);
-
-        return cl;
-    }
-#endif
 
     if ((proto == VR_NETLINK_PROTO_DEFAULT) &&
             (vrouter_obtain_family_id(cl) <= 0))
