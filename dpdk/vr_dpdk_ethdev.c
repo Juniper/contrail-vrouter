@@ -29,6 +29,8 @@
 #include <rte_port_ethdev.h>
 #include <rte_udp.h>
 
+extern int vr_rxd_sz, vr_txd_sz;
+
 struct rte_eth_conf ethdev_conf = {
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
     .link_speeds = ETH_LINK_SPEED_AUTONEG,
@@ -476,7 +478,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
             continue;
         }
 
-        ret = rte_eth_rx_queue_setup(port_id, i, VR_DPDK_NB_RXD,
+        ret = rte_eth_rx_queue_setup(port_id, i, vr_rxd_sz,
             SOCKET_ID_ANY, &rx_queue_conf, mempool);
         if (ret < 0) {
             /* return mempool to the list */
@@ -498,7 +500,7 @@ dpdk_ethdev_queues_setup(struct vr_dpdk_ethdev *ethdev)
 
     /* configure TX queues */
     for (i = 0; i < ethdev->ethdev_nb_tx_queues; i++) {
-        ret = rte_eth_tx_queue_setup(port_id, i, VR_DPDK_NB_TXD,
+        ret = rte_eth_tx_queue_setup(port_id, i, vr_txd_sz,
             SOCKET_ID_ANY, &tx_queue_conf);
         if (ret < 0) {
             RTE_LOG(ERR, VROUTER, "    error setting up eth device %" PRIu8 " TX queue %d"
