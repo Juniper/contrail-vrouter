@@ -739,25 +739,6 @@ drop:
     return FLOW_CONSUMED;
 }
 
-static void
-vr_inet_flow_swap(struct vr_flow *key_p)
-{
-    unsigned short port;
-    unsigned int ipaddr;
-
-    if (key_p->flow4_proto != VR_IP_PROTO_ICMP) {
-        port = key_p->flow4_sport;
-        key_p->flow4_sport = key_p->flow4_dport;
-        key_p->flow4_dport = port;
-    }
-
-    ipaddr = key_p->flow4_sip;
-    key_p->flow4_sip = key_p->flow4_dip;
-    key_p->flow4_dip = ipaddr;
-
-    return;
-}
-
 unsigned short
 vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 {
@@ -870,29 +851,51 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip *ip,
         struct vr_flow *flow_p, uint8_t valid_fkey_params)
 {
+    bool icmp_error_payload = false;
+    unsigned short *t_hdr, sport = 0, dport = 0, nh_id, fat_flow_mask, proto;
+    unsigned int saddr, daddr;
     int i, ret = 0;
-    unsigned short *t_hdr, sport, dport, nh_id, fat_flow_mask;
     struct vr_icmp *icmph;
 
     t_hdr = (unsigned short *)((char *)ip + (ip->ip_hl * 4));
 
-    if (ip->ip_proto == VR_IP_PROTO_ICMP) {
+    /*
+     * This is a very bad way of identifying that the packet that is
+     * being processed is actually icmp payload. As this function is not
+     * expected to call with "ip" pointing to inner network header, we
+     * consider the packet as ICMP payload if ip does not match network
+     * header
+     */
+    if ((unsigned char *)ip != pkt_network_header(pkt))
+        icmp_error_payload = true;
+
+    proto = ip->ip_proto;
+    saddr = ip->ip_saddr;
+    daddr = ip->ip_daddr;
+
+    if (proto == VR_IP_PROTO_ICMP) {
         icmph = (struct vr_icmp *)t_hdr;
         if (vr_icmp_error(icmph)) {
             /* we will generate a flow only for the first icmp error */
-            if ((unsigned char *)ip == pkt_network_header(pkt)) {
+            if (!icmp_error_payload) {
                 ret = vr_inet_proto_flow(router, vrf, pkt, vlan,
                         (struct vr_ip *)(icmph + 1), flow_p, valid_fkey_params);
                 if (ret)
                     return ret;
 
-                vr_inet_flow_swap(flow_p);
+                proto = flow_p->flow_proto;
+                saddr = flow_p->flow4_dip;
+                daddr = flow_p->flow4_sip;
+                if (proto != VR_IP_PROTO_ICMP) {
+                    sport = flow_p->flow_dport;
+                    dport = flow_p->flow_sport;
+                }
+                vr_printf("Vrouter: ICMP error sip %x dip %x\n", saddr, daddr);
             } else {
                 /* for icmp error for icmp error, we will drop the packet */
                 return -1;
             }
 
-            return 0;
         } else if (vr_icmp_echo(icmph)) {
             sport = icmph->icmp_eid;
             dport = VR_ICMP_TYPE_ECHO_REPLY;
@@ -901,47 +904,52 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
             dport = icmph->icmp_type;
         }
 
-    } else if ((ip->ip_proto == VR_IP_PROTO_TCP) ||
-            (ip->ip_proto == VR_IP_PROTO_UDP) ||
-            (ip->ip_proto == VR_IP_PROTO_SCTP)) {
+    } else if ((proto == VR_IP_PROTO_TCP) ||
+            (proto == VR_IP_PROTO_UDP) ||
+            (proto == VR_IP_PROTO_SCTP)) {
         sport = *t_hdr;
         dport = *(t_hdr + 1);
-    } else {
-        sport = 0;
-        dport = 0;
     }
 
-    fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, ip->ip_proto,
-            sport, dport);
 
-    for (i = 1; i < VR_FAT_FLOW_MAX_MASK; i = i << 1) {
-        switch (fat_flow_mask & i) {
-        case VR_FAT_FLOW_SRC_PORT_MASK:
-            valid_fkey_params &= ~VR_FLOW_KEY_SRC_PORT;
-            break;
+    /*
+     * Do not apply the fat flow config, if the packet is ICMP Error.
+     * Fat flow config needs to be applied in case of ICMP payload to
+     * the IP packet which has caused the ICMP error
+     */
+    if (!icmp_error_payload) {
+        fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, proto,
+                                sport, dport);
 
-        case VR_FAT_FLOW_DST_PORT_MASK:
-            valid_fkey_params &= ~VR_FLOW_KEY_DST_PORT;
-            break;
+        for (i = 1; i < VR_FAT_FLOW_MAX_MASK; i = i << 1) {
+            switch (fat_flow_mask & i) {
+            case VR_FAT_FLOW_SRC_PORT_MASK:
+                valid_fkey_params &= ~VR_FLOW_KEY_SRC_PORT;
+                break;
 
-        case VR_FAT_FLOW_SRC_IP_MASK:
-            valid_fkey_params &= ~VR_FLOW_KEY_SRC_IP;
-            break;
+            case VR_FAT_FLOW_DST_PORT_MASK:
+                valid_fkey_params &= ~VR_FLOW_KEY_DST_PORT;
+                break;
 
-        case VR_FAT_FLOW_DST_IP_MASK:
-            valid_fkey_params &= ~VR_FLOW_KEY_DST_IP;
-            break;
+            case VR_FAT_FLOW_SRC_IP_MASK:
+                valid_fkey_params &= ~VR_FLOW_KEY_SRC_IP;
+                break;
 
-        default:
-            break;
+            case VR_FAT_FLOW_DST_IP_MASK:
+                valid_fkey_params &= ~VR_FLOW_KEY_DST_IP;
+                break;
+
+            default:
+                break;
+            }
         }
     }
 
     valid_fkey_params &= VR_FLOW_KEY_ALL;
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
-    vr_inet_fill_flow(flow_p, nh_id, ip->ip_saddr, ip->ip_daddr,
-            ip->ip_proto, sport, dport, valid_fkey_params);
+    vr_inet_fill_flow(flow_p, nh_id, saddr, daddr,
+            proto, sport, dport, valid_fkey_params);
 
     return 0;
 }
