@@ -3208,6 +3208,11 @@ __vif_fat_flow_add(struct vr_interface *vif, uint8_t proto,
             (port_data == VIF_FAT_FLOW_PORT_DIP_IGNORE))
         port_val = port_data;
 
+    /* First reset the old value */
+    vif->vif_fat_flow_ports[proto_index][port_row][port_word] &=
+        ~(VIF_FAT_FLOW_DATA_MASK << port_bit);
+
+    /* Set the new val*/
     vif->vif_fat_flow_ports[proto_index][port_row][port_word] |=
         (port_val  << port_bit);
 
@@ -3313,15 +3318,15 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
          * in the old configuration
          */
         for (j = 0; j < old_fat_flow_config_sizes[proto_index]; j++) {
-            if (port ==
-                 VIF_FAT_FLOW_PORT(vif_old_fat_flow_config[proto_index][j])) {
-                /* already present in the old configuration. hence no additon */
-                vif_old_fat_flow_config[proto_index][j] = 0;
-                if (port_data == VIF_FAT_FLOW_PORT_DATA(
-                                vif_old_fat_flow_config[proto_index][j])) {
+            /* already present in the old configuration. hence no additon */
+            if (port == VIF_FAT_FLOW_PORT(
+                        vif_old_fat_flow_config[proto_index][j])) {
+                 if (port_data == VIF_FAT_FLOW_PORT_DATA(
+                                  vif_old_fat_flow_config[proto_index][j])) {
                     add = false;
-                    break;
-                }
+                 }
+                 vif_old_fat_flow_config[proto_index][j] = 0;
+                 break;
             }
         }
 
@@ -3336,9 +3341,10 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
     /* ..and finally delete the old configuration */
     for (i = 0; i < VIF_FAT_FLOW_MAXPROTO_INDEX; i++) {
         for (j = 0; j < old_fat_flow_config_sizes[i]; j++) {
-            if (vif_old_fat_flow_config[i] && vif_old_fat_flow_config[i][j])
+            if (vif_old_fat_flow_config[i] && vif_old_fat_flow_config[i][j]) {
                 __vif_fat_flow_delete(vif, i,
                        VIF_FAT_FLOW_PORT(vif_old_fat_flow_config[i][j]));
+            }
         }
 
         if (old_fat_flow_config_sizes[i] && vif_old_fat_flow_config[i]) {
