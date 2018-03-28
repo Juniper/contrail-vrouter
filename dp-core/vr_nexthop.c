@@ -2026,6 +2026,13 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
+    if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
+        if (!nh->nh_crypt_dev) {
+            reason = VP_DROP_NO_CRYPT_PATH; 
+            goto send_fail;
+        }
+        vif = nh->nh_crypt_dev;
+    }
     if (vif->vif_set_rewrite(vif, &pkt, fmd,
                 nh->nh_data, nh->nh_udp_tun_encap_len) < 0) {
         goto send_fail;
@@ -2238,6 +2245,13 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
+    if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
+        if (!nh->nh_crypt_dev) {
+            reason = VP_DROP_NO_CRYPT_PATH; 
+            goto send_fail;
+        }
+        vif = nh->nh_crypt_dev;
+    }
     tun_encap_rewrite = vif->vif_set_rewrite(vif, &pkt, fmd,
             nh->nh_data, tun_encap_len);
     if (tun_encap_rewrite < 0) {
@@ -2427,6 +2441,13 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* slap l2 header */
     vif = nh->nh_dev;
+    if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
+        if (!nh->nh_crypt_dev) {
+            drop_reason = VP_DROP_NO_CRYPT_PATH; 
+            goto send_fail;
+        }
+        vif = nh->nh_crypt_dev;
+    }
     tun_encap_rewrite = vif->vif_set_rewrite(vif, &pkt, fmd,
             nh->nh_data, nh->nh_gre_tun_encap_len);
     if (tun_encap_rewrite < 0) {
@@ -3104,6 +3125,7 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 {
     int ret = 0;
     struct vr_interface *vif, *old_vif = NULL;
+    struct vr_interface *crypt_vif = NULL, *old_crypt_vif = NULL;
 
     if (req->nhr_family == AF_INET6) {
         if (!req->nhr_tun_sip6 || !req->nhr_tun_dip6) {
@@ -3119,6 +3141,13 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 
     old_vif = nh->nh_dev;
     vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_oif_id);
+    old_crypt_vif = nh->nh_crypt_dev;
+    crypt_vif = vrouter_get_interface(nh->nh_rid, req->nhr_encap_crypt_oif_id);
+    nh->nh_crypt_dev = crypt_vif;
+    if (old_crypt_vif) {
+        vrouter_put_interface(old_crypt_vif);
+    }
+
     if (nh->nh_flags & NH_FLAG_TUNNEL_GRE) {
         if (!vif) {
             ret = -ENODEV;
@@ -3216,6 +3245,8 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         /* Reference to VIf should be cleaned */
         if (vif)
             vrouter_put_interface(vif);
+        if (crypt_vif)
+            vrouter_put_interface(crypt_vif);
 
         return -EINVAL;
     }
@@ -3641,6 +3672,8 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
         break;
 
     case NH_TUNNEL:
+        if (nh->nh_crypt_dev)
+            req->nhr_encap_crypt_oif_id = nh->nh_crypt_dev->vif_idx;
         req->nhr_encap_family = nh->nh_encap_family;
         if (nh->nh_flags & NH_FLAG_TUNNEL_GRE) {
             req->nhr_tun_sip = nh->nh_gre_tun_sip;
