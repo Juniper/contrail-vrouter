@@ -542,6 +542,14 @@ dpdk_argv_update(void)
         RTE_LOG(ERR, VROUTER, "Error configuring lcores: no forwarding lcores defined\n");
         return -1;
     }
+
+    if (vr_dpdk.nb_fwd_lcores > VR_MAX_CPUS - VR_DPDK_FWD_LCORE_ID) {
+        RTE_LOG(ERR, VROUTER, "Error configuring lcores: number of forwarding cores exceeds maximum of %u\n",
+                VR_MAX_CPUS - VR_DPDK_FWD_LCORE_ID);
+        return -1;
+    }
+    
+
     if (vr_dpdk.nb_io_lcores > 1
         && vr_dpdk.nb_fwd_lcores == VR_DPDK_FWD_LCORES_PER_IO*(vr_dpdk.nb_io_lcores - 1)) {
         /*
