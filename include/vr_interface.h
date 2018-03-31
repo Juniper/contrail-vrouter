@@ -124,6 +124,15 @@
 
 #define VIF_ENCAP_TYPE_ETHER        1
 #define VIF_ENCAP_TYPE_L3           2
+/* This flag is used in identifying the IPSec VTI
+   interface. VTI interfaces are L3 tunnel interfaces
+   that enable route-based VPN. VTI device is created
+   using iproute2's, <ip tunnel> command.
+   IPSec kernel will write the decrypted packets, that
+   match the source IP header and key to the matched
+   VTI interface created with the same source IP.
+*/
+#define VIF_ENCAP_TYPE_L3_DECRYPT   3
 
 typedef enum {
     MR_DROP,
