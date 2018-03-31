@@ -47,6 +47,7 @@ static rx_handler_result_t pkt_gro_dev_rx_handler(struct sk_buff **);
 static int linux_xmit_segments(struct vr_interface *, struct sk_buff *,
         unsigned short);
 static rx_handler_result_t pkt_rps_dev_rx_handler(struct sk_buff **pskb);
+static unsigned short linux_if_get_encap(struct vr_interface *vif);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
 extern rx_handler_result_t vhost_rx_handler(struct sk_buff **);
@@ -1252,6 +1253,10 @@ linux_rx_handler(struct sk_buff **pskb)
             vif_drop_pkt(vif, pkt, true);
             return RX_HANDLER_CONSUMED;
         }
+        if ((linux_if_get_encap(vif) == VIF_ENCAP_TYPE_L3_DECRYPT)) {
+          skb_push(skb,14);
+          pkt = linux_get_packet(skb, vif);
+        }
     }
 
     ret = vif->vif_rx(vif, pkt, vlan_id);
@@ -1685,8 +1690,10 @@ static unsigned short
 linux_if_get_encap(struct vr_interface *vif)
 {
     struct net_device *dev = (struct net_device *)vif->vif_os;
-
-    if (dev && (dev->type != ARPHRD_ETHER))
+    if (dev && (dev->type != ARPHRD_ETHER) && (dev->flags & IFF_NOARP) &&
+       (dev->flags &= ~(IFF_BROADCAST | IFF_MULTICAST)))
+        return VIF_ENCAP_TYPE_L3_DECRYPT;
+    else if (dev && (dev->type != ARPHRD_ETHER))
         return VIF_ENCAP_TYPE_L3;
 
     return VIF_ENCAP_TYPE_ETHER;
