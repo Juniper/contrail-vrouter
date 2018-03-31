@@ -124,6 +124,7 @@
 
 #define VIF_ENCAP_TYPE_ETHER        1
 #define VIF_ENCAP_TYPE_L3           2
+#define VIF_ENCAP_TYPE_L3_DECRYPT   3
 
 typedef enum {
     MR_DROP,
