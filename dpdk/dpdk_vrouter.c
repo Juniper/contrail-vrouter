@@ -30,6 +30,7 @@
 #include "vr_mem.h"
 #include "nl_util.h"
 
+#include <rte_version.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_kni.h>
@@ -605,7 +606,8 @@ dpdk_argv_update(void)
 static void
 version_print(void)
 {
-    RTE_LOG(INFO, VROUTER, "vRouter/DPDK version: %s\n", ContrailBuildInfo);
+    RTE_LOG(INFO, VROUTER, "vRouter version: %s\n", ContrailBuildInfo);
+    RTE_LOG(INFO, VROUTER, "DPDK version: %s\n", rte_version());
 }
 
 /*
