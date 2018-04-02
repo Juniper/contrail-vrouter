@@ -1027,6 +1027,7 @@ struct vr_forwarding_md {
     int32_t fmd_label;
     int8_t fmd_ecmp_nh_index;
     int8_t fmd_ecmp_src_nh_index;
+    int8_t fmd_l2_hdr_len;
     int16_t fmd_dvrf;
     uint32_t fmd_outer_src_ip;
     uint16_t fmd_vlan;
@@ -1051,6 +1052,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_dvrf = -1;
     fmd->fmd_outer_src_ip = 0;
     fmd->fmd_vlan = VLAN_ID_INVALID;
+    fmd->fmd_l2_hdr_len = 0;
     fmd->fmd_mirror_data = FMD_MIRROR_INVALID_DATA;
     fmd->fmd_udp_src_port = 0;
     fmd->fmd_to_me = 0;

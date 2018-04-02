@@ -70,6 +70,7 @@ enum nexthop_type {
 #define NH_FLAG_INDIRECT                    0x400000
 #define NH_FLAG_L2_CONTROL_DATA             0x800000
 #define NH_FLAG_CRYPT_TRAFFIC             0x01000000
+#define NH_FLAG_L3_VXLAN                  0x02000000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
@@ -130,6 +131,7 @@ struct vr_nexthop {
             unsigned short  tun_sport;
             unsigned short  tun_dport;
             uint16_t        tun_encap_len;
+            uint8_t         tun_l3_vxlan_mac[VR_ETHER_ALEN];
         } nh_udp_tun;
 
         struct {
@@ -181,6 +183,7 @@ struct vr_nexthop {
 #define nh_udp_tun_sport        nh_u.nh_udp_tun.tun_sport
 #define nh_udp_tun_dport        nh_u.nh_udp_tun.tun_dport
 #define nh_udp_tun_encap_len    nh_u.nh_udp_tun.tun_encap_len
+#define nh_udp_tun_l3_vxlan_mac nh_u.nh_udp_tun.tun_l3_vxlan_mac
 
 #define nh_udp_tun6_sip         nh_u.nh_udp_tun6.tun_sip6
 #define nh_udp_tun6_dip         nh_u.nh_udp_tun6.tun_dip6

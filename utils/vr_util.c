@@ -1507,7 +1507,7 @@ int
 vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
         unsigned int type, int nh_index, unsigned int flags, int vrf_index,
         int vif_index, int8_t *smac, int8_t *dmac, struct in_addr sip,
-        struct in_addr dip, int sport, int dport)
+        struct in_addr dip, int sport, int dport, int8_t *l3_vxlan_mac)
 {
     vr_nexthop_req req;
 
@@ -1541,6 +1541,11 @@ vr_send_nexthop_encap_tunnel_add(struct nl_client *cl, unsigned int router_id,
         if ((sport >= 0) && (dport >= 0)) {
             req.nhr_tun_sport = htons(sport);
             req.nhr_tun_dport = htons(dport);
+        }
+        if (flags & NH_FLAG_L3_VXLAN) {
+            req.nhr_pbb_mac_size = 6;
+            req.nhr_pbb_mac = malloc(req.nhr_pbb_mac_size);
+            memcpy(req.nhr_pbb_mac, l3_vxlan_mac, 6);
         }
     }
 

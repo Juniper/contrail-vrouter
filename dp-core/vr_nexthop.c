@@ -359,7 +359,7 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
     unsigned char eth_dmac[VR_ETHER_ALEN], *data;
-    int pull_len, handled = 0;
+    int handled = 0;
     struct vr_vrf_stats *stats;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
@@ -368,8 +368,8 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     data = pkt_data(pkt);
     fmd->fmd_to_me = 1;
-    pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
-    if (!pkt_pull(pkt, pull_len)) {
+    fmd->fmd_l2_hdr_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
+    if (pkt_pull(pkt, fmd->fmd_l2_hdr_len) < 0) {
         vr_pfree(pkt, VP_DROP_PULL);
         return NH_PROCESSING_COMPLETE;
     }
@@ -588,7 +588,8 @@ nh_pbb_tunnel_helper(struct vrouter *router, struct vr_packet **pkt,
 
 static bool
 nh_vxlan_tunnel_helper(struct vrouter *router, struct vr_packet **pkt,
-        struct vr_forwarding_md *fmd, unsigned int sip, unsigned int dip)
+        struct vr_forwarding_md *fmd, unsigned int sip, unsigned int dip,
+        int8_t *dst_mac)
 {
     unsigned short udp_src_port = VR_VXLAN_UDP_SRC_PORT;
 
@@ -618,6 +619,12 @@ nh_vxlan_tunnel_helper(struct vrouter *router, struct vr_packet **pkt,
     }
 
     vr_fmd_update_label_type(fmd, VR_LABEL_TYPE_VXLAN_ID);
+
+    if (dst_mac) {
+        struct vr_eth *eth = (struct vr_eth *)pkt_data(*pkt);
+        VR_MAC_COPY(eth->eth_dmac, dst_mac);
+        VR_MAC_COPY(eth->eth_smac, router->vr_eth_if->vif_mac);
+    }
 
     /* Add the vxlan header */
     vxlanh = (struct vr_vxlan *)pkt_push(*pkt, sizeof(struct vr_vxlan));
@@ -1678,6 +1685,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
         vr_mcast_mac_from_isid(pkt->vp_if->vif_isid, eth_mac);
 
     for (i = 0; i < nh->nh_component_cnt; i++) {
+
         dir_nh = nh->nh_component_nh[i].cnh;
         fmd->fmd_dvrf = pkt_vrf;
 
@@ -1747,7 +1755,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
                 vr_fmd_set_label(fmd, label, VR_LABEL_TYPE_UNKNOWN);
                 fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
                 if (nh_vxlan_tunnel_helper(nh->nh_router, &new_pkt,
-                                        fmd, sip, sip) == false) {
+                                        fmd, sip, sip, NULL) == false) {
                     vr_pfree(new_pkt, VP_DROP_PUSH);
                     break;
                 }
@@ -1957,6 +1965,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
     unsigned short overhead_len;
+    int8_t *dst_mac = NULL;
 
     if (!fmd) {
         reason = VP_DROP_NO_FMD;
@@ -1978,6 +1987,14 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
 
+    if (nh->nh_flags & NH_FLAG_L3_VXLAN) {
+        if (fmd->fmd_l2_hdr_len && !pkt_push(pkt, fmd->fmd_l2_hdr_len)) {
+            vr_pfree(pkt, VP_DROP_PULL);
+            return NH_PROCESSING_COMPLETE;
+        }
+        dst_mac = nh->nh_udp_tun_l3_vxlan_mac;
+    }
+
     overhead_len = VR_VXLAN_HDR_LEN;
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
@@ -1996,7 +2013,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (nh_vxlan_tunnel_helper(nh->nh_router, &pkt, fmd, nh->nh_udp_tun_sip,
-                nh->nh_udp_tun_dip) == false)
+                nh->nh_udp_tun_dip, dst_mac) == false)
         goto send_fail;
 
     pkt_set_network_header(pkt, pkt->vp_data);
@@ -2483,7 +2500,7 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
 
 
     /* If nexthop does not have valid data, drop it */
-    if (!(nh->nh_flags & NH_FLAG_VALID)) {
+    if (!nh || !(nh->nh_flags & NH_FLAG_VALID)) {
         vr_pfree(pkt, VP_DROP_INVALID_NH);
         return 0;
     }
@@ -3220,6 +3237,14 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_validate_src = nh_vxlan_tunnel_validate_src;
         nh->nh_dev = vif;
+        if (nh->nh_flags & NH_FLAG_L3_VXLAN) {
+            if ((req->nhr_pbb_mac_size != VR_ETHER_ALEN) ||
+                    (IS_MAC_ZERO(req->nhr_pbb_mac))) {
+                ret = -EINVAL;
+                goto exit_add;
+            }
+            VR_MAC_COPY(nh->nh_udp_tun_l3_vxlan_mac, req->nhr_pbb_mac);
+        }
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
         if (!(nh->nh_flags & NH_FLAG_INDIRECT)) {
             ret = -EINVAL;
@@ -3722,6 +3747,14 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
                 encap = nh->nh_data;
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
+            if (nh->nh_flags & NH_FLAG_L3_VXLAN) {
+                req->nhr_pbb_mac_size = VR_ETHER_ALEN;
+                req->nhr_pbb_mac = vr_zalloc(req->nhr_pbb_mac_size,
+                        VR_NEXTHOP_REQ_BMAC_OBJECT);
+                if (!req->nhr_pbb_mac)
+                    return -ENOMEM;
+                VR_MAC_COPY(req->nhr_pbb_mac, nh->nh_udp_tun_l3_vxlan_mac);
+            }
         } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
             if (nh->nh_pbb_label != -1) {
                 req->nhr_label_list_size = 1;
