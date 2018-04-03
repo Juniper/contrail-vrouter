@@ -356,7 +356,7 @@ error:
  */
 unsigned
 vr_dpdk_tapdev_rx_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
-    unsigned num)
+    unsigned num, int datapath)
 {
     int i, fd;
     unsigned ret = 0;
@@ -372,6 +372,10 @@ vr_dpdk_tapdev_rx_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
 
     for (i = 0; i < num; i++) {
         vif = tapdev->tapdev_vif;
+
+        if (datapath && vif_is_vhost(vif))
+            continue;
+
         stats = vif_get_stats(vif, lcore_id);
 
         mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
@@ -435,7 +439,7 @@ vr_dpdk_tapdev_dequeue_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mb
  */
 unsigned
 vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
-        unsigned num)
+        unsigned num, int datapath)
 {
     int i, fd;
     unsigned ret = 0;
@@ -451,6 +455,10 @@ vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *tapdev, struct rte_mbuf **mbufs,
 
     for (i = 0; i < num; i++) {
         vif = tapdev->tapdev_vif;
+
+        if (datapath && vif_is_vhost(vif))
+            continue;
+
         stats = vif_get_stats(vif, lcore_id);
         mbuf = mbufs[i];
 
@@ -529,7 +537,8 @@ vr_dpdk_tapdev_rxtx(void)
 
             /* Try to RX from the TAP. */
             if (likely(tapdev->tapdev_rx_ring != NULL)) {
-                nb_pkts = vr_dpdk_tapdev_rx_burst(tapdev, &mbuf, 1);
+                nb_pkts = vr_dpdk_tapdev_rx_burst(tapdev, &mbuf, 1,
+                                                  VR_DPDK_MGMTPATH);
 
                 if (likely(nb_pkts > 0)) {
                     total_pkts++;
@@ -549,7 +558,8 @@ vr_dpdk_tapdev_rxtx(void)
                         (void **)&mbuf) == 0))
                     {
                         total_pkts++;
-                        nb_pkts = vr_dpdk_tapdev_tx_burst(tapdev, &mbuf, 1);
+                        nb_pkts = vr_dpdk_tapdev_tx_burst(tapdev, &mbuf, 1,
+                                                          VR_DPDK_MGMTPATH);
 
                         if (likely(nb_pkts > 0)) {
                             total_pkts++;
