@@ -265,6 +265,9 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_VF_PMD_SFX "_vf"
 #endif
 
+#define VR_DPDK_MGMTPATH 0
+#define VR_DPDK_DATAPATH 1
+
 /*
  * DPDK LCore IDs
  */
@@ -781,13 +784,13 @@ vr_dpdk_tapdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 uint64_t vr_dpdk_tapdev_rxtx(void);
 /* RX a burst of packets from the TAP device. */
 unsigned vr_dpdk_tapdev_rx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
-        unsigned num);
+        unsigned num, int datapath);
 /* Dequeue a burst of packets from the TAP device. */
 unsigned vr_dpdk_tapdev_dequeue_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
         unsigned num);
 /* TX a burst of packets to the TAP device. */
 unsigned vr_dpdk_tapdev_tx_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
-        unsigned num);
+        unsigned num, int datapath);
 /* Enqueue a burst of packets to the TAP device. */
 unsigned vr_dpdk_tapdev_enqueue_burst(struct vr_dpdk_tapdev *, struct rte_mbuf **,
         unsigned num);
