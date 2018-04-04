@@ -1186,7 +1186,7 @@ dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
                         VR_DPDK_RX_BURST_SZ);
             else
                 nb_pkts = vr_dpdk_tapdev_rx_burst(vr_dpdk.vlan_dev, pkts,
-                        VR_DPDK_RX_BURST_SZ);
+                                         VR_DPDK_RX_BURST_SZ, VR_DPDK_DATAPATH);
             for (i = 0; i < nb_pkts; i++)
                 tx_queue->txq_ops.f_tx(tx_queue->q_queue_h, pkts[i]);
         }
@@ -1202,7 +1202,8 @@ dpdk_lcore_vlan_fwd(struct vr_dpdk_lcore* lcore)
     if (vr_dpdk.kni_state > 0)
         i = rte_kni_tx_burst(vr_dpdk.vlan_dev, pkts, nb_pkts);
     else
-        i = vr_dpdk_tapdev_tx_burst(vr_dpdk.vlan_dev, pkts, nb_pkts);
+        i = vr_dpdk_tapdev_tx_burst(vr_dpdk.vlan_dev, pkts, nb_pkts,
+                                    VR_DPDK_DATAPATH);
     for (; i < nb_pkts; i++)
         vr_dpdk_pfree(pkts[i], NULL, VP_DROP_VLAN_FWD_TX);
 }
