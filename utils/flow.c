@@ -387,6 +387,8 @@ flow_get_drop_reason(uint8_t drop_code)
         return "NoFipPortMap";
     case VR_FLOW_DR_NO_SRC_ROUTE_L2RPF:
         return "NoSrcRtRpfNh";
+    case VR_FLOW_DR_FAT_FLOW_NAT_CONFLICT:
+        return "FatFlowNatConflict";
     case VR_FLOW_DR_POLICY:
         return "Policy";
     case VR_FLOW_DR_OUT_POLICY:
