@@ -82,16 +82,17 @@ typedef enum {
 #define VR_FLOW_DR_SAME_FLOW_RFLOW_KEY    0x11
 #define VR_FLOW_DR_PORT_MAP_DROP          0x12
 #define VR_FLOW_DR_NO_SRC_ROUTE_L2RPF     0x13
-#define VR_FLOW_DR_POLICY                 0x14
-#define VR_FLOW_DR_OUT_POLICY             0x15
-#define VR_FLOW_DR_SG                     0x16
-#define VR_FLOW_DR_OUT_SG                 0x17
-#define VR_FLOW_DR_REVERSE_SG             0x18
-#define VR_FLOW_DR_REVERSE_OUT_SG         0x19
-#define VR_FLOW_DR_FW_POLICY              0x1a
-#define VR_FLOW_DR_OUT_FW_POLICY          0x1b
-#define VR_FLOW_DR_REVERSE_FW_POLICY      0x1c
-#define VR_FLOW_DR_REVERSE_OUT_FW_POLICY  0x1d
+#define VR_FLOW_DR_FAT_FLOW_NAT_CONFLICT  0x14
+#define VR_FLOW_DR_POLICY                 0x15
+#define VR_FLOW_DR_OUT_POLICY             0x16
+#define VR_FLOW_DR_SG                     0x17
+#define VR_FLOW_DR_OUT_SG                 0x18
+#define VR_FLOW_DR_REVERSE_SG             0x19
+#define VR_FLOW_DR_REVERSE_OUT_SG         0x1a
+#define VR_FLOW_DR_FW_POLICY              0x1b
+#define VR_FLOW_DR_OUT_FW_POLICY          0x1c
+#define VR_FLOW_DR_REVERSE_FW_POLICY      0x1d
+#define VR_FLOW_DR_REVERSE_OUT_FW_POLICY  0x1e
 
 #define VR_IP6_ADDRESS_LEN               16
 
