@@ -2,7 +2,7 @@
  * vr_dpdk_lcore.h - header for DPDK lcore support functions.
  *
  *
- * Copyright (c) 2015 Semihalf.
+ * Copyright (c) 2015 Juniper Networks, Inc. All rights reserved.
  */
 
 #ifndef __VR_DPDK_LCORE_H__
