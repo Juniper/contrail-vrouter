@@ -89,6 +89,11 @@ vr_table_unlink(const char *path)
     return NULL;
 }
 
+/*
+ * License: BSD-2
+ * Copyright (C) 2010 The Android Open Source Project
+ * https://github.com/aosp-mirror/platform_bionic/blob/master/libc/bionic/ether_aton.c
+ */
 int
 nl_socket(struct nl_client *cl, int domain, int type, int protocol)
 {
