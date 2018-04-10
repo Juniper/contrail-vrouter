@@ -3,6 +3,11 @@
 
 #include <time.h>
 
+/*
+ * License: GPL-2.0 WITH Linux-syscall-note
+ * https://github.com/torvalds/linux
+ * http://elixir.free-electrons.com/linux/v4.1.21/source/include/linux/timer.h
+ */
 struct list_head {
     struct list_head *next, *prev;
 };

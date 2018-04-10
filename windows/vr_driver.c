@@ -318,6 +318,12 @@ FilterAttach(NDIS_HANDLE NdisFilterHandle,
 
     NT_ASSERT(DriverContext == (NDIS_HANDLE)VrDriverObject);
 
+    /*
+     * License: MS-PL
+     * Copyright (c) 2015 Microsoft
+     * https://github.com/Microsoft/Windows-driver-samples/blob/master/network/ndis/extension/base/SxBase.c
+     */
+
     // Accept Ethernet only
     if (AttachParameters->MiniportMediaType != NdisMedium802_3) {
         status = NDIS_STATUS_INVALID_PARAMETER;
