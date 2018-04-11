@@ -3421,21 +3421,31 @@ vif_fat_flow_lookup(struct vr_interface *vif, uint8_t proto,
         h_dport = ntohs(dport);
     }
 
-    sport_mask = vif_fat_flow_port_get(vif, proto_index, 0);
-    if (!sport_mask) {
-        sport_mask = vif_fat_flow_port_get(vif, proto_index, h_sport);
-        dport_mask = vif_fat_flow_port_get(vif, proto_index, h_dport);
-    } else {
-        fat_flow_mask |= (VR_FAT_FLOW_DST_PORT_MASK |
-                VR_FAT_FLOW_SRC_PORT_MASK);
-    }
+    /*
+     * If there is a specific port configuration exists - it takes
+     * precedence
+     * If both ports have configuration - smallest port takes precedence
+     * If no specific port configuration exists, but port "0"
+     * configuration exists, use that as fat flow config
+     */
 
-    if (sport_mask && dport_mask) {
-        if (proto_index != VIF_FAT_FLOW_NOPROTO_INDEX) {
-            if (h_dport <= h_sport)
-                sport_mask = 0;
-            else
-                dport_mask = 0;
+    sport_mask = vif_fat_flow_port_get(vif, proto_index, h_sport);
+    dport_mask = vif_fat_flow_port_get(vif, proto_index, h_dport);
+
+    if (sport_mask || dport_mask) {
+        if (sport_mask && dport_mask) {
+            if (proto_index != VIF_FAT_FLOW_NOPROTO_INDEX) {
+                if (h_dport <= h_sport)
+                    sport_mask = 0;
+                else
+                    dport_mask = 0;
+            }
+        }
+    } else {
+        sport_mask = vif_fat_flow_port_get(vif, proto_index, 0);
+        if (sport_mask) {
+            fat_flow_mask |= (VR_FAT_FLOW_DST_PORT_MASK |
+                        VR_FAT_FLOW_SRC_PORT_MASK);
         }
     }
 
