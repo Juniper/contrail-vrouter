@@ -1200,6 +1200,24 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
     return 0;
 }
 
+/*
+ * This function is to handle the decrypted Rx packet. The
+ * ipsec encrypted packet is sent up the stack where the
+ * linux IPSec kernel handles it. Upon decrypting it
+ * the packet is received by the VTI interface, which is
+ * the L3 interface that is plumbed to the vrouter.
+ * This packet is the L3VPN packet to be processed by vrouter.
+ *
+*/
+static int
+ipsec_rx(struct vr_interface *vif, struct vr_packet *pkt,
+        unsigned short vlan_id)
+{
+    struct vrouter *router = vrouter_get(0);
+    pkt->vp_if = router->vr_eth_if;
+    return eth_rx(vif, pkt, vlan_id);
+}
+
 static int
 eth_set_rewrite(struct vr_interface *vif, struct vr_packet **pkt,
         struct vr_forwarding_md *fmd, unsigned char *rewrite,
@@ -1443,6 +1461,9 @@ eth_drv_add(struct vr_interface *vif,
     if ((vif->vif_type == VIF_TYPE_PHYSICAL) &&
             (hif_ops->hif_get_encap(vif) == VIF_ENCAP_TYPE_L3)) {
             vif->vif_rx = tun_rx;
+    } else if ((vif->vif_type == VIF_TYPE_PHYSICAL) &&
+               ((hif_ops->hif_get_encap(vif) == VIF_ENCAP_TYPE_L3_DECRYPT))) {
+            vif->vif_rx = ipsec_rx;
     }
 
     /*
@@ -1453,8 +1474,11 @@ eth_drv_add(struct vr_interface *vif,
      * here, such packets will be blackholed. hence, do not tap the interface
      * if the interface is set to be associated with a vhost interface.
      */
+     /*
+      * RX of the decrypted packet is handled.
+      */
     if ((!(vif->vif_flags & VIF_FLAG_VHOST_PHYS)) ||
-            (vif->vif_bridge)) {
+            (vif->vif_bridge) || (hif_ops->hif_get_encap(vif) == VIF_ENCAP_TYPE_L3_DECRYPT)) {
         ret = hif_ops->hif_add_tap(vif);
         if (ret)
             hif_ops->hif_del(vif);
