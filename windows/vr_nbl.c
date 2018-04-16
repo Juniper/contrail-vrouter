@@ -219,6 +219,30 @@ cleanup:
     return NULL;
 }
 
+void
+win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG data_length)
+{
+    pkt->vp_head = (unsigned char*) MmGetSystemAddressForMdlSafe(mdl, LowPagePriority | MdlMappingNoExecute);
+    if (!pkt->vp_head) {
+        pkt->vp_end = pkt->vp_data = pkt->vp_tail = pkt->vp_len = 0;
+        return;
+    }
+
+    pkt->vp_head += mdl_offset;
+    /* vp_data is the offset from vp_head, where packet begins.
+       TODO: When packet encapsulation comes into play, then vp_data should differ.
+             There should be enough room between vp_head and vp_data to add packet headers.
+    */
+    pkt->vp_data = 0;
+
+    // left_mdl_space is a space from begin of data section to the end of mdl
+    ULONG left_mdl_space = MmGetMdlByteCount(mdl) - mdl_offset;
+    pkt->vp_tail = pkt->vp_len = (data_length < left_mdl_space ? data_length : left_mdl_space);
+    pkt->vp_end = left_mdl_space;
+
+    return;
+}
+
 struct vr_packet *
 win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
 {
@@ -239,28 +263,19 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
 
     /* vp_head points to the beginning of accesible non-paged memory of the packet */
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
-    PMDL current_mdl = NET_BUFFER_CURRENT_MDL(nb);
-    ULONG current_mdl_count = MmGetMdlByteCount(current_mdl);
-    ULONG current_mdl_offset = NET_BUFFER_CURRENT_MDL_OFFSET(nb);
-    unsigned char* mdl_data =
-        (unsigned char*)MmGetSystemAddressForMdlSafe(current_mdl, LowPagePriority | MdlMappingNoExecute);
-    if (!mdl_data)
+    ULONG data_length = NET_BUFFER_DATA_LENGTH(nb);
+
+    if (IS_NBL_OWNED(nbl) && !IS_NBL_CLONE(nbl)) {
+        data_length = 0;
+    }
+
+    win_packet_map_from_mdl(pkt, NET_BUFFER_CURRENT_MDL(nb),
+                            NET_BUFFER_CURRENT_MDL_OFFSET(nb),
+                            data_length);
+
+    if (!pkt->vp_head) {
         goto drop;
-    pkt->vp_head = mdl_data + current_mdl_offset;
-
-    /* vp_data is the offset from vp_head, where packet begins. */
-    pkt->vp_data = 0;
-
-    ULONG packet_length = NET_BUFFER_DATA_LENGTH(nb);
-    ULONG left_mdl_space = current_mdl_count - current_mdl_offset;
-
-    if (IS_NBL_OWNED(nbl) && !IS_NBL_CLONE(nbl))
-        pkt->vp_tail = pkt->vp_len = 0;
-    else
-        pkt->vp_tail = pkt->vp_len = (packet_length < left_mdl_space ? packet_length : left_mdl_space);
-
-    /* vp_end points to the end of accesible non-paged memory */
-    pkt->vp_end = left_mdl_space;
+    }
 
     pkt->vp_if = vif;
     pkt->vp_network_h = pkt->vp_inner_network_h = 0;
