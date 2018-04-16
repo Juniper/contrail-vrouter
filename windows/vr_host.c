@@ -238,19 +238,17 @@ win_preset(struct vr_packet *pkt)
     ASSERT(pkt != NULL);
 
     PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
-    if (!nbl)
+    if (!nbl) {
         return;
+    }
 
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
-    if (!nb)
+    if (!nb) {
         return;
+    }
 
-    PMDL current_mdl = NET_BUFFER_CURRENT_MDL(nb);
-    pkt->vp_head =
-        (unsigned char*)MmGetSystemAddressForMdlSafe(current_mdl, LowPagePriority | MdlMappingNoExecute);
-    pkt->vp_data = 0;
-    pkt->vp_tail = (unsigned short)NET_BUFFER_DATA_LENGTH(nb);
-    pkt->vp_len = (unsigned short)NET_BUFFER_DATA_LENGTH(nb);
+    win_packet_map_from_mdl(pkt, NET_BUFFER_CURRENT_MDL(nb),
+                            NET_BUFFER_CURRENT_MDL_OFFSET(nb), NET_BUFFER_DATA_LENGTH(nb));
 
     return;
 }
