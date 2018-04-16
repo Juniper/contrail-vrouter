@@ -31,6 +31,7 @@ extern VOID FreeCreatedNetBufferList(PNET_BUFFER_LIST nbl);
 extern VOID FreeClonedNetBufferList(PNET_BUFFER_LIST nbl);
 
 extern struct vr_packet *win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif);
+extern void win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG data_length);
 extern struct vr_packet *win_allocate_packet(void *buffer, unsigned int size);
 extern void win_free_packet(struct vr_packet *pkt);
 
