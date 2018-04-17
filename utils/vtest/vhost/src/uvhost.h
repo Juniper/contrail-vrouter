@@ -5,6 +5,12 @@
  * Copyright (c) 2015 Juniper Networks, Inc. All rights reserved.
  */
 
+/*
+ * License: GPL-2.0+
+ * Copyright (c) 2013 Virtual Open Systems Sarl..
+ * https://www.qemu.org
+ */
+
 #ifndef QEMU_UVHOST_H
 #define QEMU_UVHOST_H
 
