@@ -1233,6 +1233,7 @@ eth_set_rewrite(struct vr_interface *vif, struct vr_packet **pkt,
      */
     if (((*pkt)->vp_if->vif_type == VIF_TYPE_HOST) &&
             (!((*pkt)->vp_flags & VP_FLAG_FROM_DP)) &&
+            (fmd->fmd_ecmp_src_nh_index == -1) &&
             (((*pkt)->vp_type == VP_TYPE_IP) || ((*pkt)->vp_type == VP_TYPE_IP6))) {
         vr_preset(*pkt);
         return 0;
