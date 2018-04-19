@@ -1708,6 +1708,15 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (fmd->fmd_outer_src_ip && fmd->fmd_outer_src_ip == dip)
             continue;
 
+        /* Dont flood back on ingress physical interface on the fabric. */
+        if (vif_is_vlan(pkt->vp_if)) {
+            if (vif_is_vlan(dir_nh->nh_dev) &&
+                pkt->vp_if->vif_parent == dir_nh->nh_dev->vif_parent)
+                continue;
+            else if (pkt->vp_if->vif_parent == dir_nh->nh_dev)
+                continue;
+        }
+
         /*
          * Enough head spaces are created in the previous nexthop
          * handling. Just cow the packet with zero size to get different
