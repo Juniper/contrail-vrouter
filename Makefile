@@ -74,6 +74,7 @@ ifneq ($(KERNELRELEASE), )
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)/sandesh/library/c
 	ccflags-y += -g -Wall
+        ccflags-$(CONFIG_RETPOLINE) += -DRETPOLINE
 
 	ifeq ($(shell uname -r | grep 2.6.32|grep -c openstack),1)
 		ccflags-y += -DISRHOSKERNEL
