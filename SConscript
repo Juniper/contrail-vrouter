@@ -75,10 +75,8 @@ def genBuildVersion():
 
 #endif /* __VR_BUILDINFO_H__ */
 """ % { 'build': env.GetBuildVersion()[1] }
-    c_file = file(os.path.join(dp_dir, 'include/vr_buildinfo.h'), 'w')
-    c_file.write(h_code)
-    c_file.close()
-    return
+    with open(os.path.join(dp_dir, 'include/vr_buildinfo.h'), 'w') as c_file:
+        c_file.write(h_code)
 
 if sys.platform.startswith('freebsd'):
     make_dir = make_dir + '/freebsd'
