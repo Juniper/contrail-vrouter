@@ -97,7 +97,8 @@ vr_valid_link_local_port(struct vrouter *router, int family,
         return false;
 
     if ((family != AF_INET) ||
-        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
+        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP) &&
+         (proto != VR_IP_PROTO_ICMP)))
         return false;
 
     if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
@@ -105,7 +106,10 @@ vr_valid_link_local_port(struct vrouter *router, int family,
 
     tmp = port - VR_DYNAMIC_PORT_START;
     if (proto == VR_IP_PROTO_UDP)
-        tmp += (router->vr_link_local_ports_size * 8 / 2);
+        tmp += (router->vr_link_local_ports_size * 8 / VR_LL_RP_MAX);
+    if (proto == VR_IP_PROTO_ICMP)
+        tmp += (router->vr_link_local_ports_size * 8 * VR_LL_RP_ICMP_INDEX /
+                                                       VR_LL_RP_MAX);
 
     data = router->vr_link_local_ports[(tmp / 8)];
     if (data & (1 << (tmp % 8)))
@@ -125,7 +129,8 @@ vr_clear_link_local_port(struct vrouter *router, int family,
         return;
 
     if ((family != AF_INET) ||
-        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
+        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP) &&
+         (proto != VR_IP_PROTO_ICMP)))
         return;
 
     if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
@@ -133,7 +138,10 @@ vr_clear_link_local_port(struct vrouter *router, int family,
 
     tmp = port - VR_DYNAMIC_PORT_START;
     if (proto == VR_IP_PROTO_UDP)
-        tmp += (router->vr_link_local_ports_size * 8 / 2);
+        tmp += (router->vr_link_local_ports_size * 8 / VR_LL_RP_MAX);
+    if (proto == VR_IP_PROTO_ICMP)
+        tmp += ((router->vr_link_local_ports_size * 8 * VR_LL_RP_ICMP_INDEX)/
+                                                        VR_LL_RP_MAX);
 
     data = &router->vr_link_local_ports[(tmp / 8)];
     *data &= (~(1 << (tmp % 8)));
@@ -152,7 +160,8 @@ vr_set_link_local_port(struct vrouter *router, int family,
         return;
 
     if ((family != AF_INET) ||
-        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP)))
+        ((proto != VR_IP_PROTO_TCP) && (proto != VR_IP_PROTO_UDP) &&
+         (proto != VR_IP_PROTO_ICMP)))
         return;
 
     if ((port < VR_DYNAMIC_PORT_START) || (port > VR_DYNAMIC_PORT_END))
@@ -160,7 +169,10 @@ vr_set_link_local_port(struct vrouter *router, int family,
 
     tmp = port - VR_DYNAMIC_PORT_START;
     if (proto == VR_IP_PROTO_UDP)
-        tmp += (router->vr_link_local_ports_size * 8 / 2);
+        tmp += (router->vr_link_local_ports_size * 8 / VR_LL_RP_MAX);
+    if (proto == VR_IP_PROTO_ICMP)
+        tmp += ((router->vr_link_local_ports_size * 8 * VR_LL_RP_ICMP_INDEX)/
+                                                        VR_LL_RP_MAX);
 
     data = &router->vr_link_local_ports[tmp / 8];
     *data |= (1 << (tmp % 8));
@@ -2093,14 +2105,23 @@ static int
 vr_flow_delete(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
 {
-
+    int port = 0;
     /* Delete Mark it */
     fe->fe_flags |= VR_FLOW_FLAG_DELETE_MARKED;
 
 
-    if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL)
-        vr_clear_link_local_port(router, AF_INET, fe->fe_key.flow_proto,
-                                   ntohs(fe->fe_key.flow_dport));
+    if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL) {
+        if (fe->fe_key.flow_proto == VR_IP_PROTO_ICMP) {
+            /*
+             * ICMP id passed as source port would be
+             * used for relaxed policy flow lookup
+             */
+            port = ntohs(fe->fe_key.flow_sport);
+        } else {
+            port = ntohs(fe->fe_key.flow_dport);
+        }
+        vr_clear_link_local_port(router, AF_INET, fe->fe_key.flow_proto, port);
+    }
 
     fe->fe_action = VR_FLOW_ACTION_DROP;
     vr_flow_reset_mirror(router, fe, req->fr_index);
@@ -2145,6 +2166,7 @@ vr_flow_update_link_local_port(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
 {
     bool set_port = false;
+    int port = 0;
 
     if (!req || !fe)
         return;
@@ -2152,12 +2174,22 @@ vr_flow_update_link_local_port(struct vrouter *router, vr_flow_req *req,
     if (fe->fe_type != VP_TYPE_IP)
         return;
 
+    if (fe->fe_key.flow_proto == VR_IP_PROTO_ICMP) {
+        /*
+         * ICMP id passed as source port would be
+         * used for relaxed policy flow lookup
+         */
+        port = ntohs(fe->fe_key.flow_sport);
+    } else {
+        port = ntohs(fe->fe_key.flow_dport);
+    }
+
     if (req->fr_flags & VR_FLOW_FLAG_LINK_LOCAL) {
         if (!(fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL))
             set_port = true;
     } else if (fe->fe_flags & VR_FLOW_FLAG_LINK_LOCAL) {
         vr_clear_link_local_port(router, AF_INET, fe->fe_key.flow_proto,
-                                            ntohs(fe->fe_key.flow_dport));
+                                                  port);
     }
 
     if (req->fr_flags & VR_FLOW_BGP_SERVICE) {
@@ -2166,8 +2198,7 @@ vr_flow_update_link_local_port(struct vrouter *router, vr_flow_req *req,
     }
 
     if (set_port) {
-        vr_set_link_local_port(router, AF_INET, fe->fe_key.flow_proto,
-                                            ntohs(fe->fe_key.flow_dport));
+        vr_set_link_local_port(router, AF_INET, fe->fe_key.flow_proto, port);
     }
 
     return;
@@ -2666,8 +2697,9 @@ vr_link_local_ports_init(struct vrouter *router)
     if (router->vr_link_local_ports)
         return 0;
 
-    /*  Udp and TCP inclusive of low and high limits*/
-    port_range = 2 * ((VR_DYNAMIC_PORT_END - VR_DYNAMIC_PORT_START) + 1);
+    /*  ICMP, Udp and TCP inclusive of low and high limits*/
+    port_range = VR_LL_RP_MAX *
+                     ((VR_DYNAMIC_PORT_END - VR_DYNAMIC_PORT_START) + 1);
     /* Make it 16 bit boundary */
     bytes = (port_range + 15) & ~15;
     /* Bits to Bytes */
