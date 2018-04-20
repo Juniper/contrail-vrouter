@@ -1,5 +1,5 @@
 /*
- * vhost_dev.c -- interface in the host OS
+ * vhost_dev.c -- interface in the host OS - DNM
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
