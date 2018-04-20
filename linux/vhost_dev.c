@@ -461,9 +461,11 @@ vhost_setup(struct net_device *dev)
     /* follow the standard steps */
     random_ether_addr(dev->dev_addr);
     ether_setup(dev);
-
+#if (! (defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
+               (RHEL_MAJOR == 7) && (RHEL_MINOR >= 5)))
 #ifdef ETH_MAX_MTU
     dev->max_mtu = ETH_MAX_MTU;
+#endif
 #endif
     dev->needed_headroom = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
     dev->netdev_ops = &vhost_dev_ops;
