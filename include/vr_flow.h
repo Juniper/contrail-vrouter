@@ -108,6 +108,11 @@ typedef enum {
 #define VR_FLOW_KEY_DST_IP       0x08
 #define VR_FLOW_KEY_DST_PORT     0x10
 
+#define VR_LL_RP_TCP_INDEX     0x0
+#define VR_LL_RP_UDP_INDEX     0x1
+#define VR_LL_RP_ICMP_INDEX    0x2
+#define VR_LL_RP_MAX           0x3
+
 struct vr_forwarding_md;
 struct _vr_flow_req;
 

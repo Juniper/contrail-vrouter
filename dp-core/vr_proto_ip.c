@@ -501,6 +501,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
     struct vr_fragment *frag;
     struct vr_interface *vif = NULL;
     struct vr_forwarding_class_qos *qos;
+    struct vr_icmp *icmph = NULL;
 
     ip = (struct vr_ip *)pkt_data(pkt);
     hlen = ip->ip_hl * 4;
@@ -555,10 +556,23 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                 } else if (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY) {
 
                     if ((ip->ip_proto == VR_IP_PROTO_UDP) ||
-                        (ip->ip_proto == VR_IP_PROTO_TCP)) {
+                        (ip->ip_proto == VR_IP_PROTO_TCP) ||
+                        (ip->ip_proto == VR_IP_PROTO_ICMP)) {
 
                         if (vr_ip_transport_header_valid(ip)) {
-                            l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
+                            /*
+                             * In case of ICMP packet relaxed policy
+                             * should be applied based on ICMP id which
+                             * is passed as source port in flow setup
+                             */
+                            if (ip->ip_proto == VR_IP_PROTO_ICMP) {
+                                icmph = (struct vr_icmp *)(pkt_data(pkt));
+                                if (vr_icmp_echo(icmph)) {
+                                    l4_port = icmph->icmp_eid;
+                                }
+                            } else {
+                                l4_port = *(unsigned short *) (pkt_data(pkt) + 2);
+                            }
                         } else {
                             frag = vr_fragment_get(router, fmd->fmd_dvrf, ip);
                             if (frag)
