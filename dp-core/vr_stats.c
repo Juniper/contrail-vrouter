@@ -7,6 +7,7 @@
 #include <vr_os.h>
 #include <vr_types.h>
 #include <vr_packet.h>
+#include <vr_offloads.h>
 #include "vr_message.h"
 #include "vr_btable.h"
 
@@ -128,6 +129,12 @@ vr_drop_stats_get(unsigned int rid, short core)
         for (cpu = 0; cpu < vr_num_cpus; cpu++) {
             vr_drop_stats_make_response(response, router->vr_pdrop_stats[cpu]);
         }
+        /* offload gets added to summed stats */
+        vr_offload_drop_stats_get(response);
+    } else if (core == (unsigned)-2) {
+        /* this allows returning only offloaded stats without
+           changing the current usage of this function */
+        vr_offload_drop_stats_get(response);
     } else if (core < vr_num_cpus) {
         /* stats for a specific core */
         vr_drop_stats_make_response(response, router->vr_pdrop_stats[core]);
