@@ -112,6 +112,8 @@ extern int vr_route_add(vr_route_req *);
 extern struct vr_nexthop *vr_inet_route_lookup(unsigned int, struct vr_route_req *);
 extern int bridge_entry_add(struct rtable_fspec *, struct vr_route_req *);
 
+int vr_nexthop_update_offload_vrfstats(uint32_t , uint32_t, uint64_t *);
+
 #ifdef __cplusplus
 }
 #endif
