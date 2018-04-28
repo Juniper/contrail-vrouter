@@ -149,7 +149,11 @@ struct vr_ip;
 struct vr_timer {
     void (*vt_timer)(void *);
     void *vt_vr_arg;
+#if (defined(__linux__) && defined(__KERNEL__))
+    struct timer_list timer;
+#else
     void *vt_os_arg;
+#endif
     unsigned int vt_stop_timer;
     unsigned int vt_msecs;
 };
