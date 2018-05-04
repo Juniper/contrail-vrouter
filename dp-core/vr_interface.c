@@ -2312,6 +2312,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
         vif->vif_hw_queues = vr_malloc(sizeof(uint16_t) *
                 req->vifr_hw_queues_size, VR_INTERFACE_QUEUE_OBJECT);
         if (!vif->vif_hw_queues) {
+            ret = -ENOMEM;
             goto error;
         }
 
