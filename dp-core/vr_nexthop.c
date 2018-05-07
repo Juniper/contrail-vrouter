@@ -2526,7 +2526,7 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
                   * since in NAT cases the new destination should have been
                   * looked up.
                   */
-                 if (!vr_flow_forward(nh->nh_router, pkt, fmd))
+                 if (!vr_flow_forward(nh->nh_router, pkt, fmd, NULL))
                      return 0;
 
                  /* pkt->vp_nh could have changed after vr_flow_forward */

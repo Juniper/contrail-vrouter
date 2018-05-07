@@ -1201,7 +1201,7 @@ vr_flow_tcp_rflow_set(struct vrouter *router, struct vr_flow_entry *fe,
     return;
 }
 
-static void
+void
 vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
@@ -1478,7 +1478,7 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
 
 flow_result_t
 vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
-               struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+               struct vr_packet *pkt, struct vr_forwarding_md *fmd, unsigned int *fe_index_p)
 {
     unsigned int fe_index;
     struct vr_flow_entry *flow_e;
@@ -1488,7 +1488,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
 
-    flow_e = vr_find_flow(router, key, pkt->vp_type,  &fe_index);
+    flow_e = vr_find_flow(router, key, pkt->vp_type, &fe_index);
     if (!flow_e) {
         if (pkt->vp_nh &&
             (pkt->vp_nh->nh_flags &
@@ -1511,6 +1511,9 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
         /* mark as hold */
         vr_flow_entry_set_hold(router, flow_e, burst);
     }
+
+    if (fe_index_p)
+        *fe_index_p = fe_index;
 
     if (flow_e->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)
         return FLOW_EVICT_DROP;
@@ -1616,28 +1619,28 @@ vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
 
 static flow_result_t
 vr_do_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
-                struct vr_forwarding_md *fmd)
+                struct vr_forwarding_md *fmd, unsigned int *fe_index)
 {
     flow_result_t result = FLOW_FORWARD;
 
     /* Flow processing is only for untagged unicast IP packets */
     if (pkt->vp_type == VP_TYPE_IP)
-        result = vr_inet_flow_lookup(router, pkt, fmd);
+        result = vr_inet_flow_lookup(router, pkt, fmd, fe_index);
     else if (pkt->vp_type == VP_TYPE_IP6)
-        result = vr_inet6_flow_lookup(router, pkt, fmd);
+        result = vr_inet6_flow_lookup(router, pkt, fmd, fe_index);
 
     return result;
 }
 
 bool
 vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
-                struct vr_forwarding_md *fmd)
+                struct vr_forwarding_md *fmd, unsigned int *fe_index)
 {
     flow_result_t result = FLOW_FORWARD;
 
     if ((!(pkt->vp_flags & VP_FLAG_MULTICAST))
         && ((fmd->fmd_vlan == VLAN_ID_INVALID) || vif_is_service(pkt->vp_if)))
-        result = vr_do_flow_lookup(router, pkt, fmd);
+        result = vr_do_flow_lookup(router, pkt, fmd, fe_index);
 
     return __vr_flow_forward(result, pkt, fmd);
 }
@@ -1702,7 +1705,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
         result = vr_flow_action(router, fe, fmd->fmd_flow_index, pkt, fmd);
         forward = __vr_flow_forward(result, pkt, fmd);
     } else {
-        forward = vr_flow_forward(router, pkt, fmd);
+        forward = vr_flow_forward(router, pkt, fmd, NULL);
     }
 
     if (forward)
