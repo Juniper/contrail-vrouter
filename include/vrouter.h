@@ -120,6 +120,9 @@ enum vr_malloc_objects_t {
     VR_QOS_MAP_OBJECT,
     VR_FC_OBJECT,
     VR_FWD_MD_OBJECT,
+#if defined(__linux__) && !defined(__KERNEL__)
+    VR_FLOW_CACHE_OBJECT,
+#endif
     VR_VROUTER_MAX_OBJECT,
 };
 

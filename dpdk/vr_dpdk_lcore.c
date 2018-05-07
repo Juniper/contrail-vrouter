@@ -31,6 +31,14 @@
 #include <rte_timer.h>
 #include <rte_kni.h>
 
+
+extern __thread int cpuid_per_thread;
+
+static inline void set_cpuid()
+{
+    cpuid_per_thread = rte_lcore_id();
+}
+
 /* Returns the least used lcore or VR_MAX_CPUS */
 unsigned
 vr_dpdk_lcore_least_used_get(void)
@@ -1689,6 +1697,7 @@ dpdk_lcore_fwd_loop(void)
 #endif
 
     RTE_LOG_DP(DEBUG, VROUTER, "Hello from forwarding lcore %u\n", lcore_id);
+    set_cpuid();
 
     while (1) {
         rte_prefetch0(lcore);

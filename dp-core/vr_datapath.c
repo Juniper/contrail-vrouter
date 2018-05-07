@@ -11,6 +11,28 @@
 #include <vr_mirror.h>
 #include <vr_bridge.h>
 #include <vr_packet.h>
+#include "vr_hash.h"
+
+#define VR_DPDK_RX_BURST_SZ 32
+
+#ifndef unlikely
+#define likely(expr) __builtin_expect(!!(expr), 1)
+#define unlikely(expr) __builtin_expect(!!(expr), 0)
+#endif
+
+#if defined(__linux__) && !defined(__KERNEL__)
+__thread int cpuid_per_thread;
+
+static inline int get_cpuid(void)
+{
+    return cpuid_per_thread;
+}
+
+static inline void rte_prefetch0(const volatile void *p)
+{
+        asm volatile ("prefetcht0 %[p]" : : [p] "m" (*(const volatile char *)p));
+}
+#endif
 
 #define VR_DPDK_RX_BURST_SZ 32
 
@@ -648,6 +670,19 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     return 0;
 }
 
+#if defined(__linux__) && !defined(__KERNEL__)
+static struct vr_flow_entry ***flow_cache_base_addr;
+static uint64_t zero64 = 0;
+
+/* Initialize flow_cache_base_addr on loading code segment */
+static void __attribute__((constructor, used))
+flow_cache_base_addr_init(void)
+{
+    flow_cache_base_addr = get_flow_cache_base_addr();
+    return;
+}
+#endif
+
 unsigned int
 vr_virtual_input_bulk(unsigned short vrf, struct vr_interface *vif,
                       struct vr_packet **pkt, struct vr_forwarding_md **fmd,
@@ -657,6 +692,22 @@ vr_virtual_input_bulk(unsigned short vrf, struct vr_interface *vif,
     struct vr_packet *pkts[VR_DPDK_RX_BURST_SZ];
     struct vr_forwarding_md *fmds[VR_DPDK_RX_BURST_SZ];
     unsigned int ret = 0;
+#if defined(__linux__) && !defined(__KERNEL__)
+    struct vr_ip *ip;
+    uint32_t hashval, index;
+    uint64_t *ip1, *ip1_saved;
+    uint64_t ip2, ip2_saved;
+    uint32_t *ip3;
+    int cpuid;
+    struct vr_flow flow, *flow_p = &flow;
+    struct vr_flow_entry *fe, **fe_p;
+    unsigned int fe_index;
+    unsigned int ip_inc_diff_cksum = 0;
+    uint32_t new_stats;
+    bool forwarded;
+
+    cpuid = get_cpuid();
+#endif
 
     for (i = 0; i < n; i++) {
         fmd[i]->fmd_vlan = vlan_id[i];
@@ -683,8 +734,85 @@ vr_virtual_input_bulk(unsigned short vrf, struct vr_interface *vif,
             continue;
         }
 
+#if defined(__linux__) && !defined(__KERNEL__)
+        /* won't cache flows if vif_idx >= VR_FLOW_VIF_MAX_IDX because of cache size */
+        if (vif->vif_idx >= VR_FLOW_VIF_MAX_IDX) {
+            if (!vr_flow_forward(pkt[i]->vp_if->vif_router, pkt[i], fmd[i], NULL))
+                continue;
+        } else if (likely(pkt[i]->vp_type == VP_TYPE_IP)) {
+            ip = (struct vr_ip *)pkt_network_header(pkt[i]);
+
+            hashval = vr_hash(&ip->ip_saddr, 12, 0);
+            hashval = vr_hash_2words(hashval, ip->ip_proto, 0);
+            index = hashval & VR_FLOW_CACHE_SIZE_MASK;
+            fe_p = *flow_cache_base_addr + (cpuid * VR_FLOW_VIF_MAX_IDX + vif->vif_idx)* VR_FLOW_CACHE_SIZE
+                                         + index;
+            fe = *fe_p;
+            if (fe) {
+                rte_prefetch0(&fe->fe_key);
+            } else {
+                ip1_saved = &zero64;
+                ip2_saved = 0;
+            }
+            ip1 = (uint64_t *)&ip->ip_saddr;
+            ip3 = (uint32_t *)&ip2;
+            *ip3 = *(uint32_t *)(ip1 + 1);
+            ip3++;
+            *ip3 = ip->ip_proto;
+            if (fe) {
+                ip1_saved = (uint64_t *)&fe->fe_key.flow4_sip;
+                ip3 = (uint32_t *)&ip2_saved;
+                *ip3 = *(uint32_t *)&fe->fe_key.flow4_sport;
+                ip3++;
+                *ip3 = fe->fe_key.flow4_proto;
+            }
+
+            forwarded = false;
+            if (unlikely((!fe) || (*ip1 != *ip1_saved) || (ip2 != ip2_saved))) {
+                bool result = vr_flow_forward(pkt[i]->vp_if->vif_router, pkt[i], fmd[i], &fe_index);
+                if (!result) {
+                    *fe_p = NULL;
+                    fe = NULL;
+                    continue;
+                } else {
+                    *fe_p = vr_flow_get_entry(pkt[i]->vp_if->vif_router, fe_index);
+                    fe = *fe_p;
+                }
+                forwarded = true;
+            }
+
+            if (!forwarded && fe) {
+                /* Update flow entry tcp state */
+                if (ip->ip_proto == VR_IP_PROTO_TCP)
+                    vr_flow_tcp_digest(pkt[i]->vp_if->vif_router, fe, pkt[i], fmd[i]);
+
+                /* Update flow entry stats */
+                new_stats = vr_sync_add_and_fetch_32u(&fe->fe_stats.flow_bytes, pkt_len(pkt[i]));
+                if (new_stats < pkt_len(pkt[i]))
+                    fe->fe_stats.flow_bytes_oflow++;
+
+                new_stats = vr_sync_add_and_fetch_32u(&fe->fe_stats.flow_packets, 1);
+                if (!new_stats)
+                    fe->fe_stats.flow_packets_oflow++;
+
+                /* Decrease ttl by one and recalculate ip checksum */
+                if (fe->fe_ttl && (fe->fe_ttl != ip->ip_ttl)) {
+                    ip_inc_diff_cksum = 0;
+                    vr_incremental_diff(ip->ip_ttl, fe->fe_ttl, &ip_inc_diff_cksum);
+                    ip->ip_ttl = fe->fe_ttl;
+
+                    if (ip_inc_diff_cksum)
+                        vr_ip_incremental_csum(ip, ip_inc_diff_cksum);
+                }
+            }
+        } else if (pkt[i]->vp_type == VP_TYPE_IP6) {
+            if (!vr_flow_forward(pkt[i]->vp_if->vif_router, pkt[i], fmd[i], NULL))
+                continue;
+        }
+#else
         if (!vr_flow_forward(pkt[i]->vp_if->vif_router, pkt[i], fmd[i], NULL))
             continue;
+#endif
 
         pkts[k] = pkt[i];
         fmds[k] = fmd[i];

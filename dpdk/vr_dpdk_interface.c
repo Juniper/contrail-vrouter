@@ -40,6 +40,10 @@
 #include <net/if_arp.h>
 #include <sys/ioctl.h>
 
+#if defined(__linux__) && !defined(__KERNEL__)
+extern volatile unsigned short cur_max_vif_idx;
+#endif
+
 static void
 dpdk_vif_queue_free(struct vr_interface *vif)
 {
@@ -1194,8 +1198,18 @@ extern void vhost_remove_xconnect(void);
 static int
 dpdk_if_add(struct vr_interface *vif)
 {
+#if defined(__linux__) && !defined(__KERNEL__)
+    unsigned short old_cur_max_vif_idx = cur_max_vif_idx;
+#endif
+
     if (vr_dpdk_is_stop_flag_set())
         return -EINPROGRESS;
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    if (vif && (vif->vif_idx > cur_max_vif_idx) && (vif->vif_idx < VR_FLOW_VIF_MAX_IDX)) {
+        cur_max_vif_idx = vif->vif_idx;
+    }
+#endif
 
     if (vif_is_fabric(vif)) {
         return dpdk_fabric_if_add(vif);
@@ -1212,6 +1226,10 @@ dpdk_if_add(struct vr_interface *vif)
     } else if (vif_is_monitoring(vif)) {
         return dpdk_monitoring_if_add(vif);
     }
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    cur_max_vif_idx = old_cur_max_vif_idx;
+#endif
 
     RTE_LOG(ERR, VROUTER,
             "Error adding vif %d (%s): unsupported interface type %d transport %d\n",
