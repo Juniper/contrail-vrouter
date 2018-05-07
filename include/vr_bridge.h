@@ -7,6 +7,10 @@
 #include "vr_defs.h"
 #include "vr_htable.h"
 
+#define VR_BE_CACHE_SIZE 8192
+#define VR_BE_CACHE_SIZE_MASK 0x00001FFF
+#define VR_BE_CACHE_MAX_CPU_ID 26
+
 #define VR_DEF_BRIDGE_ENTRIES          (256 * 1024)
 
 #define VR_MAC_COPY(dst, src) { \

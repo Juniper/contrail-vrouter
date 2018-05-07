@@ -13,6 +13,15 @@
 #include "vr_defs.h"
 #include "vr_hash.h"
 
+#if defined(__linux__) && !defined(__KERNEL__)
+extern __thread int cpuid_per_thread;
+
+static inline int get_cpuid(void)
+{
+    return cpuid_per_thread;
+}
+#endif
+
 #if defined(__linux__) && defined(__KERNEL__)
 extern short vr_bridge_table_major;
 #endif
@@ -983,6 +992,10 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     return 0;
 }
 
+#if defined(__linux__) && !defined(__KERNEL__)
+static struct vr_bridge_entry *be_cache[VR_BE_CACHE_MAX_CPU_ID][VR_BE_CACHE_SIZE];
+#endif
+
 unsigned int
 vr_bridge_input_bulk(struct vrouter *router, struct vr_packet **pkt,
                      struct vr_forwarding_md **fmd, uint32_t n)
@@ -996,6 +1009,12 @@ vr_bridge_input_bulk(struct vrouter *router, struct vr_packet **pkt,
     struct vr_nexthop *nh = NULL;
     struct vr_vrf_stats *stats;
     int i;
+#if defined(__linux__) && !defined(__KERNEL__)
+    uint32_t hashval, index;
+    int cpuid;
+
+    cpuid = get_cpuid();
+#endif
 
     for (i = 0; i < n; i++) {
         if ((pkt[i]->vp_type == VP_TYPE_IP) || (pkt[i]->vp_type == VP_TYPE_IP6)) {
@@ -1087,7 +1106,26 @@ vr_bridge_input_bulk(struct vrouter *router, struct vr_packet **pkt,
             if (IS_MAC_BMCAST(dmac) && (pkt[i]->vp_if->vif_mcast_vrf != 65535))
                 fmd[i]->fmd_dvrf = pkt[i]->vp_if->vif_mcast_vrf;
 
+#if defined(__linux__) && !defined(__KERNEL__)
+            hashval = vr_hash(dmac, 6, 0);
+            hashval = vr_hash_2words(hashval, fmd[i]->fmd_dvrf, 0);
+            index = hashval & VR_BE_CACHE_SIZE_MASK;
+            be = be_cache[cpuid][index];
+            if (be == NULL) {
+                be = bridge_lookup(dmac, fmd[i]);
+                be_cache[cpuid][index] = be;
+            } else {
+                if (fmd[i]) {
+                    if (be->be_flags & VR_BE_LABEL_VALID_FLAG)
+                        vr_fmd_set_label(fmd[i], be->be_label, VR_LABEL_TYPE_UNKNOWN);
+                    if (be->be_flags & VR_BE_L2_CONTROL_DATA_FLAG)
+                        vr_fmd_update_l2_control_data(fmd[i], true);
+                }
+            }
+#else
             be = bridge_lookup(dmac, fmd[i]);
+#endif
+            nh = NULL;
             if (be)
                 nh = be->be_nh;
 
