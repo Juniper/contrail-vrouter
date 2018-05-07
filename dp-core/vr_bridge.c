@@ -983,6 +983,183 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     return 0;
 }
 
+unsigned int
+vr_bridge_input_bulk(struct vrouter *router, struct vr_packet **pkt,
+                     struct vr_forwarding_md **fmd, uint32_t n)
+{
+    int reason, handled;
+    l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
+    unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
+    int8_t *dmac;
+    mac_learn_t ml_res;
+    struct vr_bridge_entry *be;
+    struct vr_nexthop *nh = NULL;
+    struct vr_vrf_stats *stats;
+    int i;
+
+    for (i = 0; i < n; i++) {
+        if ((pkt[i]->vp_type == VP_TYPE_IP) || (pkt[i]->vp_type == VP_TYPE_IP6)) {
+            if (fmd[i]->fmd_dscp < 0) {
+                if (pkt[i]->vp_type == VP_TYPE_IP) {
+                    fmd[i]->fmd_dscp =
+                        vr_inet_get_tos((struct vr_ip *)pkt_network_header(pkt[i]));
+                } else if (pkt[i]->vp_type == VP_TYPE_IP6) {
+                    fmd[i]->fmd_dscp =
+                        vr_inet6_get_tos((struct vr_ip6 *)pkt_network_header(pkt[i]));
+                }
+            }
+        } else {
+            if (fmd[i]->fmd_dotonep < 0) {
+                fmd[i]->fmd_dotonep = vr_vlan_get_tos(pkt_data(pkt[i]));
+            }
+        }
+
+        if (!fmd[i]->fmd_to_me) {
+            if ((pkt[i]->vp_if->vif_flags & VIF_FLAG_MAC_LEARN) ||
+                    (pkt[i]->vp_nh && (pkt[i]->vp_nh->nh_flags & NH_FLAG_MAC_LEARN))) {
+                ml_res = vr_bridge_learn(router, pkt[i],
+                        (struct vr_eth *)pkt_data(pkt[i]), fmd[i]);
+                if (ml_res == MAC_TRAPPED)
+                    continue;
+            }
+        }
+
+        dmac = (int8_t *) pkt_data(pkt[i]);
+        pull_len = 0;
+        if ((pkt[i]->vp_type == VP_TYPE_IP) || (pkt[i]->vp_type == VP_TYPE_IP6) ||
+                (pkt[i]->vp_type == VP_TYPE_ARP)) {
+            pull_len = pkt_get_network_header_off(pkt[i]) - pkt_head_space(pkt[i]);
+            if (pull_len && !pkt_pull(pkt[i], pull_len)) {
+                vr_pfree(pkt[i], VP_DROP_PULL);
+                continue;
+            }
+        }
+
+        /* Do the bridge lookup for the packets not meant for "me" */
+        if (!fmd[i]->fmd_to_me) {
+            /*
+             * If DHCP packet coming from VM, Trap it to Agent before doing the bridge
+             * lookup itself
+             */
+            if (vif_is_virtual(pkt[i]->vp_if)) {
+
+                if (pkt[i]->vp_type == VP_TYPE_IP)
+                    l4_type = vr_ip_well_known_packet(pkt[i]);
+                else if (pkt[i]->vp_type == VP_TYPE_IP6)
+                    l4_type = vr_ip6_well_known_packet(pkt[i]);
+
+                if (l4_type == L4_TYPE_DHCP_REQUEST) {
+                    if (pkt[i]->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED) {
+                        vr_trap(pkt[i], fmd[i]->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+                        continue;
+                    }
+                }
+
+                if (l4_type == L4_TYPE_IGMP) {
+                    if (pkt[i]->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED) {
+                        vr_trap(pkt[i], fmd[i]->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
+                        continue;
+                    }
+                }
+
+                /*
+                 * Handle the unicast ARP, coming from VM, not
+                 * destined to us. Broadcast ARP requests would be handled
+                 * in L2 multicast nexthop. Multicast ARP on fabric
+                 * interface also would be handled in L2 multicast nexthop.
+                 * Unicast ARP packets on fabric interface would be handled
+                 * in plug routines of interface.
+                 */
+                if ((!IS_MAC_BMCAST(dmac)) ||
+                        (pkt[i]->vp_if->vif_flags & VIF_FLAG_MAC_PROXY)) {
+                    handled = 0;
+                    if (pkt[i]->vp_type == VP_TYPE_ARP) {
+                        handled = vr_arp_input(pkt[i], fmd[i], dmac);
+                    } else if (l4_type == L4_TYPE_NEIGHBOUR_SOLICITATION) {
+                        handled = vr_neighbor_input(pkt[i], fmd[i], dmac);
+                    }
+
+                    if (handled)
+                        continue;
+                }
+            }
+
+            if (IS_MAC_BMCAST(dmac) && (pkt[i]->vp_if->vif_mcast_vrf != 65535))
+                fmd[i]->fmd_dvrf = pkt[i]->vp_if->vif_mcast_vrf;
+
+            be = bridge_lookup(dmac, fmd[i]);
+            if (be)
+                nh = be->be_nh;
+
+            if (!nh || nh->nh_type == NH_DISCARD) {
+
+                /* If Flooding of unknown unicast not allowed, drop the packet */
+                if (!vr_unknown_uc_flood(pkt[i]->vp_if, pkt[i]->vp_nh) ||
+                                     IS_MAC_BMCAST(dmac)) {
+                    vr_pfree(pkt[i], VP_DROP_L2_NO_ROUTE);
+                    continue;
+                }
+
+                be = bridge_lookup(vr_bcast_mac, fmd[i]);
+                if (!be || !(nh = be->be_nh)) {
+                    vr_pfree(pkt[i], VP_DROP_L2_NO_ROUTE);
+                    continue;
+                }
+                stats = vr_inet_vrf_stats(fmd[i]->fmd_dvrf, pkt[i]->vp_cpu);
+                if (stats)
+                    stats->vrf_uuc_floods++;
+
+                /* Treat this unknown unicast packet as multicast */
+                pkt[i]->vp_flags |= VP_FLAG_MULTICAST;
+            }
+
+            if (be)
+                vr_sync_fetch_and_add_64u(&be->be_packets, 1);
+
+            if (nh->nh_type != NH_L2_RCV)
+                overlay_len = VROUTER_L2_OVERLAY_LEN;
+
+            /*
+             * If the tunnel is a PBB tunnel, we need to accomodate for Itag
+             * and an extra ethernet (for Bmac) + Vlan header
+             */
+            if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
+                overlay_len += VR_ETHER_HLEN + sizeof(struct vr_vlan_hdr) +
+                                sizeof(struct vr_pbb_itag);
+            }
+        }
+
+        /* Adjust MSS for V4 and V6 packets */
+        if ((pkt[i]->vp_type == VP_TYPE_IP) || (pkt[i]->vp_type == VP_TYPE_IP6)) {
+
+            if (vif_is_virtual(pkt[i]->vp_if) &&
+                    vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj) {
+
+                if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt[i], overlay_len))) {
+                    vr_pfree(pkt[i], reason);
+                    continue;
+                }
+            }
+
+            if (fmd[i]->fmd_to_me) {
+                handled = vr_l3_input(pkt[i], fmd[i]);
+                if (!handled) {
+                    vr_pfree(pkt[i], VP_DROP_NOWHERE_TO_GO);
+                }
+                continue;
+            }
+        }
+
+        if (pull_len && !pkt_push(pkt[i], pull_len)) {
+            vr_pfree(pkt[i], VP_DROP_PUSH);
+            continue;
+        }
+
+        nh_output(pkt[i], nh, fmd[i]);
+    }
+    return 0;
+}
+
 void vr_compute_size_bridge_otable(void)
 {
     if (!vr_bridge_oentries)

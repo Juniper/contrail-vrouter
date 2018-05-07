@@ -12,6 +12,8 @@
 #include <vr_bridge.h>
 #include <vr_packet.h>
 
+#define VR_DPDK_RX_BURST_SZ 32
+
 extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
                                                  unsigned int);
@@ -638,12 +640,59 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         return 0;
     }
 
-    if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd))
+    if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd, NULL))
         return 0;
 
     vr_bridge_input(vif->vif_router, pkt, fmd);
 
     return 0;
+}
+
+unsigned int
+vr_virtual_input_bulk(unsigned short vrf, struct vr_interface *vif,
+                      struct vr_packet **pkt, struct vr_forwarding_md **fmd,
+                      unsigned short *vlan_id, uint32_t n)
+{
+    uint32_t i, k = 0;
+    struct vr_packet *pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_forwarding_md *fmds[VR_DPDK_RX_BURST_SZ];
+    unsigned int ret = 0;
+
+    for (i = 0; i < n; i++) {
+        fmd[i]->fmd_vlan = vlan_id[i];
+        fmd[i]->fmd_dvrf = vrf;
+        if (pkt[i]->vp_priority != VP_PRIORITY_INVALID) {
+            fmd[i]->fmd_dotonep = pkt[i]->vp_priority;
+            pkt[i]->vp_priority = VP_PRIORITY_INVALID;
+        }
+
+        if (vr_pkt_type(pkt[i], 0, fmd[i]) < 0) {
+            vif_drop_pkt(vif, pkt[i], 1);
+            continue;
+        }
+
+        /*
+         * we really do not allow any broadcast packets from interfaces
+         * that are part of transparent service chain, since transparent
+         * service chain bridges packets across vrf (and hence loops can
+         * happen)
+         */
+        if ((pkt[i]->vp_flags & VP_FLAG_MULTICAST) &&
+                (vif_is_service(vif)) && (pkt[i]->vp_type != VP_TYPE_ARP)) {
+            vif_drop_pkt(vif, pkt[i], 1);
+            continue;
+        }
+
+        if (!vr_flow_forward(pkt[i]->vp_if->vif_router, pkt[i], fmd[i], NULL))
+            continue;
+
+        pkts[k] = pkt[i];
+        fmds[k] = fmd[i];
+        k++;
+    }
+
+    ret = vr_bridge_input_bulk(vif->vif_router, pkts, fmds, k);
+    return ret;
 }
 
 unsigned int
@@ -690,6 +739,60 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
         return vif_xconnect(vif, pkt, fmd);
     }
 
+    return 0;
+}
+
+unsigned int
+vr_fabric_input_bulk(struct vr_interface *vif, struct vr_packet **pkt,
+                     struct vr_forwarding_md **fmd, unsigned short *vlan_id, uint32_t n)
+{
+    int handled = 0;
+    unsigned short pull_len;
+    unsigned char *data, eth_dmac[VR_ETHER_ALEN];
+    unsigned int ret = 0;
+    uint32_t i;
+
+    for (i = 0; i < n; i++) {
+        fmd[i]->fmd_vlan = vlan_id[i];
+        fmd[i]->fmd_dvrf = vif->vif_vrf;
+
+        if (vr_pkt_type(pkt[i], 0, fmd[i]) < 0) {
+            vif_drop_pkt(vif, pkt[i], 1);
+            continue;
+        }
+
+        if (pkt[i]->vp_type == VP_TYPE_IP6) {
+            ret = vif_xconnect(vif, pkt[i], fmd[i]);
+            continue;
+        }
+
+        /*
+         * On Fabric only ARP packets are specially handled. Rest all BUM
+         * traffic can be cross connected
+         */
+        if ((pkt[i]->vp_type != VP_TYPE_ARP) &&
+                (pkt[i]->vp_flags & VP_FLAG_MULTICAST)) {
+            ret = vif_xconnect(vif, pkt[i], fmd[i]);
+            continue;
+        }
+
+        data = pkt_data(pkt[i]);
+        pull_len = pkt_get_network_header_off(pkt[i]) - pkt_head_space(pkt[i]);
+        pkt_pull(pkt[i], pull_len);
+
+        if (pkt[i]->vp_type == VP_TYPE_IP || pkt[i]->vp_type == VP_TYPE_IP6) {
+            handled = vr_l3_input(pkt[i], fmd[i]);
+        } else if (pkt[i]->vp_type == VP_TYPE_ARP) {
+            VR_MAC_COPY(eth_dmac, data);
+            handled = vr_arp_input(pkt[i], fmd[i], eth_dmac);
+        }
+
+        if (!handled) {
+            pkt_push(pkt[i], pull_len);
+            ret = vif_xconnect(vif, pkt[i], fmd[i]);
+            continue;
+        }
+    }
     return 0;
 }
 
