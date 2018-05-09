@@ -9,6 +9,11 @@
 #include "vr_defs.h"
 #include "vr_htable.h"
 
+#define VR_FLOW_CACHE_SIZE 4096
+#define VR_FLOW_CACHE_SIZE_MASK 0x00000FFF
+#define VR_FLOW_CACHE_MAX_CPU_ID 26
+#define VR_FLOW_VIF_MAX_IDX 16
+
 #define VR_FLOW_ACTION_DROP         0x0
 #define VR_FLOW_ACTION_HOLD         0x1
 #define VR_FLOW_ACTION_FORWARD      0x2
@@ -522,5 +527,11 @@ unsigned int vr_flow_table_burst_tokens_configured(struct vrouter *);
 unsigned int vr_flow_table_burst_time_configured(struct vrouter *);
 
 void vr_compute_size_oflow_table(void);
+
+void vr_flow_tcp_digest(struct vrouter *, struct vr_flow_entry *,
+        struct vr_packet *, struct vr_forwarding_md *);
+#if defined(__linux__) && defined(__KERNEL__)
+struct vr_flow_entry ***get_flow_cache_base_addr(void);
+#endif
 
 #endif /* __VR_FLOW_H__ */

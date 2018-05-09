@@ -489,6 +489,10 @@ dpdk_argv_append(char *arg, char *val)
     return -1;
 }
 
+#if defined(__linux__) && !defined(__KERNEL__)
+extern volatile unsigned int cur_max_lcore_id;
+#endif
+
 /*
  * dpdk_argv_update - update EAL command line options for rte_eal_init()
  * Returns number of arguments in dpdk_argv on success, < 0 otherwise.
@@ -522,6 +526,9 @@ dpdk_argv_update(void)
 
     /* calculate number of forwarding and IO lcores */
     vr_dpdk.nb_fwd_lcores = CPU_COUNT(&core_mask);
+#if defined(__linux__) && !defined(__KERNEL__)
+    cur_max_lcore_id = vr_dpdk.nb_fwd_lcores + VR_DPDK_FWD_LCORE_ID;
+#endif
     vr_dpdk.nb_io_lcores = 0;
     if (VR_DPDK_USE_IO_LCORES) {
         if (VR_DPDK_SHARED_IO_LCORES) {

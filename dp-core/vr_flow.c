@@ -2104,6 +2104,55 @@ vr_flow_schedule_transition(struct vrouter *router, vr_flow_req *req,
     return __vr_flow_schedule_transition(router, fe, req->fr_index, req->fr_flags);
 }
 
+#if defined(__linux__) && !defined(__KERNEL__)
+volatile unsigned int cur_max_lcore_id = VR_FLOW_CACHE_MAX_CPU_ID;
+volatile unsigned short cur_max_vif_idx = 0;
+static struct vr_flow_entry **flow_cache = NULL;
+
+struct vr_flow_entry ***
+get_flow_cache_base_addr(void)
+{
+    return &flow_cache;
+}
+
+static void
+vr_flow_cache_delete(struct vr_flow_entry *fe)
+{
+    uint32_t flow_key[3];
+    uint16_t *port;
+    uint32_t hashval;
+    uint32_t index;
+    struct vr_flow_entry **fe_p;
+    struct vr_flow_entry *fe_cache;
+    int i, j;
+
+    if (!fe)
+        return;
+
+    flow_key[0] = fe->fe_key.flow4_sip;
+    flow_key[1] = fe->fe_key.flow4_dip;
+    port = (uint16_t *)&flow_key[2];
+    *port = fe->fe_key.flow4_sport;
+    port ++;
+    *port = fe->fe_key.flow4_dport;
+
+    hashval = vr_hash(flow_key, 12, 0);
+    hashval = vr_hash_2words(hashval, fe->fe_key.flow4_proto, 0);
+    index = hashval & VR_FLOW_CACHE_SIZE_MASK;
+    for (i = 0; i < cur_max_lcore_id; i ++) {
+        for (j = 0; j <= cur_max_vif_idx; j ++) {
+            fe_p = flow_cache + (i * VR_FLOW_VIF_MAX_IDX + j) * VR_FLOW_CACHE_SIZE + index;
+            fe_cache = *fe_p;
+            if (fe_cache
+                && !memcmp(&fe_cache->fe_key.flow4_sip, &fe->fe_key.flow4_sip, 8)
+                && !memcmp(&fe_cache->fe_key.flow4_sport, &fe->fe_key.flow4_sport, 4)) {
+                *fe_p = NULL;
+            }
+        }
+    }
+}
+#endif
+
 static int
 vr_flow_delete(struct vrouter *router, vr_flow_req *req,
         struct vr_flow_entry *fe)
@@ -2128,6 +2177,9 @@ vr_flow_delete(struct vrouter *router, vr_flow_req *req,
 
     fe->fe_action = VR_FLOW_ACTION_DROP;
     vr_flow_reset_mirror(router, fe, req->fr_index);
+#if defined(__linux__) && !defined(__KERNEL__)
+    vr_flow_cache_delete(fe);
+#endif
 
     return vr_flow_schedule_transition(router, req, fe);
 }
@@ -2641,9 +2693,25 @@ vr_compute_size_oflow_table(void)
     }
 }
 
+#if defined(__linux__) && !defined(__KERNEL__)
+static int
+vr_flow_cache_init(unsigned int size)
+{
+    flow_cache = vr_zalloc(size, VR_FLOW_CACHE_OBJECT);
+    if (!flow_cache)
+        return -ENOMEM;
+    return 0;
+}
+#endif
+
 static int
 vr_flow_table_init(struct vrouter *router)
 {
+#if defined(__linux__) && !defined(__KERNEL__)
+    unsigned int size = VR_FLOW_CACHE_MAX_CPU_ID * VR_FLOW_VIF_MAX_IDX * VR_FLOW_CACHE_SIZE * 8;
+    int ret = 0;
+#endif
+
     if (!router->vr_flow_table) {
 
         vr_compute_size_oflow_table();
@@ -2665,6 +2733,12 @@ vr_flow_table_init(struct vrouter *router)
                     __LINE__, vr_flow_entries + vr_oflow_entries);
         }
     }
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    ret = vr_flow_cache_init(size);
+    if (ret != 0)
+        return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, size);
+#endif
 
     return vr_flow_table_info_init(router);
 }
