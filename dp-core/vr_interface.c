@@ -15,15 +15,31 @@
 #include "vr_bridge.h"
 #include "vr_btable.h"
 
+#define VR_DPDK_RX_BURST_SZ 32
+
 unsigned int vr_interfaces = VR_MAX_INTERFACES;
 
 volatile bool agent_alive = false;
 
 static struct vr_host_interface_ops *hif_ops;
 
+#if defined(__linux__) && !defined(__KERNEL__)
+static inline void rte_prefetch0(const volatile void *p)
+{
+        asm volatile ("prefetcht0 %[p]" : : [p] "m" (*(const volatile char *)p));
+}
+#endif
+
+#ifdef __KERNEL__
+#define malloc(size) kmalloc((size), GFP_ATOMIC)
+#define free(ptr) kfree((ptr))
+#endif
+
 static int vm_srx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int vm_rx(struct vr_interface *, struct vr_packet *, unsigned short);
+static int vm_rx_bulk(struct vr_interface *, struct vr_packet **, unsigned short *, uint32_t);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
+static int eth_rx_bulk(struct vr_interface *, struct vr_packet **, unsigned short *, uint32_t);
 static mac_response_t vm_mac_request(struct vr_interface *, struct vr_packet *,
                 struct vr_forwarding_md *, unsigned char *);
 static void vif_fat_flow_free(uint8_t **);
@@ -157,10 +173,13 @@ static void
 vr_interface_service_disable(struct vr_interface *vif)
 {
 
-    if (vif_is_virtual(vif))
+    if (vif_is_virtual(vif)) {
         vif->vif_rx = vm_rx;
-    else
+        vif->vif_rx_bulk = vm_rx_bulk;
+    } else {
         vif->vif_rx = eth_rx;
+        vif->vif_rx_bulk = eth_rx_bulk;
+    }
 
     /*
      * once everybody sees the change, we are free to do whatever
@@ -1157,6 +1176,81 @@ vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 static int
+vm_rx_bulk(struct vr_interface *vif, struct vr_packet **pkt,
+           unsigned short *vlan_id, uint32_t n)
+{
+    uint32_t i;
+    uint32_t k = 0;
+    struct vr_forwarding_md *fmd;
+    struct vr_forwarding_md *fmds[VR_DPDK_RX_BURST_SZ];
+    unsigned short vlan_ids[VR_DPDK_RX_BURST_SZ];
+    struct vr_packet *pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_interface *sub_vif;
+    struct vr_interface_stats *stats;
+    struct vr_eth *eth;
+    int ret = 0;
+
+    fmd = (struct vr_forwarding_md *)malloc(sizeof(struct vr_forwarding_md) * n);
+    if (!fmd)
+        return 0;
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    for (i = 0; i < n; i++) {
+        rte_prefetch0(&fmd[i]);
+        rte_prefetch0(pkt[i]);
+    }
+#endif
+
+    for (i = 0; i < n; i++) {
+        sub_vif = NULL;
+        stats = vif_get_stats(vif, pkt[i]->vp_cpu);
+        eth = (struct vr_eth *)pkt_data(pkt[i]);
+        vr_init_forwarding_md(&fmd[i]);
+        fmd[i].fmd_dvrf = vif->vif_vrf;
+
+        vif_mirror(vif, pkt[i], &fmd[i], vif->vif_flags & VIF_FLAG_MIRROR_RX);
+
+        if (vlan_id[i] != VLAN_ID_INVALID && vlan_id[i] < VLAN_ID_MAX) {
+            if (vif->vif_btable) {
+                sub_vif = vif_bridge_get_sub_interface(vif->vif_btable, vlan_id[i],
+                                                        eth->eth_smac);
+            } else {
+                if (vif->vif_sub_interfaces)
+                    sub_vif = vif->vif_sub_interfaces[vlan_id[i]];
+            }
+
+            if (sub_vif) {
+                ret = sub_vif->vif_rx(sub_vif, pkt[i], VLAN_ID_INVALID);
+                continue;
+            }
+        }
+
+        /*
+         * there is a requirement that stats be not counted in both the
+         * underlying interface and in the sub-interface (double count).
+         * this behavior is a specific requirement for VM interfaces since
+         * the VM interface and the sub-interface on top are considered
+         * two different VMIs and can be in two different VRFs. Counting
+         * stats in both interfaces will wrongly put statistics in a VRF
+         * where the statistics should not have been counted. hence the
+         * stats count block is below and not the first thing that we do
+         * in this function.
+         */
+        stats->vis_ibytes += pkt_len(pkt[i]);
+        stats->vis_ipackets++;
+
+        fmds[k] = &fmd[i];
+        pkts[k] = pkt[i];
+        vlan_ids[k] = vlan_id[i];
+        k++;
+    }
+
+    ret = vr_virtual_input_bulk(vif->vif_vrf, vif, pkts, fmds, vlan_ids, k);
+    free(fmd);
+    return ret;
+}
+
+static int
 tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id)
 {
@@ -1328,6 +1422,86 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
 }
 
 static int
+eth_rx_bulk(struct vr_interface *vif, struct vr_packet **pkt,
+            unsigned short *vlan_id, uint32_t n)
+{
+    int ret = 0;
+    uint32_t k = 0;
+    struct vr_forwarding_md *fmd;
+    struct vr_forwarding_md *fmds[VR_DPDK_RX_BURST_SZ];
+    unsigned short vlan_ids[VR_DPDK_RX_BURST_SZ];
+    struct vr_packet *pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_interface *sub_vif;
+    struct vr_interface_stats *stats;
+    struct vr_eth *eth;
+    uint32_t i;
+
+
+    fmd = (struct vr_forwarding_md *)malloc(sizeof(struct vr_forwarding_md) * n);
+    if (!fmd)
+        return 0;
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    for (i = 0; i < n; i++) {
+        rte_prefetch0(&fmd[i]);
+        rte_prefetch0(pkt[i]);
+    }
+#endif
+
+    for (i = 0; i < n; i++) {
+        sub_vif = NULL;
+        stats = vif_get_stats(vif, pkt[i]->vp_cpu);
+        eth = (struct vr_eth *)pkt_data(pkt[i]);
+
+        vr_init_forwarding_md(&fmd[i]);
+
+        stats->vis_ibytes += pkt_len(pkt[i]);
+        stats->vis_ipackets++;
+
+        vif_mirror(vif, pkt[i], &fmd[i], vif->vif_flags & VIF_FLAG_MIRROR_RX);
+
+        /*
+         * please see the text on xconnect mode
+         *
+         * since we would like the packets to reach the VMs (if they were
+         * destined to in the first place), packets have to traverse the
+         * stack. so, just mark a flag suggesting that packet is destined
+         * for the vrouter and force the vrouter to receive the packet
+         */
+        if (vif_mode_xconnect(vif))
+            pkt[i]->vp_flags |= VP_FLAG_TO_ME;
+
+        if ((vlan_id[i] == VLAN_ID_INVALID) &&
+                (vif->vif_flags & VIF_FLAG_NATIVE_VLAN_TAG))
+            vlan_id[i] = 0;
+
+        if (vlan_id[i] != VLAN_ID_INVALID && vlan_id[i] < VLAN_ID_MAX) {
+            if (vif->vif_btable) {
+                sub_vif = vif_bridge_get_sub_interface(vif->vif_btable, vlan_id[i],
+                                                        eth->eth_smac);
+            } else {
+                if (vif->vif_sub_interfaces)
+                    sub_vif = vif->vif_sub_interfaces[vlan_id[i]];
+            }
+
+            if (sub_vif) {
+                ret = sub_vif->vif_rx(sub_vif, pkt[i], VLAN_ID_INVALID);
+                continue;
+            }
+        }
+
+        pkts[k] = pkt[i];
+        fmds[k] = &fmd[i];
+        vlan_ids[k] = vlan_id[i];
+        k++;
+    }
+
+    ret = vr_fabric_input_bulk(vif, pkts, fmds, vlan_ids, k);
+    free(fmd);
+    return ret;
+}
+
+static int
 eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
@@ -1440,10 +1614,12 @@ eth_drv_add(struct vr_interface *vif,
 
         if (vif_is_virtual(vif)) {
             vif->vif_rx = vm_rx;
+            vif->vif_rx_bulk = vm_rx_bulk;
             vif->vif_set_rewrite = vif_cmn_rewrite;
             vif->vif_mac_request = vm_mac_request;
         } else {
             vif->vif_rx = eth_rx;
+            vif->vif_rx_bulk = eth_rx_bulk;
             vif->vif_set_rewrite = eth_set_rewrite;
             vif->vif_mac_request = eth_mac_request;
         }

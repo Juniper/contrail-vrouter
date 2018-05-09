@@ -420,7 +420,7 @@ vr_inet6_get_flow_key(struct vrouter *router, unsigned short vrf,
 
 flow_result_t
 vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
-                    struct vr_forwarding_md *fmd)
+                    struct vr_forwarding_md *fmd, unsigned int *fe_index)
 {
     int ret;
     bool lookup = false;
@@ -472,7 +472,7 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         }
     }
 
-    return vr_flow_lookup(router, flow_p, pkt, fmd);
+    return vr_flow_lookup(router, flow_p, pkt, fmd, fe_index);
 }
 
 
