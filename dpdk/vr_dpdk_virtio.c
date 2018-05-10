@@ -1166,11 +1166,18 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
 
         /* Convert from gpa to vva (guest physical addr -> vhost virtual addr) */
         buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
-        /* Prefetch buffer address. */
-        rte_prefetch0((void *)(uintptr_t)buff_addr);
 
         /* Copy virtio_hdr to packet and increment buffer address */
         buff_hdr_addr = buff_addr;
+
+        if (unlikely(buff_addr == (uint64_t)NULL)) {
+            /* Retry with next descriptor */
+            uncompleted_pkt = 1;
+            goto next_descr;
+        }
+
+        /* Prefetch buffer address. */
+        rte_prefetch0((void *)(uintptr_t)buff_addr);
 
         /*
          * If the descriptors are chained the header and data are
@@ -1184,6 +1191,11 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
             desc = &vq->vdv_desc[desc->next];
             /* Buffer address translation. */
             buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+            if (unlikely(buff_addr == (uint64_t)NULL)) {
+                /* Retry with next descriptor */
+                uncompleted_pkt = 1;
+                goto next_descr;
+            }
         } else {
             vb_offset += virtio_hdr_len;
             hdr = 1;
@@ -1219,6 +1231,11 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
                 if (desc->flags & VRING_DESC_F_NEXT) {
                     desc = &vq->vdv_desc[desc->next];
                     buff_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl, desc->addr);
+                    if (unlikely(buff_addr == (uint64_t)NULL)) {
+                        /* Retry with next descriptor */
+                        uncompleted_pkt = 1;
+                        goto next_descr;
+                    }
                     vb_offset = 0;
                 } else {
                     /* Room in vring buffer is not enough */
@@ -1229,6 +1246,7 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
             len_to_cpy = RTE_MIN(data_len - offset, desc->len - vb_offset);
         };
 
+next_descr:
         /* Update used ring with desc information */
         vq->vdv_used->ring[res_cur_idx & (vq->vdv_size - 1)].id =
                             head[packet_success];
@@ -1248,8 +1266,10 @@ dpdk_virtio_dev_to_vm_tx_burst_simple(struct dpdk_virtio_writer *p,
         if (unlikely(uncompleted_pkt == 1))
             continue;
         */
-        rte_memcpy((void *)(uintptr_t)buff_hdr_addr,
-            (const void *)&virtio_hdr, virtio_hdr_len);
+        if (buff_hdr_addr) {
+            rte_memcpy((void *)(uintptr_t)buff_hdr_addr,
+                (const void *)&virtio_hdr, virtio_hdr_len);
+        }
 
         if (likely(res_cur_idx < res_end_idx)) {
             /* Prefetch descriptor index. */
