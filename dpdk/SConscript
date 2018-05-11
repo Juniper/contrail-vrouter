@@ -21,7 +21,7 @@ env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
 
 # Libraries
 env.Replace(LIBS = ['dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c'])
-env.Append(LIBS = ['rt', 'dl', 'pthread', 'urcu-qsbr'])
+env.Append(LIBS = ['rt', 'dl', 'pthread', 'urcu-qsbr', 'ibverbs'])
 env.Append(LINKFLAGS = env['DPDK_LINKFLAGS'])
 
 dpdk_objs = env.Object(Glob('*.c'))
