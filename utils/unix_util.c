@@ -76,7 +76,7 @@ vr_table_map(int major, unsigned int table, const char *table_path, size_t size,
     }
 
     fd = open(path, O_RDONLY | O_SYNC);
-    if (fd <= 0) {
+    if (fd < 0) {
         goto fail;
     }
 
@@ -1081,7 +1081,7 @@ int
 nl_dcb_parse_reply(struct nl_client *cl, uint8_t cmd, void *resp_buf)
 {
     int ret = 0;
-    uint8_t attr;
+    uint8_t attr = DCB_ATTR_UNDEFINED;
     struct nl_response *resp;
 
     resp = nl_parse_reply(cl);
