@@ -40,7 +40,8 @@ struct genl_family vrouter_genl_family = {
     .version    =   1,
     .maxattr    =   NL_ATTR_MAX - 1,
     .netnsok    =   true,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)) || \
+     (defined(RHEL_MAJOR) && (RHEL_MAJOR >= 7) && (RHEL_MINOR >= 5))
     .ops        =   vrouter_genl_ops,
     .n_ops      =   ARRAY_SIZE(vrouter_genl_ops),
 #endif /* Linux 4.10.0 */
