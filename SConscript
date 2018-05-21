@@ -261,6 +261,8 @@ if sys.platform != 'darwin':
         def make_cmd(target, source, env):
             msbuild = [
                 os.environ['MSBUILD'],
+                '/t:sdv',
+                '/p:Inputs="/check:*"',
                 'windows/vRouter.sln',
                 '/p:Platform=x64',
                 '/p:Configuration=' + env['VS_BUILDMODE']
