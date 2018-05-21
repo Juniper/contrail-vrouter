@@ -746,7 +746,6 @@ win_pull_inner_headers(struct vr_packet *pkt,
     UNREFERENCED_PARAMETER(tunnel_type_cb);
 
     // TODO(Windows): Implement
-    ASSERTMSG("Not implemented", FALSE);
 
     return 1;
 }
@@ -758,7 +757,6 @@ win_pcow(struct vr_packet **pkt, unsigned short head_room)
     UNREFERENCED_PARAMETER(head_room);
 
     // TODO(Windows): Implement
-    ASSERTMSG("Not implemented", FALSE);
 
     return 0;
 }
@@ -775,7 +773,6 @@ win_pull_inner_headers_fast(struct vr_packet *pkt, unsigned char proto,
     UNREFERENCED_PARAMETER(encap_type);
 
     // TODO(Windows): Implement
-    ASSERTMSG("Not implemented", FALSE);
 
     return 0;
 }
