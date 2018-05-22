@@ -154,6 +154,9 @@ VrFreeNetBufferListPool(NDIS_HANDLE pool)
 static VOID
 UninitializeVRouter(pvr_switch_context ctx)
 {
+    if (ctx->assembler_up)
+        VrAssemblerExit();
+
     if (ctx->vrouter_up)
         vrouter_exit(false);
 
@@ -195,6 +198,7 @@ InitializeVRouter(pvr_switch_context ctx)
     ASSERT(!ctx->shmem_devices_up);
     ASSERT(!ctx->message_up);
     ASSERT(!ctx->vrouter_up);
+    ASSERT(!ctx->assembler_up);
     
     /* Before any initialization happens, clean the shared memory tables */
     ShmemClean();
@@ -217,6 +221,10 @@ InitializeVRouter(pvr_switch_context ctx)
 
     ctx->vrouter_up = !vrouter_init();
     if (!ctx->vrouter_up)
+        goto cleanup;
+
+    ctx->assembler_up = !VrAssemblerInit();
+    if (!ctx->assembler_up)
         goto cleanup;
 
     return NDIS_STATUS_SUCCESS;
