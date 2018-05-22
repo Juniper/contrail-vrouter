@@ -509,4 +509,6 @@ unsigned int vr_flow_table_burst_step_configured(struct vrouter *);
 unsigned int vr_flow_table_burst_tokens_configured(struct vrouter *);
 unsigned int vr_flow_table_burst_time_configured(struct vrouter *);
 
+int vr_flow_incr_stats(int , uint32_t , uint16_t, uint32_t);
+
 #endif /* __VR_FLOW_H__ */
