@@ -13,6 +13,7 @@
 #include "vr_uvhost_client.h"
 #include "vr_uvhost_msg.h"
 #include "vr_uvhost_util.h"
+#include "vr_dpdk_filestore.h"
 
 #include <fcntl.h>
 #include <linux/virtio_net.h>
@@ -346,6 +347,13 @@ static int
 vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
 {
     struct vr_interface *vif;
+    unsigned long stored_features = 0;
+
+    if (!vr_dpdk_load_persist_feature(uvhm_client_name(vru_cl),
+                                      &stored_features)) {
+        vru_cl->vruc_msg.u64 |= stored_features;
+    }
+
     vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
@@ -358,9 +366,11 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
         vif->vif_flags |= VIF_FLAG_MRG_RXBUF;
         vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 1);
     } else {
-        vif->vif_flags &= ~VIF_FLAG_MRG_RXBUF; 
+        vif->vif_flags &= ~VIF_FLAG_MRG_RXBUF;
         vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 0);
     }
+    vr_dpdk_store_persist_feature(uvhm_client_name(vru_cl),
+                                  vru_cl->vruc_msg.u64);
     return 0;
 }
 
@@ -1103,6 +1113,7 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
     }
     /* Unmmap guest memory. */
     uvhm_client_munmap(vru_cl);
+    vr_dpdk_del_persist_feature(uvhm_client_name(vru_cl));
     vr_uvhost_del_client(vru_cl);
 
     return 0;
