@@ -154,6 +154,9 @@ VrFreeNetBufferListPool(NDIS_HANDLE pool)
 static VOID
 UninitializeVRouter(pvr_switch_context ctx)
 {
+    // TODO ctx
+    VrAssemblerExit();
+
     if (ctx->vrouter_up)
         vrouter_exit(false);
 
@@ -218,6 +221,10 @@ InitializeVRouter(pvr_switch_context ctx)
     ctx->vrouter_up = !vrouter_init();
     if (!ctx->vrouter_up)
         goto cleanup;
+
+    if (VrAssemblerInit() != STATUS_SUCCESS) {
+        goto cleanup;
+    }
 
     return NDIS_STATUS_SUCCESS;
 

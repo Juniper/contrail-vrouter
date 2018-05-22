@@ -89,6 +89,12 @@ extern void win_if_unlock(void);
 extern int vr_transport_init(void);
 extern void vr_transport_exit(void);
 
+int VrAssemblerInit(void);
+void VrAssemblerExit(void);
+
+extern int win_enqueue_to_assembler(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd);
+
 #ifdef __cplusplus
 }
 #endif
