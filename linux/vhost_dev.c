@@ -470,7 +470,6 @@ vhost_setup(struct net_device *dev)
     dev->needed_headroom = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
     dev->netdev_ops = &vhost_dev_ops;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,9))
-    dev->priv_destructor = vhost_dev_destructor;
     dev->needs_free_netdev = true;
 #else
     dev->destructor = vhost_dev_destructor;
