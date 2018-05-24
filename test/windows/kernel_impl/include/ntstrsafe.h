@@ -4,7 +4,14 @@
 
 #pragma once
 
+#include <windows.h>
 #include <subauth.h>
+
+typedef struct _ANSI_STRING {
+  USHORT Length;
+  USHORT MaximumLength;
+  PCHAR  Buffer;
+} ANSI_STRING, *PANSI_STRING;
 
 #define DECLARE_CONST_UNICODE_STRING(_var, _string) \
 const WCHAR _var ## _buffer[] = _string; \

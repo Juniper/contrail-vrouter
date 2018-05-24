@@ -221,6 +221,10 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     NdisAdvanceNetBufferListDataStart(nbl, pkt->vp_data, TRUE, NULL);
 
+    ExFreePool(pkt);
+
+    ASSERTMSG("Trying to pass non-leaf NBL to NdisFSendNetBufferLists", nbl->ChildRefCount == 0);
+
     NdisFSendNetBufferLists(VrSwitchObject->NdisFilterHandle,
         nbl,
         NDIS_DEFAULT_PORT_NUMBER,
@@ -234,7 +238,7 @@ win_if_tx(struct vr_interface *vif, struct vr_packet* pkt)
 {
     DbgPrint("%s: Got pkt\n", __func__);
     if (vif == NULL) {
-        FreeNetBufferList(pkt->vp_net_buffer_list);
+        win_free_packet(pkt);
         return 0; // Sent into /dev/null
     }
 

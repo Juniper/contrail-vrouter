@@ -4,12 +4,12 @@
 
 #pragma once
 
+#include "wdm.h"
+#include "ntstrsafe.h"
+
 #include <winsock2.h>
 #include <windows.h>
 #include <in6addr.h>
-
-#include "wdm.h"
-#include "ntstrsafe.h"
 
 // fake types
 
@@ -29,12 +29,33 @@
 #define NET_BUFFER_LIST_POOL_PARAMETERS_REVISION_1 0
 #define NDIS_SIZEOF_NET_BUFFER_LIST_POOL_PARAMETERS_REVISION_1 0
 
+// NdisFSendNetBufferLists flags (stubs)
+#define NDIS_SEND_FLAGS_DISPATCH_LEVEL 0
+#define NDIS_SEND_FLAGS_CHECK_FOR_LOOPBACK 0
+#define NDIS_SEND_FLAGS_SWITCH_SINGLE_SOURCE 0
+#define NDIS_SEND_FLAGS_SWITCH_DESTINATION_GROUP 0
+#define NDIS_TEST_SEND_FLAG(_Flags, _Flag) ((_Flags) & (_Flag))
+
+// NdisFSendNetBufferListsComplete flags (stubs)
+#define NDIS_SEND_COMPLETE_FLAGS_DISPATCH_LEVEL 0
+#define NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE 0
+
 #define NDIS_INIT_MUTEX(x)
 #define NDIS_RELEASE_MUTEX(x)
 #define NDIS_WAIT_FOR_MUTEX(x)
-#define NET_BUFFER_LIST_FIRST_NB(x) NULL
+#define NET_BUFFER_FIRST_MDL(_nb) NULL
+#define NET_BUFFER_NEXT_NB(_nb) (nb->Next)
+#define NET_BUFFER_CURRENT_MDL(_nb) (_nb->CurrentMdl)
+#define NET_BUFFER_CURRENT_MDL_OFFSET(_nb) (_nb->CurrentMdlOffset)
+#define NET_BUFFER_DATA_OFFSET(_NB) 0
 #define NET_BUFFER_DATA_LENGTH(x) 0
+#define NET_BUFFER_LIST_FIRST_NB(_nbl) (_nbl->FirstNetBuffer)
+#define NET_BUFFER_LIST_NEXT_NBL(_nbl) (_nbl->Next)
 #define NET_BUFFER_LIST_SWITCH_FORWARDING_DETAIL(x) NULL
+
+#define NDIS_SWITCH_NIC_AT_ARRAY_INDEX(_NicArray_, _Index_) NULL
+
+#define NdisQueryMdl(_Mdl, _VirtualAddress, _Length, _Priority)
 
 typedef int NDIS_MUTEX;
 typedef int NDIS_SWITCH_CONTEXT;
@@ -45,22 +66,66 @@ typedef int NDIS_SWITCH_PORT_ID;
 typedef int NDIS_SWITCH_NIC_INDEX;
 
 typedef void *PNDIS_RW_LOCK_EX;
-typedef void *PNDIS_SWITCH_NIC_ARRAY;
 typedef void *PNDIS_FILTER_ATTACH_PARAMETERS;
 typedef void *PNDIS_FILTER_PAUSE_PARAMETERS;
 typedef void *PNDIS_FILTER_RESTART_PARAMETERS;
 typedef void *PNDIS_OID_REQUEST;
-typedef void *PNET_BUFFER;
 
 // real types
 
 #define NDIS_FILTER_MAJOR_VERSION 6
 #define NDIS_FILTER_MINOR_VERSION 4
 
+typedef struct _LOCK_STATE_EX {
+  KIRQL OldIrql;
+  UCHAR LockState;
+  UCHAR Flags;
+} LOCK_STATE_EX, *PLOCK_STATE_EX;
+
 #define NET_BUFFER_LIST_INFO(_NBL, _Id)             ((_NBL)->NetBufferListInfo[(_Id)])
 
 struct _NET_BUFFER_LIST;
-typedef struct _NET_BUFFER_LIST *PNET_BUFFER_LIST;
+typedef struct _NET_BUFFER_LIST NET_BUFFER_LIST, *PNET_BUFFER_LIST;
+typedef UNICODE_STRING NDIS_STRING, *PNDIS_STRING;
+typedef PVOID NDIS_HANDLE, *PNDIS_HANDLE;
+
+struct _NET_BUFFER;
+typedef struct _NET_BUFFER NET_BUFFER, *PNET_BUFFER;
+struct _NET_BUFFER {
+  union {
+    struct {
+      PNET_BUFFER Next;
+      PMDL        CurrentMdl;
+      ULONG       CurrentMdlOffset;
+      union {
+        ULONG  DataLength;
+        SIZE_T stDataLength;
+      };
+      PMDL        MdlChain;
+      ULONG       DataOffset;
+    };
+    // SLIST_HEADER      Link;
+    // NET_BUFFER_HEADER NetBufferHeader;
+  };
+  USHORT                ChecksumBias;
+  USHORT                Reserved;
+  NDIS_HANDLE           NdisPoolHandle;
+  PVOID                 NdisReserved[2];
+  PVOID                 ProtocolReserved[6];
+  PVOID                 MiniportReserved[4];
+  // NDIS_PHYSICAL_ADDRESS DataPhysicalAddress;
+  // union {
+  //   PNET_BUFFER_SHARED_MEMORY SharedMemoryInfo;
+  //   PSCATTER_GATHER_LIST      ScatterGatherList;
+  // };
+};
+
+typedef struct _NET_BUFFER_LIST_CONTEXT {
+    struct NET_BUFFER_LIST_CONTEXT *Next;
+    USHORT                          Size;
+    USHORT                          Offset;
+    UCHAR                           ContextData[];
+} NET_BUFFER_LIST_CONTEXT, *PNET_BUFFER_LIST_CONTEXT;
 
 typedef enum _NDIS_NET_BUFFER_LIST_INFO {
     TcpIpChecksumNetBufferListInfo,
@@ -96,9 +161,6 @@ typedef enum _NDIS_NET_BUFFER_LIST_INFO {
     MaxNetBufferListInfo
 } NDIS_NET_BUFFER_LIST_INFO, *PNDIS_NET_BUFFER_LIST_INFO;
 
-typedef UNICODE_STRING NDIS_STRING, *PNDIS_STRING;
-typedef PVOID NDIS_HANDLE, *PNDIS_HANDLE;
-
 typedef struct _NDIS_OBJECT_HEADER {
     UCHAR  Type;
     UCHAR  Revision;
@@ -114,6 +176,14 @@ typedef struct _NDIS_DEVICE_OBJECT_ATTRIBUTES {
     PCUNICODE_STRING   DefaultSDDLString;
     LPCGUID            DeviceClassGuid;
 } NDIS_DEVICE_OBJECT_ATTRIBUTES, *PNDIS_DEVICE_OBJECT_ATTRIBUTES;
+
+typedef struct _NDIS_SWITCH_NIC_ARRAY {
+  NDIS_OBJECT_HEADER Header;
+  ULONG              Flags;
+  USHORT             FirstElementOffset;
+  ULONG              NumElements;
+  ULONG              ElementSize;
+} NDIS_SWITCH_NIC_ARRAY, *PNDIS_SWITCH_NIC_ARRAY;
 
 typedef void FILTER_SEND_NET_BUFFER_LISTS(
     NDIS_HANDLE FilterModuleContext,
@@ -260,25 +330,25 @@ typedef struct _NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO {
     };
 } NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO, *PNDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO;
 
-typedef struct _NET_BUFFER_LIST_CONTEXT {
-    struct NET_BUFFER_LIST_CONTEXT *Next;
-    USHORT                          Size;
-    USHORT                          Offset;
-    UCHAR                           ContextData[];
-} NET_BUFFER_LIST_CONTEXT, *PNET_BUFFER_LIST_CONTEXT;
-
 typedef struct _NET_BUFFER_LIST_DATA {
     PNET_BUFFER_LIST Next;
     PNET_BUFFER      FirstNetBuffer;
 } NET_BUFFER_LIST_DATA, *PNET_BUFFER_LIST_DATA;
 
-typedef union _NET_BUFFER_LIST_HEADER {
-    NET_BUFFER_LIST_DATA NetBufferListData;
-    SLIST_HEADER         Link;
-} NET_BUFFER_LIST_HEADER, *PNET_BUFFER_LIST_HEADER;
+// typedef struct _NET_BUFFER_LIST_HEADER {
+//     NET_BUFFER_LIST_DATA NetBufferListData;
+//     SLIST_HEADER         Link;
+// } NET_BUFFER_LIST_HEADER, *PNET_BUFFER_LIST_HEADER;
 
-typedef struct _NET_BUFFER_LIST {
-    NET_BUFFER_LIST_HEADER   NetBufferListHeader;
+struct _NET_BUFFER_LIST {
+    union {
+        struct {
+            PNET_BUFFER_LIST Next;
+            PNET_BUFFER      FirstNetBuffer;
+        };
+        // SLIST_HEADER           Link;
+        // NET_BUFFER_LIST_HEADER NetBufferListHeader;
+    };
     PNET_BUFFER_LIST_CONTEXT Context;
     PNET_BUFFER_LIST         ParentNetBufferList;
     NDIS_HANDLE              NdisPoolHandle;
@@ -292,7 +362,10 @@ typedef struct _NET_BUFFER_LIST {
     ULONG                    Flags;
     NDIS_STATUS              Status;
     PVOID                    NetBufferListInfo[MaxNetBufferListInfo];
-} NET_BUFFER_LIST, *PNET_BUFFER_LIST;
+
+    // Flags for testing:
+    BOOLEAN                  TestIsCompleted;
+};
 
 typedef struct _NDIS_SWITCH_PORT_DESTINATION {
     NDIS_SWITCH_PORT_ID   PortId;
@@ -325,9 +398,47 @@ typedef union _NDIS_SWITCH_FORWARDING_DETAIL_NET_BUFFER_LIST_INFO {
     };
 } NDIS_SWITCH_FORWARDING_DETAIL_NET_BUFFER_LIST_INFO, *PNDIS_SWITCH_FORWARDING_DETAIL_NET_BUFFER_LIST_INFO;
 
+// stubs:
+typedef struct {
+    PWCH   String;
+    USHORT Length;
+} NDIS_SWITCH_NIC_NAME;
+typedef int NDIS_SWITCH_PORT_ID, NDIS_SWITCH_NIC_INDEX, NDIS_SWITCH_NIC_TYPE;
+#define NdisSwitchNicTypeExternal 0
+#define NdisSwitchNicTypeInternal 0
+#define NdisSwitchNicTypeEmulated 0
+#define NdisSwitchNicTypeSynthetic 0
+
+typedef struct _NDIS_SWITCH_NIC_PARAMETERS {
+//   NDIS_OBJECT_HEADER           Header;
+//   ULONG                        Flags;
+  NDIS_SWITCH_NIC_NAME         NicName;
+//   NDIS_SWITCH_NIC_FRIENDLYNAME NicFriendlyName;
+  NDIS_SWITCH_PORT_ID          PortId;
+  NDIS_SWITCH_NIC_INDEX        NicIndex;
+  NDIS_SWITCH_NIC_TYPE         NicType;
+//   NDIS_SWITCH_NIC_STATE        NicState;
+//   NDIS_VM_NAME                 VmName;
+//   NDIS_VM_FRIENDLYNAME         VmFriendlyName;
+  GUID                         NetCfgInstanceId;
+//   ULONG                        MTU;
+//   USHORT                       NumaNodeId;
+//   UCHAR                        PermanentMacAddress[NDIS_MAX_PHYS_ADDRESS_LENGTH];
+//   UCHAR                        VMMacAddress[NDIS_MAX_PHYS_ADDRESS_LENGTH];
+//   UCHAR                        CurrentMacAddress[NDIS_MAX_PHYS_ADDRESS_LENGTH];
+//   BOOLEAN                      VFAssigned;
+//   ULONG64                      NdisReserved[2];
+} NDIS_SWITCH_NIC_PARAMETERS, *PNDIS_SWITCH_NIC_PARAMETERS;
+
 typedef void NET_BUFFER_FREE_MDL_HANDLER(
     PMDL Mdl
 );
+
+typedef VOID (NDIS_IO_WORKITEM_FUNCTION)(
+    PVOID                        WorkItemContext,
+    NDIS_HANDLE                  NdisIoWorkItemHandle
+    );
+typedef NDIS_IO_WORKITEM_FUNCTION (*NDIS_IO_WORKITEM_ROUTINE);
 
 PVOID NdisGetDataBuffer(
     PNET_BUFFER NetBuffer,
@@ -337,8 +448,106 @@ PVOID NdisGetDataBuffer(
     UINT        AlignOffset
 );
 
+PMDL NdisAllocateMdl(
+  NDIS_HANDLE NdisHandle,
+  PVOID       VirtualAddress,
+  UINT        Length
+);
+
+PNET_BUFFER_LIST NdisAllocateNetBufferAndNetBufferList(
+  NDIS_HANDLE           PoolHandle,
+  USHORT                ContextSize,
+  USHORT                ContextBackFill,
+  PMDL                  MdlChain,
+  ULONG                 DataOffset,
+  SIZE_T                DataLength
+);
+
+PNET_BUFFER_LIST NdisAllocateCloneNetBufferList(
+  PNET_BUFFER_LIST OriginalNetBufferList,
+  NDIS_HANDLE      NetBufferListPoolHandle,
+  NDIS_HANDLE      NetBufferPoolHandle,
+  ULONG            AllocateCloneFlags
+);
+
+PNET_BUFFER_LIST NdisAllocateReassembledNetBufferList(
+  PNET_BUFFER_LIST FragmentNetBufferList,
+  NDIS_HANDLE      NetBufferAndNetBufferListPoolHandle,
+  ULONG            StartOffset,
+  ULONG            DataOffsetDelta,
+  ULONG            DataBackFill,
+  ULONG            AllocateReassembleFlags
+);
+
+PNET_BUFFER_LIST NdisAllocateFragmentNetBufferList(
+  PNET_BUFFER_LIST OriginalNetBufferList,
+  NDIS_HANDLE      NetBufferListPool,
+  NDIS_HANDLE      NetBufferPool,
+  ULONG            StartOffset,
+  ULONG            MaximumLength,
+  ULONG            DataOffsetDelta,
+  ULONG            DataBackFill,
+  ULONG            AllocateFragmentFlags
+);
+
+void NdisFreeNetBufferList(
+  __drv_freesMem(mem)PNET_BUFFER_LIST NetBufferList
+);
+
+void NdisFreeCloneNetBufferList(
+  __drv_freesMem(mem)PNET_BUFFER_LIST CloneNetBufferList,
+  ULONG                               FreeCloneFlags
+);
+
+void NdisFreeMdl(
+  __drv_freesMem(mem)PMDL Mdl
+);
+
+void NdisFSendNetBufferListsComplete(
+  NDIS_HANDLE      NdisFilterHandle,
+  PNET_BUFFER_LIST NetBufferList,
+  ULONG            SendCompleteFlags
+);
+
+void NdisAcquireRWLockRead(
+  PNDIS_RW_LOCK_EX            Lock,
+  _IRQL_saves_ PLOCK_STATE_EX LockState,
+  UCHAR                       Flags
+);
+
+void NdisReleaseRWLock(
+  PNDIS_RW_LOCK_EX               Lock,
+  _IRQL_restores_ PLOCK_STATE_EX LockState
+);
+
+NDIS_HANDLE NdisAllocateIoWorkItem(
+  NDIS_HANDLE NdisObjectHandle
+);
+
+// callback definitions
+
+typedef NDIS_STATUS (*NDIS_SWITCH_ALLOCATE_NET_BUFFER_LIST_FORWARDING_CONTEXT)(
+  NDIS_SWITCH_CONTEXT NdisSwitchContext,
+  PNET_BUFFER_LIST NetBufferList
+);
+
+typedef void (*NDIS_SWITCH_FREE_NET_BUFFER_LIST_FORWARDING_CONTEXT)(
+  NDIS_SWITCH_CONTEXT NdisSwitchContext,
+  PNET_BUFFER_LIST NetBufferList
+);
+
+typedef NDIS_STATUS (*NDIS_SWITCH_COPY_NET_BUFFER_LIST_INFO)(
+  NDIS_SWITCH_CONTEXT NdisSwitchContext,
+  PNET_BUFFER_LIST DestNetBufferList,
+  PNET_BUFFER_LIST SrcNetBufferList,
+  UINT32 Flags
+);
+
 // fake types
 
 typedef struct _NDIS_SWITCH_OPTIONAL_HANDLERS {
     NDIS_SWITCH_ADD_NET_BUFFER_LIST_DESTINATION_HANDLER             AddNetBufferListDestination;
+    NDIS_SWITCH_ALLOCATE_NET_BUFFER_LIST_FORWARDING_CONTEXT         AllocateNetBufferListForwardingContext;
+    NDIS_SWITCH_FREE_NET_BUFFER_LIST_FORWARDING_CONTEXT             FreeNetBufferListForwardingContext;
+    NDIS_SWITCH_COPY_NET_BUFFER_LIST_INFO                           CopyNetBufferListInfo;
 } NDIS_SWITCH_OPTIONAL_HANDLERS, *PNDIS_SWITCH_OPTIONAL_HANDLERS;
