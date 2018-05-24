@@ -143,6 +143,7 @@ static void rate_process(vr_interface_req *req, vr_interface_req *prev_req);
 static void rate_stats_diff(vr_interface_req *, vr_interface_req *);
 static void rate_stats(struct nl_client *, unsigned int);
 static int is_stdin_hit();
+static int is_number(const char *nptr);
 
 static struct vr_util_flags flag_metadata[] = {
     {VIF_FLAG_POLICY_ENABLED,   "P",        "Policy"            },
@@ -1129,6 +1130,24 @@ safer_strtoul(const char *nptr, char **endptr, int base)
     }
 }
 
+static int
+is_number(const char *nptr)
+{
+    unsigned int i;
+    if (nptr == NULL) {
+        errno = EINVAL;
+        return 0;
+    } else {
+        for (i = 0; i < strlen(nptr); i++) {
+            if (!isdigit(nptr[i])) {
+                return 0;
+            } else {
+                continue;
+            }
+        }
+    }
+    return 1;
+}
 
 static void
 parse_long_opts(int option_index, char *opt_arg)
@@ -1152,7 +1171,11 @@ parse_long_opts(int option_index, char *opt_arg)
             break;
 
         case VRF_OPT_INDEX:
-            vrf_id = safer_strtoul(opt_arg, NULL, 0);
+            if (is_number(opt_arg)) {
+                vrf_id = safer_strtoul(opt_arg, NULL, 0);
+            } else {
+                printf(" Invalid vrf id %s \n", opt_arg);
+            }
             if (errno)
                 Usage();
             break;
@@ -1175,20 +1198,23 @@ parse_long_opts(int option_index, char *opt_arg)
 
         case GET_OPT_INDEX:
             vr_op = SANDESH_OP_GET;
-            vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
+            if (is_number(opt_arg))
+                vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case VIF_OPT_INDEX:
             /* we carry monitored vif index in OS index field */
-            if_kindex = safer_strtoul(opt_arg, NULL, 0);
+            if (is_number(opt_arg))
+                if_kindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case VINDEX_OPT_INDEX:
-            vif_index = safer_strtoul(opt_arg, NULL, 0);
+            if (is_number(opt_arg))
+                vif_index = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
@@ -1237,14 +1263,16 @@ parse_long_opts(int option_index, char *opt_arg)
 
         case SET_OPT_INDEX:
             vr_op = SANDESH_OP_ADD;
-            vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
+            if (is_number(opt_arg))
+                vr_ifindex = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
 
         case VLAN_OPT_INDEX:
             vr_ifflags |= VIF_FLAG_SERVICE_IF;
-            vlan_id = safer_strtoul(opt_arg, NULL, 0);
+            if (is_number(opt_arg))
+                vlan_id = safer_strtoul(opt_arg, NULL, 0);
             if (errno)
                 Usage();
             break;
