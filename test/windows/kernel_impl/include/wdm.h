@@ -4,15 +4,17 @@
 
 #pragma once
 
-#include <windows.h>
-
 #include "ntddk.h"
 #include "ntstrsafe.h"
+
+#include <windows.h>
 
 // fake types
 
 #define DO_DIRECT_IO 0
 #define PAGE_SHIFT 0
+
+#define MmGetSystemAddressForMdlSafe(_mdl, _flags) NULL
 
 enum {
     IRP_MJ_CREATE,
@@ -24,9 +26,12 @@ enum {
     IRP_MJ_MAXIMUM_FUNCTION,
 };
 
-typedef void *PMDL;
 typedef void *PDRIVER_DISPATCH;
 typedef void *PDRIVER_UNLOAD;
+
+typedef struct _MDL {
+    struct _MDL *Next;
+} MDL, *PMDL;
 
 typedef struct _DEVICE_OBJECT {
     ULONG                       Flags;

@@ -2,11 +2,14 @@
 # Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
 #
 
+# This SConscript is used only for userspace tests of vrouter
+
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
 env.Append(CPPPATH = [env['TOP_INCLUDE'], '../test/windows/kernel_impl/include'])
 env.Append(CPPDEFINES = '__KERNEL__')
+env.Append(CPPDEFINES = 'CMOCKA_UNIT_TESTING')
 
 # Treat warnings as errors
 env.Append(CPPFLAGS = '/WX')
@@ -14,6 +17,8 @@ env.Append(CPPFLAGS = '/WX')
 # Files should be added when needed to this list
 sources = [
     'vr_host_interface.c',
+    'vr_nbl.c',
+    'vr_host.c',
 ]
 
 env.StaticLibrary('windows_vrouter', source = sources)
