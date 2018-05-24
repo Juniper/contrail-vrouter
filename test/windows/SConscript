@@ -15,7 +15,12 @@ env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../windows', '../../dp-core', '../../sandesh'])
 
 vrouter_stubs = env.Object('vrouter_stubs.c')
-env.StaticLibrary('kernel_stubs', ['kernel_impl/src/wdm.c', 'kernel_impl/src/ndis.c'])
+env.StaticLibrary('kernel_stubs', [
+    'kernel_impl/src/ndis.c',
+    'kernel_impl/src/ntddk.c',
+    'kernel_impl/src/wdm.c',
+    'kernel_impl/src/wdmsec.c',
+])
 
 # vRouter code
 env.Replace(LIBS = ['windows_vrouter', 'dp_core', 'dp_sandesh_c', 'kernel_stubs'])
@@ -25,6 +30,8 @@ env.Append(LIBS = 'cmocka')
 env.Append(LIBS = ['ws2_32.lib', 'ntdll.lib'])
 
 env.AppendENVPath('Path', Dir('#build/bin'))
-example_test = env.UnitTest('example_test', ['test.c', vrouter_stubs])
-kernel_tests = env.TestSuite('kernel-tests', [example_test])
+kernel_tests = env.TestSuite('kernel-tests', [
+    env.UnitTest('example_test', ['test.c', vrouter_stubs]),
+    env.UnitTest('nbl_test', ['test_nbl.c', 'test_helpers.c', vrouter_stubs]),
+])
 env.Requires(kernel_tests, '#build/bin/cmocka.dll')

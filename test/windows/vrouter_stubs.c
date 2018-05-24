@@ -7,15 +7,9 @@
 unsigned int vr_num_cpus = 1;
 const ULONG VrAllocationTag = 'TSET';
 PSWITCH_OBJECT VrSwitchObject = NULL;
+NDIS_HANDLE VrNBLPool = "definitely not null";
 
 void get_random_bytes(void *buf, int nbytes) {
-}
-
-struct host_os * vrouter_get_host(void) {
-    return NULL;
-}
-
-VOID FreeNetBufferList(PNET_BUFFER_LIST nbl) {
 }
 
 int pkt0_if_tx(struct vr_interface *vif, struct vr_packet *pkt) {

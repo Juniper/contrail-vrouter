@@ -79,7 +79,6 @@ struct host_os * vrouter_get_host(void);
 
 NDIS_HANDLE vrouter_generate_pool(void);
 void vrouter_free_pool(NDIS_HANDLE pool);
-int win_pcopy_from_nb(unsigned char *dst, PNET_BUFFER src, unsigned int offset, unsigned int len);
 
 extern struct host_os windows_host;
 
