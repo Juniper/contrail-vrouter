@@ -15,7 +15,12 @@ env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../windows', '../../dp-core', '../../sandesh'])
 
 vrouter_stubs = env.Object('vrouter_stubs.c')
-env.StaticLibrary('kernel_stubs', ['kernel_impl/src/wdm.c', 'kernel_impl/src/ndis.c'])
+env.StaticLibrary('kernel_stubs', [
+    'kernel_impl/src/ndis.c',
+    'kernel_impl/src/ntddk.c',
+    'kernel_impl/src/wdm.c',
+    'kernel_impl/src/wdmsec.c',
+])
 
 # vRouter code
 env.Replace(LIBS = ['windows_vrouter', 'dp_core', 'dp_sandesh_c', 'kernel_stubs'])

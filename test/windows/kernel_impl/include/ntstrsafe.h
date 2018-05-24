@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <windows.h>
 #include <subauth.h>
 
 #define DECLARE_CONST_UNICODE_STRING(_var, _string) \
