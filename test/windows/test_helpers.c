@@ -10,18 +10,28 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-PNET_BUFFER_LIST AllocateMockNetBufferList(NDIS_HANDLE NBLPool) {
+PNET_BUFFER_LIST AllocateMockNetBufferList(NDIS_HANDLE NBLPool, ULONG nNetBuffers) {
     PNET_BUFFER_LIST nbl = NdisAllocateNetBufferAndNetBufferList(NBLPool, 0, 0, NULL, 0, 0);
     assert_non_null(nbl);
     NDIS_STATUS status = VrSwitchObject->NdisSwitchHandlers.AllocateNetBufferListForwardingContext(
         VrSwitchObject->NdisSwitchContext,
         nbl);
     assert(status == STATUS_SUCCESS);
+
+    PNET_BUFFER *pNextNb = &NET_BUFFER_LIST_FIRST_NB(nbl);
+    for (ULONG i = 1; i <= nNetBuffers; ++i) {
+        PNET_BUFFER nb = test_calloc(1, sizeof(NET_BUFFER));
+        assert_non_null(nb);
+        nb->TestContentTag = i;
+        *pNextNb = nb;
+        pNextNb = &NET_BUFFER_NEXT_NB(nb);
+    }
+
     return nbl;
 }
 
 struct vr_packet *AllocateMockNetBufferListWithVrPacket() {
-    PNET_BUFFER_LIST nbl = AllocateMockNetBufferList(VrNBLPool);
+    PNET_BUFFER_LIST nbl = AllocateMockNetBufferList(VrNBLPool, 0);
 
     struct vr_packet *pkt = test_calloc(1, sizeof(struct vr_packet));
     assert_non_null(pkt);
@@ -65,4 +75,13 @@ void InitializeVrSwitchObject(void) {
     VrSwitchObject->NdisSwitchHandlers.AllocateNetBufferListForwardingContext = MockAllocateNetBufferListForwardingContext;
     VrSwitchObject->NdisSwitchHandlers.FreeNetBufferListForwardingContext = MockFreeNetBufferListForwardingContext;
     VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo = MockCopyNetBufferListInfo;
+}
+
+void FreeNblChain(PNET_BUFFER_LIST nblList) {
+    PNET_BUFFER_LIST nextNbl;
+    for (; nblList; nblList = nextNbl) {
+        nextNbl = NET_BUFFER_LIST_NEXT_NBL(nblList);
+        NET_BUFFER_LIST_NEXT_NBL(nblList) = NULL;
+        FreeNetBufferList(nblList);
+    }
 }

@@ -100,6 +100,9 @@ struct _NET_BUFFER {
   //   PNET_BUFFER_SHARED_MEMORY SharedMemoryInfo;
   //   PSCATTER_GATHER_LIST      ScatterGatherList;
   // };
+
+  // Fields for testing
+  int                   TestContentTag;
 };
 
 typedef struct _NET_BUFFER_LIST_CONTEXT {
