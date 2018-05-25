@@ -8,6 +8,8 @@
 
 #include <ndis.h>
 
-PNET_BUFFER_LIST AllocateMockNetBufferList(NDIS_HANDLE NBLPool);
+PNET_BUFFER_LIST AllocateMockNetBufferList(NDIS_HANDLE NBLPool, ULONG nNetBuffers);
 struct vr_packet *AllocateMockNetBufferListWithVrPacket(void);
+void FreeNblChain(PNET_BUFFER_LIST nblList);
+
 void InitializeVrSwitchObject(void);

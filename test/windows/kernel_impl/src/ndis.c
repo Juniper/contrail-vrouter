@@ -65,7 +65,22 @@ PNET_BUFFER_LIST NdisAllocateCloneNetBufferList(
   ULONG            AllocateCloneFlags
 ) {
     PNET_BUFFER_LIST nbl = test_calloc(1, sizeof(NET_BUFFER_LIST));
+    assert_non_null(nbl);
     nbl->NdisPoolHandle = NetBufferListPoolHandle;
+
+    PNET_BUFFER *pNextNb = &NET_BUFFER_LIST_FIRST_NB(nbl);
+    for (
+        PNET_BUFFER originalNb = NET_BUFFER_LIST_FIRST_NB(OriginalNetBufferList);
+        originalNb;
+        originalNb = NET_BUFFER_NEXT_NB(originalNb)
+    ) {
+        PNET_BUFFER nb = test_calloc(1, sizeof(NET_BUFFER_LIST));
+        assert_non_null(nb);
+        *pNextNb = nb;
+        pNextNb = &NET_BUFFER_NEXT_NB(nb);
+        nb->TestContentTag = originalNb->TestContentTag;
+    }
+
     return nbl;
 }
 
@@ -98,6 +113,11 @@ PNET_BUFFER_LIST NdisAllocateFragmentNetBufferList(
 void NdisFreeNetBufferList(
   __drv_freesMem(mem)PNET_BUFFER_LIST NetBufferList
 ) {
+    PNET_BUFFER nextNb;
+    for (PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(NetBufferList); nb; nb = nextNb) {
+        nextNb = NET_BUFFER_NEXT_NB(nb);
+        test_free(nb);
+    }
     test_free(NetBufferList);
 }
 
@@ -105,7 +125,7 @@ void NdisFreeCloneNetBufferList(
   __drv_freesMem(mem)PNET_BUFFER_LIST CloneNetBufferList,
   ULONG                               FreeCloneFlags
 ) {
-    test_free(CloneNetBufferList);
+    NdisFreeNetBufferList(CloneNetBufferList);
 }
 
 void NdisFreeMdl(

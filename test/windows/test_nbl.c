@@ -12,8 +12,48 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
+static void test_SplitNblSingleNb(void **state) {
+    PNET_BUFFER_LIST nbl = AllocateMockNetBufferList(VrNBLPool, 1);
+
+    PNET_BUFFER_LIST splittedNblList = SplitMultiNetBufferNetBufferList(nbl);
+    assert_ptr_equal(nbl, splittedNblList);
+
+    FreeNetBufferList(nbl);
+}
+
+static void test_SplitNblMultipleNbs(void **state) {
+    PNET_BUFFER_LIST nbl = AllocateMockNetBufferList(VrNBLPool, 3);
+
+    PNET_BUFFER_LIST splittedNblList = SplitMultiNetBufferNetBufferList(nbl);
+
+    // Verify that original NBL is intact
+    PNET_BUFFER origNb = NET_BUFFER_LIST_FIRST_NB(nbl);
+    for (int i = 1; i <= 3; ++i) {
+        assert_non_null(origNb);
+        assert_int_equal(origNb->TestContentTag, i);
+
+        origNb = NET_BUFFER_NEXT_NB(origNb);
+    }
+    assert_null(origNb);
+
+    // Verify that every NB is cloned to a separate NBL
+    PNET_BUFFER_LIST clonedNbl = splittedNblList;
+    for (int i = 1; i<= 3; ++i) {
+        assert_non_null(clonedNbl);
+        PNET_BUFFER clonedNb = NET_BUFFER_LIST_FIRST_NB(clonedNbl);
+        assert_non_null(clonedNb);
+        assert_null(NET_BUFFER_NEXT_NB(clonedNb));
+        assert_int_equal(clonedNb->TestContentTag, i);
+
+        clonedNbl = NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
+    }
+    assert_null(clonedNbl);
+
+    FreeNblChain(splittedNblList);
+}
+
 static void test_FreeCloneNetBufferListNonRecursive(void **state) {
-    PNET_BUFFER_LIST parentNbl = AllocateMockNetBufferList(VrNBLPool);
+    PNET_BUFFER_LIST parentNbl = AllocateMockNetBufferList(VrNBLPool, 0);
 
     PNET_BUFFER_LIST child = CloneNetBufferList(parentNbl);
     assert_non_null(child);
@@ -23,7 +63,7 @@ static void test_FreeCloneNetBufferListNonRecursive(void **state) {
 }
 
 static void test_CloneNetBufferList(void **state) {
-    PNET_BUFFER_LIST parentNbl = AllocateMockNetBufferList(VrNBLPool);
+    PNET_BUFFER_LIST parentNbl = AllocateMockNetBufferList(VrNBLPool, 0);
 
     PNET_BUFFER_LIST child1 = CloneNetBufferList(parentNbl);
     assert_non_null(child1);
@@ -39,7 +79,7 @@ static void test_CloneNetBufferList(void **state) {
 
 static void test_CloneNonOwnedNetBufferList(void **state) {
     // Simulate NBL not created by us.
-    PNET_BUFFER_LIST parentNbl = AllocateMockNetBufferList(NULL);
+    PNET_BUFFER_LIST parentNbl = AllocateMockNetBufferList(NULL, 0);
 
     PNET_BUFFER_LIST child = CloneNetBufferList(parentNbl);
     assert_non_null(child);
@@ -81,6 +121,8 @@ static void test_pclone(void **state) {
 
 int main(void) {
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_SplitNblSingleNb),
+        cmocka_unit_test(test_SplitNblMultipleNbs),
         cmocka_unit_test(test_FreeCloneNetBufferListNonRecursive),
         cmocka_unit_test(test_CloneNetBufferList),
         cmocka_unit_test(test_CloneNonOwnedNetBufferList),
