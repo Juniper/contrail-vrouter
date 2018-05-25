@@ -232,6 +232,64 @@ win_free_packet(struct vr_packet *pkt)
     FreeNetBufferList(nbl);
 }
 
+/*
+ * Splits NBL with multiple NBs into list of NBLs,
+ * in which each NBL has a single NB.
+ *
+ * The original NBL is set as a parent and left intact.
+ * The returned value is a list of new NBLs.
+ *
+ * In case the NBL has a single Net Buffer List,
+ * returns the original NBL.
+ */
+PNET_BUFFER_LIST
+SplitMultiNetBufferNetBufferList(PNET_BUFFER_LIST origNbl)
+{
+    PNET_BUFFER nextNb, nb, firstNb = NET_BUFFER_LIST_FIRST_NB(origNbl);
+    PNET_BUFFER_LIST *pNextNbl, nextNbl, clonedNbl = NULL, clonedNblList = NULL;
+    pNextNbl = &clonedNblList;
+
+    if (firstNb == NULL || NET_BUFFER_NEXT_NB(firstNb) == NULL) {
+        return origNbl;
+    }
+
+    for (nb = firstNb; nb; nb = nextNb) {
+        // Pretend it's a single-NB NBL for the time of cloning
+        NET_BUFFER_LIST_FIRST_NB(origNbl) = nb;
+        nextNb = NET_BUFFER_NEXT_NB(nb);
+        NET_BUFFER_NEXT_NB(nb) = NULL;
+
+        // TODO optimization: use NDIS_CLONE_FLAGS_USE_ORIGINAL_MDLS flag
+        // (need to support it in free)
+        clonedNbl = CloneNetBufferList(origNbl);
+
+        NET_BUFFER_NEXT_NB(nb) = nextNb;
+
+        if (clonedNbl == NULL) {
+            goto cleanup;
+        }
+
+        *pNextNbl = clonedNbl;
+        pNextNbl = &NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
+    }
+
+    // Restore original NB chain
+    NET_BUFFER_LIST_FIRST_NB(origNbl) = firstNb;
+
+    return clonedNblList;
+
+cleanup:
+    NET_BUFFER_LIST_FIRST_NB(origNbl) = firstNb;
+
+    for (clonedNbl = clonedNblList; clonedNbl; clonedNbl = nextNbl) {
+        nextNbl = NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
+        NET_BUFFER_LIST_NEXT_NBL(clonedNbl) = NULL;
+        FreeClonedNetBufferListPreservingParent(clonedNbl);
+    }
+
+    return NULL;
+}
+
 #ifndef CMOCKA_UNIT_TESTING
 
 void
@@ -462,23 +520,36 @@ FilterSendNetBufferLists(
             continue;
         }
 
-        struct vr_packet *pkt = win_get_packet(curNbl, vif);
-        ASSERTMSG("win_get_packed failed!", pkt != NULL);
-
-        if (pkt == NULL) {
-            /* If `win_get_packet` fails, it will drop the NBL. */
+        // Enforce 1 to 1 NBL <-> NB relationship
+        PNET_BUFFER_LIST splittedNblList = SplitMultiNetBufferNetBufferList(curNbl);
+        if (splittedNblList == NULL) {
             NdisFSendNetBufferListsComplete(switchObject->NdisFilterHandle, curNbl, sendCompleteFlags);
             continue;
         }
+        curNbl = splittedNblList;
 
-        ASSERTMSG("VIF doesn't have a vif_rx method set!", vif->vif_rx != NULL);
-        if (vif->vif_rx) {
-            vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
-        }
-        else {
-            /* If `vif_rx` is not set (unlikely in production), then drop the packet. */
-            vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
-            continue;
+        PNET_BUFFER_LIST innerLoopNextNbl;
+        for (; curNbl; curNbl = innerLoopNextNbl) {
+            innerLoopNextNbl = curNbl->Next;
+            curNbl->Next = NULL;
+
+            struct vr_packet *pkt = win_get_packet(curNbl, vif);
+            ASSERTMSG("win_get_packed failed!", pkt != NULL);
+
+            if (pkt == NULL) {
+                FreeNetBufferList(curNbl);
+                continue;
+            }
+
+            ASSERTMSG("VIF doesn't have a vif_rx method set!", vif->vif_rx != NULL);
+            if (vif->vif_rx) {
+                vif->vif_rx(vif, pkt, VLAN_ID_INVALID);
+            }
+            else {
+                /* If `vif_rx` is not set (unlikely in production), then drop the packet. */
+                vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
+                continue;
+            }
         }
     }
 
