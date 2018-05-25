@@ -1634,8 +1634,11 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     will_fragment = (vr_pkt_type_is_overlay(pkt->vp_type) &&
             vif->vif_mtu < rte_pktmbuf_pkt_len(m));
 
-    /* Segmentation is applicable instead of fragmentation if packet has GSO enabled */
-    will_segment = will_fragment && dpdk_pkt_is_gso(m);
+    /* Segmentation is applicable if packet has GSO enabled and the 
+     * packet length is greater than the tso segment size as given by the VM
+     */
+    will_segment = dpdk_pkt_is_gso(m) &&
+                     (rte_pktmbuf_pkt_len(m) > m->tso_segsz);
 
     /*
      * With DPDK pktmbufs we don't know if the checksum is incomplete,
