@@ -662,7 +662,7 @@ dpdk_check_sriov_vf(void)
     struct rte_eth_dev_info dev_info;
     size_t soff;
 
-    for (i = 0; i < rte_eth_dev_count(); i++)
+    VR_DPDK_RTE_ETH_FOREACH_DEV(i)
     {
         rte_eth_dev_info_get(i, &dev_info);
         /* Check PMD name suffix to detect SR-IOV virtual function. */
@@ -742,8 +742,12 @@ dpdk_init(void)
     if (ret < 0)
         return ret;
 
-    /* get number of ports found in scan */
+    /* get number of available ports found in scan */
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    nb_sys_ports = rte_eth_dev_count_avail();
+#else
     nb_sys_ports = rte_eth_dev_count();
+#endif
     RTE_LOG(INFO, VROUTER, "Found %d eth device(s)\n", nb_sys_ports);
 
     /* get number of cores */

@@ -272,6 +272,17 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_MGMTPATH 0
 #define VR_DPDK_DATAPATH 1
 
+/**
+ * Macro to iterate over all enabled and ownerless dpdk ethdev ports.
+ */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    #define VR_DPDK_RTE_ETH_FOREACH_DEV(p) \
+        RTE_ETH_FOREACH_DEV(p)
+#else
+    #define VR_DPDK_RTE_ETH_FOREACH_DEV(p) \
+        for (p = 0; p < rte_eth_dev_count(); p++)
+#endif
+
 /*
  * DPDK LCore IDs
  */
