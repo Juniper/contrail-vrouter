@@ -544,7 +544,11 @@ dpdk_knidev_change_mtu(uint8_t port_id, unsigned new_mtu)
     uint8_t slave_port_id;
     struct vr_dpdk_ethdev *ethdev = NULL;
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    if (port_id >= rte_eth_dev_count_avail()) {
+#else
     if (port_id >= rte_eth_dev_count()) {
+#endif
         RTE_LOG(ERR, VROUTER,
                 "Error changing eth device %"PRIu8" MTU: invalid eth device\n",
                 port_id);
@@ -630,7 +634,11 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
     struct vr_dpdk_ethdev *ethdev = NULL;
     int ret = 0;
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    if (port_id >= rte_eth_dev_count_avail() || port_id >= RTE_MAX_ETHPORTS) {
+#else
     if (port_id >= rte_eth_dev_count() || port_id >= RTE_MAX_ETHPORTS) {
+#endif
         RTE_LOG(ERR, VROUTER, "%s: Invalid eth device %" PRIu8 "\n",
                 __func__, port_id);
         return -EINVAL;
@@ -669,6 +677,8 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 {
     int i;
     struct rte_eth_dev_info dev_info;
+    const struct rte_bus *bus;
+    const struct rte_pci_device *pci_dev;
     struct rte_kni_conf kni_conf;
     struct rte_kni_ops kni_ops;
     struct rte_kni *kni;
@@ -708,8 +718,23 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
     memset(&kni_conf, 0, sizeof(kni_conf));
     strncpy(kni_conf.name, (char *)vif->vif_name, sizeof(kni_conf.name) - 1);
 
-    kni_conf.addr = dev_info.pci_dev->addr;
-    kni_conf.id = dev_info.pci_dev->id;
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    bus = rte_bus_find_by_device(dev_info.device);
+    if (bus && !strcmp(bus->name, "pci"))
+        pci_dev = RTE_DEV_TO_PCI(dev_info.device);
+    else
+        pci_dev = NULL;
+#else
+    (void)bus;
+    pci_dev = dev_info.pci_dev;
+#endif
+    if (!pci_dev) {
+        RTE_LOG(ERR, VROUTER, "    error initializing KNI device %s: eth device"
+                " %"PRIu8" is not a pci device\n", vif->vif_name, port_id);
+        return -EINVAL;
+    }
+    kni_conf.addr = pci_dev->addr;
+    kni_conf.id = pci_dev->id;
     kni_conf.group_id = port_id;
     kni_conf.mbuf_size = vr_packet_sz;
     /*
