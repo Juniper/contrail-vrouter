@@ -278,7 +278,11 @@ dpdk_find_port_id_by_pci_addr(const struct rte_pci_addr *addr)
     uint8_t i;
     struct rte_pci_addr *eth_pci_addr;
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    RTE_ETH_FOREACH_DEV(i) {
+#else
     for (i = 0; i < rte_eth_dev_count(); i++) {
+#endif
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
         if (rte_eth_devices[i].data == NULL)
 #else
@@ -329,7 +333,11 @@ dpdk_find_port_id_by_drv_name(void)
 {
     uint8_t i;
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    RTE_ETH_FOREACH_DEV(i) {
+#else
     for (i = 0; i < rte_eth_dev_count(); i++) {
+#endif
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
         if (rte_eth_devices[i].device == NULL)
             continue;
@@ -703,7 +711,11 @@ vr_ethdev_conf_update(struct rte_eth_conf *dev_conf)
         }
     }
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    RTE_ETH_FOREACH_DEV(i)
+#else
     for (i = 0; i < rte_eth_dev_count(); i++)
+#endif
     {
         rte_eth_dev_info_get(i, &dev_info);
 
@@ -727,19 +739,24 @@ static int
 dpdk_fabric_if_add(struct vr_interface *vif)
 {
     int ret;
-    uint8_t port_id;
+    uint16_t port_id, ports_num;
     struct rte_pci_addr pci_address;
     struct vr_dpdk_ethdev *ethdev;
     struct ether_addr mac_addr;
     struct rte_eth_conf fabric_ethdev_conf;
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    ports_num = rte_eth_dev_count_avail();
+#else
+    ports_num = rte_eth_dev_count();
+#endif
     memset(&pci_address, 0, sizeof(pci_address));
     memset(&mac_addr, 0, sizeof(mac_addr));
     if (vif->vif_flags & VIF_FLAG_PMD) {
-        if (vif->vif_os_idx >= rte_eth_dev_count()) {
+        if (vif->vif_os_idx >= ports_num) {
             RTE_LOG(ERR, VROUTER, "Error adding vif %u eth device %s: invalid PMD %u"
                     " (must be less than %u)\n", vif->vif_idx, vif->vif_name,
-                    vif->vif_os_idx, (unsigned)rte_eth_dev_count());
+                    vif->vif_os_idx, ports_num);
             return -ENOENT;
         }
 
