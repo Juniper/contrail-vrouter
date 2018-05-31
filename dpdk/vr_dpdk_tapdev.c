@@ -578,7 +578,6 @@ vr_dpdk_tapdev_rxtx(void)
 static void vr_dpdk_handle_vhost0_notification(uint32_t mtu, uint32_t if_up)
 {
     static int vhost_mtu = 1500; /* Default MTU */
-    static int vhost_if_status = 1; /* Default if state */
 
     struct vr_interface *vif;
     struct vrouter *router = vrouter_get(0);
@@ -659,26 +658,6 @@ static void vr_dpdk_handle_vhost0_notification(uint32_t mtu, uint32_t if_up)
         vhost_mtu = mtu;
     }
 
-    if (vhost_if_status != if_up) {
-
-        ret = 0;
-
-        RTE_LOG(INFO, VROUTER, "Configuring eth device %" PRIu8 " %s\n",
-                        port_id, if_up ? "UP" : "DOWN");
-
-        if (if_up)
-            ret = rte_eth_dev_start(port_id);
-        else
-            rte_eth_dev_stop(port_id);
-
-        if (ret < 0) {
-            RTE_LOG(ERR, VROUTER, "Configuring eth device %" PRIu8 " UP "
-                        "failed (%d)\n", port_id, ret);
-        }
-
-        /* Save the new IF state */
-        vhost_if_status = if_up;
-    }
 }
 
 void vr_dpdk_tapdev_handle_notifications(void)
