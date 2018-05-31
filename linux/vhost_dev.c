@@ -471,7 +471,8 @@ vhost_setup(struct net_device *dev)
     dev->netdev_ops = &vhost_dev_ops;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,9))
     dev->priv_destructor = vhost_dev_destructor;
-    dev->needs_free_netdev = true;
+    /* free_netdev executed by destructor */
+    dev->needs_free_netdev = false;
 #else
     dev->destructor = vhost_dev_destructor;
 #endif /*KERNEL_4.11*/
