@@ -15,6 +15,9 @@ AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
 AddOption('--system-header-path', dest = 'system-header-path', action='store',
           help='Linux kernel headers for applications')
 
+AddOption('--add-opts', dest = 'add-opts', action='store',
+          help='Additional options for vrouter compilation')
+
 env = DefaultEnvironment().Clone()
 VRouterEnv = env
 dpdk_exists = os.path.isdir('../third_party/dpdk')
@@ -25,6 +28,9 @@ DPDK_SRC_DIR = '#third_party/dpdk/'
 DPDK_DST_DIR = env['TOP'] + '/vrouter/dpdk/' + DPDK_TARGET
 DPDK_INC_DIR = DPDK_DST_DIR + '/include'
 DPDK_LIB_DIR = DPDK_DST_DIR + '/lib'
+THRD_PRT_DIR = '#third_party/'
+INSTALL_ENV  =  os.getuid()
+ADDNL_OPTION = GetOption('add-opts')
 
 # Include paths
 env.Replace(CPPPATH = '#vrouter/include')
@@ -141,6 +147,11 @@ if sys.platform != 'darwin':
     if dpdk_exists and not GetOption('without-dpdk'):
         subdirs.append('dpdk')
         exports.append('dpdk_lib')
+        dpdk_src_dir = Dir(DPDK_SRC_DIR).abspath
+        if ADDNL_OPTION and 'enableMellanox' in ADDNL_OPTION:
+            thrd_prt_dir = Dir(THRD_PRT_DIR).abspath
+            mlnx_patch_cmd = 'patch -N ' + dpdk_src_dir + '/config/common_base ' + thrd_prt_dir + '/dpdk_mlnx.patch'
+            os.system(mlnx_patch_cmd)
 
         rte_ver_filename = '../third_party/dpdk/lib/librte_eal/common/include/rte_version.h'
         rte_ver_file = open(rte_ver_filename, 'r')
@@ -214,10 +225,15 @@ if sys.platform != 'darwin':
         #    '-lrte_pmd_mlx4',
         #    '-lrte_pmd_ring',
         #    '-lrte_pmd_pcap',
-            '-lrte_pmd_af_packet',
-            '-Wl,--end-group',
-            '-Wl,--no-whole-archive'
+            '-lrte_pmd_af_packet'
         ]
+        if ADDNL_OPTION and 'enableMellanox' in ADDNL_OPTION:
+            DPDK_LIBS.append('-lrte_pmd_mlx5')
+            DPDK_LIBS.append('-libverbs')
+            DPDK_LIBS.append('-lmlx5')
+
+        DPDK_LIBS.append('-Wl,--end-group')
+        DPDK_LIBS.append('-Wl,--no-whole-archive')
 
         if year_matches and month_matches:
             DPDK_LIBS.append('-Wl,-lnuma')
@@ -226,7 +242,6 @@ if sys.platform != 'darwin':
         DPDK_FLAGS = ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
 
         # Make DPDK
-        dpdk_src_dir = Dir(DPDK_SRC_DIR).abspath
         dpdk_dst_dir = Dir(DPDK_DST_DIR).abspath
 
         make_cmd = 'make -C ' + dpdk_src_dir \
