@@ -1524,6 +1524,8 @@ update_secure_len(vr_dpdk_virtioq_t *vq, uint32_t id,
     uint32_t vec_id = *vec_idx;
 
     do {
+        if (vec_id >= VR_BUF_VECTOR_MAX)
+            break;
         next_desc = 0;
         len += vq->vdv_desc[idx].len;
         buf_vec[vec_id].buf_addr = vq->vdv_desc[idx].addr;
