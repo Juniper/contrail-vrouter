@@ -49,13 +49,26 @@ vr_dpdk_tapdev_init(struct vr_interface *vif)
 
     RTE_LOG(INFO, VROUTER, "    creating TAP device %s\n", vif->vif_name);
 
-    /* Find an empty TAP slot. */
-    for (i = 0; i < VR_DPDK_MAX_TAP_INTERFACES; i++) {
-        if (vr_dpdk.tapdevs[i].tapdev_fd <= 0) {
-            tapdev = &vr_dpdk.tapdevs[i];
-            break;
+    /* If vif is vhost0, reuse previously existed slot if any. */
+    if (vif_is_vhost(vif)) {
+        for (i = 0; i < VR_DPDK_MAX_TAP_INTERFACES; i++) {
+            if (vr_dpdk.tapdevs[i].tapdev_vhost_fd > 0) {
+               RTE_LOG(INFO, VROUTER, "    TAP device %s already exists\n", vif->vif_name);
+               tapdev = &vr_dpdk.tapdevs[i];
+               fd = tapdev->tapdev_fd = tapdev->tapdev_vhost_fd;
+               goto enable_tap;
+            }
         }
     }
+
+    /* Find an empty TAP slot. */
+    for (i = 0; i < VR_DPDK_MAX_TAP_INTERFACES; i++) {
+         if (vr_dpdk.tapdevs[i].tapdev_fd <= 0) {
+             tapdev = &vr_dpdk.tapdevs[i];
+             break;
+         }
+    }
+
     if (tapdev == NULL) {
         RTE_LOG(ERR, VROUTER, "    error allocating TAP device %s\n",
             vif->vif_name);
@@ -73,6 +86,10 @@ vr_dpdk_tapdev_init(struct vr_interface *vif)
     /* Create TAP interface. */
     memset(&ifr, 0, sizeof(ifr));
     strncpy(ifr.ifr_name, (char *)vif->vif_name, sizeof(ifr.ifr_name) - 1);
+    if (vif_is_vhost(vif))
+        tapdev->tapdev_vhost_fd = fd;
+    else
+        tapdev->tapdev_vhost_fd = -1;
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
     if (ioctl(fd, TUNSETIFF, &ifr) < 0) {
         RTE_LOG(ERR, VROUTER, "    error creating TAP interface %s: %s (%d)\n",
@@ -80,6 +97,7 @@ vr_dpdk_tapdev_init(struct vr_interface *vif)
         goto error;
     }
 
+enable_tap:
     /* Enable TAP device. */
     vif->vif_os = tapdev;
     tapdev->tapdev_vif = vif;
@@ -145,7 +163,8 @@ vr_dpdk_tapdev_release(struct vr_interface *vif)
     if (fd > 0) {
         tapdev->tapdev_fd = -1;
         synchronize_rcu();
-        close(fd);
+        if (tapdev->tapdev_vhost_fd < 0)
+            close(fd);
     }
 
     vif->vif_os = NULL;
@@ -166,11 +185,6 @@ vr_dpdk_tapdev_release(struct vr_interface *vif)
                 rte_pktmbuf_free(mbuf);
             }
         }
-    }
-
-    if (vif_is_vhost(vif) && vr_dpdk.tap_nl_fd > 0) {
-        close(vr_dpdk.tap_nl_fd);
-        vr_dpdk.tap_nl_fd = -1;
     }
 
     return 0;
