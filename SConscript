@@ -202,6 +202,7 @@ if sys.platform != 'darwin':
             '-lrte_pmd_i40e',
         #    '-lrte_pmd_fm10k',
             '-lrte_pmd_ixgbe',
+            '-lrte_pmd_nfp',
             '-lrte_pmd_e1000',
         #    '-lrte_pmd_mlx4',
         #    '-lrte_pmd_ring',
