@@ -19,6 +19,7 @@
 #include "vr_hash.h"
 #include "vr_proto.h"
 #include "vr_sandesh.h"
+#include "vr_dpdk_offloads.h"
 
 #include <linux/if_ether.h>
 #include <netinet/ip.h>
@@ -1471,6 +1472,9 @@ struct host_os dpdk_host = {
     .hos_is_frag_limit_exceeded     =    dpdk_is_frag_limit_exceeded,
     .hos_register_nic               =    dpdk_register_nic, /* not used with DPDK */
     .hos_nl_broadcast_supported     =    false,
+    .hos_offload_flow_create        =    dpdk_offload_flow_create,
+    .hos_offload_flow_destroy       =    dpdk_offload_flow_destroy,
+    .hos_offload_prepare            =    dpdk_offload_prepare,
 };
 
 struct host_os *
