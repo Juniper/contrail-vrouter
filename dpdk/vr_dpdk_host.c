@@ -246,7 +246,7 @@ dpdk_pktmbuf_data_copy(struct rte_mbuf *dst, struct rte_mbuf *src)
     dst->data_off = src->data_off;
     dst->port = src->port;
     dst->ol_flags = src->ol_flags;
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+#ifdef IND_ATTACHED_MBUF
     dst->ol_flags &= (~IND_ATTACHED_MBUF);
 #endif
     dst->packet_type = src->packet_type;
