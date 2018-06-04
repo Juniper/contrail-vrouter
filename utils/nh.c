@@ -29,7 +29,7 @@
 #include "vr_os.h"
 #include "nl_util.h"
 
-static int8_t src_mac[6], dst_mac[6];
+static int8_t src_mac[6], dst_mac[6], l3_vxlan_mac[6];
 static uint16_t sport, dport;
 static uint32_t nh_id, if_id, vrf_id, flags;
 static int nh_set, command, type, dump_marker = -1;
@@ -198,6 +198,10 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
             strcat(ptr, "RouteLookup, ");
             break;
 
+        case NH_FLAG_L3_VXLAN:
+            strcat(ptr, "l3_vxlan, ");
+            break;
+
         case NH_FLAG_TUNNEL_VXLAN:
             strcat(ptr, "Vxlan, ");
             break;
@@ -326,6 +330,10 @@ nexthop_req_process(void *s_req)
                                                   ntohs(req->nhr_tun_dport));
         }
 
+        if (req->nhr_flags & NH_FLAG_L3_VXLAN)
+            printf(" L3_Vxlan_Mac: "MAC_FORMAT,
+                    MAC_VALUE((uint8_t*)req->nhr_rw_dst_mac));
+
         if (req->nhr_flags & NH_FLAG_TUNNEL_PBB) {
             i = -1;
             if (req->nhr_label_list_size)
@@ -422,7 +430,7 @@ op_retry:
                     vrf_id, dst, comp_nh[0], lbl[0]);
         } else if ((type == NH_ENCAP) || (type == NH_TUNNEL)) {
             ret = vr_send_nexthop_encap_tunnel_add(cl, 0, type, nh_id,
-                    flags, vrf_id, if_id, src, dst, sip, dip, sport, dport);
+                    flags, vrf_id, if_id, src, dst, sip, dip, sport, dport, l3_vxlan_mac);
         } else if (type == NH_COMPOSITE) {
             ret = vr_send_nexthop_composite_add(cl, 0, nh_id, flags, vrf_id,
                     comp_nh_ind, comp_nh, lbl, family);
@@ -502,6 +510,7 @@ cmd_usage()
            "                    [--vxlan Vxlan Tunnel]\n"
            "                        [--sport <port> source port of vxlan tunnel]\n"
            "                        [--dport <port> destination port of vxlan tunnel]\n"
+           "                        [--l3_vxlan <xx:xx:xx:xx:xx:xx> Remote EVPN-5 vRouter mac]\n"
            "                [RESOLVE_NH options]\n"
            "                [DISCARD_NH options]\n"
            "                [COMPOSITE_NH options]\n"
@@ -545,6 +554,7 @@ enum opt_index {
     L2_OPT_IND,
     SPORT_OPT_IND,
     DPORT_OPT_IND,
+    L3_VXLAN_OPT_IND,
     UDP_OPT_IND,
     VXLAN_OPT_IND,
     CNI_OPT_IND,
@@ -599,6 +609,7 @@ static struct option long_options[] = {
     [L2_OPT_IND]        = {"l2",    no_argument,        &opt[L2_OPT_IND],       1},
     [SPORT_OPT_IND]     = {"sport", required_argument,  &opt[SPORT_OPT_IND],    1},
     [DPORT_OPT_IND]     = {"dport", required_argument,  &opt[DPORT_OPT_IND],    1},
+    [L3_VXLAN_OPT_IND]  = {"l3_vxlan", required_argument, &opt[L3_VXLAN_OPT_IND], 1},
     [UDP_OPT_IND]       = {"udp",   no_argument,        &opt[UDP_OPT_IND],      1},
     [VXLAN_OPT_IND]     = {"vxlan", no_argument,        &opt[VXLAN_OPT_IND],    1},
     [CNI_OPT_IND]       = {"cni",   required_argument,  &opt[CNI_OPT_IND],      1},
@@ -714,6 +725,13 @@ parse_long_opts(int ind, char *opt_arg)
         if (errno)
             usage();
         break;
+    case L3_VXLAN_OPT_IND:
+        mac = ether_aton(opt_arg);
+        if (mac)
+            memcpy(l3_vxlan_mac, mac, sizeof(l3_vxlan_mac));
+        else
+            cmd_usage();
+        break;
     }
 
     return;
@@ -789,6 +807,9 @@ validate_options(void)
                 if (!opt_set(SMAC_OPT_IND) || !opt_set(DMAC_OPT_IND))
                     cmd_usage();
 
+                if (opt_set(L3_VXLAN_OPT_IND))
+                    flags |= NH_FLAG_L3_VXLAN;
+
                 if (memcmp(opt, zero_opt, sizeof(opt)))
                     cmd_usage();
             }
@@ -823,6 +844,8 @@ validate_options(void)
                 flags |= NH_FLAG_TUNNEL_VXLAN;
                 if (!opt_set(SPORT_OPT_IND) || !opt_set(DPORT_OPT_IND))
                     cmd_usage();
+                if (opt_set(L3_VXLAN_OPT_IND))
+                    flags |= NH_FLAG_L3_VXLAN;
             }
 
             if (!(flags & (NH_FLAG_TUNNEL_UDP_MPLS | NH_FLAG_TUNNEL_UDP |
