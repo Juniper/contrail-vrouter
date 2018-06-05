@@ -55,6 +55,7 @@ buffer sandesh vr_nexthop_req {
     25: i32         nhr_encap_crypt_oif_id;
     26: i32         nhr_crypt_traffic;
     27: i32         nhr_crypt_path_available;
+    28: list<byte>  nhr_rw_dst_mac;
 }
 
 buffer sandesh vr_interface_req {
