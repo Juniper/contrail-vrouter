@@ -81,7 +81,7 @@
 #define VIRTUAL_TRANSPORT_STRING    "virtual"
 
 static struct nl_client *cl;
-static char flag_string[32], if_name[IFNAMSIZ];
+static char flag_string[64], if_name[IFNAMSIZ];
 static int if_kindex = -1, vrf_id, vr_ifindex = -1;
 static int if_pmdindex = -1, vif_index = -1;
 static bool need_xconnect_if = false;
@@ -261,13 +261,21 @@ static char *
 vr_if_flags(int flags)
 {
     unsigned int i, array_size;
-
+    unsigned int all_len = 0;
     memset(flag_string, 0, sizeof(flag_string));
 
     array_size = sizeof(flag_metadata) / sizeof(flag_metadata[0]);
     for (i = 0; i < array_size; i++) {
-        if (flags & flag_metadata[i].vuf_flag)
-            strcat(flag_string, flag_metadata[i].vuf_flag_symbol);
+      if (flags & flag_metadata[i].vuf_flag) {
+	unsigned int flag_len;
+	flag_len = strlen(flag_metadata[i].vuf_flag_symbol);
+	if (all_len + flag_len < sizeof(flag_string)) {
+	  strcat(flag_string, flag_metadata[i].vuf_flag_symbol);
+	  all_len += flag_len;
+	}
+	else
+	  break;
+      }
     }
 
     return flag_string;
