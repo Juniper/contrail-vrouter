@@ -9,6 +9,25 @@
 #include "vrouter.h"
 #include "windows_nbl.h"
 
+/*
+ * # Memory management of NBLs and vr_packets
+ *
+ * vr_packet is allocated in separate allocation and has a pointer
+ *     void* vp_net_buffer_list;
+ * that points to its NBL. There should be at most one vr_packet
+ * per NBL (could be 0 for NBLs that are some "leftovers after Cloning").
+ * An NBL doesn't have any pointers to the associated vr_packet.
+ *
+ * vr_packets are considered owned by dp-core.
+ * vr_packets can only point to leaf NBLs.
+ * Deallocating parent NBLs is not done directly,
+ * but is triggered when the ChildRefCount drops to 0,
+ * which is be caused by freeing the child NBL.
+ *
+ * vr_packet is usually freed either by calling win_pfree or win_if_tx.
+ * Therefore, in the FilterSendNetBufferListComplete there are no vr_packets.
+ */
+
 FILTER_SEND_NET_BUFFER_LISTS FilterSendNetBufferLists;
 FILTER_SEND_NET_BUFFER_LISTS_COMPLETE FilterSendNetBufferListsComplete;
 
@@ -82,8 +101,8 @@ CreateNetBufferList(unsigned int bytesCount)
     return nbl;
 }
 
-VOID
-FreeClonedNetBufferList(PNET_BUFFER_LIST nbl)
+static VOID
+FreeClonedNetBufferList(PNET_BUFFER_LIST nbl, BOOLEAN recursive)
 {
     ASSERT(nbl != NULL);
     ASSERT(nbl->ParentNetBufferList != NULL);
@@ -93,7 +112,21 @@ FreeClonedNetBufferList(PNET_BUFFER_LIST nbl)
     FreeForwardingContext(nbl);
     NdisFreeCloneNetBufferList(nbl, 0);
 
-    parentNbl->ChildRefCount--;
+    if (InterlockedDecrement(&parentNbl->ChildRefCount) == 0 && recursive) {
+        FreeNetBufferList(parentNbl);
+    }
+}
+
+VOID
+FreeClonedNetBufferListRecursive(PNET_BUFFER_LIST nbl)
+{
+    FreeClonedNetBufferList(nbl, true);
+}
+
+VOID
+FreeClonedNetBufferListPreservingParent(PNET_BUFFER_LIST nbl)
+{
+    FreeClonedNetBufferList(nbl, false);
 }
 
 VOID
@@ -130,7 +163,7 @@ CompleteReceivedNetBufferList(PNET_BUFFER_LIST nbl)
     /* Flag SINGLE_SOURCE is used, because of singular NBLS */
     NdisFSendNetBufferListsComplete(VrSwitchObject->NdisFilterHandle,
         nbl,
-        NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE | NDIS_SEND_FLAGS_SWITCH_DESTINATION_GROUP);
+        NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE);
 }
 
 VOID
@@ -138,48 +171,17 @@ FreeNetBufferList(PNET_BUFFER_LIST nbl)
 {
     ASSERT(nbl != NULL);
     ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
+    ASSERT(nbl->ChildRefCount == 0);
 
-    struct vr_packet *pkt = (struct vr_packet *)NET_BUFFER_LIST_CONTEXT_DATA_START(nbl);
-
-    if (vr_sync_sub_and_fetch_32u(&pkt->vp_ref_cnt, 1) == 0) {
-        NdisFreeNetBufferListContext(nbl, VR_NBL_CONTEXT_SIZE);
-
-        if (IS_NBL_OWNED(nbl)) {
-            PNET_BUFFER_LIST parent = nbl->ParentNetBufferList;
-
-            if (IS_NBL_CLONE(nbl))
-                FreeClonedNetBufferList(nbl);
-            else
-                FreeCreatedNetBufferList(nbl);
-
-            if (parent != NULL)
-                FreeNetBufferList(parent);
+    if (IS_NBL_OWNED(nbl)) {
+        if (IS_NBL_CLONE(nbl)) {
+            FreeClonedNetBufferListRecursive(nbl);
         } else {
-            CompleteReceivedNetBufferList(nbl);
+            FreeCreatedNetBufferList(nbl);
         }
+    } else {
+        CompleteReceivedNetBufferList(nbl);
     }
-}
-
-static void
-free_associated_nbl(struct vr_packet* pkt)
-{
-    ASSERT(pkt != NULL);
-
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
-
-    ASSERT(nbl != NULL);
-
-    FreeNetBufferList(nbl);
-}
-
-void
-delete_unbound_nbl(PNET_BUFFER_LIST nbl, unsigned long flags)
-{
-    ASSERT(nbl != NULL);
-
-    NdisFSendNetBufferListsComplete(VrSwitchObject->NdisFilterHandle,
-        nbl,
-        flags);
 }
 
 PNET_BUFFER_LIST
@@ -194,7 +196,6 @@ CloneNetBufferList(PNET_BUFFER_LIST originalNbl)
 
     newNbl->SourceHandle = VrSwitchObject->NdisFilterHandle;
     newNbl->ParentNetBufferList = originalNbl;
-    originalNbl->ChildRefCount++;
 
     if (CreateForwardingContext(newNbl) != NDIS_STATUS_SUCCESS)
         goto cleanup;
@@ -205,6 +206,8 @@ CloneNetBufferList(PNET_BUFFER_LIST originalNbl)
     if (status != NDIS_STATUS_SUCCESS)
         goto cleanup;
 
+    InterlockedIncrement(&originalNbl->ChildRefCount);
+
     return newNbl;
 
 cleanup:
@@ -213,11 +216,23 @@ cleanup:
 
     if (newNbl) {
         NdisFreeCloneNetBufferList(newNbl, 0);
-        originalNbl->ChildRefCount--;
     }
 
     return NULL;
 }
+
+// Free the vr_packet and associated nbl
+void
+win_free_packet(struct vr_packet *pkt)
+{
+    ASSERT(pkt != NULL);
+    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    ASSERT(nbl != NULL);
+    ExFreePool(pkt);
+    FreeNetBufferList(nbl);
+}
+
+#ifndef CMOCKA_UNIT_TESTING
 
 void
 win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG data_length)
@@ -243,22 +258,24 @@ win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG
     return;
 }
 
+// Create vr_packet based on existing NBL
 struct vr_packet *
 win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
 {
+    // Precondition: nbl has exactly one NetBuffer
+
     ASSERT(nbl != NULL);
 
     DbgPrint("%s()\n", __func__);
-    /* Allocate NDIS context, which will store vr_packet pointer */
-    NdisAllocateNetBufferListContext(nbl, VR_NBL_CONTEXT_SIZE, 0, VrAllocationTag);
-    struct vr_packet *pkt = (struct vr_packet*) NET_BUFFER_LIST_CONTEXT_DATA_START(nbl);
-    if (!pkt)
+
+    struct vr_packet *pkt = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(struct vr_packet), VrAllocationTag);
+    if (!pkt) {
         return NULL;
+    }
 
     RtlZeroMemory(pkt, sizeof(struct vr_packet));
 
     pkt->vp_net_buffer_list = nbl;
-    pkt->vp_ref_cnt = 1;
     pkt->vp_cpu = (unsigned char)KeGetCurrentProcessorNumberEx(NULL);
 
     /* vp_head points to the beginning of accesible non-paged memory of the packet */
@@ -290,10 +307,11 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
     return pkt;
 
 drop:
-    NdisFreeNetBufferListContext(nbl, VR_NBL_CONTEXT_SIZE);
+    ExFreePool(pkt);
     return NULL;
 }
 
+// Crate vr_packet and NBL based on buffer
 struct vr_packet *
 win_allocate_packet(void *buffer, unsigned int size)
 {
@@ -325,17 +343,10 @@ win_allocate_packet(void *buffer, unsigned int size)
 
 fail:
     if (pkt)
-        NdisFreeNetBufferListContext(nbl, VR_NBL_CONTEXT_SIZE);
-    if (nbl)
+        win_free_packet(pkt);
+    else if (nbl)
         FreeCreatedNetBufferList(nbl);
     return NULL;
-}
-
-void
-win_free_packet(struct vr_packet *pkt)
-{
-    ASSERT(pkt != NULL);
-    free_associated_nbl(pkt);
 }
 
 static VOID
@@ -502,3 +513,5 @@ FilterSendNetBufferListsComplete(
         FreeNetBufferList(current);
     } while (next != NULL);
 }
+
+#endif // ifndef CMOCKA_UNIT_TESTING

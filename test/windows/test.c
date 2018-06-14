@@ -2,10 +2,11 @@
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
 
+#include "vr_packet.h"
+
 #include <stdarg.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include <vr_packet.h>
 
 static void test_example(void **state) {
     struct vr_ip iph;
