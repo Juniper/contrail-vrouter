@@ -725,7 +725,11 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
                             chunk_nb_pkts);
 #endif
                 }
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+                if (unlikely(ret == 0)) {
+#else
                 if (unlikely(ret == -ENOBUFS)) {
+#endif
                     /* drop packets if it's the last retry */
                     if (unlikely(retry == VR_DPDK_RETRY_NUM - 1)) {
                         /* count out the header */
