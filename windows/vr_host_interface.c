@@ -200,11 +200,31 @@ fix_tunneled_csum(struct vr_packet *pkt)
     }
 }
 
+// If computation of IP checksum is about to be offloaded, its value
+// should be set to zero (because initial checksum's value is taken into
+// account when computing the checksum). However, dp-core doesn't care about
+// this specific case (e.g. vr_incremental_diff/vr_ip_incremental_csum are
+// called to incrementally "improve" checksum).
+static void
+fix_ip_v4_csum_to_be_offloaded(struct vr_packet *pkt) {
+    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+
+    if (settings.Transmit.IpHeaderChecksum) {
+        zero_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
+    }
+}
+
 static int
 __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     if (vr_pkt_type_is_overlay(pkt->vp_type))
         fix_tunneled_csum(pkt);
+    else if(pkt->vp_type == VP_TYPE_IP) {
+        // There's no checksum in IPv6 header.
+        fix_ip_v4_csum_to_be_offloaded(pkt);
+    }
 
     PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
 
