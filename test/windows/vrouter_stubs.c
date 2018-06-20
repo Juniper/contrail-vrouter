@@ -15,7 +15,8 @@ struct host_os * vrouter_get_host(void) {
     return NULL;
 }
 
-VOID FreeNetBufferList(PNET_BUFFER_LIST nbl) {
+// Needed because we don't compile vr_nbl.c in tests yet.
+void win_free_packet(struct vr_packet *pkt) {
 }
 
 int pkt0_if_tx(struct vr_interface *vif, struct vr_packet *pkt) {

@@ -25,10 +25,10 @@ struct scheduled_work_cb_data {
     void * data;
 };
 
-NDIS_IO_WORKITEM_FUNCTION deferred_work_routine;
-
 static unsigned int win_get_cpu(void);
 static void win_pfree(struct vr_packet *pkt, unsigned short reason);  // Forward declaration
+
+static NDIS_IO_WORKITEM_FUNCTION deferred_work_routine;
 
 static int
 win_printf(const char *format, ...)
@@ -123,20 +123,7 @@ win_palloc(unsigned int size)
     return win_allocate_packet(NULL, size);
 }
 
-static void
-win_pfree(struct vr_packet *pkt, unsigned short reason)
-{
-    ASSERT(pkt != NULL);
-
-    struct vrouter *router = vrouter_get(0);
-    unsigned int cpu = pkt->vp_cpu;
-
-    if (router)
-        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
-
-    win_free_packet(pkt);
-}
-
+// This is dead code!
 static struct vr_packet *
 win_palloc_head(struct vr_packet *pkt, unsigned int size)
 {
@@ -151,7 +138,7 @@ win_palloc_head(struct vr_packet *pkt, unsigned int size)
     if (nb_head == NULL)
         return NULL;
 
-    struct vr_packet* npkt = win_get_packet(nb_head, pkt->vp_if);
+    struct vr_packet *npkt = win_get_packet(nb_head, pkt->vp_if);
     if (npkt == NULL)
     {
         FreeCreatedNetBufferList(nb_head);
@@ -164,6 +151,8 @@ win_palloc_head(struct vr_packet *pkt, unsigned int size)
 
     npkt->vp_network_h += pkt->vp_network_h + npkt->vp_end;
     npkt->vp_inner_network_h += pkt->vp_inner_network_h + npkt->vp_end;
+
+    ExFreePool(pkt);
 
     return npkt;
 }
@@ -180,15 +169,6 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
     PNET_BUFFER_LIST new_nbl = CloneNetBufferList(original_nbl);
     if (new_nbl == NULL)
         goto cleanup;
-
-    NdisAllocateNetBufferListContext(new_nbl, VR_NBL_CONTEXT_SIZE, 0, VrAllocationTag);
-    struct vr_packet* npkt = (struct vr_packet*) NET_BUFFER_LIST_CONTEXT_DATA_START(new_nbl);
-    *npkt = *pkt;
-    pkt = npkt;
-    pkt->vp_ref_cnt = 1;
-
-    pkt->vp_net_buffer_list = new_nbl;
-    // pkt->vp_ref_cnt is increased because new data is referencing this packet, but also decreased because we don't keep the parent any longer (logically)
 
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(new_nbl);
     if (nb == NULL)
@@ -214,6 +194,8 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
         RtlCopyMemory((uint8_t*)new_buffer + hspace, (uint8_t*)old_buffer + data_offset, data_size_in_current_mdl);
     }
 
+    pkt->vp_net_buffer_list = new_nbl;
+
     pkt->vp_head =
         (unsigned char*)MmGetSystemAddressForMdlSafe(nb->CurrentMdl, LowPagePriority | MdlMappingNoExecute) + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
     pkt->vp_data += (unsigned short)hspace;
@@ -226,8 +208,9 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
     return pkt;
 
 cleanup:
-    if (new_nbl)
-        FreeClonedNetBufferList(new_nbl);
+    if (new_nbl) {
+        FreeClonedNetBufferListPreservingParent(new_nbl);
+    }
 
     return NULL;
 }
@@ -256,50 +239,62 @@ win_preset(struct vr_packet *pkt)
 static struct vr_packet *
 win_pclone(struct vr_packet *pkt)
 {
+    // To keep the invariant that vr_packet references only leaf NBLs,
+    // we need to create two CloneNetBufferLists.
+    // leftNbl will be referenced by original packet
+    // and rightNbl will be referenced by npkt.
     ASSERT(pkt != NULL);
 
-    PNET_BUFFER_LIST original_nbl = pkt->vp_net_buffer_list;
+    PNET_BUFFER_LIST originalNbl = pkt->vp_net_buffer_list;
 
-    ASSERT(original_nbl != NULL);
+    ASSERT(originalNbl != NULL);
 
-    PNET_BUFFER_LIST nbl = CloneNetBufferList(original_nbl);
-    if (nbl == NULL)
+    PNET_BUFFER_LIST leftNbl = CloneNetBufferList(originalNbl);
+    if (leftNbl == NULL)
         return NULL;
 
-    NdisAllocateNetBufferListContext(nbl, VR_NBL_CONTEXT_SIZE, 0, VrAllocationTag);
-    struct vr_packet *npkt = (struct vr_packet*) NET_BUFFER_LIST_CONTEXT_DATA_START(nbl);
-    if (npkt == NULL)
+    PNET_BUFFER_LIST rightNbl = CloneNetBufferList(originalNbl);
+    if (rightNbl == NULL)
         goto cleanup_nbl;
+
+    struct vr_packet *npkt = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(struct vr_packet), VrAllocationTag);
+    if (npkt == NULL)
+        goto cleanup_both_nbls;
+
     *npkt = *pkt;
 
-    vr_sync_add_and_fetch_32u(&pkt->vp_ref_cnt, 1);
-    npkt->vp_ref_cnt = 1;
+    pkt->vp_net_buffer_list = leftNbl;
+    pkt->vp_cpu = (unsigned char)win_get_cpu();
 
-    npkt->vp_net_buffer_list = nbl;
-
+    npkt->vp_net_buffer_list = rightNbl;
     npkt->vp_cpu = (unsigned char)win_get_cpu();
-
-    NDIS_STATUS copy_status = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
-        VrSwitchObject->NdisSwitchContext,
-        nbl,
-        original_nbl,
-        0);
-
-    if (copy_status != NDIS_STATUS_SUCCESS)
-        goto cleanup_pkt;
 
     return npkt;
 
-cleanup_pkt:
-    NdisFreeNetBufferListContext(nbl, VR_NBL_CONTEXT_SIZE);
+cleanup_both_nbls:
+    FreeClonedNetBufferListPreservingParent(rightNbl);
 
 cleanup_nbl:
-    FreeClonedNetBufferList(nbl);
+    FreeClonedNetBufferListPreservingParent(leftNbl);
 
     return NULL;
 }
 
-int
+static void
+win_pfree(struct vr_packet *pkt, unsigned short reason)
+{
+    ASSERT(pkt != NULL);
+
+    struct vrouter *router = vrouter_get(0);
+    unsigned int cpu = pkt->vp_cpu;
+
+    if (router)
+        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
+
+    win_free_packet(pkt);
+}
+
+static int
 win_pcopy_from_nb(unsigned char *dst, PNET_BUFFER nb,
     unsigned int offset, unsigned int len)
 {
@@ -587,7 +582,7 @@ win_delay_op(void)
     return;
 }
 
-VOID
+static VOID
 deferred_work_routine(PVOID work_item_context, NDIS_HANDLE work_item_handle)
 {
     struct deferred_work_cb_data * cb_data = (struct deferred_work_cb_data *)(work_item_context);
