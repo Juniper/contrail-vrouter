@@ -48,6 +48,10 @@ enum vr_opt_index {
     VERSION_OPT_INDEX,
 #define MEMPOOL_SIZE_OPT        "vr_mempool_sz"
     MEMPOOL_SIZE_OPT_INDEX,
+#define DPDK_TXD_SIZE_OPT       "dpdk_txd_sz"
+    DPDK_TXD_SIZE_OPT_INDEX,
+#define DPDK_RXD_SIZE_OPT       "dpdk_rxd_sz"
+    DPDK_RXD_SIZE_OPT_INDEX,
 #define PACKET_SIZE_OPT         "vr_packet_sz"
     PACKET_SIZE_OPT_INDEX,
 #define VLAN_TCI_OPT            "vlan_tci"
@@ -104,6 +108,8 @@ static int no_gso_set = 0;
 int no_huge_set;
 int no_rx_mrgbuf = 0;
 unsigned int vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
+unsigned int vr_rxd_sz = VR_DPDK_NB_RXD;
+unsigned int vr_txd_sz = VR_DPDK_NB_TXD;
 unsigned int vr_packet_sz = VR_DEF_MAX_PACKET_SZ;
 extern char *ContrailBuildInfo;
 
@@ -624,6 +630,10 @@ dpdk_argv_update(void)
                 vr_vrfs);
     RTE_LOG(INFO, VROUTER, "Packet pool size:            %" PRIu32 "\n",
                 rss_mempool_sz);
+    RTE_LOG(INFO, VROUTER, "PMD Tx Descriptor size:      %" PRIu32 "\n",
+                vr_txd_sz);
+    RTE_LOG(INFO, VROUTER, "PMD Rx Descriptor size:      %" PRIu32 "\n",
+                vr_rxd_sz);
     RTE_LOG(INFO, VROUTER, "Maximum packet size:         %" PRIu32 "\n",
                 vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
@@ -915,6 +925,10 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [MEMPOOL_SIZE_OPT_INDEX]        =   {MEMPOOL_SIZE_OPT,      required_argument,
                                                     NULL,                   0},
+    [DPDK_TXD_SIZE_OPT_INDEX]        =  {DPDK_TXD_SIZE_OPT,     required_argument,
+                                                    NULL,                   0},
+    [DPDK_RXD_SIZE_OPT_INDEX]        =  {DPDK_RXD_SIZE_OPT,     required_argument,
+                                                    NULL,                   0},
     [PACKET_SIZE_OPT_INDEX]         =   {PACKET_SIZE_OPT,       required_argument,
                                                     NULL,                   0},
     [VLAN_TCI_OPT_INDEX]            =   {VLAN_TCI_OPT,          required_argument,
@@ -986,6 +1000,8 @@ Usage(void)
         "    --"VRFS_OPT" NUM             VRF tables limit\n"
         "    --"MEMORY_ALLOC_CHECKS_OPT"  Enable memory checks\n"
         "    --"MEMPOOL_SIZE_OPT" NUM     Main packet pool size\n"
+        "    --"DPDK_TXD_SIZE_OPT" NUM    DPDK PMD Tx Descriptor size\n"
+        "    --"DPDK_RXD_SIZE_OPT" NUM    DPDK PMD Rx Descriptor size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
         );
 
@@ -1014,6 +1030,20 @@ parse_long_opts(int opt_flow_index, char *optarg)
         vr_mempool_sz = (unsigned int)strtoul(optarg, NULL, 0);
         if (errno != 0) {
             vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
+        }
+        break;
+
+    case DPDK_RXD_SIZE_OPT_INDEX:
+        vr_rxd_sz = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_rxd_sz = VR_DPDK_NB_RXD;
+        }
+        break;
+
+    case DPDK_TXD_SIZE_OPT_INDEX:
+        vr_txd_sz = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_txd_sz = VR_DPDK_NB_TXD;
         }
         break;
 
