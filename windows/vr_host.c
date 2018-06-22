@@ -10,6 +10,8 @@
 #include "vr_hash.h"
 #include "vr_windows.h"
 #include "vrouter.h"
+
+#include "win_packet.h"
 #include "windows_nbl.h"
 
 typedef void(*scheduled_work_cb)(void *arg);
@@ -130,7 +132,8 @@ win_palloc_head(struct vr_packet *pkt, unsigned int size)
     ASSERT(pkt != NULL);
     ASSERT(size > 0);
 
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
     if (nbl == NULL)
         return NULL;
 
@@ -162,7 +165,8 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 {
     ASSERT(pkt != NULL);
 
-    PNET_BUFFER_LIST original_nbl = pkt->vp_net_buffer_list;
+    PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(pkt);
+    PNET_BUFFER_LIST original_nbl = WinPacketToNBL(wrapper->WinPacket);
     if (original_nbl == NULL)
         return NULL;
 
@@ -194,7 +198,7 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
         RtlCopyMemory((uint8_t*)new_buffer + hspace, (uint8_t*)old_buffer + data_offset, data_size_in_current_mdl);
     }
 
-    pkt->vp_net_buffer_list = new_nbl;
+    wrapper->WinPacket = WinPacketFromNBL(new_nbl);
 
     pkt->vp_head =
         (unsigned char*)MmGetSystemAddressForMdlSafe(nb->CurrentMdl, LowPagePriority | MdlMappingNoExecute) + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
@@ -220,7 +224,8 @@ win_preset(struct vr_packet *pkt)
 {
     ASSERT(pkt != NULL);
 
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
     if (!nbl) {
         return;
     }
@@ -237,44 +242,48 @@ win_preset(struct vr_packet *pkt)
 }
 
 static struct vr_packet *
-win_pclone(struct vr_packet *pkt)
+win_pclone(struct vr_packet *vrPkt)
 {
     // To keep the invariant that vr_packet references only leaf NBLs,
     // we need to create two CloneNetBufferLists.
     // leftNbl will be referenced by original packet
     // and rightNbl will be referenced by npkt.
-    ASSERT(pkt != NULL);
+    ASSERT(vrPkt != NULL);
 
-    PNET_BUFFER_LIST originalNbl = pkt->vp_net_buffer_list;
+    PVR_PACKET_WRAPPER pkt = GetWrapperFromVrPacket(vrPkt);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(pkt->WinPacket);
 
-    ASSERT(originalNbl != NULL);
+    ASSERT(nbl != NULL);
 
-    PNET_BUFFER_LIST leftNbl = CloneNetBufferList(originalNbl);
-    if (leftNbl == NULL)
+    PNET_BUFFER_LIST leftNbl = CloneNetBufferList(nbl);
+    if (leftNbl == NULL) {
         return NULL;
+    }
 
-    PNET_BUFFER_LIST rightNbl = CloneNetBufferList(originalNbl);
-    if (rightNbl == NULL)
-        goto cleanup_nbl;
+    PNET_BUFFER_LIST rightNbl = CloneNetBufferList(nbl);
+    if (rightNbl == NULL) {
+        goto cleanup_left_nbl;
+    }
 
-    struct vr_packet *npkt = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(struct vr_packet), VrAllocationTag);
-    if (npkt == NULL)
+    PVR_PACKET_WRAPPER rightPkt = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*rightPkt), VrAllocationTag);
+    if (rightPkt == NULL) {
         goto cleanup_both_nbls;
+    }
+    RtlZeroMemory(rightPkt, sizeof(*rightPkt));
+    rightPkt->VrPacket = pkt->VrPacket;
 
-    *npkt = *pkt;
+    pkt->WinPacket = WinPacketFromNBL(leftNbl);
+    pkt->VrPacket.vp_cpu = (unsigned char)win_get_cpu();
 
-    pkt->vp_net_buffer_list = leftNbl;
-    pkt->vp_cpu = (unsigned char)win_get_cpu();
+    rightPkt->WinPacket = WinPacketFromNBL(rightNbl);
+    rightPkt->VrPacket.vp_cpu = (unsigned char)win_get_cpu();
 
-    npkt->vp_net_buffer_list = rightNbl;
-    npkt->vp_cpu = (unsigned char)win_get_cpu();
-
-    return npkt;
+    return &rightPkt->VrPacket;
 
 cleanup_both_nbls:
     FreeClonedNetBufferListPreservingParent(rightNbl);
 
-cleanup_nbl:
+cleanup_left_nbl:
     FreeClonedNetBufferListPreservingParent(leftNbl);
 
     return NULL;
@@ -394,7 +403,8 @@ win_pcopy(unsigned char *dst, struct vr_packet *p_src,
     if (!p_src) {
         return -EFAULT;
     }
-    PNET_BUFFER_LIST nbl = p_src->vp_net_buffer_list;
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(p_src);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
     if (!nbl) {
         return -EFAULT;
     }
@@ -411,7 +421,8 @@ win_pfrag_len(struct vr_packet *pkt)
 {
     ASSERT(pkt != NULL);
 
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
     if (!nbl)
         return 0;
 
@@ -433,7 +444,8 @@ win_pfrag_len(struct vr_packet *pkt)
 static void *
 win_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 {
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
 
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
 
@@ -707,7 +719,8 @@ win_data_at_offset(struct vr_packet *pkt, unsigned short offset)
     // of type (struct vr_headertype*), when pointing to the beginning
     // of the header, will be valid for it's entiriety
 
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
     PMDL current_mdl = NET_BUFFER_CURRENT_MDL(nb);
     unsigned length = MmGetMdlByteCount(current_mdl) - NET_BUFFER_CURRENT_MDL_OFFSET(nb);

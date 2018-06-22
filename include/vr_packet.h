@@ -211,9 +211,6 @@ struct vr_packet {
     unsigned char vp_queue;
     unsigned char vp_priority:4,
                   vp_notused:4;
-#ifdef _WIN32
-    void* vp_net_buffer_list;
-#endif
 };
 
 

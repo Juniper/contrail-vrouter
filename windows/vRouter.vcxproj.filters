@@ -139,6 +139,9 @@
     <ClInclude Include="include\windows_nbl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="windows\win_packet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\precompsrc2.c">
@@ -286,6 +289,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\vr_shmem_devices.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\win_packet.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
