@@ -25,6 +25,6 @@ env.Append(LIBS = 'cmocka')
 env.Append(LIBS = ['ws2_32.lib', 'ntdll.lib'])
 
 env.AppendENVPath('Path', Dir('#build/bin'))
-example_test = env.UnitTest('example_test', ['test.c', vrouter_stubs])
+example_test = env.UnitTest('example_test', ['test.c', 'fake_win_packet.c', vrouter_stubs])
 kernel_tests = env.TestSuite('kernel-tests', [example_test])
 env.Requires(kernel_tests, '#build/bin/cmocka.dll')

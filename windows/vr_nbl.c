@@ -7,6 +7,8 @@
 #include "vr_packet.h"
 #include "vr_windows.h"
 #include "vrouter.h"
+
+#include "win_packet.h"
 #include "windows_nbl.h"
 
 /*
@@ -226,10 +228,14 @@ void
 win_free_packet(struct vr_packet *pkt)
 {
     ASSERT(pkt != NULL);
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+
+    PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(pkt);
+
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(wrapper->WinPacket);
     ASSERT(nbl != NULL);
-    ExFreePool(pkt);
     FreeNetBufferList(nbl);
+
+    ExFreePool(wrapper);
 }
 
 /*
@@ -322,16 +328,15 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
 
     ASSERT(nbl != NULL);
 
-    DbgPrint("%s()\n", __func__);
-
-    struct vr_packet *pkt = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(struct vr_packet), VrAllocationTag);
-    if (!pkt) {
+    PVR_PACKET_WRAPPER wrapper = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*wrapper), VrAllocationTag);
+    if (wrapper == NULL) {
         return NULL;
     }
+    RtlZeroMemory(wrapper, sizeof(*wrapper));
 
-    RtlZeroMemory(pkt, sizeof(struct vr_packet));
+    struct vr_packet *pkt = &wrapper->VrPacket;
+    wrapper->WinPacket = WinPacketFromNBL(nbl);
 
-    pkt->vp_net_buffer_list = nbl;
     pkt->vp_cpu = (unsigned char)KeGetCurrentProcessorNumberEx(NULL);
 
     /* vp_head points to the beginning of accesible non-paged memory of the packet */
@@ -363,7 +368,7 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
     return pkt;
 
 drop:
-    ExFreePool(pkt);
+    ExFreePool(wrapper);
     return NULL;
 }
 
