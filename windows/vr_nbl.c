@@ -226,10 +226,13 @@ void
 win_free_packet(struct vr_packet *pkt)
 {
     ASSERT(pkt != NULL);
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    ASSERT(pkt->vp_win_packet != NULL);
+
+    PNET_BUFFER_LIST nbl = pkt->vp_win_packet;
     ASSERT(nbl != NULL);
-    ExFreePool(pkt);
+
     FreeNetBufferList(nbl);
+    ExFreePool(pkt);
 }
 
 /*
@@ -328,10 +331,9 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
     if (!pkt) {
         return NULL;
     }
-
     RtlZeroMemory(pkt, sizeof(struct vr_packet));
 
-    pkt->vp_net_buffer_list = nbl;
+    pkt->vp_win_packet = nbl;
     pkt->vp_cpu = (unsigned char)KeGetCurrentProcessorNumberEx(NULL);
 
     /* vp_head points to the beginning of accesible non-paged memory of the packet */
@@ -363,6 +365,10 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
     return pkt;
 
 drop:
+    if (pkt->vp_win_packet) {
+        ExFreePool(pkt->vp_win_packet);
+    }
+
     ExFreePool(pkt);
     return NULL;
 }
