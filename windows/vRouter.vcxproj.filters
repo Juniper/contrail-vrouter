@@ -19,278 +19,281 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="windows\precomp.h">
+    <ClInclude Include="..\..\build\debug\vrouter\sandesh\gen-c\vr_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vrouter.h">
+    <ClInclude Include="..\include\genetlink.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_packet.h">
+    <ClInclude Include="..\include\netlink.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_qos.h">
+    <ClInclude Include="..\include\vrouter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_htable.h">
+    <ClInclude Include="..\include\vr_bitmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_flow.h">
+    <ClInclude Include="..\include\vr_bridge.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_interface.h">
+    <ClInclude Include="..\include\vr_btable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_defs.h">
+    <ClInclude Include="..\include\windows_flow_ioctl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_windows.h">
+    <ClInclude Include="..\include\windows_nbl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_os.h">
+    <ClInclude Include="..\include\windows_types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_bitmap.h">
+    <ClInclude Include="..\include\vr_datapath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_bridge.h">
+    <ClInclude Include="..\include\vr_defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_nexthop.h">
+    <ClInclude Include="..\include\vr_flow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_mpls.h">
+    <ClInclude Include="..\include\vr_fragment.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_index_table.h">
+    <ClInclude Include="..\include\vr_genetlink.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_datapath.h">
+    <ClInclude Include="..\include\vr_hash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_response.h">
+    <ClInclude Include="..\include\vr_htable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_btable.h">
+    <ClInclude Include="..\include\vr_index_table.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_fragment.h">
+    <ClInclude Include="..\include\vr_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_genetlink.h">
+    <ClInclude Include="..\include\vr_ip_mtrie.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_hash.h">
+    <ClInclude Include="..\include\windows_mem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_ip_mtrie.h">
+    <ClInclude Include="..\include\vr_message.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_message.h">
+    <ClInclude Include="..\include\vr_mirror.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_queue.h">
+    <ClInclude Include="..\include\vr_mpls.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_mirror.h">
+    <ClInclude Include="..\include\windows_ksync.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_route.h">
+    <ClInclude Include="..\include\vr_nexthop.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_sandesh.h">
+    <ClInclude Include="..\include\vr_os.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_vxlan.h">
+    <ClInclude Include="..\include\vr_packet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="windows\include\windows_builtins.h">
+    <ClInclude Include="..\include\vr_qos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\vr_stats.h">
+    <ClInclude Include="..\include\vr_queue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_builtins.h">
+    <ClInclude Include="..\include\vr_response.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\build\debug\vrouter\sandesh\gen-c\vr_types.h">
+    <ClInclude Include="..\include\vr_route.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_types.h">
+    <ClInclude Include="..\include\vr_sandesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_devices.h">
+    <ClInclude Include="..\include\vr_stats.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_mem.h">
+    <ClInclude Include="..\include\vr_vxlan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_ksync.h">
+    <ClInclude Include="..\include\vr_windows.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\genetlink.h">
+    <ClInclude Include="..\include\windows_devices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\netlink.h">
+    <ClInclude Include="..\include\windows_builtins.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_flow_ioctl.h">
+    <ClInclude Include="precomp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_nbl.h">
+    <ClInclude Include="win_packet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="windows\precompsrc2.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vr_packet.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vr_interface.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vr_message.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vrouter.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vr_queue.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vr_mirror.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dp-core\vr_nexthop.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="windows\windows_random.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="windows\vr_ksync.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="windows\vr_host.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\vr_host_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_sandesh.c">
+    <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_qos.c">
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_binary_protocol.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_stats.c">
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_mpls.c">
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\sandesh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_response.c">
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_route.c">
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_ip_mtrie.c">
+    <ClCompile Include="..\dp-core\vrouter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_vrf_assign.c">
+    <ClCompile Include="..\dp-core\vr_bitmap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_host.c">
+    <ClCompile Include="..\dp-core\vr_bridge.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_host_interface.c">
+    <ClCompile Include="..\dp-core\vr_btable.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_vxlan.c">
+    <ClCompile Include="..\dp-core\vr_buildinfo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_flow.c">
+    <ClCompile Include="..\dp-core\vr_datapath.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_datapath.c">
+    <ClCompile Include="..\dp-core\vr_flow.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_bridge.c">
+    <ClCompile Include="..\dp-core\vr_fragment.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_htable.c">
+    <ClCompile Include="..\dp-core\vr_htable.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_btable.c">
+    <ClCompile Include="..\dp-core\vr_index_table.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_vif_bridge.c">
+    <ClCompile Include="..\dp-core\vr_interface.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_fragment.c">
+    <ClCompile Include="..\dp-core\vr_ip_mtrie.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_proto_ip.c">
+    <ClCompile Include="..\dp-core\vr_message.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_proto_ip6.c">
+    <ClCompile Include="..\dp-core\vr_mirror.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_index_table.c">
+    <ClCompile Include="..\dp-core\vr_mpls.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_bitmap.c">
+    <ClCompile Include="..\dp-core\vr_nexthop.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_shmem.c">
+    <ClCompile Include="..\dp-core\vr_packet.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_pkt0.c">
+    <ClCompile Include="..\dp-core\vr_proto_ip.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_devices.c">
+    <ClCompile Include="..\dp-core\vr_proto_ip6.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dp-core\vr_buildinfo.c">
+    <ClCompile Include="..\dp-core\vr_qos.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\gen-c\vr_types.c">
+    <ClCompile Include="..\dp-core\vr_queue.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\library\c\protocol\thrift_binary_protocol.c">
+    <ClCompile Include="..\dp-core\vr_response.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c">
+    <ClCompile Include="..\dp-core\vr_route.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c">
+    <ClCompile Include="..\dp-core\vr_sandesh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c">
+    <ClCompile Include="..\dp-core\vr_stats.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\build\kbuild\sandesh\library\c\sandesh.c">
+    <ClCompile Include="..\dp-core\vr_vif_bridge.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_win_transport.c">
+    <ClCompile Include="..\dp-core\vr_vrf_assign.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_driver.c">
+    <ClCompile Include="..\dp-core\vr_vxlan.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_oid.c">
+    <ClCompile Include="precompsrc2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_nbl.c">
+    <ClCompile Include="vr_devices.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="windows\vr_shmem_devices.c">
+    <ClCompile Include="vr_driver.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_shmem_devices.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_ksync.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_host_interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_shmem.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_nbl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_oid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_pkt0.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_win_transport.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows_random.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vr_host.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="win_packet.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="windows\vRouter.inf">
+    <Inf Include="vRouter.inf">
       <Filter>Driver Files</Filter>
     </Inf>
   </ItemGroup>

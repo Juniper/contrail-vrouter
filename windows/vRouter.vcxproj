@@ -352,6 +352,7 @@
     <ClInclude Include="..\include\windows_devices.h" />
     <ClInclude Include="..\include\windows_builtins.h" />
     <ClInclude Include="precomp.h" />
+    <ClInclude Include="win_packet.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c">
@@ -513,6 +514,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="vr_host.c" />
+    <ClCompile Include="win_packet.c" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="vRouter.inf" />

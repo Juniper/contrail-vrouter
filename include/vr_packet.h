@@ -14,6 +14,7 @@
 #include "vr_bridge.h"
 #include "vr_mirror.h"
 #include "vr_os.h"
+#include "win_packet.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -212,7 +213,7 @@ struct vr_packet {
     unsigned char vp_priority:4,
                   vp_notused:4;
 #ifdef _WIN32
-    void* vp_net_buffer_list;
+    PWIN_PACKET vp_win_packet;
 #endif
 };
 

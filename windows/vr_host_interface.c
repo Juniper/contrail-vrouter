@@ -115,7 +115,7 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
     uint16_t size;
     uint8_t type;
 
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PNET_BUFFER_LIST nbl = WinPacketGetNBL(pkt->vp_win_packet);
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
 
     void* packet_data_buffer = ExAllocatePoolWithTag(NonPagedPoolNx, NET_BUFFER_DATA_LENGTH(nb), VrAllocationTag);
@@ -165,7 +165,7 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
 static void
 fix_tunneled_csum(struct vr_packet *pkt)
 {
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PNET_BUFFER_LIST nbl = WinPacketGetNBL(pkt->vp_win_packet);
     NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
     settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
 
@@ -207,7 +207,7 @@ fix_tunneled_csum(struct vr_packet *pkt)
 // called to incrementally "improve" checksum).
 static void
 fix_ip_v4_csum_to_be_offloaded(struct vr_packet *pkt) {
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PNET_BUFFER_LIST nbl = WinPacketGetNBL(pkt->vp_win_packet);
     NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
     settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
 
@@ -226,7 +226,7 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
         fix_ip_v4_csum_to_be_offloaded(pkt);
     }
 
-    PNET_BUFFER_LIST nbl = pkt->vp_net_buffer_list;
+    PNET_BUFFER_LIST nbl = WinPacketGetNBL(pkt->vp_win_packet);
 
     NDIS_SWITCH_PORT_DESTINATION newDestination = { 0 };
 
@@ -241,6 +241,7 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     NdisAdvanceNetBufferListDataStart(nbl, pkt->vp_data, TRUE, NULL);
 
+    WinPacketFreeStruct(pkt->vp_win_packet);
     ExFreePool(pkt);
 
     ASSERTMSG("Trying to pass non-leaf NBL to NdisFSendNetBufferLists", nbl->ChildRefCount == 0);
