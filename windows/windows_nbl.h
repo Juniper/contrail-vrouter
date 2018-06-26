@@ -25,7 +25,10 @@ extern VOID FreeNetBufferList(PNET_BUFFER_LIST nbl);
 extern VOID FreeCreatedNetBufferList(PNET_BUFFER_LIST nbl);
 extern VOID FreeClonedNetBufferListRecursive(PNET_BUFFER_LIST nbl);
 extern VOID FreeClonedNetBufferListPreservingParent(PNET_BUFFER_LIST nbl);
-PNET_BUFFER_LIST SplitMultiNetBufferNetBufferList(PNET_BUFFER_LIST origNbl);
+extern PNET_BUFFER_LIST SplitMultiNetBufferNetBufferList(PNET_BUFFER_LIST origNbl);
+
+extern NDIS_STATUS CreateForwardingContext(PNET_BUFFER_LIST nbl);
+extern VOID FreeForwardingContext(PNET_BUFFER_LIST nbl);
 
 extern struct vr_packet *win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif);
 extern void win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG data_length);
