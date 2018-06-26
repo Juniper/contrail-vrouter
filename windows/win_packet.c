@@ -3,23 +3,18 @@
  *
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
-#include "precomp.h"
 #include "win_packet.h"
 
-#include <ndis.h>
-
-struct _WIN_PACKET {
-    NET_BUFFER_LIST NetBufferList;
-};
-
-PNET_BUFFER_LIST
-WinPacketToNBL(PWIN_PACKET Packet)
-{
-    return &Packet->NetBufferList;
-}
-
 PWIN_PACKET
-WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList)
+WinPacketClone(PWIN_PACKET Packet)
 {
-    return (PWIN_PACKET)NetBufferList;
+    PWIN_PACKET cloned = WinPacketRawAllocateClone(Packet);
+    if (cloned == NULL) {
+        return NULL;
+    }
+
+    WinPacketRawSetParentOf(cloned, Packet);
+    WinPacketRawIncrementChildCountOf(Packet);
+
+    return cloned;
 }
