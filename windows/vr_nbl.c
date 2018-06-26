@@ -33,7 +33,7 @@
 FILTER_SEND_NET_BUFFER_LISTS FilterSendNetBufferLists;
 FILTER_SEND_NET_BUFFER_LISTS_COMPLETE FilterSendNetBufferListsComplete;
 
-static NDIS_STATUS
+NDIS_STATUS
 CreateForwardingContext(PNET_BUFFER_LIST nbl)
 {
     ASSERT(nbl != NULL);
@@ -42,7 +42,7 @@ CreateForwardingContext(PNET_BUFFER_LIST nbl)
         nbl);
 }
 
-static void
+void
 FreeForwardingContext(PNET_BUFFER_LIST nbl)
 {
     ASSERT(nbl != NULL);

@@ -241,6 +241,7 @@ win_preset(struct vr_packet *pkt)
     return;
 }
 
+#if 0
 static struct vr_packet *
 win_pclone(struct vr_packet *pkt)
 {
@@ -288,6 +289,9 @@ cleanup_nbl:
 
     return NULL;
 }
+#else
+extern struct vr_packet *win_pclone(struct vr_packet *pkt);
+#endif
 
 static void
 win_pfree(struct vr_packet *pkt, unsigned short reason)
