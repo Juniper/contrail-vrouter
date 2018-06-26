@@ -32,6 +32,16 @@ GetWinPacketFromVrPacket(struct vr_packet *VrPacket)
     return wrapper->WinPacket;
 }
 
+PWIN_PACKET WinPacketClone(PWIN_PACKET Packet);
+
+PWIN_PACKET WinPacketRawGetParentOf(PWIN_PACKET Packet);
+VOID WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent);
+
+LONG WinPacketRawGetChildCountOf(PWIN_PACKET Packet);
+VOID WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet);
+
+extern PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet);
+
 // TODO: Remove when callback layer is independent of NDIS
 PNET_BUFFER_LIST WinPacketToNBL(PWIN_PACKET Packet);
 PWIN_PACKET WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList);

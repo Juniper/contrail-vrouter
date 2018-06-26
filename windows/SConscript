@@ -7,16 +7,14 @@
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
-env.Append(CPPPATH = [env['TOP_INCLUDE'], '../test/windows/kernel_impl/include'])
-env.Append(CPPDEFINES = '__KERNEL__')
-env.Append(CPPDEFINES = 'CMOCKA_UNIT_TESTING')
+env.Append(CPPPATH = [env['TOP_INCLUDE'], '../test/windows/include'])
 
 # Treat warnings as errors
 env.Append(CPPFLAGS = '/WX')
 
 # Files should be added when needed to this list
 sources = [
-    'vr_host_interface.c',
+    'win_packet.c',
 ]
 
-env.StaticLibrary('windows_vrouter', source = sources)
+env.StaticLibrary('win_packet', source = sources)
