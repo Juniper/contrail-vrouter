@@ -7,13 +7,6 @@ import platform
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
-if platform.system() == 'Windows':
-    env.Append(CPPDEFINES = '__KERNEL__')
-    env.Append(CPPPATH = [env['TOP_INCLUDE'], '../test/windows/kernel_impl/include'])
-
-    # Treat warnings as errors
-    env.Append(CPPFLAGS = '/WX')
-
 env.Library('dp_core', Glob('*.c'))
 
 if 'install' in COMMAND_LINE_TARGETS:
