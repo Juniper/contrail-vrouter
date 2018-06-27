@@ -27,10 +27,20 @@ struct scheduled_work_cb_data {
     void * data;
 };
 
-static unsigned int win_get_cpu(void);
-static void win_pfree(struct vr_packet *pkt, unsigned short reason);  // Forward declaration
+unsigned int win_get_cpu(void);
+extern VOID win_pfree(struct vr_packet *vrPkt, unsigned short reason);
 
 static NDIS_IO_WORKITEM_FUNCTION deferred_work_routine;
+
+void
+win_update_drop_stats(struct vr_packet *pkt, unsigned short reason)
+{
+    struct vrouter *router = vrouter_get(0);
+    unsigned int cpu = pkt->vp_cpu;
+
+    if (router)
+        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
+}
 
 static int
 win_printf(const char *format, ...)
@@ -241,67 +251,7 @@ win_preset(struct vr_packet *pkt)
     return;
 }
 
-static struct vr_packet *
-win_pclone(struct vr_packet *vrPkt)
-{
-    // To keep the invariant that vr_packet references only leaf NBLs,
-    // we need to create two CloneNetBufferLists.
-    // leftNbl will be referenced by original packet
-    // and rightNbl will be referenced by npkt.
-    ASSERT(vrPkt != NULL);
-
-    PVR_PACKET_WRAPPER pkt = GetWrapperFromVrPacket(vrPkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(pkt->WinPacket);
-
-    ASSERT(nbl != NULL);
-
-    PNET_BUFFER_LIST leftNbl = CloneNetBufferList(nbl);
-    if (leftNbl == NULL) {
-        return NULL;
-    }
-
-    PNET_BUFFER_LIST rightNbl = CloneNetBufferList(nbl);
-    if (rightNbl == NULL) {
-        goto cleanup_left_nbl;
-    }
-
-    PVR_PACKET_WRAPPER rightPkt = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*rightPkt), VrAllocationTag);
-    if (rightPkt == NULL) {
-        goto cleanup_both_nbls;
-    }
-    RtlZeroMemory(rightPkt, sizeof(*rightPkt));
-    rightPkt->VrPacket = pkt->VrPacket;
-
-    pkt->WinPacket = WinPacketFromNBL(leftNbl);
-    pkt->VrPacket.vp_cpu = (unsigned char)win_get_cpu();
-
-    rightPkt->WinPacket = WinPacketFromNBL(rightNbl);
-    rightPkt->VrPacket.vp_cpu = (unsigned char)win_get_cpu();
-
-    return &rightPkt->VrPacket;
-
-cleanup_both_nbls:
-    FreeClonedNetBufferListPreservingParent(rightNbl);
-
-cleanup_left_nbl:
-    FreeClonedNetBufferListPreservingParent(leftNbl);
-
-    return NULL;
-}
-
-static void
-win_pfree(struct vr_packet *pkt, unsigned short reason)
-{
-    ASSERT(pkt != NULL);
-
-    struct vrouter *router = vrouter_get(0);
-    unsigned int cpu = pkt->vp_cpu;
-
-    if (router)
-        ((uint64_t *)(router->vr_pdrop_stats[cpu]))[reason]++;
-
-    win_free_packet(pkt);
-}
+extern struct vr_packet *win_pclone(struct vr_packet *vrPkt);
 
 static int
 win_pcopy_from_nb(unsigned char *dst, PNET_BUFFER nb,
@@ -693,7 +643,7 @@ win_get_mono_time(uint64_t *sec, uint64_t *nsec)
     *nsec = i.LowPart;
 }
 
-static unsigned int
+unsigned int
 win_get_cpu(void)
 {
     return KeGetCurrentProcessorNumberEx(NULL);

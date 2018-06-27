@@ -106,3 +106,8 @@ WinPacketRawFreeCreated_Impl(PWIN_PACKET Packet)
     Fake_WinPacketFree(Packet);
 }
 VOID (*WinPacketRawFreeCreated)(PWIN_PACKET Packet) = WinPacketRawFreeCreated_Impl;
+
+VOID 
+WinRawFree(void* buffer) {
+    test_free(buffer);
+}
