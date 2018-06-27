@@ -33,12 +33,14 @@ GetWinPacketFromVrPacket(struct vr_packet *VrPacket)
 }
 
 PWIN_PACKET WinPacketClone(PWIN_PACKET Packet);
+VOID WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
 PWIN_PACKET WinPacketRawGetParentOf(PWIN_PACKET Packet);
 VOID WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent);
 
 LONG WinPacketRawGetChildCountOf(PWIN_PACKET Packet);
 VOID WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet);
+VOID WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet);
 
 extern PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet);
 

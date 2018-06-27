@@ -27,7 +27,7 @@ struct scheduled_work_cb_data {
     void * data;
 };
 
-static unsigned int win_get_cpu(void);
+unsigned int win_get_cpu(void);
 static void win_pfree(struct vr_packet *pkt, unsigned short reason);  // Forward declaration
 
 static NDIS_IO_WORKITEM_FUNCTION deferred_work_routine;
@@ -241,6 +241,7 @@ win_preset(struct vr_packet *pkt)
     return;
 }
 
+/*
 static struct vr_packet *
 win_pclone(struct vr_packet *vrPkt)
 {
@@ -288,6 +289,8 @@ cleanup_left_nbl:
 
     return NULL;
 }
+*/
+extern struct vr_packet *win_pclone(struct vr_packet *vrPkt);
 
 static void
 win_pfree(struct vr_packet *pkt, unsigned short reason)
@@ -693,7 +696,7 @@ win_get_mono_time(uint64_t *sec, uint64_t *nsec)
     *nsec = i.LowPart;
 }
 
-static unsigned int
+unsigned int
 win_get_cpu(void)
 {
     return KeGetCurrentProcessorNumberEx(NULL);

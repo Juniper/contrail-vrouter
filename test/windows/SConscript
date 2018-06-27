@@ -19,6 +19,9 @@ env.Replace(LIBS = ['win_packet'])
 env.Append(LIBS = 'cmocka')
 
 env.AppendENVPath('Path', Dir('#build/bin'))
-test_runner = env.UnitTest('test_runner', ['test.c', 'fake_win_packet_raw.c', 'test_win_packet_clone.c'])
+test_sources = [
+    'test.c', 'fake_win_packet_raw.c', 'test_win_packet_clone.c', 'test_win_pclone.c'
+]
+test_runner = env.UnitTest('test_runner', test_sources)
 kernel_tests = env.TestSuite('kernel-tests', [test_runner])
 env.Requires(kernel_tests, '#build/bin/cmocka.dll')
