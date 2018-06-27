@@ -30,6 +30,14 @@ Fake_WinPacketFree(PWIN_PACKET Packet)
     test_free(Packet);
 }
 
+VOID
+WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet)
+{
+    PWIN_PACKET parent = WinPacketRawGetParentOf(Packet);
+    WinPacketRawDecrementChildCountOf(parent);
+    Fake_WinPacketFree(Packet);
+}
+
 PWIN_PACKET
 WinPacketRawGetParentOf(PWIN_PACKET Packet)
 {
@@ -52,6 +60,12 @@ VOID
 WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet)
 {
     Packet->ChildRefCount++;
+}
+
+VOID
+WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet)
+{
+    Packet->ChildRefCount--;
 }
 
 static PWIN_PACKET
