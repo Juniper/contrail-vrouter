@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
+#include "win_packet_raw.h"
 #include "fake_win_packet.h"
 
 #include <assert.h>

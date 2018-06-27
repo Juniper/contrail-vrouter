@@ -30,6 +30,7 @@ GetWinPacketFromVrPacket(struct vr_packet *VrPacket)
 }
 
 PWIN_PACKET WinPacketClone(PWIN_PACKET Packet);
+VOID WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
 void WinPacketFreeRecursive(PWIN_PACKET Packet);
 void WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);

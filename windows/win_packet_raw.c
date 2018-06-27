@@ -21,7 +21,7 @@ WinPacketRawGetParentOf(PWIN_PACKET Packet)
     return WinPacketFromNBL(parentNbl);
 }
 
-void
+VOID
 WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
 {
     PNET_BUFFER_LIST parentNbl = WinPacketToNBL(Parent);

@@ -15,6 +15,8 @@ env.Append(CPPFLAGS = '/WX')
 # Files should be added when needed to this list
 sources = [
     'win_packet.c',
+    'win_pclone.c',
+    'win_pfree.c',
 ]
 
 env.StaticLibrary('win_packet', source = sources)
