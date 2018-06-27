@@ -25,6 +25,10 @@ void WinPacketRawFreeCreated(PWIN_PACKET Packet);
 PWIN_PACKET WinPacketRawAllocateClone(PWIN_PACKET Packet);
 void WinPacketRawFreeClone(PWIN_PACKET Packet);
 
+// TODO: Move elsewhere?
+extern void *(*WinRawAllocate)(size_t size);
+void WinRawFree(void *buffer);
+
 // TODO: Remove when callback layer is independent of NDIS
 PNET_BUFFER_LIST WinPacketToNBL(PWIN_PACKET Packet);
 PWIN_PACKET WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList);

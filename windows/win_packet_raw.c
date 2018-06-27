@@ -21,7 +21,7 @@ WinPacketRawGetParentOf(PWIN_PACKET Packet)
     return WinPacketFromNBL(parentNbl);
 }
 
-void
+VOID
 WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
 {
     PNET_BUFFER_LIST parentNbl = WinPacketToNBL(Parent);
@@ -153,4 +153,18 @@ PWIN_PACKET
 WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList)
 {
     return (PWIN_PACKET)NetBufferList;
+}
+
+static PVOID
+WinRawAllocate_Impl(size_t size)
+{
+    return ExAllocatePoolWithTag(NonPagedPoolNx, size, VrAllocationTag);
+}
+
+PVOID (*WinRawAllocate)(size_t size) = WinRawAllocate_Impl;
+
+VOID
+WinRawFree(PVOID buffer)
+{
+    ExFreePool(buffer);
 }

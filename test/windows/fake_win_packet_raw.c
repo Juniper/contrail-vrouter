@@ -137,3 +137,8 @@ WinPacketRawFreeCreated(PWIN_PACKET Packet)
 {
     WinPacketRawFreeCreated_Callback(Packet);
 }
+
+void
+WinRawFree(void *buffer) {
+    test_free(buffer);
+}
