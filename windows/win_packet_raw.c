@@ -21,7 +21,7 @@ WinPacketRawGetParentOf(PWIN_PACKET Packet)
     return WinPacketFromNBL(parentNbl);
 }
 
-void
+VOID
 WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
 {
     PNET_BUFFER_LIST parentNbl = WinPacketToNBL(Parent);
@@ -58,7 +58,7 @@ WinPacketRawIsOwned(PWIN_PACKET Packet)
     return nbl->NdisPoolHandle == VrNBLPool;
 }
 
-static void
+static VOID
 WinPacketRawComplete_Impl(PWIN_PACKET Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
@@ -69,9 +69,9 @@ WinPacketRawComplete_Impl(PWIN_PACKET Packet)
     NdisFSendNetBufferListsComplete(VrSwitchObject->NdisFilterHandle,
         nbl, NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE);
 }
-void (*WinPacketRawComplete)(PWIN_PACKET Packet) = WinPacketRawComplete_Impl;
+VOID (*WinPacketRawComplete)(PWIN_PACKET Packet) = WinPacketRawComplete_Impl;
 
-static void
+static VOID
 WinPacketRawFreeCreated_Impl(PWIN_PACKET Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
@@ -137,7 +137,7 @@ failure:
 }
 PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet) = WinPacketRawAllocateClone_Impl;
 
-void
+VOID 
 WinPacketRawFreeClone_Impl(PWIN_PACKET Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
@@ -145,7 +145,7 @@ WinPacketRawFreeClone_Impl(PWIN_PACKET Packet)
     FreeForwardingContext(nbl);
     NdisFreeCloneNetBufferList(nbl, 0);
 }
-void (*WinPacketRawFreeClone)(PWIN_PACKET Packet) = WinPacketRawFreeClone_Impl;
+VOID (*WinPacketRawFreeClone)(PWIN_PACKET Packet) = WinPacketRawFreeClone_Impl;
 
 PNET_BUFFER_LIST
 WinPacketToNBL(PWIN_PACKET Packet)
@@ -157,4 +157,18 @@ PWIN_PACKET
 WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList)
 {
     return (PWIN_PACKET)NetBufferList;
+}
+
+static PVOID 
+WinRawAllocate_Impl(size_t size) 
+{
+    return ExAllocatePoolWithTag(NonPagedPoolNx, size, VrAllocationTag);
+}
+
+PVOID (*WinRawAllocate)(size_t size) = WinRawAllocate_Impl;
+
+VOID 
+WinRawFree(PVOID buffer)
+{
+    ExFreePool(buffer);
 }
