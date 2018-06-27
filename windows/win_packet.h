@@ -33,23 +33,28 @@ GetWinPacketFromVrPacket(struct vr_packet *VrPacket)
 }
 
 PWIN_PACKET WinPacketClone(PWIN_PACKET Packet);
+VOID WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
-void WinPacketFree(PWIN_PACKET Packet);
-void WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
+VOID WinPacketFree(PWIN_PACKET Packet);
+VOID WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
 PWIN_PACKET WinPacketRawGetParentOf(PWIN_PACKET Packet);
-void WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent);
+VOID WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent);
 
 LONG WinPacketRawGetChildCountOf(PWIN_PACKET Packet);
 LONG WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet);
 LONG WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet);
 
 bool WinPacketRawIsOwned(PWIN_PACKET Packet);
-extern void (*WinPacketRawComplete)(PWIN_PACKET Packet);
-extern void (*WinPacketRawFreeCreated)(PWIN_PACKET Packet);
+extern VOID (*WinPacketRawComplete)(PWIN_PACKET Packet);
+extern VOID (*WinPacketRawFreeCreated)(PWIN_PACKET Packet);
 
 extern PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet);
-extern void (*WinPacketRawFreeClone)(PWIN_PACKET Packet);
+extern VOID (*WinPacketRawFreeClone)(PWIN_PACKET Packet);
+
+// TODO: Move elsewhere?
+extern PVOID (*WinRawAllocate)(size_t size);
+VOID WinRawFree(PVOID buffer);
 
 // TODO: Remove when callback layer is independent of NDIS
 PNET_BUFFER_LIST WinPacketToNBL(PWIN_PACKET Packet);

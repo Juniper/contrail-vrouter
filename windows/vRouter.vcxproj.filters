@@ -297,6 +297,12 @@
     <ClCompile Include="windows\win_packet_raw.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="windows\win_pclone.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\win_pfree.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="windows\vRouter.inf">
