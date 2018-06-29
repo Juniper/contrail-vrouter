@@ -21,6 +21,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
@@ -54,6 +55,8 @@ enum vr_opt_index {
     VLAN_TCI_OPT_INDEX,
 #define VLAN_NAME_OPT           "vlan_fwd_intf_name"
     VLAN_NAME_OPT_INDEX,
+#define LOG_FILE_OPT            "log_file"
+    LOG_FILE_OPT_INDEX,
 #define VTEST_VLAN_OPT          "vtest_vlan"
     VTEST_VLAN_OPT_INDEX,
 #define VDEV_OPT                "vdev"
@@ -103,6 +106,8 @@ static int no_gro_set = 0;
 static int no_gso_set = 0;
 int no_huge_set;
 int no_rx_mrgbuf = 0;
+#define DPDK_LOG_FILE_SZ 512
+char dpdk_log_file[512] = "/var/log/contrail/contrail-vrouter-dpdk.log";
 unsigned int vr_mempool_sz = VR_DEF_MEMPOOL_SZ;
 unsigned int vr_packet_sz = VR_DEF_MAX_PACKET_SZ;
 extern char *ContrailBuildInfo;
@@ -125,6 +130,7 @@ static char *dpdk_argv[] = {
 
 /* Timestamp logger */
 static FILE *timestamp_log_stream;
+static FILE *dpdk_log = NULL;
 
 /* A packet mbuf pool constructor with vr_packet support */
 void vr_dpdk_pktmbuf_pool_init(struct rte_mempool *mp, void *opaque_arg)
@@ -605,6 +611,7 @@ dpdk_argv_update(void)
         return -1;
 
     /* print out configuration */
+    RTE_LOG(INFO, VROUTER, "Log file : %s\n", dpdk_log_file);
     if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
         RTE_LOG(INFO, VROUTER, "Using VLAN TCI: %" PRIu16 "\n", vr_dpdk.vlan_tag);
     }
@@ -810,6 +817,9 @@ dpdk_exit(void)
     if (pthread_mutex_destroy(&vr_dpdk.if_lock)) {
         RTE_LOG(ERR, VROUTER, "Error destroying interface lock\n");
     }
+
+    if (dpdk_log)
+        fclose(dpdk_log);
 }
 
 /* Set stop flag for all lcores */
@@ -921,6 +931,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VLAN_NAME_OPT_INDEX]           =   {VLAN_NAME_OPT,         required_argument,
                                                     NULL,                   0},
+    [LOG_FILE_OPT_INDEX]            =   {LOG_FILE_OPT,          required_argument,
+                                                    NULL,                   0},
     [VTEST_VLAN_OPT_INDEX]          =   {VTEST_VLAN_OPT,        no_argument,
                                                     NULL,                   0},
     [VDEV_OPT_INDEX]                =   {VDEV_OPT,              required_argument,
@@ -966,6 +978,7 @@ Usage(void)
         "    --"NO_HUGE_OPT"    Use malloc instead of hugetlbfs\n"
         "    --"HELP_OPT"       This help\n"
         "    --"VERSION_OPT"    Display build information\n"
+        "    --"LOG_FILE_OPT" <path> Override default log file location to <path>\n"
         "\n"
         "    --"VDEV_OPT" CONF          Add a virtual device.\n"
         "                         The argument format is <driver><id>[,key=val,...]\n"
@@ -1134,6 +1147,12 @@ parse_long_opts(int opt_flow_index, char *optarg)
         dpdk_argv_append("--"SOCKET_MEM_OPT, optarg);
         break;
 
+    case LOG_FILE_OPT_INDEX:
+        strncpy(dpdk_log_file, optarg, sizeof(dpdk_log_file) - 1);
+        dpdk_log_file[sizeof(dpdk_log_file) - 1] = '\0';
+        break;
+
+
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -1162,6 +1181,10 @@ timestamp_log_write(__attribute__((unused)) void *c, const char *buf, size_t siz
         len = sizeof(outbuf);
 
     ret = fwrite(outbuf, len, 1, stdout);
+    if (c != NULL) {
+        ret = fwrite(outbuf, len, 1, (FILE*)c);
+        fflush((FILE*)c);
+    }
     fflush(stdout);
 
     if (ret == 0)
@@ -1182,13 +1205,7 @@ main(int argc, char *argv[])
     strncpy(vr_dpdk.vlan_name, VR_DPDK_VLAN_FWD_DEF_NAME,
         sizeof(vr_dpdk.vlan_name) - 1);
 
-    /* init the timestamp log */
-    timestamp_log_stream = fopencookie(NULL, "w+", timestamp_log_func);
-    if (timestamp_log_stream == NULL) {
-        printf("Error configuring log stream. Falling back to stdout.\n");
-        timestamp_log_stream = stdout;
-    }
-    rte_openlog_stream(timestamp_log_stream);
+    rte_openlog_stream(stdout);
 
     while ((opt = getopt_long(argc, argv, "", long_options, &option_index))
             >= 0) {
@@ -1204,6 +1221,19 @@ main(int argc, char *argv[])
             break;
         }
     }
+
+    /* init the timestamp log */
+    dpdk_log = fopen(dpdk_log_file, "a+");
+    if (dpdk_log == NULL) {
+        RTE_LOG(ERR, VROUTER, "Error opening %s: errno %d\n", dpdk_log_file, errno);
+    }
+    timestamp_log_stream = fopencookie(dpdk_log, "a+", timestamp_log_func);
+    if (timestamp_log_stream == NULL) {
+        printf("Error configuring log stream. Falling back to stdout.\n");
+        timestamp_log_stream = stdout;
+    }
+    rte_openlog_stream(timestamp_log_stream);
+
     /* for other getopts in DPDK */
     optind = 0;
 
