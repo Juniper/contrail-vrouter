@@ -492,6 +492,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
     bool flow_processing = false;
+    bool relaxed_policy_found =  false;
     unsigned int hlen;
     unsigned short drop_reason, l4_port = 0;
     int unhandled = 1;
@@ -580,8 +581,10 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                         }
 
                         if (l4_port && vr_valid_link_local_port(router, AF_INET,
-                                         ip->ip_proto, ntohs(l4_port)))
+                                         ip->ip_proto, ntohs(l4_port))) {
                             flow_processing = true;
+                            relaxed_policy_found = true;
+			}
                     }
                 }
             }
@@ -606,7 +609,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                  * gets marked in fmd_to_me, lets subject it l3
                  * processing again.
                  */
-                if (fmd->fmd_to_me || (pkt->vp_nh->nh_flags & NH_FLAG_RELAXED_POLICY)) {
+                if (fmd->fmd_to_me || relaxed_policy_found) {
                     if (!vr_l3_input(pkt, fmd)) {
                         drop_reason = VP_DROP_NOWHERE_TO_GO;
                         goto drop_pkt;
