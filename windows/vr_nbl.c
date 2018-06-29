@@ -111,18 +111,20 @@ FreeClonedNetBufferList(PNET_BUFFER_LIST nbl, BOOLEAN recursive)
 
     PNET_BUFFER_LIST parentNbl = nbl->ParentNetBufferList;
 
+    // WPR
     FreeForwardingContext(nbl);
     NdisFreeCloneNetBufferList(nbl, 0);
+    // WPR: ends
 
     if (InterlockedDecrement(&parentNbl->ChildRefCount) == 0 && recursive) {
-        FreeNetBufferList(parentNbl);
+        WP FreeNetBufferList(parentNbl);
     }
 }
 
 VOID
 FreeClonedNetBufferListRecursive(PNET_BUFFER_LIST nbl)
 {
-    FreeClonedNetBufferList(nbl, true);
+    WP FreeClonedNetBufferList(nbl, true);
 }
 
 VOID
@@ -169,7 +171,7 @@ CompleteReceivedNetBufferList(PNET_BUFFER_LIST nbl)
 }
 
 VOID
-FreeNetBufferList(PNET_BUFFER_LIST nbl)
+WP FreeNetBufferList(PNET_BUFFER_LIST nbl)
 {
     ASSERT(nbl != NULL);
     ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
@@ -177,12 +179,12 @@ FreeNetBufferList(PNET_BUFFER_LIST nbl)
 
     if (IS_NBL_OWNED(nbl)) {
         if (IS_NBL_CLONE(nbl)) {
-            FreeClonedNetBufferListRecursive(nbl);
+            WP FreeClonedNetBufferListRecursive(nbl);
         } else {
-            FreeCreatedNetBufferList(nbl);
+            WPR FreeCreatedNetBufferList(nbl);
         }
     } else {
-        CompleteReceivedNetBufferList(nbl);
+        WPR CompleteReceivedNetBufferList(nbl);
     }
 }
 
