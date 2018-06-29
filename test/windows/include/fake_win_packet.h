@@ -11,4 +11,6 @@
 PWIN_PACKET Fake_WinPacketAllocate();
 VOID Fake_WinPacketFree(PWIN_PACKET Packet);
 
+VOID Fake_WinPacketSetIsOwned(PWIN_PACKET Packet, BOOL IsOwned);
+
 #endif // _FAKE_WIN_PACKET_H_

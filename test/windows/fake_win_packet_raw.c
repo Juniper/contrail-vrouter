@@ -13,6 +13,7 @@
 struct _WIN_PACKET {
     PWIN_PACKET Parent;
     LONG ChildRefCount;
+    BOOL IsOwned;
 };
 
 PWIN_PACKET
@@ -60,3 +61,22 @@ WinPacketRawAllocateClone_Impl(PWIN_PACKET Packet)
     return NULL;
 }
 PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet) = WinPacketRawAllocateClone_Impl;
+
+BOOL
+WinPacketRawIsOwned(PWIN_PACKET Packet)
+{
+    return Packet->IsOwned;
+}
+
+VOID
+Fake_WinPacketSetIsOwned(PWIN_PACKET Packet, BOOL IsOwned)
+{
+    Packet->IsOwned = IsOwned;
+}
+
+static VOID
+WinPacketRawComplete_Impl(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+VOID (*WinPacketRawComplete)(PWIN_PACKET Packet) = WinPacketRawComplete_Impl;
