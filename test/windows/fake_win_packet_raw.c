@@ -13,6 +13,7 @@
 struct _WIN_PACKET {
     PWIN_PACKET Parent;
     LONG ChildRefCount;
+    BOOL IsOwned;
 };
 
 PWIN_PACKET
@@ -54,9 +55,53 @@ WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet)
     Packet->ChildRefCount++;
 }
 
+LONG
+WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet)
+{
+    return --Packet->ChildRefCount;
+}
+
 static PWIN_PACKET
 WinPacketRawAllocateClone_Impl(PWIN_PACKET Packet)
 {
-    return NULL;
+    return Fake_WinPacketAllocate();
 }
 PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet) = WinPacketRawAllocateClone_Impl;
+
+VOID
+WinPacketRawFreeClone(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+
+BOOL
+WinPacketRawIsOwned(PWIN_PACKET Packet)
+{
+    return Packet->IsOwned;
+}
+
+BOOL
+WinPacketRawIsCloned(PWIN_PACKET Packet)
+{
+    return Packet->Parent != NULL;
+}
+
+VOID
+Fake_WinPacketSetIsOwned(PWIN_PACKET Packet, BOOL IsOwned)
+{
+    Packet->IsOwned = IsOwned;
+}
+
+static VOID
+WinPacketRawComplete_Impl(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+VOID (*WinPacketRawComplete)(PWIN_PACKET Packet) = WinPacketRawComplete_Impl;
+
+static VOID
+WinPacketRawFreeCreated_Impl(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+VOID (*WinPacketRawFreeCreated)(PWIN_PACKET Packet) = WinPacketRawFreeCreated_Impl;
