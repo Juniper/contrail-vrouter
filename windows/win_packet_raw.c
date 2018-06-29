@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
-#include "win_packet.h"
+#include "win_packet_raw.h"
 #include "windows_nbl.h"
 
 #include <ndis.h>
@@ -12,7 +12,16 @@ struct _WIN_PACKET {
     NET_BUFFER_LIST NetBufferList;
 };
 
-VOID
+PWIN_PACKET
+WinPacketRawGetParentOf(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST childNbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST parentNbl = childNbl->ParentNetBufferList;
+
+    return WinPacketFromNBL(parentNbl);
+}
+
+void
 WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
 {
     PNET_BUFFER_LIST parentNbl = WinPacketToNBL(Parent);
@@ -21,15 +30,76 @@ WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
     childNbl->ParentNetBufferList = parentNbl;
 }
 
-VOID
+long
+WinPacketRawGetChildCountOf(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    return nbl->ChildRefCount;
+}
+
+long
 WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
-    InterlockedIncrement(&nbl->ChildRefCount);
+    return InterlockedIncrement(&nbl->ChildRefCount);
 }
 
-static PWIN_PACKET
-WinPacketRawAllocateClone_Impl(PWIN_PACKET Packet)
+long
+WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    return InterlockedDecrement(&nbl->ChildRefCount);
+}
+
+bool
+WinPacketRawIsOwned(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    return nbl->NdisPoolHandle == VrNBLPool;
+}
+
+void
+WinPacketRawComplete(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+
+    ASSERT(nbl != NULL);
+
+    /* Flag SINGLE_SOURCE is used, because of singular NBLS */
+    NdisFSendNetBufferListsComplete(VrSwitchObject->NdisFilterHandle,
+        nbl, NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE);
+}
+
+void
+WinPacketRawFreeCreated(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+
+    ASSERT(nbl != NULL);
+    ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
+
+    PNET_BUFFER nb = NULL;
+    PMDL mdl = NULL;
+    PMDL mdl_next = NULL;
+    PVOID data = NULL;
+
+    FreeForwardingContext(nbl);
+
+    /* Free MDLs associated with NET_BUFFERS */
+    for (nb = NET_BUFFER_LIST_FIRST_NB(nbl); nb != NULL; nb = NET_BUFFER_NEXT_NB(nb))
+        for (mdl = NET_BUFFER_FIRST_MDL(nb); mdl != NULL; mdl = mdl_next) {
+            mdl_next = mdl->Next;
+            data = MmGetSystemAddressForMdlSafe(mdl, LowPagePriority | MdlMappingNoExecute);
+            NdisFreeMdl(mdl);
+            if (data != NULL)
+                ExFreePool(data);
+        }
+
+    NdisFreeNetBufferList(nbl);
+}
+
+PWIN_PACKET
+WinPacketRawAllocateClone(PWIN_PACKET Packet)
 {
     NDIS_STATUS status;
 
@@ -63,7 +133,15 @@ cleanup_cloned_nbl:
 failure:
     return NULL;
 }
-PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet) = WinPacketRawAllocateClone_Impl;
+
+void
+WinPacketRawFreeClone(PWIN_PACKET Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+
+    FreeForwardingContext(nbl);
+    NdisFreeCloneNetBufferList(nbl, 0);
+}
 
 PNET_BUFFER_LIST
 WinPacketToNBL(PWIN_PACKET Packet)
