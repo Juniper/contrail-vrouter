@@ -103,89 +103,6 @@ CreateNetBufferList(unsigned int bytesCount)
     return nbl;
 }
 
-static VOID
-FreeClonedNetBufferList(PNET_BUFFER_LIST nbl, BOOLEAN recursive)
-{
-    ASSERT(nbl != NULL);
-    ASSERT(nbl->ParentNetBufferList != NULL);
-
-    PNET_BUFFER_LIST parentNbl = nbl->ParentNetBufferList;
-
-    FreeForwardingContext(nbl);
-    NdisFreeCloneNetBufferList(nbl, 0);
-
-    if (InterlockedDecrement(&parentNbl->ChildRefCount) == 0 && recursive) {
-        FreeNetBufferList(parentNbl);
-    }
-}
-
-VOID
-FreeClonedNetBufferListRecursive(PNET_BUFFER_LIST nbl)
-{
-    FreeClonedNetBufferList(nbl, true);
-}
-
-VOID
-FreeClonedNetBufferListPreservingParent(PNET_BUFFER_LIST nbl)
-{
-    FreeClonedNetBufferList(nbl, false);
-}
-
-VOID
-FreeCreatedNetBufferList(PNET_BUFFER_LIST nbl)
-{
-    ASSERT(nbl != NULL);
-    ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
-
-    PNET_BUFFER nb = NULL;
-    PMDL mdl = NULL;
-    PMDL mdl_next = NULL;
-    PVOID data = NULL;
-
-    FreeForwardingContext(nbl);
-
-    /* Free MDLs associated with NET_BUFFERS */
-    for (nb = NET_BUFFER_LIST_FIRST_NB(nbl); nb != NULL; nb = NET_BUFFER_NEXT_NB(nb))
-        for (mdl = NET_BUFFER_FIRST_MDL(nb); mdl != NULL; mdl = mdl_next) {
-            mdl_next = mdl->Next;
-            data = MmGetSystemAddressForMdlSafe(mdl, LowPagePriority | MdlMappingNoExecute);
-            NdisFreeMdl(mdl);
-            if (data != NULL)
-                ExFreePool(data);
-        }
-
-    NdisFreeNetBufferList(nbl);
-}
-
-static VOID
-CompleteReceivedNetBufferList(PNET_BUFFER_LIST nbl)
-{
-    ASSERT(nbl != NULL);
-
-    /* Flag SINGLE_SOURCE is used, because of singular NBLS */
-    NdisFSendNetBufferListsComplete(VrSwitchObject->NdisFilterHandle,
-        nbl,
-        NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE);
-}
-
-VOID
-FreeNetBufferList(PNET_BUFFER_LIST nbl)
-{
-    ASSERT(nbl != NULL);
-    ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
-    ASSERT(nbl->ChildRefCount == 0);
-
-    if (IS_NBL_OWNED(nbl)) {
-        if (IS_NBL_CLONE(nbl)) {
-            FreeClonedNetBufferListRecursive(nbl);
-        } else {
-            FreeCreatedNetBufferList(nbl);
-        }
-    } else {
-        CompleteReceivedNetBufferList(nbl);
-    }
-}
-
 PNET_BUFFER_LIST
 CloneNetBufferList(PNET_BUFFER_LIST originalNbl)
 {
@@ -231,10 +148,7 @@ win_free_packet(struct vr_packet *pkt)
 
     PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(pkt);
 
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(wrapper->WinPacket);
-    ASSERT(nbl != NULL);
-    FreeNetBufferList(nbl);
-
+    WinPacketFree(wrapper->WinPacket);
     ExFreePool(wrapper);
 }
 
@@ -290,7 +204,7 @@ cleanup:
     for (clonedNbl = clonedNblList; clonedNbl; clonedNbl = nextNbl) {
         nextNbl = NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
         NET_BUFFER_LIST_NEXT_NBL(clonedNbl) = NULL;
-        FreeClonedNetBufferListPreservingParent(clonedNbl);
+        WinPacketFreeClonedPreservingParent(WinPacketFromNBL(clonedNbl));
     }
 
     return NULL;
@@ -406,7 +320,7 @@ fail:
     if (pkt)
         win_free_packet(pkt);
     else if (nbl)
-        FreeCreatedNetBufferList(nbl);
+        WinPacketRawFreeCreated(WinPacketFromNBL(nbl));
     return NULL;
 }
 
@@ -540,7 +454,7 @@ FilterSendNetBufferLists(
             ASSERTMSG("win_get_packed failed!", pkt != NULL);
 
             if (pkt == NULL) {
-                FreeNetBufferList(curNbl);
+                WinPacketFree(WinPacketFromNBL(curNbl));
                 continue;
             }
 
@@ -584,6 +498,6 @@ FilterSendNetBufferListsComplete(
         next = current->Next;
         current->Next = NULL;
 
-        FreeNetBufferList(current);
+        WinPacketFree(WinPacketFromNBL(current));
     } while (next != NULL);
 }

@@ -144,7 +144,7 @@ win_palloc_head(struct vr_packet *pkt, unsigned int size)
     struct vr_packet *npkt = win_get_packet(nb_head, pkt->vp_if);
     if (npkt == NULL)
     {
-        FreeCreatedNetBufferList(nb_head);
+        WinPacketRawFreeCreated(WinPacketFromNBL(nb_head));
         return NULL;
     }
 
@@ -213,7 +213,7 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 
 cleanup:
     if (new_nbl) {
-        FreeClonedNetBufferListPreservingParent(new_nbl);
+        WinPacketFreeClonedPreservingParent(WinPacketFromNBL(new_nbl));
     }
 
     return NULL;
@@ -281,10 +281,10 @@ win_pclone(struct vr_packet *vrPkt)
     return &rightPkt->VrPacket;
 
 cleanup_both_nbls:
-    FreeClonedNetBufferListPreservingParent(rightNbl);
+    WinPacketFreeClonedPreservingParent(WinPacketFromNBL(rightNbl));
 
 cleanup_left_nbl:
-    FreeClonedNetBufferListPreservingParent(leftNbl);
+    WinPacketFreeClonedPreservingParent(WinPacketFromNBL(leftNbl));
 
     return NULL;
 }
