@@ -21,7 +21,6 @@ extern FILTER_SEND_NET_BUFFER_LISTS_COMPLETE FilterSendNetBufferListsComplete;
 
 extern PNET_BUFFER_LIST CreateNetBufferList(unsigned int bytesCount);
 extern PNET_BUFFER_LIST CloneNetBufferList(PNET_BUFFER_LIST originalNbl);
-extern VOID FreeNetBufferList(PNET_BUFFER_LIST nbl);
 extern VOID FreeCreatedNetBufferList(PNET_BUFFER_LIST nbl);
 extern VOID FreeClonedNetBufferListRecursive(PNET_BUFFER_LIST nbl);
 extern VOID FreeClonedNetBufferListPreservingParent(PNET_BUFFER_LIST nbl);

@@ -115,7 +115,7 @@ FreeClonedNetBufferList(PNET_BUFFER_LIST nbl, BOOLEAN recursive)
     NdisFreeCloneNetBufferList(nbl, 0);
 
     if (InterlockedDecrement(&parentNbl->ChildRefCount) == 0 && recursive) {
-        FreeNetBufferList(parentNbl);
+        WinPacketFree(WinPacketFromNBL(parentNbl));
     }
 }
 
@@ -155,35 +155,6 @@ FreeCreatedNetBufferList(PNET_BUFFER_LIST nbl)
         }
 
     NdisFreeNetBufferList(nbl);
-}
-
-static VOID
-CompleteReceivedNetBufferList(PNET_BUFFER_LIST nbl)
-{
-    ASSERT(nbl != NULL);
-
-    /* Flag SINGLE_SOURCE is used, because of singular NBLS */
-    NdisFSendNetBufferListsComplete(VrSwitchObject->NdisFilterHandle,
-        nbl,
-        NDIS_SEND_COMPLETE_FLAGS_SWITCH_SINGLE_SOURCE);
-}
-
-VOID
-FreeNetBufferList(PNET_BUFFER_LIST nbl)
-{
-    ASSERT(nbl != NULL);
-    ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
-    ASSERT(nbl->ChildRefCount == 0);
-
-    if (IS_NBL_OWNED(nbl)) {
-        if (IS_NBL_CLONE(nbl)) {
-            FreeClonedNetBufferListRecursive(nbl);
-        } else {
-            FreeCreatedNetBufferList(nbl);
-        }
-    } else {
-        CompleteReceivedNetBufferList(nbl);
-    }
 }
 
 PNET_BUFFER_LIST
@@ -231,10 +202,7 @@ win_free_packet(struct vr_packet *pkt)
 
     PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(pkt);
 
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(wrapper->WinPacket);
-    ASSERT(nbl != NULL);
-    FreeNetBufferList(nbl);
-
+    WinPacketFree(wrapper->WinPacket);
     ExFreePool(wrapper);
 }
 
@@ -540,7 +508,7 @@ FilterSendNetBufferLists(
             ASSERTMSG("win_get_packed failed!", pkt != NULL);
 
             if (pkt == NULL) {
-                FreeNetBufferList(curNbl);
+                WinPacketFree(WinPacketFromNBL(curNbl));
                 continue;
             }
 
@@ -584,6 +552,6 @@ FilterSendNetBufferListsComplete(
         next = current->Next;
         current->Next = NULL;
 
-        FreeNetBufferList(current);
+        WinPacketFree(WinPacketFromNBL(current));
     } while (next != NULL);
 }
