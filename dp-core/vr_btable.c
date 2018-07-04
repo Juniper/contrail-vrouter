@@ -87,6 +87,20 @@ vr_btable_free(struct vr_btable *table)
     return;
 }
 
+static void
+vr_btable_fill_pow2_fields(struct vr_btable *table) {
+    unsigned int number = table->vb_alloc_limit;
+
+    if (!(table->vb_alloc_limit & (table->vb_alloc_limit - 1))) {
+        while (number >>= 1)
+            table->vb_alloc_limit_log++;
+        table->vb_alloc_limit_mask = table->vb_alloc_limit - 1;
+    } else {
+        table->vb_alloc_limit_log = 0;
+        table->vb_alloc_limit_mask = 0;
+    }
+}
+
 struct vr_btable *
 vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
 {
@@ -160,6 +174,8 @@ vr_btable_alloc(unsigned int num_entries, unsigned int entry_size)
     table->vb_entries = num_entries;
     table->vb_esize = entry_size;
 
+    vr_btable_fill_pow2_fields(table);
+
     return table;
 
 exit_alloc:
@@ -216,6 +232,8 @@ vr_btable_attach(struct iovec *iov, unsigned int iov_len,
 
     table->vb_entries = (total_size / esize);
     table->vb_flags |= VB_FLAG_MEMORY_ATTACHED;
+
+    vr_btable_fill_pow2_fields(table);
 
     return table;
 
