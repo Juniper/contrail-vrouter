@@ -21,6 +21,8 @@ struct vr_btable {
     unsigned short  vb_partitions;
     unsigned int    vb_flags;
     unsigned int    vb_alloc_limit;
+    unsigned short  vb_alloc_limit_log;
+    unsigned int    vb_alloc_limit_mask;
     void            **vb_mem;
     struct vr_btable_partition *vb_table_info;
 };
@@ -48,13 +50,21 @@ vr_btable_size(struct vr_btable *table)
 static inline void *
 vr_btable_get(struct vr_btable *table, unsigned int entry)
 {
-    unsigned int t_index, t_offset;
+    unsigned int t_index, t_offset, entry_cont;
 
     if (entry >= table->vb_entries)
         return NULL;
 
-    t_index = (entry * table->vb_esize) / table->vb_alloc_limit;
-    t_offset = (entry * table->vb_esize) % table->vb_alloc_limit;
+    entry_cont = entry * table->vb_esize;
+
+    if (table->vb_alloc_limit_mask) {
+        t_index = entry_cont >> table->vb_alloc_limit_log;
+        t_offset = entry_cont & table->vb_alloc_limit_mask;
+    } else {
+        t_index = entry_cont / table->vb_alloc_limit;
+        t_offset = entry_cont % table->vb_alloc_limit;
+    }
+
     if (t_index >= table->vb_partitions)
         return NULL;
 
