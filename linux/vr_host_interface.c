@@ -1712,15 +1712,13 @@ linux_if_get_encap(struct vr_interface *vif)
 static int
 linux_if_tx_csum_offload(struct net_device *dev)
 {
-    const char *driver_name;
-
     if (dev->features & NETIF_F_HW_CSUM) {
         return 1;
     }
 
 #ifndef RHEL_MAJOR
     if (dev->dev.parent) {
-        driver_name = dev_driver_string(dev->dev.parent);
+        const char *driver_name = dev_driver_string(dev->dev.parent);
         if (driver_name && ((!strncmp(driver_name, "ixgbe", 6)) ||
                             (!strncmp(driver_name, "i40e", 5)))) {
             return 1;
