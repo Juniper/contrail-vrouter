@@ -15,7 +15,7 @@
 #include "vr_interface.h"
 #include "vr_bridge.h"
 
-#define VIF_BRIDGE_ENTRIES      1024
+#define VIF_BRIDGE_ENTRIES      10240
 #define VIF_BRIDGE_OENTRIES     512
 
 __attribute__packed__open__
