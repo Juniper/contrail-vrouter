@@ -24,29 +24,30 @@ Fake_WinPacketRawAllocateClone_ReturnsNull(PWIN_PACKET Packet)
 static PWIN_PACKET
 Fake_WinPacketRawAllocateClone_ReturnsNewPacket(PWIN_PACKET Packet)
 {
-    return Fake_WinPacketAllocate();
+    return Fake_WinPacketAllocateOwned();
 }
 
 int
 Test_WinPacketClone_SetUp(void **state)
 {
-    Saved_WinPacketRawAllocateClone = WinPacketRawAllocateClone;
+    Saved_WinPacketRawAllocateClone = WinPacketRawAllocateClone_Callback;
     return 0;
 }
 
 int
 Test_WinPacketClone_TearDown(void **state)
 {
-    WinPacketRawAllocateClone = Saved_WinPacketRawAllocateClone;
+    WinPacketRawAllocateClone_Callback = Saved_WinPacketRawAllocateClone;
     return 0;
 }
 
 void
 Test_WinPacketClone_ReturnsNullWhenCloneFails(void **state)
 {
-    WinPacketRawAllocateClone = Fake_WinPacketRawAllocateClone_ReturnsNull;
+    WinPacketRawAllocateClone_Callback =
+        Fake_WinPacketRawAllocateClone_ReturnsNull;
 
-    PWIN_PACKET packet = Fake_WinPacketAllocate();
+    PWIN_PACKET packet = Fake_WinPacketAllocateNonOwned();
     PWIN_PACKET cloned = WinPacketClone(packet);
 
     assert_null(cloned);
@@ -58,9 +59,10 @@ Test_WinPacketClone_ReturnsNullWhenCloneFails(void **state)
 void
 Test_WinPacketClone_ReturnsPacketWhenCloneSucceeds(void **state)
 {
-    WinPacketRawAllocateClone = Fake_WinPacketRawAllocateClone_ReturnsNewPacket;
+    WinPacketRawAllocateClone_Callback =
+        Fake_WinPacketRawAllocateClone_ReturnsNewPacket;
 
-    PWIN_PACKET packet = Fake_WinPacketAllocate();
+    PWIN_PACKET packet = Fake_WinPacketAllocateNonOwned();
     PWIN_PACKET cloned = WinPacketClone(packet);
 
     assert_non_null(cloned);
@@ -74,9 +76,10 @@ Test_WinPacketClone_ReturnsPacketWhenCloneSucceeds(void **state)
 void
 Test_WinPacketClone_RefCountIsValidAfterMultipleClones(void **state)
 {
-    WinPacketRawAllocateClone = Fake_WinPacketRawAllocateClone_ReturnsNewPacket;
+    WinPacketRawAllocateClone_Callback =
+        Fake_WinPacketRawAllocateClone_ReturnsNewPacket;
 
-    PWIN_PACKET packet = Fake_WinPacketAllocate();
+    PWIN_PACKET packet = Fake_WinPacketAllocateNonOwned();
 
     PWIN_PACKET cloned1 = WinPacketClone(packet);
     PWIN_PACKET cloned2 = WinPacketClone(packet);
@@ -100,9 +103,10 @@ Test_WinPacketClone_RefCountIsValidAfterMultipleClones(void **state)
 void
 Test_WinPacketClone_RefCountIsValidAfterCloneOfClone(void **state)
 {
-    WinPacketRawAllocateClone = Fake_WinPacketRawAllocateClone_ReturnsNewPacket;
+    WinPacketRawAllocateClone_Callback =
+        Fake_WinPacketRawAllocateClone_ReturnsNewPacket;
 
-    PWIN_PACKET packet = Fake_WinPacketAllocate();
+    PWIN_PACKET packet = Fake_WinPacketAllocateNonOwned();
 
     PWIN_PACKET cloned1 = WinPacketClone(packet);
     PWIN_PACKET cloned2 = WinPacketClone(cloned1);

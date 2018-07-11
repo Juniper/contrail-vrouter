@@ -6,11 +6,8 @@
 #ifndef __WIN_PACKET_H__
 #define __WIN_PACKET_H__
 
-#include <ndis.h>
-
+#include "win_packet_raw.h"
 #include "vr_packet.h"
-
-typedef struct _WIN_PACKET WIN_PACKET, *PWIN_PACKET;
 
 // NOTE: VrPacket should **always** be a first field in VR_PACKET_WRAPPER struct.
 typedef struct _VR_PACKET_WRAPPER {
@@ -34,16 +31,7 @@ GetWinPacketFromVrPacket(struct vr_packet *VrPacket)
 
 PWIN_PACKET WinPacketClone(PWIN_PACKET Packet);
 
-PWIN_PACKET WinPacketRawGetParentOf(PWIN_PACKET Packet);
-VOID WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent);
-
-LONG WinPacketRawGetChildCountOf(PWIN_PACKET Packet);
-VOID WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet);
-
-extern PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet);
-
-// TODO: Remove when callback layer is independent of NDIS
-PNET_BUFFER_LIST WinPacketToNBL(PWIN_PACKET Packet);
-PWIN_PACKET WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList);
+void WinPacketFreeRecursive(PWIN_PACKET Packet);
+void WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
 #endif /* __WIN_PACKET_H__ */

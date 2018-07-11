@@ -6,25 +6,39 @@
 #include "fake_win_packet.h"
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <setjmp.h>
 #include <cmocka.h>
 
 struct _WIN_PACKET {
     PWIN_PACKET Parent;
-    LONG ChildRefCount;
+    long ChildRefCount;
+    bool IsOwned;
 };
 
-PWIN_PACKET
-Fake_WinPacketAllocate()
+static PWIN_PACKET
+Fake_WinPacketAllocate(bool IsOwned)
 {
-    PWIN_PACKET packet = test_malloc(sizeof(*packet));
+    PWIN_PACKET packet = test_calloc(1, sizeof(*packet));
     assert(packet != NULL);
-    memset(packet, 0, sizeof(*packet));
+    packet->IsOwned = IsOwned;
     return packet;
 }
 
-VOID
+PWIN_PACKET
+Fake_WinPacketAllocateOwned()
+{
+    return Fake_WinPacketAllocate(true);
+}
+
+PWIN_PACKET
+Fake_WinPacketAllocateNonOwned()
+{
+    return Fake_WinPacketAllocate(false);
+}
+
+void
 Fake_WinPacketFree(PWIN_PACKET Packet)
 {
     test_free(Packet);
@@ -36,27 +50,90 @@ WinPacketRawGetParentOf(PWIN_PACKET Packet)
     return Packet->Parent;
 }
 
-VOID
+void
 WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
 {
     Packet->Parent = Parent;
 }
 
-LONG
+long
 WinPacketRawGetChildCountOf(PWIN_PACKET Packet)
 {
     return Packet->ChildRefCount;
 }
 
-VOID
+long
 WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet)
 {
-    Packet->ChildRefCount++;
+    return ++Packet->ChildRefCount;
+}
+
+long
+WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet)
+{
+    return --Packet->ChildRefCount;
 }
 
 static PWIN_PACKET
 WinPacketRawAllocateClone_Impl(PWIN_PACKET Packet)
 {
-    return NULL;
+    return Fake_WinPacketAllocateOwned();
 }
-PWIN_PACKET (*WinPacketRawAllocateClone)(PWIN_PACKET Packet) = WinPacketRawAllocateClone_Impl;
+PWIN_PACKET (*WinPacketRawAllocateClone_Callback)(PWIN_PACKET Packet) = WinPacketRawAllocateClone_Impl;
+
+PWIN_PACKET
+WinPacketRawAllocateClone(PWIN_PACKET Packet)
+{
+    return WinPacketRawAllocateClone_Callback(Packet);
+}
+
+static void
+WinPacketRawFreeClone_Impl(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+void (*WinPacketRawFreeClone_Callback)(PWIN_PACKET Packet) = WinPacketRawFreeClone_Impl;
+
+void
+WinPacketRawFreeClone(PWIN_PACKET Packet)
+{
+    WinPacketRawFreeClone_Callback(Packet);
+}
+
+bool
+WinPacketRawIsOwned(PWIN_PACKET Packet)
+{
+    return Packet->IsOwned;
+}
+
+bool
+WinPacketRawIsCloned(PWIN_PACKET Packet)
+{
+    return Packet->Parent != NULL;
+}
+
+static void
+WinPacketRawComplete_Impl(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+void (*WinPacketRawComplete_Callback)(PWIN_PACKET Packet) = WinPacketRawComplete_Impl;
+
+void
+WinPacketRawComplete(PWIN_PACKET Packet)
+{
+    WinPacketRawComplete_Callback(Packet);
+}
+
+static void
+WinPacketRawFreeCreated_Impl(PWIN_PACKET Packet)
+{
+    Fake_WinPacketFree(Packet);
+}
+void (*WinPacketRawFreeCreated_Callback)(PWIN_PACKET Packet) = WinPacketRawFreeCreated_Impl;
+
+void
+WinPacketRawFreeCreated(PWIN_PACKET Packet)
+{
+    WinPacketRawFreeCreated_Callback(Packet);
+}
