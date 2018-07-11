@@ -220,7 +220,9 @@
     <Link>
       <AdditionalDependencies>ndis.lib;ntstrsafe.lib;Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <DriverSign />
+    <DriverSign>
+      <AdditionalOptions>/debug</AdditionalOptions>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -514,7 +516,12 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="vr_host.c" />
-    <ClCompile Include="win_packet.c" />
+    <ClCompile Include="win_packet.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="win_packet_raw.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="vRouter.inf" />
