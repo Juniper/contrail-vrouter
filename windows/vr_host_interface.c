@@ -9,6 +9,8 @@
 #include "vrouter.h"
 
 #include "win_packet.h"
+#include "win_packet_raw.h"
+#include "win_packet_impl.h"
 #include "windows_devices.h"
 #include "windows_nbl.h"
 
@@ -118,7 +120,8 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
     uint8_t type;
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
 
     void* packet_data_buffer = ExAllocatePoolWithTag(NonPagedPoolNx, NET_BUFFER_DATA_LENGTH(nb), VrAllocationTag);
@@ -169,7 +172,8 @@ static void
 fix_tunneled_csum(struct vr_packet *pkt)
 {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
     NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
     settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
 
@@ -212,7 +216,8 @@ fix_tunneled_csum(struct vr_packet *pkt)
 static void
 fix_ip_v4_csum_to_be_offloaded(struct vr_packet *pkt) {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
     NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
     settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
 
@@ -232,7 +237,8 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     }
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
 
     NDIS_SWITCH_PORT_DESTINATION newDestination = { 0 };
 

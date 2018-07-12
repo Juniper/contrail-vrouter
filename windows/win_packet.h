@@ -6,8 +6,16 @@
 #ifndef __WIN_PACKET_H__
 #define __WIN_PACKET_H__
 
-#include "win_packet_raw.h"
 #include "vr_packet.h"
+
+typedef struct _WIN_PACKET WIN_PACKET, *PWIN_PACKET;
+typedef struct _WIN_MULTI_PACKET WIN_MULTI_PACKET, *PWIN_MULTI_PACKET;
+
+typedef struct _WIN_PACKET_LIST WIN_PACKET_LIST, *PWIN_PACKET_LIST;
+struct _WIN_PACKET_LIST {
+    PWIN_PACKET_LIST Next;
+    PWIN_PACKET WinPacket;
+};
 
 // NOTE: VrPacket should **always** be a first field in VR_PACKET_WRAPPER struct.
 typedef struct _VR_PACKET_WRAPPER {
@@ -34,5 +42,7 @@ VOID WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
 void WinPacketFreeRecursive(PWIN_PACKET Packet);
 void WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
+
+PWIN_PACKET_LIST WinPacketSplitMultiPacket(PWIN_MULTI_PACKET WinMultiPacket);
 
 #endif /* __WIN_PACKET_H__ */
