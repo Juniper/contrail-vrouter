@@ -908,7 +908,6 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     struct vring_desc *desc;
     char *pkt_addr, *tail_addr;
     struct rte_mbuf *mbuf;
-    struct rte_mbuf *mbufs[VR_DPDK_RX_BURST_SZ];
     uint32_t pkt_len, nb_pkts = 0;
     vr_uvh_client_t *vru_cl;
 
@@ -935,21 +934,10 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 
     DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p AVAILABLE %u packets\n",
             __func__, vq, avail_pkts);
-
-    if (rte_mempool_avail_count(vr_dpdk.rss_mempool) < (16 * VR_DPDK_RX_BURST_SZ)) {
-        /* Means mempool resource is very few */
-        return 0;
-    }
-
-    /* Allocate mbufs. */
-    if (rte_pktmbuf_alloc_bulk(vr_dpdk.rss_mempool, mbufs, avail_pkts) != 0) {
-        /* Means no enough available rte_mbuf */
-        return 0;
-    }
-
     for (i = 0; i < avail_pkts; i++) {
         uint32_t header_len = 0;
-        mbuf = mbufs[i];
+        /* Allocate a mbuf. */
+        mbuf = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
         if (unlikely(mbuf == NULL)) {
             p->nb_nombufs++;
             DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p no_mbufs=%"PRIu64"\n",
