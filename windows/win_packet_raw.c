@@ -12,6 +12,14 @@ struct _WIN_PACKET {
     NET_BUFFER_LIST NetBufferList;
 };
 
+struct _WIN_SUB_PACKET {
+    NET_BUFFER NetBuffer;
+}
+
+struct _WIN_MULTI_PACKET {
+    NET_BUFFER_LIST NetBufferList;
+}
+
 PWIN_PACKET
 WinPacketRawGetParentOf(PWIN_PACKET Packet)
 {

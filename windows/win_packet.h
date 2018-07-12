@@ -35,4 +35,6 @@ VOID WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 void WinPacketFreeRecursive(PWIN_PACKET Packet);
 void WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet);
 
+PWIN_PACKET_LIST WinPacketSplitMultiPacket(PWIN_MULTI_PACKET WinMultiPacket);
+
 #endif /* __WIN_PACKET_H__ */

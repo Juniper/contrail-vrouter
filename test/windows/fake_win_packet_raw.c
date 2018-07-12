@@ -12,10 +12,36 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
+// In win_packet.c (not raw)
+// struct _WIN_PACKET {
+//     WIN_MULTI_PACKET packet;
+// };
+
+// struct _WIN_SUB_PACKET {
+//     int data;
+//     PWIN_SUB_PACKET Next;
+// };
+
+// struct _WIN_MULTI_PACKET {
+//     PWIN_MULTI_PACKET Parent;
+//     long ChildRefCount;
+//     bool IsOwned;
+//     PWIN_SUB_PACKET FirstSubPacket;
+// };
+
 struct _WIN_PACKET {
     PWIN_PACKET Parent;
     long ChildRefCount;
     bool IsOwned;
+};
+
+struct _WIN_SUB_PACKET {
+    PWIN_PACKET Packet;
+    PWIN_SUB_PACKET Next;
+};
+
+struct _WIN_MULTI_PACKET {
+    PWIN_SUB_PACKET FirstSubPacket;
 };
 
 static PWIN_PACKET
@@ -43,6 +69,65 @@ void
 Fake_WinPacketFree(PWIN_PACKET Packet)
 {
     test_free(Packet);
+}
+
+static void
+Fake_WinMultiPacketAllocateSubPackets(PWIN_MULTI_PACKET Packet, size_t SubPacketsCount)
+{
+    PWIN_SUB_PACKET *localSubPackets = test_calloc(SubPacketsCount, sizeof(PWIN_SUB_PACKET));
+
+    for (size_t i = 0; i < SubPacketsCount; ++i) {
+        PWIN_SUB_PACKET subPacket = test_calloc(1, sizeof(*subPacket));
+
+        localSubPackets[i] = subPacket;
+        if (i != 0) {
+            localSubPackets[i - 1]->Next = subPacket;
+        }
+
+        subPacket->Packet = Fake_WinPacketAllocateNonOwned();
+    }
+
+    Packet->FirstSubPacket = localSubPackets[0];
+
+    test_free(localSubPackets);
+}
+
+PWIN_MULTI_PACKET
+Fake_WinMultiPacketAllocateWithSubPackets(size_t SubPacketsCount)
+{
+    PWIN_MULTI_PACKET packet = test_calloc(1, sizeof(*packet));
+
+    if (SubPacketsCount > 0) {
+        Fake_WinMultiPacketAllocateSubPackets(packet, SubPacketsCount);
+    }
+
+    return packet;
+}
+
+static void Fake_WinSubPacketFreeRecursive(PWIN_SUB_PACKET SubPacket, bool FreeWinPackets)
+{
+    if (SubPacket != NULL) {
+        Fake_WinSubPacketFreeRecursive(SubPacket->Next, FreeWinPackets);
+
+        if (FreeWinPackets) {
+            test_free(SubPacket->Packet);
+        }
+
+        test_free(SubPacket);
+    }
+}
+
+void
+Fake_WinMultiPacketFree(PWIN_MULTI_PACKET Packet, bool FreeWinPackets)
+{
+    Fake_WinSubPacketFreeRecursive(Packet->FirstSubPacket, FreeWinPackets);
+    test_free(Packet);
+}
+
+PWIN_PACKET
+Fake_WinSubPacketToWinPacket(PWIN_SUB_PACKET SubPacket)
+{
+    return SubPacket->Packet;
 }
 
 PWIN_PACKET
@@ -137,4 +222,63 @@ void
 WinPacketRawFreeCreated(PWIN_PACKET Packet)
 {
     WinPacketRawFreeCreated_Callback(Packet);
+}
+
+PWIN_PACKET
+WinMultiPacketRawToWinPacket(PWIN_MULTI_PACKET MultiPacket)
+{
+    assert_null(MultiPacket->FirstSubPacket->Next);
+    return MultiPacket->FirstSubPacket->Packet;
+}
+
+static PWIN_PACKET_LIST
+WinPacketListRawAllocateElement_Impl()
+{
+    return test_calloc(1, sizeof(WIN_PACKET_LIST));
+}
+PWIN_PACKET_LIST (*WinPacketListRawAllocateElement_Callback)() = WinPacketListRawAllocateElement_Impl;
+
+PWIN_PACKET_LIST
+WinPacketListRawAllocateElement()
+{
+    return WinPacketListRawAllocateElement_Callback();
+}
+
+void
+WinPacketListRawFreeElement(PWIN_PACKET_LIST List) {
+    test_free(List);
+}
+
+void
+Fake_WinPacketListRawFree(PWIN_PACKET_LIST List)
+{
+    if (List != NULL) {
+        Fake_WinPacketListRawFree(List->Next);
+        test_free(List->WinPacket);
+        test_free(List);
+    }
+}
+
+PWIN_SUB_PACKET
+WinMultiPacketRawGetFirstSubPacket(PWIN_MULTI_PACKET MultiPacket)
+{
+    return MultiPacket->FirstSubPacket;
+}
+
+void
+WinMultiPacketRawSetFirstSubPacket(PWIN_MULTI_PACKET MultiPacket, PWIN_SUB_PACKET SubPacket)
+{
+    MultiPacket->FirstSubPacket = SubPacket;
+}
+
+PWIN_SUB_PACKET
+WinSubPacketRawGetNext(PWIN_SUB_PACKET SubPacket)
+{
+    return SubPacket->Next;
+}
+
+void
+WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next)
+{
+    SubPacket->Next = Next;
 }
