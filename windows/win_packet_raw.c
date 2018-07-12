@@ -8,8 +8,20 @@
 
 #include <ndis.h>
 
-struct _WIN_PACKET {
+struct _WIN_SUB_PACKET {
+    NET_BUFFER NetBuffer;
+}
+
+struct _WIN_PACKET_RAW {
     NET_BUFFER_LIST NetBufferList;
+}
+
+struct _WIN_PACKET {
+    WIN_PACKET_RAW Packet;
+};
+
+struct _WIN_MULTI_PACKET {
+    WIN_PACKET_RAW Packet;
 };
 
 PWIN_PACKET
