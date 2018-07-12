@@ -4,64 +4,71 @@
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
 #include "win_packet_raw.h"
+#include "win_packet.h"
 #include "windows_nbl.h"
 
 #include <ndis.h>
 
-struct _WIN_PACKET {
+struct _WIN_SUB_PACKET {
+    NET_BUFFER NetBuffer;
+};
+
+struct _WIN_PACKET_RAW {
     NET_BUFFER_LIST NetBufferList;
 };
 
-PWIN_PACKET
-WinPacketRawGetParentOf(PWIN_PACKET Packet)
+static const ULONG PacketListAllocationTag = 'ELPW';
+
+PWIN_PACKET_RAW
+WinPacketRawGetParentOf(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST childNbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST childNbl = WinPacketRawToNBL(Packet);
     PNET_BUFFER_LIST parentNbl = childNbl->ParentNetBufferList;
 
-    return WinPacketFromNBL(parentNbl);
+    return WinPacketRawFromNBL(parentNbl);
 }
 
 void
-WinPacketRawSetParentOf(PWIN_PACKET Packet, PWIN_PACKET Parent)
+WinPacketRawSetParentOf(PWIN_PACKET_RAW Packet, PWIN_PACKET_RAW Parent)
 {
-    PNET_BUFFER_LIST parentNbl = WinPacketToNBL(Parent);
-    PNET_BUFFER_LIST childNbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST parentNbl = WinPacketRawToNBL(Parent);
+    PNET_BUFFER_LIST childNbl = WinPacketRawToNBL(Packet);
 
     childNbl->ParentNetBufferList = parentNbl;
 }
 
 long
-WinPacketRawGetChildCountOf(PWIN_PACKET Packet)
+WinPacketRawGetChildCountOf(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
     return nbl->ChildRefCount;
 }
 
 long
-WinPacketRawIncrementChildCountOf(PWIN_PACKET Packet)
+WinPacketRawIncrementChildCountOf(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
     return InterlockedIncrement(&nbl->ChildRefCount);
 }
 
 long
-WinPacketRawDecrementChildCountOf(PWIN_PACKET Packet)
+WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
     return InterlockedDecrement(&nbl->ChildRefCount);
 }
 
 bool
-WinPacketRawIsOwned(PWIN_PACKET Packet)
+WinPacketRawIsOwned(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
     return nbl->NdisPoolHandle == VrNBLPool;
 }
 
 void
-WinPacketRawComplete(PWIN_PACKET Packet)
+WinPacketRawComplete(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
     ASSERT(nbl != NULL);
 
@@ -71,9 +78,9 @@ WinPacketRawComplete(PWIN_PACKET Packet)
 }
 
 void
-WinPacketRawFreeCreated(PWIN_PACKET Packet)
+WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
     ASSERT(nbl != NULL);
     ASSERTMSG("A non-singular NBL made it's way into the process", nbl->Next == NULL);
@@ -98,12 +105,12 @@ WinPacketRawFreeCreated(PWIN_PACKET Packet)
     NdisFreeNetBufferList(nbl);
 }
 
-PWIN_PACKET
-WinPacketRawAllocateClone(PWIN_PACKET Packet)
+PWIN_PACKET_RAW
+WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet)
 {
     NDIS_STATUS status;
 
-    PNET_BUFFER_LIST originalNbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(Packet);
     PNET_BUFFER_LIST clonedNbl = NdisAllocateCloneNetBufferList(originalNbl, VrNBLPool, NULL, 0);
     if (clonedNbl == NULL) {
         goto failure;
@@ -122,7 +129,7 @@ WinPacketRawAllocateClone(PWIN_PACKET Packet)
         goto cleanup_forwarding_context;
     }
 
-    return WinPacketFromNBL(clonedNbl);
+    return WinPacketRawFromNBL(clonedNbl);
 
 cleanup_forwarding_context:
     FreeForwardingContext(clonedNbl);
@@ -135,22 +142,81 @@ failure:
 }
 
 void
-WinPacketRawFreeClone(PWIN_PACKET Packet)
+WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
 {
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
     FreeForwardingContext(nbl);
     NdisFreeCloneNetBufferList(nbl, 0);
 }
 
+PWIN_PACKET_LIST
+WinPacketListRawAllocateElement()
+{
+    PWIN_PACKET_LIST element =
+        ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*element), PacketListAllocationTag);
+    RtlZeroMemory(element, sizeof(*element));
+    return element;
+}
+
+void
+WinPacketListRawFreeElement(PWIN_PACKET_LIST Element)
+{
+    ExFreePool(Element);
+}
+
+static inline PNET_BUFFER
+WinSubPacketRawToNB(PWIN_SUB_PACKET SubPacket)
+{
+    return &SubPacket->NetBuffer;
+}
+
+static inline PWIN_SUB_PACKET
+WinSubPacketRawFromNB(PNET_BUFFER NetBuffer)
+{
+    return (PWIN_SUB_PACKET)NetBuffer;
+}
+
+PWIN_SUB_PACKET
+WinPacketRawGetFirstSubPacket(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
+    return WinSubPacketRawFromNB(nb);
+}
+
+void
+WinPacketRawSetFirstSubPacket(PWIN_PACKET_RAW Packet, PWIN_SUB_PACKET SubPacket)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    PNET_BUFFER nb = WinSubPacketRawToNB(SubPacket);
+    NET_BUFFER_LIST_FIRST_NB(nbl) = nb;
+}
+
+PWIN_SUB_PACKET
+WinSubPacketRawGetNext(PWIN_SUB_PACKET SubPacket)
+{
+    PNET_BUFFER currentNb = WinSubPacketRawToNB(SubPacket);
+    PNET_BUFFER nextNb = NET_BUFFER_NEXT_NB(currentNb);
+    return WinSubPacketRawFromNB(nextNb);
+}
+
+void
+WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next)
+{
+    PNET_BUFFER currentNb = WinSubPacketRawToNB(SubPacket);
+    PNET_BUFFER nextNb = WinSubPacketRawToNB(Next);
+    NET_BUFFER_NEXT_NB(currentNb) = nextNb;
+}
+
 PNET_BUFFER_LIST
-WinPacketToNBL(PWIN_PACKET Packet)
+WinPacketRawToNBL(PWIN_PACKET_RAW Packet)
 {
     return &Packet->NetBufferList;
 }
 
-PWIN_PACKET
-WinPacketFromNBL(PNET_BUFFER_LIST NetBufferList)
+PWIN_PACKET_RAW
+WinPacketRawFromNBL(PNET_BUFFER_LIST NetBufferList)
 {
-    return (PWIN_PACKET)NetBufferList;
+    return (PWIN_PACKET_RAW)NetBufferList;
 }

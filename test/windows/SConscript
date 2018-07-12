@@ -28,6 +28,7 @@ test_suite_base_names = [
     'win_packet_free',
     'win_pclone',
     'win_pfree',
+    'win_packet_split_multi_packet',
 ]
 
 test_suites = []

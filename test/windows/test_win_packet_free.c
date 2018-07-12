@@ -11,37 +11,38 @@
 #include <cmocka.h>
 
 #include "win_packet.h"
+#include "win_packet_impl.h"
 #include "fake_win_packet.h"
 
 static void
-Fake_WinPacketRawComplete(PWIN_PACKET Packet)
+Fake_WinPacketRawComplete(PWIN_PACKET_RAW Packet)
 {
     assert_false(WinPacketRawIsOwned(Packet));
     assert_false(WinPacketRawIsCloned(Packet));
 
-    Fake_WinPacketFree(Packet);
+    Fake_WinPacketFree((PWIN_PACKET)Packet);
 }
-static void (*Saved_WinPacketRawComplete)(PWIN_PACKET Packet);
+static void (*Saved_WinPacketRawComplete)(PWIN_PACKET_RAW Packet);
 
 static void
-Fake_WinPacketRawFreeCreated(PWIN_PACKET Packet)
+Fake_WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet)
 {
     assert_true(WinPacketRawIsOwned(Packet));
     assert_false(WinPacketRawIsCloned(Packet));
 
-    Fake_WinPacketFree(Packet);
+    Fake_WinPacketFree((PWIN_PACKET)Packet);
 }
-static void (*Saved_WinPacketRawFreeCreated)(PWIN_PACKET Packet);
+static void (*Saved_WinPacketRawFreeCreated)(PWIN_PACKET_RAW Packet);
 
 static void
-Fake_WinPacketRawFreeClone(PWIN_PACKET Packet)
+Fake_WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
 {
     assert_true(WinPacketRawIsOwned(Packet));
     assert_true(WinPacketRawIsCloned(Packet));
 
-    Fake_WinPacketFree(Packet);
+    Fake_WinPacketFree((PWIN_PACKET)Packet);
 }
-static void (*Saved_WinPacketRawFreeClone)(PWIN_PACKET Packet);
+static void (*Saved_WinPacketRawFreeClone)(PWIN_PACKET_RAW Packet);
 
 int
 Test_WinPacketFree_SetUp(void **state)
@@ -80,7 +81,8 @@ void
 Test_WinPacketFree_NotOursWithChildrenAssertsOnChildCount(void **state)
 {
     PWIN_PACKET packet = Fake_WinPacketAllocateNonOwned();
-    WinPacketRawIncrementChildCountOf(packet);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(packet);
+    WinPacketRawIncrementChildCountOf(rawPacket);
 
     expect_assert_failure(WinPacketFreeRecursive(packet));
 
@@ -99,7 +101,8 @@ void
 Test_WinPacketFree_CreatedWithChildrenAssertsOnChildCount(void **state)
 {
     PWIN_PACKET packet = Fake_WinPacketAllocateOwned();
-    WinPacketRawIncrementChildCountOf(packet);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(packet);
+    WinPacketRawIncrementChildCountOf(rawPacket);
 
     expect_assert_failure(WinPacketFreeRecursive(packet));
 
@@ -129,11 +132,12 @@ Test_WinPacketFree_ClonedWithoutChildren_ParentIsNotFreedWhenMultipleChildren(vo
 static PWIN_PACKET
 Fake_WinPacketAllocate_ClonedWithChildren()
 {
-    PWIN_PACKET badParent = (PWIN_PACKET)~0;
+    PWIN_PACKET_RAW badParent = (PWIN_PACKET_RAW)~0;
 
     PWIN_PACKET packet = Fake_WinPacketAllocateOwned();
-    WinPacketRawSetParentOf(packet, badParent);
-    WinPacketRawIncrementChildCountOf(packet);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(packet);
+    WinPacketRawSetParentOf(rawPacket, badParent);
+    WinPacketRawIncrementChildCountOf(rawPacket);
 
     return packet;
 }
@@ -152,12 +156,13 @@ void
 Test_WinPacketFree_ClonedPreservingParent_Works(void **state)
 {
     PWIN_PACKET parent = Fake_WinPacketAllocateNonOwned();
+    PWIN_PACKET_RAW rawParent = WinPacketToRawPacket(parent);
     PWIN_PACKET cloned = WinPacketClone(parent);
 
-    assert_int_equal(WinPacketRawGetChildCountOf(parent), 1);
+    assert_int_equal(WinPacketRawGetChildCountOf(rawParent), 1);
 
     WinPacketFreeClonedPreservingParent(cloned);
-    assert_int_equal(WinPacketRawGetChildCountOf(parent), 0);
+    assert_int_equal(WinPacketRawGetChildCountOf(rawParent), 0);
 
     Fake_WinPacketFree(parent);
 }
@@ -216,9 +221,9 @@ Test_WinPacketFree_TreeSingleLowerChild(void **state)
 
     WinPacketFreeRecursive(tree->lowerChild1);
 
-    assert_int_equal(WinPacketRawGetChildCountOf(tree->parent), 2);
-    assert_int_equal(WinPacketRawGetChildCountOf(tree->upperChild1), 1);
-    assert_int_equal(WinPacketRawGetChildCountOf(tree->upperChild2), 1);
+    assert_int_equal(WinPacketRawGetChildCountOf(WinPacketToRawPacket(tree->parent)), 2);
+    assert_int_equal(WinPacketRawGetChildCountOf(WinPacketToRawPacket(tree->upperChild1)), 1);
+    assert_int_equal(WinPacketRawGetChildCountOf(WinPacketToRawPacket(tree->upperChild2)), 1);
 
     tree->lowerChild1 = NULL;
 
@@ -234,8 +239,8 @@ Test_WinPacketFree_TreeAllLowerChildrenOfOneUpperChild(void **state)
     WinPacketFreeRecursive(tree->lowerChild1);
     WinPacketFreeRecursive(tree->lowerChild2);
 
-    assert_int_equal(WinPacketRawGetChildCountOf(tree->parent), 1);
-    assert_int_equal(WinPacketRawGetChildCountOf(tree->upperChild2), 1);
+    assert_int_equal(WinPacketRawGetChildCountOf(WinPacketToRawPacket(tree->parent)), 1);
+    assert_int_equal(WinPacketRawGetChildCountOf(WinPacketToRawPacket(tree->upperChild2)), 1);
 
     tree->lowerChild1 = NULL;
     tree->lowerChild2 = NULL;

@@ -12,6 +12,8 @@
 #include "vrouter.h"
 
 #include "win_packet.h"
+#include "win_packet_raw.h"
+#include "win_packet_impl.h"
 #include "windows_nbl.h"
 
 typedef void(*scheduled_work_cb)(void *arg);
@@ -144,7 +146,8 @@ win_palloc_head(struct vr_packet *pkt, unsigned int size)
     ASSERT(size > 0);
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
     if (nbl == NULL)
         return NULL;
 
@@ -155,7 +158,7 @@ win_palloc_head(struct vr_packet *pkt, unsigned int size)
     struct vr_packet *npkt = win_get_packet(nb_head, pkt->vp_if);
     if (npkt == NULL)
     {
-        WinPacketRawFreeCreated(WinPacketFromNBL(nb_head));
+        WinPacketRawFreeCreated(WinPacketRawFromNBL(nb_head));
         return NULL;
     }
 
@@ -177,7 +180,8 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
     ASSERT(pkt != NULL);
 
     PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(pkt);
-    PNET_BUFFER_LIST original_nbl = WinPacketToNBL(wrapper->WinPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(wrapper->WinPacket);
+    PNET_BUFFER_LIST original_nbl = WinPacketRawToNBL(rawPacket);
     if (original_nbl == NULL)
         return NULL;
 
@@ -209,7 +213,7 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
         RtlCopyMemory((uint8_t*)new_buffer + hspace, (uint8_t*)old_buffer + data_offset, data_size_in_current_mdl);
     }
 
-    wrapper->WinPacket = WinPacketFromNBL(new_nbl);
+    wrapper->WinPacket = (PWIN_PACKET)WinPacketRawFromNBL(new_nbl);
 
     pkt->vp_head =
         (unsigned char*)MmGetSystemAddressForMdlSafe(nb->CurrentMdl, LowPagePriority | MdlMappingNoExecute) + NET_BUFFER_CURRENT_MDL_OFFSET(nb);
@@ -224,7 +228,8 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
 
 cleanup:
     if (new_nbl) {
-        WinPacketFreeClonedPreservingParent(WinPacketFromNBL(new_nbl));
+        PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(new_nbl);
+        WinPacketFreeClonedPreservingParent((PWIN_PACKET)rawPacket);
     }
 
     return NULL;
@@ -236,7 +241,8 @@ win_preset(struct vr_packet *pkt)
     ASSERT(pkt != NULL);
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
     if (!nbl) {
         return;
     }
@@ -353,7 +359,8 @@ win_pcopy(unsigned char *dst, struct vr_packet *p_src,
         return -EFAULT;
     }
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(p_src);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
     if (!nbl) {
         return -EFAULT;
     }
@@ -371,7 +378,8 @@ win_pfrag_len(struct vr_packet *pkt)
     ASSERT(pkt != NULL);
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
     if (!nbl)
         return 0;
 
@@ -394,7 +402,8 @@ static void *
 win_pheader_pointer(struct vr_packet *pkt, unsigned short hdr_len, void *buf)
 {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
 
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
 
@@ -669,7 +678,8 @@ win_data_at_offset(struct vr_packet *pkt, unsigned short offset)
     // of the header, will be valid for it's entiriety
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PNET_BUFFER_LIST nbl = WinPacketToNBL(winPacket);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
     PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
     PMDL current_mdl = NET_BUFFER_CURRENT_MDL(nb);
     unsigned length = MmGetMdlByteCount(current_mdl) - NET_BUFFER_CURRENT_MDL_OFFSET(nb);
