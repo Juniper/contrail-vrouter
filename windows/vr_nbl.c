@@ -9,6 +9,8 @@
 #include "vrouter.h"
 
 #include "win_packet.h"
+#include "win_packet_raw.h"
+#include "win_packet_impl.h"
 #include "windows_nbl.h"
 
 /*
@@ -204,7 +206,8 @@ cleanup:
     for (clonedNbl = clonedNblList; clonedNbl; clonedNbl = nextNbl) {
         nextNbl = NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
         NET_BUFFER_LIST_NEXT_NBL(clonedNbl) = NULL;
-        WinPacketFreeClonedPreservingParent(WinPacketFromNBL(clonedNbl));
+        PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(clonedNbl);
+        WinPacketFreeClonedPreservingParent((PWIN_PACKET)rawPacket);
     }
 
     return NULL;
@@ -249,7 +252,8 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
     RtlZeroMemory(wrapper, sizeof(*wrapper));
 
     struct vr_packet *pkt = &wrapper->VrPacket;
-    wrapper->WinPacket = WinPacketFromNBL(nbl);
+    PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(nbl);
+    wrapper->WinPacket = (PWIN_PACKET)(rawPacket);
 
     pkt->vp_cpu = (unsigned char)KeGetCurrentProcessorNumberEx(NULL);
 
@@ -317,10 +321,12 @@ win_allocate_packet(void *buffer, unsigned int size)
     return pkt;
 
 fail:
-    if (pkt)
+    if (pkt) {
         win_free_packet(pkt);
-    else if (nbl)
-        WinPacketRawFreeCreated(WinPacketFromNBL(nbl));
+    } else if (nbl) {
+        PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(nbl);
+        WinPacketRawFreeCreated(rawPacket);
+    }
     return NULL;
 }
 
@@ -454,7 +460,8 @@ FilterSendNetBufferLists(
             ASSERTMSG("win_get_packed failed!", pkt != NULL);
 
             if (pkt == NULL) {
-                WinPacketFreeRecursive(WinPacketFromNBL(curNbl));
+                PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(curNbl);
+                WinPacketFreeRecursive((PWIN_PACKET)rawPacket);
                 continue;
             }
 
@@ -498,6 +505,7 @@ FilterSendNetBufferListsComplete(
         next = current->Next;
         current->Next = NULL;
 
-        WinPacketFreeRecursive(WinPacketFromNBL(current));
+        PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(current);
+        WinPacketFreeRecursive((PWIN_PACKET)rawPacket);
     } while (next != NULL);
 }

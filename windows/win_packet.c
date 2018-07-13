@@ -4,62 +4,81 @@
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
 #include "win_packet.h"
+#include "win_packet_impl.h"
+#include "win_packet_raw.h"
 
 #include "win_assert.h"
+
+static void WinPacketFreeRecursiveImpl(PWIN_PACKET_RAW RawPacket);
+
+static inline PWIN_PACKET
+WinPacketFromRawPacket(PWIN_PACKET_RAW Packet)
+{
+    return (PWIN_PACKET)Packet;
+}
 
 PWIN_PACKET
 WinPacketClone(PWIN_PACKET Packet)
 {
-    PWIN_PACKET cloned = WinPacketRawAllocateClone(Packet);
-    if (cloned == NULL) {
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(Packet);
+    PWIN_PACKET_RAW rawCloned = WinPacketRawAllocateClone(rawPacket);
+    if (rawCloned == NULL) {
         return NULL;
     }
 
-    WinPacketRawSetParentOf(cloned, Packet);
-    WinPacketRawIncrementChildCountOf(Packet);
+    WinPacketRawSetParentOf(rawCloned, rawPacket);
+    WinPacketRawIncrementChildCountOf(rawPacket);
 
-    return cloned;
+    return WinPacketFromRawPacket(rawCloned);
 }
 
 static bool
-WinPacketIsCloned(PWIN_PACKET Packet)
+WinPacketIsCloned(PWIN_PACKET_RAW RawPacket)
 {
-    return WinPacketRawGetParentOf(Packet) != NULL;
+    return WinPacketRawGetParentOf(RawPacket) != NULL;
 }
 
 void
 WinPacketFreeClonedPreservingParent(PWIN_PACKET Packet)
 {
-    PWIN_PACKET parent = WinPacketRawGetParentOf(Packet);
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(Packet);
+    PWIN_PACKET_RAW rawParent = WinPacketRawGetParentOf(rawPacket);
 
-    WinPacketRawDecrementChildCountOf(parent);
-    WinPacketRawFreeClone(Packet);
+    WinPacketRawDecrementChildCountOf(rawParent);
+    WinPacketRawFreeClone(rawPacket);
 }
 
 static void
-WinPacketFreeClonedRecurvise(PWIN_PACKET Packet)
+WinPacketFreeClonedRecurvise(PWIN_PACKET_RAW RawPacket)
 {
-    PWIN_PACKET parent = WinPacketRawGetParentOf(Packet);
+    PWIN_PACKET_RAW rawParent = WinPacketRawGetParentOf(RawPacket);
 
-    WinPacketRawFreeClone(Packet);
+    WinPacketRawFreeClone(RawPacket);
 
-    if (WinPacketRawDecrementChildCountOf(parent) == 0) {
-        WinPacketFreeRecursive(parent);
+    if (WinPacketRawDecrementChildCountOf(rawParent) == 0) {
+        WinPacketFreeRecursiveImpl(rawParent);
+    }
+}
+
+static void
+WinPacketFreeRecursiveImpl(PWIN_PACKET_RAW RawPacket)
+{
+    WinAssert(WinPacketRawGetChildCountOf(RawPacket) == 0);
+
+    if (WinPacketRawIsOwned(RawPacket)) {
+        if (WinPacketIsCloned(RawPacket)) {
+            WinPacketFreeClonedRecurvise(RawPacket);
+        } else {
+            WinPacketRawFreeCreated(RawPacket);
+        }
+    } else {
+        WinPacketRawComplete(RawPacket);
     }
 }
 
 void
 WinPacketFreeRecursive(PWIN_PACKET Packet)
 {
-    WinAssert(WinPacketRawGetChildCountOf(Packet) == 0);
-
-    if (WinPacketRawIsOwned(Packet)) {
-        if (WinPacketIsCloned(Packet)) {
-            WinPacketFreeClonedRecurvise(Packet);
-        } else {
-            WinPacketRawFreeCreated(Packet);
-        }
-    } else {
-        WinPacketRawComplete(Packet);
-    }
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(Packet);
+    WinPacketFreeRecursiveImpl(rawPacket);
 }

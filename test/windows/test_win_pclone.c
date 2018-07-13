@@ -12,11 +12,12 @@
 
 #include "vr_packet.h"
 #include "win_packet.h"
+#include "win_packet_impl.h"
 #include "fake_win_packet.h"
 
 extern struct vr_packet *win_pclone(struct vr_packet *pkt);
 
-static PWIN_PACKET (*Saved_WinPacketRawAllocateClone)(PWIN_PACKET Packet);
+static PWIN_PACKET_RAW (*Saved_WinPacketRawAllocateClone)(PWIN_PACKET_RAW Packet);
 static PVOID (*Saved_WinRawAllocate)(size_t size);
 
 static uint32_t RawAllocateClone_CalledCount;
@@ -29,21 +30,21 @@ Fake_WinPacketRawAllocateClone_SetFailureOnNthCall(uint32_t N)
     RawAllocateClone_FirstFailure = N;
 }
 
-static PWIN_PACKET
-Failing_WinPacketRawAllocateClone(PWIN_PACKET Packet)
+static PWIN_PACKET_RAW
+Failing_WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet)
 {
     RawAllocateClone_CalledCount++;
     if (RawAllocateClone_CalledCount >= RawAllocateClone_FirstFailure) {
         return NULL;
     } else {
-        return Fake_WinPacketAllocateOwned();
+        return WinPacketToRawPacket(Fake_WinPacketAllocateOwned());
     }
 }
 
-static PWIN_PACKET
-Succeeding_WinPacketRawAllocateClone(PWIN_PACKET Packet)
+static PWIN_PACKET_RAW
+Succeeding_WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet)
 {
-    return Fake_WinPacketAllocateOwned();
+    return WinPacketToRawPacket(Fake_WinPacketAllocateOwned());
 }
 
 static PVOID
@@ -79,7 +80,7 @@ static PWIN_PACKET
 GetParent_(struct vr_packet * vrPkt)
 {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(vrPkt);
-    return WinPacketRawGetParentOf(winPacket);
+    return (PWIN_PACKET)WinPacketRawGetParentOf(WinPacketToRawPacket(winPacket));
 }
 
 int
@@ -161,7 +162,7 @@ Test_win_pclone_ReturnsPacketWhenCloneSucceeds(void **state)
     struct vr_packet *clonedVrPkt = win_pclone(vrPkt);
     assert_non_null(clonedVrPkt);
 
-    assert_int_equal(WinPacketRawGetChildCountOf(originalWinPkt), 2);
+    assert_int_equal(WinPacketRawGetChildCountOf(WinPacketToRawPacket(originalWinPkt)), 2);
     assert_ptr_equal(GetParent_(vrPkt), originalWinPkt);
     assert_ptr_equal(GetParent_(clonedVrPkt), originalWinPkt);
     assert_int_equal(clonedVrPkt->vp_type, 1);

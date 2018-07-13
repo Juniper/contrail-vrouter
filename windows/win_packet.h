@@ -6,8 +6,9 @@
 #ifndef __WIN_PACKET_H__
 #define __WIN_PACKET_H__
 
-#include "win_packet_raw.h"
 #include "vr_packet.h"
+
+typedef struct _WIN_PACKET WIN_PACKET, *PWIN_PACKET;
 
 // NOTE: VrPacket should **always** be a first field in VR_PACKET_WRAPPER struct.
 typedef struct _VR_PACKET_WRAPPER {
