@@ -9,6 +9,10 @@
 
 #include <ndis.h>
 
+struct _WIN_SUB_PACKET {
+    NET_BUFFER NetBuffer;
+};
+
 struct _WIN_PACKET_RAW {
     NET_BUFFER_LIST NetBufferList;
 };
@@ -144,6 +148,65 @@ WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
 
     FreeForwardingContext(nbl);
     NdisFreeCloneNetBufferList(nbl, 0);
+}
+
+PWIN_PACKET_LIST
+WinPacketListRawAllocateElement()
+{
+    PWIN_PACKET_LIST element =
+        ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(*element), PacketListAllocationTag);
+    RtlZeroMemory(element, sizeof(*element));
+    return element;
+}
+
+void
+WinPacketListRawFreeElement(PWIN_PACKET_LIST Element)
+{
+    ExFreePool(Element);
+}
+
+static inline PNET_BUFFER
+WinSubPacketRawToNB(PWIN_SUB_PACKET SubPacket)
+{
+    return &SubPacket->NetBuffer;
+}
+
+static inline PWIN_SUB_PACKET
+WinSubPacketRawFromNB(PNET_BUFFER NetBuffer)
+{
+    return (PWIN_SUB_PACKET)NetBuffer;
+}
+
+PWIN_SUB_PACKET
+WinPacketRawGetFirstSubPacket(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
+    return WinSubPacketRawFromNB(nb);
+}
+
+void
+WinPacketRawSetFirstSubPacket(PWIN_PACKET_RAW Packet, PWIN_SUB_PACKET SubPacket)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    PNET_BUFFER nb = WinSubPacketRawToNB(SubPacket);
+    NET_BUFFER_LIST_FIRST_NB(nbl) = nb;
+}
+
+PWIN_SUB_PACKET
+WinSubPacketRawGetNext(PWIN_SUB_PACKET SubPacket)
+{
+    PNET_BUFFER currentNb = WinSubPacketRawToNB(SubPacket);
+    PNET_BUFFER nextNb = NET_BUFFER_NEXT_NB(currentNb);
+    return WinSubPacketRawFromNB(nextNb);
+}
+
+void
+WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next)
+{
+    PNET_BUFFER currentNb = WinSubPacketRawToNB(SubPacket);
+    PNET_BUFFER nextNb = WinSubPacketRawToNB(Next);
+    NET_BUFFER_NEXT_NB(currentNb) = nextNb;
 }
 
 PNET_BUFFER_LIST
