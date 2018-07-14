@@ -291,7 +291,7 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Flow Table limit                     %u\n"
         "    Flow Table overflow limit            %u\n"
         "    Mirror entries limit                 %u\n"
-        "    Memroy Allocation Checks             %u\n"
+        "    Memory Allocation Checks             %u\n"
         "\n",
 
         req->vo_interfaces, req->vo_vrfs, req->vo_nexthops,
