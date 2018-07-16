@@ -106,6 +106,9 @@ vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
     } else if (ip->ip_proto == VR_IP_PROTO_UDP) {
         udp = (struct vr_udp *)((unsigned char *)ip + ip->ip_hl * 4);
         csump = &udp->udp_csum;
+        if (*csump == 0) {
+            return;
+        }
     } else {
         return;
     }
