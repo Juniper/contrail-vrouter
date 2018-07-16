@@ -286,6 +286,80 @@ drop:
     return NULL;
 }
 
+static bool
+IsProtocolHeaderInsideBuffer(struct vr_packet *pkt)
+{
+    // TODO check the exact protocol and its length
+    // TODO support long IP headers
+    // TODO support IPv6
+    // TODO move this to dp-core?
+
+    if (pkt->vp_len < sizeof (struct vr_eth))
+        return false;
+
+    struct vr_eth* eth = (struct vr_eth *)pkt->vp_head;
+    if (eth->eth_proto == VR_ETH_PROTO_IP) {
+        if (pkt->vp_len < sizeof (struct vr_eth) + sizeof (struct vr_ip))
+            return false;
+
+        struct vr_ip* ip = (struct vr_ip *)(pkt->vp_head + sizeof (struct vr_eth));
+
+        // Everything but the fragment tail has to fit also protocol (eg. UDP) buffer.
+        if (!vr_ip_fragment_tail(ip) &&
+            pkt->vp_len <= sizeof (struct vr_eth) + sizeof (struct vr_ip))
+            return false;
+    }
+
+    return true;
+}
+
+// Checks if all the headers needed by agent are in the first
+// MDL, otherwise reallocates the NBL.
+// This function consumes the vr_packet and associated NBL.
+// Returns a "fixed" vr_packet (could be original one) or NULL on failure.
+static struct vr_packet *
+ReallocateHeaders(struct vr_packet *orig_vr_pkt)
+{
+    PVR_PACKET_WRAPPER orig_pkt = GetWrapperFromVrPacket(orig_vr_pkt);
+    PNET_BUFFER orig_nb = NET_BUFFER_LIST_FIRST_NB(WinPacketToNBL(orig_pkt->WinPacket));
+    LONG data_length = NET_BUFFER_DATA_LENGTH(orig_nb);
+
+    if (orig_pkt->VrPacket.vp_len == data_length || IsProtocolHeaderInsideBuffer(&orig_pkt->VrPacket))
+        return &orig_pkt->VrPacket;
+
+    PNET_BUFFER_LIST new_nbl = CreateNetBufferList(data_length);
+    if (new_nbl == NULL)
+        goto fail;
+
+    // TODO support fragmented tunnelled packets (this is unlikely case, but still)
+    // TODO (opt) don't copy the whole buffer (we can reuse original memory,
+    // as we only need to copy ether + IP + proto headers)
+    ULONG bytes_copied;
+    NDIS_STATUS status = NdisCopyFromNetBufferToNetBuffer(
+        NET_BUFFER_LIST_FIRST_NB(new_nbl),
+        0,
+        data_length,
+        orig_nb,
+        0,
+        &bytes_copied
+    );
+    if (status != NDIS_STATUS_SUCCESS)
+        goto fail;
+
+    struct vr_interface *vif = orig_pkt->VrPacket.vp_if;
+    PVR_PACKET_WRAPPER new_pkt = GetWrapperFromVrPacket(win_get_packet(new_nbl, vif));
+    if (new_pkt == NULL)
+        goto fail;
+
+    return &new_pkt->VrPacket;
+
+fail:
+    if (new_nbl)
+        WinPacketFreeRecursive(WinPacketFromNBL(new_nbl));
+    win_free_packet(&orig_pkt->VrPacket);
+    return NULL;
+}
+
 // Crate vr_packet and NBL based on buffer
 struct vr_packet *
 win_allocate_packet(void *buffer, unsigned int size)
@@ -455,6 +529,11 @@ FilterSendNetBufferLists(
 
             if (pkt == NULL) {
                 WinPacketFreeRecursive(WinPacketFromNBL(curNbl));
+                continue;
+            }
+
+            pkt = ReallocateHeaders(pkt);
+            if (pkt == NULL) {
                 continue;
             }
 
