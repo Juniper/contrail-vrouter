@@ -123,6 +123,10 @@ buffer sandesh vr_interface_req {
     62: byte        vifr_vhostuser_mode;
     63: i32         vifr_mcast_vrf;
     64: list<byte>  vifr_if_guid;
+    65: list<u64>   vifr_fat_flow_exclude_ip_list;
+    66: list<u64>   vifr_fat_flow_exclude_ip6_u_list;
+    67: list<u64>   vifr_fat_flow_exclude_ip6_l_list;
+    68: list<u16>   vifr_fat_flow_exclude_ip6_plen_list;
 }
 
 buffer sandesh vr_vxlan_req {
