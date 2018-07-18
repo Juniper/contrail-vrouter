@@ -29,7 +29,7 @@ modules.order
 .vs
 *.VC.db
 *.VC.VC.opendb
-/ipch/
+*/ipch/
 /sandesh/gen-c/*
 /test/cmocka
 /test/atomic-test/x64

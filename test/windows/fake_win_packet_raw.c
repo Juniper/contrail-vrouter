@@ -251,7 +251,7 @@ Fake_WinPacketListRawFree(PWIN_PACKET_LIST List)
         if (List->WinPacket != NULL) {
             Fake_WinPacketFree(List->WinPacket);
         }
-        test_free(List);
+        WinPacketListRawFreeElement(List);
     }
 }
 
