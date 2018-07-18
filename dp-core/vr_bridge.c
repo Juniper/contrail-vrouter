@@ -313,9 +313,6 @@ bridge_lookup(uint8_t *mac, struct vr_forwarding_md *fmd)
     rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
     rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
     rt.rtr_req.rtr_mac = mac;
-    /* If multicast L2 packet, use broadcast composite nexthop */
-    if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
-        rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     be = __bridge_lookup(rt.rtr_req.rtr_vrf_id, &rt);
 
@@ -817,6 +814,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
     unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
     int8_t *dmac;
+    int8_t *lookup_mac;
     mac_learn_t ml_res;
     struct vr_bridge_entry *be;
     struct vr_nexthop *nh = NULL;
@@ -911,7 +909,14 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         if (IS_MAC_BMCAST(dmac) && (pkt->vp_if->vif_mcast_vrf != 65535))
             fmd->fmd_dvrf = pkt->vp_if->vif_mcast_vrf;
 
-        be = bridge_lookup(dmac, fmd);
+        lookup_mac = dmac;
+        if (IS_MAC_BMCAST(dmac) && !IS_MAC_BCAST(dmac) &&
+            (pkt->vp_type == VP_TYPE_IP)) {
+            lookup_mac = dmac;
+        } else if (IS_MAC_BMCAST(dmac)) {
+            lookup_mac = (int8_t *)vr_bcast_mac;
+        }
+        be = bridge_lookup(lookup_mac, fmd);
         if (be)
             nh = be->be_nh;
 
