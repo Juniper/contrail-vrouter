@@ -226,6 +226,261 @@ fix_ip_v4_csum_to_be_offloaded(struct vr_packet *pkt) {
     }
 }
 
+/////////////////////////////////////////////////////////////////////
+// IP FRAGMENTATION POC
+
+struct POC_FragmentationContext {
+    struct vr_packet *pkt;
+    PNET_BUFFER_LIST original_nbl;
+    PNET_BUFFER_LIST fragmented_nbl;
+    int mtu;
+
+    // Original packet.
+    unsigned char* outer_headers;
+    struct vr_ip* outer_ip_header;
+    struct vr_ip* inner_ip_header;
+
+    // Size for outer and inner headers is the same in original packet and
+    // in all new packets (fragments).
+    int outer_headers_size;
+    int inner_headers_size;
+
+    // Payload offset in original packet (excluding all headers).
+    int inner_payload_offset;
+
+    // Payload size of original packet (excluding all headers).
+    int total_payload_size;
+
+    // 'More fragments' flag from original inner IP header.
+    bool inner_ip_mf;
+
+    // Fragment offset from original inner IP header.
+    unsigned short inner_ip_byte_offset;
+
+    // Free space for payload in inner fragmented IP packet. It takes into
+    // account size of all headers (inner and outer) and MTU.
+    int free_space_for_inner_payload;
+
+    // Maximum size of payload in inner fragmented IP packet. It takes into
+    // account size of all headers (inner and outer) and MTU. Additionally
+    // maximum_inner_payload_length % 8 == 0 as required in fragment offset
+    // definition.
+    int maximum_inner_payload_length;
+};
+
+#define MAX_HEADERS_SIZE 1000
+#define MPLS_HEADER_SIZE 4
+#define VXLAN_HEADER_SIZE 8
+#define VXLAN_DST_PORT 4789
+#define MORE_FRAGMENTS_FLAG 4
+#define OFFSET_FLAGS_MASK 7
+
+void POC_InitializeContext(
+        struct POC_FragmentationContext* pctx,
+        struct vr_packet *pkt) {
+    RtlZeroMemory(pctx, sizeof(struct POC_FragmentationContext));
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+    pctx->pkt = pkt;
+    pctx->original_nbl = WinPacketRawToNBL(winPacketRaw);
+    pctx->mtu = pkt->vp_if->vif_mtu;
+}
+
+bool POC_IsFragmentationNeeded(struct POC_FragmentationContext* pctx) {
+    return vr_pkt_type_is_overlay(pctx->pkt->vp_type)
+        && pctx->original_nbl->FirstNetBuffer->DataLength > pctx->mtu;
+}
+
+void POC_ExtractOuterHeadersFromOriginalPacket(struct POC_FragmentationContext* pctx) {
+    pctx->outer_headers = pctx->pkt->vp_head + pctx->pkt->vp_data;
+    pctx->outer_ip_header = (struct vr_ip*)(pctx->outer_headers
+        + sizeof(struct vr_eth));
+
+    pctx->outer_headers_size = sizeof(struct vr_eth) + sizeof(struct vr_ip);
+    if (pctx->outer_ip_header->ip_proto == VR_IP_PROTO_GRE) {
+        pctx->outer_headers_size += sizeof(struct vr_gre) + MPLS_HEADER_SIZE ;
+    } else if (pctx->outer_ip_header->ip_proto == VR_IP_PROTO_UDP) {
+        pctx->outer_headers_size += sizeof(struct vr_udp);
+        struct vr_udp* outer_udp_header = (struct vr_udp*)(
+            pctx->outer_headers + sizeof(struct vr_eth) + sizeof(struct vr_ip));
+        if (outer_udp_header->udp_dport == VXLAN_DST_PORT) {
+            pctx->outer_headers_size += VXLAN_HEADER_SIZE;
+        } else {
+            pctx->outer_headers_size += MPLS_HEADER_SIZE;
+        }
+    }
+}
+
+void POC_ExtractInnerHeadersFromOriginalPacket(
+        struct POC_FragmentationContext* pctx) {
+    pctx->inner_ip_header = (struct vr_ip*)(pctx->outer_headers
+        + pctx->outer_headers_size + sizeof(struct vr_eth));
+
+    // Determine inner header size: eth, ip.
+    // What about IPv6? We don't care in POC.
+    // We also assume that IP header has constant size (which is not true).
+    pctx->inner_headers_size = sizeof(struct vr_eth) + sizeof(struct vr_ip);
+    pctx->inner_payload_offset = pctx->outer_headers_size
+        + pctx->inner_headers_size;
+    pctx->total_payload_size = sizeof(struct vr_eth)
+        + pctx->outer_ip_header->ip_len - pctx->inner_payload_offset;
+
+    // Extract inner fragmentation flags and offset.
+    pctx->inner_ip_mf = pctx->inner_ip_header->ip_frag_off
+        & MORE_FRAGMENTS_FLAG;
+    pctx->inner_ip_byte_offset = pctx->inner_ip_header->ip_frag_off
+        & ~OFFSET_FLAGS_MASK;
+}
+
+void POC_SplitOriginalPacket(struct POC_FragmentationContext* pctx) {
+    // Note: fragment offset in IP header actually means amount of 8-byte
+    // blocks. It means that 'payload size' % 8 == 0 for each packet with
+    // 'more fragments' flag set to true.
+    pctx->free_space_for_inner_payload = pctx->mtu - pctx->inner_payload_offset;
+    pctx->maximum_inner_payload_length
+        = pctx->free_space_for_inner_payload & ~OFFSET_FLAGS_MASK;
+
+    PNET_BUFFER_LIST fragmented_nbl = NdisAllocateFragmentNetBufferList(
+        pctx->original_nbl,
+        VrNBLPool,
+        VrNBPool,
+        pctx->inner_payload_offset,
+        pctx->maximum_inner_payload_length,
+        0,
+        0,
+        0
+    );
+
+    pctx->fragmented_nbl->ParentNetBufferList = pctx->original_nbl;
+    InterlockedIncrement(&pctx->original_nbl->ChildRefCount);
+}
+
+bool POC_CopyHeadersToNetBuffer(
+        struct POC_FragmentationContext* pctx,
+        PNET_BUFFER nb) {
+    unsigned long bytes_copied = 0;
+    NDIS_STATUS status = NdisCopyFromNetBufferToNetBuffer(
+        nb,
+        0,
+        pctx->inner_payload_offset,
+        pctx->original_nbl->FirstNetBuffer,
+        0,
+        &bytes_copied
+    );
+
+    if (status != NDIS_STATUS_SUCCESS
+            || bytes_copied != pctx->inner_payload_offset) {
+        return false;
+        // Failure.
+        // Can't recover.
+    }
+    return true;
+}
+
+void POC_FixHeadersOfInnerFragmentedPacket(
+        struct POC_FragmentationContext* pctx,
+        unsigned char* headers,
+        bool more_new_packets,
+        unsigned short* byte_offset_for_next_inner_ip_header) {
+    struct vr_ip* fragment_inner_ip_header = (struct vr_ip*)(headers
+        + pctx->outer_headers_size + sizeof(struct vr_eth));
+
+    // Fix 'more fragments' in inner IP header.
+    if (more_new_packets || pctx->inner_ip_mf) {
+        fragment_inner_ip_header->ip_frag_off |= MORE_FRAGMENTS_FLAG;
+    }
+
+    // Fix 'fragment offset' in inner IP header.
+    fragment_inner_ip_header->ip_frag_off &= OFFSET_FLAGS_MASK;
+    fragment_inner_ip_header->ip_frag_off
+        += *byte_offset_for_next_inner_ip_header;
+    *byte_offset_for_next_inner_ip_header
+        += pctx->maximum_inner_payload_length;
+
+    // Fix packet length in inner IP header.
+    fragment_inner_ip_header->ip_len = pctx->inner_headers_size
+        + (more_new_packets ? pctx->maximum_inner_payload_length
+        : pctx->total_payload_size % pctx->maximum_inner_payload_length);
+
+    // Fix checksum in inner IP header.
+    unsigned short inner_csum = vr_ip_csum(fragment_inner_ip_header);
+    fragment_inner_ip_header->ip_csum = inner_csum;
+}
+
+void POC_FixHeadersOfOuterFragmentedPacket(
+        struct POC_FragmentationContext* pctx,
+        unsigned char* headers) {
+    struct vr_ip* fragment_inner_ip_header = (struct vr_ip*)(headers
+        + pctx->outer_headers_size + sizeof(struct vr_eth));
+    struct vr_ip* fragment_outer_ip_header = (struct vr_ip*)(headers
+            + sizeof(struct vr_eth));
+
+    // Fix packet length in outer IP header.
+    fragment_outer_ip_header->ip_len = pctx->outer_headers_size
+        + fragment_inner_ip_header->ip_len;
+
+    // Fix checksum in outer IP header.
+    unsigned short outer_csum = vr_ip_csum(fragment_outer_ip_header);
+    fragment_outer_ip_header->ip_csum = outer_csum;
+}
+
+void POC_FixHeadersOfFragmentedPackets(struct POC_FragmentationContext* pctx) {
+    PNET_BUFFER cur_nb;
+    PNET_BUFFER next_nb;
+
+    // TODO: use header_storage
+    // char header_storage[MAX_HEADERS_SIZE];
+
+    unsigned short byte_offset_for_next_inner_ip_header
+        = pctx->inner_ip_byte_offset;
+    for (cur_nb = pctx->fragmented_nbl->FirstNetBuffer;
+            cur_nb != NULL;
+            cur_nb = next_nb) {
+        next_nb = cur_nb->Next;
+
+        if(!POC_CopyHeadersToNetBuffer(pctx, cur_nb)) {
+            // Big failure. Can't recover.
+        }
+
+        unsigned char* headers = NdisGetDataBuffer(
+            cur_nb, pctx->inner_payload_offset, NULL /*header_storage*/, 1, 1);
+        if (headers == NULL) {
+            // Failure.
+            // It actually means that new NB doesn't have all headers
+            // in consistent block of memory.
+            // Can be handled with header_storage (TODO).
+        }
+
+        POC_FixHeadersOfInnerFragmentedPacket(
+            pctx,
+            headers,
+            next_nb != NULL,
+            &byte_offset_for_next_inner_ip_header);
+        POC_FixHeadersOfOuterFragmentedPacket(pctx, headers);
+
+        // TODO
+        //if (headers != header_storage) {
+        //    copy to cur_nb from header_storage
+        //}
+    }
+}
+
+PNET_BUFFER_LIST POC_Fragment(struct vr_packet *pkt) {
+    struct POC_FragmentationContext ctx;
+    POC_InitializeContext(&ctx, pkt);
+    if(!POC_IsFragmentationNeeded(&ctx)) {
+        return ctx.original_nbl;
+    }
+    POC_ExtractOuterHeadersFromOriginalPacket(&ctx);
+    POC_ExtractInnerHeadersFromOriginalPacket(&ctx);
+    POC_SplitOriginalPacket(&ctx);
+    POC_FixHeadersOfFragmentedPackets(&ctx);
+
+    return ctx.fragmented_nbl;
+}
+
+/////////////////////////////////////////////////////////////////////
+
 static int
 __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
@@ -252,6 +507,8 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     fwd->IsPacketDataSafe = TRUE;
 
     NdisAdvanceNetBufferListDataStart(nbl, pkt->vp_data, TRUE, NULL);
+
+    nbl = POC_Fragment(pkt);
 
     ExFreePool(pkt);
 
