@@ -59,6 +59,7 @@ extern const ULONG VrOidRequestId;
 
 extern PSWITCH_OBJECT VrSwitchObject;
 extern NDIS_HANDLE VrNBLPool;
+extern NDIS_HANDLE VrNBPool;
 extern PNDIS_RW_LOCK_EX AsyncWorkRWLock;
 
 /* Functions for OID request handling are located in windows/vr_oid.c */
