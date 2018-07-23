@@ -469,7 +469,7 @@ flow_result_t vr_inet_flow_lookup(struct vrouter *, struct vr_packet *,
 flow_result_t vr_inet6_flow_lookup(struct vrouter *, struct vr_packet *,
                                   struct vr_forwarding_md *);
 int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
-        uint16_t, struct vr_ip6 *, struct vr_flow *, uint8_t, bool);
+        uint16_t, struct vr_ip6 *, struct vr_flow *, uint8_t, bool, bool);
 int vr_inet6_get_flow_key(struct vrouter *, unsigned short, struct vr_packet *,
         uint16_t, struct vr_flow *, uint8_t);
 
@@ -479,7 +479,7 @@ extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
 extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
        uint32_t, uint32_t, uint8_t, uint16_t, uint16_t, uint8_t);
 extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
-       unsigned char *, uint8_t, uint16_t, uint16_t, uint8_t);
+       unsigned char *, unsigned char *, uint8_t, uint16_t, uint16_t, uint8_t);
 extern void vr_inet6_fill_flow_from_req(struct vr_flow *,
         struct _vr_flow_req *);
 extern void vr_inet6_fill_rflow_from_req(struct vr_flow *,
