@@ -154,65 +154,6 @@ win_free_packet(struct vr_packet *pkt)
     ExFreePool(wrapper);
 }
 
-/*
- * Splits NBL with multiple NBs into list of NBLs,
- * in which each NBL has a single NB.
- *
- * The original NBL is set as a parent and left intact.
- * The returned value is a list of new NBLs.
- *
- * In case the NBL has a single Net Buffer List,
- * returns the original NBL.
- */
-PNET_BUFFER_LIST
-SplitMultiNetBufferNetBufferList(PNET_BUFFER_LIST origNbl)
-{
-    PNET_BUFFER nextNb, nb, firstNb = NET_BUFFER_LIST_FIRST_NB(origNbl);
-    PNET_BUFFER_LIST *pNextNbl, nextNbl, clonedNbl = NULL, clonedNblList = NULL;
-    pNextNbl = &clonedNblList;
-
-    if (firstNb == NULL || NET_BUFFER_NEXT_NB(firstNb) == NULL) {
-        return origNbl;
-    }
-
-    for (nb = firstNb; nb; nb = nextNb) {
-        // Pretend it's a single-NB NBL for the time of cloning
-        NET_BUFFER_LIST_FIRST_NB(origNbl) = nb;
-        nextNb = NET_BUFFER_NEXT_NB(nb);
-        NET_BUFFER_NEXT_NB(nb) = NULL;
-
-        // TODO optimization: use NDIS_CLONE_FLAGS_USE_ORIGINAL_MDLS flag
-        // (need to support it in free)
-        clonedNbl = CloneNetBufferList(origNbl);
-
-        NET_BUFFER_NEXT_NB(nb) = nextNb;
-
-        if (clonedNbl == NULL) {
-            goto cleanup;
-        }
-
-        *pNextNbl = clonedNbl;
-        pNextNbl = &NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
-    }
-
-    // Restore original NB chain
-    NET_BUFFER_LIST_FIRST_NB(origNbl) = firstNb;
-
-    return clonedNblList;
-
-cleanup:
-    NET_BUFFER_LIST_FIRST_NB(origNbl) = firstNb;
-
-    for (clonedNbl = clonedNblList; clonedNbl; clonedNbl = nextNbl) {
-        nextNbl = NET_BUFFER_LIST_NEXT_NBL(clonedNbl);
-        NET_BUFFER_LIST_NEXT_NBL(clonedNbl) = NULL;
-        PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(clonedNbl);
-        WinPacketFreeClonedPreservingParent((PWIN_PACKET)rawPacket);
-    }
-
-    return NULL;
-}
-
 void
 win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG data_length)
 {
@@ -526,24 +467,26 @@ FilterSendNetBufferLists(
         }
 
         // Enforce 1 to 1 NBL <-> NB relationship
-        PNET_BUFFER_LIST splittedNblList = SplitMultiNetBufferNetBufferList(curNbl);
-        if (splittedNblList == NULL) {
+        // PNET_BUFFER_LIST splittedNblList = SplitMultiNetBufferNetBufferList(curNbl);
+        PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(curNbl);
+        PWIN_PACKET_LIST splittedPacketList = WinPacketSplitMultiPacket((PWIN_MULTI_PACKET)rawPacket);
+        if (splittedPacketList == NULL) {
             NdisFSendNetBufferListsComplete(switchObject->NdisFilterHandle, curNbl, sendCompleteFlags);
             continue;
         }
-        curNbl = splittedNblList;
 
-        PNET_BUFFER_LIST innerLoopNextNbl;
-        for (; curNbl; curNbl = innerLoopNextNbl) {
-            innerLoopNextNbl = curNbl->Next;
-            curNbl->Next = NULL;
+        PWIN_PACKET_LIST nextElement = NULL;
+        for (PWIN_PACKET_LIST element = splittedPacketList; element != NULL; element = nextElement) {
+            PWIN_PACKET winPacket = element->WinPacket;
+            PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(winPacket);
+            nextElement = element->Next;
+            WinPacketListRawFreeElement(element);
 
-            struct vr_packet *pkt = win_get_packet(curNbl, vif);
+            struct vr_packet *pkt = win_get_packet(WinPacketRawToNBL(rawPacket), vif);
             ASSERTMSG("win_get_packed failed!", pkt != NULL);
 
             if (pkt == NULL) {
-                PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(curNbl);
-                WinPacketFreeRecursive((PWIN_PACKET)rawPacket);
+                WinPacketFreeRecursive(winPacket);
                 continue;
             }
 

@@ -9,6 +9,8 @@
 #include "vr_os.h"
 #include <ndis.h>
 
+typedef struct _WIN_PACKET_LIST WIN_PACKET_LIST, *PWIN_PACKET_LIST;
+typedef struct _WIN_SUB_PACKET WIN_SUB_PACKET, *PWIN_SUB_PACKET;
 typedef struct _WIN_PACKET_RAW WIN_PACKET_RAW, *PWIN_PACKET_RAW;
 
 PWIN_PACKET_RAW WinPacketRawGetParentOf(PWIN_PACKET_RAW Packet);
@@ -24,6 +26,15 @@ void WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet);
 
 PWIN_PACKET_RAW WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeClone(PWIN_PACKET_RAW Packet);
+
+PWIN_PACKET_LIST WinPacketListRawAllocateElement();
+void WinPacketListRawFreeElement(PWIN_PACKET_LIST Element);
+
+PWIN_SUB_PACKET WinPacketRawGetFirstSubPacket(PWIN_PACKET_RAW Packet);
+void WinPacketRawSetFirstSubPacket(PWIN_PACKET_RAW Packet, PWIN_SUB_PACKET SubPacket);
+
+PWIN_SUB_PACKET WinSubPacketRawGetNext(PWIN_SUB_PACKET SubPacket);
+void WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next);
 
 // TODO: Remove this declaration and change the definition to `static inline`
 // when callback layer is independent of NDIS
