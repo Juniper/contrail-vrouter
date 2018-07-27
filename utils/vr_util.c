@@ -64,6 +64,12 @@ vr_extract_token(char *string, char token_separator)
         return NULL;
     }
 
+    /* If first character is a separator its a malforned request */
+    if (*string == token_separator) {
+        printf("Malformed request: separator used incorrectly \n");
+        return NULL;
+    }
+
     /* start searching for the token */
     sep = strchr(string, token_separator);
     if (sep) {
