@@ -809,20 +809,6 @@ win_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     return 0;
 }
 
-static int
-win_enqueue_to_assembler(struct vrouter *router, struct vr_packet *pkt,
-    struct vr_forwarding_md *fmd)
-{
-    UNREFERENCED_PARAMETER(router);
-    UNREFERENCED_PARAMETER(pkt);
-    UNREFERENCED_PARAMETER(fmd);
-
-    // TODO(Windows): Implement
-    ASSERTMSG("Not implemented", FALSE);
-
-    return 0;
-}
-
 static void
 win_set_log_level(unsigned int log_level)
 {
@@ -981,7 +967,7 @@ struct host_os windows_host = {
     .hos_pkt_from_vm_tcp_mss_adj = win_pkt_from_vm_tcp_mss_adj,
     .hos_pkt_may_pull = win_pkt_may_pull,
     .hos_gro_process = win_gro_process,
-    .hos_enqueue_to_assembler = NULL,
+    .hos_enqueue_to_assembler = win_enqueue_to_assembler,
     .hos_set_log_level = win_set_log_level,
     .hos_set_log_type = win_set_log_type,
     .hos_get_log_level = win_get_log_level,
