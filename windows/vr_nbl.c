@@ -467,7 +467,6 @@ FilterSendNetBufferLists(
         }
 
         // Enforce 1 to 1 NBL <-> NB relationship
-        // PNET_BUFFER_LIST splittedNblList = SplitMultiNetBufferNetBufferList(curNbl);
         PWIN_PACKET_RAW rawPacket = WinPacketRawFromNBL(curNbl);
         PWIN_PACKET_LIST splittedPacketList = WinPacketSplitMultiPacket((PWIN_MULTI_PACKET)rawPacket);
         if (splittedPacketList == NULL) {

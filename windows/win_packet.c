@@ -11,6 +11,7 @@
 
 static void WinPacketFreeRecursiveImpl(PWIN_PACKET_RAW RawPacket);
 
+/* NOTICE: This cast is safe to perform only if WinPacket contains single SubPacket */
 static inline PWIN_PACKET
 WinPacketFromRawPacket(PWIN_PACKET_RAW Packet)
 {
@@ -95,6 +96,13 @@ WinPacketSplitMultiPacketWithSingleSubPacket(PWIN_PACKET_RAW RawMultiPacket)
     return element;
 }
 
+/*
+ * Splits NBL with multiple NBs (WinMultiPacket) into list of NBLs,
+ * in which each NBL has a single NB (WinPackets).
+ *
+ * The original NBL is set as a parent and left intact.
+ * The returned value is a list of new NBLs (WinPacketList).
+ */
 static PWIN_PACKET_LIST
 WinPacketSplitMultiPacketWithMultipleSubPackets(PWIN_PACKET_RAW RawMultiPacket)
 {

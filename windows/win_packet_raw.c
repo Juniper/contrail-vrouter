@@ -9,14 +9,6 @@
 
 #include <ndis.h>
 
-struct _WIN_SUB_PACKET {
-    NET_BUFFER NetBuffer;
-};
-
-struct _WIN_PACKET_RAW {
-    NET_BUFFER_LIST NetBufferList;
-};
-
 static const ULONG PacketListAllocationTag = 'ELPW';
 
 PWIN_PACKET_RAW
@@ -168,7 +160,7 @@ WinPacketListRawFreeElement(PWIN_PACKET_LIST Element)
 static inline PNET_BUFFER
 WinSubPacketRawToNB(PWIN_SUB_PACKET SubPacket)
 {
-    return &SubPacket->NetBuffer;
+    return (PNET_BUFFER)SubPacket;
 }
 
 static inline PWIN_SUB_PACKET
@@ -212,7 +204,7 @@ WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next)
 PNET_BUFFER_LIST
 WinPacketRawToNBL(PWIN_PACKET_RAW Packet)
 {
-    return &Packet->NetBufferList;
+    return (PNET_BUFFER_LIST)Packet;
 }
 
 PWIN_PACKET_RAW
