@@ -21,6 +21,7 @@ const ULONG VrOidRequestId = 'RVCO';
 
 PSWITCH_OBJECT VrSwitchObject = NULL;
 NDIS_HANDLE VrNBLPool = NULL;
+NDIS_HANDLE VrNBPool = NULL;
 
 /*
  * Read/write lock which must be acquired by deferred callbacks. Used in functions from
@@ -151,6 +152,30 @@ VrFreeNetBufferListPool(NDIS_HANDLE pool)
     NdisFreeNetBufferListPool(pool);
 }
 
+static NDIS_HANDLE
+VrGenerateNetBufferPool(VOID)
+{
+    NET_BUFFER_POOL_PARAMETERS params;
+    params.DataSize = 0;
+    params.PoolTag = VrAllocationTag;
+    params.Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
+    params.Header.Revision = NET_BUFFER_POOL_PARAMETERS_REVISION_1;
+    params.Header.Size = NDIS_SIZEOF_NET_BUFFER_POOL_PARAMETERS_REVISION_1;
+
+    NDIS_HANDLE pool = NdisAllocateNetBufferPool(VrSwitchObject->NdisFilterHandle, &params);
+
+    ASSERT(pool != NULL);
+
+    return pool;
+}
+
+static void
+VrFreeNetBufferPool(NDIS_HANDLE pool)
+{
+    ASSERTMSG("NB pool is not initialized", pool != NULL);
+    NdisFreeNetBufferPool(pool);
+}
+
 static VOID
 UninitializeVRouter(pvr_switch_context ctx)
 {
@@ -175,6 +200,9 @@ UninitializeWindowsComponents(pvr_switch_context ctx)
 {
     if (VrNBLPool)
         VrFreeNetBufferListPool(VrNBLPool);
+
+    if (VrNBPool)
+        VrFreeNetBufferPool(VrNBPool);
 
     if (AsyncWorkRWLock)
         NdisFreeRWLock(AsyncWorkRWLock);
@@ -247,6 +275,10 @@ InitializeWindowsComponents(PSWITCH_OBJECT Switch)
 
     VrNBLPool = VrGenerateNetBufferListPool();
     if (VrNBLPool == NULL)
+        goto cleanup;
+
+    VrNBPool = VrGenerateNetBufferPool();
+    if (VrNBPool == NULL)
         goto cleanup;
 
     Switch->ExtensionContext = ctx;
