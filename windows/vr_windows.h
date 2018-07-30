@@ -27,7 +27,6 @@ typedef struct _vr_switch_context
     BOOLEAN                 shmem_devices_up;
     BOOLEAN                 message_up;
     BOOLEAN                 vrouter_up;
-    BOOLEAN                 assembler_up;
 } vr_switch_context, *pvr_switch_context;
 
 typedef struct _SWITCH_OBJECT
@@ -89,12 +88,6 @@ extern void win_if_unlock(void);
 /* vRouter transport module init functions */
 extern int vr_transport_init(void);
 extern void vr_transport_exit(void);
-
-int VrAssemblerInit(void);
-void VrAssemblerExit(void);
-
-extern int win_enqueue_to_assembler(struct vrouter *router, struct vr_packet *pkt,
-        struct vr_forwarding_md *fmd);
 
 #ifdef __cplusplus
 }
