@@ -21,6 +21,7 @@ const ULONG VrOidRequestId = 'RVCO';
 
 PSWITCH_OBJECT VrSwitchObject = NULL;
 NDIS_HANDLE VrNBLPool = NULL;
+NDIS_HANDLE VrNBPool = NULL;
 
 /*
  * Read/write lock which must be acquired by deferred callbacks. Used in functions from
@@ -149,6 +150,30 @@ VrFreeNetBufferListPool(NDIS_HANDLE pool)
 {
     ASSERTMSG("NBL pool is not initialized", pool != NULL);
     NdisFreeNetBufferListPool(pool);
+}
+
+static NDIS_HANDLE
+VrGenerateNetBufferPool(VOID)
+{
+    NET_BUFFER_POOL_PARAMETERS params;
+    params.DataSize = 0;
+    params.PoolTag = VrAllocationTag;
+    params.Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
+    params.Header.Revision = NET_BUFFER_POOL_PARAMETERS_REVISION_1;
+    params.Header.Size = NDIS_SIZEOF_NET_BUFFER_POOL_PARAMETERS_REVISION_1;
+
+    NDIS_HANDLE pool = NdisAllocateNetBufferPool(VrSwitchObject->NdisFilterHandle, &params);
+
+    ASSERT(pool != NULL);
+
+    return pool;
+}
+
+static void
+VrFreeNetBufferPool(NDIS_HANDLE pool)
+{
+    ASSERTMSG("NB pool is not initialized", pool != NULL);
+    NdisFreeNetBufferPool(pool);
 }
 
 static VOID
