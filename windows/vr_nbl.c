@@ -269,7 +269,10 @@ static struct vr_packet *
 ReallocateHeaders(struct vr_packet *orig_vr_pkt)
 {
     PVR_PACKET_WRAPPER orig_pkt = GetWrapperFromVrPacket(orig_vr_pkt);
-    PNET_BUFFER orig_nb = NET_BUFFER_LIST_FIRST_NB(WinPacketToNBL(orig_pkt->WinPacket));
+    PWIN_PACKET_RAW raw_packet = WinPacketToRawPacket(orig_pkt->WinPacket);
+    PNET_BUFFER_LIST original_nbl = WinPacketRawToNBL(raw_packet);
+
+    PNET_BUFFER orig_nb = NET_BUFFER_LIST_FIRST_NB(original_nbl);
     LONG data_length = NET_BUFFER_DATA_LENGTH(orig_nb);
 
     if (orig_pkt->VrPacket.vp_len == data_length || AreAllHeadersInsideBuffer(&orig_pkt->VrPacket))
@@ -307,8 +310,10 @@ ReallocateHeaders(struct vr_packet *orig_vr_pkt)
     return &new_pkt->VrPacket;
 
 fail:
-    if (new_nbl)
-        WinPacketFreeRecursive(WinPacketFromNBL(new_nbl));
+    if (new_nbl) {
+        PWIN_PACKET_RAW raw_packet = WinPacketRawFromNBL(new_nbl);
+        WinPacketFreeRecursive((PWIN_PACKET)raw_packet);
+    }
     win_free_packet(&orig_pkt->VrPacket);
     return NULL;
 }
