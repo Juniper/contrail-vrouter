@@ -39,6 +39,8 @@
 
 /* vRouter/DPDK command-line options. */
 enum vr_opt_index {
+#define FWD_THREAD_DEQUEUE_LOOPS_OPT "dequeue_loops"
+    FWD_THREAD_DEQUEUE_LOOPS_OPT_INDEX,
 #define NO_DAEMON_OPT           "no-daemon"
     NO_DAEMON_OPT_INDEX,
 #define NO_HUGE_OPT             "no-huge"
@@ -100,6 +102,7 @@ extern unsigned int vr_bridge_oentries;
 extern unsigned int vr_mpls_labels;
 extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
+extern unsigned int fwd_thread_dequeue_loops;
 
 static int no_daemon_set;
 static int no_gro_set = 0;
@@ -767,6 +770,8 @@ dpdk_init(void)
     RTE_LOG(INFO, VROUTER, "Using %d service lcores\n",
                             rte_lcore_count() - vr_dpdk.nb_fwd_lcores
                             - vr_dpdk.nb_io_lcores);
+    RTE_LOG(INFO, VROUTER, "Using %d dequeue loops\n",
+                            fwd_thread_dequeue_loops);
 
     /* init timer subsystem */
     rte_timer_subsystem_init();
@@ -967,6 +972,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
                                                     NULL,                   0},
+    [FWD_THREAD_DEQUEUE_LOOPS_OPT_INDEX] = {FWD_THREAD_DEQUEUE_LOOPS_OPT, required_argument,
+                                                    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -1002,6 +1009,7 @@ Usage(void)
         "    --"MEMORY_ALLOC_CHECKS_OPT"  Enable memory checks\n"
         "    --"MEMPOOL_SIZE_OPT" NUM     Main packet pool size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
+        "    --"FWD_THREAD_DEQUEUE_LOOPS_OPT" NUM      Maximum dequeue loop number\n"
         );
 
     exit(1);
@@ -1154,6 +1162,12 @@ parse_long_opts(int opt_flow_index, char *optarg)
         dpdk_log_file[sizeof(dpdk_log_file) - 1] = '\0';
         break;
 
+    case FWD_THREAD_DEQUEUE_LOOPS_OPT_INDEX:
+        fwd_thread_dequeue_loops = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            fwd_thread_dequeue_loops = 4;
+        }
+        break;
 
     case HELP_OPT_INDEX:
     default:

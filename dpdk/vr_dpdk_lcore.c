@@ -31,6 +31,8 @@
 #include <rte_timer.h>
 #include <rte_kni.h>
 
+unsigned int fwd_thread_dequeue_loops = 4;
+
 /* Returns the least used lcore or VR_MAX_CPUS */
 unsigned
 vr_dpdk_lcore_least_used_get(void)
@@ -1024,66 +1026,80 @@ dpdk_lcore_rx_ring_vroute(struct vr_dpdk_lcore *lcore, struct rte_ring *ring)
     unsigned short vif_idx;
     unsigned int vif_gen;
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ + VR_DPDK_RX_RING_CHUNK_SZ];
+    unsigned int avail_nb_pkts = 0;
+    int max_loops = fwd_thread_dequeue_loops;
 
-    /* dequeue the first chunk */
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-    ret = rte_ring_sc_dequeue_bulk(ring, (void **)pkts,
-            VR_DPDK_RX_RING_CHUNK_SZ, NULL);
-#else
-    ret = rte_ring_sc_dequeue_bulk(ring, (void **)pkts,
-            VR_DPDK_RX_RING_CHUNK_SZ);
-#endif
-
-    /* From DPDK 17.11 on, return value of rte_ring_sc_dequeue_bulk
-     * is different from the previous one, 0 means dequeue failure,
-     * non-zero means success, return value should be equal to the
-     * third parameter VR_DPDK_RX_RING_CHUNK_SZ if success.
+    /* lcore_rx_ring often have more than
+     * VR_DPDK_RX_BURST_SZ + VR_DPDK_RX_RING_CHUNK_SZ rte_mbufs if
+     * multiqueue is enabled or there are many enough interfaces, so
+     * here dequeue more rte_mbufs in the rx ring.
      */
+    do {
+        /* dequeue the first chunk */
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-    if (ret != 0) {
+        ret = rte_ring_sc_dequeue_bulk(ring, (void **)pkts,
+                VR_DPDK_RX_RING_CHUNK_SZ, &avail_nb_pkts);
 #else
-    if (likely(ret == 0)) {
+        ret = rte_ring_sc_dequeue_bulk(ring, (void **)pkts,
+                VR_DPDK_RX_RING_CHUNK_SZ);
 #endif
-        header = (uintptr_t)pkts[0];
-        RTE_VERIFY((header & (1ULL << LCORE_RX_RING_HEADER_OFF)) != 0);
-        nb_pkts = header & LCORE_RX_RING_NB_PKTS_MASK;
-        RTE_VERIFY(nb_pkts - 1 <= VR_DPDK_RX_BURST_SZ);
-        total_pkts += nb_pkts - 1;
-        vif_idx = header >> LCORE_RX_RING_VIF_IDX_OFF
-                & LCORE_RX_RING_VIF_IDX_MASK;
-        vif_gen = header >> LCORE_RX_RING_VIF_GEN_OFF
-                & LCORE_RX_RING_VIF_GEN_MASK;
 
-        if (nb_pkts > VR_DPDK_RX_RING_CHUNK_SZ) {
-            /* round up to the chunk size */
-            chunk_nb_pkts = (nb_pkts + VR_DPDK_RX_RING_CHUNK_SZ - 1)
-                    /VR_DPDK_RX_RING_CHUNK_SZ*VR_DPDK_RX_RING_CHUNK_SZ;
+        /* From DPDK 17.11 on, return value of rte_ring_sc_dequeue_bulk
+         * is different from the previous one, 0 means dequeue failure,
+         * non-zero means success, return value should be equal to the
+         * third parameter VR_DPDK_RX_RING_CHUNK_SZ if success.
+         */
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-            ret = rte_ring_sc_dequeue_bulk(ring,
-                    (void **)(pkts + VR_DPDK_RX_RING_CHUNK_SZ),
-                    chunk_nb_pkts - VR_DPDK_RX_RING_CHUNK_SZ, NULL);
+        if (ret != 0) {
 #else
-            ret = rte_ring_sc_dequeue_bulk(ring,
-                    (void **)(pkts + VR_DPDK_RX_RING_CHUNK_SZ),
-                    chunk_nb_pkts - VR_DPDK_RX_RING_CHUNK_SZ);
+        if (likely(ret == 0)) {
 #endif
-            /* we always should be able to dequeue the mbufs */
+            header = (uintptr_t)pkts[0];
+            RTE_VERIFY((header & (1ULL << LCORE_RX_RING_HEADER_OFF)) != 0);
+            nb_pkts = header & LCORE_RX_RING_NB_PKTS_MASK;
+            RTE_VERIFY(nb_pkts - 1 <= VR_DPDK_RX_BURST_SZ);
+            total_pkts += nb_pkts - 1;
+            vif_idx = header >> LCORE_RX_RING_VIF_IDX_OFF
+                    & LCORE_RX_RING_VIF_IDX_MASK;
+            vif_gen = header >> LCORE_RX_RING_VIF_GEN_OFF
+                    & LCORE_RX_RING_VIF_GEN_MASK;
+
+            if (likely(nb_pkts > VR_DPDK_RX_RING_CHUNK_SZ)) {
+                /* round up to the chunk size */
+                chunk_nb_pkts = nb_pkts;
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-            RTE_VERIFY(ret != 0);
+                ret = rte_ring_sc_dequeue_bulk(ring,
+                        (void **)(pkts + VR_DPDK_RX_RING_CHUNK_SZ),
+                        chunk_nb_pkts - VR_DPDK_RX_RING_CHUNK_SZ,
+                        &avail_nb_pkts);
 #else
-            RTE_VERIFY(ret == 0);
+                ret = rte_ring_sc_dequeue_bulk(ring,
+                        (void **)(pkts + VR_DPDK_RX_RING_CHUNK_SZ),
+                        chunk_nb_pkts - VR_DPDK_RX_RING_CHUNK_SZ);
 #endif
+                /* we always should be able to dequeue the mbufs */
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+                RTE_VERIFY(ret != 0);
+#else
+                RTE_VERIFY(ret == 0);
+#endif
+            }
+            vif = __vrouter_get_interface(router, vif_idx);
+            if (likely(vif != NULL) && vif->vif_gen == vif_gen) {
+                /* skip the header */
+                vr_dpdk_lcore_vroute(lcore, vif, &pkts[1], nb_pkts - 1);
+            } else {
+                /* the vif is no longer available, just drop the packets */
+                for (i = 1; i < nb_pkts; i++)
+                    vr_dpdk_pfree(pkts[i], NULL, VP_DROP_INTERFACE_DROP);
+            }
         }
-        vif = __vrouter_get_interface(router, vif_idx);
-        if (likely(vif != NULL) && vif->vif_gen == vif_gen) {
-            /* skip the header */
-            vr_dpdk_lcore_vroute(lcore, vif, &pkts[1], nb_pkts - 1);
-        } else {
-            /* the vif is no longer available, just drop the packets */
-            for (i = 1; i < nb_pkts; i++)
-                vr_dpdk_pfree(pkts[i], NULL, VP_DROP_INTERFACE_DROP);
-        }
-    }
+        max_loops--;
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+    } while ((avail_nb_pkts != 0) && (max_loops > 0));
+#else
+    } while ((ret == 0) && (max_loops > 0));
+#endif
 
     return total_pkts;
 }
@@ -1247,6 +1263,8 @@ dpdk_lcore_sriov_rxtx(struct vr_dpdk_lcore *lcore)
     }
 }
 
+static __thread uint64_t tx_rings_count = VR_DPDK_TX_FLUSH_LOOPS;
+
 /* Forwarding lcore RX/TX */
 static inline void
 dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
@@ -1268,7 +1286,10 @@ dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
         total_pkts += dpdk_lcore_rx_ring_vroute(lcore, lcore->lcore_io_rx_ring);
     }
     /* push TX rings */
-    total_pkts += dpdk_lcore_tx_rings_push(lcore);
+    if (--tx_rings_count == 0) {
+        total_pkts += dpdk_lcore_tx_rings_push(lcore);
+        tx_rings_count = VR_DPDK_TX_FLUSH_LOOPS;
+    }
 
     /* make a short pause if no single packet received */
     if (unlikely(total_pkts == 0)) {
