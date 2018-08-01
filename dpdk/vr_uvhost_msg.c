@@ -359,10 +359,12 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
     uint8_t is_gso_vm = 1;
     unsigned long stored_features = 0;
 
-    if (!vr_dpdk_load_persist_feature(uvhm_client_name(vru_cl),
-                                      &stored_features)) {
-        vru_cl->vruc_msg.u64 |= stored_features;
-    }
+    /* Load from cache only if mrgbuf is enabled */
+    if (dpdk_check_rx_mrgbuf_disable() == 0)
+        if (!vr_dpdk_load_persist_feature(uvhm_client_name(vru_cl),
+                                          &stored_features)) {
+            vru_cl->vruc_msg.u64 |= stored_features;
+        }
 
     vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
