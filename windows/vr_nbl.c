@@ -268,6 +268,7 @@ AreAllHeadersInsideBuffer(struct vr_packet *pkt)
 static struct vr_packet *
 ReallocateHeaders(struct vr_packet *orig_vr_pkt)
 {
+    NDIS_STATUS status;
     PVR_PACKET_WRAPPER orig_pkt = GetWrapperFromVrPacket(orig_vr_pkt);
     PWIN_PACKET_RAW raw_packet = WinPacketToRawPacket(orig_pkt->WinPacket);
     PNET_BUFFER_LIST original_nbl = WinPacketRawToNBL(raw_packet);
@@ -282,11 +283,20 @@ ReallocateHeaders(struct vr_packet *orig_vr_pkt)
     if (new_nbl == NULL)
         goto fail;
 
+    status = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
+        VrSwitchObject->NdisSwitchContext,
+        new_nbl,
+        original_nbl,
+        0
+    );
+    if (status != NDIS_STATUS_SUCCESS)
+        goto fail;
+
     // TODO support fragmented tunnelled packets (this is unlikely case, but still)
     // TODO (opt) don't copy the whole buffer (we can reuse original memory,
     // as we only need to copy ether + IP + proto headers)
     ULONG bytes_copied;
-    NDIS_STATUS status = NdisCopyFromNetBufferToNetBuffer(
+    status = NdisCopyFromNetBufferToNetBuffer(
         NET_BUFFER_LIST_FIRST_NB(new_nbl),
         0,
         data_length,
