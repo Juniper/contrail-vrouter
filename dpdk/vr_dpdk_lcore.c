@@ -1312,6 +1312,8 @@ dpdk_lcore_signals_init(unsigned lcore_id)
     }
 }
 
+static __thread char lcores_str[VR_DPDK_STR_BUF_SZ];
+
 /*
  * dpdk_lcore_dst_lcores_stringify - stringify lcores to distribute packets.
  */
@@ -1319,7 +1321,6 @@ static char *
 dpdk_lcore_dst_lcores_stringify(struct vr_dpdk_lcore *lcore)
 {
     int i;
-    static char lcores_str[VR_DPDK_STR_BUF_SZ];
     char *p = lcores_str;
 
     for (i = 0; i < lcore->lcore_nb_dst_lcores; i++) {
