@@ -447,6 +447,7 @@ struct vr_flow_trap_arg {
 
 struct vr_packet;
 struct vrouter;
+struct vr_ip;
 struct vr_ip6;
 
 extern int vr_flow_init(struct vrouter *);
@@ -508,7 +509,7 @@ int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
 uint16_t vr_flow_fat_flow_lookup(struct vrouter *,
-        struct vr_packet *, uint16_t, uint16_t, uint16_t);
+        struct vr_packet *, struct vr_ip *, struct vr_ip6 *, uint16_t, uint16_t, uint16_t);
 extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
 unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);

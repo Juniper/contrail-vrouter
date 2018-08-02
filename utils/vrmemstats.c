@@ -169,6 +169,10 @@ mem_stats_req_process(void *s_req)
             stats->vms_qos_map_object);
     printf("Forwarding Class Objects        %" PRIu64 "\n",
             stats->vms_fc_object);
+    printf("Fatflow v4 exclude list object  %" PRIu64 "\n",
+            stats->vms_interface_fat_flow_ipv4_exclude_list_object);
+    printf("Fatflow v6 exclude list object  %" PRIu64 "\n",
+            stats->vms_interface_fat_flow_ipv6_exclude_list_object);
     return;
 }
 

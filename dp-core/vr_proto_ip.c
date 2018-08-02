@@ -937,9 +937,8 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
      * the IP packet which has caused the ICMP error
      */
     if (!icmp_error_payload) {
-        fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, proto,
+        fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, ip, NULL, proto,
                                 sport, dport);
-
         for (i = 1; i < VR_FAT_FLOW_MAX_MASK; i = i << 1) {
             switch (fat_flow_mask & i) {
             case VR_FAT_FLOW_SRC_PORT_MASK:
