@@ -881,6 +881,7 @@ win_update_vif_port(struct vr_interface *vif, vr_interface_req *vifr, PNDIS_SWIT
             {
                 vif->vif_port = element->PortId;
                 vif->vif_nic = element->NicIndex;
+                vif->vif_mtu = element->MTU;
 
                 break;
             }
