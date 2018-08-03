@@ -333,7 +333,8 @@ nl_reset_cl_sock(struct nl_client *cl)
 struct nl_response *
 nl_parse_reply_os_specific(struct nl_client *cl)
 {
-    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf + cl->cl_buf_offset);
+    struct nlmsghdr *nlh = (struct nlmsghdr *)(cl->cl_buf +
+            cl->cl_buf_offset - NLMSG_HDRLEN);
     struct nl_response *resp = &cl->resp;
 
     if ((nlh->nlmsg_type == RTM_SETDCB) || (nlh->nlmsg_type == RTM_GETDCB)) {
