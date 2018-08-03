@@ -10,11 +10,6 @@
 #include "vr_packet.h"
 #include "vr_windows.h"
 
-// VR_NBL_CONTEXT_SIZE is sizeof(struct vr_packet) rounded up to the nearest multiple of MEMORY_ALLOCATION_ALIGNMENT
-#define VR_NBL_CONTEXT_SIZE \
-    (((sizeof(struct vr_packet) + MEMORY_ALLOCATION_ALIGNMENT - 1) / MEMORY_ALLOCATION_ALIGNMENT) * \
-        MEMORY_ALLOCATION_ALIGNMENT)
-
 #define IS_NBL_OWNED(nbl) ((nbl)->NdisPoolHandle == VrNBLPool)
 #define IS_NBL_CLONE(nbl) ((nbl)->ParentNetBufferList != NULL)
 
@@ -28,7 +23,8 @@ extern PNET_BUFFER_LIST CreateNetBufferList(unsigned int bytesCount);
 extern PNET_BUFFER_LIST CloneNetBufferList(PNET_BUFFER_LIST originalNbl);
 extern VOID FreeNetBufferList(PNET_BUFFER_LIST nbl);
 extern VOID FreeCreatedNetBufferList(PNET_BUFFER_LIST nbl);
-extern VOID FreeClonedNetBufferList(PNET_BUFFER_LIST nbl);
+extern VOID FreeClonedNetBufferListRecursive(PNET_BUFFER_LIST nbl);
+extern VOID FreeClonedNetBufferListPreservingParent(PNET_BUFFER_LIST nbl);
 
 extern struct vr_packet *win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif);
 extern void win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_offset, ULONG data_length);
