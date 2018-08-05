@@ -1577,6 +1577,7 @@ vr_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
 
 uint16_t
 vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
+        struct vr_ip *ip, struct vr_ip6 *ip6,
         uint16_t l4_proto, uint16_t sport, uint16_t dport)
 {
     uint8_t fat_flow_mask, tmp_mask = 0;
@@ -1594,7 +1595,7 @@ vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     if (!vif_l)
         return VR_FAT_FLOW_NO_MASK;
 
-    fat_flow_mask = vif_fat_flow_lookup(vif_l, l4_proto, sport, dport);
+    fat_flow_mask = vif_fat_flow_lookup(vif_l, ip, ip6, l4_proto, sport, dport);
     if (pkt->vp_if != vif_l) {
 
         if (fat_flow_mask & VR_FAT_FLOW_SRC_IP_MASK)

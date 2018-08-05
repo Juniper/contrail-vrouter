@@ -374,6 +374,8 @@ buffer sandesh vr_mem_stats_req {
    68:  i64             vms_interface_req_pbb_mac_object;
    69:  i64             vms_nexthop_req_bmac_object;
    70:  i64             vms_interface_req_bridge_id_object;
+   71:  i64             vms_interface_fat_flow_ipv4_exclude_list_object;
+   72:  i64             vms_interface_fat_flow_ipv6_exclude_list_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */

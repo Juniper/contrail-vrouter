@@ -636,6 +636,27 @@ list_get_print(vr_interface_req *req)
         }
     }
     printf("\n");
+    if (req->vifr_fat_flow_exclude_ip_list_size) {
+        vr_interface_print_head_space();
+        printf("FatFlows IPv4 exclude prefix list:\n");
+        for (i = 0; i < req->vifr_fat_flow_exclude_ip_list_size; i++) {
+             vr_interface_print_head_space();
+             printf("\t%s\n", inet_ntop(AF_INET, &req->vifr_fat_flow_exclude_ip_list[i], ip_addr, INET_ADDRSTRLEN));
+        }
+        printf("\n");
+    }
+    if (req->vifr_fat_flow_exclude_ip6_u_list_size) {
+        vr_interface_print_head_space();
+        printf("FatFlows IPv6 exclude prefix list:\n");
+        for (i = 0; i < req->vifr_fat_flow_exclude_ip6_u_list_size; i++) {
+             tmp = (uint64_t *)ip6_ip;
+             *tmp = req->vifr_fat_flow_exclude_ip6_u_list[i];
+             *(tmp + 1) = req->vifr_fat_flow_exclude_ip6_l_list[i];
+             vr_interface_print_head_space();
+             printf("\t%s\n", inet_ntop(AF_INET6, ip6_ip, ip6_addr, INET6_ADDRSTRLEN));
+        }
+        printf("\n");
+    } 
 
     if (get_set && req->vifr_flags & VIF_FLAG_SERVICE_IF) {
         vr_vrf_assign_dump = true;

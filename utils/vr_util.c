@@ -821,6 +821,25 @@ vr_interface_req_destroy(vr_interface_req *req)
         req->vifr_fat_flow_protocol_port_size = 0;
     }
 
+    if (req->vifr_fat_flow_exclude_ip_list_size && 
+           req->vifr_fat_flow_exclude_ip_list) {
+        free(req->vifr_fat_flow_exclude_ip_list);
+        req->vifr_fat_flow_exclude_ip_list = NULL;
+        req->vifr_fat_flow_exclude_ip_list_size = 0;
+    }
+    if (req->vifr_fat_flow_exclude_ip6_u_list_size &&
+           req->vifr_fat_flow_exclude_ip6_u_list) {
+        free(req->vifr_fat_flow_exclude_ip6_u_list);
+        req->vifr_fat_flow_exclude_ip6_u_list = NULL;
+        req->vifr_fat_flow_exclude_ip6_u_list_size = 0;
+    }
+    if (req->vifr_fat_flow_exclude_ip6_l_list_size && 
+           req->vifr_fat_flow_exclude_ip6_l_list) {
+        free(req->vifr_fat_flow_exclude_ip6_l_list);
+        req->vifr_fat_flow_exclude_ip6_l_list = NULL;
+        req->vifr_fat_flow_exclude_ip6_l_list_size = 0;
+    }
+
     free(req);
     return;
 }
@@ -845,6 +864,12 @@ vr_interface_req_get_copy(vr_interface_req *src)
     dst->vifr_src_mac = NULL;
     dst->vifr_fat_flow_protocol_port_size = 0;
     dst->vifr_fat_flow_protocol_port = NULL;
+    dst->vifr_fat_flow_exclude_ip_list_size = 0;
+    dst->vifr_fat_flow_exclude_ip_list = NULL;
+    dst->vifr_fat_flow_exclude_ip6_u_list_size = 0;
+    dst->vifr_fat_flow_exclude_ip6_u_list = NULL;
+    dst->vifr_fat_flow_exclude_ip6_l_list_size = 0;
+    dst->vifr_fat_flow_exclude_ip6_l_list = NULL;
 
     if (src->vifr_name) {
         dst->vifr_name = malloc(strlen(src->vifr_name) + 1);
@@ -898,6 +923,38 @@ vr_interface_req_get_copy(vr_interface_req *src)
                 src->vifr_fat_flow_protocol_port_size);
         dst->vifr_fat_flow_protocol_port_size =
             src->vifr_fat_flow_protocol_port_size;
+    }
+
+    if (src->vifr_fat_flow_exclude_ip_list_size &&
+             src->vifr_fat_flow_exclude_ip_list) {
+        dst->vifr_fat_flow_exclude_ip_list = malloc(src->vifr_fat_flow_exclude_ip_list_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_exclude_ip_list) {
+            goto free_vif;
+        }
+        memcpy(dst->vifr_fat_flow_exclude_ip_list, src->vifr_fat_flow_exclude_ip_list, 
+               src->vifr_fat_flow_exclude_ip_list_size * sizeof(uint64_t));
+        dst->vifr_fat_flow_exclude_ip_list_size = src->vifr_fat_flow_exclude_ip_list_size;
+    }
+
+    if (src->vifr_fat_flow_exclude_ip6_u_list_size &&
+            src->vifr_fat_flow_exclude_ip6_u_list) {
+        dst->vifr_fat_flow_exclude_ip6_u_list = malloc(src->vifr_fat_flow_exclude_ip6_u_list_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_exclude_ip6_u_list) {
+            goto free_vif;
+        }
+        memcpy(dst->vifr_fat_flow_exclude_ip6_u_list, src->vifr_fat_flow_exclude_ip6_u_list, 
+               src->vifr_fat_flow_exclude_ip6_u_list_size * sizeof(uint64_t));
+        dst->vifr_fat_flow_exclude_ip6_u_list_size = src->vifr_fat_flow_exclude_ip6_u_list_size;
+    }
+    if (src->vifr_fat_flow_exclude_ip6_l_list_size &&
+            src->vifr_fat_flow_exclude_ip6_l_list) {
+        dst->vifr_fat_flow_exclude_ip6_l_list = malloc(src->vifr_fat_flow_exclude_ip6_l_list_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_exclude_ip6_l_list) {
+            goto free_vif;
+        }
+        memcpy(dst->vifr_fat_flow_exclude_ip6_l_list, src->vifr_fat_flow_exclude_ip6_l_list, 
+               src->vifr_fat_flow_exclude_ip6_l_list_size * sizeof(uint64_t));
+        dst->vifr_fat_flow_exclude_ip6_l_list_size = src->vifr_fat_flow_exclude_ip6_l_list_size;
     }
 
     return dst;

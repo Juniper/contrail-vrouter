@@ -54,6 +54,39 @@ extern void vr_drop_stats_get_vif_stats(vr_drop_stats_req *, struct vr_interface
 
 #define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
 
+static inline uint64_t
+vr_htonll (uint64_t n)
+{
+    uint64_t t = 1;
+    uint8_t *p, out[8];
+
+    if (*((uint8_t *) &t) == 1) {
+        p = (uint8_t *) &n;
+        out[0] = *(p + 7);
+        out[1] = *(p + 6);
+        out[2] = *(p + 5);
+        out[3] = *(p + 4);
+        out[4] = *(p + 3);
+        out[5] = *(p + 2);
+        out[6] = *(p + 1);
+        out[7] = *(p + 0);
+        return (*((uint64_t *) out));
+    }
+    return n;
+}
+
+static inline void
+fat_flow_ipv6_plen_to_mask (uint16_t plen, uint64_t *high_mask, uint64_t *low_mask)
+{
+    if (plen > 64) {
+        *high_mask = 0xFFFFFFFFFFFFFFFF;
+        *low_mask = vr_htonll((0xFFFFFFFFFFFFFFFF << (128 - plen)));
+    } else {
+        *low_mask = 0;
+        *high_mask = vr_htonll((0xFFFFFFFFFFFFFFFF << (64 - plen)));
+    }
+}
+
 struct vr_interface_stats *
 vif_get_stats(struct vr_interface *vif, unsigned short cpu)
 {
@@ -2610,6 +2643,16 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         }
     }
 
+    /* Fill the ipv4 & ipv6 exclude lists; NOTE: The prefix lengths are not filled */
+    for (i = 0; i < req->vifr_fat_flow_exclude_ip_list_size; i++) {
+        req->vifr_fat_flow_exclude_ip_list[i] = (uint64_t) intf->vif_fat_flow_ipv4_exclude_list[i];
+    }
+ 
+    for (i = 0; i < req->vifr_fat_flow_exclude_ip6_u_list_size; i++) {
+        req->vifr_fat_flow_exclude_ip6_u_list[i] = intf->vif_fat_flow_ipv6_high_exclude_list[i];
+        req->vifr_fat_flow_exclude_ip6_l_list[i] = intf->vif_fat_flow_ipv6_low_exclude_list[i];
+    }
+
     req->vifr_qos_map_index = intf->vif_qos_map_index;
     req->vifr_dpackets = vr_interface_get_drops(intf);
     return;
@@ -2633,6 +2676,30 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
             return -ENOMEM;
         }
         req->vifr_fat_flow_protocol_port_size = fat_flow_config_size;
+    }
+
+    if (vif->vif_fat_flow_ipv4_exclude_list_size) {
+        req->vifr_fat_flow_exclude_ip_list = vr_zalloc(vif->vif_fat_flow_ipv4_exclude_list_size * sizeof(uint64_t),
+                                                       VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT);
+        if (!req->vifr_fat_flow_exclude_ip_list) {
+            return -ENOMEM;
+        }
+        req->vifr_fat_flow_exclude_ip_list_size = vif->vif_fat_flow_ipv4_exclude_list_size;
+    }
+
+    if (vif->vif_fat_flow_ipv6_exclude_list_size) {
+        req->vifr_fat_flow_exclude_ip6_u_list = vr_zalloc(vif->vif_fat_flow_ipv6_exclude_list_size * sizeof(uint64_t),
+                                                          VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT);
+        if (!req->vifr_fat_flow_exclude_ip6_u_list) {
+            return -ENOMEM;
+        }
+        req->vifr_fat_flow_exclude_ip6_u_list_size = vif->vif_fat_flow_ipv6_exclude_list_size;
+        req->vifr_fat_flow_exclude_ip6_l_list = vr_zalloc(vif->vif_fat_flow_ipv6_exclude_list_size * sizeof(uint64_t),
+                                                          VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT);
+        if (!req->vifr_fat_flow_exclude_ip6_l_list) {
+            return -ENOMEM;
+        }
+        req->vifr_fat_flow_exclude_ip6_l_list_size = vif->vif_fat_flow_ipv6_exclude_list_size;
     }
 
     __vr_interface_make_req(req, vif, core);
@@ -2710,6 +2777,22 @@ vr_interface_req_free_fat_flow_config(vr_interface_req *req)
                 VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT);
         req->vifr_fat_flow_protocol_port = NULL;
         req->vifr_fat_flow_protocol_port_size = 0;
+    }
+
+    if (req->vifr_fat_flow_exclude_ip_list) {
+        vr_free(req->vifr_fat_flow_exclude_ip_list, VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT);
+        req->vifr_fat_flow_exclude_ip_list = NULL;
+        req->vifr_fat_flow_exclude_ip_list_size = 0;
+    }
+    if (req->vifr_fat_flow_exclude_ip6_u_list) {
+        vr_free(req->vifr_fat_flow_exclude_ip6_u_list, VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT);
+        req->vifr_fat_flow_exclude_ip6_u_list = NULL;
+        req->vifr_fat_flow_exclude_ip6_u_list_size = 0;
+    }
+    if (req->vifr_fat_flow_exclude_ip6_l_list) {
+        vr_free(req->vifr_fat_flow_exclude_ip6_l_list, VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT);
+        req->vifr_fat_flow_exclude_ip6_l_list = NULL;
+        req->vifr_fat_flow_exclude_ip6_l_list_size = 0;
     }
 
     return;
@@ -3255,6 +3338,60 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
     int i, j, ret;
     unsigned int size;
     bool add;
+    uint32_t v4_prefix, v4_prefix_len, v4_mask;
+    uint64_t v6_prefix_h, v6_prefix_l, v6_mask_l, v6_mask_h;
+    uint16_t v6_prefix_len;
+
+    /* Populate the ipv4 & ipv6 exclude lists */
+    if (!req->vifr_fat_flow_exclude_ip_list_size) {
+        memset(vif->vif_fat_flow_ipv4_exclude_list, 0, 
+               FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE * sizeof(uint32_t));
+        memset(vif->vif_fat_flow_ipv4_exclude_plen_list, 0, 
+               FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE * sizeof(uint8_t));
+        vif->vif_fat_flow_ipv4_exclude_list_size = 0;
+    } else {
+        if (req->vifr_fat_flow_exclude_ip_list_size > FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE) {
+            return -EINVAL;
+        }
+        /* copy the exclude list and size */
+        for (i = 0; i < req->vifr_fat_flow_exclude_ip_list_size; i++) {
+             v4_prefix_len = FAT_FLOW_EXCLUDE_IPV4_PREFIX_LEN(req->vifr_fat_flow_exclude_ip_list[i]);
+             v4_prefix = FAT_FLOW_EXCLUDE_IPV4_PREFIX(req->vifr_fat_flow_exclude_ip_list[i]);
+             v4_mask = FAT_FLOW_IPV4_PLEN_TO_MASK(v4_prefix_len);
+             vif->vif_fat_flow_ipv4_exclude_list[i] = v4_prefix & v4_mask;
+             vif->vif_fat_flow_ipv4_exclude_plen_list[i] = (uint8_t) v4_prefix_len;
+        }
+        vif->vif_fat_flow_ipv4_exclude_list_size = req->vifr_fat_flow_exclude_ip_list_size;
+    }
+
+    if (!req->vifr_fat_flow_exclude_ip6_l_list_size) {
+        memset(vif->vif_fat_flow_ipv6_low_exclude_list, 0, 
+               FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE * sizeof(uint64_t));
+        memset(vif->vif_fat_flow_ipv6_high_exclude_list, 0, 
+               FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE * sizeof(uint64_t));
+        memset(vif->vif_fat_flow_ipv6_exclude_plen_list, 0,
+               FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE * sizeof(uint8_t));
+        vif->vif_fat_flow_ipv6_exclude_list_size = 0;
+    } else {
+        if ((req->vifr_fat_flow_exclude_ip6_l_list_size != req->vifr_fat_flow_exclude_ip6_u_list_size) ||
+            (req->vifr_fat_flow_exclude_ip6_l_list_size != req->vifr_fat_flow_exclude_ip6_plen_list_size) ||
+            (req->vifr_fat_flow_exclude_ip6_l_list_size > FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE)) {
+             return -EINVAL;
+        }
+        /* copy the exclude list and size */
+        for (i = 0; i < req->vifr_fat_flow_exclude_ip6_l_list_size; i++) {
+             v6_prefix_l = req->vifr_fat_flow_exclude_ip6_l_list[i];
+             v6_prefix_h = req->vifr_fat_flow_exclude_ip6_u_list[i];
+             v6_prefix_len = req->vifr_fat_flow_exclude_ip6_plen_list[i];
+             fat_flow_ipv6_plen_to_mask(v6_prefix_len, &v6_mask_h, &v6_mask_l);
+             vif->vif_fat_flow_ipv6_low_exclude_list[i] = v6_prefix_l & v6_mask_l;
+             vif->vif_fat_flow_ipv6_high_exclude_list[i] = v6_prefix_h & v6_mask_h;
+             vif->vif_fat_flow_ipv6_exclude_plen_list[i] = (uint8_t) v6_prefix_len;
+        }
+        vif->vif_fat_flow_ipv6_exclude_list_size = req->vifr_fat_flow_exclude_ip6_l_list_size;
+    }
+
+    /* Do rest of fat flow config processing */
 
     if (!req->vifr_fat_flow_protocol_port_size) {
         if (!memcmp(vif->vif_fat_flow_config_size, old_fat_flow_config_sizes,
@@ -3403,14 +3540,64 @@ vif_fat_flow_port_get(struct vr_interface *vif, uint8_t proto_index,
     return 0;
 }
 
+
+static uint8_t
+vif_fat_flow_exclude_list_lookup (struct vr_interface *vif, struct vr_ip *ip, struct vr_ip6 *ip6)
+{
+    int i;
+    uint64_t v6_prefix_h, v6_prefix_l, v6_mask_h, v6_mask_l;
+    uint32_t v4_mask;
+    
+
+    if (ip) {
+        if (!vif->vif_fat_flow_ipv4_exclude_list_size) {
+            return 0;
+        }
+        for (i = 0; i < vif->vif_fat_flow_ipv4_exclude_list_size; i++) {
+             v4_mask = FAT_FLOW_IPV4_PLEN_TO_MASK(vif->vif_fat_flow_ipv4_exclude_plen_list[i]);
+             if (((ip->ip_saddr & v4_mask) == vif->vif_fat_flow_ipv4_exclude_list[i]) ||
+                 ((ip->ip_daddr & v4_mask) == vif->vif_fat_flow_ipv4_exclude_list[i])) {
+                  return 1;
+             }
+        }
+    } else if (ip6) {
+        if (!vif->vif_fat_flow_ipv6_exclude_list_size) {
+            return 0;
+        }
+        for (i = 0; i < vif->vif_fat_flow_ipv6_exclude_list_size; i++) {
+             fat_flow_ipv6_plen_to_mask(vif->vif_fat_flow_ipv6_exclude_plen_list[i], &v6_mask_h, &v6_mask_l);
+             /* compare src ip */
+             memcpy(&v6_prefix_h, (uint8_t *) ip6->ip6_src, 8);
+             memcpy(&v6_prefix_l, ((uint8_t *) ip6->ip6_src) + 8, 8);
+             if (((v6_prefix_l & v6_mask_l) == vif->vif_fat_flow_ipv6_low_exclude_list[i]) &&
+                 ((v6_prefix_h & v6_mask_h) == vif->vif_fat_flow_ipv6_high_exclude_list[i])) {
+                  return 1;
+             }
+             /* compare dst ip */
+             memcpy(&v6_prefix_h, (uint8_t *) ip6->ip6_dst, 8);
+             memcpy(&v6_prefix_l, ((uint8_t *) ip6->ip6_dst) + 8, 8);
+             if (((v6_prefix_l & v6_mask_l) == vif->vif_fat_flow_ipv6_low_exclude_list[i]) &&
+                 ((v6_prefix_h & v6_mask_h) == vif->vif_fat_flow_ipv6_high_exclude_list[i])) {
+                  return 1;
+             }
+        }
+    }
+    return 0;
+}
+
 uint16_t
-vif_fat_flow_lookup(struct vr_interface *vif, uint8_t proto,
+vif_fat_flow_lookup(struct vr_interface *vif, struct vr_ip *ip, struct vr_ip6 *ip6, uint8_t proto,
         uint16_t sport, uint16_t dport)
 {
     uint8_t fat_flow_mask = 0, sport_mask = 0, dport_mask = 0;
     uint16_t h_sport, h_dport;
     unsigned int proto_index;
 
+    /* Check if the IPs belong to exclude list, if so return NO_MASK */
+    if (vif_fat_flow_exclude_list_lookup(vif, ip, ip6)) {
+        return fat_flow_mask;
+    }
+    
     proto_index = vif_fat_flow_get_proto_index(proto);
     if (!vif->vif_fat_flow_config[proto_index])
         return fat_flow_mask;

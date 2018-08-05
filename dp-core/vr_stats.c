@@ -317,6 +317,12 @@ vr_mem_stats_get(void)
         response->vms_interface_req_mirror_meta_object +=
             (stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_alloc -
             stats_block[VR_INTERFACE_REQ_MIRROR_META_OBJECT].ms_free);
+        response->vms_interface_fat_flow_ipv4_exclude_list_object +=
+            (stats_block[VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT].ms_alloc -
+             stats_block[VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT].ms_free);
+        response->vms_interface_fat_flow_ipv6_exclude_list_object +=
+            (stats_block[VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT].ms_alloc -
+             stats_block[VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT].ms_free);
         for (i = 0; i < VR_VROUTER_MAX_OBJECT; i++) {
             alloced += stats_block[i].ms_alloc;
             freed += stats_block[i].ms_free;
