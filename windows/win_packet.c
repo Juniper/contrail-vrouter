@@ -62,13 +62,29 @@ WinPacketFreeClonedRecurvise(PWIN_PACKET_RAW RawPacket)
 }
 
 static void
+WinPacketFreeMultiFragmentRecursive(PWIN_PACKET_RAW RawPacket)
+{
+    PWIN_PACKET_RAW rawParent = WinPacketRawGetParentOf(RawPacket);
+
+    WinPacketRawFreeMultiFragment(RawPacket);
+
+    if (WinPacketRawDecrementChildCountOf(rawParent) == 0) {
+        WinPacketFreeRecursiveImpl(rawParent);
+    }
+}
+
+static void
 WinPacketFreeRecursiveImpl(PWIN_PACKET_RAW RawPacket)
 {
     WinAssert(WinPacketRawGetChildCountOf(RawPacket) == 0);
 
     if (WinPacketRawIsOwned(RawPacket)) {
         if (WinPacketIsCloned(RawPacket)) {
-            WinPacketFreeClonedRecurvise(RawPacket);
+            if (WinPacketRawIsMultiFragment(RawPacket)) {
+                WinPacketFreeMultiFragmentRecursive(RawPacket);
+            } else {
+                WinPacketFreeClonedRecurvise(RawPacket);
+            }
         } else {
             WinPacketRawFreeCreated(RawPacket);
         }
