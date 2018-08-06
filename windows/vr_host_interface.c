@@ -401,6 +401,13 @@ frg_split_original_packet(struct FragmentationContext* pctx)
         return;
     }
 
+    ASSERTMSG(
+        "frg_split_original_packet: It is expected that all headers are in first MDL",
+        pctx->fragmented_nbl->FirstNetBuffer != NULL &&
+        MmGetMdlByteCount(pctx->fragmented_nbl->FirstNetBuffer->CurrentMdl)
+        - pctx->fragmented_nbl->FirstNetBuffer->CurrentMdlOffset
+        == pctx->inner_payload_offset);
+
     if (!frg_fix_split_packet_metadata(pctx)) {
         NdisFreeFragmentNetBufferList(pctx->fragmented_nbl,
             pctx->inner_payload_offset, 0);
