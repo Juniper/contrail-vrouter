@@ -57,6 +57,13 @@ WinPacketRawIsOwned(PWIN_PACKET_RAW Packet)
     return nbl->NdisPoolHandle == VrNBLPool;
 }
 
+bool
+WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    return nbl->FirstNetBuffer && nbl->FirstNetBuffer->Next;
+}
+
 void
 WinPacketRawComplete(PWIN_PACKET_RAW Packet)
 {
@@ -140,6 +147,21 @@ WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
 
     FreeForwardingContext(nbl);
     NdisFreeCloneNetBufferList(nbl, 0);
+}
+
+void
+WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    FreeForwardingContext(nbl);
+    unsigned int first_mdl_length
+        = MmGetMdlByteCount(nbl->FirstNetBuffer->CurrentMdl);
+    unsigned int first_mdl_data_offset
+        = nbl->FirstNetBuffer->CurrentMdlOffset;
+    unsigned int first_mdl_data_length
+        = first_mdl_length - first_mdl_data_offset;
+    NdisFreeFragmentNetBufferList(nbl, first_mdl_data_length, 0);
 }
 
 PWIN_PACKET_LIST
