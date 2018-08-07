@@ -139,9 +139,25 @@ if sys.platform != 'darwin':
 
     buildversion = genBuildVersion()
 
-    subdirs = ['linux', 'include', 'dp-core', 'host', 'sandesh',
-               'windows', 'utils', 'uvrouter', 'test']
     exports = ['VRouterEnv']
+    subdirs = [
+        'include',
+        'dp-core',
+        'sandesh',
+        'utils',
+        'test',
+    ]
+
+    if platform.system() == 'Windows':
+        subdirs += [
+            'windows',
+        ]
+    else:
+        subdirs += [
+            'host',
+            'linux',
+            'uvrouter',
+        ]
   
     if dpdk_exists and not GetOption('without-dpdk'):
         subdirs.append('dpdk')
