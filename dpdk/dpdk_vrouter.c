@@ -39,6 +39,8 @@
 
 /* vRouter/DPDK command-line options. */
 enum vr_opt_index {
+#define SKIP_MPLSOGRE_RSS_HASH_OPT  "skip_mplsogre_rss_hash"
+    SKIP_MPLSOGRE_RSS_HASH_OPT_INDEX,
 #define NO_DAEMON_OPT           "no-daemon"
     NO_DAEMON_OPT_INDEX,
 #define NO_HUGE_OPT             "no-huge"
@@ -101,6 +103,7 @@ extern unsigned int vr_mpls_labels;
 extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 
+int skip_mplsogre_rss_hash = 0;
 static int no_daemon_set;
 static int no_gro_set = 0;
 static int no_gso_set = 0;
@@ -917,6 +920,8 @@ vr_dpdk_exit_trigger(void)
 }
 
 static struct option long_options[] = {
+    [SKIP_MPLSOGRE_RSS_HASH_OPT_INDEX]           =   {SKIP_MPLSOGRE_RSS_HASH_OPT,         no_argument,
+                                                    &skip_mplsogre_rss_hash,         1},
     [NO_DAEMON_OPT_INDEX]           =   {NO_DAEMON_OPT,         no_argument,
                                                     &no_daemon_set,         1},
     [NO_HUGE_OPT_INDEX]             =   {NO_HUGE_OPT,           no_argument,
@@ -1238,6 +1243,10 @@ main(int argc, char *argv[])
 
     /* for other getopts in DPDK */
     optind = 0;
+
+    if (skip_mplsogre_rss_hash) {
+        RTE_LOG(INFO, VROUTER, "Skip MPLSoGRE RSS hash\n");
+    }
 
     if (!no_daemon_set) {
         if (daemon(0, 0) < 0) {

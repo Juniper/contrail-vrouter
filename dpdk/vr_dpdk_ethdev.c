@@ -870,6 +870,8 @@ dpdk_mbuf_rss_hash(struct rte_mbuf *mbuf, struct vr_ip *ipv4_hdr,
     return 1;
 }
 
+extern int skip_mplsogre_rss_hash;
+
 /* dpdk_mbuf_parse_and_hash_packets
  *
  * Parse incoming packet. Check L2, L3 headers, encapsulation type, perform
@@ -961,7 +963,8 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
                  * by the NIC driver for MPLS over GRE packets. It is
                  * removed here and will be set after we perform hashing.
                  */
-                mbuf->ol_flags &= ~PKT_RX_RSS_HASH;
+                if (!skip_mplsogre_rss_hash)
+                    mbuf->ol_flags &= ~PKT_RX_RSS_HASH;
                 /* Go to parsing. */
             } else {
                 return dpdk_mbuf_rss_hash(mbuf, ipv4_hdr, NULL); /* Looks like GRE, but no MPLS. */
