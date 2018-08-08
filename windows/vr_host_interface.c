@@ -99,7 +99,7 @@ fix_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 
     ASSERT(0 < offset);
 
-    iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+    iph = (struct vr_ip *)(pkt_data(pkt) + offset);
     iph->ip_csum = vr_ip_csum(iph);
 }
 
@@ -110,7 +110,7 @@ zero_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 
     ASSERT(0 < offset);
 
-    iph = (struct vr_ip *)pkt_data_at_offset(pkt, offset);
+    iph = (struct vr_ip *)(pkt_data(pkt) + offset);
     iph->ip_csum = 0;
 }
 
@@ -209,21 +209,37 @@ fix_tunneled_csum(struct vr_packet *pkt)
     }
 }
 
-// If computation of IP checksum is about to be offloaded, its value
-// should be set to zero (because initial checksum's value is taken into
-// account when computing the checksum). However, dp-core doesn't care about
-// this specific case (e.g. vr_incremental_diff/vr_ip_incremental_csum are
-// called to incrementally "improve" checksum).
+// Fixes the IPv4 checksum and sets the correct info.Transmit value.
+//
+// TODO try to offload the checksums when doing fragmentation too.
 static void
-fix_ip_v4_csum_to_be_offloaded(struct vr_packet *pkt) {
+fix_ip_v4_csum(struct vr_packet *pkt) {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
     NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
     settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
 
-    if (settings.Transmit.IpHeaderChecksum) {
-        zero_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
+    if (pkt->vp_data != 0) {
+        // This packet came to us in a tunnel (which is now unwrapped),
+        // therefore .Receive is now the active field of the settings union
+        // (although we don't look at it as it refers to the outer headers anyway).
+        // We assume all the checksums are valid, so we need to explicitly disable
+        // offloading (so the .Receive field isn't erroneously reinterpreted as .Transmit)
+        NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = 0;
+    } else {
+        // This packet comes from a container or the agent,
+        // therefore we should look at settings.Transmit.
+        if (settings.Transmit.IpHeaderChecksum) {
+            // If computation of IP checksum is about to be offloaded, its value
+            // should be set to zero (because initial checksum's value is taken into
+            // account when computing the checksum). However, dp-core doesn't care about
+            // this specific case (e.g. vr_incremental_diff/vr_ip_incremental_csum are
+            // called to incrementally "improve" checksum).
+            zero_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
+        } else {
+            // No offloading requested - checksum should be valid.
+        }
     }
 }
 
@@ -519,6 +535,10 @@ frg_fix_headers_of_fragmented_packet(struct FragmentationContext* pctx)
     PNET_BUFFER cur_nb;
     PNET_BUFFER next_nb;
 
+    // Disable checksum offloading, so it doesn't interefere with our
+    // checksum calculation.
+    NET_BUFFER_LIST_INFO(pctx->fragmented_nbl, TcpIpChecksumNetBufferListInfo) = 0;
+
     unsigned short byte_offset_for_next_inner_ip_header
         = pctx->inner_ip_frag_offset_in_bytes;
     for (cur_nb = pctx->fragmented_nbl->FirstNetBuffer;
@@ -569,9 +589,9 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
     if (vr_pkt_type_is_overlay(pkt->vp_type))
         fix_tunneled_csum(pkt);
-    else if(pkt->vp_type == VP_TYPE_IP) {
+    else if (pkt->vp_type == VP_TYPE_IP) {
         // There's no checksum in IPv6 header.
-        fix_ip_v4_csum_to_be_offloaded(pkt);
+        fix_ip_v4_csum(pkt);
     }
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
