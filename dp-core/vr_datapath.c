@@ -432,7 +432,7 @@ vr_mac_reply_send(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
      * any of the primary/secondary. In this case, reply is forced
      * to go on the receiving VIF
      */
-    if (vif_is_vhost(vif) || vif_is_fabric(vif) ||
+    if (vif_is_vhost(vif) || (vif_is_fabric(vif) && (fmd->fmd_dvrf == 0)) ||
             (vif->vif_flags & (VIF_FLAG_NO_ARP_PROXY | VIF_FLAG_MAC_PROXY))) {
         vif_tx = true;
     } else {
