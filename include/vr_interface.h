@@ -234,6 +234,14 @@ struct vr_vrf_assign {
 #define VIF_FAT_FLOW_PORT_SIP_IGNORE    1
 #define VIF_FAT_FLOW_PORT_DIP_IGNORE    2
 
+#define FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE    3   /* support for 3 internal addresses for now */
+#define FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE    3   /* support for 3 internal addresses for now */
+
+#define FAT_FLOW_EXCLUDE_IPV4_PREFIX_LEN(a)  ((uint32_t) ((a) >> 32))
+#define FAT_FLOW_EXCLUDE_IPV4_PREFIX(a)      ((uint32_t) ((a) & 0x00000000FFFFFFFF))
+
+#define FAT_FLOW_IPV4_PLEN_TO_MASK(plen)   (htonl((0xFFFFFFFF << (32-(plen)))))
+
 struct vr_interface {
     unsigned int vif_flags;
     /*  Generation number is incrementing every time a vif is added. */
@@ -336,6 +344,14 @@ struct vr_interface {
     uint8_t vif_pbb_mac[VR_ETHER_ALEN];
     uint16_t vif_mcast_vrf;
     vhostuser_mode_t vif_vhostuser_mode;
+    /* fat flow exclude prefix list for v4 & v6 */
+    uint64_t vif_fat_flow_ipv6_high_exclude_list[FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE];
+    uint64_t vif_fat_flow_ipv6_low_exclude_list[FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE];
+    uint32_t vif_fat_flow_ipv4_exclude_list[FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE];
+    uint8_t vif_fat_flow_ipv6_exclude_plen_list[FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE];
+    uint8_t vif_fat_flow_ipv4_exclude_plen_list[FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE];
+    uint8_t vif_fat_flow_ipv6_exclude_list_size;
+    uint8_t vif_fat_flow_ipv4_exclude_list_size;
 };
 
 struct vr_interface_settings {
@@ -387,7 +403,7 @@ extern unsigned int vr_interface_req_get_size(void *);
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
-extern uint16_t vif_fat_flow_lookup(struct vr_interface *,
+extern uint16_t vif_fat_flow_lookup(struct vr_interface *, struct vr_ip *, struct vr_ip6 *,
         uint8_t, uint16_t, uint16_t);
 extern unsigned int vr_interface_req_get_size(void *);
 #endif /* __VR_INTERFACE_H__ */

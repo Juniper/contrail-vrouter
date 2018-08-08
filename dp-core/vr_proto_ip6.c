@@ -295,7 +295,7 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
         ip6_dst = ip6_addr;
     }
 
-    fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, ip6_nxt,
+    fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, NULL, ip6, ip6_nxt,
             sport, dport);
     for (i = 1; i < VR_FAT_FLOW_MAX_MASK; i = i << 1) {
         switch (fat_flow_mask & i) {
