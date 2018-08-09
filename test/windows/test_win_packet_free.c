@@ -29,6 +29,7 @@ Fake_WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet)
 {
     assert_true(WinPacketRawIsOwned(Packet));
     assert_false(WinPacketRawIsCloned(Packet));
+    assert_false(WinPacketRawIsMultiFragment(Packet));
 
     Fake_WinPacketFree((PWIN_PACKET)Packet);
 }
@@ -39,10 +40,22 @@ Fake_WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
 {
     assert_true(WinPacketRawIsOwned(Packet));
     assert_true(WinPacketRawIsCloned(Packet));
+    assert_false(WinPacketRawIsMultiFragment(Packet));
 
     Fake_WinPacketFree((PWIN_PACKET)Packet);
 }
 static void (*Saved_WinPacketRawFreeClone)(PWIN_PACKET_RAW Packet);
+
+static void
+Fake_WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
+{
+    assert_true(WinPacketRawIsOwned(Packet));
+    assert_true(WinPacketRawIsCloned(Packet));
+    assert_true(WinPacketRawIsMultiFragment(Packet));
+
+    Fake_WinPacketFree((PWIN_PACKET)Packet);
+}
+static void (*Saved_WinPacketRawFreeMultiFragment)(PWIN_PACKET_RAW Packet);
 
 int
 Test_WinPacketFree_SetUp(void **state)
@@ -56,6 +69,10 @@ Test_WinPacketFree_SetUp(void **state)
     Saved_WinPacketRawFreeClone = WinPacketRawFreeClone_Callback;
     WinPacketRawFreeClone_Callback = Fake_WinPacketRawFreeClone;
 
+    Saved_WinPacketRawFreeMultiFragment
+        = WinPacketRawFreeMultiFragment_Callback;
+    WinPacketRawFreeMultiFragment_Callback = Fake_WinPacketRawFreeMultiFragment;
+
     return 0;
 }
 
@@ -65,6 +82,8 @@ Test_WinPacketFree_TearDown(void **state)
     WinPacketRawComplete_Callback = Saved_WinPacketRawComplete;
     WinPacketRawFreeCreated_Callback = Saved_WinPacketRawFreeCreated;
     WinPacketRawFreeClone_Callback = Saved_WinPacketRawFreeClone;
+    WinPacketRawFreeMultiFragment_Callback
+        = Saved_WinPacketRawFreeMultiFragment;
 
     return 0;
 }
@@ -150,6 +169,13 @@ Test_WinPacketFree_ClonedWithChildrenAssertsOnChildCount(void **state)
     expect_assert_failure(WinPacketFreeRecursive(packet));
 
     Fake_WinPacketFree(packet);
+}
+
+void
+Test_WinPacketFree_FragmentedIsFreed(void **state)
+{
+    PWIN_PACKET packet = Fake_WinPacketAllocateMultiFragment();
+    WinPacketFreeRecursive(packet);
 }
 
 void
@@ -280,6 +306,8 @@ int main(void) {
         WinPacketFree_UnitTest(ClonedWithoutChildren_ParentIsFreed),
         WinPacketFree_UnitTest(ClonedWithoutChildren_ParentIsNotFreedWhenMultipleChildren),
         WinPacketFree_UnitTest(ClonedWithChildrenAssertsOnChildCount),
+
+        WinPacketFree_UnitTest(FragmentedIsFreed),
 
         WinPacketFree_UnitTest(ClonedPreservingParent_Works),
 

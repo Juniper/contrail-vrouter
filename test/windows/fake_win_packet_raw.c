@@ -22,6 +22,7 @@ struct _WIN_PACKET_RAW {
     PWIN_PACKET_RAW Parent;
     long ChildRefCount;
     bool IsOwned;
+    bool IsMultiFragment;
     PWIN_SUB_PACKET FirstSubPacket;
 };
 
@@ -40,6 +41,15 @@ Fake_WinPacketAllocate(bool IsOwned)
     assert(packet != NULL);
     WinPacketToRawPacket(packet)->IsOwned = IsOwned;
     return packet;
+}
+
+PWIN_PACKET
+Fake_WinPacketAllocateMultiFragment()
+{
+    PWIN_PACKET parent = Fake_WinPacketAllocateOwned();
+    PWIN_PACKET cloned = WinPacketClone(parent);
+    WinPacketToRawPacket(cloned)->IsMultiFragment = true;
+    return cloned;
 }
 
 PWIN_PACKET
@@ -187,6 +197,12 @@ WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
     WinPacketRawFreeClone_Callback(Packet);
 }
 
+void
+WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
+{
+    WinPacketRawFreeMultiFragment_Callback(Packet);
+}
+
 bool
 WinPacketRawIsOwned(PWIN_PACKET_RAW Packet)
 {
@@ -197,6 +213,12 @@ bool
 WinPacketRawIsCloned(PWIN_PACKET_RAW Packet)
 {
     return Packet->Parent != NULL;
+}
+
+bool
+WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet)
+{
+    return Packet->IsMultiFragment;
 }
 
 static void
@@ -224,6 +246,13 @@ WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet)
 {
     WinPacketRawFreeCreated_Callback(Packet);
 }
+
+void
+WinPacketRawFreeMultiFragment_Impl(PWIN_PACKET_RAW Packet)
+{
+    Fake_WinPacketFree((PWIN_PACKET)Packet);
+}
+void (*WinPacketRawFreeMultiFragment_Callback)(PWIN_PACKET_RAW Packet) = WinPacketRawFreeMultiFragment_Impl;
 
 static PWIN_PACKET_LIST
 WinPacketListRawAllocateElement_Impl()

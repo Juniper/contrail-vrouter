@@ -9,6 +9,7 @@
 #include "win_packet.h"
 #include "win_packet_raw.h"
 
+PWIN_PACKET Fake_WinPacketAllocateMultiFragment();
 PWIN_PACKET Fake_WinPacketAllocateOwned();
 PWIN_PACKET Fake_WinPacketAllocateNonOwned();
 VOID Fake_WinPacketFree(PWIN_PACKET Packet);
@@ -24,6 +25,7 @@ extern PWIN_PACKET_RAW (*WinPacketRawAllocateClone_Callback)(PWIN_PACKET_RAW Pac
 extern void (*WinPacketRawComplete_Callback)(PWIN_PACKET_RAW Packet);
 extern void (*WinPacketRawFreeCreated_Callback)(PWIN_PACKET_RAW Packet);
 extern void (*WinPacketRawFreeClone_Callback)(PWIN_PACKET_RAW Packet);
+extern void (*WinPacketRawFreeMultiFragment_Callback)(PWIN_PACKET_RAW Packet);
 extern PWIN_PACKET_LIST (*WinPacketListRawAllocateElement_Callback)();
 
 #endif // _FAKE_WIN_PACKET_H_

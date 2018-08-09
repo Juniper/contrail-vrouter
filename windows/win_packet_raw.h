@@ -21,11 +21,13 @@ long WinPacketRawIncrementChildCountOf(PWIN_PACKET_RAW Packet);
 long WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet);
 
 bool WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
+bool WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
 void WinPacketRawComplete(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet);
 
 PWIN_PACKET_RAW WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeClone(PWIN_PACKET_RAW Packet);
+void WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet);
 
 PWIN_PACKET_LIST WinPacketListRawAllocateElement();
 void WinPacketListRawFreeElement(PWIN_PACKET_LIST Element);
