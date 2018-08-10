@@ -431,8 +431,10 @@ vr_mac_reply_send(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
      * can not be bridged as the destination mac address might point to
      * any of the primary/secondary. In this case, reply is forced
      * to go on the receiving VIF
+     * If ARP request is received on fabric, reply on the same interface
+     * only if vrf is 0 (underlay network)
      */
-    if (vif_is_vhost(vif) || vif_is_fabric(vif) ||
+    if (vif_is_vhost(vif) || (vif_is_fabric(vif) && (fmd->fmd_dvrf == 0)) ||
             (vif->vif_flags & (VIF_FLAG_NO_ARP_PROXY | VIF_FLAG_MAC_PROXY))) {
         vif_tx = true;
     } else {
