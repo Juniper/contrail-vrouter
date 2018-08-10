@@ -285,10 +285,7 @@ frg_initialize_fragmentation_context(
 {
     RtlZeroMemory(pctx, sizeof(struct FragmentationContext));
     pctx->pkt = pkt;
-
-    // TODO: should eventually be 'pkt->vp_if->vif_mtu;' when MTU is
-    // set correctly.
-    pctx->mtu = 1514;
+    pctx->mtu = pkt->vp_if->vif_mtu;
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
@@ -679,11 +676,7 @@ win_if_get_settings(struct vr_interface *vif, struct vr_interface_settings *sett
 static unsigned int
 win_if_get_mtu(struct vr_interface *vif)
 {
-    UNREFERENCED_PARAMETER(vif);
-
-    /* TODO: Implement */
-    DbgPrint("%s(): dummy implementation called\n", __func__);
-
+    // vif_mtu is set correctly in win_register_nic
     return vif->vif_mtu;
 }
 
