@@ -184,15 +184,10 @@ vr_dpdk_pktmbuf_init(struct rte_mempool *mp, void *opaque_arg, void *_m, unsigne
 static int
 dpdk_mempools_create(void)
 {
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-    unsigned int rss_mempool_sz = vr_mempool_sz - 1;
-    unsigned int frag_direct_mempool_sz = VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ - 1;
-    unsigned int frag_indirect_mempool_sz = VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ - 1;
-#else
     unsigned int rss_mempool_sz = vr_mempool_sz;
     unsigned int frag_direct_mempool_sz = VR_DPDK_FRAG_DIRECT_MEMPOOL_SZ;
     unsigned int frag_indirect_mempool_sz = VR_DPDK_FRAG_INDIRECT_MEMPOOL_SZ;
-#endif
+
     /* Create the mbuf pool used for RSS */
     vr_dpdk.rss_mempool = rte_mempool_create("rss_mempool",
             rss_mempool_sz,
@@ -232,11 +227,7 @@ dpdk_mempools_create(void)
 #if VR_DPDK_USE_HW_FILTERING
     int ret, i;
     char mempool_name[RTE_MEMPOOL_NAMESIZE];
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-    unsigned int vm_mempool_sz = VR_DPDK_VM_MEMPOOL_SZ - 1;
-#else
     unsigned int vm_mempool_sz = VR_DPDK_VM_MEMPOOL_SZ;
-#endif
 
     /* Create a list of free mempools */
     vr_dpdk.nb_free_mempools = 0;
@@ -515,11 +506,7 @@ dpdk_argv_update(void)
     char *io_core_mask_str;
     char *fwd_core_mask_str;
     static char lcores_string[VR_DPDK_STR_BUF_SZ];
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-    unsigned int rss_mempool_sz = vr_mempool_sz - 1;
-#else
     unsigned int rss_mempool_sz = vr_mempool_sz;
-#endif
 
     /* get number of available CPUs */
     system_cpus_count = sysconf(_SC_NPROCESSORS_CONF);
