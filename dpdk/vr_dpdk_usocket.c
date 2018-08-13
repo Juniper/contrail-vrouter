@@ -703,11 +703,7 @@ retry_read:
 static struct vr_usocket *
 usock_alloc(unsigned short proto, unsigned short type)
 {
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-    unsigned int pkt0_mempool_sz = PKT0_MBUF_POOL_SIZE - 1;
-#else
     unsigned int pkt0_mempool_sz = PKT0_MBUF_POOL_SIZE;
-#endif
     int sock_fd = -1, domain, ret;
     /* socket TX buffer size = (hold flow table entries * size of jumbo frame) */
     int setsocksndbuff = vr_flow_hold_limit * vr_packet_sz;
