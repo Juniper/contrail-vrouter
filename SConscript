@@ -158,7 +158,7 @@ if sys.platform != 'darwin':
             'linux',
             'uvrouter',
         ]
-  
+
     if dpdk_exists and not GetOption('without-dpdk'):
         subdirs.append('dpdk')
         exports.append('dpdk_lib')
@@ -173,7 +173,7 @@ if sys.platform != 'darwin':
         file_content = rte_ver_file.read()
         rte_ver_file.close()
         matches = re.findall("define RTE_VER_MAJOR 2", file_content)
-   
+
         if matches:
             rte_libs = ('-lethdev', '-lrte_malloc')
         else:
@@ -183,7 +183,7 @@ if sys.platform != 'darwin':
         month_matches = re.findall("define RTE_VER_MONTH 11", file_content)
         if year_matches and month_matches:
             rte_libs = rte_libs + ('-lrte_mempool_ring', '-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
-  
+
         #
         # DPDK libraries need to be linked as a whole archive, otherwise some
         # callbacks and constructors will not be linked in. Also some of the
@@ -317,6 +317,8 @@ if sys.platform != 'darwin':
     kern = env.Command(vrouter_target, None, make_cmd)
     env.Default(kern)
     env.AlwaysBuild(kern)
+
+    env.Requires(kern, ['#build/bin/cmocka.dll', '#build/include/cmocka.h'])
 
     env.Depends(kern, buildinfo)
     env.Depends(kern, buildversion)
