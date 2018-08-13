@@ -39,6 +39,7 @@ env.Append(CPPPATH = ['#src/contrail-common/sandesh/library/c'])
 
 if sys.platform.startswith('win'):
     env.Append(CPPPATH = '#vrouter/windows')
+    env.Append(LIBS = 'cmocka')
 
 # Make Sandesh quiet for production
 if 'production' in env['OPT']:
