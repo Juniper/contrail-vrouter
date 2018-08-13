@@ -5,7 +5,7 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vRouter", "vRouter.vcxproj", "{127F464E-61D0-4815-8D07-6600177A534C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic-test", "..\test\atomic-test\atomic-test.vcxproj", "{621A6695-3A8D-4F94-942B-D8745888E768}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atomic-test", "..\test\windows\atomic-test\atomic-test.vcxproj", "{621A6695-3A8D-4F94-942B-D8745888E768}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
