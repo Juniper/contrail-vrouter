@@ -224,6 +224,14 @@ win_get_packet(PNET_BUFFER_LIST nbl, struct vr_interface *vif)
     pkt->vp_queue = 0;
     pkt->vp_priority = 0;  /* PCP Field from IEEE 802.1Q. vp_priority = 0 is a default value for this. */
 
+    if (vif != NULL && vif_is_virtual(vif)) {
+        NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+        settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+        if (settings.Transmit.IsIPv4 && (settings.Transmit.TcpChecksum || settings.Transmit.UdpChecksum)) {
+            pkt->vp_flags |= VP_FLAG_CSUM_PARTIAL;
+        }
+    }
+
     return pkt;
 
 drop:
