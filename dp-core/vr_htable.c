@@ -564,9 +564,10 @@ vr_hentry_t *
 vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
 {
     unsigned int hash, tmp_hash, ind, i, ent_key_len;
-    vr_hentry_t *ent, *o_ent;
+    vr_hentry_t *ent, *start_ent, *o_ent;
     vr_hentry_key ent_key;
     struct vr_htable *table = (struct vr_htable *)htable;
+    int btable_partition = table->ht_htable->vb_partitions;
 
     if (!table || !key)
         return NULL;
@@ -584,11 +585,15 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
     /* Look into the hash table from hash*/
     tmp_hash = hash % table->ht_hentries;
     tmp_hash &= ~(table->ht_bucket_size - 1);
+    start_ent = vr_btable_get(table->ht_htable, tmp_hash);
     for (i = 0; i < table->ht_bucket_size; i++) {
 
-        ind = tmp_hash + i;
-
-        ent = vr_btable_get(table->ht_htable, ind);
+        if (btable_partition == 1) {
+            ent = (vr_hentry_t *)((char *)start_ent + i * (table->ht_htable->vb_esize));
+        } else {
+            ind = tmp_hash + i;
+            ent = vr_btable_get(table->ht_htable, ind);
+        }
         if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
             continue;
 
