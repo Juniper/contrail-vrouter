@@ -612,6 +612,8 @@ dpdk_lcore_delay_us(unsigned us)
     rcu_thread_online();
 }
 
+static __thread uint16_t last_dst_core_idx = 0;
+
 /*
  * Distribute mbufs among forwarding lcores using hash.rss.
  * The destination lcores are listed in lcore->lcore_dst_lcore_idxs.
@@ -662,7 +664,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
         else
             hashval = 0;
 
-        dst_lcore_idx = hashval % nb_dst_lcores;
+        dst_lcore_idx = last_dst_core_idx % nb_dst_lcores;
         dst_fwd_lcore_idx = dst_lcore_idxs[dst_lcore_idx] + VR_DPDK_FWD_LCORE_ID;
 
         /* put the mbuf to the burst */
@@ -676,6 +678,7 @@ vr_dpdk_lcore_distribute(struct vr_dpdk_lcore *lcore, const bool io_lcore,
         lcore_pkts[dst_lcore_idx][0] = (struct rte_mbuf *)(
                             (uintptr_t)lcore_pkts[dst_lcore_idx][0] + 1);
     }
+    last_dst_core_idx++;
 
     stats = vif_get_stats(vif, lcore_id);
 
