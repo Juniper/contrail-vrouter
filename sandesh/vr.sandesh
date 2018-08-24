@@ -301,6 +301,8 @@ buffer sandesh vrouter_ops {
    36: i32          vo_burst_step;
    37: i32          vo_memory_alloc_checks;
    38: u32          vo_priority_tagging;
+   39: i32          vo_vif_bridge_entries;
+   40: i32          vo_vif_oflow_bridge_entries;
 }
 
 buffer sandesh vr_mem_stats_req {
