@@ -15,8 +15,8 @@
 #include "vr_interface.h"
 #include "vr_bridge.h"
 
-#define VIF_BRIDGE_ENTRIES      1024
-#define VIF_BRIDGE_OENTRIES     512
+unsigned int vif_bridge_entries = VIF_BRIDGE_ENTRIES;
+unsigned int vif_bridge_oentries = VIF_BRIDGE_OENTRIES;
 
 __attribute__packed__open__
 struct vif_bridge_key {
@@ -181,8 +181,8 @@ vif_bridge_init(struct vr_interface *vif)
     if (!vif)
         return -EINVAL;
 
-    vif->vif_btable = vr_htable_create(vrouter_get(0), VIF_BRIDGE_ENTRIES,
-            VIF_BRIDGE_OENTRIES, sizeof(struct vif_bridge_entry),
+    vif->vif_btable = vr_htable_create(vrouter_get(0), vif_bridge_entries,
+            vif_bridge_oentries, sizeof(struct vif_bridge_entry),
             sizeof(struct vif_bridge_key), 0, vif_bridge_get_key);
 
     if (!vif->vif_btable)

@@ -18,6 +18,12 @@
  */
 #define VR_MAX_INTERFACES           (256 + 4096)
 
+/* 
+ * Default size for the interface bridge table.
+ */
+#define VIF_BRIDGE_ENTRIES      1024
+#define VIF_BRIDGE_OENTRIES     512
+
 #define VIF_TYPE_HOST               0
 #define VIF_TYPE_AGENT              1
 #define VIF_TYPE_PHYSICAL           2
