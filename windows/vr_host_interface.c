@@ -281,7 +281,7 @@ struct FragmentationContext {
 
 static void
 frg_initialize_fragmentation_context(
-    struct FragmentationContext* pctx,
+    struct FragmentationContext *pctx,
     struct vr_packet *pkt)
 {
     RtlZeroMemory(pctx, sizeof(struct FragmentationContext));
@@ -293,17 +293,23 @@ frg_initialize_fragmentation_context(
     pctx->original_nbl = WinPacketRawToNBL(winPacketRaw);
 }
 
-static bool
-frg_is_fragmentation_needed(struct FragmentationContext* pctx)
+static inline bool
+frg_is_fragmentation_needed(struct FragmentationContext *pctx)
 {
     return vr_pkt_type_is_overlay(pctx->pkt->vp_type)
         && NET_BUFFER_DATA_LENGTH(pctx->original_nbl->FirstNetBuffer)
         > pctx->mtu;
 }
 
+static inline unsigned char *
+frg_get_next_header_after_ip(struct vr_ip *ip)
+{
+    return (unsigned char *)ip + ip->ip_hl * 4;
+}
+
 static void
 frg_extract_outer_headers_from_original_packet(
-    struct FragmentationContext* pctx)
+    struct FragmentationContext *pctx)
 {
     pctx->outer_headers = pkt_data(pctx->pkt);
     pctx->outer_ip_header = (struct vr_ip*)(pctx->outer_headers
@@ -315,8 +321,7 @@ frg_extract_outer_headers_from_original_packet(
         pctx->outer_headers_size += VR_GRE_BASIC_HDR_LEN + VR_MPLS_HDR_LEN;
     } else if (outer_iph->ip_proto == VR_IP_PROTO_UDP) {
         pctx->outer_headers_size += sizeof(struct vr_udp);
-        struct vr_udp* outer_udph = (struct vr_udp*)((uint8_t *)outer_iph
-            + outer_iph->ip_hl * 4);
+        struct vr_udp *outer_udph = (struct vr_udp *)frg_get_next_header_after_ip(outer_iph);
         if (vr_vxlan_udp_port(ntohs(outer_udph->udp_dport))) {
             pctx->outer_headers_size += sizeof(struct vr_vxlan);
         } else {
@@ -325,13 +330,13 @@ frg_extract_outer_headers_from_original_packet(
     }
 }
 
-static bool
+static inline bool
 frg_more_fragments(struct vr_ip* ip)
 {
     return ntohs(ip->ip_frag_off) & VR_IP_MF ? true : false;
 }
 
-static unsigned short
+static inline unsigned short
 frg_fragment_offset_in_bytes(struct vr_ip* ip)
 {
     return (ntohs(ip->ip_frag_off) & VR_IP_FRAG_OFFSET_MASK) * 8;
@@ -511,8 +516,18 @@ frg_fix_headers_of_outer_fragmented_packet(
             + sizeof(struct vr_eth));
 
     // Fix packet length in outer IP header.
-    fragment_outer_ip_header->ip_len = htons(pctx->outer_headers_size - sizeof(struct vr_eth)
-        + ntohs(fragment_inner_ip_header->ip_len) + pctx->inner_eth_header_size);
+    unsigned short outer_ip_len = pctx->outer_headers_size - sizeof(struct vr_eth) +
+        ntohs(fragment_inner_ip_header->ip_len) + pctx->inner_eth_header_size;
+    fragment_outer_ip_header->ip_len = htons(outer_ip_len);
+
+    // Fix packet length in outer UDP header.
+    if (fragment_outer_ip_header->ip_proto == VR_IP_PROTO_UDP) {
+        struct vr_udp* outer_udp_header =
+            (struct vr_udp*)frg_get_next_header_after_ip(fragment_outer_ip_header);
+
+        outer_udp_header->udp_length = htons(outer_ip_len -
+            fragment_outer_ip_header->ip_hl * 4);
+    }
 
     // Fix checksum in outer IP header.
     unsigned short outer_csum = vr_ip_csum(fragment_outer_ip_header);
