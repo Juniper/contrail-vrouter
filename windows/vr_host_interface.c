@@ -258,6 +258,7 @@ struct FragmentationContext {
     // in all new packets (fragments).
     int outer_headers_size;
     int inner_headers_size;
+    int inner_eth_header_size;
 
     // Payload offset in original packet (excluding all headers).
     int inner_payload_offset;
@@ -340,12 +341,15 @@ static void
 frg_extract_inner_headers_from_original_packet(
     struct FragmentationContext* pctx)
 {
-    pctx->inner_ip_header = (struct vr_ip*)(pctx->outer_headers
-        + pctx->outer_headers_size + sizeof(struct vr_eth));
+    unsigned short inner_iph_offset = pkt_get_inner_network_header_off(pctx->pkt);
+    pctx->inner_ip_header = (struct vr_ip*)pkt_data_at_offset(pctx->pkt, inner_iph_offset);
 
     // Determine inner header size: eth, ip.
     // TODO: IPv6.
-    pctx->inner_headers_size = sizeof(struct vr_eth)
+    unsigned char *inner_headers = pctx->outer_headers + pctx->outer_headers_size;
+    pctx->inner_eth_header_size = (unsigned char*)pctx->inner_ip_header - inner_headers;
+
+    pctx->inner_headers_size = pctx->inner_eth_header_size
         + pctx->inner_ip_header->ip_hl * 4;
     pctx->inner_payload_offset = pctx->outer_headers_size
         + pctx->inner_headers_size;
@@ -468,7 +472,7 @@ frg_fix_headers_of_inner_fragmented_packet(
     unsigned short* byte_offset_for_next_inner_ip_header)
 {
     struct vr_ip* fragment_inner_ip_header = (struct vr_ip*)(headers
-        + pctx->outer_headers_size + sizeof(struct vr_eth));
+        + pctx->outer_headers_size + pctx->inner_eth_header_size);
 
     // Fix 'more fragments' in inner IP header.
     if (more_new_packets || pctx->inner_ip_mf) {
@@ -502,13 +506,13 @@ frg_fix_headers_of_outer_fragmented_packet(
     unsigned char* headers)
 {
     struct vr_ip* fragment_inner_ip_header = (struct vr_ip*)(headers
-        + pctx->outer_headers_size + sizeof(struct vr_eth));
+        + pctx->outer_headers_size + pctx->inner_eth_header_size);
     struct vr_ip* fragment_outer_ip_header = (struct vr_ip*)(headers
             + sizeof(struct vr_eth));
 
     // Fix packet length in outer IP header.
-    fragment_outer_ip_header->ip_len = htons(pctx->outer_headers_size
-        + ntohs(fragment_inner_ip_header->ip_len));
+    fragment_outer_ip_header->ip_len = htons(pctx->outer_headers_size - sizeof(struct vr_eth)
+        + ntohs(fragment_inner_ip_header->ip_len) + pctx->inner_eth_header_size);
 
     // Fix checksum in outer IP header.
     unsigned short outer_csum = vr_ip_csum(fragment_outer_ip_header);
