@@ -15,6 +15,8 @@
 #include "windows_devices.h"
 #include "windows_nbl.h"
 
+static BOOLEAN physicalVifAdded;
+
 static NDIS_MUTEX win_if_mutex;
 
 void
@@ -29,6 +31,10 @@ win_if_unlock(void)
     NDIS_RELEASE_MUTEX(&win_if_mutex);
 }
 
+BOOLEAN IsPacketPassthroughEnabled(void) {
+    return !physicalVifAdded;
+}
+
 static int
 win_if_add(struct vr_interface* vif)
 {
@@ -38,8 +44,10 @@ win_if_add(struct vr_interface* vif)
     if (vif->vif_name[0] == '\0')
         return -ENODEV;
 
-    // Unlike FreeBSD/Linux, we don't have to register handlers here
+    if (vif->vif_type == VIF_TYPE_PHYSICAL)
+        physicalVifAdded = true;
 
+    // Unlike FreeBSD/Linux, we don't have to register handlers here
     return 0;
 }
 
@@ -54,7 +62,9 @@ win_if_add_tap(struct vr_interface* vif)
 static int
 win_if_del(struct vr_interface *vif)
 {
-    UNREFERENCED_PARAMETER(vif);
+    if (vif->vif_type == VIF_TYPE_PHYSICAL)
+        physicalVifAdded = false;
+
     return 0;
 }
 

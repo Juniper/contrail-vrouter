@@ -32,6 +32,8 @@ PNDIS_RW_LOCK_EX AsyncWorkRWLock = NULL;
 unsigned int vr_num_cpus;
 int vrouter_dbg = 0;
 
+VR_BASIC_NIC_ENTRY ExternalNicEntry, InternalNicEntry;
+
 /*
  * NDIS Function prototypes
  */
@@ -99,6 +101,8 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     f_chars.OidRequestHandler = FilterOidRequest;
     f_chars.OidRequestCompleteHandler = FilterOidRequestComplete;
     f_chars.CancelOidRequestHandler = FilterCancelOidRequest;
+
+    f_chars.NetPnPEventHandler = FilterNetPnpEvent;
 
     status = NdisFRegisterFilterDriver(DriverObject,
                                        (NDIS_HANDLE)VrDriverObject,
@@ -453,10 +457,70 @@ NDIS_STATUS
 FilterRestart(NDIS_HANDLE FilterModuleContext, PNDIS_FILTER_RESTART_PARAMETERS RestartParameters)
 {
     PSWITCH_OBJECT switchObject = (PSWITCH_OBJECT)FilterModuleContext;
+    NDIS_STATUS status;
 
     UNREFERENCED_PARAMETER(RestartParameters);
 
-    switchObject->Running = TRUE;
+    PNDIS_SWITCH_PARAMETERS switchParameters;
+    status = VrGetSwitchParameters(switchObject, &switchParameters);
+    if (status != NDIS_STATUS_SUCCESS)
+        return status;
+
+    if (switchParameters->IsActive)
+        status = HandleBasicNics(switchObject);
+
+    VrFreeNdisObject(switchParameters);
+
+    if (status == NDIS_STATUS_SUCCESS)
+        switchObject->Running = TRUE;
+
+    return status;
+}
+
+NDIS_STATUS FilterNetPnpEvent(
+    NDIS_HANDLE FilterModuleContext,
+    PNET_PNP_EVENT_NOTIFICATION NetPnPEventNotification)
+{
+    NDIS_STATUS status = NDIS_STATUS_SUCCESS;
+    PSWITCH_OBJECT switchObject = (PSWITCH_OBJECT)FilterModuleContext;
+
+    if (NetPnPEventNotification->NetPnPEvent.NetEvent == NetEventSwitchActivate) {
+        status = HandleBasicNics(switchObject);
+    }
+    return status;
+}
+
+NDIS_STATUS
+HandleBasicNics(PSWITCH_OBJECT SwitchObject)
+{
+    NDIS_STATUS status;
+    PNDIS_SWITCH_NIC_ARRAY array;
+    PNDIS_SWITCH_NIC_PARAMETERS curNic;
+    ULONG arrIndex;
+    
+    status = VrGetNicArray(SwitchObject, &array);
+    if (status != NDIS_STATUS_SUCCESS)
+        return status;
+
+    for (arrIndex = 0; arrIndex < array->NumElements; ++arrIndex) {
+        curNic = NDIS_SWITCH_NIC_AT_ARRAY_INDEX(array, arrIndex);
+        HandleBasicNic(curNic);
+    }
+    VrFreeNdisObject(array);
 
     return NDIS_STATUS_SUCCESS;
+}
+
+VOID
+HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
+{
+    if (NicParams->NicType == NdisSwitchNicTypeExternal && NicParams->NicIndex != 0 && !ExternalNicEntry.IsConnected) {
+        ExternalNicEntry.PortId = NicParams->PortId;
+        ExternalNicEntry.NicIndex = NicParams->NicIndex;
+        ExternalNicEntry.IsConnected = TRUE;
+    } else if (NicParams->NicType == NdisSwitchNicTypeInternal && !InternalNicEntry.IsConnected) {
+        InternalNicEntry.PortId = NicParams->PortId;
+        InternalNicEntry.NicIndex = NicParams->NicIndex;
+        InternalNicEntry.IsConnected = TRUE;
+    }
 }

@@ -18,6 +18,7 @@
 /* Functions for NBL handling are located in windows/vr_nbl.c */
 extern FILTER_SEND_NET_BUFFER_LISTS FilterSendNetBufferLists;
 extern FILTER_SEND_NET_BUFFER_LISTS_COMPLETE FilterSendNetBufferListsComplete;
+extern FILTER_NET_PNP_EVENT FilterNetPnpEvent;
 
 extern PNET_BUFFER_LIST CreateNetBufferList(unsigned int bytesCount);
 extern PNET_BUFFER_LIST CloneNetBufferList(PNET_BUFFER_LIST originalNbl);
