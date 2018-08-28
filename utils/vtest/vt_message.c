@@ -100,6 +100,7 @@ vt_message(xmlNodePtr node, struct vtest *test)
     void *buf;
     node = node->xmlChildrenNode;
     int message_modules_element_key = -1;
+    int i;
 
     if (!node || !test) {
         return E_MESSAGE_ERR_FARG;
@@ -126,12 +127,34 @@ vt_message(xmlNodePtr node, struct vtest *test)
             return E_MESSAGE_ERR_MESSAGE_MODULES;
         }
 
+        /* If it is a flow, we decide if multiple flows we want to insert */
+        if (!strncmp(node->name, "vr_flow_req", sizeof("vr_flow_req"))) {
+
+            for (i = 0; i < test->flow_count && i <= VT_MAX_FLOW; i++) {
+                buf = vt_message_modules[message_modules_element_key].vmm_node(node, test);
+                if (!buf && vt_message_modules[message_modules_element_key].vmm_size) {
+                    return E_MESSAGE_ERR_UNK;
+
+                } else if (buf) {
+                    vr_flow_req *req = (vr_flow_req *)buf;
+                    req->fr_flow_sip_l += i;
+                    test->message_ptr_num++;
+                    test->messages.data[test->message_ptr_num].mem = buf;
+                    test->messages.data[test->message_ptr_num].type =
+                        (vt_message_modules[message_modules_element_key].vmm_name);
+                }
+            }
+            node = node->next;
+            continue;
+        }
+
         buf = vt_message_modules[message_modules_element_key].vmm_node(node, test);
         if (!buf && vt_message_modules[message_modules_element_key].vmm_size) {
             return E_MESSAGE_ERR_UNK;
 
         } else if (buf) {
             test->message_ptr_num++;
+            test->message_ptr_start++;
             test->messages.data[test->message_ptr_num].mem = buf;
             test->messages.data[test->message_ptr_num].type =
                 (vt_message_modules[message_modules_element_key].vmm_name);

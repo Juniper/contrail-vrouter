@@ -131,35 +131,46 @@ static int inline
 vt_post_process_message(struct vtest *test) {
 
     int ret = 0;
+    int tot_cnt = 0;
 
     test->vtest_return = E_MAIN_TEST_PASS;
-    if (test->messages.data[test->message_ptr_num].mem) {
+    tot_cnt = test->message_ptr_num - test->message_ptr_start;
+    /* reset the current pointer */
+    test->message_ptr_num = test->message_ptr_start;
+    /*advance the start pointer */
+    test->message_ptr_start += tot_cnt;
+    tot_cnt++;
 
-        ret = vt_send_vRouter_msg(test);
-        if (!(ret > 0)) {
-            fprintf(stderr, "Send message, failed\n");
-            return E_PROCESS_XML_ERR_MSG_SEND;
+    while (tot_cnt != 0) {
+        if (test->messages.data[test->message_ptr_num].mem) {
+            ret = vt_send_vRouter_msg(test);
+            if (!(ret > 0)) {
+                fprintf(stderr, "Send message, failed\n");
+                return E_PROCESS_XML_ERR_MSG_SEND;
+            }
+
+            ret = vt_recv_vRouter_msg(test);
+            if (!(ret > 0)) {
+                fprintf(stderr, "Receive message, failed\n");
+                return E_PROCESS_XML_ERR_MSG_RECV;
+            }
+
+            ret =  vt_check_return_val(test);
+            if (ret != E_PROCESS_XML_OK) {
+                fprintf(stderr, "Message has different return value, failed\n");
+                return E_PROCESS_XML_ERR;
+            }
+
+            /* If expect element is in <message> file. */
+            ret = vt_post_process_message_expect(test);
+            if (ret != E_PROCESS_XML_OK) {
+                fprintf(stderr, "Expected message has different value then returned, failed\n");
+
+                return ret;
+            }
         }
-
-        ret = vt_recv_vRouter_msg(test);
-        if (!(ret > 0)) {
-            fprintf(stderr, "Receive message, failed\n");
-            return E_PROCESS_XML_ERR_MSG_RECV;
-        }
-
-        ret =  vt_check_return_val(test);
-        if (ret != E_PROCESS_XML_OK) {
-            fprintf(stderr, "Message has different return value, failed\n");
-            return E_PROCESS_XML_ERR;
-        }
-
-        /* If expect element is in <message> file. */
-        ret = vt_post_process_message_expect(test);
-        if (ret != E_PROCESS_XML_OK) {
-            fprintf(stderr, "Expected message has different value then returned, failed\n");
-
-            return ret;
-        }
+        tot_cnt--;
+        test->message_ptr_num++;
     }
 
     return E_MAIN_OK;
@@ -215,6 +226,10 @@ vt_process_node(xmlNodePtr node, struct vtest *test)
         return E_PROCESS_XML_ERR_FARG;
     }
 
+    /* control block is processed already */
+    if (!strncmp((char *) node->name, "control", sizeof("control"))) {
+        return E_PROCESS_XML_OK;
+    }
     for (i = 0; i < VTEST_NUM_MODULES; i++) {
         if (!strncmp((char *)node->name, vt_modules[i].vt_name,
                     strlen(vt_modules[i].vt_name) + 1)) {
@@ -280,6 +295,39 @@ vt_tree_traverse(xmlNodePtr node, struct vtest *test)
     return E_PROCESS_XML_ERR;
 }
 
+static int
+vt_traverse_control_node(xmlNodePtr node, struct vtest *test)
+{
+    int ret = E_MAIN_SKIP;
+
+    if (!node || !test) {
+        return E_PROCESS_XML_ERR_FARG;
+    }
+
+    while (node) {
+        if (node->type == XML_ELEMENT_NODE) {
+            if (!strncmp((char *) node->name, "control", sizeof("control"))) {
+                xmlNodePtr child_node = node->xmlChildrenNode;
+                while (child_node) {
+                    if (!strncmp((char *) child_node->name, "flow_count",
+                            sizeof("flow_count"))) {
+                        if (child_node->children &&
+                                    child_node->children->content) {
+                            test->flow_count =
+                                strtoul(child_node->children->content, NULL, 0);
+                            ret = E_MAIN_OK;
+                        }
+                    }
+                    child_node = child_node->next;
+                }
+            }
+
+
+        }
+        node = node->next;
+    }
+    return ret;
+}
 
 int
 vt_parse_file(char *file, struct vtest *test)
@@ -302,6 +350,7 @@ vt_parse_file(char *file, struct vtest *test)
         return E_PROCESS_XML_ERR;
     }
 
+    ret = vt_traverse_control_node(node->xmlChildrenNode, test);
     ret = vt_tree_traverse(node->xmlChildrenNode, test);
 
     xmlFreeDoc(doc);

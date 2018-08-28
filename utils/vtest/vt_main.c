@@ -92,12 +92,18 @@ vt_init(struct vtest *test)
 {
 
     memset(test, 0, sizeof(struct vtest));
+    (test->messages).data = calloc(sizeof(struct message_element), VT_MESSAGES_MAX);
+    if(test->messages.data == NULL) {
+        return E_MAIN_ERR_ALLOC;
+    }
     memset(&received_msg, 0, sizeof(received_msg));
     memset(&return_msg, 0, sizeof(return_msg));
 
     test->messages.received_vrouter_msg = &received_msg;
     test->messages.return_vrouter_msg = &return_msg;
     test->message_ptr_num = -1;
+    test->message_ptr_start = -1;
+    test->flow_count = 1;
 
     received_msg.ptr_num = test->message_ptr_num;
     return_msg.ptr_num = test->message_ptr_num;

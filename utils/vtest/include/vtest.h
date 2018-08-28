@@ -20,8 +20,8 @@
 #define VT_MAX_TEST_MODULE_NAME_LEN 128
 
 #define VT_PACKET_MAX_TX_CLIENT     (1024 * 4)
-#define VT_MESSAGES_MAX             (1024 * 4)
-
+#define VT_MESSAGES_MAX             (1024 * 512)
+#define VT_MAX_FLOW                 500000
 
 struct packet_interface {
    unsigned short vif_id;
@@ -70,7 +70,7 @@ struct message_element {
 };
 
 struct message {
-    struct message_element data[VT_MESSAGES_MAX];
+    struct message_element *data;
     /* Following pointers are for reponse and process callbacks from vRouter
      * Cause, we are using global variables. */
     struct received_vrouter *received_vrouter_msg;
@@ -85,7 +85,10 @@ struct vtest {
     char *vtest_name;
     char *vtest_error_module;
     struct message messages;
+    /* for multiple messages, we have a start pointer */
+    int message_ptr_start;
     int message_ptr_num;
+    unsigned int flow_count;
     struct packet_interface packet_tx;
     struct packet_interface packet_rx[VT_PACKET_MAX_TX_CLIENT];
     struct packet packet;
