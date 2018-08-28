@@ -35,6 +35,8 @@ extern unsigned int vr_flow_entries;
 extern unsigned int vr_oflow_entries;
 extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
+extern unsigned int vif_bridge_entries;
+extern unsigned int vif_bridge_oentries;
 extern const char *ContrailBuildInfo;
 
 void vrouter_exit(bool);
@@ -343,6 +345,8 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_flow_entries = vr_flow_entries;
     resp->vo_oflow_entries = vr_oflow_entries;
     resp->vo_mirror_entries = router->vr_max_mirror_indices;
+    resp->vo_vif_bridge_entries = vif_bridge_entries;
+    resp->vo_vif_oflow_bridge_entries = vif_bridge_oentries;
 
     /* Runtime parameters adjustable via sysctl or the vrouter utility */
     resp->vo_perfr = vr_perfr;

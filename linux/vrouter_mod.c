@@ -42,6 +42,8 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 extern unsigned int vr_flow_hold_limit;
 extern unsigned int vr_interfaces;
+extern unsigned int vif_bridge_entries;
+extern unsigned int vif_bridge_oentries;
 
 extern char *ContrailBuildInfo;
 
@@ -2629,6 +2631,11 @@ module_param(vr_bridge_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_bridge_entries, "Number of entries in the bridge table. Default is "__stringify(VR_DEF_BRIDGE_ENTRIES));
 module_param(vr_bridge_oentries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_bridge_oentries, "Number of overflow entries in the bridge table.");
+
+module_param(vif_bridge_entries, uint, S_IRUGO);
+MODULE_PARM_DESC(vif_bridge_entries, "Number of entries in the per interface bridge table. Default is "__stringify(VIF_BRIDGE_ENTRIES));
+module_param(vif_bridge_oentries, uint, S_IRUGO);
+MODULE_PARM_DESC(vif_bridge_oentries, "Number of overflow entries in the per interface bridge table.");
 
 module_param(vr_mpls_labels, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));
