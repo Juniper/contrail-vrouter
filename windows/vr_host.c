@@ -930,7 +930,7 @@ win_register_nic(struct vr_interface* vif, vr_interface_req* vifr)
     win_update_vif_port(vif, vifr, array);
     win_if_unlock();
 
-    VrFreeNicArray(array);
+    VrFreeSwitchObject(array);
 
     vif_attach(vif);
 }

@@ -440,6 +440,8 @@ FilterSendNetBufferLists(
     BOOLEAN sameSource;
     ULONG sendCompleteFlags = 0;
     BOOLEAN on_dispatch_level;
+    
+    NDIS_SWITCH_PORT_DESTINATION newDestination = {0};
 
     PNET_BUFFER_LIST extForwardedNbls = NULL;  // NBLs forwarded by extension.
     PNET_BUFFER_LIST nativeForwardedNbls = NULL;  // NBLs that require native forwarding - extension just sends them.
@@ -480,6 +482,31 @@ FilterSendNetBufferLists(
         PNDIS_SWITCH_FORWARDING_DETAIL_NET_BUFFER_LIST_INFO fwd_detail = NET_BUFFER_LIST_SWITCH_FORWARDING_DETAIL(curNbl);
         NDIS_SWITCH_PORT_ID source_port = fwd_detail->SourcePortId;
         NDIS_SWITCH_NIC_INDEX source_nic = fwd_detail->SourceNicIndex;
+
+        if (!physicalVifAdded) {
+            if (ExternalNicEntry.IsConnected && InternalNicEntry.IsConnected) {
+                if (source_port == ExternalNicEntry.PortId && source_nic == ExternalNicEntry.NicIndex) {
+                    newDestination.PortId = InternalNicEntry.PortId;
+                    newDestination.NicIndex = InternalNicEntry.NicIndex;
+                } else {
+                    newDestination.PortId = ExternalNicEntry.PortId;
+                    newDestination.NicIndex = ExternalNicEntry.NicIndex;
+                }
+
+                switchObject->NdisSwitchHandlers.AddNetBufferListDestination(
+                    switchObject->NdisSwitchContext,
+                    curNbl,
+                    &newDestination);
+
+                NdisFSendNetBufferLists(switchObject->NdisFilterHandle,
+                    curNbl,
+                    NDIS_DEFAULT_PORT_NUMBER,
+                    0);
+            } else {
+                NdisFSendNetBufferListsComplete(switchObject->NdisFilterHandle, curNbl, sendCompleteFlags);
+            }
+            continue;
+        }
 
         struct vr_interface *vif = GetAssociatedVrInterface(source_port, source_nic);
 
