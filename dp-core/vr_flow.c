@@ -545,6 +545,8 @@ vr_flow_get_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type
 
         fe->fe_type = type;
         memcpy(&fe->fe_key, key, key->flow_key_len);
+        vr_htable_set_signature(router->vr_flow_table, (vr_hentry_t *)fe,
+                                                 key, key->flow_key_len);
         fe->fe_key.flow_key_len = key->flow_key_len;
     }
 

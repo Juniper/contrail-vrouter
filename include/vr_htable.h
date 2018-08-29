@@ -49,5 +49,8 @@ void vr_htable_reset(vr_htable_t, htable_trav_cb , void *);
 void vr_htable_release_hentry(vr_htable_t, vr_hentry_t *);
 unsigned int vr_htable_size(vr_htable_t);
 void *vr_htable_get_address(vr_htable_t, uint64_t);
+void
+vr_htable_set_signature(vr_htable_t htable, vr_hentry_t *ent,
+                                        void *key, unsigned int key_size);
 
 #endif

@@ -576,6 +576,7 @@ vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
         return -ENOMEM;
 
     fragment_entry_set(fe, key, sport, dport);
+    vr_htable_set_signature(ftable, (vr_hentry_t *)fe, key, 0);
     fe->f_received += len;
 
     return 0;
