@@ -17,6 +17,13 @@
                                             VR_HENTRY_FLAG_DELETE_PROCESSED)
 #define VR_HENTRY_FLAG_IN_FREE_LIST      0x8
 
+/* a simple hash function to calculate based on first hash */
+uint32_t
+vr_htable_sec_hash(uint32_t input) {
+    input = input >> 16 | input << 16;
+    input ^= (input >> 13) * 0xDDDA390F;
+    return input;
+}
 
 struct vr_htable {
     struct vrouter *ht_router;
@@ -25,6 +32,7 @@ struct vr_htable {
     unsigned int ht_entry_size;
     unsigned int ht_key_size;
     unsigned int ht_bucket_size;
+    uint32_t *ht_sig_table;
     struct vr_btable *ht_htable;
     struct vr_btable *ht_otable;
     struct vr_btable *ht_dtable;
@@ -415,6 +423,27 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     return;
 }
 
+void
+vr_htable_set_signature(vr_htable_t htable, vr_hentry_t *ent,
+                                        void *key, unsigned int key_size)
+{
+    uint32_t hash;
+    struct vr_htable *table = (struct vr_htable *)htable;
+
+    if (!key_size) {
+        key_size = table->ht_key_size;
+        if (!key_size) {
+            table->ht_sig_table[ent->hentry_index] = 0;
+            return;
+        }
+    }
+
+    if (ent->hentry_index >= table->ht_hentries)
+        return;
+    hash = vr_hash(key, key_size, 0);
+    table->ht_sig_table[ent->hentry_index] = hash;
+}
+
 vr_hentry_t *
 vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
 {
@@ -438,6 +467,24 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
 
     ind = 0;
     ent = NULL;
+    for (i = 0; i < table->ht_bucket_size; i++) {
+        ind = tmp_hash + i;
+        ent = vr_btable_get(table->ht_htable, ind);
+        if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID)) {
+            if (vr_sync_bool_compare_and_swap_8u(&ent->hentry_flags,
+                        (ent->hentry_flags & ~VR_HENTRY_FLAG_VALID),
+                        VR_HENTRY_FLAG_VALID)) {
+                ent->hentry_bucket_index = VR_INVALID_HENTRY_INDEX;
+                (void)vr_sync_add_and_fetch_32u(&table->ht_used_entries, 1);
+                return ent;
+            }
+        }
+    }
+
+    hash = vr_htable_sec_hash(hash);
+    tmp_hash = hash % table->ht_hentries;
+    tmp_hash &= ~(table->ht_bucket_size - 1);
+
     for (i = 0; i < table->ht_bucket_size; i++) {
         ind = tmp_hash + i;
         ent = vr_btable_get(table->ht_htable, ind);
@@ -534,6 +581,30 @@ vr_htable_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t *hentry)
         return ind;
     }
 
+    hash = vr_htable_sec_hash(hash);
+
+    /* Look into the hash table from hash */
+    tmp_hash = hash % table->ht_hentries;
+    tmp_hash &= ~(table->ht_bucket_size - 1);
+    for (i = 0; i < table->ht_bucket_size; i++) {
+        ind = tmp_hash + i;
+        ent = vr_btable_get(table->ht_htable, ind);
+
+        if (ent->hentry_index == VR_INVALID_HENTRY_INDEX)
+            continue;
+
+        if (ent == hentry)
+            continue;
+
+        hkey = table->ht_get_key(htable, ent, &ent_key_len);
+        if (!hkey || (ent_key_len != key_len))
+            continue;
+
+        if (memcmp(hkey, hentry, key_len) != 0)
+            continue;
+        return ind;
+    }
+
     /* Look into the complete over flow table starting from hash*/
     tmp_hash = hash % table->ht_oentries;
     for (i = 0; i < table->ht_oentries; i++) {
@@ -563,10 +634,11 @@ vr_htable_find_duplicate_hentry_index(vr_htable_t htable, vr_hentry_t *hentry)
 vr_hentry_t *
 vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
 {
-    unsigned int hash, tmp_hash, ind, i, ent_key_len;
-    vr_hentry_t *ent, *o_ent;
+    unsigned int hash, first_hash, tmp_hash, ind, i, ent_key_len;
+    vr_hentry_t *ent, *start_ent, *o_ent;
     vr_hentry_key ent_key;
     struct vr_htable *table = (struct vr_htable *)htable;
+    int btable_partition = table->ht_htable->vb_partitions;
 
     if (!table || !key)
         return NULL;
@@ -579,16 +651,24 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
 
     ent = NULL;
 
-    hash = vr_hash(key, key_len, 0);
+    first_hash = hash = vr_hash(key, key_len, 0);
 
     /* Look into the hash table from hash*/
     tmp_hash = hash % table->ht_hentries;
     tmp_hash &= ~(table->ht_bucket_size - 1);
+    start_ent = vr_btable_get(table->ht_htable, tmp_hash);
     for (i = 0; i < table->ht_bucket_size; i++) {
-
         ind = tmp_hash + i;
+        if((table->ht_sig_table[ind] != hash))
+             continue;
 
-        ent = vr_btable_get(table->ht_htable, ind);
+        if (btable_partition == 1) {
+            ent = (vr_hentry_t *)((char *)start_ent +
+                                        i * (table->ht_htable->vb_esize));
+        } else {
+            ent = vr_btable_get(table->ht_htable, ind);
+        }
+
         if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
             continue;
 
@@ -598,6 +678,46 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
 
         if (memcmp(ent_key, key, key_len) == 0)
             return ent;
+    }
+
+
+    hash = vr_htable_sec_hash(hash);
+
+    /* Look into the hash table from hash*/
+    tmp_hash = hash % table->ht_hentries;
+    tmp_hash &= ~(table->ht_bucket_size - 1);
+    start_ent = vr_btable_get(table->ht_htable, tmp_hash);
+    for (i = 0; i < table->ht_bucket_size; i++) {
+        ind = tmp_hash + i;
+        /* Note that even in second bucket, we use first hash as sig */
+        if((table->ht_sig_table[ind] != first_hash))
+             continue;
+
+        if (btable_partition == 1) {
+            ent = (vr_hentry_t *)((char *)start_ent +
+                                        i * (table->ht_htable->vb_esize));
+        } else {
+            ent = vr_btable_get(table->ht_htable, ind);
+        }
+
+        if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
+            continue;
+
+        ent_key = table->ht_get_key(htable, ent, &ent_key_len);
+        if (!ent_key || (key_len != ent_key_len))
+            continue;
+
+        if (memcmp(ent_key, key, key_len) == 0)
+            return ent;
+    }
+
+    i = table->ht_bucket_size - 1;
+    if (btable_partition == 1) {
+        ent = (vr_hentry_t *)((char *)start_ent +
+                                        i * (table->ht_htable->vb_esize));
+    } else {
+        ind = tmp_hash + i;
+        ent = vr_btable_get(table->ht_htable, ind);
     }
 
     for (o_ent = ent->hentry_next; o_ent; o_ent = o_ent->hentry_next) {
@@ -761,6 +881,12 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
         prev = ent;
     }
 
+    table->ht_sig_table = vr_zalloc(sizeof(uint32_t) * entries, VR_HTABLE_OBJECT);
+    if (!table->ht_sig_table) {
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, entries);
+        goto exit;
+    }
+
     table->ht_hentries = entries;
     table->ht_oentries = oentries;
     table->ht_entry_size = entry_size;
@@ -809,6 +935,7 @@ vr_htable_delete(vr_htable_t htable)
     if (table->ht_dtable)
         vr_btable_free(table->ht_dtable);
 
+    vr_free(table->ht_sig_table, VR_HTABLE_OBJECT);
     vr_free(table, VR_HTABLE_OBJECT);
 
     return;

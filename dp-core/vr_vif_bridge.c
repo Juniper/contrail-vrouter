@@ -104,6 +104,7 @@ vif_bridge_alloc(vr_htable_t htable, unsigned short vlan,
         return NULL;
 
     memcpy(&vbe->vbe_key, &key, sizeof(key));
+    vr_htable_set_signature(htable, (vr_hentry_t *)vbe, &key, 0);
     return vbe;
 }
 

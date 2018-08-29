@@ -104,6 +104,7 @@ bridge_add(unsigned int router_id, unsigned int vrf,
 
         VR_MAC_COPY(be->be_key.be_mac, mac);
         be->be_key.be_vrf_id = vrf;
+        vr_htable_set_signature(vn_rtable, (vr_hentry_t *)be, &(be->be_key), 0);
         be->be_packets = 0;
         be->be_flags = VR_BE_VALID_FLAG;
         be->be_nh_id = -1;
