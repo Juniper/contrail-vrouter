@@ -14,7 +14,7 @@ env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../windows'])
 
 # vRouter code
-env.Replace(LIBS = ['win_packet'])
+env.Replace(LIBS = ['win_packet', 'Ws2_32'])
 # 3rd party libs
 env.Append(LIBS = 'cmocka')
 
@@ -28,7 +28,7 @@ test_suite_base_names = [
     'win_packet_free',
     'win_pclone',
     'win_pfree',
-    'win_packet_split_multi_packet',
+    'win_csum',
 ]
 
 test_suites = []
