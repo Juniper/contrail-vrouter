@@ -443,22 +443,43 @@ win_pset_data(struct vr_packet *pkt, unsigned short offset)
     ASSERT(pkt->vp_data == offset);
 }
 
-static unsigned int
+unsigned int
 win_pgso_size(struct vr_packet *pkt)
 {
-    UNREFERENCED_PARAMETER(pkt);
-
-    /* TODO: More research on Generic Segmentation Offload mechanism in Windows is needed.
-     *       As stated in https://msdn.microsoft.com/en-us/windows/hardware/drivers/network/offloading-the-segmentation-of-large-tcp-packets
-     *       NDIS supported offload for TCP/IP packets only. dp-core code which does GSO checks is also
-     *       considering only TCP/IP packets.
-     *       However we do not know if there is further work needed in the NDIS driver to perform TCP offload.
+    /*
+     * dp-core interprets output of vr_pgso_size as follows:
      *
-     * Returning 0 right now is a valid option, because dp-core code supports gso_size == 0 (i.e.
-     * when GSO is not supported by NIC driver).
+     * If vr_pgo_size returned 0, then LSO was not requested.
+     * If vr_pgo_size returned a non-zero value, then LSO was requested.
+     *
+     * LSO is requested if and only if the value of
+     * lso_info.LsoV2Transmit.MSS is non-zero, thus we can just return it
+     * from vr_pgso_size.
      */
 
-    return 0;
+    // PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    // PNET_BUFFER_LIST nbl = WinPacketRawToNBL(WinPacketToRawPacket(winPacket));
+    // NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
+    // lso_info.Value = NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo);
+    // return lso_info.LsoV2Transmit.MSS;
+
+    /*
+     * TODO - this value should not be fixed.
+     * This is temporary workaround as generally this is not correct.
+     * Better solution might modify MTU in container to some lower value.
+     *
+     * At this stage we are not able to force the OS to always enable LSO
+     * and provide reasonable value for MSS. Sometimes Windows concludes that
+     * LSO should be disabled and sets MSS equal to zero. That significantly
+     * affects performance of TCP transmission - below acceptable treshold.
+     * Because of that reasonable default is temporarily provided. Besides
+     * typical MTU, it was taken into account that headers (for Ethernet, IP,
+     * TCP) may have variable length. There's also additional "safety" margin.
+     *
+     * This optimization together with TCP segmentation implemented for Windows
+     * improves performance by order of magnitude.
+     */
+    return 1300;
 }
 
 static void
@@ -469,8 +490,6 @@ win_delete_timer(struct vr_timer *vtimer)
     params.DeleteContext = NULL;
     params.DeleteCallback = NULL;
     ExDeleteTimer(vtimer->vt_os_arg, TRUE, FALSE, &params);
-
-    return;
 }
 
 void
@@ -505,8 +524,6 @@ scheduled_work_routine(PVOID work_item_context, NDIS_HANDLE work_item_handle)
 
     NdisFreeIoWorkItem(work_item_handle);
     ExFreePool(cb_data);
-
-    return;
 }
 
 static int
