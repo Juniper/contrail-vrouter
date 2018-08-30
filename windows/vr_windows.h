@@ -68,12 +68,24 @@ extern FILTER_OID_REQUEST FilterOidRequest;
 extern FILTER_OID_REQUEST_COMPLETE FilterOidRequestComplete;
 extern FILTER_CANCEL_OID_REQUEST FilterCancelOidRequest;
 
+/* Handling of special NICs when there are no vifs */
+typedef struct _VR_BASIC_NIC_ENTRY
+{
+    BOOLEAN                 IsConnected;
+    NDIS_SWITCH_PORT_ID     PortId;
+    NDIS_SWITCH_NIC_INDEX   NicIndex;
+} VR_BASIC_NIC_ENTRY, *PVR_BASIC_NIC_ENTRY;
+extern VR_BASIC_NIC_ENTRY ExternalNicEntry, InternalNicEntry;
+NDIS_STATUS HandleBasicNics(PSWITCH_OBJECT SwitchObject);
+VOID HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams);
+
 /* Functions used to initialize message subsystem */
 extern NTSTATUS vr_message_init(void);
 extern void vr_message_exit(void);
 
 NDIS_STATUS VrGetNicArray(PSWITCH_OBJECT Switch, PNDIS_SWITCH_NIC_ARRAY *OutputNicArray);
-VOID VrFreeNicArray(PNDIS_SWITCH_NIC_ARRAY NicArray);
+NDIS_STATUS VrGetSwitchParameters(PSWITCH_OBJECT Switch, PNDIS_SWITCH_PARAMETERS *OutputNicArray);
+VOID VrFreeNdisObject(PVOID buffer);
 
 void get_random_bytes(void *buf, int nbytes);
 
@@ -86,6 +98,8 @@ extern struct host_os windows_host;
 
 extern void win_if_lock(void);
 extern void win_if_unlock(void);
+
+extern BOOLEAN IsPacketPassthroughEnabled(void);
 
 /* vRouter transport module init functions */
 extern int vr_transport_init(void);

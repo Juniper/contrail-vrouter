@@ -426,6 +426,39 @@ GetAssociatedVrInterface(NDIS_SWITCH_PORT_ID vifPort, NDIS_SWITCH_NIC_INDEX vifN
     return NULL;
 }
 
+static VOID
+HandlePassthroughPacket(
+    PSWITCH_OBJECT switchObject,
+    PNET_BUFFER_LIST nbl,
+    NDIS_SWITCH_PORT_ID source_port,
+    NDIS_SWITCH_NIC_INDEX source_nic,
+    ULONG sendCompleteFlags)
+{
+    NDIS_SWITCH_PORT_DESTINATION newDestination = {0};
+
+    if (ExternalNicEntry.IsConnected && InternalNicEntry.IsConnected) {
+        if (source_port == ExternalNicEntry.PortId && source_nic == ExternalNicEntry.NicIndex) {
+            newDestination.PortId = InternalNicEntry.PortId;
+            newDestination.NicIndex = InternalNicEntry.NicIndex;
+        } else {
+            newDestination.PortId = ExternalNicEntry.PortId;
+            newDestination.NicIndex = ExternalNicEntry.NicIndex;
+        }
+
+        switchObject->NdisSwitchHandlers.AddNetBufferListDestination(
+            switchObject->NdisSwitchContext,
+            nbl,
+            &newDestination);
+
+        NdisFSendNetBufferLists(switchObject->NdisFilterHandle,
+            nbl,
+            NDIS_DEFAULT_PORT_NUMBER,
+            0);
+    } else {
+        NdisFSendNetBufferListsComplete(switchObject->NdisFilterHandle, nbl, sendCompleteFlags);
+    }
+}
+
 VOID
 FilterSendNetBufferLists(
     NDIS_HANDLE filterModuleContext,
@@ -480,6 +513,11 @@ FilterSendNetBufferLists(
         PNDIS_SWITCH_FORWARDING_DETAIL_NET_BUFFER_LIST_INFO fwd_detail = NET_BUFFER_LIST_SWITCH_FORWARDING_DETAIL(curNbl);
         NDIS_SWITCH_PORT_ID source_port = fwd_detail->SourcePortId;
         NDIS_SWITCH_NIC_INDEX source_nic = fwd_detail->SourceNicIndex;
+
+        if (IsPacketPassthroughEnabled()) {
+            HandlePassthroughPacket(switchObject, curNbl, source_port, source_nic, sendCompleteFlags);
+            continue;
+        }
 
         struct vr_interface *vif = GetAssociatedVrInterface(source_port, source_nic);
 

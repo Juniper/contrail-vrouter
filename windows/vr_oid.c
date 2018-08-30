@@ -47,7 +47,7 @@ VrCompleteInternalOidRequest(PNDIS_OID_REQUEST NdisRequest, NDIS_STATUS Status)
 }
 
 static NDIS_STATUS
-VrQuerySwitchNicArray(PSWITCH_OBJECT Switch, PVOID Buffer, ULONG BufferLength, PULONG OutputBytesNeeded)
+VrQuerySwitchOid(PSWITCH_OBJECT Switch, NDIS_OID Oid, PVOID Buffer, ULONG BufferLength, PULONG OutputBytesNeeded)
 {
     PNDIS_OID_REQUEST oidRequest;
     PVR_OID_REQUEST_STATUS oidRequestStatus;
@@ -77,7 +77,7 @@ VrQuerySwitchNicArray(PSWITCH_OBJECT Switch, PVOID Buffer, ULONG BufferLength, P
     oidRequest->Timeout = 0;
     oidRequest->RequestId = (PVOID)VrOidRequestId;
 
-    oidRequest->DATA.QUERY_INFORMATION.Oid = OID_SWITCH_NIC_ARRAY;
+    oidRequest->DATA.QUERY_INFORMATION.Oid = Oid;
     oidRequest->DATA.QUERY_INFORMATION.InformationBuffer = Buffer;
     oidRequest->DATA.QUERY_INFORMATION.InformationBufferLength = BufferLength;
 
@@ -107,28 +107,29 @@ VrGetNicArray(PSWITCH_OBJECT Switch, PNDIS_SWITCH_NIC_ARRAY *OutputNicArray)
 {
     NDIS_STATUS status;
     PNDIS_SWITCH_NIC_ARRAY nicArray = NULL;
-    ULONG nicArrayLength = 0;
+    ULONG nicArraySize = 0;
+    const NDIS_OID Oid = OID_SWITCH_NIC_ARRAY;
 
     if (OutputNicArray == NULL) {
         return NDIS_STATUS_INVALID_PARAMETER;
     }
 
-    status = VrQuerySwitchNicArray(Switch, 0, 0, &nicArrayLength);
+    status = VrQuerySwitchOid(Switch, Oid, 0, 0, &nicArraySize);
     if (status != NDIS_STATUS_INVALID_LENGTH) {
         DbgPrint("vRouter:%s(): OID_SWITCH_NIC_ARRAY did not return required buffer size\n", __func__);
         return NDIS_STATUS_FAILURE;
     }
 
-    nicArray = ExAllocatePoolWithTag(NonPagedPoolNx, nicArrayLength, VrAllocationTag);
+    nicArray = ExAllocatePoolWithTag(NonPagedPoolNx, nicArraySize, VrAllocationTag);
     if (nicArray == NULL) {
         return NDIS_STATUS_RESOURCES;
     }
 
     nicArray->Header.Revision = NDIS_SWITCH_PORT_ARRAY_REVISION_1;
     nicArray->Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
-    nicArray->Header.Size = (USHORT)nicArrayLength;
+    nicArray->Header.Size = (USHORT)nicArraySize;
 
-    status = VrQuerySwitchNicArray(Switch, nicArray, nicArrayLength, NULL);
+    status = VrQuerySwitchOid(Switch, Oid, nicArray, nicArraySize, NULL);
     if (status == NDIS_STATUS_SUCCESS) {
         *OutputNicArray = nicArray;
     } else {
@@ -138,11 +139,41 @@ VrGetNicArray(PSWITCH_OBJECT Switch, PNDIS_SWITCH_NIC_ARRAY *OutputNicArray)
     return status;
 }
 
-VOID
-VrFreeNicArray(PNDIS_SWITCH_NIC_ARRAY NicArray)
+NDIS_STATUS
+VrGetSwitchParameters(PSWITCH_OBJECT Switch, PNDIS_SWITCH_PARAMETERS *OutputParams)
 {
-    if (NicArray != NULL) {
-        ExFreePool(NicArray);
+    NDIS_STATUS status;
+    PNDIS_SWITCH_PARAMETERS parameters = NULL;
+    ULONG switchParamsSize = sizeof(NDIS_SWITCH_PARAMETERS);
+
+    if (OutputParams == NULL) {
+        return NDIS_STATUS_INVALID_PARAMETER;
+    }
+
+    parameters = ExAllocatePoolWithTag(NonPagedPoolNx, switchParamsSize, VrAllocationTag);
+    if (parameters == NULL) {
+        return NDIS_STATUS_RESOURCES;
+    }
+
+    parameters->Header.Revision = NDIS_SWITCH_PARAMETERS_REVISION_1;
+    parameters->Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
+    parameters->Header.Size = (USHORT)switchParamsSize;
+
+    status = VrQuerySwitchOid(Switch, OID_SWITCH_PARAMETERS, parameters, switchParamsSize, NULL);
+    if (status == NDIS_STATUS_SUCCESS) {
+        *OutputParams = parameters;
+    } else {
+        ExFreePool(parameters);
+    }
+
+    return status;
+}
+
+VOID
+VrFreeNdisObject(PVOID buffer)
+{
+    if (buffer != NULL) {
+        ExFreePool(buffer);
     }
 }
 
@@ -203,6 +234,15 @@ FilterOidRequest(NDIS_HANDLE FilterModuleContext, PNDIS_OID_REQUEST OidRequest)
 
     VrStoreOriginalOidRequest(clonedRequest, OidRequest);
     NdisInterlockedIncrement(&switchObject->PendingOidCount);
+
+    if (clonedRequest->RequestType == NdisRequestSetInformation) {
+        NDIS_OID oid = clonedRequest->DATA.SET_INFORMATION.Oid;
+        PNDIS_OBJECT_HEADER header = clonedRequest->DATA.SET_INFORMATION.InformationBuffer;
+
+        // in the future we should handle NIC_DISCONNECT
+        if (oid == OID_SWITCH_NIC_CONNECT)
+            HandleBasicNic((PNDIS_SWITCH_NIC_PARAMETERS)header);
+    }
 
     KeMemoryBarrier();
 
