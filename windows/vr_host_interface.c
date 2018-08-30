@@ -254,6 +254,8 @@ fix_ip_v4_csum(struct vr_packet *pkt) {
 }
 
 struct FragmentationContext {
+    // todo: all sizes -> ULONG
+
     struct vr_packet *pkt;
     PNET_BUFFER_LIST original_nbl;
     PNET_BUFFER_LIST fragmented_nbl;
@@ -264,11 +266,19 @@ struct FragmentationContext {
     struct vr_ip* outer_ip_header;
     struct vr_ip* inner_ip_header;
 
+    // If we're performing TCP segmentation instead of
+    // IP fragmentation. In this case, we assume that TCP headers
+    // belong to inner headers and the payload is the TCP payload.
+    bool is_tcp_segmentation;
+
     // Size for outer and inner headers is the same in original packet and
     // in all new packets (fragments).
     int outer_headers_size;
     int inner_headers_size;
     int inner_eth_header_size;
+
+    // Offset of the inner TCP header (only when segmenting)
+    int tcp_header_offset;
 
     // Payload offset in original packet (excluding all headers).
     int inner_payload_offset;
@@ -309,6 +319,7 @@ frg_is_fragmentation_needed(struct FragmentationContext *pctx)
     return vr_pkt_type_is_overlay(pctx->pkt->vp_type)
         && NET_BUFFER_DATA_LENGTH(pctx->original_nbl->FirstNetBuffer)
         > pctx->mtu;
+
 }
 
 static inline unsigned char *
@@ -366,15 +377,33 @@ frg_extract_inner_headers_from_original_packet(
 
     pctx->inner_headers_size = pctx->inner_eth_header_size
         + pctx->inner_ip_header->ip_hl * 4;
-    pctx->inner_payload_offset = pctx->outer_headers_size
-        + pctx->inner_headers_size;
-    pctx->total_payload_size = sizeof(struct vr_eth)
-        + ntohs(pctx->outer_ip_header->ip_len) - pctx->inner_payload_offset;
+
+    if (pctx->inner_ip_header->ip_proto == VR_IP_PROTO_TCP) {
+        pctx->is_tcp_segmentation = true;
+
+        struct vr_tcp *tcp = (struct vr_tcp*)(pctx->inner_ip_header + 1);
+        pctx->inner_headers_size += VR_TCP_OFFSET(tcp->tcp_offset_r_flags) * 4;
+        pctx->tcp_header_offset = (unsigned char*)(tcp) - pctx->outer_headers;
+
+        DbgPrint(
+            "frg: Segmentation requested, IP OFFSET %u, TCP OFFSET %u\n",
+            pctx->outer_headers_size + pctx->inner_eth_header_size,
+            pctx->tcp_header_offset
+        );
+    } else {
+        pctx->is_tcp_segmentation = false;
+    }
 
     // Extract inner fragmentation flags and offset.
     pctx->inner_ip_mf = frg_more_fragments(pctx->inner_ip_header);
     pctx->inner_ip_frag_offset_in_bytes
         = frg_fragment_offset_in_bytes(pctx->inner_ip_header);
+
+    pctx->inner_payload_offset = pctx->outer_headers_size
+        + pctx->inner_headers_size;
+    pctx->total_payload_size = sizeof(struct vr_eth)
+        + ntohs(pctx->outer_ip_header->ip_len) - pctx->inner_payload_offset;
+
 }
 
 static void
@@ -416,7 +445,11 @@ frg_split_original_packet(struct FragmentationContext* pctx)
     // 'more fragments' flag set to true. It means that
     // maximum_inner_payload_length has to be aligned down to 8-byte boundary.
     int free_space_for_inner_payload = pctx->mtu - pctx->inner_payload_offset;
-    pctx->maximum_inner_payload_length = free_space_for_inner_payload & ~7;
+    if (pctx->is_tcp_segmentation) {
+        pctx->maximum_inner_payload_length = win_pgso_size(pctx->pkt);
+    } else {
+        pctx->maximum_inner_payload_length = free_space_for_inner_payload & ~7;
+    }
 
     pctx->fragmented_nbl = NdisAllocateFragmentNetBufferList(
         pctx->original_nbl,
@@ -489,25 +522,30 @@ frg_fix_headers_of_inner_fragmented_packet(
     struct vr_ip* fragment_inner_ip_header = (struct vr_ip*)(headers
         + pctx->outer_headers_size + pctx->inner_eth_header_size);
 
-    // Fix 'more fragments' in inner IP header.
-    if (more_new_packets || pctx->inner_ip_mf) {
-        fragment_inner_ip_header->ip_frag_off |= htons(VR_IP_MF);
+    if (!pctx->is_tcp_segmentation) {
+        // Fix 'more fragments' in inner IP header.
+        if (more_new_packets || pctx->inner_ip_mf) {
+            fragment_inner_ip_header->ip_frag_off |= htons(VR_IP_MF);
+        }
+
+        // Fix 'fragment offset' in inner IP header.
+        frg_set_fragment_offset(fragment_inner_ip_header,
+            *byte_offset_for_next_inner_ip_header);
+        *byte_offset_for_next_inner_ip_header
+            += pctx->maximum_inner_payload_length;
     }
 
-    // Fix 'fragment offset' in inner IP header.
-    frg_set_fragment_offset(fragment_inner_ip_header,
-        *byte_offset_for_next_inner_ip_header);
-    *byte_offset_for_next_inner_ip_header
-        += pctx->maximum_inner_payload_length;
-
     // Fix packet length in inner IP header.
-    unsigned short inner_ip_packet_length = fragment_inner_ip_header->ip_hl * 4;
+    unsigned short inner_ip_packet_length =
+        pctx->inner_headers_size - pctx->inner_eth_header_size;
+
     if (more_new_packets) {
         inner_ip_packet_length += pctx->maximum_inner_payload_length;
     } else {
         inner_ip_packet_length += pctx->total_payload_size
             % pctx->maximum_inner_payload_length;
     }
+
     fragment_inner_ip_header->ip_len = htons(inner_ip_packet_length);
 
     // Fix checksum in inner IP header.
@@ -562,6 +600,110 @@ frg_remove_fragmented_nbl(struct FragmentationContext* pctx)
     InterlockedDecrement(&pctx->original_nbl->ChildRefCount);
 }
 
+__attribute__packed__open__
+struct frg_tcp_pseudo_header {
+    unsigned int source_address;
+    unsigned int destination_address;
+    unsigned char reserved;
+    unsigned char protocol;
+    unsigned short tcp_length;
+} __attribute__packed__close__;
+
+static void
+frg_create_tcp_pseudo_header(
+    struct vr_ip* ip_hdr,
+    struct frg_tcp_pseudo_header* tcp_pseudo_hdr)
+{
+    tcp_pseudo_hdr->source_address = ip_hdr->ip_saddr;
+    tcp_pseudo_hdr->destination_address = ip_hdr->ip_daddr;
+    tcp_pseudo_hdr->reserved = 0;
+    tcp_pseudo_hdr->protocol = ip_hdr->ip_proto;
+    tcp_pseudo_hdr->tcp_length =
+        htons(ntohs(ip_hdr->ip_len) - ip_hdr->ip_hl * 4);
+}
+
+static bool
+frg_fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
+    PNET_BUFFER nb,
+    unsigned inner_ip_offset_in_nb,
+    struct vr_tcp* inner_tcp_header)
+{
+    uint32_t csum;
+    uint16_t size;
+    uint8_t type;
+
+    void* packet_data_buffer = ExAllocatePoolWithTag(
+        NonPagedPoolNx, NET_BUFFER_DATA_LENGTH(nb), VrAllocationTag);
+    uint8_t* packet_data = NdisGetDataBuffer(
+        nb, NET_BUFFER_DATA_LENGTH(nb), packet_data_buffer, 1, 0);
+
+    if (packet_data == NULL)
+        // No need for free
+        return false;
+
+    struct vr_ip *hdr = (struct vr_ip*) &packet_data[inner_ip_offset_in_nb];
+    unsigned inner_tcp_offset_in_nb = inner_ip_offset_in_nb + hdr->ip_hl * 4;
+    size = ntohs(hdr->ip_len) - 4 * hdr->ip_hl;
+
+    type = hdr->ip_proto;
+
+    uint8_t* payload = &packet_data[inner_tcp_offset_in_nb];
+    csum = calc_csum((uint8_t*) payload, size);
+
+    inner_tcp_header->tcp_csum = htons(~(trim_csum(csum)));
+
+    if (packet_data_buffer)
+        ExFreePool(packet_data_buffer);
+
+    return true;
+}
+
+static void
+frg_fill_checksum_of_inner_tcp_packet(
+    struct FragmentationContext* pctx,
+    PNET_BUFFER cur_nb,
+    unsigned char* headers)
+{
+    struct frg_tcp_pseudo_header inner_tcp_pseudo_header;
+    frg_create_tcp_pseudo_header(
+        (struct vr_ip *)(headers + ((uint8_t *)pctx->inner_ip_header - (uint8_t *)pctx->outer_headers)),
+        &inner_tcp_pseudo_header);
+
+    uint16_t tcp_pseudo_hdr_csum = calc_csum(
+        (uint8_t*)&inner_tcp_pseudo_header, sizeof(inner_tcp_pseudo_header));
+
+    struct vr_tcp* inner_tcp_header =
+        (struct vr_tcp*) (headers + pctx->tcp_header_offset);
+    inner_tcp_header->tcp_csum = htons(tcp_pseudo_hdr_csum);
+
+    frg_fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
+        cur_nb, (uint8_t*)pctx->inner_ip_header - (uint8_t*)pctx->outer_headers,
+        inner_tcp_header);
+}
+
+static void
+frg_fix_headers_of_inner_tcp_packet(
+    struct FragmentationContext* pctx,
+    PNET_BUFFER cur_nb,
+    unsigned char *headers,
+    unsigned int byte_offset_for_next_inner_tcp_header,
+    bool more_new_packets)
+{
+    struct vr_tcp* inner_tcp_header =
+        (struct vr_tcp*) (headers + pctx->tcp_header_offset);
+    inner_tcp_header->tcp_seq = htonl(byte_offset_for_next_inner_tcp_header);
+
+    uint16_t flags = ntohs(inner_tcp_header->tcp_offset_r_flags);
+
+    if (more_new_packets) {
+        flags &= ~VR_TCP_FLAG_FIN & ~VR_TCP_FLAG_PSH;
+    }
+
+    inner_tcp_header->tcp_offset_r_flags = htons(flags);
+
+    frg_fill_checksum_of_inner_tcp_packet(pctx, cur_nb, headers);
+}
+
 static void
 frg_fix_headers_of_fragmented_packet(struct FragmentationContext* pctx)
 {
@@ -570,10 +712,20 @@ frg_fix_headers_of_fragmented_packet(struct FragmentationContext* pctx)
 
     // Disable checksum offloading, so it doesn't interefere with our
     // checksum calculation.
-    NET_BUFFER_LIST_INFO(pctx->fragmented_nbl, TcpIpChecksumNetBufferListInfo) = 0;
+    NET_BUFFER_LIST_INFO(pctx->fragmented_nbl, TcpIpChecksumNetBufferListInfo)
+        = 0;
 
     unsigned short byte_offset_for_next_inner_ip_header
         = pctx->inner_ip_frag_offset_in_bytes;
+
+    unsigned int segment_offset_for_next_inner_tcp_header = 0;
+    if (pctx->is_tcp_segmentation) {
+        struct vr_tcp* inner_tcp_header =
+            (struct vr_tcp*) (pctx->outer_headers + pctx->tcp_header_offset);
+        segment_offset_for_next_inner_tcp_header
+            = ntohl(inner_tcp_header->tcp_seq);
+    }
+
     for (cur_nb = pctx->fragmented_nbl->FirstNetBuffer;
             cur_nb != NULL;
             cur_nb = next_nb) {
@@ -587,12 +739,22 @@ frg_fix_headers_of_fragmented_packet(struct FragmentationContext* pctx)
             return;
         }
 
-        bool more_fragments = (next_nb != NULL);
+        bool more_new_packets = (next_nb != NULL);
         frg_fix_headers_of_inner_fragmented_packet(
             pctx,
             headers,
-            more_fragments,
+            more_new_packets,
             &byte_offset_for_next_inner_ip_header);
+        if (pctx->is_tcp_segmentation) {
+            frg_fix_headers_of_inner_tcp_packet(
+                pctx,
+                cur_nb,
+                headers,
+                segment_offset_for_next_inner_tcp_header,
+                more_new_packets);
+            segment_offset_for_next_inner_tcp_header
+                += pctx->maximum_inner_payload_length;
+        }
         frg_fix_headers_of_outer_fragmented_packet(pctx, headers);
     }
 }
@@ -603,11 +765,31 @@ fragment_packet_if_needed(struct vr_packet *pkt)
     struct FragmentationContext ctx;
     frg_initialize_fragmentation_context(&ctx, pkt);
 
-    if(!frg_is_fragmentation_needed(&ctx)) {
+    if (!frg_is_fragmentation_needed(&ctx)) {
         return ctx.original_nbl;
     }
 
     frg_extract_headers_from_original_packet(&ctx);
+
+    if (ctx.is_tcp_segmentation) {
+        PNET_BUFFER_LIST nbl = WinPacketRawToNBL(WinPacketToRawPacket(GetWinPacketFromVrPacket(pkt)));
+        NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
+        lso_info.Value = NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo);
+        if (lso_info.Value == 0) {
+            DbgPrint("LSO was not requested, but TCP packet requires segmentation!\n");
+        }
+
+        if (lso_info.LsoV2Transmit.MSS + ctx.outer_headers_size + ctx.inner_headers_size > ctx.mtu) {
+            DbgPrint(
+                "LSO: Warning: Won't fit! %d + %d > %d\n",
+                lso_info.LsoV2Transmit.MSS,
+                ctx.outer_headers_size + ctx.inner_headers_size,
+                ctx.mtu
+            );
+            // TODO: What to do? Trap to agent?
+        }
+    }
+
     frg_split_original_packet(&ctx);
 
     if (ctx.fragmented_nbl != NULL) {
@@ -620,9 +802,13 @@ fragment_packet_if_needed(struct vr_packet *pkt)
 static int
 __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
-    if (vr_pkt_type_is_overlay(pkt->vp_type))
-        fix_tunneled_csum(pkt);
-    else if (pkt->vp_type == VP_TYPE_IP) {
+    if (vr_pkt_type_is_overlay(pkt->vp_type)) {
+        //if (!win_pgso_size(pkt)) {
+            fix_tunneled_csum(pkt);
+        //} else {
+            // csums handled by LSO
+        //}
+    } else if (pkt->vp_type == VP_TYPE_IP) {
         // There's no checksum in IPv6 header.
         fix_ip_v4_csum(pkt);
     }
