@@ -133,6 +133,8 @@
     <ClInclude Include="..\include\windows_builtins.h" />
     <ClInclude Include="precomp.h" />
     <ClInclude Include="win_packet.h" />
+    <ClInclude Include="win_csum.h" />
+    <ClInclude Include="win_packet_splitting.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c">
@@ -278,6 +280,10 @@
     <ClCompile Include="win_memory.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="win_csum.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="win_packet_splitting.c" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="vRouter.inf" />
