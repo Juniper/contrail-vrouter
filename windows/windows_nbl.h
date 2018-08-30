@@ -32,4 +32,7 @@ extern void win_packet_map_from_mdl(struct vr_packet *pkt, PMDL mdl, ULONG mdl_o
 extern struct vr_packet *win_allocate_packet(void *buffer, unsigned int size);
 extern void win_free_packet(struct vr_packet *pkt);
 
+// TODO find better header for this function
+extern unsigned int win_pgso_size(struct vr_packet *pkt);
+
 #endif /* __WINDOWS_NBL_H__ */

@@ -542,6 +542,19 @@ FilterSendNetBufferLists(
             nextElement = element->Next;
             WinPacketListRawFreeElement(element);
 
+            PNET_BUFFER_LIST nbl = WinPacketRawToNBL(rawPacket);
+            NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
+            lso_info.Value = NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo);
+            if (lso_info.Value) {
+                ULONG sz = NET_BUFFER_DATA_LENGTH(NET_BUFFER_LIST_FIRST_NB(nbl));
+                DbgPrint(
+                    "LSO requested, NB len %lu, MSS %lu, OFFSET %lu\n",
+                    sz,
+                    lso_info.LsoV2Transmit.MSS,
+                    lso_info.LsoV2Transmit.TcpHeaderOffset
+                );
+            }
+
             struct vr_packet *pkt = win_get_packet(WinPacketRawToNBL(rawPacket), vif);
             ASSERTMSG("win_get_packed failed!", pkt != NULL);
 
