@@ -254,6 +254,8 @@ fix_ip_v4_csum(struct vr_packet *pkt) {
 }
 
 struct FragmentationContext {
+    // todo: all sizes -> ULONG
+
     struct vr_packet *pkt;
     PNET_BUFFER_LIST original_nbl;
     PNET_BUFFER_LIST fragmented_nbl;
@@ -264,11 +266,19 @@ struct FragmentationContext {
     struct vr_ip* outer_ip_header;
     struct vr_ip* inner_ip_header;
 
+    // If we're performing TCP segmentation instead of
+    // IP fragmentation. In this case, we assume that TCP headers
+    // belong to inner headers and the payload is the TCP payload.
+    bool is_tcp_segmentation;
+
     // Size for outer and inner headers is the same in original packet and
     // in all new packets (fragments).
     int outer_headers_size;
     int inner_headers_size;
     int inner_eth_header_size;
+
+    // Offset of the inner TCP header (only when segmenting)
+    int tcp_header_offset;
 
     // Payload offset in original packet (excluding all headers).
     int inner_payload_offset;
@@ -309,6 +319,7 @@ frg_is_fragmentation_needed(struct FragmentationContext *pctx)
     return vr_pkt_type_is_overlay(pctx->pkt->vp_type)
         && NET_BUFFER_DATA_LENGTH(pctx->original_nbl->FirstNetBuffer)
         > pctx->mtu;
+
 }
 
 static inline unsigned char *
@@ -366,15 +377,33 @@ frg_extract_inner_headers_from_original_packet(
 
     pctx->inner_headers_size = pctx->inner_eth_header_size
         + pctx->inner_ip_header->ip_hl * 4;
-    pctx->inner_payload_offset = pctx->outer_headers_size
-        + pctx->inner_headers_size;
-    pctx->total_payload_size = sizeof(struct vr_eth)
-        + ntohs(pctx->outer_ip_header->ip_len) - pctx->inner_payload_offset;
+
+    if (pctx->inner_ip_header->ip_proto == VR_IP_PROTO_TCP) {
+        pctx->is_tcp_segmentation = true;
+
+        struct vr_tcp *tcp = (struct vr_tcp*)(pctx->inner_ip_header + 1);
+        pctx->inner_headers_size += VR_TCP_OFFSET(tcp->tcp_offset_r_flags) * 4;
+        pctx->tcp_header_offset = (unsigned char*)(tcp) - pctx->outer_headers;
+
+        DbgPrint(
+            "frg: Segmentation requested, IP OFFSET %u, TCP OFFSET %u\n",
+            pctx->outer_headers_size + pctx->inner_eth_header_size,
+            pctx->tcp_header_offset
+        );
+    } else {
+        pctx->is_tcp_segmentation = false;
+    }
 
     // Extract inner fragmentation flags and offset.
     pctx->inner_ip_mf = frg_more_fragments(pctx->inner_ip_header);
     pctx->inner_ip_frag_offset_in_bytes
         = frg_fragment_offset_in_bytes(pctx->inner_ip_header);
+
+    pctx->inner_payload_offset = pctx->outer_headers_size
+        + pctx->inner_headers_size;
+    pctx->total_payload_size = sizeof(struct vr_eth)
+        + ntohs(pctx->outer_ip_header->ip_len) - pctx->inner_payload_offset;
+
 }
 
 static void
@@ -603,11 +632,65 @@ fragment_packet_if_needed(struct vr_packet *pkt)
     struct FragmentationContext ctx;
     frg_initialize_fragmentation_context(&ctx, pkt);
 
-    if(!frg_is_fragmentation_needed(&ctx)) {
+    if (!frg_is_fragmentation_needed(&ctx)) {
         return ctx.original_nbl;
     }
 
     frg_extract_headers_from_original_packet(&ctx);
+
+    if (ctx.is_tcp_segmentation) {
+        PNET_BUFFER_LIST nbl = WinPacketRawToNBL(WinPacketToRawPacket(GetWinPacketFromVrPacket(pkt)));
+        NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
+        lso_info.Value = NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo);
+        if (lso_info.Value == 0) {
+            DbgPrint("LSO was not requested, but TCP packet requires segmentation!\n");
+            return NULL;
+        }
+
+        if (!vr_pkt_type_is_overlay(pkt->vp_type)) {
+            // Dead code: frg assumes always overlay!
+            DbgPrint("LSO between containers, nothing to do!\n");
+            return ctx.original_nbl;
+        }
+
+        if (lso_info.LsoV2Transmit.MSS + ctx.outer_headers_size + ctx.inner_headers_size > ctx.mtu) {
+            DbgPrint(
+                "LSO: Warning: Won't fit! %d + %d > %d\n",
+                lso_info.LsoV2Transmit.MSS,
+                ctx.outer_headers_size + ctx.inner_headers_size,
+                ctx.mtu
+            );
+        }
+
+        lso_info.LsoV2Transmit.TcpHeaderOffset = ctx.tcp_header_offset;
+        // lso_info.LsoV2Transmit.MSS = 1112; // Magic number for debugging purposes, it should stay untouched.
+
+        NDIS_TCP_SEND_OFFLOADS_SUPPLEMENTAL_NET_BUFFER_LIST_INFO encap_info;
+        encap_info.Value = 0;
+        encap_info.EncapsulatedPacketOffsets.IsEncapsulatedPacket = 1;
+        encap_info.EncapsulatedPacketOffsets.EncapsulatedPacketOffsetsValid = 1;
+        encap_info.EncapsulatedPacketOffsets.InnerFrameOffset = ctx.outer_headers_size; // Offset from what?
+        encap_info.EncapsulatedPacketOffsets.TransportIpHeaderRelativeOffset = ctx.inner_eth_header_size; // Relative to what?
+        encap_info.EncapsulatedPacketOffsets.TcpHeaderRelativeOffset =
+            ctx.tcp_header_offset - (ctx.outer_headers_size + ctx.inner_eth_header_size); // Relative to what?
+        encap_info.EncapsulatedPacketOffsets.IsInnerIPv6 = 0; // TODO(stub)
+        encap_info.EncapsulatedPacketOffsets.TcpOptionsPresent = 0; // TODO(stub)
+
+        NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO csum_info;
+        csum_info.Value = 0;
+        csum_info.Transmit.IsIPv4 = 1; // TODO(stub)
+        csum_info.Transmit.IpHeaderChecksum = 1;
+        // no more checksums required for outer packet
+
+        NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo) = lso_info.Value;
+        NET_BUFFER_LIST_INFO(nbl, TcpSendOffloadsSupplementalNetBufferListInfo) = encap_info.Value;
+        NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = csum_info.Value;
+
+        DbgPrint("LSO: WHOOOSH!\n");
+
+        return ctx.original_nbl;
+    }
+
     frg_split_original_packet(&ctx);
 
     if (ctx.fragmented_nbl != NULL) {
@@ -620,9 +703,13 @@ fragment_packet_if_needed(struct vr_packet *pkt)
 static int
 __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
-    if (vr_pkt_type_is_overlay(pkt->vp_type))
-        fix_tunneled_csum(pkt);
-    else if (pkt->vp_type == VP_TYPE_IP) {
+    if (vr_pkt_type_is_overlay(pkt->vp_type)) {
+        if (!win_pgso_size(pkt)) {
+            fix_tunneled_csum(pkt);
+        } else {
+            // csums handled by LSO
+        }
+    } else if (pkt->vp_type == VP_TYPE_IP) {
         // There's no checksum in IPv6 header.
         fix_ip_v4_csum(pkt);
     }
