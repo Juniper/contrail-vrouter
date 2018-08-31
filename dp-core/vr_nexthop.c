@@ -1011,6 +1011,11 @@ nh_composite_mcast_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
+    if (!(nh->nh_flags & NH_FLAG_VALIDATE_MCAST_SRC)) {
+        *((unsigned int *)ret_flags) = NH_FLAG_VALIDATE_MCAST_SRC;
+        return NH_SOURCE_VALID;
+    }
+
     return NH_SOURCE_INVALID;
 }
 
@@ -1208,7 +1213,13 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_nexthop *dir_nh;
     struct vr_packet *new_pkt;
     struct vr_vrf_stats *stats;
-
+    // Context for the flag:
+    // For 5.1, mcast source is outside contrail and only <*,G> is supported.
+    // Until such a time when source can be inside contrail, multicast data
+    // packets sourced from inside contrail has to be dropped.
+    // Also, packets originating outside of contrail has pkt->vp_data pointing
+    // to inner ethernet header (in case of VxLan tunneled packet).
+    bool pull_header = true;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
@@ -1245,6 +1256,15 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt_src = PKT_SRC_EDGE_REPL_TREE;
         if (nh->nh_family == AF_BRIDGE)
             pull_len = VR_VXLAN_HDR_LEN;
+    }
+
+    if (tun_src & NH_FLAG_VALIDATE_MCAST_SRC) {
+        // Since source check is relaxed, tunnel source is hard-coded to
+        // fabric.
+        tun_src = NH_FLAG_COMPOSITE_FABRIC;
+        pkt_src = PKT_SRC_EDGE_REPL_TREE;
+        // In this case ethernet header pointer need not be adjusted.
+        pull_header = false;
     }
 
     if (tun_src & NH_FLAG_COMPOSITE_TOR) {
@@ -1358,8 +1378,11 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             pull_len = pbb_pull_len;
             if (nh->nh_family == AF_BRIDGE &&
-                    (pkt_src == PKT_SRC_EDGE_REPL_TREE))
-                pull_len += VR_VXLAN_HDR_LEN;
+                    (pkt_src == PKT_SRC_EDGE_REPL_TREE)) {
+                if (pull_header) {
+                    pull_len += VR_VXLAN_HDR_LEN;
+                }
+            }
 
             if (pull_len && !pkt_pull(new_pkt, pull_len)) {
                 vr_pfree(new_pkt, VP_DROP_PULL);
@@ -1383,6 +1406,12 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
+            }
+            if (!pull_header) {
+                // Recover header space to write tunnel header when sending to
+                // other computes. Assumption is that multicast data packet was
+                // received from outside contrail using vxlan header.
+                pkt_push(new_pkt, VR_VXLAN_HDR_LEN);
             }
             fmd->fmd_dvrf = dir_nh->nh_vrf;
 
