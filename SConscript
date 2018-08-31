@@ -22,6 +22,58 @@ env = DefaultEnvironment().Clone()
 VRouterEnv = env
 dpdk_exists = os.path.isdir('../third_party/dpdk')
 
+# Get compile-time machine flags and define vrouter macros.
+# Developers can check these compile-time flags to use
+# specific CPU features.
+compiler = env['CC']
+
+# get CPU flag for GCC
+if compiler == 'gcc' or compiler == 'clang':
+    target = env.get('TARGET_MACHINE')
+    # specify gcc -march flag for x86_64
+    if target == 'x86_64':
+        cpu = env.get('CPU_TYPE')
+        if cpu == 'native':
+            env.Append(CCFLAGS = '-march=' + 'native')
+        elif cpu == 'snb':
+            env.Append(CCFLAGS = '-march=' + 'corei7-avx')
+        elif cpu == 'ivb':
+            env.Append(CCFLAGS = '-march=' + 'core-avx-i')
+        elif cpu == 'hsw':
+            env.Append(CCFLAGS = '-march=' + 'core-avx2')
+
+    flags = env['CCFLAGS']
+    autoflags_b = b''
+    proc = subprocess.Popen(str(compiler) + ' ' + str(flags) + \
+        ' -dM -E - < /dev/null', stdout=subprocess.PIPE, shell=True)
+    (autoflags_b, _) = proc.communicate()
+
+    autoflags = autoflags_b.decode('utf-8')
+    if autoflags.find('__x86_64__') != -1:
+        env.Append(CCFLAGS = '-D__VR_X86_64__')
+    if autoflags.find('__AVX2__') != -1:
+        env.Append(CCFLAGS = '-D__VR_AVX2__')
+    if autoflags.find('__AVX__') != -1:
+        env.Append(CCFLAGS = '-D__VR_AVX__')
+    if autoflags.find('__SSE__') != -1:
+        env.Append(CCFLAGS = '-D__VR_SSE__')
+    if autoflags.find('__SSE2__') != -1:
+        env.Append(CCFLAGS = '-D__VR_SSE2__')
+    if autoflags.find('__SSE3__') != -1:
+        env.Append(CCFLAGS = '-D__VR_SSE3__')
+    if autoflags.find('__SSSE3__') != -1:
+        env.Append(CCFLAGS = '-D__VR_SSSE3__')
+    if autoflags.find('__SSE4_1__') != -1:
+        env.Append(CCFLAGS = '-D__VR_SSE4_1__')
+    if autoflags.find('__SSE4_2__') != -1:
+        env.Append(CCFLAGS = '-D__VR_SSE4_2__')
+    if autoflags.find('__AES__') != -1:
+        env.Append(CCFLAGS = '-D__VR_AES__')
+    if autoflags.find('__RDRND__') != -1:
+        env.Append(CCFLAGS = '-D__VR_RDRND__')
+    if autoflags.find('__PCLMUL__') != -1:
+        env.Append(CCFLAGS = '-D__VR_PCLMUL__')
+
 # DPDK build configuration
 DPDK_TARGET = 'x86_64-native-linuxapp-gcc'
 DPDK_SRC_DIR = '#third_party/dpdk/'
