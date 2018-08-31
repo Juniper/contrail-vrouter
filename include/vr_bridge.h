@@ -43,6 +43,14 @@
 #define IS_MAC_BMCAST(dst) \
      (((uint8_t *)dst)[0]& 0x1)
 
+#define IS_MAC_UCAST(dst) \
+     (((uint8_t *)dst)[0]& 0x0)
+
+#define MAC_IS_UCAST                    (1 << 0)
+#define MAC_IS_BCAST_ONLY               (1 << 1)
+#define MAC_IS_MCAST_ONLY               (1 << 2)
+#define MAC_IS_BMCAST                   ((MAC_IS_BCAST_ONLY)|(MAC_IS_MCAST_ONLY))
+
 #define VR_BE_INVALID_INDEX              ((unsigned int)-1)
 
 struct vr_bridge_entry;

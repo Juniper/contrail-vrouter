@@ -1208,7 +1208,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_nexthop *dir_nh;
     struct vr_packet *new_pkt;
     struct vr_vrf_stats *stats;
-
+    bool mcast_pkt = false;
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
@@ -1245,6 +1245,12 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt_src = PKT_SRC_EDGE_REPL_TREE;
         if (nh->nh_family == AF_BRIDGE)
             pull_len = VR_VXLAN_HDR_LEN;
+    }
+
+    if (tun_src & NH_FLAG_VALIDATE_MCAST_SRC) {
+        tun_src = NH_FLAG_COMPOSITE_FABRIC;
+        pkt_src = PKT_SRC_EDGE_REPL_TREE;
+        mcast_pkt = true;
     }
 
     if (tun_src & NH_FLAG_COMPOSITE_TOR) {
@@ -1358,8 +1364,11 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             pull_len = pbb_pull_len;
             if (nh->nh_family == AF_BRIDGE &&
-                    (pkt_src == PKT_SRC_EDGE_REPL_TREE))
-                pull_len += VR_VXLAN_HDR_LEN;
+                    (pkt_src == PKT_SRC_EDGE_REPL_TREE)) {
+                if (!mcast_pkt) {
+                    pull_len += VR_VXLAN_HDR_LEN;
+                }
+            }
 
             if (pull_len && !pkt_pull(new_pkt, pull_len)) {
                 vr_pfree(new_pkt, VP_DROP_PULL);
@@ -1383,6 +1392,9 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
                 break;
+            }
+            if (mcast_pkt) {
+                pkt_push(new_pkt, VR_VXLAN_HDR_LEN);
             }
             fmd->fmd_dvrf = dir_nh->nh_vrf;
 
