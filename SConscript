@@ -22,6 +22,32 @@ env = DefaultEnvironment().Clone()
 VRouterEnv = env
 dpdk_exists = os.path.isdir('../third_party/dpdk')
 
+# Get machine flags and define vrouter macros
+# Developers can check these compile-time flags to use
+# specific CPU features.
+compiler = env['CC']
+flags = env['CCFLAGS']
+proc = subprocess.Popen(str(compiler) + ' ' + str(flags) + ' -dM -E - < /dev/null',stdout=subprocess.PIPE, shell=True)
+(autoflags, _) = proc.communicate()
+if autoflags.find('__x86_64__') > 0:
+    env.Append(CCFLAGS = '-D__VR_X86_64__')
+if autoflags.find('__AVX2__') > 0:
+    env.Append(CCFLAGS = '-D__VR_AVX2__')
+if autoflags.find('__AVX__') > 0:
+    env.Append(CCFLAGS = '-D__VR_AVX__')
+if autoflags.find('__SSE__') > 0:
+    env.Append(CCFLAGS = '-D__VR_SSE__')
+if autoflags.find('__SSE2__') > 0:
+    env.Append(CCFLAGS = '-D__VR_SSE2__')
+if autoflags.find('__SSE3__') > 0:
+    env.Append(CCFLAGS = '-D__VR_SSE3__')
+if autoflags.find('__SSSE3__') > 0:
+    env.Append(CCFLAGS = '-D__VR_SSSE3__')
+if autoflags.find('__SSE4_1__') > 0:
+    env.Append(CCFLAGS = '-D__VR_SSE4_1__')
+if autoflags.find('__SSE4_2__') > 0:
+    env.Append(CCFLAGS = '-D__VR_SSE4_2__')
+
 # DPDK build configuration
 DPDK_TARGET = 'x86_64-native-linuxapp-gcc'
 DPDK_SRC_DIR = '#third_party/dpdk/'
