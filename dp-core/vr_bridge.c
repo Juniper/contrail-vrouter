@@ -30,8 +30,24 @@ struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
 extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
 extern l4_pkt_type_t vr_ip6_well_known_packet(struct vr_packet *);
+extern int vr_bridge_get_mac_type(char *mac);
 
 void *vr_bridge_table, *vr_bridge_otable;
+
+int
+vr_bridge_get_mac_type(char *mac)
+{
+    int flags = 0;
+    if (IS_MAC_BCAST(mac)) {
+        flags |= MAC_IS_BCAST_ONLY;
+    } else if (IS_MAC_BMCAST(mac)) {
+        flags |= MAC_IS_MCAST_ONLY;
+    } else {
+        flags |= MAC_IS_UCAST;
+    }
+
+    return flags;
+}
 
 void *
 vr_bridge_get_va(struct vrouter *router, uint64_t offset)
@@ -313,9 +329,6 @@ bridge_lookup(uint8_t *mac, struct vr_forwarding_md *fmd)
     rt.rtr_req.rtr_index = VR_BE_INVALID_INDEX;
     rt.rtr_req.rtr_mac_size = VR_ETHER_ALEN;
     rt.rtr_req.rtr_mac = mac;
-    /* If multicast L2 packet, use broadcast composite nexthop */
-    if (IS_MAC_BMCAST(rt.rtr_req.rtr_mac))
-        rt.rtr_req.rtr_mac = (int8_t *)vr_bcast_mac;
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
     be = __bridge_lookup(rt.rtr_req.rtr_vrf_id, &rt);
 
@@ -817,10 +830,12 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
     l4_pkt_type_t l4_type = L4_TYPE_UNKNOWN;
     unsigned short pull_len, overlay_len = VROUTER_OVERLAY_LEN;
     int8_t *dmac;
+    int8_t *lookup_mac;
     mac_learn_t ml_res;
     struct vr_bridge_entry *be;
     struct vr_nexthop *nh = NULL;
     struct vr_vrf_stats *stats;
+    int mac_flags;
 
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
         if (fmd->fmd_dscp < 0) {
@@ -849,6 +864,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
     }
 
     dmac = (int8_t *) pkt_data(pkt);
+    mac_flags = vr_bridge_get_mac_type((char *)dmac);
     pull_len = 0;
     if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6) ||
             (pkt->vp_type == VP_TYPE_ARP)) {
@@ -894,7 +910,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
              * Unicast ARP packets on fabric interface would be handled
              * in plug routines of interface.
              */
-            if ((!IS_MAC_BMCAST(dmac)) ||
+            if (!(mac_flags&MAC_IS_BMCAST) ||
                     (pkt->vp_if->vif_flags & VIF_FLAG_MAC_PROXY)) {
                 handled = 0;
                 if (pkt->vp_type == VP_TYPE_ARP) {
@@ -908,10 +924,30 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
             }
         }
 
-        if (IS_MAC_BMCAST(dmac) && (pkt->vp_if->vif_mcast_vrf != 65535))
+        if ((mac_flags&MAC_IS_BMCAST) && (pkt->vp_if->vif_mcast_vrf != 65535))
             fmd->fmd_dvrf = pkt->vp_if->vif_mcast_vrf;
 
-        be = bridge_lookup(dmac, fmd);
+        be = NULL;
+        lookup_mac = dmac;
+        if (!(mac_flags&MAC_IS_UCAST)) {
+            if (pkt->vp_type == VP_TYPE_IP6) {
+                lookup_mac = (int8_t *)vr_bcast_mac;
+            } else {
+                if ((l4_type == L4_TYPE_IGMP) &&
+                    !(pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED)) {
+                    /*
+                     * If IGMP is not enabled at VMI,
+                     * packet has to be flooded
+                     */
+                    lookup_mac = (int8_t *)vr_bcast_mac;
+                }
+            }
+            be = bridge_lookup(lookup_mac, fmd);
+        }
+        if (!be) {
+            lookup_mac = dmac;
+            be = bridge_lookup(lookup_mac, fmd);
+        }
         if (be)
             nh = be->be_nh;
 
@@ -919,7 +955,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
 
             /* If Flooding of unknown unicast not allowed, drop the packet */
             if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
-                                 IS_MAC_BMCAST(dmac)) {
+                                 (mac_flags&MAC_IS_BMCAST)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return NULL;
             }
