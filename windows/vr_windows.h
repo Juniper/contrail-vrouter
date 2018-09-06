@@ -58,6 +58,7 @@ typedef struct _VR_OID_REQUEST_STATUS
 extern const ULONG VrAllocationTag;
 extern const ULONG VrOidRequestId;
 
+extern NDIS_HANDLE VrDriverHandle;
 extern PSWITCH_OBJECT VrSwitchObject;
 extern NDIS_HANDLE VrNBLPool;
 extern NDIS_HANDLE VrNBPool;
