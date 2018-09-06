@@ -525,7 +525,7 @@ win_schedule_work(unsigned int cpu, void(*fn)(void *), void *arg)
     cb_data->user_cb = fn;
     cb_data->data = arg;
 
-    work_item = NdisAllocateIoWorkItem(VrSwitchObject->NdisFilterHandle);
+    work_item = NdisAllocateIoWorkItem(VrDriverHandle);
     if (!work_item) {
         scheduled_work_routine((PVOID)(cb_data), NULL);
     } else {
@@ -580,7 +580,7 @@ win_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
     cb_data->user_cb = user_cb;
     cb_data->router = router;
 
-    work_item = NdisAllocateIoWorkItem(VrSwitchObject->NdisFilterHandle);
+    work_item = NdisAllocateIoWorkItem(VrDriverHandle);
     if (!work_item) {
         deferred_work_routine((PVOID)(cb_data), NULL);
     } else {
