@@ -108,12 +108,12 @@ static const struct rte_eth_rxconf rx_queue_conf = {
 /* TX ring configuration */
 static const struct rte_eth_txconf tx_queue_conf = {
     .tx_thresh = {
-        .pthresh = 36,  /* Ring prefetch threshold */
+        .pthresh = 32,  /* Ring prefetch threshold */
         .hthresh = 0,   /* Ring host threshold */
         .wthresh = 0,   /* Ring writeback threshold */
     },
-    .tx_free_thresh = 0,
-    .tx_rs_thresh = 0,      /* Use PMD default values */
+    .tx_free_thresh = 32,
+    .tx_rs_thresh = 32,     /* Use PMD default values */
     .txq_flags = 0          /* Set flags for the Tx queue */
 };
 
