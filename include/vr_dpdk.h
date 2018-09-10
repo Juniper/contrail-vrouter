@@ -765,7 +765,17 @@ static inline int vr_dpdk_if_lock()
 /* Unlock interface operations */
 static inline int vr_dpdk_if_unlock()
 { return pthread_mutex_unlock(&vr_dpdk.if_lock); }
-uint16_t dpdk_get_ether_header_len(const void *data);
+static inline uint16_t
+dpdk_get_ether_header_len(const void *data)
+{
+    struct ether_hdr *eth = (struct ether_hdr *)data;
+
+    if (eth->ether_type == rte_cpu_to_be_16(ETHER_TYPE_VLAN))
+        return sizeof(struct ether_hdr) + sizeof(struct vlan_hdr);
+    else
+        return sizeof(struct ether_hdr);
+}
+
 
 /*
  * vr_dpdk_tapdev.c
