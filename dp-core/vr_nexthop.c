@@ -2246,19 +2246,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_GSO;
 
 
-    if (pkt->vp_type == VP_TYPE_IPOIP)
-        pkt->vp_type = VP_TYPE_IP;
-    else if (pkt->vp_type == VP_TYPE_IP6OIP)
-        pkt->vp_type = VP_TYPE_IP6;
-
-    /*
-     * Change the packet type
-     */
-    if (pkt->vp_type == VP_TYPE_IP6)
-        pkt->vp_type = VP_TYPE_IP6OIP;
-    else if (pkt->vp_type == VP_TYPE_IP)
-        pkt->vp_type = VP_TYPE_IPOIP;
-    else
+    if ((pkt->vp_type != VP_TYPE_IPOIP) && (pkt->vp_type != VP_TYPE_IP6OIP))
         pkt->vp_type = VP_TYPE_IP;
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port),
@@ -2543,7 +2531,7 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
                   * since in NAT cases the new destination should have been
                   * looked up.
                   */
-                 if (!vr_flow_forward(nh->nh_router, pkt, fmd))
+                 if (!vr_flow_forward(nh->nh_router, pkt, fmd, NULL))
                      return 0;
 
                  /* pkt->vp_nh could have changed after vr_flow_forward */
@@ -2567,6 +2555,98 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
         return nh_output(pkt, nh->nh_direct_nh, fmd);
     else
         vr_pfree(pkt, VP_DROP_INVALID_NH);
+
+    return 0;
+}
+
+int
+nh_output_bulk(struct vr_packet **pkts, struct vr_nexthop **nhs,
+          struct vr_forwarding_md **fmds, uint32_t n)
+{
+    bool need_flow_lookup;
+    nh_processing_t res;
+    struct vr_nexthop *nh;
+    struct vr_forwarding_md *fmd;
+    struct vr_packet *pkt;
+    int i;
+
+    for (i = 0; i < n; i++) {
+        nh = nhs[i];
+        pkt = pkts[i];
+        fmd = fmds[i];
+
+    loop:
+        need_flow_lookup = false;
+        if (!pkt->vp_ttl) {
+            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ZERO_TTL, NULL);
+            continue;
+        }
+
+        pkt->vp_nh = nh;
+
+
+        /* If nexthop does not have valid data, drop it */
+        if (!(nh->nh_flags & NH_FLAG_VALID)) {
+            vr_pfree(pkt, VP_DROP_INVALID_NH);
+            continue;
+        }
+
+        if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
+            /*
+             * If the packet has not gone through flow lookup once
+             * (!VP_FLAG_FLOW_SET), we need to determine whether it has to undergo
+             * flow lookup now or not. There are two cases:
+             *
+             * 1. when policy flag is set in the nexthop, and
+             * 2. when the source is an ECMP (For bridged packets this ECMP
+             *      is avoided)
+             *
+             * When the source is an ECMP, we would like the packet to reach the
+             * same place from where it came from, and hence a flow has to be setup
+             * so that DP knows where to send the packet to (from an ECMP NH).
+             * Typical example for this situation is when the packet reaches the
+             * target VM's server from an ECMP-ed service chain.
+             */
+             if (!(pkt->vp_flags & VP_FLAG_FLOW_SET)) {
+                 if (nh->nh_flags & (NH_FLAG_POLICY_ENABLED |
+                             NH_FLAG_FLOW_LOOKUP)) {
+                     need_flow_lookup = true;
+                 }
+
+                 if (need_flow_lookup) {
+                     pkt->vp_flags |= VP_FLAG_FLOW_GET;
+                     /*
+                      * after vr_flow_forward returns, pkt->vp_nh could have changed
+                      * since in NAT cases the new destination should have been
+                      * looked up.
+                      */
+                     if (!vr_flow_forward(nh->nh_router, pkt, fmd, NULL))
+                         continue;
+
+                     /* pkt->vp_nh could have changed after vr_flow_forward */
+                     if (!pkt->vp_nh) {
+                         vr_pfree(pkt, VP_DROP_INVALID_NH);
+                         continue;
+                     }
+
+                     if (nh != pkt->vp_nh) {
+                         nh = pkt->vp_nh;
+                         goto loop;
+                     }
+                 }
+            }
+        }
+
+        res = nh->nh_reach_nh(pkt, nh, fmd);
+        if (res == NH_PROCESSING_COMPLETE)
+            continue;
+
+        if ((nh->nh_flags & NH_FLAG_INDIRECT) && nh->nh_direct_nh) {
+            nh = nh->nh_direct_nh;
+            goto loop;
+        } else
+            vr_pfree(pkt, VP_DROP_INVALID_NH);
+    }
 
     return 0;
 }
