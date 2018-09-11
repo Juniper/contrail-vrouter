@@ -12,6 +12,8 @@
 #include <vr_bridge.h>
 #include <vr_packet.h>
 
+#define VR_DPDK_RX_BURST_SZ 32
+
 extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
 extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
                                                  unsigned int);
@@ -611,8 +613,8 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
  * This function demultiplexes the packet to right input
  * function depending on the protocols enabled on the VIF
  */
-unsigned int
-vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
+static inline unsigned int
+vr_virtual_input_inline(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                  unsigned short vlan_id)
 {
@@ -640,16 +642,60 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
         return 0;
     }
 
-    if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd))
+    if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd, NULL))
         return 0;
 
-    vr_bridge_input(vif->vif_router, pkt, fmd);
+    return 1;
+}
+
+unsigned int
+vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
+                 struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+                 unsigned short vlan_id)
+{
+    unsigned int ret;
+
+    ret = vr_virtual_input_inline(vrf, vif, pkt, fmd, vlan_id);
+
+    if (ret == 1)
+        vr_bridge_input(vif->vif_router, pkt, fmd);
 
     return 0;
 }
 
 unsigned int
-vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
+vr_virtual_input_bulk(unsigned short vrf, struct vr_interface *vif,
+                 struct vr_packet **pkts, struct vr_forwarding_md **fmds,
+                 unsigned short *vlan_ids, uint32_t n)
+{
+    uint32_t i, k = 0;
+    struct vr_packet *pkt;
+    struct vr_forwarding_md *fmd;
+    unsigned short vlan_id;
+    struct vr_packet *new_pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_forwarding_md *new_fmds[VR_DPDK_RX_BURST_SZ];
+    unsigned int ret = 0;
+
+    for (i = 0; i < n; i++) {
+        pkt = pkts[i];
+        fmd = fmds[i];
+        vlan_id = vlan_ids[i];
+
+        ret = vr_virtual_input_inline(vrf, vif, pkt, fmd, vlan_id);
+        if (ret != 1)
+            continue;
+
+        new_pkts[k] = pkt;
+        new_fmds[k] = fmd;
+        k++;
+    }
+
+    ret = vr_bridge_input_bulk(vif->vif_router, new_pkts, new_fmds, k);
+    return ret;
+}
+
+static inline unsigned int
+vr_fabric_input_inline(struct vr_interface *vif, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd, unsigned short vlan_id)
 {
     int handled = 0;
@@ -690,6 +736,27 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     if (!handled) {
         pkt_push(pkt, pull_len);
         return vif_xconnect(vif, pkt, fmd);
+    }
+
+    return 0;
+}
+
+unsigned int
+vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
+                struct vr_forwarding_md *fmd, unsigned short vlan_id)
+{
+    return vr_fabric_input_inline(vif, pkt, fmd, vlan_id);
+}
+
+unsigned int
+vr_fabric_input_bulk(struct vr_interface *vif, struct vr_packet **pkts,
+                struct vr_forwarding_md **fmds, unsigned short *vlan_ids,
+                uint32_t n)
+{
+    uint32_t i;
+
+    for (i = 0; i < n; i++) {
+        vr_fabric_input_inline(vif, pkts[i], fmds[i], vlan_ids[i]);
     }
 
     return 0;

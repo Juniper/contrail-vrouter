@@ -13,6 +13,8 @@
 #include "vr_defs.h"
 #include "vr_hash.h"
 
+#define VR_DPDK_RX_BURST_SZ 32
+
 #if defined(__linux__) && defined(__KERNEL__)
 extern short vr_bridge_table_major;
 #endif
@@ -809,8 +811,8 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
     return ml_res;
 }
 
-unsigned int
-vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
+static inline struct vr_nexthop *
+vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
     int reason, handled;
@@ -844,7 +846,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             ml_res = vr_bridge_learn(router, pkt,
                     (struct vr_eth *)pkt_data(pkt), fmd);
             if (ml_res == MAC_TRAPPED)
-                return 0;
+                return NULL;
         }
     }
 
@@ -855,7 +857,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
         if (pull_len && !pkt_pull(pkt, pull_len)) {
             vr_pfree(pkt, VP_DROP_PULL);
-            return 0;
+            return NULL;
         }
     }
 
@@ -875,14 +877,14 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             if (l4_type == L4_TYPE_DHCP_REQUEST) {
                 if (pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED) {
                     vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return 0;
+                    return NULL;
                 }
             }
 
             if (l4_type == L4_TYPE_IGMP) {
                 if (pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED) {
                     vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return 0;
+                    return NULL;
                 }
             }
 
@@ -904,7 +906,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                 }
 
                 if (handled)
-                    return 0;
+                    return NULL;
             }
         }
 
@@ -921,13 +923,13 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
                                  IS_MAC_BMCAST(dmac)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-                return 0;
+                return NULL;
             }
 
             be = bridge_lookup(vr_bcast_mac, fmd);
             if (!be || !(nh = be->be_nh)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-                return 0;
+                return NULL;
             }
             stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
             if (stats)
@@ -961,7 +963,7 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
 
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, overlay_len))) {
                 vr_pfree(pkt, reason);
-                return 0;
+                return NULL;
             }
         }
 
@@ -970,16 +972,59 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             if (!handled) {
                 vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
             }
-            return 0;
+            return NULL;
         }
     }
 
     if (pull_len && !pkt_push(pkt, pull_len)) {
         vr_pfree(pkt, VP_DROP_PUSH);
-        return 0;
+        return NULL;
     }
 
-    nh_output(pkt, nh, fmd);
+    return nh;
+}
+
+unsigned int
+vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
+                struct vr_forwarding_md *fmd)
+{
+    struct vr_nexthop *nh;
+
+    nh = vr_bridge_input_inline(router, pkt, fmd);
+
+    if (nh)
+        nh_output(pkt, nh, fmd);
+
+    return 0;
+}
+
+unsigned int
+vr_bridge_input_bulk(struct vrouter *router, struct vr_packet **pkts,
+                struct vr_forwarding_md **fmds, uint32_t n)
+{
+    struct vr_nexthop *nh;
+    struct vr_packet *pkt;
+    struct vr_forwarding_md *fmd;
+    struct vr_packet *new_pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_forwarding_md *new_fmds[VR_DPDK_RX_BURST_SZ];
+    struct vr_nexthop *nhs[VR_DPDK_RX_BURST_SZ];
+    int i, k = 0;
+
+    for (i = 0; i < n; i++) {
+        pkt = pkts[i];
+        fmd = fmds[i];
+
+        nh = vr_bridge_input_inline(router, pkt, fmd);
+        if (!nh)
+            continue;
+
+        new_pkts[k] = pkt;
+        nhs[k] = nh;
+        new_fmds[k] = fmd;
+        k++;
+    }
+
+    nh_output_bulk(new_pkts, nhs, new_fmds, k);
     return 0;
 }
 
