@@ -786,11 +786,12 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     struct rte_mbuf *pkts[VR_DPDK_RX_BURST_SZ], uint32_t nb_pkts)
 {
     int i;
-    struct rte_mbuf *mbuf;
-    struct vr_packet *pkt;
+    struct rte_mbuf *mbuf[VR_DPDK_RX_BURST_SZ];
+    struct vr_packet *pkt[VR_DPDK_RX_BURST_SZ];
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct rte_mbuf *p_copy;
-    unsigned short vlan_id = VLAN_ID_INVALID;
+    unsigned short vlan_id[VR_DPDK_RX_BURST_SZ];
+    uint32_t n = 0;
 
     RTE_LOG_DP(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -800,14 +801,14 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
             &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif->vif_idx]][0];
         if (likely(monitoring_tx_queue && monitoring_tx_queue->txq_ops.f_tx)) {
             for (i = 0; i < nb_pkts; i++) {
-                mbuf = pkts[i];
+                mbuf[i] = pkts[i];
                 /* convert mbuf to vr_packet */
-                pkt = vr_dpdk_packet_get(mbuf, vif);
+                pkt[i] = vr_dpdk_packet_get(mbuf[i], vif);
                 /*
                  * dp-core changes the original packet, so clone does not work
                  * as expected here.
                  */
-                p_copy = vr_dpdk_pktmbuf_copy_mon(mbuf, vr_dpdk.rss_mempool);
+                p_copy = vr_dpdk_pktmbuf_copy_mon(mbuf[i], vr_dpdk.rss_mempool);
                 if (likely(p_copy != NULL)) {
                     monitoring_tx_queue->txq_ops.f_tx(monitoring_tx_queue->q_queue_h,
                                                         p_copy);
@@ -817,8 +818,9 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     }
 
     for (i = 0; i < nb_pkts; i++) {
-        mbuf = pkts[i];
-        rte_prefetch0(rte_pktmbuf_mtod(mbuf, char *));
+        vlan_id[i] = VLAN_ID_INVALID;
+        mbuf[i] = pkts[i];
+        rte_prefetch0(rte_pktmbuf_mtod(mbuf[i], char *));
 
         /*
          * If vRouter works in VLAN, we check if the packet received on the
@@ -828,14 +830,14 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
          */
         if (unlikely(vr_dpdk.vlan_tag != VLAN_ID_INVALID &&
                 vif_is_fabric(vif))) {
-            if ((mbuf->vlan_tci & 0xFFF) != vr_dpdk.vlan_tag) {
-                if (vr_dpdk.vlan_ring == NULL || rte_vlan_insert(&mbuf)) {
-                    vr_dpdk_pfree(mbuf, vif, VP_DROP_VLAN_FWD_ENQ);
+            if ((mbuf[i]->vlan_tci & 0xFFF) != vr_dpdk.vlan_tag) {
+                if (vr_dpdk.vlan_ring == NULL || rte_vlan_insert(&mbuf[i])) {
+                    vr_dpdk_pfree(mbuf[i], vif, VP_DROP_VLAN_FWD_ENQ);
                     continue;
                 }
                 /* Packets will be dequeued in dpdk_lcore_fwd_io() */
-                if (rte_ring_mp_enqueue(vr_dpdk.vlan_ring, mbuf) != 0)
-                    vr_dpdk_pfree(mbuf, vif, VP_DROP_VLAN_FWD_ENQ);
+                if (rte_ring_mp_enqueue(vr_dpdk.vlan_ring, mbuf[i]) != 0)
+                    vr_dpdk_pfree(mbuf[i], vif, VP_DROP_VLAN_FWD_ENQ);
                 /* Nothing to route, take the next packet. */
                 continue;
             } else {
@@ -846,7 +848,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
                  * clean ethernet frames from fabric interface. If we did not
                  * do this, the VLAN tag would be passed to dp-core processing
                  * and vhost connectivity would be corrupted. */
-                mbuf->ol_flags &= ~PKT_RX_VLAN;
+                mbuf[i]->ol_flags &= ~PKT_RX_VLAN;
             }
         }
 
@@ -854,17 +856,25 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
 #ifdef VR_DPDK_PKT_DUMP_VIF_FILTER
         if (VR_DPDK_PKT_DUMP_VIF_FILTER(vif))
 #endif
-        rte_pktmbuf_dump(stdout, mbuf, 0x60);
+        rte_pktmbuf_dump(stdout, mbuf[i], 0x60);
 #endif
 
-        if ((mbuf->ol_flags & PKT_RX_VLAN) != 0) {
-            vlan_id = mbuf->vlan_tci & 0xFFF;
+        if ((mbuf[i]->ol_flags & PKT_RX_VLAN) != 0) {
+            vlan_id[n] = mbuf[i]->vlan_tci & 0xFFF;
         }
 
         /* convert mbuf to vr_packet */
-        pkt = vr_dpdk_packet_get(mbuf, vif);
-        /* send the packet to vRouter */
-        vif->vif_rx(vif, pkt, vlan_id);
+        pkt[n] = vr_dpdk_packet_get(mbuf[i], vif);
+        n++;
+    }
+
+    /* send the packets to vRouter */
+    if (vif->vif_rx_bulk) {
+        vif->vif_rx_bulk(vif, pkt, vlan_id, n);
+    } else {
+        for (i = 0; i < n; i++) {
+            vif->vif_rx(vif, pkt[i], vlan_id[i]);
+        }
     }
 }
 
