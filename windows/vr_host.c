@@ -33,6 +33,7 @@ unsigned int win_get_cpu(void);
 extern struct vr_packet *win_pclone(struct vr_packet *vrPkt);
 extern void win_pfree(struct vr_packet *vrPkt, unsigned short reason);
 
+static NDIS_IO_WORKITEM_FUNCTION scheduled_work_routine;
 static NDIS_IO_WORKITEM_FUNCTION deferred_work_routine;
 
 void
@@ -492,7 +493,7 @@ win_create_timer(struct vr_timer *vtimer)
     return 0;
 }
 
-static void
+static VOID
 scheduled_work_routine(PVOID work_item_context, NDIS_HANDLE work_item_handle)
 {
     struct scheduled_work_cb_data * cb_data = (struct scheduled_work_cb_data *)(work_item_context);
@@ -502,9 +503,7 @@ scheduled_work_routine(PVOID work_item_context, NDIS_HANDLE work_item_handle)
     cb_data->user_cb(cb_data->data);
     NdisReleaseRWLock(AsyncWorkRWLock, &lock_state);
 
-    if (work_item_handle) {
-        NdisFreeIoWorkItem(work_item_handle);
-    }
+    NdisFreeIoWorkItem(work_item_handle);
     ExFreePool(cb_data);
 
     return;
@@ -525,12 +524,13 @@ win_schedule_work(unsigned int cpu, void(*fn)(void *), void *arg)
     cb_data->user_cb = fn;
     cb_data->data = arg;
 
-    work_item = NdisAllocateIoWorkItem(VrSwitchObject->NdisFilterHandle);
+    work_item = NdisAllocateIoWorkItem(VrDriverHandle);
     if (!work_item) {
-        scheduled_work_routine((PVOID)(cb_data), NULL);
-    } else {
-        NdisQueueIoWorkItem(work_item, scheduled_work_routine, (PVOID)(cb_data));
+        ExFreePool(cb_data);
+        return -ENOMEM;
     }
+
+    NdisQueueIoWorkItem(work_item, scheduled_work_routine, (PVOID)(cb_data));
 
     return 0;
 }
@@ -580,8 +580,12 @@ win_defer(struct vrouter *router, vr_defer_cb user_cb, void *data)
     cb_data->user_cb = user_cb;
     cb_data->router = router;
 
-    work_item = NdisAllocateIoWorkItem(VrSwitchObject->NdisFilterHandle);
+    work_item = NdisAllocateIoWorkItem(VrDriverHandle);
     if (!work_item) {
+        // This callback is expected to always run.
+        // However, a situation, in which NdisAllocateIoWorkItem
+        // consistently fails, may call for some attention.
+        ASSERTMSG("win_defer: NdisAllocateIoWorkItem failed.", work_item != NULL);
         deferred_work_routine((PVOID)(cb_data), NULL);
     } else {
         NdisQueueIoWorkItem(work_item, deferred_work_routine, (PVOID)(cb_data));

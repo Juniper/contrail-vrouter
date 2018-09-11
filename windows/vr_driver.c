@@ -14,7 +14,7 @@ static const PWSTR UniqueName = L"{56553588-1538-4BE6-B8E0-CB46402DC205}";
 static const PWSTR ServiceName = L"vRouter";
 
 static PDRIVER_OBJECT VrDriverObject = NULL;
-static NDIS_HANDLE VrDriverHandle = NULL;
+NDIS_HANDLE VrDriverHandle = NULL;
 
 const ULONG VrAllocationTag = 'RVCO';
 const ULONG VrOidRequestId = 'RVCO';
@@ -231,7 +231,7 @@ InitializeVRouter(pvr_switch_context ctx)
     ASSERT(!ctx->message_up);
     ASSERT(!ctx->vrouter_up);
     ASSERT(!ctx->assembler_up);
-    
+
     /* Before any initialization happens, clean the shared memory tables */
     ShmemClean();
 
@@ -497,7 +497,7 @@ HandleBasicNics(PSWITCH_OBJECT SwitchObject)
     PNDIS_SWITCH_NIC_ARRAY array;
     PNDIS_SWITCH_NIC_PARAMETERS curNic;
     ULONG arrIndex;
-    
+
     status = VrGetNicArray(SwitchObject, &array);
     if (status != NDIS_STATUS_SUCCESS)
         return status;
