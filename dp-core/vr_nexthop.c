@@ -2246,19 +2246,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_GSO;
 
 
-    if (pkt->vp_type == VP_TYPE_IPOIP)
-        pkt->vp_type = VP_TYPE_IP;
-    else if (pkt->vp_type == VP_TYPE_IP6OIP)
-        pkt->vp_type = VP_TYPE_IP6;
-
-    /*
-     * Change the packet type
-     */
-    if (pkt->vp_type == VP_TYPE_IP6)
-        pkt->vp_type = VP_TYPE_IP6OIP;
-    else if (pkt->vp_type == VP_TYPE_IP)
-        pkt->vp_type = VP_TYPE_IPOIP;
-    else
+    if ((pkt->vp_type != VP_TYPE_IPOIP) && (pkt->vp_type != VP_TYPE_IP6OIP))
         pkt->vp_type = VP_TYPE_IP;
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port),
@@ -2493,13 +2481,15 @@ send_fail:
  * Returns 0 - Completion of pkt handling
  *        <0 - Error in pkt handling
  */
-int
-nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
+static inline int
+nh_output_inline(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
-    bool need_flow_lookup = false;
+    bool need_flow_lookup;
     nh_processing_t res;
 
+loop:
+    need_flow_lookup = false;
     if (!pkt->vp_ttl) {
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ZERO_TTL, NULL);
         return 0;
@@ -2543,7 +2533,7 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
                   * since in NAT cases the new destination should have been
                   * looked up.
                   */
-                 if (!vr_flow_forward(nh->nh_router, pkt, fmd))
+                 if (!vr_flow_forward(nh->nh_router, pkt, fmd, NULL))
                      return 0;
 
                  /* pkt->vp_nh could have changed after vr_flow_forward */
@@ -2553,7 +2543,8 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
                  }
 
                  if (nh != pkt->vp_nh) {
-                     return nh_output(pkt, pkt->vp_nh, fmd);
+                     nh = pkt->vp_nh;
+                     goto loop;
                  }
              }
         }
@@ -2567,6 +2558,26 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
         return nh_output(pkt, nh->nh_direct_nh, fmd);
     else
         vr_pfree(pkt, VP_DROP_INVALID_NH);
+
+    return 0;
+}
+
+int
+nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
+          struct vr_forwarding_md *fmd)
+{
+    return nh_output_inline(pkt, nh, fmd);
+}
+
+int
+nh_output_bulk(struct vr_packet **pkts, struct vr_nexthop **nhs,
+          struct vr_forwarding_md **fmds, uint32_t n)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        nh_output_inline(pkts[i], nhs[i], fmds[i]);
+    }
 
     return 0;
 }
