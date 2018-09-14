@@ -805,6 +805,9 @@ vr_rflow_update_ecmp_index(struct vrouter *router, struct vr_flow_entry *fe,
 
     fmd->fmd_ecmp_src_nh_index = new_ecmp_index;
 
+    /* Update hardware reverse flow. */
+    (void)vr_offload_flow_set(rfe, fe->fe_rflow, NULL);
+
     return 0;
 }
 
