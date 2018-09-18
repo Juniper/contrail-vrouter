@@ -611,8 +611,8 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
  * This function demultiplexes the packet to right input
  * function depending on the protocols enabled on the VIF
  */
-unsigned int
-vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
+static inline unsigned int
+vr_virtual_input_inline(unsigned short vrf, struct vr_interface *vif,
                  struct vr_packet *pkt, struct vr_forwarding_md *fmd,
                  unsigned short vlan_id)
 {
@@ -643,13 +643,27 @@ vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
     if (!vr_flow_forward(pkt->vp_if->vif_router, pkt, fmd))
         return 0;
 
-    vr_bridge_input(vif->vif_router, pkt, fmd);
+
+    return 1;
+}
+
+unsigned int
+vr_virtual_input(unsigned short vrf, struct vr_interface *vif,
+                 struct vr_packet *pkt, struct vr_forwarding_md *fmd,
+                 unsigned short vlan_id)
+{
+    unsigned int ret;
+
+    ret = vr_virtual_input_inline(vrf, vif, pkt, fmd, vlan_id);
+
+    if (ret == 1)
+        vr_bridge_input(vif->vif_router, pkt, fmd);
 
     return 0;
 }
 
-unsigned int
-vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
+static inline unsigned int
+vr_fabric_input_inline(struct vr_interface *vif, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd, unsigned short vlan_id)
 {
     int handled = 0;
@@ -693,6 +707,13 @@ vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
     }
 
     return 0;
+}
+
+unsigned int
+vr_fabric_input(struct vr_interface *vif, struct vr_packet *pkt,
+                struct vr_forwarding_md *fmd, unsigned short vlan_id)
+{
+    return vr_fabric_input_inline(vif, pkt, fmd, vlan_id);
 }
 
 int
