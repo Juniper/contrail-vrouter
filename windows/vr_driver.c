@@ -303,101 +303,78 @@ cleanup:
     return NDIS_STATUS_FAILURE;
 }
 
-static NDIS_STATUS
-CreateSwitch(PSWITCH_OBJECT Switch)
+static PSWITCH_OBJECT
+AllocateSwitchObject(NDIS_HANDLE NdisFilterHandle,
+                     NDIS_SWITCH_CONTEXT SwitchContext,
+                     NDIS_SWITCH_OPTIONAL_HANDLERS SwitchHandlers)
+{
+    ULONG switchObjectSize = sizeof(SWITCH_OBJECT);
+    PSWITCH_OBJECT switchObject = ExAllocatePoolWithTag(NonPagedPoolNx, switchObjectSize, VrAllocationTag);
+    if (switchObject == NULL) {
+        return NULL;
+    }
+
+    RtlZeroMemory(switchObject, switchObjectSize);
+    switchObject->Running = FALSE;
+
+    // Initialize NDIS related information.
+    switchObject->NdisFilterHandle = NdisFilterHandle;
+    switchObject->NdisSwitchContext = SwitchContext;
+    switchObject->NdisSwitchHandlers = SwitchHandlers;
+
+    return switchObject;
+}
+
+static PSWITCH_OBJECT
+CreateSwitch(NDIS_HANDLE NdisFilterHandle,
+             NDIS_SWITCH_CONTEXT SwitchContext,
+             NDIS_SWITCH_OPTIONAL_HANDLERS SwitchHandlers)
 {
     if (VrSwitchObject != NULL)
-        return NDIS_STATUS_FAILURE;
+        return NULL;
 
     vr_num_cpus = KeQueryActiveProcessorCount(NULL);
     if (vr_num_cpus == 0)
-        return NDIS_STATUS_FAILURE;
+        return NULL;
 
-    VrSwitchObject = Switch;
+    PSWITCH_OBJECT switchObj = AllocateSwitchObject(NdisFilterHandle, SwitchContext, SwitchHandlers);
+    if (switchObj == NULL)
+        return NULL;
+
+    VrSwitchObject = switchObj;
 
     BOOLEAN windows = FALSE;
     BOOLEAN vrouter = FALSE;
 
-    NDIS_STATUS status = InitializeWindowsComponents(Switch);
+    NDIS_STATUS status = InitializeWindowsComponents(switchObj);
     if (!NT_SUCCESS(status))
         goto cleanup;
     windows = TRUE;
 
-    status = InitializeVRouter(Switch->ExtensionContext);
+    status = InitializeVRouter(switchObj->ExtensionContext);
     if (!NT_SUCCESS(status))
         goto cleanup;
     vrouter = TRUE;
 
-    return NDIS_STATUS_SUCCESS;
+    return switchObj;
 
 cleanup:
     if (vrouter)
-        UninitializeVRouter(Switch->ExtensionContext);
+        UninitializeVRouter(switchObj->ExtensionContext);
 
     if (windows)
-        UninitializeWindowsComponents(Switch->ExtensionContext);
+        UninitializeWindowsComponents(switchObj->ExtensionContext);
 
+    ExFreePool(switchObj);
     VrSwitchObject = NULL;
 
-    return NDIS_STATUS_FAILURE;
+    return NULL;
 }
 
-NDIS_STATUS
-FilterAttach(NDIS_HANDLE NdisFilterHandle,
-             NDIS_HANDLE DriverContext,
-             PNDIS_FILTER_ATTACH_PARAMETERS AttachParameters)
+static NDIS_STATUS
+SetFilterContextAndAttibutes(NDIS_HANDLE NdisFilterHandle, PSWITCH_OBJECT SwitchObject)
 {
-    NDIS_STATUS status;
     NDIS_FILTER_ATTRIBUTES filterAttributes;
-    ULONG switchObjectSize;
-    NDIS_SWITCH_CONTEXT switchContext;
-    NDIS_SWITCH_OPTIONAL_HANDLERS switchHandler;
-    PSWITCH_OBJECT switchObject;
-
-    UNREFERENCED_PARAMETER(DriverContext);
-
-    status = NDIS_STATUS_SUCCESS;
-    switchObject = NULL;
-    switchObjectSize = sizeof(SWITCH_OBJECT);
-
-    NT_ASSERT(DriverContext == (NDIS_HANDLE)VrDriverObject);
-
-    /*
-     * License: MS-PL
-     * Copyright (c) 2015 Microsoft
-     * https://github.com/Microsoft/Windows-driver-samples/blob/master/network/ndis/extension/base/SxBase.c
-     */
-
-    // Accept Ethernet only
-    if (AttachParameters->MiniportMediaType != NdisMedium802_3) {
-        status = NDIS_STATUS_INVALID_PARAMETER;
-        goto Cleanup;
-    }
-
-    switchHandler.Header.Type = NDIS_OBJECT_TYPE_SWITCH_OPTIONAL_HANDLERS;
-    switchHandler.Header.Size = NDIS_SIZEOF_SWITCH_OPTIONAL_HANDLERS_REVISION_1;
-    switchHandler.Header.Revision = NDIS_SWITCH_OPTIONAL_HANDLERS_REVISION_1;
-
-    status = NdisFGetOptionalSwitchHandlers(NdisFilterHandle, &switchContext, &switchHandler);
-    if (status != NDIS_STATUS_SUCCESS)
-        goto Cleanup;
-
-    switchObject = ExAllocatePoolWithTag(NonPagedPoolNx, switchObjectSize, VrAllocationTag);
-    if (switchObject == NULL) {
-        status = NDIS_STATUS_RESOURCES;
-        goto Cleanup;
-    }
-
-    RtlZeroMemory(switchObject, switchObjectSize);
-
-    // Initialize NDIS related information.
-    switchObject->NdisFilterHandle = NdisFilterHandle;
-    switchObject->NdisSwitchContext = switchContext;
-    switchObject->NdisSwitchHandlers = switchHandler;
-
-    status = CreateSwitch(switchObject);
-    if (status != NDIS_STATUS_SUCCESS)
-        goto Cleanup;
 
     filterAttributes.Header.Revision = NDIS_FILTER_ATTRIBUTES_REVISION_1;
     filterAttributes.Header.Size = NDIS_SIZEOF_FILTER_ATTRIBUTES_REVISION_1;
@@ -405,19 +382,53 @@ FilterAttach(NDIS_HANDLE NdisFilterHandle,
     filterAttributes.Flags = 0;
 
     NDIS_DECLARE_FILTER_MODULE_CONTEXT(SWITCH_OBJECT);
-    status = NdisFSetAttributes(NdisFilterHandle, switchObject, &filterAttributes);
-    if (status != NDIS_STATUS_SUCCESS)
-        goto Cleanup;
+    return NdisFSetAttributes(NdisFilterHandle, SwitchObject, &filterAttributes);
+}
 
-    switchObject->Running = FALSE;
+static NDIS_STATUS
+GetSwitchHandlersAndContext(NDIS_HANDLE NdisFilterHandle,
+                            PNDIS_SWITCH_CONTEXT OutContext,
+                            PNDIS_SWITCH_OPTIONAL_HANDLERS OutHandlers)
+{
+    OutHandlers->Header.Type = NDIS_OBJECT_TYPE_SWITCH_OPTIONAL_HANDLERS;
+    OutHandlers->Header.Size = NDIS_SIZEOF_SWITCH_OPTIONAL_HANDLERS_REVISION_1;
+    OutHandlers->Header.Revision = NDIS_SWITCH_OPTIONAL_HANDLERS_REVISION_1;
+
+    return NdisFGetOptionalSwitchHandlers(NdisFilterHandle, OutContext, OutHandlers);
+}
+
+NDIS_STATUS
+FilterAttach(NDIS_HANDLE NdisFilterHandle,
+             NDIS_HANDLE DriverContext,
+             PNDIS_FILTER_ATTACH_PARAMETERS AttachParameters)
+{
+    UNREFERENCED_PARAMETER(DriverContext);
+    NT_ASSERT(DriverContext == (NDIS_HANDLE)VrDriverObject);
+
+    // Accept Ethernet only
+    if (AttachParameters->MiniportMediaType != NdisMedium802_3) {
+        return NDIS_STATUS_INVALID_PARAMETER;
+    }
+
+    NDIS_SWITCH_CONTEXT switchContext;
+    NDIS_SWITCH_OPTIONAL_HANDLERS switchHandlers;
+    NDIS_STATUS status = GetSwitchHandlersAndContext(NdisFilterHandle, &switchContext, &switchHandlers);
+    if (status != NDIS_STATUS_SUCCESS) {
+        return status;
+    }
+
+    PSWITCH_OBJECT switchObject = CreateSwitch(NdisFilterHandle, switchContext, switchHandlers);
+    if (switchObject == NULL) {
+        return NDIS_STATUS_FAILURE;
+    }
+
+    status = SetFilterContextAndAttibutes(NdisFilterHandle, switchObject);
+    if (status != NDIS_STATUS_SUCCESS) {
+        ExFreePool(switchObject);
+        return status;
+    }
 
     return NDIS_STATUS_SUCCESS;
-
-Cleanup:
-    if (switchObject != NULL)
-        ExFreePool(switchObject);
-
-    return status;
 }
 
 VOID
