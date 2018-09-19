@@ -17,6 +17,7 @@ sources = [
     'win_packet.c',
     'win_pclone.c',
     'win_pfree.c',
+    'win_csum.c',
 ]
 
 env.StaticLibrary('win_packet', source = sources)
