@@ -1179,7 +1179,7 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     }
 }
 
-static uint16_t
+static inline uint16_t
 dpdk_get_ether_header_len(const void *data)
 {
     struct ether_hdr *eth = (struct ether_hdr *)data;
