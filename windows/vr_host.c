@@ -485,29 +485,56 @@ win_pgso_size(struct vr_packet *pkt)
 static void
 win_delete_timer(struct vr_timer *vtimer)
 {
-    EXT_DELETE_PARAMETERS params;
-    ExInitializeDeleteTimerParameters(&params);
-    params.DeleteContext = NULL;
-    params.DeleteCallback = NULL;
-    ExDeleteTimer(vtimer->vt_os_arg, TRUE, FALSE, &params);
+    ASSERTMSG("IRQL is too high for ExDeleteTimer", KeGetCurrentIrql() <= APC_LEVEL);
+
+    EXT_DELETE_PARAMETERS parameters;
+    ExInitializeDeleteTimerParameters(&parameters);
+
+    PEX_TIMER timer = vtimer->vt_os_arg;
+    const BOOLEAN doCancel = TRUE;
+    const BOOLEAN doWaitForCompletion = TRUE;
+    BOOLEAN canceled = ExDeleteTimer(timer, doCancel, doWaitForCompletion, &parameters);
+    ASSERTMSG("Timer should be canceled as a result of ExDeleteTimer", canceled);
 }
 
-void
-win_timer_callback(PEX_TIMER Timer, void *Context)
+static VOID
+TimerCallback(PEX_TIMER Timer, PVOID Context)
 {
     UNREFERENCED_PARAMETER(Timer);
 
-    struct vr_timer *ctx = (struct vr_timer*)Context;
+    ASSERTMSG("Timer callbacks are called on DISPATCH_LEVEL", KeGetCurrentIrql() == DISPATCH_LEVEL);
+
+    struct vr_timer *ctx = (struct vr_timer *)Context;
     ctx->vt_timer(ctx->vt_vr_arg);
+}
+
+static LONGLONG
+ConvertMillisTo100Nanos(const LONGLONG msecs)
+{
+    return 10000LL * msecs;
 }
 
 static int
 win_create_timer(struct vr_timer *vtimer)
 {
-    vtimer->vt_os_arg = ExAllocateTimer(win_timer_callback, (void *)vtimer, EX_TIMER_HIGH_RESOLUTION);
+    PVOID context = (PVOID)vtimer;
+    ULONG attributes = EX_TIMER_HIGH_RESOLUTION;
+    PEX_TIMER timer = ExAllocateTimer(TimerCallback, context, attributes);
+    if (timer == NULL) {
+        return -ENOMEM;
+    }
 
-    // DueTime is negative, because it's then treated as relative time instead of absolute.
-    ExSetTimer(vtimer->vt_os_arg, (-10000LL) * vtimer->vt_msecs, 10000LL * vtimer->vt_msecs, NULL);
+    vtimer->vt_os_arg = timer;
+
+    EXT_SET_PARAMETERS parameters;
+    ExInitializeSetTimerParameters(&parameters);
+
+    // From ExSetTimer docs: "If the value of the DueTime parameter is negative,
+    // the expiration time is relative to the current system time."
+    LONGLONG dueTime = -ConvertMillisTo100Nanos(vtimer->vt_msecs);
+    LONGLONG period = ConvertMillisTo100Nanos(vtimer->vt_msecs);
+    BOOLEAN wasPending = ExSetTimer(timer, dueTime, period, &parameters);
+    ASSERTMSG("Allocated timer should not be pending before ExSetTimer", !wasPending);
 
     return 0;
 }

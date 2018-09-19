@@ -103,10 +103,13 @@ VrAssemblerTableScan(void *arg)
     unsigned int i, j, scanned = 0;
 
     struct vr_win_fragment_bucket *vfb;
+    struct vr_win_fragment_bucket *table;
 
     i = vr_win_assembler_scan_index;
     for (j = 0; j < VR_ASSEMBLER_BUCKET_COUNT; j++) {
-        vfb = &VrAssemblerTable[(i + j) % VR_ASSEMBLER_BUCKET_COUNT];
+        table = VrAssemblerTable;
+        ASSERTMSG("VrAssemblerTable should not be freed during this call", table != NULL);
+        vfb = &table[(i + j) % VR_ASSEMBLER_BUCKET_COUNT];
         KeAcquireSpinLock(&vfb->vfb_lock, &old_irql);
         if (vfb->vfb_frag_list)
             scanned += vr_assembler_table_scan(&vfb->vfb_frag_list);
