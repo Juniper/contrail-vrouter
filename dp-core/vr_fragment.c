@@ -269,6 +269,7 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
     if (vr_create_timer(vtimer)) {
         vr_free(vtimer, VR_TIMER_OBJECT);
         vr_assembler_table_scan_timer = NULL;
+        return -ENOMEM;
     }
 
     return 0;
