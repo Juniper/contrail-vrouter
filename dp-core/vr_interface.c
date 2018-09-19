@@ -15,15 +15,26 @@
 #include "vr_bridge.h"
 #include "vr_btable.h"
 
+#define VR_DPDK_RX_BURST_SZ 32
+
 unsigned int vr_interfaces = VR_MAX_INTERFACES;
 
 volatile bool agent_alive = false;
 
 static struct vr_host_interface_ops *hif_ops;
 
+#if defined(__linux__) && !defined(__KERNEL__)
+static inline void rte_prefetch0(const volatile void *p)
+{
+        asm volatile ("prefetcht0 %[p]" : : [p] "m" (*(const volatile char *)p));
+}
+#endif
+
 static int vm_srx(struct vr_interface *, struct vr_packet *, unsigned short);
 static int vm_rx(struct vr_interface *, struct vr_packet *, unsigned short);
+static int vm_rx_bulk(struct vr_interface *, struct vr_packet **, unsigned short *, uint32_t);
 static int eth_rx(struct vr_interface *, struct vr_packet *, unsigned short);
+static int eth_rx_bulk(struct vr_interface *, struct vr_packet **, unsigned short *, uint32_t);
 static mac_response_t vm_mac_request(struct vr_interface *, struct vr_packet *,
                 struct vr_forwarding_md *, unsigned char *);
 static void vif_fat_flow_free(uint8_t **);
@@ -190,10 +201,13 @@ static void
 vr_interface_service_disable(struct vr_interface *vif)
 {
 
-    if (vif_is_virtual(vif))
+    if (vif_is_virtual(vif)) {
         vif->vif_rx = vm_rx;
-    else
+        vif->vif_rx_bulk = vm_rx_bulk;
+    } else {
         vif->vif_rx = eth_rx;
+        vif->vif_rx_bulk = eth_rx_bulk;
+    }
 
     /*
      * once everybody sees the change, we are free to do whatever
@@ -1204,6 +1218,70 @@ vm_rx(struct vr_interface *vif, struct vr_packet *pkt,
     return ret;
 }
 
+#ifndef _WIN32
+static __thread struct vr_forwarding_md fmds_per_thread[VR_DPDK_RX_BURST_SZ];
+#endif
+
+#ifdef _WIN32
+static int
+vm_rx_bulk(struct vr_interface *vif, struct vr_packet **pkts,
+        unsigned short *vlan_ids, uint32_t n)
+{
+    uint32_t i;
+    int ret;
+
+    for (i = 0; i < n; i++) {
+        ret = vm_rx(vif, pkts[i], vlan_ids[i]);
+    }
+
+    return ret;
+}
+#else
+static int
+vm_rx_bulk(struct vr_interface *vif, struct vr_packet **pkts,
+        unsigned short *vlan_ids, uint32_t n)
+{
+    struct vr_packet *new_pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_forwarding_md *new_fmds[VR_DPDK_RX_BURST_SZ];
+    unsigned short new_vlan_ids[VR_DPDK_RX_BURST_SZ];
+    struct vr_packet *pkt;
+    struct vr_forwarding_md *fmd, *fmds;
+    unsigned short vlan_id;
+    uint32_t i;
+    uint32_t k = 0;
+    int ret = 0;
+
+    fmds = fmds_per_thread;
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    for (i = 0; i < n; i++) {
+        rte_prefetch0(&fmds[i]);
+        rte_prefetch0(pkts[i]);
+        rte_prefetch0(pkt_data(pkts[i]) - 64);
+        rte_prefetch0(pkt_data(pkts[i]));
+    }
+#endif
+
+    for (i = 0; i < n; i++) {
+        pkt = pkts[i];
+        fmd = &fmds[i];
+        vlan_id = vlan_ids[i];
+
+        ret = vm_rx_inline(vif, pkt, vlan_id, &fmd);
+        if (ret != 0)
+            continue;
+
+        new_fmds[k] = fmd;
+        new_pkts[k] = pkt;
+        new_vlan_ids[k] = vlan_id;
+        k++;
+    }
+
+    ret = vr_virtual_input_bulk(vif->vif_vrf, vif, new_pkts, new_fmds, new_vlan_ids, k);
+    return ret;
+}
+#endif
+
 static int
 tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id)
@@ -1390,6 +1468,63 @@ eth_rx(struct vr_interface *vif, struct vr_packet *pkt,
     return ret;
 }
 
+#ifdef _WIN32
+static int
+eth_rx_bulk(struct vr_interface *vif, struct vr_packet **pkts,
+        unsigned short *vlan_ids, uint32_t n)
+{
+    uint32_t i;
+    int ret;
+
+    for (i = 0; i < n; i++) {
+        ret = eth_rx(vif, pkts[i], vlan_ids[i]);
+    }
+
+    return ret;
+}
+#else
+static int
+eth_rx_bulk(struct vr_interface *vif, struct vr_packet **pkts,
+        unsigned short *vlan_ids, uint32_t n)
+{
+    struct vr_forwarding_md *fmd, *fmds;
+    struct vr_packet *pkt;
+    struct vr_packet *new_pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_forwarding_md *new_fmds[VR_DPDK_RX_BURST_SZ];
+    unsigned short new_vlan_ids[VR_DPDK_RX_BURST_SZ];
+    unsigned short vlan_id;
+    uint32_t i, k = 0;
+    int ret = 0;
+
+    fmds = fmds_per_thread;
+
+#if defined(__linux__) && !defined(__KERNEL__)
+    for (i = 0; i < n; i++) {
+        rte_prefetch0(&fmds[i]);
+        rte_prefetch0(pkts[i]);
+    }
+#endif
+
+    for (i = 0; i < n; i++) {
+        pkt = pkts[i];
+        fmd = &fmds[i];
+        vlan_id = vlan_ids[i];
+
+        ret = eth_rx_inline(vif, pkt, vlan_id, &fmd);
+        if (ret != 0)
+            continue;
+
+        new_pkts[k] = pkt;
+        new_fmds[k] = fmd;
+        new_vlan_ids[k] = vlan_id;
+        k++;
+    }
+
+    ret = vr_fabric_input_bulk(vif, new_pkts, new_fmds, new_vlan_ids, k);
+    return ret;
+}
+#endif
+
 static int
 eth_tx(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
@@ -1503,10 +1638,12 @@ eth_drv_add(struct vr_interface *vif,
 
         if (vif_is_virtual(vif)) {
             vif->vif_rx = vm_rx;
+            vif->vif_rx_bulk = vm_rx_bulk;
             vif->vif_set_rewrite = vif_cmn_rewrite;
             vif->vif_mac_request = vm_mac_request;
         } else {
             vif->vif_rx = eth_rx;
+            vif->vif_rx_bulk = eth_rx_bulk;
             vif->vif_set_rewrite = eth_set_rewrite;
             vif->vif_mac_request = eth_mac_request;
         }

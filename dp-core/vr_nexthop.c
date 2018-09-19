@@ -2246,19 +2246,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         pkt->vp_flags |= VP_FLAG_GSO;
 
 
-    if (pkt->vp_type == VP_TYPE_IPOIP)
-        pkt->vp_type = VP_TYPE_IP;
-    else if (pkt->vp_type == VP_TYPE_IP6OIP)
-        pkt->vp_type = VP_TYPE_IP6;
-
-    /*
-     * Change the packet type
-     */
-    if (pkt->vp_type == VP_TYPE_IP6)
-        pkt->vp_type = VP_TYPE_IP6OIP;
-    else if (pkt->vp_type == VP_TYPE_IP)
-        pkt->vp_type = VP_TYPE_IPOIP;
-    else
+    if ((pkt->vp_type != VP_TYPE_IPOIP) && (pkt->vp_type != VP_TYPE_IP6OIP))
         pkt->vp_type = VP_TYPE_IP;
 
     if (nh_udp_tunnel_helper(pkt, htons(udp_src_port),
@@ -2545,7 +2533,7 @@ loop:
                   * since in NAT cases the new destination should have been
                   * looked up.
                   */
-                 if (!vr_flow_forward(nh->nh_router, pkt, fmd))
+                 if (!vr_flow_forward(nh->nh_router, pkt, fmd, NULL))
                      return 0;
 
                  /* pkt->vp_nh could have changed after vr_flow_forward */
@@ -2580,6 +2568,19 @@ nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
     return nh_output_inline(pkt, nh, fmd);
+}
+
+int
+nh_output_bulk(struct vr_packet **pkts, struct vr_nexthop **nhs,
+          struct vr_forwarding_md **fmds, uint32_t n)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        nh_output_inline(pkts[i], nhs[i], fmds[i]);
+    }
+
+    return 0;
 }
 
 static nh_processing_t

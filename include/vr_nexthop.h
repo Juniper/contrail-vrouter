@@ -229,6 +229,8 @@ extern int vr_ip_rcv(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
 extern int nh_output(struct vr_packet *,
         struct vr_nexthop *, struct vr_forwarding_md *);
+extern int nh_output_bulk(struct vr_packet **,
+        struct vr_nexthop **, struct vr_forwarding_md **, uint32_t);
 extern int vr_nexthop_add(vr_nexthop_req *);
 extern int vr_nexthop_get(vr_nexthop_req *);
 extern int vr_nexthop_dump(vr_nexthop_req *);

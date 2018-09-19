@@ -13,6 +13,8 @@
 #include "vr_defs.h"
 #include "vr_hash.h"
 
+#define VR_DPDK_RX_BURST_SZ 32
+
 #if defined(__linux__) && defined(__KERNEL__)
 extern short vr_bridge_table_major;
 #endif
@@ -993,6 +995,36 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
     if (nh)
         nh_output(pkt, nh, fmd);
 
+    return 0;
+}
+
+unsigned int
+vr_bridge_input_bulk(struct vrouter *router, struct vr_packet **pkts,
+                struct vr_forwarding_md **fmds, uint32_t n)
+{
+    struct vr_nexthop *nh;
+    struct vr_packet *pkt;
+    struct vr_forwarding_md *fmd;
+    struct vr_packet *new_pkts[VR_DPDK_RX_BURST_SZ];
+    struct vr_forwarding_md *new_fmds[VR_DPDK_RX_BURST_SZ];
+    struct vr_nexthop *nhs[VR_DPDK_RX_BURST_SZ];
+    int i, k = 0;
+
+    for (i = 0; i < n; i++) {
+        pkt = pkts[i];
+        fmd = fmds[i];
+
+        nh = vr_bridge_input_inline(router, pkt, fmd);
+        if (!nh)
+            continue;
+
+        new_pkts[k] = pkt;
+        nhs[k] = nh;
+        new_fmds[k] = fmd;
+        k++;
+    }
+
+    nh_output_bulk(new_pkts, nhs, new_fmds, k);
     return 0;
 }
 
