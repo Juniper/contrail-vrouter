@@ -836,7 +836,20 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
 {
     uint8_t port_id;
     struct vr_dpdk_ethdev *ethdev;
+#if (RTE_VERSION < RTE_VERSION_NUM(17, 11, 0, 0))
     struct rte_eth_dev *ethdev_ptr;
+#else
+    char name[VR_INTERFACE_NAME_LEN];
+    int ret;
+
+    ret = snprintf(name, sizeof(name), "eth_af_packet_%d", vif->vif_idx);
+    if (ret >= sizeof(name)) {
+        RTE_LOG(ERR, VROUTER,
+                "    error creating name for af_packet device %s\n", name);
+        return ret;
+    }
+
+#endif
 
     RTE_LOG(INFO, VROUTER, "Deleting vif %u %s device\n", vif->vif_idx,
             vif_is_fabric(vif) ? "eth" : "af_packet");
@@ -852,7 +865,9 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
     }
 
     ethdev = (struct vr_dpdk_ethdev *)(vif->vif_os);
+#if (RTE_VERSION < RTE_VERSION_NUM(17, 11, 0, 0))
     ethdev_ptr = ethdev->ethdev_ptr;
+#endif
     port_id = ethdev->ethdev_port_id;
 
     /* unschedule RX/TX queues */
@@ -872,6 +887,9 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
          */
         rte_eth_dev_close(port_id);
 
+#if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
+        rte_eth_dev_detach(port_id, name);
+#else
         rte_free(ethdev_ptr->data->dev_private);
         rte_free(ethdev_ptr->data);
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
@@ -881,6 +899,7 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
 #endif
 
         rte_eth_dev_release_port(ethdev_ptr);
+#endif
     }
 
     dpdk_vif_queue_free(vif);
