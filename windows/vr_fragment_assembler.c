@@ -106,6 +106,7 @@ VrAssemblerTableScan(void *arg)
 
     i = vr_win_assembler_scan_index;
     for (j = 0; j < VR_ASSEMBLER_BUCKET_COUNT; j++) {
+        ASSERTMSG("VrAssemblerTable should not be freed during this call", VrAssemblerTable != NULL);
         vfb = &VrAssemblerTable[(i + j) % VR_ASSEMBLER_BUCKET_COUNT];
         KeAcquireSpinLock(&vfb->vfb_lock, &old_irql);
         if (vfb->vfb_frag_list)
