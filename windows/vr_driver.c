@@ -6,8 +6,9 @@
 #include "windows_devices.h"
 #include "windows_nbl.h"
 
-#include "vrouter.h"
-#include "vr_packet.h"
+#include <vrouter.h>
+#include <vr_packet.h>
+#include <vr_interface.h>
 
 static const PWSTR FriendlyName = L"OpenContrail's vRouter forwarding extension";
 static const PWSTR UniqueName = L"{56553588-1538-4BE6-B8E0-CB46402DC205}";
@@ -522,6 +523,26 @@ HandleBasicNics(PSWITCH_OBJECT SwitchObject)
     return NDIS_STATUS_SUCCESS;
 }
 
+static struct vr_interface *
+GetVrInterfaceByGuid(GUID if_guid)
+{
+    struct vrouter *vrouter = vrouter_get(0);
+    ASSERT(vrouter != NULL);
+
+    for (int i = 0; i < vrouter->vr_max_interfaces; i++) {
+        struct vr_interface* vif = vrouter->vr_interfaces[i];
+
+        if (vif == NULL)
+            continue;
+
+        if (IsEqualGUID(&vif->vif_guid, &if_guid))
+            return vif;
+    }
+
+    // VIF is not registered, very temporary state
+    return NULL;
+}
+
 VOID
 HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
 {
@@ -529,9 +550,19 @@ HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
         ExternalNicEntry.PortId = NicParams->PortId;
         ExternalNicEntry.NicIndex = NicParams->NicIndex;
         ExternalNicEntry.IsConnected = TRUE;
-    } else if (NicParams->NicType == NdisSwitchNicTypeInternal && !InternalNicEntry.IsConnected) {
-        InternalNicEntry.PortId = NicParams->PortId;
-        InternalNicEntry.NicIndex = NicParams->NicIndex;
-        InternalNicEntry.IsConnected = TRUE;
+    } else if (NicParams->NicType == NdisSwitchNicTypeInternal) {
+        if (!InternalNicEntry.IsConnected) {
+            // probably host
+            InternalNicEntry.PortId = NicParams->PortId;
+            InternalNicEntry.NicIndex = NicParams->NicIndex;
+            InternalNicEntry.IsConnected = TRUE;
+        } else {
+            // probably container
+            struct vr_interface *vif = GetVrInterfaceByGuid(NicParams->NetCfgInstanceId);
+            if (vif) {
+                vif->vif_port = NicParams->PortId;
+                vif->vif_nic = NicParams->NicIndex;
+            }
+        }
     }
 }

@@ -925,7 +925,7 @@ win_update_vif_port(struct vr_interface *vif, vr_interface_req *vifr, PNDIS_SWIT
 
         if (element->NicType == NdisSwitchNicTypeExternal || element->NicType == NdisSwitchNicTypeInternal)
         {
-            if (memcmp(&element->NetCfgInstanceId, vifr->vifr_if_guid, sizeof(element->NetCfgInstanceId)) == 0)
+            if (IsEqualGUID(&element->NetCfgInstanceId, vifr->vifr_if_guid))
             {
                 vif->vif_port = element->PortId;
                 vif->vif_nic = element->NicIndex;
@@ -965,9 +965,13 @@ win_register_nic(struct vr_interface* vif, vr_interface_req* vifr)
     PNDIS_SWITCH_NIC_ARRAY array;
     NDIS_STATUS status;
 
-    if (vifr->vifr_if_guid == NULL)
-        return; // Bad Sandesh version on utility tool
+    if (vifr->vifr_type == VIF_TYPE_AGENT) {
+        // pkt0 is not a real interface on Windows
+        return;
+    }
 
+    // is this a good idea? padding?
+    memcpy(&vif->vif_guid, vifr->vifr_if_guid, sizeof(vif->vif_guid));
     status = VrGetNicArray(VrSwitchObject, &array);
     if (status != NDIS_STATUS_SUCCESS) {
         DbgPrint("vRouter:%s(): VrGetNicArray failed to get NIC array\n", __func__);
