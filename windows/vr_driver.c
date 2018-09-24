@@ -5,9 +5,10 @@
 #include "vr_windows.h"
 #include "windows_devices.h"
 #include "windows_nbl.h"
+#include "win_interface.h"
 
-#include "vrouter.h"
-#include "vr_packet.h"
+#include <vrouter.h>
+#include <vr_packet.h>
 
 static const PWSTR FriendlyName = L"OpenContrail's vRouter forwarding extension";
 static const PWSTR UniqueName = L"{56553588-1538-4BE6-B8E0-CB46402DC205}";
@@ -32,7 +33,7 @@ PNDIS_RW_LOCK_EX AsyncWorkRWLock = NULL;
 unsigned int vr_num_cpus;
 int vrouter_dbg = 0;
 
-VR_BASIC_NIC_ENTRY ExternalNicEntry, InternalNicEntry;
+VR_BASIC_NIC_ENTRY ExternalNicEntry, VhostNicEntry;
 
 /*
  * NDIS Function prototypes
@@ -522,6 +523,24 @@ HandleBasicNics(PSWITCH_OBJECT SwitchObject)
     return NDIS_STATUS_SUCCESS;
 }
 
+static BOOLEAN
+doesIfCountedStringStartWithUnicodeString(PIF_COUNTED_STRING_LH s, PUNICODE_STRING prefix)
+{
+    if (s->Length >= prefix->Length) {
+        SIZE_T length = prefix->Length;
+        return (RtlCompareMemory(s->String, prefix->Buffer, length) == length);
+    }
+    else
+        return false;
+}
+
+static BOOLEAN
+isContainerNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
+{
+    UNICODE_STRING containerPrefix = RTL_CONSTANT_STRING(L"Container");
+    return doesIfCountedStringStartWithUnicodeString(&NicParams->NicFriendlyName, &containerPrefix);
+}
+
 VOID
 HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
 {
@@ -529,9 +548,17 @@ HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
         ExternalNicEntry.PortId = NicParams->PortId;
         ExternalNicEntry.NicIndex = NicParams->NicIndex;
         ExternalNicEntry.IsConnected = TRUE;
-    } else if (NicParams->NicType == NdisSwitchNicTypeInternal && !InternalNicEntry.IsConnected) {
-        InternalNicEntry.PortId = NicParams->PortId;
-        InternalNicEntry.NicIndex = NicParams->NicIndex;
-        InternalNicEntry.IsConnected = TRUE;
+    } else if (NicParams->NicType == NdisSwitchNicTypeInternal) {
+        if (isContainerNic(NicParams)) {
+            struct vr_interface *vif = GetVrInterfaceByGuid(NicParams->NetCfgInstanceId);
+            if (vif) {
+                vif->vif_port = NicParams->PortId;
+                vif->vif_nic = NicParams->NicIndex;
+            }
+        } else if (!VhostNicEntry.IsConnected) {
+            VhostNicEntry.PortId = NicParams->PortId;
+            VhostNicEntry.NicIndex = NicParams->NicIndex;
+            VhostNicEntry.IsConnected = TRUE;
+        }
     }
 }
