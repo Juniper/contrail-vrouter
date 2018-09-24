@@ -11,6 +11,7 @@
 #include "win_packet.h"
 #include "win_packet_raw.h"
 #include "win_packet_impl.h"
+#include "win_interface.h"
 #include "windows_nbl.h"
 
 /*
@@ -406,26 +407,6 @@ SplitNetBufferListsByForwardingType(
     }
 }
 
-static struct vr_interface *
-GetAssociatedVrInterface(NDIS_SWITCH_PORT_ID vifPort, NDIS_SWITCH_NIC_INDEX vifNic)
-{
-    struct vrouter *vrouter = vrouter_get(0);
-    ASSERT(vrouter != NULL);
-
-    for (int i = 0; i < vrouter->vr_max_interfaces; i++) {
-        struct vr_interface* vif = vrouter->vr_interfaces[i];
-
-        if (vif == NULL)
-            continue;
-
-        if (vif->vif_port == vifPort && vif->vif_nic == vifNic)
-            return vif;
-    }
-
-    // VIF is not registered, very temporary state
-    return NULL;
-}
-
 static VOID
 HandlePassthroughPacket(
     PSWITCH_OBJECT switchObject,
@@ -436,10 +417,10 @@ HandlePassthroughPacket(
 {
     NDIS_SWITCH_PORT_DESTINATION newDestination = {0};
 
-    if (ExternalNicEntry.IsConnected && InternalNicEntry.IsConnected) {
+    if (ExternalNicEntry.IsConnected && VhostNicEntry.IsConnected) {
         if (source_port == ExternalNicEntry.PortId && source_nic == ExternalNicEntry.NicIndex) {
-            newDestination.PortId = InternalNicEntry.PortId;
-            newDestination.NicIndex = InternalNicEntry.NicIndex;
+            newDestination.PortId = VhostNicEntry.PortId;
+            newDestination.NicIndex = VhostNicEntry.NicIndex;
         } else {
             newDestination.PortId = ExternalNicEntry.PortId;
             newDestination.NicIndex = ExternalNicEntry.NicIndex;
@@ -519,7 +500,7 @@ FilterSendNetBufferLists(
             continue;
         }
 
-        struct vr_interface *vif = GetAssociatedVrInterface(source_port, source_nic);
+        struct vr_interface *vif = GetVrInterfaceByPortAndNic(source_port, source_nic);
 
         if (!vif) {
             // If no vif attached yet, then drop NBL.
