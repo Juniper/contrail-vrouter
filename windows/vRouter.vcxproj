@@ -135,6 +135,7 @@
     <ClInclude Include="win_packet.h" />
     <ClInclude Include="win_csum.h" />
     <ClInclude Include="win_packet_splitting.h" />
+    <ClInclude Include="win_interface.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c">
@@ -284,6 +285,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="win_packet_splitting.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="win_interface.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
