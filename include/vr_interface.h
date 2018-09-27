@@ -305,6 +305,7 @@ struct vr_interface {
 #elif defined(_WIN32)
     NDIS_SWITCH_PORT_ID vif_port;
     NDIS_SWITCH_NIC_INDEX vif_nic;
+    GUID vif_guid;
 #endif
 #endif
     /* Big and less frequently used fields. */

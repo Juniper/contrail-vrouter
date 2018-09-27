@@ -349,7 +349,7 @@ if sys.platform != 'darwin':
             ]
 
             subprocess.call(msbuild, cwd=Dir('#/vrouter').abspath)
-        vrouter_target = File('#/build/debug/vrouter/extension/vRouter/vRouter.sys')
+        vrouter_target = File('#/build/' + env['OPT'] + '/vrouter/extension/vRouter/vRouter.sys')
     else:
         make_cmd = 'cd ' + make_dir + ' && make'
         if kernel_dir: make_cmd += ' KERNELDIR=' + kernel_dir
