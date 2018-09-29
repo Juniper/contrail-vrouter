@@ -958,6 +958,7 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
             vr_uvhost_log("Client %s: shutdown at message receiving\n",
                     uvhm_client_name(vru_cl));
             ret = -1;
+            vr_dpdk_del_persist_feature(uvhm_client_name(vru_cl));
             goto cleanup;
         }
     } else if (vru_cl->vruc_msg_bytes_read < VHOST_USER_HSIZE) {
@@ -1255,7 +1256,6 @@ vr_uvh_nl_vif_del_handler(vrnu_vif_del_t *msg)
     }
     /* Unmmap guest memory. */
     uvhm_client_munmap(vru_cl);
-    vr_dpdk_del_persist_feature(uvhm_client_name(vru_cl));
     vr_uvhost_del_client(vru_cl);
 
     return 0;
