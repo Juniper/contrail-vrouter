@@ -40,6 +40,12 @@
                         <Component Id="VrouterFiles" Guid="A7761417-38C9-4F79-83F4-7579B817EA3D" Win64="yes">
                             <File Id="VrouterExe" Source="../vrouter.exe"/>
                         </Component>
+                        <Component Id="VrmemstatsFiles" Guid="DB20C55F-11D1-44F7-A062-DA4EAB16AC39" Win64="yes">
+                            <File Id="VrmemstatsExe" Source="../vrmemstats.exe"/>
+                        </Component>
+                        <Component Id="MirrorFiles" Guid="79431212-BFC4-4509-A6CC-A88C6B559C68" Win64="yes">
+                            <File Id="MirrorExe" Source="../mirror.exe"/>
+                        </Component>
                         <Component Id="VtestFiles" Guid="13BFC527-4B1B-44F4-80E7-975FA16EA99A" Win64="yes">
                             <File Id="VtestExe" Source="../vtest/vtest.exe"/>
                         </Component>
@@ -64,6 +70,8 @@
             <ComponentRef Id="DropstatsFiles"/>
             <ComponentRef Id="VxlanFiles"/>
             <ComponentRef Id="VrouterFiles"/>
+            <ComponentRef Id="VrmemstatsFiles"/>
+            <ComponentRef Id="MirrorFiles"/>
             <ComponentRef Id="VtestFiles"/>
             <ComponentRef Id="Libxml2DLL"/>
             <ComponentRef Id="VRouterUtilsPath"/>
