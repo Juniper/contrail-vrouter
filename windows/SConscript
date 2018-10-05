@@ -14,10 +14,11 @@ env.Append(CPPFLAGS = '/WX')
 
 # Files should be added when needed to this list
 sources = [
+    'win_csum.c',
     'win_packet.c',
     'win_pclone.c',
     'win_pfree.c',
-    'win_csum.c',
+    'win_tx_postprocess.c',
 ]
 
 env.StaticLibrary('win_packet', source = sources)

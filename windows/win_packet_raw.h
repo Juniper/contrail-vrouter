@@ -20,6 +20,16 @@ long WinPacketRawGetChildCountOf(PWIN_PACKET_RAW Packet);
 long WinPacketRawIncrementChildCountOf(PWIN_PACKET_RAW Packet);
 long WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet);
 
+BOOLEAN WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
+BOOLEAN WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet);
+BOOLEAN WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet);
+
+ULONG WinPacketRawDataLength(PWIN_PACKET_RAW Packet);
+PVOID WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize);
+
 bool WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
 bool WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
 void WinPacketRawComplete(PWIN_PACKET_RAW Packet);
