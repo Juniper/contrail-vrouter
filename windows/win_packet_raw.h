@@ -30,6 +30,8 @@ VOID WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet);
 ULONG WinPacketRawDataLength(PWIN_PACKET_RAW Packet);
 PVOID WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize);
 
+PVOID WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset);
+
 bool WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
 bool WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
 void WinPacketRawComplete(PWIN_PACKET_RAW Packet);

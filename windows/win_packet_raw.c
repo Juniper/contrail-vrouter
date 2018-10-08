@@ -137,6 +137,39 @@ WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize
     return NdisGetDataBuffer(nb, BufferSize, Buffer, 1, 0);
 }
 
+PVOID
+WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset)
+{
+    // THIS FUNCTION IS NOT SECURE
+    // DP-CORE assumes all headers will be contigous, ie. pointers
+    // of type (struct vr_headertype*), when pointing to the beginning
+    // of the header, will be valid for it's entiriety
+
+    // TODO: Extract most of the logic into WIN_PACKET layer.
+
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
+    PMDL current_mdl = NET_BUFFER_CURRENT_MDL(nb);
+    unsigned length = MmGetMdlByteCount(current_mdl) - NET_BUFFER_CURRENT_MDL_OFFSET(nb);
+    while (length < Offset) {
+        /* Get the pointer to the beginning of data represented in current MDL. */
+        Offset -= length;
+
+        current_mdl = current_mdl->Next;
+        if (current_mdl == NULL)
+            return NULL;
+
+        length = MmGetMdlByteCount(current_mdl);
+    }
+
+    void* ret = MmGetSystemAddressForMdlSafe(current_mdl,
+        LowPagePriority | MdlMappingNoExecute);
+    if (ret == NULL)
+        return NULL;
+
+    return (uint8_t*) ret + Offset;
+}
+
 bool
 WinPacketRawIsOwned(PWIN_PACKET_RAW Packet)
 {
