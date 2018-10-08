@@ -3,6 +3,7 @@
 #include <basetsd.h>
 #include <vr_packet.h>
 
+#include "win_assert.h"
 #include "win_csum.h"
 #include "win_memory.h"
 #include "win_packet_impl.h"
@@ -12,12 +13,43 @@
 // TODO: Put it in a header.
 extern void *win_data_at_offset(struct vr_packet *pkt, unsigned short offset);
 
+// TODO: This is duplicated from vr_proto_ip.c because compilation and linking in tests.
+static unsigned short
+vr_ip_csum(struct vr_ip *ip)
+{
+    int sum = 0;
+    unsigned short *ptr = (unsigned short *)ip;
+    unsigned short answer = 0;
+    unsigned short *w = ptr;
+    int len = ip->ip_hl * 4;
+    int nleft = len;
+
+    ip->ip_csum = 0;
+
+    while (nleft > 1) {
+        sum += *w++;
+        nleft -= 2;
+    }
+
+    /* mop up an odd byte, if necessary */
+    if (nleft == 1) {
+        *(unsigned char *)(&answer) = *(unsigned char *)w;
+        sum += answer;
+    }
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    answer = ~sum;
+
+    return answer;
+}
+
 static void
 fix_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
     struct vr_ip *iph;
 
-    ASSERT(0 < offset);
+    WinAssert(0 < offset);
 
     iph = (struct vr_ip *)(pkt_data(pkt) + offset);
     iph->ip_csum = vr_ip_csum(iph);
@@ -28,7 +60,7 @@ zero_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
     struct vr_ip *iph;
 
-    ASSERT(0 < offset);
+    WinAssert(0 < offset);
 
     iph = (struct vr_ip *)(pkt_data(pkt) + offset);
     iph->ip_csum = 0;

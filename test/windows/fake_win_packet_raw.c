@@ -163,6 +163,59 @@ WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet)
     return --Packet->ChildRefCount;
 }
 
+BOOLEAN
+WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return false;
+}
+
+BOOLEAN
+WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return false;
+}
+
+VOID
+WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+BOOLEAN
+WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return false;
+}
+
+VOID
+WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+VOID
+WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+ULONG
+WinPacketRawDataLength(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return 0;
+}
+
+PVOID
+WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize)
+{
+    assert(false && "Not implemented");
+    return NULL;
+}
+
 static PWIN_PACKET_RAW
 WinPacketRawAllocateClone_Impl(PWIN_PACKET_RAW Packet)
 {

@@ -258,6 +258,7 @@ MarkNetBufferListAsSafe(PNET_BUFFER_LIST NetBufferList)
 static int
 __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
+    #if 1
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         fix_tunneled_csum(pkt);
     } else if (pkt->vp_type == VP_TYPE_IP) {
@@ -273,6 +274,10 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     if (fragmented_nbl != NULL) {
         nbl = fragmented_nbl;
     }
+    #else
+    PWIN_PACKET_RAW result = WinTxPostprocess(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(result);
+    #endif
 
     NDIS_SWITCH_PORT_DESTINATION newDestination = VrInterfaceToDestination(vif);
     VrSwitchObject->NdisSwitchHandlers.AddNetBufferListDestination(VrSwitchObject->NdisSwitchContext, nbl, &newDestination);
