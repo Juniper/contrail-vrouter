@@ -15,6 +15,7 @@ env.Append(CPPFLAGS = '/WX')
 # Files should be added when needed to this list
 sources = [
     'win_csum.c',
+    # 'win_packet_splitting.c', # TODO: Uncomment when implementing tests
     'win_packet.c',
     'win_pclone.c',
     'win_pfree.c',

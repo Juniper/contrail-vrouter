@@ -267,12 +267,13 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
-    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
 
-    PNET_BUFFER_LIST fragmented_nbl = split_packet_if_needed(pkt);
-    if (fragmented_nbl != NULL) {
-        nbl = fragmented_nbl;
+    PWIN_MULTI_PACKET fragmentedWinPacket = split_packet_if_needed(pkt);
+    if (fragmentedWinPacket != NULL) {
+        winPacketRaw = WinMultiPacketToRawPacket(fragmentedWinPacket);
     }
+
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
 
     NDIS_SWITCH_PORT_DESTINATION newDestination = VrInterfaceToDestination(vif);
     VrSwitchObject->NdisSwitchHandlers.AddNetBufferListDestination(VrSwitchObject->NdisSwitchContext, nbl, &newDestination);
