@@ -16,8 +16,8 @@
 
 struct SplittingContext {
     struct vr_packet *pkt;
-    PNET_BUFFER_LIST original_nbl;
-    PNET_BUFFER_LIST split_nbl;
+    PWIN_PACKET original_pkt;
+    PWIN_MULTI_PACKET split_pkt;
     int mtu;
 
     // Original packet.
@@ -67,17 +67,15 @@ initialize_splitting_context(
     pctx->pkt = pkt;
     pctx->mtu = pkt->vp_if->vif_mtu;
 
-    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
-    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
-    pctx->original_nbl = WinPacketRawToNBL(winPacketRaw);
+    pctx->original_pkt = GetWinPacketFromVrPacket(pkt);
 }
 
 static inline bool
 is_splitting_needed(struct SplittingContext *pctx)
 {
-    return vr_pkt_type_is_overlay(pctx->pkt->vp_type)
-        && NET_BUFFER_DATA_LENGTH(pctx->original_nbl->FirstNetBuffer)
-        > pctx->mtu;
+    PWIN_PACKET_RAW rawPkt = WinPacketToRawPacket(pctx->original_pkt);
+    return vr_pkt_type_is_overlay(pctx->pkt->vp_type) &&
+        WinPacketRawDataLength(rawPkt) > pctx->mtu;
 }
 
 static inline unsigned char *
@@ -192,23 +190,28 @@ extract_headers_from_original_packet(struct SplittingContext* pctx)
 static bool
 fix_split_packet_metadata(struct SplittingContext* pctx)
 {
-    pctx->split_nbl->SourceHandle = VrSwitchObject->NdisFilterHandle;
+    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
 
-    if (CreateForwardingContext(pctx->split_nbl) != NDIS_STATUS_SUCCESS) {
+    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
+    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
+
+    splitNbl->SourceHandle = VrSwitchObject->NdisFilterHandle;
+
+    if (CreateForwardingContext(splitNbl) != NDIS_STATUS_SUCCESS) {
         return false;
     }
 
-    NDIS_STATUS status
-        = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
-        VrSwitchObject->NdisSwitchContext, pctx->split_nbl,
-        pctx->original_nbl, 0);
+    NDIS_STATUS status = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
+        VrSwitchObject->NdisSwitchContext, splitNbl, originalNbl, 0);
+
     if (status != NDIS_STATUS_SUCCESS) {
-        FreeForwardingContext(pctx->split_nbl);
+        FreeForwardingContext(splitNbl);
         return false;
     }
 
-    pctx->split_nbl->ParentNetBufferList = pctx->original_nbl;
-    InterlockedIncrement(&pctx->original_nbl->ChildRefCount);
+    splitNbl->ParentNetBufferList = originalNbl;
+    InterlockedIncrement(&originalNbl->ChildRefCount);
     return true;
 }
 
@@ -228,11 +231,14 @@ calculate_maximum_inner_payload_length_for_new_packets(
     }
 }
 
-PNET_BUFFER_LIST
+PWIN_MULTI_PACKET
 split_original_nbl(struct SplittingContext* pctx)
 {
-    return NdisAllocateFragmentNetBufferList(
-        pctx->original_nbl,
+    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
+
+    PNET_BUFFER_LIST splitNbl = NdisAllocateFragmentNetBufferList(
+        originalNbl,
         VrNBLPool,
         VrNBPool,
         pctx->inner_payload_offset,
@@ -241,6 +247,9 @@ split_original_nbl(struct SplittingContext* pctx)
         0,
         0
     );
+
+    PWIN_PACKET_RAW splitRawPacket = WinPacketRawFromNBL(splitNbl);
+    return (PWIN_MULTI_PACKET)splitRawPacket;
 }
 
 static void
@@ -248,22 +257,25 @@ split_original_packet(struct SplittingContext* pctx)
 {
     calculate_maximum_inner_payload_length_for_new_packets(pctx);
 
-    pctx->split_nbl = split_original_nbl(pctx);
-    if (pctx->split_nbl == NULL) {
+    pctx->split_pkt = split_original_nbl(pctx);
+    if (pctx->split_pkt == NULL) {
         return;
     }
 
+    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
+    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
+
     ASSERTMSG(
         "split_original_packet: It is expected that all headers are in first MDL",
-        pctx->split_nbl->FirstNetBuffer != NULL &&
-        MmGetMdlByteCount(pctx->split_nbl->FirstNetBuffer->CurrentMdl)
-        - pctx->split_nbl->FirstNetBuffer->CurrentMdlOffset
+        splitNbl->FirstNetBuffer != NULL &&
+        MmGetMdlByteCount(splitNbl->FirstNetBuffer->CurrentMdl)
+        - splitNbl->FirstNetBuffer->CurrentMdlOffset
         == pctx->inner_payload_offset);
 
     if (!fix_split_packet_metadata(pctx)) {
-        NdisFreeFragmentNetBufferList(pctx->split_nbl,
+        NdisFreeFragmentNetBufferList(splitNbl,
             pctx->inner_payload_offset, 0);
-        pctx->split_nbl = NULL;
+        pctx->split_pkt = NULL;
     }
 }
 
@@ -272,12 +284,15 @@ copy_original_headers_to_net_buffer(
     struct SplittingContext* pctx,
     PNET_BUFFER nb)
 {
+    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
+
     unsigned long bytes_copied = 0;
     NDIS_STATUS status = NdisCopyFromNetBufferToNetBuffer(
         nb,
         0,
         pctx->inner_payload_offset,
-        pctx->original_nbl->FirstNetBuffer,
+        originalNbl->FirstNetBuffer,
         0,
         &bytes_copied
     );
@@ -392,11 +407,16 @@ get_split_packet_headers(PNET_BUFFER nb)
 static void
 remove_split_nbl(struct SplittingContext* pctx)
 {
-    FreeForwardingContext(pctx->split_nbl);
-    NdisFreeFragmentNetBufferList(pctx->split_nbl,
-        pctx->inner_payload_offset, 0);
-    pctx->split_nbl = NULL;
-    InterlockedDecrement(&pctx->original_nbl->ChildRefCount);
+    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
+
+    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
+    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
+
+    FreeForwardingContext(splitNbl);
+    NdisFreeFragmentNetBufferList(splitNbl, pctx->inner_payload_offset, 0);
+    pctx->split_pkt = NULL;
+    InterlockedDecrement(&originalNbl->ChildRefCount);
 }
 
 static bool
@@ -487,13 +507,18 @@ static void
 disable_csum_calculation_offloading_for_outer_split_packets(
     struct SplittingContext* pctx)
 {
-    NET_BUFFER_LIST_INFO(pctx->split_nbl, TcpIpChecksumNetBufferListInfo)
-        = 0;
+    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
+    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
+
+    NET_BUFFER_LIST_INFO(splitNbl, TcpIpChecksumNetBufferListInfo) = 0;
 }
 
 static void
 fix_headers_of_new_packets(struct SplittingContext* pctx)
 {
+    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
+    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
+
     PNET_BUFFER cur_nb;
     PNET_BUFFER next_nb;
 
@@ -510,7 +535,7 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
             = get_initial_segment_offset_for_inner_tcp_header(pctx);
     }
 
-    for (cur_nb = pctx->split_nbl->FirstNetBuffer;
+    for (cur_nb = splitNbl->FirstNetBuffer;
             cur_nb != NULL;
             cur_nb = next_nb) {
         next_nb = cur_nb->Next;
@@ -550,15 +575,15 @@ split_packet_if_needed(struct vr_packet *pkt)
     initialize_splitting_context(&ctx, pkt);
 
     if (!is_splitting_needed(&ctx)) {
-        return (PWIN_MULTI_PACKET)WinPacketRawFromNBL(ctx.original_nbl);
+        return (PWIN_MULTI_PACKET)WinPacketToRawPacket(ctx.original_pkt);
     }
 
     extract_headers_from_original_packet(&ctx);
     split_original_packet(&ctx);
 
-    if (ctx.split_nbl != NULL) {
+    if (ctx.split_pkt != NULL) {
         fix_headers_of_new_packets(&ctx);
     }
 
-    return (PWIN_MULTI_PACKET)WinPacketRawFromNBL(ctx.split_nbl);
+    return ctx.split_pkt;
 }
