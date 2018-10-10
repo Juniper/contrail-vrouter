@@ -38,7 +38,11 @@ void WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawCopyOutOfBandData(PWIN_PACKET_RAW Child, PWIN_PACKET_RAW Original);
 PWIN_PACKET_RAW WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeClone(PWIN_PACKET_RAW Packet);
+PWIN_PACKET_RAW WinPacketRawAllocateMultiFragment(
+    PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize, ULONG MaxFragmentLen);
 void WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet);
+void WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet);
+void WinPacketRawAssertAllHeadersAreInFirstMDL(PWIN_PACKET_RAW Packet, ULONG HeadersSize);
 
 PWIN_PACKET_LIST WinPacketListRawAllocateElement();
 void WinPacketListRawFreeElement(PWIN_PACKET_LIST Element);

@@ -242,12 +242,22 @@ WinPacketRawFreeClone(PWIN_PACKET_RAW Packet)
     NdisFreeCloneNetBufferList(nbl, 0);
 }
 
+PWIN_PACKET_RAW
+WinPacketRawAllocateMultiFragment(
+    PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize, ULONG MaxFragmentLen)
+{
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(OriginalPkt);
+    PNET_BUFFER_LIST splitNbl = NdisAllocateFragmentNetBufferList(
+        originalNbl, VrNBLPool, VrNBPool, HeadersSize,
+        MaxFragmentLen, HeadersSize, 0, 0);
+
+    return WinPacketRawFromNBL(splitNbl);
+}
+
 void
-WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
+WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
-
-    FreeForwardingContext(nbl);
 
     unsigned int first_mdl_length
         = MmGetMdlByteCount(nbl->FirstNetBuffer->CurrentMdl);
@@ -256,6 +266,26 @@ WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
     unsigned int first_mdl_data_length
         = first_mdl_length - first_mdl_data_offset;
     NdisFreeFragmentNetBufferList(nbl, first_mdl_data_length, 0);
+}
+
+void
+WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    FreeForwardingContext(nbl);
+    WinPacketRawFreeMultiFragmentWithoutFwdContext(Packet);
+}
+
+void
+WinPacketRawAssertAllHeadersAreInFirstMDL(PWIN_PACKET_RAW Packet, ULONG HeadersSize)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    ULONG mdlDataSize = MmGetMdlByteCount(nbl->FirstNetBuffer->CurrentMdl) -
+        nbl->FirstNetBuffer->CurrentMdlOffset;
+
+    ASSERTMSG("It is expected that all headers are in first MDL",
+        mdlDataSize == HeadersSize);
 }
 
 PWIN_PACKET_LIST

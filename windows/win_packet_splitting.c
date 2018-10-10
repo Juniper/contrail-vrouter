@@ -219,50 +219,24 @@ calculate_maximum_inner_payload_length_for_new_packets(
     }
 }
 
-PWIN_MULTI_PACKET
-split_original_nbl(struct SplittingContext* pctx)
-{
-    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
-    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
-
-    PNET_BUFFER_LIST splitNbl = NdisAllocateFragmentNetBufferList(
-        originalNbl,
-        VrNBLPool,
-        VrNBPool,
-        pctx->inner_payload_offset,
-        pctx->maximum_inner_payload_length,
-        pctx->inner_payload_offset,
-        0,
-        0
-    );
-
-    PWIN_PACKET_RAW splitRawPacket = WinPacketRawFromNBL(splitNbl);
-    return (PWIN_MULTI_PACKET)splitRawPacket;
-}
-
 static void
 split_original_packet(struct SplittingContext* pctx)
 {
     calculate_maximum_inner_payload_length_for_new_packets(pctx);
 
-    pctx->split_pkt = split_original_nbl(pctx);
-    if (pctx->split_pkt == NULL) {
+    PWIN_PACKET_RAW originalPkt = WinPacketToRawPacket(pctx->original_pkt);
+    PWIN_PACKET_RAW splitRawPkt = WinPacketRawAllocateMultiFragment(
+        originalPkt, pctx->inner_payload_offset, pctx->maximum_inner_payload_length);
+
+    if (splitRawPkt == NULL) {
         return;
     }
 
-    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
-    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
-
-    ASSERTMSG(
-        "split_original_packet: It is expected that all headers are in first MDL",
-        splitNbl->FirstNetBuffer != NULL &&
-        MmGetMdlByteCount(splitNbl->FirstNetBuffer->CurrentMdl)
-        - splitNbl->FirstNetBuffer->CurrentMdlOffset
-        == pctx->inner_payload_offset);
+    pctx->split_pkt = (PWIN_MULTI_PACKET)splitRawPkt;
+    WinPacketRawAssertAllHeadersAreInFirstMDL(splitRawPkt, pctx->inner_payload_offset);
 
     if (!fix_split_packet_metadata(pctx)) {
-        NdisFreeFragmentNetBufferList(splitNbl,
-            pctx->inner_payload_offset, 0);
+        WinPacketRawFreeMultiFragmentWithoutFwdContext(splitRawPkt);
         pctx->split_pkt = NULL;
     }
 }
