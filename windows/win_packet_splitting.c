@@ -191,27 +191,15 @@ static bool
 fix_split_packet_metadata(struct SplittingContext* pctx)
 {
     PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
-    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
-
     PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
-    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
 
-    splitNbl->SourceHandle = VrSwitchObject->NdisFilterHandle;
-
-    if (CreateForwardingContext(splitNbl) != NDIS_STATUS_SUCCESS) {
+    if (WinPacketRawCopyOutOfBandData(splitRawPacket, originalRawPacket) == FALSE) {
         return false;
     }
 
-    NDIS_STATUS status = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
-        VrSwitchObject->NdisSwitchContext, splitNbl, originalNbl, 0);
+    WinPacketRawSetParentOf(splitRawPacket, originalRawPacket);
+    WinPacketRawIncrementChildCountOf(originalRawPacket);
 
-    if (status != NDIS_STATUS_SUCCESS) {
-        FreeForwardingContext(splitNbl);
-        return false;
-    }
-
-    splitNbl->ParentNetBufferList = originalNbl;
-    InterlockedIncrement(&originalNbl->ChildRefCount);
     return true;
 }
 
@@ -408,15 +396,12 @@ static void
 remove_split_nbl(struct SplittingContext* pctx)
 {
     PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
-    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
-
     PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
-    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
 
-    FreeForwardingContext(splitNbl);
-    NdisFreeFragmentNetBufferList(splitNbl, pctx->inner_payload_offset, 0);
+    WinPacketRawFreeMultiFragment(splitRawPacket);
     pctx->split_pkt = NULL;
-    InterlockedDecrement(&originalNbl->ChildRefCount);
+
+    WinPacketRawDecrementChildCountOf(originalRawPacket);
 }
 
 static bool

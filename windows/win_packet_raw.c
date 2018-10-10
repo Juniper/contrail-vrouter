@@ -191,40 +191,46 @@ WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet)
     NdisFreeNetBufferList(nbl);
 }
 
+BOOLEAN
+WinPacketRawCopyOutOfBandData(PWIN_PACKET_RAW Child, PWIN_PACKET_RAW Original)
+{
+    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(Original);
+    PNET_BUFFER_LIST childNbl = WinPacketRawToNBL(Child);
+
+    childNbl->SourceHandle = VrSwitchObject->NdisFilterHandle;
+
+    if (CreateForwardingContext(childNbl) != NDIS_STATUS_SUCCESS) {
+        return FALSE;
+    }
+
+    NDIS_STATUS status = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
+        VrSwitchObject->NdisSwitchContext, childNbl, originalNbl, 0);
+
+    if (status != NDIS_STATUS_SUCCESS) {
+        FreeForwardingContext(childNbl);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 PWIN_PACKET_RAW
 WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet)
 {
-    NDIS_STATUS status;
-
     PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(Packet);
     PNET_BUFFER_LIST clonedNbl = NdisAllocateCloneNetBufferList(originalNbl, VrNBLPool, NULL, 0);
     if (clonedNbl == NULL) {
-        goto failure;
+        return NULL;
     }
 
-    clonedNbl->SourceHandle = VrSwitchObject->NdisFilterHandle;
+    PWIN_PACKET_RAW clonedPkt = WinPacketRawFromNBL(clonedNbl);
 
-    status = CreateForwardingContext(clonedNbl);
-    if (status != NDIS_STATUS_SUCCESS) {
-        goto cleanup_cloned_nbl;
+    if (WinPacketRawCopyOutOfBandData(clonedPkt, Packet) == FALSE) {
+        NdisFreeCloneNetBufferList(clonedNbl, 0);
+        return NULL;
     }
 
-    status = VrSwitchObject->NdisSwitchHandlers.CopyNetBufferListInfo(
-        VrSwitchObject->NdisSwitchContext, clonedNbl, originalNbl, 0);
-    if (status != NDIS_STATUS_SUCCESS) {
-        goto cleanup_forwarding_context;
-    }
-
-    return WinPacketRawFromNBL(clonedNbl);
-
-cleanup_forwarding_context:
-    FreeForwardingContext(clonedNbl);
-
-cleanup_cloned_nbl:
-    NdisFreeCloneNetBufferList(clonedNbl, 0);
-
-failure:
-    return NULL;
+    return clonedPkt;
 }
 
 void
@@ -242,6 +248,7 @@ WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
     FreeForwardingContext(nbl);
+
     unsigned int first_mdl_length
         = MmGetMdlByteCount(nbl->FirstNetBuffer->CurrentMdl);
     unsigned int first_mdl_data_offset

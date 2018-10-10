@@ -35,6 +35,7 @@ bool WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
 void WinPacketRawComplete(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet);
 
+BOOLEAN WinPacketRawCopyOutOfBandData(PWIN_PACKET_RAW Child, PWIN_PACKET_RAW Original);
 PWIN_PACKET_RAW WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeClone(PWIN_PACKET_RAW Packet);
 void WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet);
