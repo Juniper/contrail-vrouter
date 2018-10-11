@@ -203,19 +203,19 @@ WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet)
     WinPacketRawFreeMultiFragment_Callback(Packet);
 }
 
-bool
+BOOLEAN
 WinPacketRawIsOwned(PWIN_PACKET_RAW Packet)
 {
     return Packet->IsOwned;
 }
 
-bool
+BOOLEAN
 WinPacketRawIsCloned(PWIN_PACKET_RAW Packet)
 {
     return Packet->Parent != NULL;
 }
 
-bool
+BOOLEAN
 WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet)
 {
     return Packet->IsMultiFragment;
