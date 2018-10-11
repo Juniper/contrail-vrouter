@@ -79,6 +79,7 @@ win_if_del_tap(struct vr_interface *vif)
     return 0;
 }
 
+// TODO: To be removed after WinTxPostprocess() went live.
 static void
 fix_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
@@ -90,6 +91,7 @@ fix_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
     iph->ip_csum = vr_ip_csum(iph);
 }
 
+// TODO: To be removed after WinTxPostprocess() went live.
 static void
 zero_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
@@ -101,6 +103,7 @@ zero_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
     iph->ip_csum = 0;
 }
 
+// TODO: To be removed after WinTxPostprocess() went live.
 static bool fix_csum(struct vr_packet *pkt, unsigned offset)
 {
     uint32_t csum;
@@ -156,6 +159,7 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
     return true;
 }
 
+// TODO: To be removed after WinTxPostprocess() went live.
 static void
 fix_tunneled_csum(struct vr_packet *pkt)
 {
@@ -199,6 +203,7 @@ fix_tunneled_csum(struct vr_packet *pkt)
 // Fixes the IPv4 checksum and sets the correct info.Transmit value.
 //
 // TODO try to offload the checksums when doing fragmentation too.
+// TODO: To be removed after WinTxPostprocess() went live.
 static void
 fix_ip_v4_csum(struct vr_packet *pkt) {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);

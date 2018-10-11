@@ -50,6 +50,93 @@ WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet)
     return InterlockedDecrement(&nbl->ChildRefCount);
 }
 
+BOOLEAN
+WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+
+    return settings.Transmit.IpHeaderChecksum;
+}
+
+BOOLEAN
+WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+
+    return settings.Transmit.TcpChecksum;
+}
+
+VOID
+WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+    settings.Transmit.TcpChecksum = 0;
+    settings.Transmit.TcpHeaderOffset = 0;
+    NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = settings.Value;
+}
+
+BOOLEAN
+WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+
+    return settings.Transmit.UdpChecksum;
+}
+
+VOID
+WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+    settings.Transmit.UdpChecksum = 0;
+    NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = settings.Value;
+}
+
+VOID
+WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = 0;
+}
+
+ULONG
+WinPacketRawDataLength(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    ASSERT(nbl->Next == NULL);
+
+    PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
+    ASSERT(nb->Next == NULL);
+
+    return NET_BUFFER_DATA_LENGTH(nb);
+}
+
+PVOID
+WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    ASSERT(nbl->Next == NULL);
+
+    PNET_BUFFER nb = NET_BUFFER_LIST_FIRST_NB(nbl);
+    ASSERT(nb->Next == NULL);
+
+    return NdisGetDataBuffer(nb, BufferSize, Buffer, 1, 0);
+}
+
 bool
 WinPacketRawIsOwned(PWIN_PACKET_RAW Packet)
 {

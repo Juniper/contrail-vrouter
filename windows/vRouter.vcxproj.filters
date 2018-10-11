@@ -142,6 +142,9 @@
     <ClInclude Include="windows\win_packet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="windows\win_tx_postprocess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windows\precompsrc2.c">
@@ -305,6 +308,9 @@
     </ClCompile>
     <ClCompile Include="windows\win_memory.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\win_tx_postprocess.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
