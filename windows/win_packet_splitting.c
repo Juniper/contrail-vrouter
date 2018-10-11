@@ -543,14 +543,14 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
     }
 }
 
-PNET_BUFFER_LIST
+PWIN_MULTI_PACKET
 split_packet_if_needed(struct vr_packet *pkt)
 {
     struct SplittingContext ctx;
     initialize_splitting_context(&ctx, pkt);
 
     if (!is_splitting_needed(&ctx)) {
-        return ctx.original_nbl;
+        return (PWIN_MULTI_PACKET)WinPacketRawFromNBL(ctx.original_nbl);
     }
 
     extract_headers_from_original_packet(&ctx);
@@ -560,5 +560,5 @@ split_packet_if_needed(struct vr_packet *pkt)
         fix_headers_of_new_packets(&ctx);
     }
 
-    return ctx.split_nbl;
+    return (PWIN_MULTI_PACKET)WinPacketRawFromNBL(ctx.split_nbl);
 }

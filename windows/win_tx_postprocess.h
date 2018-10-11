@@ -10,9 +10,8 @@
 #include <ndis.h>
 #include <vr_packet.h>
 
-#include "win_packet_raw.h"
+#include "win_packet.h"
 
-// TODO: Think about returning PWIN_PACKET instead of PWIN_PACKET_RAW.
-PWIN_PACKET_RAW WinTxPostprocess(struct vr_packet *VrPacket);
+PWIN_MULTI_PACKET WinTxPostprocess(struct vr_packet *VrPacket);
 
 #endif

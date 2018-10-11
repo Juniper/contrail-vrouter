@@ -7,6 +7,7 @@
 #include "win_memory.h"
 #include "win_packet_impl.h"
 #include "win_packet_raw.h"
+#include "win_packet_splitting.h"
 #include "win_packet.h"
 
 static void
@@ -148,7 +149,7 @@ fix_ip_v4_csum(struct vr_packet *pkt)
     }
 }
 
-PWIN_PACKET_RAW
+PWIN_MULTI_PACKET
 WinTxPostprocess(struct vr_packet *VrPacket)
 {
     if (vr_pkt_type_is_overlay(VrPacket->vp_type)) {
@@ -160,16 +161,15 @@ WinTxPostprocess(struct vr_packet *VrPacket)
 
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(VrPacket);
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+    PWIN_MULTI_PACKET multiPacket = (PWIN_MULTI_PACKET)winPacketRaw;
 
     // TODO: Make compilable
     #if 0
-    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
-
-    PNET_BUFFER_LIST fragmented_nbl = split_packet_if_needed(VrPacket);
-    if (fragmented_nbl != NULL) {
-        nbl = fragmented_nbl;
+    PWIN_MULTI_PACKET fragmentedPacket = split_packet_if_needed(VrPacket);
+    if (fragmentedPacket != NULL) {
+        multiPacket = fragmentedPacket;
     }
     #endif
 
-    return winPacketRaw;
+    return multiPacket;
 }
