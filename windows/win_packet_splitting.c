@@ -10,7 +10,6 @@
 #include "win_packet.h"
 #include "win_packet_raw.h"
 #include "win_packet_impl.h"
-#include "windows_nbl.h"
 #include "win_csum.h"
 
 struct SplittingContext {
@@ -206,15 +205,17 @@ static void
 calculate_maximum_inner_payload_length_for_new_packets(
     struct SplittingContext* pctx)
 {
+    PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(pctx->original_pkt);
+
     // Note: fragment offset in IP header actually means amount of 8-byte
     // blocks. It means that 'payload size' % 8 == 0 for each packet with
     // 'more fragments' flag set to true. It means that
     // maximum_inner_payload_length has to be aligned down to 8-byte boundary.
-    int free_space_for_inner_payload = pctx->mtu - pctx->inner_payload_offset;
     if (pctx->is_tcp_segmentation) {
-        pctx->maximum_inner_payload_length = win_pgso_size(pctx->pkt);
+        pctx->maximum_inner_payload_length = WinPacketRawGetMSS(rawPacket);
     } else {
-        pctx->maximum_inner_payload_length = free_space_for_inner_payload & ~7;
+        int freeSpaceForInnerPayload = pctx->mtu - pctx->inner_payload_offset;
+        pctx->maximum_inner_payload_length = freeSpaceForInnerPayload & ~7;
     }
 }
 
