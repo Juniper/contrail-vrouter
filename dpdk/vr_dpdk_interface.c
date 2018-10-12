@@ -437,6 +437,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 {
     int ret;
     uint8_t port_id;
+    uint16_t mtu;
     struct rte_pci_addr pci_address;
     struct vr_dpdk_ethdev *ethdev;
     struct ether_addr mac_addr;
@@ -483,6 +484,17 @@ dpdk_fabric_if_add(struct vr_interface *vif)
                 MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
     }
 
+    if (rte_eth_dev_get_mtu(port_id, &mtu) == 0 && mtu > 0) {
+         /* Ethernet header size */
+         mtu += sizeof(struct vr_eth);
+         if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+             /* 802.1q header size */
+             mtu += sizeof(uint32_t);
+         }
+         vif->vif_mtu = mtu;
+         if (vif->vif_bridge)
+             vif->vif_bridge->vif_mtu = mtu;
+    }
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
         RTE_LOG(ERR, VROUTER, "    error adding eth dev %s: already added\n",
