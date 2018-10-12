@@ -17,7 +17,8 @@ VOID Fake_WinPacketFree(PWIN_PACKET Packet);
 PWIN_MULTI_PACKET Fake_WinMultiPacketAllocateWithSubPackets(size_t SubPacketsCount);
 void Fake_WinMultiPacketFree(PWIN_MULTI_PACKET Packet);
 
-long Fake_WinSubPacketGetData(PWIN_SUB_PACKET SubPacket);
+void *Fake_WinSubPacketGetData(PWIN_SUB_PACKET SubPacket);
+void Fake_WinSubPacketSetData(PWIN_SUB_PACKET SubPacket, void *Data, size_t Size);
 
 void Fake_WinPacketListRawFree(PWIN_PACKET_LIST List);
 
