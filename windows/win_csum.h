@@ -30,4 +30,6 @@ void fill_partial_csum_of_tcp_packet(
 void fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
     uint8_t* ip_packet);
 
+void fill_csum_of_ip_header(struct vr_ip* iph);
+
 #endif //__WIN_CSUM_H__

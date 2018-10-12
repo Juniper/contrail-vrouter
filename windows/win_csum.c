@@ -70,3 +70,40 @@ fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
     struct vr_tcp* tcph = (struct vr_tcp*) tcp_packet;
     tcph->tcp_csum = htons(~(trim_csum(csum)));
 }
+
+// TODO: This is duplicated from vr_proto_ip.c because compilation and linking in tests.
+static unsigned short
+vr_ip_csum(struct vr_ip *ip)
+{
+    int sum = 0;
+    unsigned short *ptr = (unsigned short *)ip;
+    unsigned short answer = 0;
+    unsigned short *w = ptr;
+    int len = ip->ip_hl * 4;
+    int nleft = len;
+
+    ip->ip_csum = 0;
+
+    while (nleft > 1) {
+        sum += *w++;
+        nleft -= 2;
+    }
+
+    /* mop up an odd byte, if necessary */
+    if (nleft == 1) {
+        *(unsigned char *)(&answer) = *(unsigned char *)w;
+        sum += answer;
+    }
+
+    sum = (sum >> 16) + (sum & 0xFFFF);
+    sum += (sum >> 16);
+    answer = ~sum;
+
+    return answer;
+}
+
+void
+fill_csum_of_ip_header(struct vr_ip* iph)
+{
+    iph->ip_csum = vr_ip_csum(iph);
+}
