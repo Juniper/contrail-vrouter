@@ -1158,8 +1158,18 @@ vr_uvh_cl_timer_handler(int fd, void *arg)
 
     ret = connect(vru_cl->vruc_fd, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
+        vr_uvhost_log("    error connecting uvhost socket FD %d to %s:"
+                " %s (%d)\n", vru_cl->vruc_fd, sun.sun_path, rte_strerror(errno), errno);
         ret = vr_uvh_cl_timer_setup(vru_cl);
     } else {
+
+        vr_uvhost_log("    connected to %s for uvhost socket FD %d\n",
+                  sun.sun_path, vru_cl->vruc_fd);
+        /*
+         * Remove the timer fd
+         */
+        vr_uvhost_del_fd(vru_cl->vruc_timer_fd, UVH_FD_READ);
+
         /*
          * socket connected
          * add to msg handler
@@ -1209,10 +1219,14 @@ vr_uvh_cl_timer_setup(vr_uvh_client_t *vru_cl)
         vru_cl->vruc_timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 
     if (vru_cl->vruc_timer_fd == -1) {
+        vr_uvhost_log("    timer create failed for uvhost socket FD %d:"
+                " %s (%d)\n", vru_cl->vruc_fd, rte_strerror(errno), errno);
         ret = -1;
     } else {
         ret = timerfd_settime(vru_cl->vruc_timer_fd, 0, &cl_timer, NULL);
         if (ret == -1) {
+            vr_uvhost_log("    timer setup failed for uvhost socket FD %d:"
+                " %s (%d)\n", vru_cl->vruc_fd, rte_strerror(errno), errno);
             close(vru_cl->vruc_timer_fd);
             vru_cl->vruc_timer_fd = -1;
         } else {
@@ -1296,7 +1310,22 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
                         msg->vrnu_vif_idx, rte_strerror(errno), errno);
         goto error;
     }
-    vr_uvhost_log("    vif %u socket %s FD is %d\n",
+
+    /* FIXME: workaround for agent issue #1796091
+     * Agent sends vhostuser mode as client eventhough
+     * its hardcoded in the api-server as server and
+     * the port configuration from neutron shows as server.
+     * Hardcode it to server mode as we dont use client
+     * mode in > 5.x, until agent code is fixed.
+     */
+    if (msg->vrnu_vif_vhostuser_mode == VRNU_VIF_MODE_CLIENT)
+        msg->vrnu_vif_vhostuser_mode = VRNU_VIF_MODE_SERVER;
+
+    if (msg->vrnu_vif_vhostuser_mode == VRNU_VIF_MODE_CLIENT)
+        vr_uvhost_log("    vif (client) %u socket %s FD is %d\n",
+                            msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
+    else
+        vr_uvhost_log("    vif (server) %u socket %s FD is %d\n",
                             msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
 
     memset(&sun, 0, sizeof(sun));
