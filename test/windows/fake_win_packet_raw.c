@@ -14,7 +14,8 @@
 #include <cmocka.h>
 
 struct _WIN_SUB_PACKET {
-    long Data;
+    void *Data;
+    size_t Size;
     PWIN_SUB_PACKET Next;
 };
 
@@ -90,7 +91,7 @@ Fake_WinMultiPacketAllocateSubPackets(PWIN_MULTI_PACKET Packet, size_t SubPacket
             localSubPackets[i - 1]->Next = subPacket;
         }
 
-        subPacket->Data = i + 1;
+        subPacket->Data = (void *)(i + 1);
     }
 
     rawPacket->FirstSubPacket = localSubPackets[0];
@@ -127,10 +128,17 @@ Fake_WinMultiPacketFree(PWIN_MULTI_PACKET Packet)
     test_free(Packet);
 }
 
-long
+void *
 Fake_WinSubPacketGetData(PWIN_SUB_PACKET SubPacket)
 {
     return SubPacket->Data;
+}
+
+void
+Fake_WinSubPacketSetData(PWIN_SUB_PACKET SubPacket, void *Data, size_t Size)
+{
+    SubPacket->Data = Data;
+    SubPacket->Size = Size;
 }
 
 PWIN_PACKET_RAW
@@ -172,8 +180,7 @@ WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 BOOLEAN
 WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
-    return false;
+    return true;
 }
 
 VOID
