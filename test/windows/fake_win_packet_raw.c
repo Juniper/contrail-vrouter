@@ -14,7 +14,8 @@
 #include <cmocka.h>
 
 struct _WIN_SUB_PACKET {
-    long Data;
+    void *Data;
+    size_t Size;
     PWIN_SUB_PACKET Next;
 };
 
@@ -40,6 +41,12 @@ Fake_WinPacketAllocate(bool IsOwned)
     PWIN_PACKET packet = test_calloc(1, sizeof(*packet));
     assert(packet != NULL);
     WinPacketToRawPacket(packet)->IsOwned = IsOwned;
+
+    // TODO: ??
+    PWIN_SUB_PACKET subPacket = test_calloc(1, sizeof(*subPacket));
+    assert(subPacket != NULL);
+    WinPacketToRawPacket(packet)->FirstSubPacket = subPacket;
+
     return packet;
 }
 
@@ -90,7 +97,7 @@ Fake_WinMultiPacketAllocateSubPackets(PWIN_MULTI_PACKET Packet, size_t SubPacket
             localSubPackets[i - 1]->Next = subPacket;
         }
 
-        subPacket->Data = i + 1;
+        subPacket->Data = (void *)(i + 1);
     }
 
     rawPacket->FirstSubPacket = localSubPackets[0];
@@ -127,10 +134,17 @@ Fake_WinMultiPacketFree(PWIN_MULTI_PACKET Packet)
     test_free(Packet);
 }
 
-long
+void *
 Fake_WinSubPacketGetData(PWIN_SUB_PACKET SubPacket)
 {
     return SubPacket->Data;
+}
+
+void
+Fake_WinSubPacketSetData(PWIN_SUB_PACKET SubPacket, void *Data, size_t Size)
+{
+    SubPacket->Data = Data;
+    SubPacket->Size = Size;
 }
 
 PWIN_PACKET_RAW
@@ -172,27 +186,25 @@ WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 BOOLEAN
 WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
     return false;
 }
 
 VOID
 WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
+    // TODO: Really... clear it.
 }
 
 BOOLEAN
 WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
-    return false;
+    return true;
 }
 
 VOID
 WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
+    // TODO: Really... clear it.
 }
 
 VOID
@@ -211,31 +223,31 @@ WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket)
 ULONG
 WinPacketRawDataLength(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
-    return 0;
+    PWIN_SUB_PACKET subPkt = WinPacketRawGetFirstSubPacket(Packet);
+    return subPkt->Size;
 }
 
 PVOID
-WinSubPacketRawGetDataBuffer(
-    PWIN_SUB_PACKET SubPacket, PVOID Buffer, ULONG BufferSize)
+WinSubPacketRawGetDataBuffer(PWIN_SUB_PACKET SubPacket, PVOID Buffer, ULONG BufferSize)
 {
-    assert(false && "Not implemented");
-    return NULL;
+    assert(SubPacket->Size == BufferSize);
+    return SubPacket->Data;
 }
 
 PVOID
 WinPacketRawGetDataBuffer(
     PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize)
 {
-    assert(false && "Not implemented");
-    return NULL;
+    PWIN_SUB_PACKET subPkt = WinPacketRawGetFirstSubPacket(Packet);
+    return WinSubPacketRawGetDataBuffer(subPkt, Buffer, BufferSize);
 }
 
 PVOID
 WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset)
 {
-    assert(false && "Not implemented");
-    return NULL;
+    PWIN_SUB_PACKET subPkt = WinPacketRawGetFirstSubPacket(Packet);
+    PUINT8 p = subPkt->Data;
+    return (PUINT16)(p + Offset);
 }
 
 ULONG
@@ -289,7 +301,7 @@ WinPacketRawAllocateClone_Impl(PWIN_PACKET_RAW Packet)
 
     if (Packet->FirstSubPacket != NULL) {
         assert_null(Packet->FirstSubPacket->Next);
-        cloned->FirstSubPacket = test_calloc(1, sizeof(*cloned->FirstSubPacket));
+        //cloned->FirstSubPacket = test_calloc(1, sizeof(*cloned->FirstSubPacket));
         *cloned->FirstSubPacket = *Packet->FirstSubPacket;
     }
 

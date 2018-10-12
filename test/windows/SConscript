@@ -24,12 +24,13 @@ common_tests_src = ['fake_win_packet_raw.c', 'fake_win_memory.c', 'fake_vrouter.
 common_tests_obj = env.Object(common_tests_src)
 
 test_suite_base_names = [
+    'win_csum',
     'win_packet_clone',
     'win_packet_free',
+    'win_packet_split_multi_packet',
     'win_pclone',
     'win_pfree',
-    'win_packet_split_multi_packet',
-    'win_csum',
+    'win_tx_postprocess',
 ]
 
 test_suites = []
