@@ -258,6 +258,7 @@ MarkNetBufferListAsSafe(PNET_BUFFER_LIST NetBufferList)
 static int
 __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 {
+    #if 1
     if (vr_pkt_type_is_overlay(pkt->vp_type)) {
         fix_tunneled_csum(pkt);
     } else if (pkt->vp_type == VP_TYPE_IP) {
@@ -272,6 +273,10 @@ __win_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
     if (fragmentedWinPacket != NULL) {
         winPacketRaw = WinMultiPacketToRawPacket(fragmentedWinPacket);
     }
+    #else
+    PWIN_PACKET_RAW result = WinTxPostprocess(pkt);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(result);
+    #endif
 
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(winPacketRaw);
 
