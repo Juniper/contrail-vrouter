@@ -19,6 +19,7 @@
 #include "vr_hash.h"
 #include "vr_proto.h"
 #include "vr_sandesh.h"
+#include "vr_cpuid.h"
 
 #include <linux/if_ether.h>
 #include <netinet/ip.h>
@@ -1617,6 +1618,8 @@ vr_dpdk_host_init(void)
 
     if (vr_host_inited)
         return 0;
+
+    vr_init_cpuid = vr_dpdk_init_cpuid;
 
     /*
      * Set number of CPUs. Note it is not just number of lcores, so we
