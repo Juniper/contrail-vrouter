@@ -20,7 +20,7 @@ void Fake_WinMultiPacketFree(PWIN_MULTI_PACKET Packet);
 void *Fake_WinSubPacketGetData(PWIN_SUB_PACKET SubPacket);
 void Fake_WinSubPacketSetData(PWIN_SUB_PACKET SubPacket, void *Data, size_t Size);
 
-void Fake_WinPacketListRawFree(PWIN_PACKET_LIST List);
+void Fake_WinPacketListRawFree(PWIN_PACKET_LIST List, bool OwnsPacket);
 
 extern PWIN_PACKET_RAW (*WinPacketRawAllocateClone_Callback)(PWIN_PACKET_RAW Packet);
 extern void (*WinPacketRawComplete_Callback)(PWIN_PACKET_RAW Packet);

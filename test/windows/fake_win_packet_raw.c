@@ -76,13 +76,16 @@ Fake_WinPacketAllocateNonOwned()
     return Fake_WinPacketAllocate(false);
 }
 
+static void Fake_WinSubPacketFreeRecursive(PWIN_SUB_PACKET SubPacket);
+
 void
 Fake_WinPacketFree(PWIN_PACKET Packet)
 {
     PWIN_PACKET_RAW packet = WinPacketToRawPacket(Packet);
 
     if (packet->FirstSubPacket != NULL) {
-        test_free(packet->FirstSubPacket);
+        Fake_WinSubPacketFreeRecursive(packet->FirstSubPacket);
+        //test_free(packet->FirstSubPacket);
     }
 
     test_free(Packet);
@@ -104,7 +107,7 @@ Fake_WinMultiPacketAllocateSubPackets(PWIN_MULTI_PACKET Packet, size_t SubPacket
 
         // In all tests using this function, we are checking for ptr
         // equality only, so we do not need any valid memory address here.
-        subPacket->Data = (void *)(i + 1);
+        subPacket->Data = test_calloc(1, 1);
     }
 
     rawPacket->FirstSubPacket = localSubPackets[0];
@@ -128,6 +131,9 @@ static void
 Fake_WinSubPacketFreeRecursive(PWIN_SUB_PACKET SubPacket)
 {
     if (SubPacket != NULL) {
+        if (SubPacket->Data != NULL) {
+            test_free(SubPacket->Data);
+        }
         Fake_WinSubPacketFreeRecursive(SubPacket->Next);
         test_free(SubPacket);
     }
@@ -217,7 +223,8 @@ WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
 VOID
 WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
+    Packet->IsUdpChecksumOffloaded = false;
+    // TODO: Clear other fields
 }
 
 ULONG
@@ -267,15 +274,48 @@ WinPacketRawGetMSS(PWIN_PACKET_RAW Packet)
 BOOLEAN
 WinPacketRawCopyOutOfBandData(PWIN_PACKET_RAW Child, PWIN_PACKET_RAW Original)
 {
-    assert(false && "Not implemented");
-    return false;
+    // TODO: Implement?
+    return true;
 }
 
 PWIN_PACKET_RAW WinPacketRawAllocateMultiFragment(
     PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize, ULONG MaxFragmentLen)
 {
-    assert(false && "Not implemented");
-    return NULL;
+    PWIN_SUB_PACKET originalSubPkt = OriginalPkt->FirstSubPacket;
+    assert(originalSubPkt->Next == NULL);
+
+    uint8_t *data = originalSubPkt->Data;
+    size_t dataSize = originalSubPkt->Size;
+
+    uint8_t *payload = data + HeadersSize;
+    size_t payloadSize = dataSize - HeadersSize;
+
+    PWIN_PACKET fragmentedPacket = Fake_WinPacketAllocate(true);
+    PWIN_PACKET_RAW rawFragmentedPacket = WinPacketToRawPacket(fragmentedPacket);
+    PWIN_SUB_PACKET *subPacketPtr = &rawFragmentedPacket->FirstSubPacket;
+
+    for (size_t payloadOffset = 0; payloadOffset < payloadSize; payloadOffset += MaxFragmentLen) {
+        size_t fragmentPayloadSize =
+            payloadOffset + MaxFragmentLen < payloadSize ?
+                MaxFragmentLen : payloadSize - payloadOffset;
+
+        size_t fragmentSize = fragmentPayloadSize + HeadersSize;
+
+        uint8_t *buffer = test_calloc(fragmentSize, 1);
+        memcpy(buffer + HeadersSize, payload + payloadOffset, fragmentPayloadSize);
+
+        if (*subPacketPtr == NULL) {
+            *subPacketPtr = test_calloc(1, sizeof(**subPacketPtr));
+            assert(*subPacketPtr != NULL);
+        }
+
+        (*subPacketPtr)->Data = buffer;
+        (*subPacketPtr)->Size = fragmentSize;
+
+        subPacketPtr = &(*subPacketPtr)->Next;
+    }
+
+    return rawFragmentedPacket;
 }
 
 VOID WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet)
@@ -286,19 +326,18 @@ VOID WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet)
 VOID WinPacketRawAssertAllHeadersAreInFirstMDL(
     PWIN_PACKET_RAW Packet, ULONG HeadersSize)
 {
-    assert(false && "Not implemented");
 }
 
 VOID WinPacketRawCopyHeadersToSubPacket(
     PWIN_SUB_PACKET SubPkt, PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize)
 {
-    assert(false && "Not implemented");
+    PWIN_SUB_PACKET originalSubPkt = OriginalPkt->FirstSubPacket;
+    memcpy(SubPkt->Data, originalSubPkt->Data, HeadersSize);
 }
 
 PVOID WinSubPacketRawGetDataPtr(PWIN_SUB_PACKET SubPacket)
 {
-    assert(false && "Not implemented");
-    return NULL;
+    return SubPacket->Data;
 }
 
 static PWIN_PACKET_RAW
@@ -410,12 +449,22 @@ WinPacketListRawFreeElement(PWIN_PACKET_LIST Element) {
 }
 
 void
-Fake_WinPacketListRawFree(PWIN_PACKET_LIST List)
+Fake_WinPacketListRawFree(PWIN_PACKET_LIST List, bool OwnsPacket)
 {
     if (List != NULL) {
-        Fake_WinPacketListRawFree(List->Next);
+        Fake_WinPacketListRawFree(List->Next, OwnsPacket);
         if (List->WinPacket != NULL) {
-            Fake_WinPacketFree(List->WinPacket);
+            // NOTE: We do not use Fake_WinPacketFree, because in fake implementation
+            // cloning copies pointer values. On attempt to free MULTI_PACKET and WIN_PACKET_LIST
+            // there is a double-free on this pointer.
+            // NOTE: KURAWHDUHBAUISD
+            PWIN_PACKET packet = List->WinPacket;
+            PWIN_PACKET_RAW rawPacket = WinPacketToRawPacket(packet);
+            assert(rawPacket->FirstSubPacket->Next == NULL);
+            if (OwnsPacket) {
+                test_free(rawPacket->FirstSubPacket);
+                test_free(rawPacket);
+            }
         }
         WinPacketListRawFreeElement(List);
     }
