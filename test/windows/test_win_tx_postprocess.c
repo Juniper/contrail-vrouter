@@ -141,6 +141,102 @@ MPLSoGREPacket()
     return vrPacket;
 }
 
+static struct vr_packet *
+UdpPacketOverMplsOverUdp()
+{
+    uint8_t *buffer = test_calloc(4096, 1);
+
+    // NOTE: Ethernet header does not affect packet postprocessing. Initialization not needed.
+    struct vr_eth *outerEthHeader = (struct vr_eth *)(buffer);
+
+    // TODO: Fill.
+    struct vr_ip *outerIpHeader = (struct vr_ip *)(outerEthHeader + 1);
+
+    struct vr_udp *outerUdpHeader = (struct vr_udp *)(outerIpHeader + 1);
+    {
+        outerUdpHeader->udp_sport = htons(49152);
+        outerUdpHeader->udp_dport = htons(6635);
+        outerUdpHeader->udp_length = htons(1526);
+        outerUdpHeader->udp_csum = 0;
+    }
+
+    // NOTE: MPLS header does not affect packet postprocessing. Initialization not needed.
+    uint32_t *mplsHeader = (uint32_t *)(outerUdpHeader + 1);
+
+    struct vr_eth *innerEthHeader = (struct vr_eth *)(mplsHeader + 1);
+    {
+        uint8_t smac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x03};
+        uint8_t dmac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x04};
+
+        VR_MAC_COPY(innerEthHeader->eth_dmac, dmac);
+        VR_MAC_COPY(innerEthHeader->eth_smac, smac);
+        innerEthHeader->eth_proto = htons(VR_ETH_PROTO_IP);
+    }
+
+    struct vr_ip *innerIpHeader = (struct vr_ip *)(innerEthHeader + 1);
+    {
+        innerIpHeader->ip_hl = 5;
+        innerIpHeader->ip_version = 4;
+        innerIpHeader->ip_tos = 0;
+        innerIpHeader->ip_len = htons(1500);
+        innerIpHeader->ip_id = htons(3100);
+        innerIpHeader->ip_frag_off = htons(VR_IP_MF);
+        innerIpHeader->ip_ttl = 128;
+        innerIpHeader->ip_proto = VR_IP_PROTO_UDP;
+        innerIpHeader->ip_csum = 0;
+        innerIpHeader->ip_saddr = htonl(0x0a000004);
+        innerIpHeader->ip_daddr = htonl(0x0a000003);
+    }
+
+    struct vr_udp *innerUdpHeader = (struct vr_udp *)(innerIpHeader + 1);
+    {
+        innerUdpHeader->udp_sport = htons(11111);
+        innerUdpHeader->udp_dport = htons(22222);
+        innerUdpHeader->udp_length = htons(2608); // NOTE: ('a...z' * 100) + UDP HEADER
+        innerUdpHeader->udp_csum = htons(0xa08c);
+    }
+
+    uint8_t payload[4096] = { 0 };
+    for (unsigned int i = 0; i < 100; ++i) {
+        for (char x = 'a'; x <= 'z'; ++x) {
+            payload[i * 26 + (unsigned int)x] = x;
+        }
+    }
+    size_t firstFragmentSize = 1472;
+
+    uint8_t *innerPayload = (uint8_t *)(innerUdpHeader + 1);
+    memcpy(innerPayload, payload, firstFragmentSize);
+
+    struct vr_interface *vif = AllocateFakeInterface();
+    struct vr_packet *vrPacket = AllocateVrPacketNonOwned();
+    {
+        vrPacket->vp_head = buffer;
+        vrPacket->vp_if = vif;
+        vrPacket->vp_nh = NULL;
+        vrPacket->vp_data = 0; // TODO: Fill? Field is not used in this test case.
+        vrPacket->vp_tail = 0; // TODO: No magic. Originally 0x618.
+        vrPacket->vp_len = 0; // TODO: No magic. Originally 0x618.
+        vrPacket->vp_end = 0; // TODO: No magic. Originally 0x618.
+        vrPacket->vp_network_h = 0xe; // TODO: No magic.
+        vrPacket->vp_flags = VP_FLAG_FLOW_SET;
+        vrPacket->vp_inner_network_h = 0x3c; // TODO: No magic.
+        vrPacket->vp_cpu = 0;
+        vrPacket->vp_type = VP_TYPE_IPOIP;
+        vrPacket->vp_ttl = 64;
+        vrPacket->vp_queue = 0;
+        vrPacket->vp_priority = VP_PRIORITY_INVALID;
+        vrPacket->vp_notused = 0;
+    }
+
+    PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(vrPacket);
+    PWIN_PACKET winPkt = wrapper->WinPacket;
+    PWIN_PACKET_RAW rawPkt = WinPacketToRawPacket(winPkt);
+    PWIN_SUB_PACKET subPkt = WinPacketRawGetFirstSubPacket(rawPkt);
+    Fake_WinSubPacketSetData(subPkt, buffer, 1560); // TODO: Calculate length.
+
+    return vrPacket;
+}
+
 static void
 FreePacket(struct vr_packet *VrPacket)
 {
@@ -151,7 +247,8 @@ FreePacket(struct vr_packet *VrPacket)
 
 typedef enum
 {
-    IP_OFFLOADED = 1 << 0,
+    NO_OFFLOADS   = 0,
+    IP_OFFLOADED  = 1 << 0,
     UDP_OFFLOADED = 1 << 1,
     TCP_OFFLOADED = 1 << 2,
 } ChecksumOffloadFlag;
@@ -242,6 +339,16 @@ AssertInnerUdpCsumValue(PWIN_MULTI_PACKET Packet, uint16_t Checksum)
 }
 
 static void
+FreeWinMultiPacket(PWIN_MULTI_PACKET Packet)
+{
+    PWIN_PACKET_RAW rawPacket = WinMultiPacketToRawPacket(Packet);
+    PWIN_PACKET_RAW parent = WinPacketRawGetParentOf(rawPacket);
+
+    Fake_WinMultiPacketFree(Packet);
+    WinPacketRawDecrementChildCountOf(parent);
+}
+
+static void
 Test_win_tx_pp_ArpPacket(void **state)
 {
     PVR_PACKET_WRAPPER wrapper = test_calloc(1, sizeof(*wrapper));
@@ -275,12 +382,37 @@ Test_win_tx_pp_SmallIpUdpOverTunnelPacket(void **state)
     FreePacket(vrPacket);
 }
 
+static void
+Test_win_tx_pp_FragmentedUdpOverMplsOverUdp(void **state)
+{
+    struct vr_packet *vrPacket = UdpPacketOverMplsOverUdp();
+    AssertVrPktChecksumsOffloadStatus(vrPacket, IP_OFFLOADED | UDP_OFFLOADED);
+
+    PWIN_MULTI_PACKET result = WinTxPostprocess(vrPacket);
+
+    AssertMultiPktChecksumsOffloadStatus(result, NO_OFFLOADS);
+
+    PWIN_PACKET_RAW resultPacket = WinMultiPacketToRawPacket(result);
+    PWIN_SUB_PACKET firstFragment = WinPacketRawGetFirstSubPacket(resultPacket);
+    assert_non_null(firstFragment);
+
+    PWIN_SUB_PACKET secondFragment = WinSubPacketRawGetNext(firstFragment);
+    assert_non_null(secondFragment);
+
+    PWIN_SUB_PACKET notAFragment = WinSubPacketRawGetNext(secondFragment);
+    assert_null(notAFragment);
+
+    FreeWinMultiPacket(result);
+    FreePacket(vrPacket);
+}
+
 #define win_tx_pp_test(f) cmocka_unit_test(Test_win_tx_pp_##f)
 
 int main(void) {
     const struct CMUnitTest tests[] = {
         win_tx_pp_test(ArpPacket),
         win_tx_pp_test(SmallIpUdpOverTunnelPacket),
+        win_tx_pp_test(FragmentedUdpOverMplsOverUdp),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
