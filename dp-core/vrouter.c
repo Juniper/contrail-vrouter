@@ -12,6 +12,7 @@
 #include "vr_types.h"
 #include "vr_sandesh.h"
 #include "vr_message.h"
+#include "vr_cpuid.h"
 #include <vr_packet.h>
 #include <vr_interface.h>
 #include <vr_nexthop.h>
@@ -28,6 +29,8 @@
 static struct vrouter router;
 struct host_os *vrouter_host;
 struct vr_offload_ops *offload_ops;
+void (*vr_init_cpuid)(struct vr_cpu_type_t *vr_cpu_type) = NULL;
+struct vr_cpu_type_t vr_cpu_type = {0};
 
 extern struct host_os *vrouter_get_host(void);
 extern int vr_stats_init(struct vrouter *);
@@ -520,6 +523,10 @@ vrouter_init(void)
 {
     unsigned int i;
     int ret;
+
+    /* init CPU id struct*/
+    if (vr_init_cpuid != NULL)
+        vr_init_cpuid(&vr_cpu_type);
 
     vrouter_host = vrouter_get_host();
     if (!vrouter_host && (ret = -ENOMEM))
