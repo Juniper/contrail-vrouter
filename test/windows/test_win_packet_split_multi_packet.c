@@ -73,7 +73,8 @@ Test_WinPacketSplitMultiPacket_ReturnsSinglePacketWhenSinglePacketPassed(void **
     assert_int_equal(Fake_WinSubPacketGetData(subPacketFromWinPacket), Fake_WinSubPacketGetData(subPacket));
     assert_null(packetList->Next);
 
-    Fake_WinPacketListRawFree(packetList);
+    Fake_WinPacketListRawFree(packetList, false);
+    Fake_WinMultiPacketFree(multiPacket);
 }
 
 void
@@ -113,7 +114,7 @@ Test_WinPacketSplitMultiPacket_ReturnsListWhenMultiplePacketsPassed(void **state
     assert_null(packetListPtr);
     assert_null(subPacketPtr);
 
-    Fake_WinPacketListRawFree(packetList);
+    Fake_WinPacketListRawFree(packetList, true);
     Fake_WinMultiPacketFree(multiPacket);
 }
 
