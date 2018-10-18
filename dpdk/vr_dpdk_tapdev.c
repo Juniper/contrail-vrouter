@@ -625,6 +625,7 @@ static void vr_dpdk_handle_vhost0_notification(uint32_t mtu, uint32_t if_up)
         } else {
             RTE_LOG(INFO, VROUTER, "Changing eth device MTU to %u\n", mtu);
 
+            rte_eth_devices[port_id].data->mtu = mtu;
             ret =  rte_eth_dev_set_mtu(port_id, mtu);
             if (ret < 0) {
                 /*
