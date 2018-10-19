@@ -279,6 +279,7 @@ struct vr_interface {
      * for sure...
      */
     int (*vif_rx)(struct vr_interface *, struct vr_packet *, unsigned short);
+    int (*vif_rx_bulk)(struct vr_interface *, struct vr_packet **, unsigned short *, uint32_t);
 
     int (*vif_set_rewrite)(struct vr_interface *, struct vr_packet **,
             struct vr_forwarding_md *, unsigned char *, unsigned short);

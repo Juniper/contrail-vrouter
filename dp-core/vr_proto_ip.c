@@ -602,7 +602,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                     goto drop_pkt;
                 }
                 /* Subject it to flow */
-                if (!vr_flow_forward(router, pkt, fmd))
+                if (!vr_flow_forward(router, pkt, fmd, NULL))
                     return 0;
 
                 /*
@@ -1041,7 +1041,7 @@ vr_inet_get_flow_key(struct vrouter *router, struct vr_packet *pkt,
 
 flow_result_t
 vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
-                    struct vr_forwarding_md *fmd)
+                    struct vr_forwarding_md *fmd, unsigned int *fe_index)
 {
     int ret;
     bool lookup = false;
@@ -1116,7 +1116,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         }
     }
 
-    return vr_flow_lookup(router, flow_p, pkt, fmd);
+    return vr_flow_lookup(router, flow_p, pkt, fmd, fe_index);
 }
 
 mac_response_t
@@ -1206,7 +1206,7 @@ vr_ip_input(struct vrouter *router, struct vr_packet *pkt,
     if (fmd->fmd_dscp < 0)
         fmd->fmd_dscp = vr_inet_get_tos(ip);
 
-    if (!vr_flow_forward(router, pkt, fmd))
+    if (!vr_flow_forward(router, pkt, fmd, NULL))
         return 0;
 
     return vr_forward(router, pkt, fmd);

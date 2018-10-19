@@ -29,8 +29,13 @@ well_known_mac(unsigned char *dmac)
 unsigned int vr_virtual_input(unsigned short, struct vr_interface *,
                               struct vr_packet *, struct vr_forwarding_md *,
                               unsigned short);
+unsigned int vr_virtual_input_bulk(unsigned short, struct vr_interface *,
+                              struct vr_packet **, struct vr_forwarding_md **,
+                              unsigned short *, uint32_t);
 unsigned int vr_fabric_input(struct vr_interface *, struct vr_packet *,
                              struct vr_forwarding_md *, unsigned short);
+unsigned int vr_fabric_input_bulk(struct vr_interface *, struct vr_packet **,
+                             struct vr_forwarding_md **, unsigned short *, uint32_t);
 
 int vr_l3_input(struct vr_packet *, struct vr_forwarding_md *);
 int vr_l2_input(struct vr_packet *, struct vr_forwarding_md *);
@@ -55,6 +60,9 @@ extern int vr_forward(struct vrouter *, struct vr_packet *,
 unsigned int
 vr_bridge_input(struct vrouter *, struct vr_packet *,
                                     struct vr_forwarding_md *);
+unsigned int
+vr_bridge_input_bulk(struct vrouter *, struct vr_packet **,
+                                    struct vr_forwarding_md **, uint32_t);
 extern struct vr_nexthop *vr_bridge_lookup(unsigned int, struct vr_route_req *);
 extern unsigned short vr_bridge_route_flags(unsigned int, unsigned char *);
 

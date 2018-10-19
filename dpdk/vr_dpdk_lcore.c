@@ -787,10 +787,11 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
 {
     int i;
     struct rte_mbuf *mbuf;
-    struct vr_packet *pkt;
+    struct vr_packet *new_pkts[VR_DPDK_RX_BURST_SZ];
     struct vr_dpdk_queue *monitoring_tx_queue;
     struct rte_mbuf *p_copy;
-    unsigned short vlan_id = VLAN_ID_INVALID;
+    unsigned short vlan_ids[VR_DPDK_RX_BURST_SZ];
+    uint32_t n = 0;
 
     RTE_LOG_DP(DEBUG, VROUTER, "%s: RX %" PRIu32 " packet(s) from interface %s\n",
          __func__, nb_pkts, vif->vif_name);
@@ -802,7 +803,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
             for (i = 0; i < nb_pkts; i++) {
                 mbuf = pkts[i];
                 /* convert mbuf to vr_packet */
-                pkt = vr_dpdk_packet_get(mbuf, vif);
+                new_pkts[i] = vr_dpdk_packet_get(mbuf, vif);
                 /*
                  * dp-core changes the original packet, so clone does not work
                  * as expected here.
@@ -817,6 +818,7 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
     }
 
     for (i = 0; i < nb_pkts; i++) {
+        vlan_ids[i] = VLAN_ID_INVALID;
         mbuf = pkts[i];
         rte_prefetch0(rte_pktmbuf_mtod(mbuf, char *));
 
@@ -858,13 +860,21 @@ vr_dpdk_lcore_vroute(struct vr_dpdk_lcore *lcore, struct vr_interface *vif,
 #endif
 
         if ((mbuf->ol_flags & PKT_RX_VLAN) != 0) {
-            vlan_id = mbuf->vlan_tci & 0xFFF;
+            vlan_ids[n] = mbuf->vlan_tci & 0xFFF;
         }
 
         /* convert mbuf to vr_packet */
-        pkt = vr_dpdk_packet_get(mbuf, vif);
-        /* send the packet to vRouter */
-        vif->vif_rx(vif, pkt, vlan_id);
+        new_pkts[n] = vr_dpdk_packet_get(mbuf, vif);
+        n++;
+    }
+
+    /* send the packets to vRouter */
+    if (vif->vif_rx_bulk) {
+        vif->vif_rx_bulk(vif, new_pkts, vlan_ids, n);
+    } else {
+        for (i = 0; i < n; i++) {
+            vif->vif_rx(vif, new_pkts[i], vlan_ids[i]);
+        }
     }
 }
 
