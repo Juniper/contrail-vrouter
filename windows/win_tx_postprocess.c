@@ -3,6 +3,7 @@
 #include <basetsd.h>
 #include <vr_packet.h>
 
+#include "win_callbacks.h"
 #include "win_csum.h"
 #include "win_memory.h"
 #include "win_packet_impl.h"
@@ -73,10 +74,10 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
 
     // This time it's the "real" packet. Header being contiguous is guaranteed, but nothing else
     if (type == VR_IP_PROTO_UDP) {
-        struct vr_udp* udp = (struct vr_udp*) pkt_data_at_offset(pkt, offset);
+        struct vr_udp* udp = (struct vr_udp*) win_data_at_offset(pkt, offset);
         udp->udp_csum = htons(~(trim_csum(csum)));
     } else if (type == VR_IP_PROTO_TCP) {
-        struct vr_tcp* tcp = (struct vr_tcp*) pkt_data_at_offset(pkt, offset);
+        struct vr_tcp* tcp = (struct vr_tcp*) win_data_at_offset(pkt, offset);
         tcp->tcp_csum = htons(~(trim_csum(csum)));
     }
 
