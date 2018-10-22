@@ -14,11 +14,11 @@ typedef struct _WIN_SUB_PACKET WIN_SUB_PACKET, *PWIN_SUB_PACKET;
 typedef struct _WIN_PACKET_RAW WIN_PACKET_RAW, *PWIN_PACKET_RAW;
 
 PWIN_PACKET_RAW WinPacketRawGetParentOf(PWIN_PACKET_RAW Packet);
-void WinPacketRawSetParentOf(PWIN_PACKET_RAW Packet, PWIN_PACKET_RAW Parent);
+VOID WinPacketRawSetParentOf(PWIN_PACKET_RAW Packet, PWIN_PACKET_RAW Parent);
 
-long WinPacketRawGetChildCountOf(PWIN_PACKET_RAW Packet);
-long WinPacketRawIncrementChildCountOf(PWIN_PACKET_RAW Packet);
-long WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet);
+LONG WinPacketRawGetChildCountOf(PWIN_PACKET_RAW Packet);
+LONG WinPacketRawIncrementChildCountOf(PWIN_PACKET_RAW Packet);
+LONG WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet);
 
 BOOLEAN WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
@@ -27,31 +27,36 @@ BOOLEAN WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet);
 
+ULONG WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket);
 ULONG WinPacketRawDataLength(PWIN_PACKET_RAW Packet);
+PVOID WinSubPacketRawGetDataBuffer(PWIN_SUB_PACKET SubPacket, PVOID Buffer, ULONG BufferSize);
 PVOID WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize);
 
-bool WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
-bool WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
-void WinPacketRawComplete(PWIN_PACKET_RAW Packet);
-void WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet);
+BOOLEAN WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
+BOOLEAN WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawComplete(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawFreeCreated(PWIN_PACKET_RAW Packet);
 
 BOOLEAN WinPacketRawCopyOutOfBandData(PWIN_PACKET_RAW Child, PWIN_PACKET_RAW Original);
 PWIN_PACKET_RAW WinPacketRawAllocateClone(PWIN_PACKET_RAW Packet);
-void WinPacketRawFreeClone(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawFreeClone(PWIN_PACKET_RAW Packet);
 PWIN_PACKET_RAW WinPacketRawAllocateMultiFragment(
     PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize, ULONG MaxFragmentLen);
-void WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet);
-void WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet);
-void WinPacketRawAssertAllHeadersAreInFirstMDL(PWIN_PACKET_RAW Packet, ULONG HeadersSize);
+VOID WinPacketRawFreeMultiFragment(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawAssertAllHeadersAreInFirstMDL(PWIN_PACKET_RAW Packet, ULONG HeadersSize);
+VOID WinPacketRawCopyHeadersToSubPacket(
+    PWIN_SUB_PACKET SubPkt, PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize);
+PVOID WinSubPacketRawGetDataPtr(PWIN_SUB_PACKET SubPacket);
 
 PWIN_PACKET_LIST WinPacketListRawAllocateElement();
-void WinPacketListRawFreeElement(PWIN_PACKET_LIST Element);
+VOID WinPacketListRawFreeElement(PWIN_PACKET_LIST Element);
 
 PWIN_SUB_PACKET WinPacketRawGetFirstSubPacket(PWIN_PACKET_RAW Packet);
-void WinPacketRawSetFirstSubPacket(PWIN_PACKET_RAW Packet, PWIN_SUB_PACKET SubPacket);
+VOID WinPacketRawSetFirstSubPacket(PWIN_PACKET_RAW Packet, PWIN_SUB_PACKET SubPacket);
 
 PWIN_SUB_PACKET WinSubPacketRawGetNext(PWIN_SUB_PACKET SubPacket);
-void WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next);
+VOID WinSubPacketRawSetNext(PWIN_SUB_PACKET SubPacket, PWIN_SUB_PACKET Next);
 
 // TODO: Remove this declaration and change the definition to `static inline`
 // when callback layer is independent of NDIS
