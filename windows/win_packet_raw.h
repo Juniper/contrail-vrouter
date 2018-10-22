@@ -32,6 +32,8 @@ ULONG WinPacketRawDataLength(PWIN_PACKET_RAW Packet);
 PVOID WinSubPacketRawGetDataBuffer(PWIN_SUB_PACKET SubPacket, PVOID Buffer, ULONG BufferSize);
 PVOID WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize);
 
+ULONG WinPacketRawGetMSS(PWIN_PACKET_RAW Packet);
+
 BOOLEAN WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawComplete(PWIN_PACKET_RAW Packet);
