@@ -3,14 +3,13 @@
  */
 #include "vr_interface.h"
 #include "vr_packet.h"
-#include "vr_windows.h"
 #include "vr_mpls.h"
 #include "vrouter.h"
 
+#include "win_memory.h"
 #include "win_packet.h"
 #include "win_packet_raw.h"
 #include "win_packet_impl.h"
-#include "windows_devices.h"
 #include "windows_nbl.h"
 #include "win_csum.h"
 
@@ -242,33 +241,6 @@ split_original_packet(struct SplittingContext* pctx)
 }
 
 static void
-copy_original_headers_to_net_buffer(
-    struct SplittingContext* pctx,
-    PNET_BUFFER nb)
-{
-    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
-    PNET_BUFFER_LIST originalNbl = WinPacketRawToNBL(originalRawPacket);
-
-    unsigned long bytes_copied = 0;
-    NDIS_STATUS status = NdisCopyFromNetBufferToNetBuffer(
-        nb,
-        0,
-        pctx->inner_payload_offset,
-        originalNbl->FirstNetBuffer,
-        0,
-        &bytes_copied
-    );
-
-    // Failure may occur only due to error in fragmentation logic.
-    // New resources are not allocated in NdisCopyFromNetBufferToNetBuffer.
-    ASSERTMSG(
-        "copy_original headers_to_net_buffer: NdisCopyFromNetBufferToNetBuffer"
-        " failed",
-        status == NDIS_STATUS_SUCCESS
-        && bytes_copied == pctx->inner_payload_offset);
-}
-
-static void
 set_fragment_offset(struct vr_ip* ip, unsigned short offset_in_bytes)
 {
     ASSERTMSG(
@@ -358,14 +330,6 @@ fix_headers_of_outer_split_packet(
     fix_csum_in_ip_header(fragment_outer_ip_header);
 }
 
-static unsigned char*
-get_split_packet_headers(PNET_BUFFER nb)
-{
-    return (unsigned char*) MmGetSystemAddressForMdlSafe(
-        nb->CurrentMdl, LowPagePriority | MdlMappingNoExecute)
-        + nb->CurrentMdlOffset;
-}
-
 static void
 remove_split_nbl(struct SplittingContext* pctx)
 {
@@ -380,26 +344,23 @@ remove_split_nbl(struct SplittingContext* pctx)
 
 static bool
 fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
-    PNET_BUFFER nb,
+    PWIN_SUB_PACKET SubPacket,
     unsigned inner_ip_offset_in_nb)
 {
-    uint32_t csum;
-    uint16_t size;
-    uint8_t type;
+    ULONG packetDataSize = WinSubPacketRawDataLength(SubPacket);
+    PVOID packetDataBuff = WinRawAllocate(packetDataSize);
 
-    void* packet_data_buffer = ExAllocatePoolWithTag(
-        NonPagedPoolNx, NET_BUFFER_DATA_LENGTH(nb), VrAllocationTag);
-    uint8_t* packet_data = NdisGetDataBuffer(
-        nb, NET_BUFFER_DATA_LENGTH(nb), packet_data_buffer, 1, 0);
+    uint8_t* packetData = WinSubPacketRawGetDataBuffer(
+        SubPacket, packetDataBuff, packetDataSize);
 
-    if (packet_data == NULL)
+    if (packetData == NULL)
         return false;
 
     fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
-        packet_data + inner_ip_offset_in_nb);
+        packetData + inner_ip_offset_in_nb);
 
-    if (packet_data_buffer)
-        ExFreePool(packet_data_buffer);
+    if (packetDataBuff)
+        ExFreePool(packetDataBuff);
 
     return true;
 }
@@ -418,7 +379,7 @@ fill_partial_csum_of_inner_tcp_packet(
 static void
 fill_checksum_of_inner_tcp_packet(
     struct SplittingContext* pctx,
-    PNET_BUFFER cur_nb,
+    PWIN_SUB_PACKET SubPacket,
     unsigned char* headers)
 {
     struct vr_tcp* inner_tcp_header =
@@ -426,14 +387,14 @@ fill_checksum_of_inner_tcp_packet(
 
     fill_partial_csum_of_inner_tcp_packet(pctx, inner_tcp_header, headers);
     fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
-        cur_nb, (uint8_t*)pctx->inner_ip_header
+        SubPacket, (uint8_t*)pctx->inner_ip_header
         - (uint8_t*)pctx->outer_headers);
 }
 
 static void
 fix_headers_of_inner_tcp_packet(
     struct SplittingContext* pctx,
-    PNET_BUFFER cur_nb,
+    PWIN_SUB_PACKET SubPacket,
     unsigned char *headers,
     unsigned int byte_offset_for_next_inner_tcp_header,
     bool more_new_packets)
@@ -450,7 +411,7 @@ fix_headers_of_inner_tcp_packet(
 
     inner_tcp_header->tcp_offset_r_flags = htons(flags);
 
-    fill_checksum_of_inner_tcp_packet(pctx, cur_nb, headers);
+    fill_checksum_of_inner_tcp_packet(pctx, SubPacket, headers);
 }
 
 static unsigned int
@@ -463,27 +424,17 @@ get_initial_segment_offset_for_inner_tcp_header(
 }
 
 static void
-disable_csum_calculation_offloading_for_outer_split_packets(
-    struct SplittingContext* pctx)
-{
-    PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
-    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
-
-    NET_BUFFER_LIST_INFO(splitNbl, TcpIpChecksumNetBufferListInfo) = 0;
-}
-
-static void
 fix_headers_of_new_packets(struct SplittingContext* pctx)
 {
+    PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(pctx->original_pkt);
     PWIN_PACKET_RAW splitRawPacket = WinMultiPacketToRawPacket(pctx->split_pkt);
-    PNET_BUFFER_LIST splitNbl = WinPacketRawToNBL(splitRawPacket);
 
-    PNET_BUFFER cur_nb;
-    PNET_BUFFER next_nb;
+    PWIN_SUB_PACKET curSubPkt;
+    PWIN_SUB_PACKET nextSubPkt;
 
     // Disable checksum calculation offloading, so it doesn't interefere
     // with our checksum calculation.
-    disable_csum_calculation_offloading_for_outer_split_packets(pctx);
+    WinPacketRawClearChecksumInfo(splitRawPacket);
 
     unsigned short byte_offset_for_next_inner_ip_header
         = pctx->inner_ip_frag_offset_in_bytes;
@@ -494,20 +445,20 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
             = get_initial_segment_offset_for_inner_tcp_header(pctx);
     }
 
-    for (cur_nb = splitNbl->FirstNetBuffer;
-            cur_nb != NULL;
-            cur_nb = next_nb) {
-        next_nb = cur_nb->Next;
+    for (curSubPkt = WinPacketRawGetFirstSubPacket(splitRawPacket);
+            curSubPkt != NULL;
+            curSubPkt = nextSubPkt) {
+        nextSubPkt = WinSubPacketRawGetNext(curSubPkt);
 
-        copy_original_headers_to_net_buffer(pctx, cur_nb);
+        WinPacketRawCopyHeadersToSubPacket(curSubPkt, originalRawPacket, pctx->inner_payload_offset);
 
-        unsigned char* headers = get_split_packet_headers(cur_nb);
+        unsigned char* headers = WinSubPacketRawGetDataPtr(curSubPkt);
         if (headers == NULL) {
             remove_split_nbl(pctx);
             return;
         }
 
-        bool more_new_packets = (next_nb != NULL);
+        bool more_new_packets = (nextSubPkt != NULL);
         fix_headers_of_inner_split_packet(
             pctx,
             headers,
@@ -516,7 +467,7 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
         if (pctx->is_tcp_segmentation) {
             fix_headers_of_inner_tcp_packet(
                 pctx,
-                cur_nb,
+                curSubPkt,
                 headers,
                 segment_offset_for_next_inner_tcp_header,
                 more_new_packets);
