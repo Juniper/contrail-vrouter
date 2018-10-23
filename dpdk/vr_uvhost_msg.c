@@ -1158,7 +1158,7 @@ vr_uvh_cl_timer_handler(int fd, void *arg)
 
     ret = connect(vru_cl->vruc_fd, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
-        vr_uvhost_log("    error connecting uvhost socket FD %d to %s:"
+        RTE_LOG_DP(DEBUG, UVHOST, "Error connecting uvhost socket FD %d to %s:"
                 " %s (%d)\n", vru_cl->vruc_fd, sun.sun_path, rte_strerror(errno), errno);
         ret = vr_uvh_cl_timer_setup(vru_cl);
     } else {
