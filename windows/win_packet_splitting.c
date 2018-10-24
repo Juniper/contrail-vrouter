@@ -6,11 +6,13 @@
 #include "vr_mpls.h"
 #include "vrouter.h"
 
-#include "win_memory.h"
-#include "win_packet.h"
-#include "win_packet_raw.h"
-#include "win_packet_impl.h"
+#include "win_assert.h"
 #include "win_csum.h"
+#include "win_callbacks.h"
+#include "win_memory.h"
+#include "win_packet_impl.h"
+#include "win_packet_raw.h"
+#include "win_packet.h"
 
 struct SplittingContext {
     struct vr_packet *pkt;
@@ -160,7 +162,7 @@ extract_inner_headers_size_and_offset_from_original_packet(
     struct SplittingContext* pctx)
 {
     unsigned short inner_iph_offset = pkt_get_inner_network_header_off(pctx->pkt);
-    pctx->inner_ip_header = (struct vr_ip*)pkt_data_at_offset(pctx->pkt, inner_iph_offset);
+    pctx->inner_ip_header = (struct vr_ip*)win_data_at_offset(pctx->pkt, inner_iph_offset);
 
     unsigned char *inner_headers = pctx->outer_headers + pctx->outer_headers_size;
     pctx->inner_eth_header_size = (unsigned char*)pctx->inner_ip_header - inner_headers;
@@ -244,7 +246,7 @@ split_original_packet(struct SplittingContext* pctx)
 static void
 set_fragment_offset(struct vr_ip* ip, unsigned short offset_in_bytes)
 {
-    ASSERTMSG(
+    WinAssertMsg(
         "set_fragment_offset: offset_in_bytes is not divisible by 8",
         offset_in_bytes % 8 == 0);
     ip->ip_frag_off &= htons(~VR_IP_FRAG_OFFSET_MASK);
@@ -268,12 +270,6 @@ fix_packet_length_in_inner_ip_header_of_split_packet(
     }
 
     fragment_inner_ip_header->ip_len = htons(inner_ip_packet_length);
-}
-
-static void
-fix_csum_in_ip_header(struct vr_ip* iph)
-{
-    iph->ip_csum = vr_ip_csum(iph);
 }
 
 static void
@@ -301,7 +297,7 @@ fix_headers_of_inner_split_packet(
 
     fix_packet_length_in_inner_ip_header_of_split_packet(
         pctx, fragment_inner_ip_header, more_new_packets);
-    fix_csum_in_ip_header(fragment_inner_ip_header);
+    fill_csum_of_ip_header(fragment_inner_ip_header);
 }
 
 static void
@@ -328,7 +324,7 @@ fix_headers_of_outer_split_packet(
             fragment_outer_ip_header->ip_hl * 4);
     }
 
-    fix_csum_in_ip_header(fragment_outer_ip_header);
+    fill_csum_of_ip_header(fragment_outer_ip_header);
 }
 
 static void
@@ -360,8 +356,9 @@ fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
     fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
         packetData + inner_ip_offset_in_nb);
 
-    if (packetDataBuff)
-        ExFreePool(packetDataBuff);
+    if (packetDataBuff) {
+        WinRawFree(packetDataBuff);
+    }
 
     return true;
 }

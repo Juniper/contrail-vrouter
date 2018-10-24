@@ -4,6 +4,7 @@
 #include <vr_packet.h>
 
 #include "win_callbacks.h"
+#include "win_assert.h"
 #include "win_csum.h"
 #include "win_memory.h"
 #include "win_packet_impl.h"
@@ -16,10 +17,10 @@ fix_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
     struct vr_ip *iph;
 
-    ASSERT(0 < offset);
+    WinAssert(0 < offset);
 
     iph = (struct vr_ip *)(pkt_data(pkt) + offset);
-    iph->ip_csum = vr_ip_csum(iph);
+    fill_csum_of_ip_header(iph);
 }
 
 static void
@@ -27,7 +28,7 @@ zero_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
     struct vr_ip *iph;
 
-    ASSERT(0 < offset);
+    WinAssert(0 < offset);
 
     iph = (struct vr_ip *)(pkt_data(pkt) + offset);
     iph->ip_csum = 0;
@@ -164,13 +165,10 @@ WinTxPostprocess(struct vr_packet *VrPacket)
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
     PWIN_MULTI_PACKET multiPacket = (PWIN_MULTI_PACKET)winPacketRaw;
 
-    // TODO: Make compilable
-    #if 0
     PWIN_MULTI_PACKET fragmentedPacket = split_packet_if_needed(VrPacket);
     if (fragmentedPacket != NULL) {
         multiPacket = fragmentedPacket;
     }
-    #endif
 
     return multiPacket;
 }

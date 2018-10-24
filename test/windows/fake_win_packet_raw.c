@@ -163,6 +163,125 @@ WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet)
     return --Packet->ChildRefCount;
 }
 
+BOOLEAN
+WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    return true;
+}
+
+BOOLEAN
+WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return false;
+}
+
+VOID
+WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+BOOLEAN
+WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return false;
+}
+
+VOID
+WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+VOID
+WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+ULONG
+WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket)
+{
+    assert(false && "Not implemented");
+    return 0;
+}
+
+ULONG
+WinPacketRawDataLength(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return 0;
+}
+
+PVOID
+WinSubPacketRawGetDataBuffer(
+    PWIN_SUB_PACKET SubPacket, PVOID Buffer, ULONG BufferSize)
+{
+    assert(false && "Not implemented");
+    return NULL;
+}
+
+PVOID
+WinPacketRawGetDataBuffer(
+    PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize)
+{
+    assert(false && "Not implemented");
+    return NULL;
+}
+
+PVOID
+WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset)
+{
+    assert(false && "Not implemented");
+    return NULL;
+}
+
+ULONG
+WinPacketRawGetMSS(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+    return 0;
+}
+
+BOOLEAN
+WinPacketRawCopyOutOfBandData(PWIN_PACKET_RAW Child, PWIN_PACKET_RAW Original)
+{
+    assert(false && "Not implemented");
+    return false;
+}
+
+PWIN_PACKET_RAW WinPacketRawAllocateMultiFragment(
+    PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize, ULONG MaxFragmentLen)
+{
+    assert(false && "Not implemented");
+    return NULL;
+}
+
+VOID WinPacketRawFreeMultiFragmentWithoutFwdContext(PWIN_PACKET_RAW Packet)
+{
+    assert(false && "Not implemented");
+}
+
+VOID WinPacketRawAssertAllHeadersAreInFirstMDL(
+    PWIN_PACKET_RAW Packet, ULONG HeadersSize)
+{
+    assert(false && "Not implemented");
+}
+
+VOID WinPacketRawCopyHeadersToSubPacket(
+    PWIN_SUB_PACKET SubPkt, PWIN_PACKET_RAW OriginalPkt, ULONG HeadersSize)
+{
+    assert(false && "Not implemented");
+}
+
+PVOID WinSubPacketRawGetDataPtr(PWIN_SUB_PACKET SubPacket)
+{
+    assert(false && "Not implemented");
+    return NULL;
+}
+
 static PWIN_PACKET_RAW
 WinPacketRawAllocateClone_Impl(PWIN_PACKET_RAW Packet)
 {
