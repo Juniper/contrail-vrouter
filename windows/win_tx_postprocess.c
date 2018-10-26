@@ -46,15 +46,16 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
     ULONG packet_data_size = WinPacketRawDataLength(winPacketRaw);
     void *packet_data_buffer = WinRawAllocate(packet_data_size);
 
-    // Copy the packet. This function will not fail if ExAllocatePoolWithTag succeeded
-    // So no need to clean it up
-    // If ExAllocatePoolWithTag failed (packet_data_buffer== NULL),
-    // this function will work okay if the data is contigous.
+    // If the data is in contiguous block but the WinRawAllocate
+    // function failed this function will still work ok.
     uint8_t* packet_data = WinPacketRawGetDataBuffer(winPacketRaw, packet_data_buffer, packet_data_size);
 
-    if (packet_data == NULL)
-        // No need for free
+    if (packet_data == NULL) {
+        if (packet_data_buffer != NULL) {
+            WinRawFree(packet_data_buffer);
+        }
         return false;
+    }
 
     if (pkt->vp_type == VP_TYPE_IP6 || pkt->vp_type == VP_TYPE_IP6OIP) {
         struct vr_ip6 *hdr = (struct vr_ip6*) (packet_data + offset);
@@ -82,8 +83,9 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
         tcp->tcp_csum = htons(~(trim_csum(csum)));
     }
 
-    if (packet_data_buffer)
+    if (packet_data_buffer) {
         WinRawFree(packet_data_buffer);
+    }
 
     return true;
 }
