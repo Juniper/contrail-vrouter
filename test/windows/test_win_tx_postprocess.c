@@ -142,6 +142,7 @@ MPLSoGREPacket()
     PWIN_PACKET_RAW rawPkt = WinPacketToRawPacket(winPkt);
     PWIN_SUB_PACKET subPkt = WinPacketRawGetFirstSubPacket(rawPkt);
     Fake_WinSubPacketSetData(subPkt, buffer, headersSize + ARRAYSIZE(payload));
+    Fake_WinPacketRawSetOffloadInfo(rawPkt, true, true, false);
 
     return vrPacket;
 }
@@ -325,6 +326,119 @@ UdpPacketOverMplsOverUdp()
                            + sizeof(*innerUdpHeader)
                            + fragmentedUdpPayloadSize;
     Fake_WinSubPacketSetData(subPkt, buffer, subPacketLength);
+    Fake_WinPacketRawSetOffloadInfo(rawPkt, true, true, false);
+
+    return vrPacket;
+}
+
+static struct vr_packet *
+TcpPacketOverMplsOverUdp()
+{
+    size_t headerSize = sizeof(struct vr_eth) + sizeof(struct vr_ip) + sizeof(struct vr_udp) + sizeof(uint32_t)
+        + sizeof(struct vr_eth) + sizeof(struct vr_ip) + sizeof(struct vr_tcp);
+
+    size_t dataSize = 5000;
+
+    uint8_t *buffer = test_calloc(headerSize + dataSize, 1);
+
+    // NOTE: Ethernet header does not affect packet postprocessing. Initialization not needed.
+    struct vr_eth *outerEthHeader = (struct vr_eth *)(buffer);
+    {
+        uint8_t smac[6] = {0x00, 0x50, 0x56, 0x8C, 0x94, 0xEA};
+        uint8_t dmac[6] = {0x00, 0x50, 0x56, 0x8C, 0x4A, 0x77};
+
+        VR_MAC_COPY(outerEthHeader->eth_dmac, dmac);
+        VR_MAC_COPY(outerEthHeader->eth_smac, smac);
+        outerEthHeader->eth_proto = htons(VR_ETH_PROTO_IP);
+    }
+
+    struct vr_ip *outerIpHeader = (struct vr_ip *)(outerEthHeader + 1);
+    {
+        outerIpHeader->ip_hl = sizeof(*outerIpHeader) / 4;
+        outerIpHeader->ip_version = 4;
+        outerIpHeader->ip_tos = 0;
+        outerIpHeader->ip_len = htons(
+            headerSize - sizeof(struct vr_eth) + dataSize
+        );
+        outerIpHeader->ip_id = htons(392);
+        outerIpHeader->ip_frag_off = 0;
+        outerIpHeader->ip_ttl = 64;
+        outerIpHeader->ip_proto = VR_IP_PROTO_UDP;
+        outerIpHeader->ip_csum = htons(0x0D50);
+        outerIpHeader->ip_saddr = htonl(0xAC10000B);
+        outerIpHeader->ip_daddr = htonl(0xAC10000C);
+    }
+
+    struct vr_udp *outerUdpHeader = (struct vr_udp *)(outerIpHeader + 1);
+    {
+        outerUdpHeader->udp_sport = htons(49152);
+        outerUdpHeader->udp_dport = htons(6635);
+        outerUdpHeader->udp_length = htons(headerSize - sizeof(struct vr_eth) - sizeof(struct vr_ip) + dataSize);
+        outerUdpHeader->udp_csum = 0;
+    }
+
+    // NOTE: MPLS header does not affect packet postprocessing. Initialization not needed.
+    uint32_t *mplsHeader = (uint32_t *)(outerUdpHeader + 1);
+
+    struct vr_eth *innerEthHeader = (struct vr_eth *)(mplsHeader + 1);
+
+    struct vr_ip *innerIpHeader = (struct vr_ip *)(innerEthHeader + 1);
+    {
+        innerIpHeader->ip_hl = sizeof(*innerIpHeader) / 4;
+        innerIpHeader->ip_version = 4;
+        innerIpHeader->ip_tos = 2 + (0 << 2);
+        innerIpHeader->ip_len = htons(0);
+        innerIpHeader->ip_id = htons(16658);
+        innerIpHeader->ip_frag_off = htons(VR_IP_DF);
+        innerIpHeader->ip_ttl = 128;
+        innerIpHeader->ip_proto = VR_IP_PROTO_TCP;
+        innerIpHeader->ip_csum = 0;
+        innerIpHeader->ip_saddr = htonl(0x0a000103);
+        innerIpHeader->ip_daddr = htonl(0x0a000104);
+    }
+
+    struct vr_tcp *innerTcpHeader = (struct vr_tcp *)(innerIpHeader + 1);
+    {
+        innerTcpHeader->tcp_sport = htons(11111);
+        innerTcpHeader->tcp_dport = htons(22222);
+        innerTcpHeader->tcp_seq = htonl(0xac5c9eb7);
+        innerTcpHeader->tcp_ack = htonl(0xab2b2229);
+        innerTcpHeader->tcp_offset_r_flags = htons(VR_TCP_FLAG_PSH | VR_TCP_FLAG_ACK | ((20/4) << 12));
+        innerTcpHeader->tcp_win = htons(8212);
+        innerTcpHeader->tcp_csum = htons(0x160D);
+        innerTcpHeader->tcp_urg = htons(0);
+    }
+
+    memset(buffer + headerSize, '1', dataSize);
+
+    struct vr_interface *vif = AllocateFakeInterface();
+    struct vr_packet *vrPacket = AllocateVrPacketNonOwned();
+    {
+        vrPacket->vp_head = buffer;
+        vrPacket->vp_if = vif;
+        vrPacket->vp_nh = NULL;
+        vrPacket->vp_data = 0;
+        vrPacket->vp_tail = 0; // NOTE: Not used.
+        vrPacket->vp_len = 0; // NOTE: Not used.
+        vrPacket->vp_end = 0; // NOTE: Not used.
+        vrPacket->vp_network_h = CalculateIpHeaderOffset(outerEthHeader, outerIpHeader);
+        vrPacket->vp_flags = VP_FLAG_FLOW_SET;
+        vrPacket->vp_inner_network_h = CalculateIpHeaderOffset(outerEthHeader, innerIpHeader);
+        vrPacket->vp_cpu = 0;
+        vrPacket->vp_type = VP_TYPE_IPOIP;
+        vrPacket->vp_ttl = 64;
+        vrPacket->vp_queue = 0;
+        vrPacket->vp_priority = VP_PRIORITY_INVALID;
+        vrPacket->vp_notused = 0;
+    }
+
+    PVR_PACKET_WRAPPER wrapper = GetWrapperFromVrPacket(vrPacket);
+    PWIN_PACKET winPkt = wrapper->WinPacket;
+    PWIN_PACKET_RAW rawPkt = WinPacketToRawPacket(winPkt);
+    PWIN_SUB_PACKET subPkt = WinPacketRawGetFirstSubPacket(rawPkt);
+
+    Fake_WinSubPacketSetData(subPkt, buffer, headerSize + dataSize);
+    Fake_WinPacketRawSetOffloadInfo(rawPkt, false, false, true);
 
     return vrPacket;
 }
@@ -340,43 +454,50 @@ FreePacket(struct vr_packet *VrPacket)
 typedef enum
 {
     NO_OFFLOADS   = 0,
-    IP_OFFLOADED  = 1 << 0,
-    UDP_OFFLOADED = 1 << 1,
-    TCP_OFFLOADED = 1 << 2,
-} ChecksumOffloadFlag;
+    IPCHKSUM_OFFLOADED  = 1 << 0,
+    UDPCHKSUM_OFFLOADED = 1 << 1,
+    TCPPCHKSUM_OFFLOADED = 1 << 2,
+    SEG_OFFLOADED = 1 << 3,
+} OffloadFlag;
 
 static void
-AssertMultiPktChecksumsOffloadStatus(PWIN_MULTI_PACKET Packet, ChecksumOffloadFlag Offload)
+AssertMultiPktOffloadStatus(PWIN_MULTI_PACKET Packet, OffloadFlag Offload)
 {
     PWIN_PACKET_RAW rawPkt = WinMultiPacketToRawPacket(Packet);
 
-    if (Offload & IP_OFFLOADED) {
+    if (Offload & IPCHKSUM_OFFLOADED) {
         assert_true(WinPacketRawShouldIpChecksumBeOffloaded(rawPkt));
     } else {
         assert_false(WinPacketRawShouldIpChecksumBeOffloaded(rawPkt));
     }
 
-    if (Offload & UDP_OFFLOADED) {
+    if (Offload & UDPCHKSUM_OFFLOADED) {
         assert_true(WinPacketRawShouldUdpChecksumBeOffloaded(rawPkt));
     } else {
         assert_false(WinPacketRawShouldUdpChecksumBeOffloaded(rawPkt));
     }
 
-    if (Offload & TCP_OFFLOADED) {
+    if (Offload & TCPPCHKSUM_OFFLOADED) {
         assert_true(WinPacketRawShouldTcpChecksumBeOffloaded(rawPkt));
     } else {
         assert_false(WinPacketRawShouldTcpChecksumBeOffloaded(rawPkt));
     }
+
+    if (Offload & SEG_OFFLOADED) {
+        assert_true(WinPacketRawShouldSegmentationBeOffloaded(rawPkt));
+    } else {
+        assert_false(WinPacketRawShouldSegmentationBeOffloaded(rawPkt));
+    }
 }
 
 static void
-AssertVrPktChecksumsOffloadStatus(struct vr_packet *VrPacket, ChecksumOffloadFlag Offload)
+AssertVrPktOffloadStatus(struct vr_packet *VrPacket, OffloadFlag Offload)
 {
     PWIN_PACKET winPacket = GetWinPacketFromVrPacket(VrPacket);
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
     PWIN_MULTI_PACKET multiPacket = (PWIN_MULTI_PACKET)winPacketRaw;
 
-    AssertMultiPktChecksumsOffloadStatus(multiPacket, Offload);
+    AssertMultiPktOffloadStatus(multiPacket, Offload);
 }
 
 static void *
@@ -514,42 +635,124 @@ AssertFragmentsAreValid(PWIN_MULTI_PACKET Fragments)
 }
 
 static void
-AssertPayloadMatchForFragments(struct vr_packet *OriginalPacket,
-    PWIN_SUB_PACKET FirstSubPacket, PWIN_SUB_PACKET SecondSubPacket)
+AssertPayloadMatch(struct vr_packet *OriginalPacket,
+    PWIN_MULTI_PACKET ResultPacket, size_t headersSize)
 {
     PWIN_PACKET originalWinPacket = GetWinPacketFromVrPacket(OriginalPacket);
     PWIN_PACKET_RAW originalRawPacket = WinPacketToRawPacket(originalWinPacket);
     PWIN_SUB_PACKET originalSubPacket = WinPacketRawGetFirstSubPacket(originalRawPacket);
 
-    size_t headersSize = sizeof(struct vr_eth) + sizeof(struct vr_ip) +
-        sizeof(struct vr_udp) + sizeof(uint32_t) +
-        sizeof(struct vr_eth) + sizeof(struct vr_ip);
-
     size_t originalPayloadSize = Fake_WinSubPacketGetDataSize(originalSubPacket) - headersSize;
     uint8_t *originalPacketData = Fake_WinSubPacketGetData(originalSubPacket);
     uint8_t *originalPayload = originalPacketData + headersSize;
 
-    size_t firstPayloadSize = Fake_WinSubPacketGetDataSize(FirstSubPacket) - headersSize;
-    uint8_t *firstPacketData = Fake_WinSubPacketGetData(FirstSubPacket);
-    uint8_t *firstPayload = firstPacketData + headersSize;
+    PWIN_PACKET_RAW rawResultPacket = WinMultiPacketToRawPacket(ResultPacket);
+    PWIN_SUB_PACKET subPacket = WinPacketRawGetFirstSubPacket(rawResultPacket);
+    size_t resultPayloadSize = 0;
 
-    size_t secondPayloadSize = Fake_WinSubPacketGetDataSize(SecondSubPacket) - headersSize;
-    uint8_t *secondPacketData = Fake_WinSubPacketGetData(SecondSubPacket);
-    uint8_t *secondPayload = secondPacketData + headersSize;
+    while(subPacket != NULL)
+    {
+        size_t subPacketPayloadSize = Fake_WinSubPacketGetDataSize(subPacket) - headersSize;
+        uint8_t *subPacketData = Fake_WinSubPacketGetData(subPacket);
+        uint8_t *subPacketPayload = subPacketData + headersSize;
+        assert_true(memcmp(originalPayload + resultPayloadSize, subPacketPayload, subPacketPayloadSize) == 0);
+        resultPayloadSize += subPacketPayloadSize;
+        subPacket = WinSubPacketRawGetNext(subPacket);
+    }
 
-    assert_int_equal(originalPayloadSize, firstPayloadSize + secondPayloadSize);
-    assert_true(memcmp(originalPayload, firstPayload, firstPayloadSize) == 0);
-    assert_true(memcmp(originalPayload + firstPayloadSize, secondPayload, secondPayloadSize) == 0);
+    assert_int_equal(originalPayloadSize, resultPayloadSize);
 }
 
 static void
-AssertPayloadMatch(struct vr_packet *OriginalPacket, PWIN_MULTI_PACKET ResultPacket)
+AssertFirstSegmentIsValid(PWIN_SUB_PACKET SubPacket)
 {
-    PWIN_PACKET_RAW rawPacket = WinMultiPacketToRawPacket(ResultPacket);
-    PWIN_SUB_PACKET firstFragment = WinPacketRawGetFirstSubPacket(rawPacket);
-    PWIN_SUB_PACKET secondFragment = WinSubPacketRawGetNext(firstFragment);
+    void *buffer = Fake_WinSubPacketGetData(SubPacket);
 
-    AssertPayloadMatchForFragments(OriginalPacket, firstFragment, secondFragment);
+    struct vr_eth *outerEthHeader = (struct vr_eth *)(buffer);
+    struct vr_ip *outerIpHeader = (struct vr_ip *)(outerEthHeader + 1);
+    struct vr_udp *outerUdpHeader = (struct vr_udp *)(outerIpHeader + 1);
+    uint32_t *mplsHeader = (uint32_t *)(outerUdpHeader + 1);
+    struct vr_eth *innerEthHeader = (struct vr_eth *)(mplsHeader + 1);
+    struct vr_ip *innerIpHeader = (struct vr_ip *)(innerEthHeader + 1);
+    struct vr_tcp *innerTcpHeader = (struct vr_tcp *)(innerIpHeader + 1);
+
+    assert_int_equal(outerIpHeader->ip_len, htons(1386));
+    assert_int_equal(outerIpHeader->ip_csum, htons(0x1BC4));
+    assert_int_equal(outerIpHeader->ip_saddr, htonl(0xAC10000B));
+    assert_int_equal(outerIpHeader->ip_daddr, htonl(0xAC10000C));
+
+    assert_int_equal(outerUdpHeader->udp_csum, htons(0));
+
+    assert_int_equal(innerIpHeader->ip_len, htons(1340));
+    assert_int_equal(innerIpHeader->ip_csum, htons(0x9EA1));
+    assert_int_equal(innerIpHeader->ip_saddr, htonl(0x0A000103));
+    assert_int_equal(innerIpHeader->ip_daddr, htonl(0x0A000104));
+    assert_int_equal(innerIpHeader->ip_frag_off, htons(VR_IP_DF));
+
+    assert_int_equal(innerTcpHeader->tcp_seq, htonl(0xac5c9eb7));
+    assert_int_equal(innerTcpHeader->tcp_ack, htonl(0xab2b2229));
+    assert_int_equal(innerTcpHeader->tcp_offset_r_flags, htons(VR_TCP_FLAG_ACK | ((20/4) << 12)));
+    assert_int_equal(innerTcpHeader->tcp_win, htons(8212));
+    assert_int_equal(innerTcpHeader->tcp_csum, htons(0xF320));
+    assert_int_equal(innerTcpHeader->tcp_urg, htons(0));
+}
+
+static void
+AssertLastSegmentIsValid(PWIN_SUB_PACKET SubPacket)
+{
+    void *buffer = Fake_WinSubPacketGetData(SubPacket);
+
+    struct vr_eth *outerEthHeader = (struct vr_eth *)(buffer);
+    struct vr_ip *outerIpHeader = (struct vr_ip *)(outerEthHeader + 1);
+    struct vr_udp *outerUdpHeader = (struct vr_udp *)(outerIpHeader + 1);
+    uint32_t *mplsHeader = (uint32_t *)(outerUdpHeader + 1);
+    struct vr_eth *innerEthHeader = (struct vr_eth *)(mplsHeader + 1);
+    struct vr_ip *innerIpHeader = (struct vr_ip *)(innerEthHeader + 1);
+    struct vr_tcp *innerTcpHeader = (struct vr_tcp *)(innerIpHeader + 1);
+
+    assert_int_equal(outerIpHeader->ip_len, htons(1186));
+    assert_int_equal(outerIpHeader->ip_csum, htons(0x1C8C));
+    assert_int_equal(outerIpHeader->ip_saddr, htonl(0xAC10000B));
+    assert_int_equal(outerIpHeader->ip_daddr, htonl(0xAC10000C));
+
+    assert_int_equal(outerUdpHeader->udp_csum, htons(0));
+
+    assert_int_equal(innerIpHeader->ip_len, htons(1140));
+    assert_int_equal(innerIpHeader->ip_csum, htons(0x9F69));
+    assert_int_equal(innerIpHeader->ip_saddr, htonl(0x0a000103));
+    assert_int_equal(innerIpHeader->ip_daddr, htonl(0x0a000104));
+    assert_int_equal(innerIpHeader->ip_frag_off, htons(VR_IP_DF));
+
+    assert_int_equal(innerTcpHeader->tcp_seq, htonl(0xac5cadf3));
+    assert_int_equal(innerTcpHeader->tcp_ack, htonl(0xab2b2229));
+    assert_int_equal(innerTcpHeader->tcp_offset_r_flags, htons(VR_TCP_FLAG_PSH | VR_TCP_FLAG_ACK | ((20/4) << 12)));
+    assert_int_equal(innerTcpHeader->tcp_win, htons(8212));
+    assert_int_equal(innerTcpHeader->tcp_csum, htons(0x1BDC));
+    assert_int_equal(innerTcpHeader->tcp_urg, htons(0));
+}
+
+static void
+AssertSegmentsAreValid(PWIN_MULTI_PACKET Segments)
+{
+    PWIN_PACKET_RAW resultPacket = WinMultiPacketToRawPacket(Segments);
+
+    PWIN_SUB_PACKET firstSegment = WinPacketRawGetFirstSubPacket(resultPacket);
+    assert_non_null(firstSegment);
+
+    PWIN_SUB_PACKET secondSegment = WinSubPacketRawGetNext(firstSegment);
+    assert_non_null(secondSegment);
+
+    PWIN_SUB_PACKET thirdSegment = WinSubPacketRawGetNext(secondSegment);
+    assert_non_null(thirdSegment);
+
+    PWIN_SUB_PACKET fourthSegment = WinSubPacketRawGetNext(thirdSegment);
+    assert_non_null(fourthSegment);
+
+    PWIN_SUB_PACKET notASegment = WinSubPacketRawGetNext(fourthSegment);
+    assert_null(notASegment);
+
+    AssertFirstSegmentIsValid(firstSegment);
+    AssertLastSegmentIsValid(fourthSegment);
 }
 
 static void
@@ -569,7 +772,7 @@ static void
 Test_win_tx_pp_SmallIpUdpOverTunnelPacket(void **state)
 {
     struct vr_packet *vrPacket = MPLSoGREPacket();
-    AssertVrPktChecksumsOffloadStatus(vrPacket, IP_OFFLOADED | UDP_OFFLOADED);
+    AssertVrPktOffloadStatus(vrPacket, IPCHKSUM_OFFLOADED | UDPCHKSUM_OFFLOADED);
 
     PWIN_MULTI_PACKET result = WinTxPostprocess(vrPacket);
 
@@ -577,7 +780,7 @@ Test_win_tx_pp_SmallIpUdpOverTunnelPacket(void **state)
     AssertOuterIpCsumValue(result, 0);
     AssertInnerIpCsumValue(result, 0xD375);
     AssertInnerUdpCsumValue(result, 0x0534);
-    AssertMultiPktChecksumsOffloadStatus(result, IP_OFFLOADED);
+    AssertMultiPktOffloadStatus(result, IPCHKSUM_OFFLOADED);
 
     FreePacket(vrPacket);
 }
@@ -586,14 +789,37 @@ static void
 Test_win_tx_pp_FragmentedUdpOverMplsOverUdp(void **state)
 {
     struct vr_packet *vrPacket = UdpPacketOverMplsOverUdp();
-    AssertVrPktChecksumsOffloadStatus(vrPacket, IP_OFFLOADED | UDP_OFFLOADED);
+    AssertVrPktOffloadStatus(vrPacket, IPCHKSUM_OFFLOADED | UDPCHKSUM_OFFLOADED);
 
     PWIN_MULTI_PACKET result = WinTxPostprocess(vrPacket);
 
     assert_ptr_not_equal(result, NULL);
-    AssertMultiPktChecksumsOffloadStatus(result, NO_OFFLOADS);
+    AssertMultiPktOffloadStatus(result, NO_OFFLOADS);
     AssertFragmentsAreValid(result);
-    AssertPayloadMatch(vrPacket, result);
+    size_t headersSize = sizeof(struct vr_eth) + sizeof(struct vr_ip) +
+        sizeof(struct vr_udp) + sizeof(uint32_t) +
+        sizeof(struct vr_eth) + sizeof(struct vr_ip);
+    AssertPayloadMatch(vrPacket, result, headersSize);
+
+    FreeWinMultiPacket(result);
+    FreePacket(vrPacket);
+}
+
+static void
+Test_win_tx_pp_SegmentedTcpOverMplsOverUdp(void **state)
+{
+    struct vr_packet *vrPacket = TcpPacketOverMplsOverUdp();
+    AssertVrPktOffloadStatus(vrPacket, SEG_OFFLOADED);
+
+    PWIN_MULTI_PACKET result = WinTxPostprocess(vrPacket);
+
+    assert_ptr_not_equal(result, NULL);
+    AssertMultiPktOffloadStatus(result, NO_OFFLOADS);
+    AssertSegmentsAreValid(result);
+    size_t headersSize = sizeof(struct vr_eth) + sizeof(struct vr_ip) +
+        sizeof(struct vr_udp) + sizeof(uint32_t) +
+        sizeof(struct vr_eth) + sizeof(struct vr_ip) + sizeof(struct vr_tcp);
+    AssertPayloadMatch(vrPacket, result, headersSize);
 
     FreeWinMultiPacket(result);
     FreePacket(vrPacket);
@@ -606,6 +832,7 @@ int main(void) {
         win_tx_pp_test(ArpPacket),
         win_tx_pp_test(SmallIpUdpOverTunnelPacket),
         win_tx_pp_test(FragmentedUdpOverMplsOverUdp),
+        win_tx_pp_test(SegmentedTcpOverMplsOverUdp),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
