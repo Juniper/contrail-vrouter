@@ -34,6 +34,7 @@ PVOID WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG Buff
 
 PVOID WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset);
 ULONG WinPacketRawGetMSS(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearSegmentation(PWIN_PACKET_RAW Packet);
 
 BOOLEAN WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
