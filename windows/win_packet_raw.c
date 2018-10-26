@@ -199,6 +199,16 @@ WinPacketRawGetMSS(PWIN_PACKET_RAW Packet)
     return 1300;
 }
 
+VOID
+WinPacketRawClearSegmentation(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
+    lso_info.Value = 0;
+    NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo) = lso_info.Value;
+}
+
 PVOID
 WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset)
 {
