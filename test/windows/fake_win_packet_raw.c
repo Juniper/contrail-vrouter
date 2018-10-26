@@ -30,6 +30,7 @@ struct _WIN_PACKET_RAW {
 
     bool IsIpChecksumOffloaded;
     bool IsUdpChecksumOffloaded;
+    bool IsSegmentationOffloaded;
 
     PWIN_SUB_PACKET FirstSubPacket;
 };
@@ -49,14 +50,19 @@ Fake_WinPacketAllocate(bool IsOwned)
     assert(packet != NULL);
     WinPacketToRawPacket(packet)->IsOwned = IsOwned;
 
-    WinPacketToRawPacket(packet)->IsIpChecksumOffloaded = true;
-    WinPacketToRawPacket(packet)->IsUdpChecksumOffloaded = true;
-
     PWIN_SUB_PACKET subPacket = test_calloc(1, sizeof(*subPacket));
     assert(subPacket != NULL);
     WinPacketToRawPacket(packet)->FirstSubPacket = subPacket;
 
     return packet;
+}
+
+void
+Fake_WinPacketRawSetOffloadInfo(PWIN_PACKET_RAW packet, bool IpChecksumOffload, bool UdpChecksumOffload, bool SegmentationOffload)
+{
+    packet->IsIpChecksumOffloaded = IpChecksumOffload;
+    packet->IsUdpChecksumOffloaded = UdpChecksumOffload;
+    packet->IsSegmentationOffloaded = SegmentationOffload;
 }
 
 PWIN_PACKET
@@ -212,6 +218,12 @@ WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
     return false;
 }
 
+BOOLEAN
+WinPacketRawShouldSegmentationBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    return Packet->IsSegmentationOffloaded;
+}
+
 VOID
 WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
 {
@@ -237,11 +249,16 @@ WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
     Packet->IsUdpChecksumOffloaded = false;
 }
 
+VOID
+WinPacketRawClearSegmentation(PWIN_PACKET_RAW Packet)
+{
+    Packet->IsSegmentationOffloaded = false;
+}
+
 ULONG
 WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket)
 {
-    assert(false && "Not implemented");
-    return 0;
+    return SubPacket->Size;
 }
 
 ULONG
@@ -277,8 +294,8 @@ WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset)
 ULONG
 WinPacketRawGetMSS(PWIN_PACKET_RAW Packet)
 {
-    assert(false && "Not implemented");
-    return 0;
+    // TODO
+    return 1300;
 }
 
 BOOLEAN
