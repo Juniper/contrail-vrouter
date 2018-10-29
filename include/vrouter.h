@@ -10,6 +10,11 @@
 extern "C" {
 #endif
 
+#define STD_ON 1
+#define STD_OFF 0 
+#define VR_DROP_STATS_LOG_BUFFER_INFRA STD_ON
+
+
 #include "sandesh.h"
 #include "vr_types.h"
 #include "vr_interface.h"
@@ -23,6 +28,8 @@ extern "C" {
 #include "vr_mpls.h"
 #include "vr_index_table.h"
 #include "vr_mem.h"
+#include "vr_stats.h"
+
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -45,6 +52,11 @@ extern unsigned int vr_num_cpus;
 #define VR_LOG_INFO     7U
 #define VR_LOG_DEBUG    8U
 
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+#define VP_DROP_STATS_LOG_MAX 200
+#define VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE 20
+#endif
+
 enum vr_malloc_objects_t {
     VR_ASSEMBLER_TABLE_OBJECT,
     VR_BRIDGE_MAC_OBJECT,
@@ -54,6 +66,10 @@ enum vr_malloc_objects_t {
     VR_DEFER_OBJECT,
     VR_DROP_STATS_OBJECT,
     VR_DROP_STATS_REQ_OBJECT,
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    VR_DROP_STATS_LOG_OBJECT,
+    VR_DROP_STATS_LOG_REQ_OBJECT,
+#endif
     VR_FLOW_QUEUE_OBJECT,
     VR_FLOW_REQ_OBJECT,
     VR_FLOW_REQ_PATH_OBJECT,
@@ -383,6 +399,10 @@ struct vrouter {
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;
     struct vr_interface *vr_eth_if;
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    struct vr_drop_stats_log_st **vr_drop_stats_log;
+    uint64_t *vr_drop_stats_log_circular_buffer;
+#endif
 };
 
 struct vr_defer_data {
@@ -392,6 +412,7 @@ struct vr_defer_data {
 extern volatile bool vr_not_ready;
 
 extern struct vrouter *vrouter_get(unsigned int);
+
 extern unsigned int vrouter_generation_num_get(struct vrouter *router);
 
 extern int vrouter_init(void);

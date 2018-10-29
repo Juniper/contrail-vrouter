@@ -137,6 +137,8 @@
 #define PKT_ENCAP_VXLAN         0x02
 
 
+
+
 /* packet drop reasons */
 #define VP_DROP_DISCARD                     0
 #define VP_DROP_PULL                        1
@@ -1444,5 +1446,94 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
 
     return;
 }
+
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+
+#define DS_LOG vr_drop_stats_log_func
+extern unsigned int vr_config_drop_stats_log_buffer_size; 
+extern unsigned int vr_config_drop_stats_log_buffer_support;
+unsigned int vr_drop_stats_log_req_get_size(void *);
+struct vr_drop_loc
+{
+    unsigned int file;
+    unsigned int line;
+};
+
+struct vr_drop_stats_log_st {
+    time_t timestamp;
+    unsigned char   vp_type;
+    unsigned short  drop_reason;
+    unsigned short  vif_idx;
+    unsigned int    nh_id;
+    struct in_addr src;
+    struct in_addr dst;
+    unsigned short  sport;
+    unsigned short  dport;
+    struct vr_drop_loc drop_loc;
+
+    unsigned short  pkt_len;
+    unsigned char   pkt_header[100];
+};
+#define DS_LOG_FILL(X,Y) X=Y;
+
+/* #define DS_LOG_FILL(X,Y) if(Y != 0) { \
+    X = Y;  \
+    }       \
+    else {  \
+    vr_printf( #Y " not filled"); \
+    }*/
+
+static inline void vr_drop_stats_log_func(unsigned short drop_reason,struct vr_packet *pkt,unsigned short drop_loc_file_id,unsigned int drop_loc_line_id)
+{
+    int cpu = vr_get_cpu();
+    uint64_t m_sec=0,n_sec=0;
+    struct vr_ip *ip = NULL;
+
+    struct vrouter *router = vrouter_get(0);
+
+    int dropstats_log_buffer = router->vr_drop_stats_log_circular_buffer[cpu];
+    
+    if(vr_config_drop_stats_log_buffer_support ==1)
+    {
+        vr_get_time(&m_sec,&n_sec);
+
+        if (pkt->vp_type == VP_TYPE_IP) {
+            ip = (struct vr_ip *)pkt_network_header(pkt);
+            if(!ip)
+                return;
+        }
+        
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].timestamp , (unsigned int)m_sec)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].vp_type , pkt->vp_type)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].drop_reason , drop_reason)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].vif_idx , pkt->vp_if->vif_idx)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].nh_id , pkt->vp_nh->nh_id)
+
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].src.s_addr , ip->ip_saddr)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].dst.s_addr , ip->ip_daddr)
+
+        //TODO:sport and dport can be accessed through vr_packet, need to find the mechanism
+        router->vr_drop_stats_log[cpu][dropstats_log_buffer].sport = 0;// sport;
+        router->vr_drop_stats_log[cpu][dropstats_log_buffer].dport = 0;//dport;
+
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].drop_loc.file , drop_loc_file_id)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].drop_loc.line , drop_loc_line_id)
+
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].pkt_len , pkt->vp_len)
+
+        if(pkt->vp_len > 100)
+            memcpy(router->vr_drop_stats_log[cpu][dropstats_log_buffer].pkt_header,pkt_network_header(pkt),pkt->vp_len);
+        else
+            memcpy(router->vr_drop_stats_log[cpu][dropstats_log_buffer].pkt_header,pkt_network_header(pkt),100);
+
+        router->vr_drop_stats_log_circular_buffer[cpu] = ((++dropstats_log_buffer)%vr_config_drop_stats_log_buffer_size);
+
+    }
+}
+#else
+
+#define DS_LOG
+
+#endif
 
 #endif /* __VR_PACKET_H__ */
