@@ -89,6 +89,10 @@ enum vr_opt_index {
     SOCKET_MEM_OPT_INDEX,
 #define LCORES_OPT              "lcores"
     LCORES_OPT_INDEX,
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+#define DROP_STATS_LOG_BUFFER_SIZE_OPT "vr_config_drop_stats_log_buffer_size"
+    DROP_STATS_LOG_BUFFER_SIZE_OPT_INDEX,
+#endif
 #define MEMORY_ALLOC_CHECKS_OPT "vr_memory_alloc_checks"
     MEMORY_ALLOC_CHECKS_OPT_INDEX,
     MAX_OPT_INDEX
@@ -100,6 +104,7 @@ extern unsigned int vr_bridge_oentries;
 extern unsigned int vr_mpls_labels;
 extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
+extern unsigned int vr_config_drop_stats_log_buffer_size;
 
 static int no_daemon_set;
 static int no_gro_set = 0;
@@ -958,6 +963,10 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
                                                     NULL,                   0},
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    [DROP_STATS_LOG_BUFFER_SIZE_OPT_INDEX] =   {DROP_STATS_LOG_BUFFER_SIZE_OPT, required_argument,
+                                                    NULL,                   0},
+#endif
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -1122,6 +1131,14 @@ parse_long_opts(int opt_flow_index, char *optarg)
             vr_vrfs = VR_DEF_VRFS;
         }
         break;
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    case DROP_STATS_LOG_BUFFER_SIZE_OPT_INDEX:
+        vr_config_drop_stats_log_buffer_size = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_config_drop_stats_log_buffer_size = 20;
+        }
+        break;
+#endif
 
     case SOCKET_DIR_OPT_INDEX:
         vr_socket_dir = optarg;

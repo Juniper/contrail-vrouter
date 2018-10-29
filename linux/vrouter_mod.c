@@ -44,6 +44,8 @@ extern unsigned int vr_flow_hold_limit;
 extern unsigned int vr_interfaces;
 extern unsigned int vif_bridge_entries;
 extern unsigned int vif_bridge_oentries;
+extern unsigned int vr_config_drop_stats_log_buffer_size;
+extern unsigned int vr_config_drop_stats_log_buffer_support;
 
 extern char *ContrailBuildInfo;
 
@@ -599,7 +601,7 @@ lh_pcow(struct vr_packet **pktp, unsigned short head_room)
 #endif
     if (skb_cow(skb, head_room)) 
         return -ENOMEM;
-    /* Now manipulate the offsets as data pointers are modified */
+    /* Now manipulate the offsets as data pointers are  */
     pkt->vp_head = skb->head;
     pkt->vp_tail = skb_tail_pointer(skb) - skb->head;
 
@@ -2624,11 +2626,13 @@ init_fail:
 
 module_param(vr_flow_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_flow_entries, "Number of entries in the flow table. Default is "__stringify(VR_DEF_FLOW_ENTRIES));
+
 module_param(vr_oflow_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_oflow_entries, "Number of overflow entries in the flow table.");
 
 module_param(vr_bridge_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_bridge_entries, "Number of entries in the bridge table. Default is "__stringify(VR_DEF_BRIDGE_ENTRIES));
+
 module_param(vr_bridge_oentries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_bridge_oentries, "Number of overflow entries in the bridge table.");
 
@@ -2637,12 +2641,22 @@ MODULE_PARM_DESC(vif_bridge_entries, "Number of entries in the per interface bri
 module_param(vif_bridge_oentries, uint, S_IRUGO);
 MODULE_PARM_DESC(vif_bridge_oentries, "Number of overflow entries in the per interface bridge table.");
 
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+module_param(vr_config_drop_stats_log_buffer_size,uint, S_IRUGO);
+MODULE_PARM_DESC(vr_config_drop_stats_log_buffer_size,"Vrouter Drop stats packet log buffer size");
+
+module_param(vr_config_drop_stats_log_buffer_support,uint, S_IRUGO);
+MODULE_PARM_DESC(vr_config_drop_stats_log_buffer_support,"Enable/Disable vrouter dropstats log support");
+#endif
 module_param(vr_mpls_labels, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));
+
 module_param(vr_nexthops, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_nexthops, "Number of entries in the nexhop table. Default is "__stringify(VR_DEF_NEXTHOPS));
+
 module_param(vr_vrfs, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_vrfs, "Number of vrfs. Default is "__stringify(VR_DEF_VRFS));
+
 module_param(vr_flow_hold_limit, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_flow_hold_limit, "Maximum number of entries in the flow table that can be in the HOLD state. Default is 8192");
 module_param(vr_interfaces, uint, S_IRUGO);

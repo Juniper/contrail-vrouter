@@ -282,18 +282,20 @@ static void
 print_vrouter_parameters(vrouter_ops *req)
 {
     printf("Startup parameters\n"
-        "    Interfaces limit                     %u\n"
-        "    VRF tables limit                     %u\n"
-        "    NextHops limit                       %u\n"
-        "    MPLS Labels limit                    %u\n"
-        "    Bridge Table limit                   %u\n"
-        "    Bridge Table Overflow limit          %u\n"
-        "    Flow Table limit                     %u\n"
-        "    Flow Table overflow limit            %u\n"
-        "    Mirror entries limit                 %u\n"
-        "    Memroy Allocation Checks             %u\n"
-        "    Vif Bridge Table limit               %u\n"
-        "    Vif Bridge Table Overflow limit      %u\n"
+        "    Interfaces limit                       %u\n"
+        "    VRF tables limit                       %u\n"
+        "    NextHops limit                         %u\n"
+        "    MPLS Labels limit                      %u\n"
+        "    Bridge Table limit                     %u\n"
+        "    Bridge Table Overflow limit            %u\n"
+        "    Flow Table limit                       %u\n"
+        "    Flow Table overflow limit              %u\n"
+        "    Mirror entries limit                   %u\n"
+        "    Memroy Allocation Checks               %u\n"
+        "    Vif Bridge Table limit                 %u\n"
+        "    Vif Bridge Table Overflow limit        %u\n"
+        "    Vrouter Drop stats log bugger size     %u\n"
+        "    Support Drop stats log enable/disable  %u\n"
         "\n",
 
         req->vo_interfaces, req->vo_vrfs, req->vo_nexthops,
@@ -301,7 +303,8 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_oflow_bridge_entries, req->vo_flow_entries,
         req->vo_oflow_entries, req->vo_mirror_entries,
         req->vo_memory_alloc_checks, req->vo_vif_bridge_entries,
-	req->vo_vif_oflow_bridge_entries
+	req->vo_vif_oflow_bridge_entries,req->vo_drop_stats_log_buffer_size,
+        req->vo_drop_stats_log_buffer_support
     );
 
     printf("Runtime parameters\n"
