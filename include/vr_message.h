@@ -26,16 +26,17 @@
 #define VR_RESPONSE_OBJECT_ID           7
 #define VR_VRF_ASSIGN_OBJECT_ID         8
 #define VR_VRF_STATS_OBJECT_ID          9
-#define VR_DROP_STATS_OBJECT_ID         10
-#define VR_VXLAN_OBJECT_ID              11
-#define VR_VROUTER_OPS_OBJECT_ID        12
-#define VR_FLOW_TABLE_DATA_OBJECT_ID    13
-#define VR_MEM_STATS_OBJECT_ID          14
-#define VR_QOS_MAP_OBJECT_ID            15
-#define VR_FC_MAP_OBJECT_ID             16
-#define VR_FLOW_RESPONSE_OBJECT_ID      17
-#define VR_BRIDGE_TABLE_DATA_OBJECT_ID  18
-#define VR_HPAGE_CFG_OBJECT_ID          19
+#define VR_DROP_STATS_LOG_OBJECT_ID     10
+#define VR_DROP_STATS_OBJECT_ID         11
+#define VR_VXLAN_OBJECT_ID              12
+#define VR_VROUTER_OPS_OBJECT_ID        13
+#define VR_FLOW_TABLE_DATA_OBJECT_ID    14
+#define VR_MEM_STATS_OBJECT_ID          15
+#define VR_QOS_MAP_OBJECT_ID            16
+#define VR_FC_MAP_OBJECT_ID             17
+#define VR_FLOW_RESPONSE_OBJECT_ID      18
+#define VR_BRIDGE_TABLE_DATA_OBJECT_ID  19
+#define VR_HPAGE_CFG_OBJECT_ID          20
 
 #define VR_MESSAGE_PAGE_SIZE            (4096 - 128)
 

@@ -303,6 +303,8 @@ buffer sandesh vrouter_ops {
    38: u32          vo_priority_tagging;
    39: i32          vo_vif_bridge_entries;
    40: i32          vo_vif_oflow_bridge_entries;
+   41: i32          vo_drop_stats_log_buffer_size;
+   42: byte          vo_drop_stats_log_buffer_support;
 }
 
 buffer sandesh vr_mem_stats_req {
@@ -381,6 +383,18 @@ buffer sandesh vr_mem_stats_req {
 }
 
 /* any new addition needs update to vr_util.c & flow.c */
+
+buffer sandesh vr_drop_stats_log_req {
+    1:  sandesh_op      h_op;
+    2:  i16             vds_rid;
+    3:  i16             vds_core;
+    4:  i16             vds_stats_index;
+    5:  i16             vds_max_num_cores;
+    6:  i16             vds_drop_stats_max_log_buffer_size;
+    7:  i16             vds_drop_stats_support;
+    8:  list <byte>      vds_drop_stats_log_arr;
+}
+
 buffer sandesh vr_drop_stats_req {
     1:  sandesh_op      h_op;
     2:  i16             vds_rid;
