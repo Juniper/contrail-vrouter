@@ -36,12 +36,14 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     flags = ntohl(vxlan->vxlan_flags);
     if (!(flags & VR_VXLAN_IBIT)) {
         drop_reason = VP_DROP_INVALID_VNID;
+        DS_LOG(drop_reason,pkt,VR_VXLAN_C,__LINE__);
         goto fail;
     }
 
     vnid = ntohl(vxlan->vxlan_vnid) >> VR_VXLAN_VNID_SHIFT;
     if (!pkt_pull(pkt, sizeof(struct vr_vxlan))) {
         drop_reason = VP_DROP_PULL;
+        DS_LOG(drop_reason,pkt,VR_VXLAN_C,__LINE__);
         goto fail;
     }
 
@@ -50,6 +52,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
     nh = (struct vr_nexthop *)vr_itable_get(router->vr_vxlan_table, vnid);
     if (!nh) {
         drop_reason = VP_DROP_INVALID_VNID;
+        DS_LOG(drop_reason,pkt,VR_VXLAN_C,__LINE__);
         goto fail;
     }
 
@@ -57,6 +60,7 @@ vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
 
     if (vr_pkt_type(pkt, 0, fmd) < 0) {
         drop_reason = VP_DROP_INVALID_PACKET;
+        DS_LOG(drop_reason,pkt,VR_VXLAN_C,__LINE__);
         goto fail;
     }
 

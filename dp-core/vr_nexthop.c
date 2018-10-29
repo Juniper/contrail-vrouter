@@ -218,8 +218,10 @@ vrouter_add_nexthop(struct vr_nexthop *nh)
     struct vrouter *router = vrouter_get(nh->nh_rid);
 
     if (!router || nh->nh_id >= router->vr_max_nexthops)
+    {
+        vr_printf("func: %s Line no: %d\n",__func__,__LINE__);
         return -EINVAL;
-
+    }
     /*
      * NH change just copies the field
      * over to nexthop, incase of change
@@ -290,6 +292,7 @@ nh_tunnel_loop_detect_handle(struct vr_packet *pkt, struct vr_nexthop *nh,
         return 0;
 
     if (fmd->fmd_outer_src_ip == dip) {
+        DS_LOG(VP_DROP_PKT_LOOP,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_PKT_LOOP);
         return 1;
     }
@@ -370,6 +373,7 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
     fmd->fmd_to_me = 1;
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (!pkt_pull(pkt, pull_len)) {
+        DS_LOG(VP_DROP_PULL,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_PULL);
         return NH_PROCESSING_COMPLETE;
     }
@@ -391,9 +395,10 @@ nh_l2_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
         handled = vr_arp_input(pkt, fmd, eth_dmac);
     }
 
-    if (!handled)
+    if (!handled){
+        DS_LOG(VP_DROP_INVALID_PROTOCOL,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
-
+    }
     return NH_PROCESSING_COMPLETE;
 }
 
@@ -409,9 +414,10 @@ nh_l3_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (nh->nh_family == AF_INET)
         return vr_ip_rcv(nh->nh_router, pkt, fmd);
-    else
+    else {
+        DS_LOG(VP_DROP_INVALID_PROTOCOL,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
-
+    }
     return NH_PROCESSING_COMPLETE;
 }
 
@@ -642,6 +648,7 @@ nh_mcast_clone(struct vr_packet *pkt, unsigned short head_room)
 
     /* Increase the head space by the head_room */
     if (vr_pcow(&clone_pkt, head_room)) {
+        DS_LOG(VP_DROP_PCOW_FAIL,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(clone_pkt, VP_DROP_PCOW_FAIL);
         return NULL;
     }
@@ -914,6 +921,7 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1073,6 +1081,7 @@ nh_handle_mcast_control_pkt(struct vr_packet *pkt, struct vr_eth *eth,
     pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
     if (!pkt_pull(pkt, pull_len)) {
         drop_reason = VP_DROP_PULL;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1216,9 +1225,11 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     pkt_vrf = fmd->fmd_dvrf;
     drop_reason = VP_DROP_CLONED_ORIGINAL;
+//    DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1229,12 +1240,14 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
      */
     if (!nh->nh_validate_src) {
         drop_reason = VP_DROP_MISC;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
     tun_src = pkt_src = 0;
     if (nh->nh_validate_src(pkt, nh, fmd, &tun_src) == NH_SOURCE_INVALID) {
         drop_reason = VP_DROP_INVALID_MCAST_SOURCE;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1260,11 +1273,13 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
             pbb_pull_len = __vr_pbb_decode(eth, pkt_head_len(pkt) - pull_len, fmd);
             if (pbb_pull_len <= 0) {
                 drop_reason = VP_DROP_INVALID_PACKET;
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 goto drop;
             }
 
             if (vr_pkt_type(pkt, pbb_pull_len + pull_len, fmd) < 0) {
                 drop_reason = VP_DROP_INVALID_PACKET;
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 goto drop;
             }
 
@@ -1326,6 +1341,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!nh->nh_component_cnt) {
         drop_reason = VP_DROP_DISCARD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1353,6 +1369,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             if (!(new_pkt = nh_mcast_clone(pkt, 0))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 break;
             }
 
@@ -1363,6 +1380,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
             if (pull_len && !pkt_pull(new_pkt, pull_len)) {
                 vr_pfree(new_pkt, VP_DROP_PULL);
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 break;
             }
         } else if (dir_nh->nh_flags & NH_FLAG_COMPOSITE_FABRIC) {
@@ -1382,6 +1400,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
             /* Create head space for L2 Mcast header */
             if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 break;
             }
             fmd->fmd_dvrf = dir_nh->nh_vrf;
@@ -1400,6 +1419,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
                 if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                     drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+                    DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                     break;
                 }
                 fmd->fmd_dvrf = dir_nh->nh_vrf;
@@ -1416,6 +1436,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
             clone_size = VR_L2_MCAST_PKT_HEAD_SPACE - VR_L2_CTRL_DATA_LEN;
             if (!(new_pkt = nh_mcast_clone(pkt, clone_size))) {
                 drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 break;
             }
 
@@ -1424,6 +1445,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
                 pull_len = VR_VXLAN_HDR_LEN + pbb_pull_len;
                 if (!pkt_pull(new_pkt, pull_len)) {
                     vr_pfree(new_pkt, VP_DROP_PULL);
+                    DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                     break;
                 }
             }
@@ -1460,11 +1482,13 @@ nh_composite_encap(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!nh->nh_component_cnt) {
         drop_reason = VP_DROP_DISCARD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1482,6 +1506,7 @@ nh_composite_encap(struct vr_packet *pkt, struct vr_nexthop *nh,
         /* There would be enought head space to clone it with zero size */
         if (!(new_pkt = nh_mcast_clone(pkt, 0))) {
             drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             break;
         }
         fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
@@ -1511,11 +1536,13 @@ nh_composite_tor(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!nh->nh_component_cnt) {
         drop_reason = VP_DROP_DISCARD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1542,6 +1569,7 @@ nh_composite_tor(struct vr_packet *pkt, struct vr_nexthop *nh,
         new_pkt = nh_mcast_clone(pkt, 0);
         if (!new_pkt) {
             drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             break;
         }
 
@@ -1576,11 +1604,13 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!nh->nh_component_cnt) {
         drop_reason = VP_DROP_DISCARD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1610,12 +1640,14 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
         new_pkt = nh_mcast_clone(pkt, 0);
         if (!new_pkt) {
             drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             break;
         }
 
         if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
             if (!nh_pbb_tunnel_helper(nh->nh_router, &new_pkt, fmd,
                     eth_mac, pkt->vp_if->vif_pbb_mac, pkt->vp_if->vif_isid)) {
+                DS_LOG(VP_DROP_PUSH,pkt,VR_NEXTHOP_C,__LINE__);
                 vr_pfree(new_pkt, VP_DROP_PUSH);
                 continue;
             }
@@ -1623,6 +1655,7 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
 
         if (l2_control_data && !vr_l2_control_data_add(&new_pkt)) {
             drop_reason = VP_DROP_PULL;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             break;
         }
 
@@ -1658,11 +1691,13 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!nh->nh_component_cnt) {
         drop_reason = VP_DROP_DISCARD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -1702,6 +1737,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
             dip = dir_nh->nh_udp_tun_dip;
         } else {
             drop_reason = VP_DROP_INVALID_NH;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             break;
         }
 
@@ -1726,6 +1762,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
         new_pkt = nh_mcast_clone(pkt, 0);
         if (!new_pkt) {
             drop_reason = VP_DROP_MCAST_CLONE_FAIL;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             break;
         }
 
@@ -1737,6 +1774,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
              * does not valid label/vnid, skip the processing
              */
             if (label < 0) {
+                DS_LOG(VP_DROP_INVALID_LABEL,pkt,VR_NEXTHOP_C,__LINE__);
                 vr_pfree(new_pkt, VP_DROP_INVALID_LABEL);
                 break;
             }
@@ -1744,6 +1782,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
                 if (!nh_pbb_tunnel_helper(nh->nh_router, &new_pkt, fmd, eth_mac,
                               pkt->vp_if->vif_pbb_mac, pkt->vp_if->vif_isid)) {
+                    DS_LOG(VP_DROP_PUSH,pkt,VR_NEXTHOP_C,__LINE__);
                     vr_pfree(new_pkt, VP_DROP_PUSH);
                     continue;
                 }
@@ -1758,6 +1797,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
                 fmd->fmd_dvrf = dir_nh->nh_dev->vif_vrf;
                 if (nh_vxlan_tunnel_helper(nh->nh_router, &new_pkt,
                                         fmd, sip, sip) == false) {
+                    DS_LOG(VP_DROP_PUSH,pkt,VR_NEXTHOP_C,__LINE__);
                     vr_pfree(new_pkt, VP_DROP_PUSH);
                     break;
                 }
@@ -1766,6 +1806,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
 
         if (nh->nh_family == AF_BRIDGE) {
             if (vr_l2_control_data_add(&new_pkt) == false) {
+                DS_LOG(VP_DROP_PUSH,pkt,VR_NEXTHOP_C,__LINE__);
                 vr_pfree(new_pkt, VP_DROP_PUSH);
                 break;
             }
@@ -1795,6 +1836,7 @@ nh_discard(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (stats)
         stats->vrf_discards++;
 
+    DS_LOG(VP_DROP_DISCARD,pkt,VR_NEXTHOP_C,__LINE__);
     vr_pfree(pkt, VP_DROP_DISCARD);
     return NH_PROCESSING_COMPLETE;
 }
@@ -1950,6 +1992,7 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     return NH_PROCESSING_COMPLETE;
 
 send_fail:
+    DS_LOG(VP_DROP_PUSH,pkt,VR_NEXTHOP_C,__LINE__);
     vr_pfree(pkt, VP_DROP_PUSH);
     return NH_PROCESSING_COMPLETE;
 }
@@ -1970,11 +2013,13 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!fmd) {
         reason = VP_DROP_NO_FMD;
+        DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto send_fail;
     }
 
     if (fmd->fmd_label < 0) {
         reason = VP_DROP_INVALID_LABEL;
+        DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto send_fail;
     }
 
@@ -1996,6 +2041,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
         if (!nh->nh_dev || IS_MAC_ZERO(nh->nh_dev->vif_mac)) {
             reason = VP_DROP_INTERFACE_DROP;
+            DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
             goto send_fail;
         }
 
@@ -2010,6 +2056,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                 vr_ip_dont_fragment_set(pkt)) {
             if (pkt->vp_flags & VP_FLAG_MULTICAST) {
                 reason = VP_DROP_MCAST_DF_BIT;
+                DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
                 goto send_fail;
             }
 
@@ -2055,6 +2102,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
         if (!nh->nh_crypt_dev) {
             reason = VP_DROP_NO_CRYPT_PATH; 
+            DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
             goto send_fail;
         }
         vif = nh->nh_crypt_dev;
@@ -2083,6 +2131,7 @@ nh_pbb_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (vr_fmd_etree_is_enabled(fmd)) {
         if ((!vr_fmd_etree_is_root(fmd)) &&
                     (!(nh->nh_flags & NH_FLAG_ETREE_ROOT))) {
+            DS_LOG(VP_DROP_LEAF_TO_LEAF,pkt,VR_NEXTHOP_C,__LINE__);
             vr_pfree(pkt, VP_DROP_LEAF_TO_LEAF);
             return NH_PROCESSING_COMPLETE;
         }
@@ -2094,7 +2143,8 @@ nh_pbb_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!nh_pbb_tunnel_helper(nh->nh_router, &pkt, fmd, nh->nh_pbb_mac,
             pkt->vp_if->vif_pbb_mac, pkt->vp_if->vif_isid)) {
-        vr_pfree(pkt, VP_DROP_PUSH);
+                DS_LOG(VP_DROP_PUSH,pkt,VR_NEXTHOP_C,__LINE__);
+                vr_pfree(pkt, VP_DROP_PUSH);
         return NH_PROCESSING_COMPLETE;
     }
     vr_fmd_set_label(fmd, nh->nh_pbb_label, VR_LABEL_TYPE_UNKNOWN);
@@ -2198,6 +2248,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         udp_src_port = vr_get_udp_src_port(pkt, fmd, fmd->fmd_dvrf);
         if (udp_src_port == 0) {
             reason = VP_DROP_PULL;
+            DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
             goto send_fail;
         }
     }
@@ -2213,6 +2264,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                 vr_ip_dont_fragment_set(pkt)) {
             if (pkt->vp_flags & VP_FLAG_MULTICAST) {
                 reason = VP_DROP_MCAST_DF_BIT;
+                DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
                 goto send_fail;
             }
             trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
@@ -2274,6 +2326,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
         if (!nh->nh_crypt_dev) {
             reason = VP_DROP_NO_CRYPT_PATH; 
+            DS_LOG(reason,pkt,VR_NEXTHOP_C,__LINE__);
             goto send_fail;
         }
         vif = nh->nh_crypt_dev;
@@ -2377,6 +2430,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
                 vr_ip_dont_fragment_set(pkt)) {
             if (pkt->vp_flags & VP_FLAG_MULTICAST) {
                 drop_reason = VP_DROP_MCAST_DF_BIT;
+                DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
                 goto send_fail;
             }
 
@@ -2394,6 +2448,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         tmp_pkt = vr_pexpand_head(pkt, gre_head_space - pkt_head_space(pkt));
         if (!tmp_pkt) {
             drop_reason = VP_DROP_HEAD_ALLOC_FAIL;
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             goto send_fail;
         }
         pkt = tmp_pkt;
@@ -2411,6 +2466,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     gre_hdr = (struct vr_gre *)pkt_push(pkt, sizeof(struct vr_gre));
     if (!gre_hdr) {
         drop_reason = VP_DROP_PUSH;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto send_fail;
     }
 
@@ -2420,6 +2476,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     ip = (struct vr_ip *)pkt_push(pkt, sizeof(struct vr_ip));
     if (!ip) {
         drop_reason = VP_DROP_PUSH;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto send_fail;
     }
     pkt_set_network_header(pkt, pkt->vp_data);
@@ -2470,6 +2527,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
         if (!nh->nh_crypt_dev) {
             drop_reason = VP_DROP_NO_CRYPT_PATH; 
+            DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
             goto send_fail;
         }
         vif = nh->nh_crypt_dev;
@@ -2478,6 +2536,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
             nh->nh_data, nh->nh_gre_tun_encap_len);
     if (tun_encap_rewrite < 0) {
         drop_reason = VP_DROP_PUSH;
+        DS_LOG(drop_reason,pkt,VR_NEXTHOP_C,__LINE__);
         goto send_fail;
     }
     vif->vif_tx(vif, pkt, fmd);
@@ -2512,6 +2571,7 @@ loop:
 
     /* If nexthop does not have valid data, drop it */
     if (!(nh->nh_flags & NH_FLAG_VALID)) {
+        DS_LOG(VP_DROP_INVALID_NH,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_NH);
         return 0;
     }
@@ -2550,6 +2610,7 @@ loop:
 
                  /* pkt->vp_nh could have changed after vr_flow_forward */
                  if (!pkt->vp_nh) {
+                     DS_LOG(VP_DROP_INVALID_NH,pkt,VR_NEXTHOP_C,__LINE__);
                      vr_pfree(pkt, VP_DROP_INVALID_NH);
                      return 0;
                  }
@@ -2594,6 +2655,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
     if (vr_fmd_etree_is_enabled(fmd)) {
         if ((!vr_fmd_etree_is_root(fmd)) &&
                     (!(nh->nh_flags & NH_FLAG_ETREE_ROOT))) {
+            DS_LOG(VP_DROP_LEAF_TO_LEAF,pkt,VR_NEXTHOP_C,__LINE__);
             vr_pfree(pkt, VP_DROP_LEAF_TO_LEAF);
             return NH_PROCESSING_COMPLETE;
         }
@@ -2607,6 +2669,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     vif = nh->nh_dev;
     if (!vif) {
+        DS_LOG(VP_DROP_INVALID_IF,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_IF);
         return NH_PROCESSING_COMPLETE;
     }
@@ -2620,6 +2683,7 @@ nh_encap_l2(struct vr_packet *pkt, struct vr_nexthop *nh,
             pbb_self_mac = vif->vif_pbb_mac;
 
         if (!VR_MAC_CMP(fmd->fmd_dmac, pbb_self_mac)) {
+            DS_LOG(VP_DROP_BMAC_ISID_MISMATCH,pkt,VR_NEXTHOP_C,__LINE__);
             vr_pfree(pkt, VP_DROP_BMAC_ISID_MISMATCH);
             return NH_PROCESSING_COMPLETE;
         }
@@ -2703,6 +2767,7 @@ nh_encap_l3_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
         eth = (struct vr_eth *)pkt_push(pkt, sizeof(struct vr_eth));
         if (!eth) {
             dreason = VP_DROP_PUSH;
+            DS_LOG(dreason,pkt,VR_NEXTHOP_C,__LINE__);
             goto drop;
         }
 
@@ -2721,6 +2786,7 @@ nh_encap_l3_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     } else {
         dreason = VP_DROP_INVALID_PROTOCOL;
+        DS_LOG(dreason,pkt,VR_NEXTHOP_C,__LINE__);
         goto drop;
     }
 
@@ -2747,6 +2813,7 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     vif = nh->nh_dev;
     if (!vif) {
+        DS_LOG(VP_DROP_INVALID_IF,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_IF);
         return NH_PROCESSING_COMPLETE;
     }
@@ -2771,6 +2838,7 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (qos)
             vr_inet_set_tos(ip, VR_IP_DSCP(qos->vfcq_dscp));
     } else {
+        DS_LOG(VP_DROP_INVALID_PROTOCOL,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
         return NH_PROCESSING_COMPLETE;
     }
@@ -2799,6 +2867,7 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     rewrite_len = vif->vif_set_rewrite(vif, &pkt, fmd, nh->nh_data, nh->nh_encap_len);
     if (rewrite_len < 0) {
+        DS_LOG(VP_DROP_REWRITE_FAIL,pkt,VR_NEXTHOP_C,__LINE__);
         vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
         return NH_PROCESSING_COMPLETE;
     }
@@ -3385,6 +3454,7 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 
 exit_add:
     if (nh->nh_dev) {
+	vr_printf("nh->flags: %d\n req->nhr_family: %d\n",nh->nh_flags,req->nhr_family);
         nh->nh_validate_src = nh_encap_validate_src;
         if (req->nhr_family == AF_BRIDGE) {
             nh->nh_reach_nh = nh_encap_l2;
@@ -3468,13 +3538,16 @@ vr_nexthop_add(vr_nexthop_req *req)
     struct vr_nexthop *nh;
     struct vrouter *router = vrouter_get(req->nhr_rid);
 
-    if (!vr_nexthop_valid_request(req) && (ret = -EINVAL))
+    if (!vr_nexthop_valid_request(req) && (ret = -EINVAL)){
+        vr_printf("func: %s Line no: %d\n",__func__,__LINE__);
         goto generate_resp;
+    }
 
     nh = __vrouter_get_nexthop(router, req->nhr_id);
     if (!nh) {
         len = vr_nexthop_size(req);
         if (len < 0) {
+        vr_printf("func: %s Line no: %d\n",__func__,__LINE__);
             ret = -EINVAL;
             goto generate_resp;
         }
@@ -3493,6 +3566,7 @@ vr_nexthop_add(vr_nexthop_req *req)
          * everybody sees that
          */
         if (!vr_nexthop_valid_change(req, nh)) {
+        vr_printf("func: %s Line no: %d\n",__func__,__LINE__);
             ret = -EINVAL;
             goto generate_resp;
         }
@@ -3573,6 +3647,7 @@ vr_nexthop_add(vr_nexthop_req *req)
             break;
 
         default:
+        vr_printf("func: %s Line no: %d\n",__func__,__LINE__);
             ret = -EINVAL;
         }
 

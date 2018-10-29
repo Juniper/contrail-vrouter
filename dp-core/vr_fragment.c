@@ -161,7 +161,7 @@ vr_fragment_queue_free(struct vr_fragment_queue *queue)
     queue->vfq_tail = NULL;
     while (vfqe) {
         next = vfqe->fqe_next;
-        if (vfqe->fqe_pnode.pl_packet)
+        if (vfqe->fqe_pnode.pl_packet)//TODO: vr struct not there to collect logs
             vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
         vfqe->fqe_pnode.pl_packet = NULL;
         vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
@@ -366,11 +366,13 @@ vr_fragment_assembler(struct vr_fragment **head_p,
     if (!found) {
         if (frag_head) {
             drop_reason = VP_DROP_CLONED_ORIGINAL;
+            DS_LOG(drop_reason,pkt,VR_FRAGMENT_C,__LINE__);
             goto exit_assembly;
         }
 
         if (list_length > VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE) {
             drop_reason = VP_DROP_FRAGMENT_QUEUE_FAIL;
+            DS_LOG(drop_reason,pkt,VR_FRAGMENT_C,__LINE__);
             goto exit_assembly;
         }
 
@@ -378,6 +380,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
         if (!frag) {
             ret = -ENOMEM;
             drop_reason = VP_DROP_NO_MEMORY;
+            DS_LOG(drop_reason,pkt,VR_FRAGMENT_C,__LINE__);
             goto exit_assembly;
         }
 
@@ -411,6 +414,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
         }
     } else {
         frag->f_port_info_valid = true;
+        DS_LOG(VP_DROP_CLONED_ORIGINAL,pkt,VR_FRAGMENT_C,__LINE__);
         vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
     }
 
@@ -541,7 +545,8 @@ vr_fragment_enqueue(struct vrouter *router,
 fail:
     if (fqe)
         vr_free(fqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
-
+    
+    DS_LOG(VP_DROP_FRAGMENTS,pkt,VR_FRAGMENT_C,__LINE__);
     vr_pfree(pkt, VP_DROP_FRAGMENTS);
     return -1;
 }
