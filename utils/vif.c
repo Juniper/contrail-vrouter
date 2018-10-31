@@ -1518,6 +1518,7 @@ static void
 rate_stats(struct nl_client *cl, unsigned int vr_op)
 {
     struct tm *tm;
+    time_t secs;
     char fmt[80] = {0};
     int ret = 0;
     char kb_input[2] = {0};
@@ -1557,7 +1558,8 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
             if(list_set) {
                 printf("Key 'q' for quit, key 'k' for previous page, key 'j' for next page.\n");
             }
-            tm = localtime(&last_time.tv_sec);
+            secs = last_time.tv_sec;
+            tm = localtime(&secs);
             if (tm) {
                 strftime(fmt, sizeof(fmt), "%Y-%m-%d %H:%M:%S %z", tm);
                 printf("%s \n", fmt);

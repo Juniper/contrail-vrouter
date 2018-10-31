@@ -486,56 +486,34 @@ gen(FILE *fp)
                 gen_write(fp_expect, 0, ", node->content);\n");
 
             } else if (!strncmp(type, "list", strlen("list"))) {
+                char* size = NULL;
                 if (!strncmp(sub_type, "byte", strlen("byte"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U8, &list_size);\n");
-
-                    gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
-                    gen_write(fp_expect, 0, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, ",\n");
-                    gen_write(fp_expect, nesting + 2, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U8);\n");
-
-                } else if (!strncmp(sub_type, "i16", strlen("i16"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U16, &list_size);\n");
-
-                    gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
-                    gen_write(fp_expect, 0, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, ",\n");
-                    gen_write(fp_expect, nesting + 2, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U16);\n");
-
+                    size = "8";
+                } else if (!strncmp(sub_type, "i16", strlen("i16")) ||
+                        !strncmp(sub_type, "u16", strlen("u16"))) {
+                    size = "16";
                 } else if (!strncmp(sub_type, "i32", strlen("i32")) ||
                         !strncmp(sub_type, "u32", strlen("u32"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U32, &list_size);\n");
-
-                    gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
-                    gen_write(fp_expect, 0, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, ",\n");
-                    gen_write(fp_expect, nesting + 2, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U32);\n");
-
-                } else if (!strncmp(sub_type, "i64", strlen("i64"))) {
-                    gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U64, &list_size);\n");
-
-                    gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
-                    gen_write(fp_expect, 0, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, ",\n");
-                    gen_write(fp_expect, nesting + 2, "req->");
-                    gen_raw_write(fp_expect, 0, var, var_len);
-                    gen_write(fp_expect, 0, "_size");
-                    gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U64);\n");
-
+                    size = "32";
+                } else if (!strncmp(sub_type, "i64", strlen("i64")) ||
+                        !strncmp(sub_type, "u64", strlen("u64"))) {
+                    size = "64";
                 }
+
+                gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U");
+                gen_write(ofp, 0, size);
+                gen_write(ofp, 0, ", &list_size);\n");
+
+                gen_write(fp_expect, 0, "result = vt_gen_list_compare(");
+                gen_write(fp_expect, 0, "req->");
+                gen_raw_write(fp_expect, 0, var, var_len);
+                gen_write(fp_expect, 0, ",\n");
+                gen_write(fp_expect, nesting + 2, "req->");
+                gen_raw_write(fp_expect, 0, var, var_len);
+                gen_write(fp_expect, 0, "_size");
+                gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U");
+                gen_write(fp_expect, 0, size);
+                gen_write(fp_expect, 0, ");\n");
 
                 gen_write(ofp, nesting, "req->");
                 gen_raw_write(ofp, 0, var, var_len);
