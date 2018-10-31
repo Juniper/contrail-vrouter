@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
-#include "precomp.h"
-
 #include <errno.h>
 #include "vr_os.h"
 #include "vr_packet.h"

@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
-#include <precomp.h>
-
 #include "vr_message.h"
 #include "vr_sandesh.h"
 

@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
-#include "precomp.h"
-
 #include "windows_devices.h"
 #include "windows_shmem_ioctl.h"
 #include "windows_ksync.h"

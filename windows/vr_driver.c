@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
-#include "precomp.h"
 #include "vr_windows.h"
 #include "windows_devices.h"
+#include "windows_shmem.h"
 #include "windows_nbl.h"
 #include "win_interface.h"
 

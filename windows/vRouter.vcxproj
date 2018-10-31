@@ -57,8 +57,7 @@
       <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\debug\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
       <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
-      <PreCompiledHeaderFile>precomp.h</PreCompiledHeaderFile>
-      <PreCompiledHeader>Create</PreCompiledHeader>
+      <PreCompiledHeader></PreCompiledHeader>
     </ClCompile>
     <ResourceCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..;.;</AdditionalIncludeDirectories>
@@ -77,8 +76,7 @@
       <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\production\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
       <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
-      <PreCompiledHeaderFile>precomp.h</PreCompiledHeaderFile>
-      <PreCompiledHeader>Create</PreCompiledHeader>
+      <PreCompiledHeader></PreCompiledHeader>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
@@ -131,7 +129,6 @@
     <ClInclude Include="..\include\vr_windows.h" />
     <ClInclude Include="..\include\windows_devices.h" />
     <ClInclude Include="..\include\windows_builtins.h" />
-    <ClInclude Include="precomp.h" />
     <ClInclude Include="win_packet.h" />
     <ClInclude Include="win_csum.h" />
     <ClInclude Include="win_packet_splitting.h" />
@@ -139,164 +136,63 @@
     <ClInclude Include="win_tx_postprocess.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_binary_protocol.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\sandesh.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vrouter.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_bitmap.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_bridge.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_btable.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_buildinfo.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_datapath.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_flow.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_fragment.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_htable.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_index_table.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_interface.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_ip_mtrie.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_message.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_mirror.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_mpls.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_nexthop.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_packet.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_proto_ip.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_proto_ip6.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_qos.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_queue.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_response.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_route.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_sandesh.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_stats.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_vif_bridge.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_vrf_assign.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\dp-core\vr_vxlan.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="precompsrc2.c" />
-    <ClCompile Include="vr_devices.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_binary_protocol.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\sandesh.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c" />
+    <ClCompile Include="..\dp-core\vrouter.c" />
+    <ClCompile Include="..\dp-core\vr_bitmap.c" />
+    <ClCompile Include="..\dp-core\vr_bridge.c" />
+    <ClCompile Include="..\dp-core\vr_btable.c" />
+    <ClCompile Include="..\dp-core\vr_buildinfo.c" />
+    <ClCompile Include="..\dp-core\vr_datapath.c" />
+    <ClCompile Include="..\dp-core\vr_flow.c" />
+    <ClCompile Include="..\dp-core\vr_fragment.c" />
+    <ClCompile Include="..\dp-core\vr_htable.c" />
+    <ClCompile Include="..\dp-core\vr_index_table.c" />
+    <ClCompile Include="..\dp-core\vr_interface.c" />
+    <ClCompile Include="..\dp-core\vr_ip_mtrie.c" />
+    <ClCompile Include="..\dp-core\vr_message.c" />
+    <ClCompile Include="..\dp-core\vr_mirror.c" />
+    <ClCompile Include="..\dp-core\vr_mpls.c" />
+    <ClCompile Include="..\dp-core\vr_nexthop.c" />
+    <ClCompile Include="..\dp-core\vr_packet.c" />
+    <ClCompile Include="..\dp-core\vr_proto_ip.c" />
+    <ClCompile Include="..\dp-core\vr_proto_ip6.c" />
+    <ClCompile Include="..\dp-core\vr_qos.c" />
+    <ClCompile Include="..\dp-core\vr_queue.c" />
+    <ClCompile Include="..\dp-core\vr_response.c" />
+    <ClCompile Include="..\dp-core\vr_route.c" />
+    <ClCompile Include="..\dp-core\vr_sandesh.c" />
+    <ClCompile Include="..\dp-core\vr_stats.c" />
+    <ClCompile Include="..\dp-core\vr_vif_bridge.c" />
+    <ClCompile Include="..\dp-core\vr_vrf_assign.c" />
+    <ClCompile Include="..\dp-core\vr_vxlan.c" />
+    <ClCompile Include="vr_devices.c" />
     <ClCompile Include="vr_driver.c" />
     <ClCompile Include="vr_shmem_devices.c" />
-    <ClCompile Include="vr_ksync.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="vr_ksync.c" />
     <ClCompile Include="vr_host_interface.c" />
-    <ClCompile Include="vr_shmem.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="vr_shmem.c" />
     <ClCompile Include="vr_nbl.c" />
     <ClCompile Include="vr_oid.c" />
-    <ClCompile Include="vr_pkt0.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="vr_pkt0.c" />
     <ClCompile Include="vr_win_transport.c" />
-    <ClCompile Include="windows_random.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="vr_fragment_assembler.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="windows_random.c" />
+    <ClCompile Include="vr_fragment_assembler.c" />
     <ClCompile Include="vr_host.c" />
-    <ClCompile Include="win_packet.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_packet_raw.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_data_at_offset.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_pclone.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_pfree.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_memory.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_csum.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_packet_splitting.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_interface.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="win_tx_postprocess.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="win_packet.c" />
+    <ClCompile Include="win_packet_raw.c" />
+    <ClCompile Include="win_data_at_offset.c" />
+    <ClCompile Include="win_pclone.c" />
+    <ClCompile Include="win_pfree.c" />
+    <ClCompile Include="win_memory.c" />
+    <ClCompile Include="win_csum.c" />
+    <ClCompile Include="win_packet_splitting.c" />
+    <ClCompile Include="win_interface.c" />
+    <ClCompile Include="win_tx_postprocess.c" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="vRouter.inf" />

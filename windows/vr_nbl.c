@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
-#include "precomp.h"
-
 #include "vr_interface.h"
 #include "vr_packet.h"
 #include "vr_windows.h"

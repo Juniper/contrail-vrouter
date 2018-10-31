@@ -19,9 +19,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="windows\precomp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\vrouter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -147,9 +144,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="windows\precompsrc2.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="dp-core\vr_packet.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -313,7 +307,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\win_tx_postprocess.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
