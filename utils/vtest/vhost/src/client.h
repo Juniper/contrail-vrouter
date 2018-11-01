@@ -27,8 +27,8 @@ typedef struct Client {
     int socket;
     char sh_mem_path[UNIX_PATH_MAX];
     int sh_mem_fds[VHOST_MEMORY_MAX_NREGIONS];
+    int mode;
 } Client;
-
 
 typedef enum {
     E_CLIENT_OK = EXIT_SUCCESS,
