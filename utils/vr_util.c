@@ -46,7 +46,6 @@
 
 /* Suppress NetLink error messages */
 bool vr_ignore_nl_errors = false;
-char *vr_socket_dir = VR_DEF_SOCKET_DIR;
 
 char *
 vr_extract_token(char *string, char token_separator)
