@@ -271,8 +271,8 @@ tx_rx_pcap_test(struct vtest *test) {
 
     memset(&tx_rx_handler, 0, sizeof(struct tx_rx_handler));
 
-    tx_state = init_vhost_net(&tx_rx_handler.send_data, src_vif_ctrl_sock);
-    rx_state = init_vhost_net(&tx_rx_handler.recv_data, dst_vif_ctrl_sock);
+    tx_state = init_vhost_net(&tx_rx_handler.send_data, src_vif_ctrl_sock, 1);
+    rx_state = init_vhost_net(&tx_rx_handler.recv_data, dst_vif_ctrl_sock, 1);
 
     if (tx_state != E_VHOST_NET_OK || rx_state != E_VHOST_NET_OK) {
         return E_PACKET_ERR;

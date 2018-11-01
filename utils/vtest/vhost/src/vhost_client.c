@@ -24,7 +24,7 @@
 
 static int vhost_client_delete_Vhost_Client(Vhost_Client *vhost_client);
 static int vhost_client_init_Vhost_Client(Vhost_Client *vhost_client);
-static int vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *);
+static int vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *, int mode);
 static Vhost_Client* vhost_client_create_vhost_client(void);
 static int vhost_client_init_control_communication(Vhost_Client *vhost_client);
 static int vhost_client_set_mem_Vhost_Client(Vhost_Client *vhost_client);
@@ -203,7 +203,7 @@ vhost_client_delete_Vhost_Client(Vhost_Client *vhost_client) {
 }
 
 static int
-vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *vhost_client_path ) {
+vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *vhost_client_path, int mode ) {
 
     Vhost_Client *l_vhost_client = NULL;
     VHOST_CLIENT_H_RET_VAL vhost_client_ret_val = E_VHOST_CLIENT_OK;
@@ -222,6 +222,7 @@ vhost_client_run_vhost_client(Vhost_Client **vhost_cl, const char *vhost_client_
         return E_VHOST_CLIENT_ERR;
     }
 
+    l_vhost_client->client.mode = mode;
     client_ret_val = client_init_Client(&l_vhost_client->client, vhost_client_path);
     if (client_ret_val != E_CLIENT_OK) {
         return E_VHOST_CLIENT_ERR;
@@ -345,7 +346,7 @@ map_ret_val_vhost_client_2_vhost_net(VHOST_CLIENT_H_RET_VAL vhost_client_ret_val
 }
 
 int
-init_vhost_net(vhost_net **client,  const char *vhost_client_path ) {
+init_vhost_net(vhost_net **client,  const char *vhost_client_path, int mode) {
 
     Vhost_Client *run_vhost_client= NULL;
     VHOST_CLIENT_H_RET_VAL vhost_client_ret_val = E_VHOST_CLIENT_OK;
@@ -358,7 +359,7 @@ init_vhost_net(vhost_net **client,  const char *vhost_client_path ) {
 
 
     vhost_client_ret_val = vhost_client_run_vhost_client(&run_vhost_client,
-            vhost_client_path);
+            vhost_client_path, mode);
 
     if (vhost_client_ret_val != E_VHOST_CLIENT_OK) {
         return map_ret_val_vhost_client_2_vhost_net(vhost_client_ret_val);
