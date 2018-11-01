@@ -46,7 +46,6 @@
 
 /* Suppress NetLink error messages */
 bool vr_ignore_nl_errors = false;
-char *vr_socket_dir = VR_DEF_SOCKET_DIR;
 
 char *
 vr_extract_token(char *string, char token_separator)
@@ -301,7 +300,7 @@ vr_get_nl_client(int proto)
 
     /* Do not use ini file if we are in a test mode. */
     if (proto == VR_NETLINK_PROTO_TEST) {
-        ret = nl_socket(cl, AF_INET, SOCK_STREAM, 0);
+        ret = nl_socket(cl, AF_UNIX, SOCK_STREAM, 0);
         if (ret <= 0)
             goto fail;
 
