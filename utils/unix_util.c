@@ -197,7 +197,7 @@ nl_connect(struct nl_client *cl, uint32_t ip, uint16_t port)
 
         memset(sa, 0, sizeof(*sa));
         sa->sun_family = cl->cl_socket_domain;
-        strcpy(sa->sun_path, VR_DEF_NETLINK_PATH);
+        snprintf(sa->sun_path, sizeof(sa->sun_path), "%s/dpdk_netlink", vr_socket_dir);
         cl->cl_sa = (struct sockaddr *)sa;
         cl->cl_sa_len = sizeof(*sa);
 

@@ -32,7 +32,7 @@ typedef struct vhost_net {
 
 } vhost_net;
 
-int init_vhost_net(vhost_net **client,  const char *vhost_client_path );
+int init_vhost_net(vhost_net **client,  const char *vhost_client_path, int mode);
 int deinit_vhost_net(vhost_net *client);
 #endif
 

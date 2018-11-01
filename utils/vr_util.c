@@ -301,7 +301,7 @@ vr_get_nl_client(int proto)
 
     /* Do not use ini file if we are in a test mode. */
     if (proto == VR_NETLINK_PROTO_TEST) {
-        ret = nl_socket(cl, AF_INET, SOCK_STREAM, 0);
+        ret = nl_socket(cl, AF_UNIX, SOCK_STREAM, 0);
         if (ret <= 0)
             goto fail;
 
