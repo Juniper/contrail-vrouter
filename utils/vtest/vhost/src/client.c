@@ -20,6 +20,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <linux/un.h>
+#include <poll.h>
+#include <fcntl.h>
 
 
 #include "client.h"
@@ -108,6 +110,14 @@ client_connect_socket(Client *client) {
     size_t addrlen = 0;
     struct stat unix_socket_stat;
     unsigned int connect_retry = 0;
+    mode_t umask_mode;
+    int sock;
+    struct sockaddr_un sun;
+    socklen_t len = sizeof(sun);
+    struct timeval tv;
+    struct pollfd pfd[1];
+    int ret;
+    int flags, tmp_sock;
 
     if (!client->socket || strlen(client->socket_path) == 0) {
         fprintf(stderr, "%s(): Error connecting socket: no socket\n",
@@ -123,17 +133,90 @@ client_connect_socket(Client *client) {
     strncpy(unix_socket.sun_path, client->socket_path, sizeof(unix_socket.sun_path) - 1);
     addrlen = strlen(unix_socket.sun_path) + sizeof(AF_UNIX);
 
-    /**
-     * Sometimes we try to connect before vRouter creates socket.
-     * Try to connect couple of times before failing.
-     */
+    if (client->mode) {
+        unlink(unix_socket.sun_path);
 
-    while (connect(client->socket, (struct sockaddr *)&unix_socket, addrlen)  == -1) {
-        sleep(3);
-        if (++connect_retry > 10) {
-            fprintf(stderr, "%s(): Error connecting socket: %s (%d)\n",
-                __func__, strerror(errno), errno);
+        sock = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (sock == -1) {
+            fprintf(stderr, "Error creating socket: %s (%d)\n",
+                                    strerror(errno), errno);
             return E_CLIENT_ERR_CONN;
+        }
+
+        /*
+         * Ensure RW permissions for the socket files such that QEMU process is
+         * able to connect.
+         */
+        umask_mode = umask(~(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH |
+                S_IWOTH));
+
+        ret = bind(sock, (struct sockaddr *) &unix_socket, sizeof(unix_socket));
+        if (ret == -1) {
+            fprintf(stderr, "Error binding socket %s: %s (%d)\n",
+                unix_socket.sun_path, strerror(errno), errno);
+            return E_CLIENT_ERR_CONN;
+        }
+
+        umask(umask_mode);
+
+        /*
+         * Set the socket to non-blocking
+         */
+        flags = fcntl(sock, F_GETFL, 0);
+        fcntl(sock, flags | O_NONBLOCK);
+
+        ret = listen(sock, 1);
+        if (ret == -1) {
+            fprintf(stderr, "Error listening to socket %s (%d)\n",
+                            strerror(errno), errno);
+            close(sock);
+            unlink(unix_socket.sun_path);
+            return E_CLIENT_ERR_CONN;
+        }
+
+        pfd[0].fd = sock;
+        pfd[0].events = POLLIN;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+
+        ret = poll(pfd, 1, 30000);
+        if (ret < 0) {
+            close(sock);
+            unlink(unix_socket.sun_path);
+            return E_CLIENT_ERR_CONN;
+        }
+ 
+        if (pfd[0].revents & POLLIN) {
+            tmp_sock = client->socket;
+            //vr_uvhost_log("Handling connection FD %d...\n", fd);
+            client->socket = accept(sock, (struct sockaddr *) &sun, &len);
+            if (client->socket < 0) {
+                fprintf(stderr, "Error accepting NetLink connection\n");
+                close(sock);
+                unlink(unix_socket.sun_path);
+                client->socket = tmp_sock;
+                return E_CLIENT_ERR_CONN;
+            }
+            close(tmp_sock);
+        } else {
+            fprintf(stderr, "Not connected\n");
+            close(sock);
+            unlink(unix_socket.sun_path);
+            return E_CLIENT_ERR_CONN;
+        }
+    } else {
+        /**
+         * Sometimes we try to connect before vRouter creates socket.
+         * Try to connect couple of times before failing.
+         */
+
+        while (connect(client->socket, (struct sockaddr *)&unix_socket, addrlen)  == -1) {
+            sleep(3);
+            if (++connect_retry > 10) {
+                fprintf(stderr, "%s(): Error connecting socket: %s (%d)\n",
+                    __func__, strerror(errno), errno);
+                return E_CLIENT_ERR_CONN;
+            }
         }
     }
 
