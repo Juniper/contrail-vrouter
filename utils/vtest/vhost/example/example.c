@@ -43,8 +43,8 @@ main (int argc, char **argv) {
     struct tx_rx_handler tx_rx_handler;
 
     memset(&tx_rx_handler, 0, sizeof(struct tx_rx_handler));
-    init_vhost_net(&tx_rx_handler.send_data, "/var/run/vrouter/uvh_vif_1");
-    init_vhost_net(&tx_rx_handler.recv_data, "/var/run/vrouter/uvh_vif_2");
+    init_vhost_net(&tx_rx_handler.send_data, "/var/run/vrouter/uvh_vif_1", 1);
+    init_vhost_net(&tx_rx_handler.recv_data, "/var/run/vrouter/uvh_vif_2", 1);
 
     memset(&tx_rx_handler.errbuf, 0, sizeof(char) * 128);
     tx_rx_handler.p =  pcap_open_offline("deadbeef.pcap",tx_rx_handler.errbuf);
