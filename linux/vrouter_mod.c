@@ -1028,6 +1028,11 @@ lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
         return -1;
     }
 
+    if (size > skb->len) {
+        lh_printk("vRouter: Packet length exceeds buffer length. Dropping\n");
+        return -1;
+    }
+
     if (__skb_checksum_complete_head(skb, size))
         return -1;
 
