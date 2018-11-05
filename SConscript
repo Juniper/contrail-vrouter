@@ -27,6 +27,9 @@ dpdk_exists = os.path.isdir('../third_party/dpdk')
 # specific CPU features.
 compiler = env['CC']
 
+if compiler == 'cl':
+    env.Append(CCFLAGS = '/WX')
+
 # get CPU flag for GCC
 if compiler == 'gcc' or compiler == 'clang':
     target = env.get('TARGET_MACHINE')

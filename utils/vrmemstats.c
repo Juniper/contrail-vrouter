@@ -34,7 +34,7 @@ mem_stats_req_process(void *s_req)
 
     printf("vRouter memory usage statistics\n\n");
 
-    printf("Alloced %lu Freed %lu\n", stats->vms_alloced, stats->vms_freed);
+    printf("Alloced %" PRIu64 " Freed %" PRIu64 "\n", stats->vms_alloced, stats->vms_freed);
     printf("Outstanding memory/object:\n\n");
 
     printf("Assembler Table                 %" PRIu64 "\n",

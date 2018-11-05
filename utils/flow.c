@@ -1613,9 +1613,10 @@ flow_stats(void)
             printf("Error: system() failed\n");
         }
 
+        time_t secs = now.tv_sec;
         struct tm *tm;
         char fmt[64], buf[64];
-        if((tm = localtime(&now.tv_sec)) != NULL)
+        if((tm = localtime(&secs)) != NULL)
         {
             strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S %z", tm);
             snprintf(buf, sizeof buf, fmt, now.tv_usec);
@@ -1703,7 +1704,8 @@ flow_rate(void)
         flow_op_rate = processed_rate + added_rate + deleted_rate;
 
         char fmt[64];
-        tm = localtime(&now.tv_sec);
+        time_t secs = now.tv_sec;
+        tm = localtime(&secs);
         strftime(fmt, sizeof fmt, "%Y-%m-%d %H:%M:%S", tm);
 
         if (hold_rate || processed_rate || added_rate || deleted_rate) {
