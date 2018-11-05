@@ -11,6 +11,7 @@
 #include "vr_htable.h"
 #include "vr_qos.h"
 #include "vr_flow.h"
+#include "vr_index_table.h"
 
 /*
  * 2 interfaces/VM + maximum vlan interfaces. VR_MAX_INTERFACES needs to
@@ -231,14 +232,23 @@ struct vr_vrf_assign {
 
 #define VIF_FAT_FLOW_PROTOCOL_SHIFT     16
 #define VIF_FAT_FLOW_PORT_DATA_SHIFT    24
+#define VIF_FAT_FLOW_PORT_AGGR_INFO_SHIFT 24
 #define VIF_FAT_FLOW_DATA_MASK           3
+#define VIF_FAT_FLOW_PREFIX_AGGR_DATA_SHIFT 28
+
 #define VIF_FAT_FLOW_PORT(p_p)          ((p_p) & 0xFFFF)
 #define VIF_FAT_FLOW_PROTOCOL(p_p)      (((p_p) >> VIF_FAT_FLOW_PROTOCOL_SHIFT) & 0xFF)
-#define VIF_FAT_FLOW_PORT_DATA(p_p)     (((p_p) >> VIF_FAT_FLOW_PORT_DATA_SHIFT) & 0x3)
+#define VIF_FAT_FLOW_PORT_DATA(p_p)        (((p_p) >> VIF_FAT_FLOW_PORT_DATA_SHIFT) & 0x03)
+#define VIF_FAT_FLOW_PORT_AGGR_INFO(p_p)   (((p_p) >> VIF_FAT_FLOW_PORT_AGGR_INFO_SHIFT))
+#define VIF_FAT_FLOW_PREFIX_AGGR_DATA(p_p) (((p_p) >> VIF_FAT_FLOW_PREFIX_AGGR_DATA_SHIFT) & 0x0F)
 
-#define VIF_FAT_FLOW_PORT_SET           3
+#define VIF_FAT_FLOW_CFG_PORT_DATA(p_p)        ((p_p) & 0x0F)
+#define VIF_FAT_FLOW_CFG_PREFIX_AGGR_DATA(p_p) ((p_p) >> 4)
+
+#define VIF_FAT_FLOW_PORT_INVALID       0
 #define VIF_FAT_FLOW_PORT_SIP_IGNORE    1
 #define VIF_FAT_FLOW_PORT_DIP_IGNORE    2
+#define VIF_FAT_FLOW_PORT_SET           3
 
 #define FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE    3   /* support for 3 internal addresses for now */
 #define FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE    3   /* support for 3 internal addresses for now */
@@ -247,6 +257,52 @@ struct vr_vrf_assign {
 #define FAT_FLOW_EXCLUDE_IPV4_PREFIX(a)      ((uint32_t) ((a) & 0x00000000FFFFFFFF))
 
 #define FAT_FLOW_IPV4_PLEN_TO_MASK(plen)   (htonl((0xFFFFFFFF << (32-(plen)))))
+
+/* This enum should match with what is defined in agent */
+typedef enum vr_fat_flow_prefix_aggr_ {
+    VR_AGGREGATE_NONE = 0,
+    VR_AGGREGATE_PREFIX_MIN_VAL = VR_AGGREGATE_NONE,
+    VR_AGGREGATE_DST_IPV6,
+    VR_AGGREGATE_SRC_IPV6,
+    VR_AGGREGATE_SRC_DST_IPV6,
+    VR_AGGREGATE_DST_IPV4,
+    VR_AGGREGATE_SRC_IPV4,
+    VR_AGGREGATE_SRC_DST_IPV4,
+} vr_fat_flow_prefix_aggr_t;
+
+typedef struct vr_fat_flow_cfg_ {
+    uint8_t    protocol;
+    uint16_t   port;
+    uint8_t    port_aggr_info;
+    uint64_t   src_prefix_h;
+    uint64_t   src_prefix_l;
+    uint8_t    src_prefix_mask;
+    uint8_t    src_aggregate_plen;
+    uint64_t   dst_prefix_h;
+    uint64_t   dst_prefix_l;
+    uint8_t    dst_prefix_mask;
+    uint8_t    dst_aggregate_plen;
+} vr_fat_flow_cfg_t;
+
+typedef struct vr_fat_flow_prefix_rule_port_data_ {
+#define PREFIX_RULE_TYPE_SINGLE_PREFIX   0x01 /* only src or dst rule */
+#define PREFIX_RULE_TYPE_DUAL_PREFIX     0x02 /* src and dst rule */
+#define PREFIX_RULE_HAS_IGNORE_DST       0x04 /* src rule with ign dst */ 
+#define PREFIX_RULE_HAS_IGNORE_SRC       0x08 /* dst rule with ign src */ 
+
+    uint8_t            rule_type;       /* rule type flags */
+    uint8_t            aggr_plen;       /* Aggregate plen */
+    struct ip_mtrie    *second_prefix;  /* Valid only in case of dual prefix rule */
+} vr_fat_flow_prefix_rule_port_data_t;
+
+typedef struct vr_fat_flow_prefix_rule_proto_info_ {
+    vr_itable_t proto[VIF_FAT_FLOW_MAXPROTO_INDEX];
+} vr_fat_flow_prefix_rule_proto_info_t;
+
+typedef struct vr_fat_flow_prefix_rule_data_ {
+    vr_fat_flow_prefix_rule_proto_info_t *proto_info;
+    struct vr_fat_flow_prefix_rule_data_ *next;
+} vr_fat_flow_prefix_rule_data_t;
 
 struct vr_interface {
     unsigned int vif_flags;
@@ -282,14 +338,16 @@ struct vr_interface {
 
     int (*vif_set_rewrite)(struct vr_interface *, struct vr_packet **,
             struct vr_forwarding_md *, unsigned char *, unsigned short);
-    uint8_t **vif_fat_flow_ports[VIF_FAT_FLOW_MAXPROTO_INDEX];
-    /*
-     * one for tcp, another for udp, one for sctp and one for
-     * everything else
-     */
-    uint32_t *vif_fat_flow_config[VIF_FAT_FLOW_MAXPROTO_INDEX];
-    uint16_t vif_fat_flow_config_size[VIF_FAT_FLOW_MAXPROTO_INDEX];
-
+    uint8_t **vif_fat_flow_no_prefix_rules[VIF_FAT_FLOW_MAXPROTO_INDEX];
+    struct ip_mtrie    *vif_fat_flow_v4_src_prefix_rules;
+    struct ip_mtrie    *vif_fat_flow_v4_dst_prefix_rules;
+    struct ip_mtrie    *vif_fat_flow_v6_src_prefix_rules;
+    struct ip_mtrie    *vif_fat_flow_v6_dst_prefix_rules;
+    vr_fat_flow_prefix_rule_data_t *vif_fat_flow_rule_data_list;
+    vr_fat_flow_cfg_t  *fat_flow_cfg;
+    uint16_t           fat_flow_cfg_size;
+    /* Total number of no prefix and prefix based rules */
+    uint16_t           fat_flow_num_rules[VIF_FAT_FLOW_MAXPROTO_INDEX];
     unsigned char vif_mac[VR_ETHER_ALEN];
     uint8_t vif_transport;
     uint8_t vif_mirror_id;
@@ -410,7 +468,9 @@ extern unsigned int vr_interface_req_get_size(void *);
 #if defined(__linux__) && defined(__KERNEL__)
 extern void vr_set_vif_ptr(struct net_device *dev, void *vif);
 #endif
-extern uint16_t vif_fat_flow_lookup(struct vr_interface *, struct vr_ip *, struct vr_ip6 *,
-        uint8_t, uint16_t, uint16_t);
+
+extern uint16_t vif_fat_flow_lookup(int incoming_vif, struct vr_interface *vif, uint8_t proto,
+                    uint16_t sport, uint16_t dport, unsigned int *saddr, unsigned int *daddr,
+                    unsigned char *ip6_src, unsigned char *ip6_dst);
 extern unsigned int vr_interface_req_get_size(void *);
 #endif /* __VR_INTERFACE_H__ */

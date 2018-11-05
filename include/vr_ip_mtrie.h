@@ -11,25 +11,27 @@ extern "C" {
 #endif
 struct ip_bucket;
 
-/*
- * Override the least significant bit of a pointer to indicate whether it
- * points to a bucket or nexthop.
- */
-#define ENTRY_IS_BUCKET(EPtr)        (((EPtr)->entry_long_i) & (uintptr_t)0x1)
-#define ENTRY_IS_NEXTHOP(EPtr)       !ENTRY_IS_BUCKET(EPtr)
+#define ENTRY_TYPE_BUCKET      1
+#define ENTRY_TYPE_NEXTHOP     2
+#define ENTRY_TYPE_VDATA       3
 
-#define PTR_IS_BUCKET(ptr)           ((ptr) & (uintptr_t)0x1)
-#define PTR_IS_NEXTHOP(ptr)          !PTR_IS_BUCKET(ptr)
-#define PTR_TO_BUCKET(ptr)           ((struct ip_bucket *)((ptr) ^ (uintptr_t)0x1))
+#define ENTRY_IS_BUCKET(EPtr)        ((EPtr)->entry_type == ENTRY_TYPE_BUCKET)
+#define ENTRY_IS_NEXTHOP(EPtr)       ((EPtr)->entry_type == ENTRY_TYPE_NEXTHOP)
+#define ENTRY_IS_VDATA(EPtr)         ((EPtr)->entry_type == ENTRY_TYPE_VDATA)
+
+#define PTR_TO_BUCKET(ptr)           ((struct ip_bucket *)(ptr))
 #define PTR_TO_NEXTHOP(ptr)          ((struct vr_nexthop *)(ptr))
+#define PTR_TO_VDATA(ptr)            ((void *)(ptr))
 
 struct ip_bucket_entry {
     union {
         struct vr_nexthop *nexthop_p;
         struct ip_bucket  *bucket_p;
-        uintptr_t           long_i;
+        void              *vdata_p;
+        uintptr_t         long_i;
     } entry_data;                  
 
+    unsigned char entry_type;
     unsigned int entry_prefix_len:8;
     unsigned int entry_label_flags:4;
     unsigned int entry_label:20;
@@ -39,6 +41,7 @@ struct ip_bucket_entry {
 #define entry_nh_p      entry_data.nexthop_p
 #define entry_bkt_p     entry_data.bucket_p
 #define entry_long_i    entry_data.long_i
+#define entry_vdata_p   entry_data.vdata_p
 
 struct ip_bucket {
     struct ip_bucket_entry bkt_data[0];
@@ -72,6 +75,12 @@ struct mtrie_bkt_info {
     unsigned int            bi_size;
 };
 
+/* vdata mtrie APIs */
+struct ip_mtrie * vdata_mtrie_init (unsigned int prefix_len, void *data);
+int vdata_mtrie_add(struct ip_mtrie *mtrie, struct vr_route_req *rt);
+void * vdata_mtrie_lookup(struct ip_mtrie *mtrie, struct vr_route_req *rt);
+int vdata_mtrie_delete(struct ip_mtrie *mtrie, struct vr_route_req *rt);
+void vdata_mtrie_delete_all(struct ip_mtrie *mtrie);
 
 #ifdef __cplusplus
 }
