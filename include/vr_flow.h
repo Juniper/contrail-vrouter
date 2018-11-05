@@ -508,8 +508,10 @@ int vr_flow_flush_pnode(struct vrouter *, struct vr_packet_node *,
                 struct vr_flow_entry *, struct vr_forwarding_md *);
 void vr_flow_fill_pnode(struct vr_packet_node *, struct vr_packet *,
         struct vr_forwarding_md *);
-uint16_t vr_flow_fat_flow_lookup(struct vrouter *,
-        struct vr_packet *, struct vr_ip *, struct vr_ip6 *, uint16_t, uint16_t, uint16_t);
+uint16_t vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
+              uint16_t l4_proto, uint16_t sport, uint16_t dport,
+              unsigned int *saddr, unsigned int *daddr,
+              unsigned char *ip6_src, unsigned char *ip6_dst);
 extern int16_t vr_flow_get_qos(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
 unsigned int vr_flow_table_used_oflow_entries(struct vrouter *);
