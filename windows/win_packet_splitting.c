@@ -350,8 +350,12 @@ fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
     uint8_t* packetData = WinSubPacketRawGetDataBuffer(
         SubPacket, packetDataBuff, packetDataSize);
 
-    if (packetData == NULL)
+    if (packetData == NULL) {
+        if (packetDataBuff != NULL) {
+            WinRawFree(packetDataBuff);
+        }
         return false;
+    }
 
     fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
         packetData + inner_ip_offset_in_nb);
