@@ -334,6 +334,9 @@ dpdk_find_port_id_by_drv_name(void)
         if (rte_eth_devices[i].device == NULL)
             continue;
 
+        if (rte_eth_devices[i].state == RTE_ETH_DEV_UNUSED)
+            continue;
+
         if (rte_eth_devices[i].device->driver == NULL ||
             rte_eth_devices[i].device->driver->name == NULL)
             continue;
