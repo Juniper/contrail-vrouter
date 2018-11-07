@@ -4262,3 +4262,41 @@ vr_nexthop_init(struct vrouter *router)
     return nh_table_init(router);
 }
 
+/*
+ * Called by offload module to update vrfstats with packets which have been
+ * offloaded.
+ */
+int
+vr_nexthop_update_offload_vrfstats(uint32_t vrfid, uint32_t num_cntrs,
+                               uint64_t *cntrs)
+{
+    uint32_t i;
+    uint64_t *dst_cntr;
+    uint64_t *src_cntr;
+    struct vr_vrf_stats *stats;
+    uint32_t tmp[2];
+    uint64_t tmp64;
+
+    if (!vr_inet_vrf_stats)
+        return 0;
+
+    /* hw offload stats always go to CPU 0 */
+    stats = vr_inet_vrf_stats(vrfid, 0);
+    if (stats && num_cntrs <= sizeof(struct vr_vrf_stats) * sizeof(uint64_t)) {
+        dst_cntr = (uint64_t *)stats;
+        src_cntr = cntrs;
+        for (i = 0; i < num_cntrs; i++) {
+            tmp[0] = (uint32_t)(*src_cntr);
+            tmp[1] = (uint32_t)((*src_cntr) >> 32);
+            tmp[0] = ntohl(tmp[0]);
+            tmp[1] = ntohl(tmp[1]);
+            tmp64 = (uint64_t)tmp[0] |
+                    ((uint64_t)tmp[1] << 32);
+            *dst_cntr += tmp64;
+            src_cntr++;
+            dst_cntr++;
+        }
+    }
+
+    return 0;
+}
