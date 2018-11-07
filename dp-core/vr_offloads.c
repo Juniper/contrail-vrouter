@@ -534,3 +534,9 @@ vr_offloads_exit(struct vrouter *router, bool soft_reset)
     if (!soft_reset)
         _vr_offload_unregister();
 }
+
+/* Statistics update functions used by offload module */
+#if defined(__linux__) && defined(__KERNEL__)
+EXPORT_SYMBOL(vr_flow_incr_stats);
+EXPORT_SYMBOL(vr_nexthop_update_offload_vrfstats);
+#endif
