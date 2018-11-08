@@ -3,9 +3,11 @@
 #
 
 Import('VRouterEnv')
+
 env = VRouterEnv.Clone()
 
 env.Append(CPPPATH = [env['TOP_INCLUDE'], 'include'])
+env.Append(CPPPATH = [env['TOP_INCLUDE'], 'win_tx_postprocess_tests/include'])
 
 # Treat warnings as errors
 env.Append(CPPFLAGS = '/WX')
@@ -33,9 +35,15 @@ test_suite_base_names = [
     'win_tx_postprocess',
 ]
 
+test_suite_additional_sources = {
+    'win_tx_postprocess' : env.Object(Glob("win_tx_postprocess_tests/*.c"))
+}
+
 test_suites = []
 for test_suite_name in test_suite_base_names:
     test_suite_src = ['test_{}.c'.format(test_suite_name)] + common_tests_obj
+    if test_suite_name in test_suite_additional_sources:
+        test_suite_src += test_suite_additional_sources[test_suite_name]
     test_suite = env.UnitTest('{}_tests'.format(test_suite_name), test_suite_src)
     test_suites.append(test_suite)
 
