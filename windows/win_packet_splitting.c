@@ -441,7 +441,7 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
 
     // Disable checksum calculation offloading, so it doesn't interefere
     // with our checksum calculation.
-    WinPacketRawClearChecksumInfo(splitRawPacket);
+    WinPacketRawClearChecksumOffloading(splitRawPacket);
 
     unsigned short byte_offset_for_next_inner_ip_header
         = pctx->inner_ip_frag_offset_in_bytes;
@@ -503,7 +503,7 @@ split_packet_if_needed(struct vr_packet *pkt)
 
         if(ctx.is_tcp_segmentation) {
             PWIN_PACKET_RAW rawPacket = WinMultiPacketToRawPacket(ctx.split_pkt);
-            WinPacketRawClearSegmentation(rawPacket);
+            WinPacketRawClearSegmentationOffloading(rawPacket);
         }
     }
 

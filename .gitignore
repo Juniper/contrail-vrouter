@@ -27,6 +27,7 @@ dp-core/vr_buildinfo.c
 Module.symvers
 modules.order
 .vs
+.vscode/*
 *.VC.db
 *.VC.VC.opendb
 */ipch/
