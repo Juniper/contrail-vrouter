@@ -85,7 +85,7 @@ WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 }
 
 VOID
-WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
+WinPacketRawClearTcpChecksumOffloading(PWIN_PACKET_RAW Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
@@ -109,7 +109,7 @@ WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 }
 
 VOID
-WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
+WinPacketRawClearUdpChecksumOffloading(PWIN_PACKET_RAW Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
@@ -121,7 +121,7 @@ WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
 }
 
 VOID
-WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
+WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
     NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = 0;
@@ -200,7 +200,7 @@ WinPacketRawGetMSS(PWIN_PACKET_RAW Packet)
 }
 
 VOID
-WinPacketRawClearSegmentation(PWIN_PACKET_RAW Packet)
+WinPacketRawClearSegmentationOffloading(PWIN_PACKET_RAW Packet)
 {
     PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 

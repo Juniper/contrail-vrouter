@@ -219,38 +219,39 @@ WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
 }
 
 BOOLEAN
+WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
+{
+    return Packet->IsUdpChecksumOffloaded;
+}
+
+BOOLEAN
 WinPacketRawShouldSegmentationBeOffloaded(PWIN_PACKET_RAW Packet)
 {
     return Packet->IsSegmentationOffloaded;
 }
 
 VOID
-WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet)
+WinPacketRawClearTcpChecksumOffloading(PWIN_PACKET_RAW Packet)
 {
     // TODO: Really... clear it.
 }
 
-BOOLEAN
-WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet)
-{
-    return Packet->IsUdpChecksumOffloaded;
-}
-
 VOID
-WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet)
+WinPacketRawClearUdpChecksumOffloading(PWIN_PACKET_RAW Packet)
 {
     Packet->IsUdpChecksumOffloaded = false;
 }
 
 VOID
-WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet)
+WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet)
 {
     Packet->IsIpChecksumOffloaded = false;
-    Packet->IsUdpChecksumOffloaded = false;
+    WinPacketRawClearTcpChecksumOffloading(Packet);
+    WinPacketRawClearUdpChecksumOffloading(Packet);
 }
 
 VOID
-WinPacketRawClearSegmentation(PWIN_PACKET_RAW Packet)
+WinPacketRawClearSegmentationOffloading(PWIN_PACKET_RAW Packet)
 {
     Packet->IsSegmentationOffloaded = false;
 }

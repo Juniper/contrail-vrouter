@@ -110,7 +110,7 @@ fix_tunneled_csum(struct vr_packet *pkt)
     if (WinPacketRawShouldTcpChecksumBeOffloaded(winPacketRaw)) {
         // Calculate the header/data csum and turn off HW acceleration
         if (fix_csum(pkt, pkt->vp_inner_network_h)) {
-            WinPacketRawClearTcpChecksumFlags(winPacketRaw);
+            WinPacketRawClearTcpChecksumOffloading(winPacketRaw);
         }
         // else try to offload it even though it's tunneled.
     }
@@ -118,7 +118,7 @@ fix_tunneled_csum(struct vr_packet *pkt)
     if (WinPacketRawShouldUdpChecksumBeOffloaded(winPacketRaw)) {
         // Calculate the header/data csum and turn off HW acceleration
         if (fix_csum(pkt, pkt->vp_inner_network_h)) {
-            WinPacketRawClearUdpChecksumFlags(winPacketRaw);
+            WinPacketRawClearUdpChecksumOffloading(winPacketRaw);
         }
         // else try to offload it even though it's tunneled.
     }
@@ -136,7 +136,7 @@ fix_ip_v4_csum(struct vr_packet *pkt)
         // (although we don't look at it as it refers to the outer headers anyway).
         // We assume all the checksums are valid, so we need to explicitly disable
         // offloading (so the .Receive field isn't erroneously reinterpreted as .Transmit)
-        WinPacketRawClearChecksumInfo(winPacketRaw);
+        WinPacketRawClearChecksumOffloading(winPacketRaw);
     } else {
         // This packet comes from a container or the agent,
         // therefore we should look at settings.Transmit.
