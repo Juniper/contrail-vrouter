@@ -1091,6 +1091,7 @@ mtrie_alloc_vrf(unsigned int vrf_id, unsigned int family)
         mtrie_table = vn_rtable[index];
         mtrie_table[vrf_id] = mtrie;
         mtrie->root.entry_label = 0xFFFFF;
+        mtrie->root.entry_label_flags = 0;
     }
 
     return mtrie;
