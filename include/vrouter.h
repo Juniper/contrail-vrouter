@@ -10,6 +10,13 @@
 extern "C" {
 #endif
 
+#define STD_ON 1 /* Standard ON */
+#define STD_OFF 0 /* Standard OFF*/
+
+/* Enable/Disable packet drop log buffer infra at compile time*/
+#define VR_DROP_STATS_LOG_BUFFER_INFRA STD_ON
+
+
 #include "sandesh.h"
 #include "vr_types.h"
 #include "vr_interface.h"
@@ -23,6 +30,8 @@ extern "C" {
 #include "vr_mpls.h"
 #include "vr_index_table.h"
 #include "vr_mem.h"
+#include "vr_stats.h"
+
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -54,6 +63,10 @@ enum vr_malloc_objects_t {
     VR_DEFER_OBJECT,
     VR_DROP_STATS_OBJECT,
     VR_DROP_STATS_REQ_OBJECT,
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    VR_DROP_STATS_LOG_OBJECT,
+    VR_DROP_STATS_LOG_REQ_OBJECT,
+#endif
     VR_FLOW_QUEUE_OBJECT,
     VR_FLOW_REQ_OBJECT,
     VR_FLOW_REQ_PATH_OBJECT,
@@ -383,6 +396,10 @@ struct vrouter {
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;
     struct vr_interface *vr_eth_if;
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    struct vr_drop_stats_log_st **vr_drop_stats_log;
+    uint64_t *vr_drop_stats_log_circular_buf_index;
+#endif
 };
 
 struct vr_defer_data {

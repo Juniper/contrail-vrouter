@@ -460,6 +460,7 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
             vr_enqueue_to_assembler(router, pkt, fmd);
         } else {
+            DS_LOG(VP_DROP_MISC, pkt, VR_PROTO_IP6_C, __LINE__);
             vr_pfree(pkt, VP_DROP_MISC);
         }
         return FLOW_CONSUMED;
@@ -497,6 +498,7 @@ vr_ip6_input(struct vrouter *router, struct vr_packet *pkt,
     t_hdr = (unsigned short *)((char *)ip6 + sizeof(struct vr_ip6));
 
     if (!pkt_pull(pkt, sizeof(struct vr_ip6))) {
+        DS_LOG(VP_DROP_PULL, pkt, VR_PROTO_IP6_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PULL);
         return 0;
     }
@@ -521,6 +523,7 @@ vr_ip6_input(struct vrouter *router, struct vr_packet *pkt,
     }
 
     if (!pkt_push(pkt, sizeof(struct vr_ip6))) {
+        DS_LOG(VP_DROP_PUSH, pkt, VR_PROTO_IP6_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PUSH);
         return 0;
     }
@@ -681,6 +684,7 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         break;
 
     case MR_DROP:
+        DS_LOG(VP_DROP_INVALID_ARP, pkt, VR_PROTO_IP6_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_ARP);
         break;
 
@@ -696,6 +700,7 @@ vr_neighbor_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     return handled;
 
 drop:
+    DS_LOG(VP_DROP_INVALID_PACKET, pkt, VR_PROTO_IP6_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INVALID_PACKET);
     return handled;
 }

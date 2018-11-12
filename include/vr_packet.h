@@ -1445,4 +1445,114 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
     return;
 }
 
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+
+/* VP_DROP_STATS_LOG_MAX macro denotes the number of entry for  Packet log buffer on each core*/
+#define VP_DROP_STATS_LOG_MAX 200
+
+/* Currently we couldn't transfer data more than 4KB through sandesh.
+ * so with the below VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE macro,
+ * we are processing those much of entries in a single transfer.
+ * Below values is arrived based on struct  vr_drop_stats_log_st size*/
+#define VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE 20
+
+#define DS_LOG vr_drop_stats_log_func
+extern unsigned int vr_config_drop_stats_log_buffer_size;
+extern unsigned int vr_config_drop_stats_log_buffer_enable;
+unsigned int vr_drop_stats_log_req_get_size(void *);
+struct vr_drop_loc
+{
+    unsigned int file;
+    unsigned int line;
+};
+
+struct vr_drop_stats_log_st {
+    time_t timestamp;
+    unsigned char   vp_type;
+    unsigned short  drop_reason;
+    unsigned short  vif_idx;
+    unsigned int    nh_id;
+    struct in_addr src;
+    struct in_addr dst;
+    unsigned short  sport;
+    unsigned short  dport;
+    struct vr_drop_loc drop_loc;
+
+    unsigned short  pkt_len;
+    unsigned char   pkt_header[100];
+};
+
+/* #define DS_LOG_FILL(X,Y) X=Y; */
+
+/* If value passed as 0, it will not be logged and be printed in dmesg log*/
+#define DS_LOG_FILL(X,Y) if(Y != 0) { \
+    X = Y;  \
+    }       \
+    else {  \
+    vr_printf( #Y " not filled in core %d buffer id: %d",cpu,dropstats_log_buffer ); \
+    }
+
+/* Below function logs the packet drops  frpm pkt structure */
+static inline void vr_drop_stats_log_func(unsigned short drop_reason,struct vr_packet *pkt,unsigned short drop_loc_file_id,unsigned int drop_loc_line_id)
+{
+    int cpu = vr_get_cpu();
+    uint64_t m_sec=0,n_sec=0;
+    struct vr_ip *ip = NULL;
+
+    struct vrouter *router = vrouter_get(0);
+
+    int dropstats_log_buffer = router->vr_drop_stats_log_circular_buf_index[cpu];
+    
+    if(vr_config_drop_stats_log_buffer_enable == 1)
+    {
+        vr_get_time(&m_sec,&n_sec);
+
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].timestamp , (unsigned int)m_sec)
+        
+        if(pkt != NULL)
+        {
+            if (pkt->vp_type == VP_TYPE_IP) {
+                ip = (struct vr_ip *)pkt_network_header(pkt);
+                if(!ip)
+                    return;
+                
+                DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].src.s_addr , ip->ip_saddr)
+                DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].dst.s_addr , ip->ip_daddr)
+            
+            }
+        
+            DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].vp_type , pkt->vp_type)
+            DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].vif_idx , pkt->vp_if->vif_idx)
+            DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].nh_id , pkt->vp_nh->nh_id)
+            DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].pkt_len , pkt->vp_len)
+            if(pkt->vp_len < 100)
+                memcpy(router->vr_drop_stats_log[cpu][dropstats_log_buffer].pkt_header,pkt_network_header(pkt),pkt->vp_len);
+            else
+                memcpy(router->vr_drop_stats_log[cpu][dropstats_log_buffer].pkt_header,pkt_network_header(pkt),100);
+        }
+           
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].drop_reason , drop_reason)
+
+
+        //TODO:sport and dport can be accessed through vr_packet, need to find the mechanism
+        router->vr_drop_stats_log[cpu][dropstats_log_buffer].sport = 0;// sport;
+        router->vr_drop_stats_log[cpu][dropstats_log_buffer].dport = 0;//dport;
+
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].drop_loc.file , drop_loc_file_id)
+        DS_LOG_FILL(router->vr_drop_stats_log[cpu][dropstats_log_buffer].drop_loc.line , drop_loc_line_id)
+
+
+        /* Circular buffer - dropstats_log_buffer counter increments for every packet log, when it reaches max.
+         * configured value, it will start from zero and reach till max buffer size.
+         * circular buffer maintained for each core */
+        router->vr_drop_stats_log_circular_buf_index[cpu] = ((++dropstats_log_buffer)%vr_config_drop_stats_log_buffer_size);
+
+    }
+}
+#else
+
+#define DS_LOG(W,X,Y,Z)
+
+#endif
+
 #endif /* __VR_PACKET_H__ */
