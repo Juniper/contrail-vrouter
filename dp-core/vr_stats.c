@@ -10,6 +10,11 @@
 #include "vr_message.h"
 #include "vr_btable.h"
 
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+unsigned int vr_config_drop_stats_log_buffer_size = VP_DROP_STATS_LOG_MAX;
+unsigned int vr_config_drop_stats_log_buffer_enable = 1;
+#endif
+
 void vr_stats_exit(struct vrouter *, bool);
 int vr_stats_init(struct vrouter *);
 
@@ -142,7 +147,92 @@ exit_get:
 
     return;
 }
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
 
+unsigned int vr_drop_stats_log_req_get_size(void *object)
+{
+    unsigned int size=0;
+    vr_drop_stats_log_req *req = (vr_drop_stats_log_req *)object;
+
+    return size = 4 * sizeof(*req) + (vr_config_drop_stats_log_buffer_size * sizeof(struct vr_drop_stats_log_st));
+}
+
+static void
+vr_drop_stats_log_get(unsigned int rid,short core,int index)
+{
+    int ret=0,pkt_buffer_size=0;
+    
+    struct vrouter *router = vrouter_get(rid);
+    vr_drop_stats_log_req *response;
+    
+    response = vr_zalloc(sizeof(*response) , VR_DROP_STATS_LOG_REQ_OBJECT);
+    if (!response)
+    {
+        vr_module_error(-ENOMEM, __FUNCTION__,__LINE__,sizeof(*response));
+        goto exit_get;    
+    }
+    if(vr_config_drop_stats_log_buffer_enable ==1)
+    {
+        
+        if( vr_config_drop_stats_log_buffer_size - index > VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE )
+            pkt_buffer_size = VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE;
+        else
+            pkt_buffer_size = vr_config_drop_stats_log_buffer_size - index;
+        
+
+        response->vds_drop_stats_log_arr_size = pkt_buffer_size * sizeof(struct vr_drop_stats_log_st);
+
+        response->vds_drop_stats_log_arr = (char *)vr_zalloc(response->vds_drop_stats_log_arr_size , VR_DROP_STATS_LOG_REQ_OBJECT);
+        if(!response->vds_drop_stats_log_arr)
+        {   
+            vr_module_error(-ENOMEM, __FUNCTION__,__LINE__,vr_config_drop_stats_log_buffer_size * sizeof(struct vr_drop_stats_log_st));
+            goto exit_get;
+        }
+        response->vds_core = core+1;
+        response->vds_stats_index = index;
+        response->vds_max_num_cores = vr_num_cpus;
+        response->vds_drop_stats_support = vr_config_drop_stats_log_buffer_enable;
+        response->vds_drop_stats_max_log_buffer_size = vr_config_drop_stats_log_buffer_size;
+        
+        if(core == -1){
+            /* When the core is requested as 0, need to process for all cores*/
+            core = 0;
+        }
+        memcpy(response->vds_drop_stats_log_arr, router->vr_drop_stats_log[core]+(index),response->vds_drop_stats_log_arr_size);  
+        
+    }
+    else
+    {
+        response->vds_drop_stats_support = vr_config_drop_stats_log_buffer_enable;
+    }
+    ret = vr_message_response(VR_DROP_STATS_LOG_OBJECT_ID, response, 0, false);
+exit_get:
+    if(vr_config_drop_stats_log_buffer_enable == 1)
+        if(response->vds_drop_stats_log_arr != NULL)
+            vr_free(response->vds_drop_stats_log_arr,VR_DROP_STATS_LOG_REQ_OBJECT);
+
+    if(response != NULL)
+        vr_free(response,VR_DROP_STATS_LOG_REQ_OBJECT);
+}
+
+void
+vr_drop_stats_log_req_process(void *s_req)
+{
+    int ret=0,core=1,index=0;
+    vr_drop_stats_log_req *req = (vr_drop_stats_log_req *)s_req;
+    
+    if (req->h_op != SANDESH_OP_GET)
+        vr_send_response(ret);
+    core = req->vds_core;
+    index = req->vds_stats_index;
+
+    vr_drop_stats_log_get(req->vds_rid,core-1,index);
+
+}
+#else
+void  vr_drop_stats_log_req_process(void *s_req)
+{}
+#endif
 void
 vr_drop_stats_req_process(void *s_req)
 {
@@ -456,7 +546,21 @@ vr_pkt_drop_stats_exit(struct vrouter *router)
         vr_free(router->vr_pdrop_stats[i], VR_DROP_STATS_OBJECT);
         router->vr_pdrop_stats[i] = NULL;
     }
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    for (i = 0; i < vr_num_cpus; i++) {
+        if(!router->vr_drop_stats_log[i])
+            break;
 
+        vr_free(router->vr_drop_stats_log[i], VR_DROP_STATS_LOG_OBJECT);
+        router->vr_drop_stats_log[i] = NULL;
+    }
+
+    vr_free(router->vr_drop_stats_log, VR_DROP_STATS_LOG_OBJECT);
+    vr_free(router->vr_drop_stats_log_circular_buf_index,VR_DROP_STATS_LOG_OBJECT);
+    router->vr_drop_stats_log = NULL;
+    router->vr_drop_stats_log_circular_buf_index = NULL;
+#endif
+    
     vr_free(router->vr_pdrop_stats, VR_DROP_STATS_OBJECT);
     router->vr_pdrop_stats = NULL;
 
@@ -490,6 +594,48 @@ vr_pkt_drop_stats_init(struct vrouter *router)
             goto cleanup;
         }
     }
+#if (VR_DROP_STATS_LOG_BUFFER_INFRA == STD_ON)
+    if(vr_config_drop_stats_log_buffer_enable == 1)
+    {
+        /* Initialization of drop stats log buffer*/
+        
+        size = sizeof(uint64_t *) * vr_num_cpus; /* Calculate the number of cores */
+        /* Create log buffer object for each core*/
+        router->vr_drop_stats_log = vr_zalloc(size, VR_DROP_STATS_LOG_OBJECT);
+        if (!router->vr_drop_stats_log) {
+            vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, size);
+            goto cleanup;
+        }
+        
+        /* Calculate the MAX STATS log buffer*/
+        size = vr_config_drop_stats_log_buffer_size * sizeof(struct vr_drop_stats_log_st);
+        
+
+        for (i = 0; i < vr_num_cpus; i++) {
+            /* Create a MAX log buffer configured and assign to each core */
+            router->vr_drop_stats_log[i] = vr_zalloc(size, VR_DROP_STATS_LOG_OBJECT);
+            if (!router->vr_drop_stats_log[i]) {
+                
+                vr_printf("Inside drop stats init router->vr_drop_stats_log \n");
+                vr_module_error(-ENOMEM, __FUNCTION__,
+                        __LINE__, i);
+                goto cleanup;
+            }
+        }
+        /* Creating the circular buffer for each core  */
+        size = sizeof(uint64_t) * vr_num_cpus;
+
+        router->vr_drop_stats_log_circular_buf_index = vr_zalloc(size, VR_DROP_STATS_LOG_OBJECT);
+        if (!router->vr_drop_stats_log_circular_buf_index) {
+            vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, size);
+            goto cleanup;
+        }
+    }
+
+#endif    
+    
 
     return 0;
 

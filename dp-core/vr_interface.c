@@ -97,6 +97,7 @@ static int
 vif_discard_tx(struct vr_interface *vif, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
+    DS_LOG(VP_DROP_INTERFACE_TX_DISCARD, pkt, VR_INTERFACE_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INTERFACE_TX_DISCARD);
     return 0;
 }
@@ -105,6 +106,7 @@ static int
 vif_discard_rx(struct vr_interface *vif, struct vr_packet *pkt,
         unsigned short vlan_id __attribute__unused__)
 {
+    DS_LOG(VP_DROP_INTERFACE_RX_DISCARD, pkt, VR_INTERFACE_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INTERFACE_RX_DISCARD);
     return 0;
 }
@@ -118,6 +120,8 @@ vif_drop_pkt(struct vr_interface *vif, struct vr_packet *pkt, bool input)
         stats->vis_ierrors++;
     else
         stats->vis_oerrors++;
+
+    DS_LOG(VP_DROP_INTERFACE_DROP, pkt, VR_INTERFACE_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
     return;
 }
@@ -364,6 +368,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
     hdr = (struct agent_hdr *)pkt_pull(pkt, sizeof(struct vr_eth));
     if (!hdr || !pkt_pull(pkt, sizeof(*hdr))) {
         stats->vis_ierrors++;
+        DS_LOG(VP_DROP_PULL, pkt, VR_INTERFACE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PULL);
         return 0;
     }
@@ -408,6 +413,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         vif = __vrouter_get_interface(vrouter_get(0), ntohs(hdr->hdr_ifindex));
         if (!vif) {
             stats->vis_ierrors++;
+            DS_LOG(VP_DROP_INVALID_IF, pkt, VR_INTERFACE_C, __LINE__);
             vr_pfree(pkt, VP_DROP_INVALID_IF);
             return 0;
         }
@@ -424,6 +430,7 @@ agent_rx(struct vr_interface *vif, struct vr_packet *pkt,
         break;
 
     default:
+        DS_LOG(VP_DROP_INVALID_PACKET, pkt, VR_INTERFACE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_PACKET);
         break;
     }
@@ -525,6 +532,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
         pkt_c = pkt_copy(pkt, 0, len);
         if (pkt_c) {
+            DS_LOG(VP_DROP_DUPLICATED, pkt, VR_INTERFACE_C, __LINE__);
             vr_pfree(pkt, VP_DROP_DUPLICATED);
             pkt = pkt_c;
         }
@@ -604,6 +612,7 @@ agent_send(struct vr_interface *vif, struct vr_packet *pkt,
 
 drop:
     stats->vis_oerrors++;
+    DS_LOG(VP_DROP_PUSH, pkt, VR_INTERFACE_C, __LINE__);
     vr_pfree(pkt, VP_DROP_PUSH);
     return 0;
 }
@@ -758,6 +767,7 @@ vhost_tx(struct vr_interface *vif, struct vr_packet *pkt,
             if (pull_len) {
                 new_eth = pkt_pull(pkt, pull_len);
                 if (!new_eth) {
+                    DS_LOG(VP_DROP_PULL, pkt, VR_INTERFACE_C, __LINE__);
                     vr_pfree(pkt, VP_DROP_PULL);
                     return 0;
                 }
@@ -862,6 +872,7 @@ vlan_rx(struct vr_interface *vif, struct vr_packet *pkt,
 
     if (vr_untag_pkt(pkt)) {
         stats->vis_ierrors++;
+        DS_LOG(VP_DROP_PULL, pkt, VR_INTERFACE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PULL);
         return 0;
     }
@@ -926,6 +937,7 @@ vlan_tx(struct vr_interface *vif, struct vr_packet *pkt,
     return ret;
 
 drop:
+    DS_LOG(VP_DROP_INVALID_IF, pkt, VR_INTERFACE_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INVALID_IF);
     stats->vis_oerrors++;
 
@@ -1231,6 +1243,7 @@ tun_rx(struct vr_interface *vif, struct vr_packet *pkt,
         break;
 
     default:
+        DS_LOG(VP_DROP_INVALID_PACKET, pkt, VR_INTERFACE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_PACKET);
         return 0;
     }

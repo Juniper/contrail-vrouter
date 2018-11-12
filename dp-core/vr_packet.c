@@ -24,6 +24,7 @@ pkt_copy(struct vr_packet *pkt, unsigned short off, unsigned short len)
     pkt_c->vp_data += head_space;
     pkt_c->vp_tail += head_space;
     if (vr_pcopy(pkt_data(pkt_c), pkt, off, len) < 0) {
+        DS_LOG(VP_DROP_MISC, pkt, VR_PACKET_C, __LINE__);
         vr_pfree(pkt_c, VP_DROP_MISC);
         return NULL;
     }
@@ -50,6 +51,7 @@ pkt_cow(struct vr_packet *pkt, unsigned short head_room)
 
     /* Increase the head space by the head_room */
     if (vr_pcow(&clone_pkt, head_room)) {
+        DS_LOG(VP_DROP_PCOW_FAIL, pkt, VR_PACKET_C, __LINE__);
         vr_pfree(clone_pkt, VP_DROP_PCOW_FAIL);
         return NULL;
     }

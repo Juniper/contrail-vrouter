@@ -257,18 +257,21 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
 
     if (!router) {
         res = VP_DROP_MISC;
+        DS_LOG(res, 0, VR_MPLS_C, __LINE__);
         goto fail;
     }
 
     label >>= VR_MPLS_LABEL_SHIFT;
     if (label >= router->vr_max_labels) {
         res = VP_DROP_INVALID_LABEL;
+        DS_LOG(res, 0, VR_MPLS_C, __LINE__);
         goto fail;
     }
 
     nh = __vrouter_get_label(router, label);
     if(!nh) {
         res = VP_DROP_INVALID_LABEL;
+        DS_LOG(res, 0, VR_MPLS_C, __LINE__);
         goto fail;
     }
 
@@ -286,6 +289,7 @@ vr_mpls_tunnel_type(unsigned int label, unsigned int control_data, unsigned
 
     default:
         res = VP_DROP_INVALID_NH;
+        DS_LOG(res, 0, VR_MPLS_C, __LINE__);
     }
 
 fail:
@@ -316,11 +320,13 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     label >>= VR_MPLS_LABEL_SHIFT;
     if (label >= router->vr_max_labels) {
         drop_reason = VP_DROP_INVALID_LABEL;
+        DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
         goto dropit;
     }
 
     if (--ttl <= 0) {
         drop_reason = VP_DROP_TTL_EXCEEDED;
+        DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
         goto dropit;
     }
 
@@ -334,12 +340,14 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     /* drop the TOStack label */
     if (!pkt_pull(pkt, VR_MPLS_HDR_LEN)) {
         drop_reason = VP_DROP_PULL;
+        DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
         goto dropit;
     }
 
     nh = __vrouter_get_label(router, label);
     if (!nh) {
         drop_reason = VP_DROP_INVALID_LABEL;
+        DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
         goto dropit;
     }
 
@@ -363,6 +371,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
             pkt->vp_type = VP_TYPE_IP6;
         } else {
             drop_reason = VP_DROP_INVALID_PROTOCOL;
+            DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
             goto dropit;
         }
 
@@ -384,21 +393,25 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         if (pull_len) {
             if (*(unsigned int *)pkt_data(pkt) != VR_L2_CTRL_DATA) {
                 drop_reason = VP_DROP_INVALID_PACKET;
+                DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
                 goto dropit;
             }
 
             if (!pkt_pull(pkt, pull_len)) {
                 drop_reason = VP_DROP_PULL;
+                DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
                 goto dropit;
             }
         }
 
         if (vr_pkt_type(pkt, l2_offset, fmd) < 0) {
             drop_reason = VP_DROP_INVALID_PACKET;
+            DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
             goto dropit;
         }
     } else {
         drop_reason = VP_DROP_INVALID_NH;
+        DS_LOG(drop_reason, pkt, VR_MPLS_C, __LINE__);
         goto dropit;
     }
 
