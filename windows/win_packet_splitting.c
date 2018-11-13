@@ -341,8 +341,8 @@ remove_split_nbl(struct SplittingContext* pctx)
 
 static bool
 fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
-    PWIN_SUB_PACKET SubPacket,
-    unsigned inner_ip_offset_in_nb)
+    struct SplittingContext* pctx, struct vr_tcp* tcp_hdr,
+    PWIN_SUB_PACKET SubPacket, unsigned inner_ip_offset_in_nb)
 {
     ULONG packetDataSize = WinSubPacketRawDataLength(SubPacket);
     PVOID packetDataBuff = WinRawAllocate(packetDataSize);
@@ -359,6 +359,11 @@ fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
 
     fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
         packetData + inner_ip_offset_in_nb);
+
+    struct vr_tcp* tcpHdrCopy =
+        (struct vr_tcp *)(packetData + pctx->tcp_header_offset);
+
+    tcp_hdr->tcp_csum = tcpHdrCopy->tcp_csum;
 
     if (packetDataBuff) {
         WinRawFree(packetDataBuff);
@@ -389,8 +394,8 @@ fill_checksum_of_inner_tcp_packet(
 
     fill_partial_csum_of_inner_tcp_packet(pctx, inner_tcp_header, headers);
     fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
-        SubPacket, (uint8_t*)pctx->inner_ip_header
-        - (uint8_t*)pctx->outer_headers);
+        pctx, inner_tcp_header, SubPacket,
+        (uint8_t*)pctx->inner_ip_header - (uint8_t*)pctx->outer_headers);
 }
 
 static void
@@ -495,6 +500,11 @@ split_packet_if_needed(struct vr_packet *pkt)
 
     if (ctx.split_pkt != NULL) {
         fix_headers_of_new_packets(&ctx);
+
+        if(ctx.is_tcp_segmentation) {
+            PWIN_PACKET_RAW rawPacket = WinMultiPacketToRawPacket(ctx.split_pkt);
+            WinPacketRawClearSegmentation(rawPacket);
+        }
     }
 
     return ctx.split_pkt;
