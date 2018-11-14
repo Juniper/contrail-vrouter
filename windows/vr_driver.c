@@ -554,6 +554,7 @@ HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
             if (vif) {
                 vif->vif_port = NicParams->PortId;
                 vif->vif_nic = NicParams->NicIndex;
+                vif->vif_mtu = NicParams->MTU;
             }
         } else if (!VhostNicEntry.IsConnected) {
             VhostNicEntry.PortId = NicParams->PortId;
