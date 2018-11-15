@@ -8,7 +8,7 @@
 #include "vr_message.h"
 #include "vr_sandesh.h"
 #include "vr_packet.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 #include <vr_interface.h>
 #include <vr_response.h>
 

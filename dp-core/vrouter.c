@@ -23,7 +23,7 @@
 #include <vr_mirror.h>
 #include <vr_vxlan.h>
 #include <vr_qos.h>
-#include <vr_offloads.h>
+#include <vr_offloads_dp.h>
 
 static struct vrouter router;
 struct host_os *vrouter_host;

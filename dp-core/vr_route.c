@@ -9,7 +9,7 @@
 #include <vr_route.h>
 #include "vr_message.h"
 #include "vr_sandesh.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 unsigned int vr_vrfs = VR_DEF_VRFS;
 

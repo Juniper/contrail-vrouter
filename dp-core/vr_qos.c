@@ -13,7 +13,7 @@
 #include "vr_interface.h"
 #include "vr_datapath.h"
 #include "vr_qos.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 unsigned int vr_qos_map_entries = VR_DEF_QOS_MAP_ENTRIES;
 unsigned int vr_fc_map_entries = VR_DEF_FC_MAP_ENTRIES;
