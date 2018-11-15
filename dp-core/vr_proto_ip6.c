@@ -233,6 +233,7 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
     int i, ret = 0;
     uint8_t ip6_nxt;
     unsigned char *ip6_src, *ip6_dst, *ip6_addr;
+    unsigned char ip6_src_flow[16], ip6_dst_flow[16];
     unsigned short *t_hdr, sport, dport, port, nh_id,
                    fat_flow_mask = VR_FAT_FLOW_NO_MASK;
     struct vr_ip6_frag *v6_frag;
@@ -294,9 +295,16 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
         ip6_src = ip6_dst;
         ip6_dst = ip6_addr;
     }
+    /*
+     * memcpy src and dst ip and create flow with it
+     * as we don't want to change the actual pkt hdr
+     * (esp with prefix based fat flow)
+     */
+    memcpy(ip6_src_flow, ip6_src, 16);
+    memcpy(ip6_dst_flow, ip6_dst, 16);
 
-    fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, NULL, ip6, ip6_nxt,
-            sport, dport);
+    fat_flow_mask = vr_flow_fat_flow_lookup(router, pkt, ip6_nxt,
+            sport, dport, NULL, NULL, ip6_src_flow, ip6_dst_flow);
     for (i = 1; i < VR_FAT_FLOW_MAX_MASK; i = i << 1) {
         switch (fat_flow_mask & i) {
         case VR_FAT_FLOW_SRC_PORT_MASK:
@@ -323,7 +331,7 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
     valid_fkey_params &= VR_FLOW_KEY_ALL;
 
     nh_id = vr_inet_flow_nexthop(pkt, vlan);
-    vr_inet6_fill_flow(flow_p, nh_id, ip6_src, ip6_dst,
+    vr_inet6_fill_flow(flow_p, nh_id, ip6_src_flow, ip6_dst_flow,
             ip6_nxt, sport, dport, valid_fkey_params);
 
     return 0;

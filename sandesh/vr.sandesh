@@ -127,6 +127,14 @@ buffer sandesh vr_interface_req {
     66: list<u64>   vifr_fat_flow_exclude_ip6_u_list;
     67: list<u64>   vifr_fat_flow_exclude_ip6_l_list;
     68: list<u16>   vifr_fat_flow_exclude_ip6_plen_list;
+    77: list<u64>   vifr_fat_flow_src_prefix_h;
+    78: list<u64>   vifr_fat_flow_src_prefix_l;
+    79: list<byte>  vifr_fat_flow_src_prefix_mask;
+    80: list<byte>  vifr_fat_flow_src_aggregate_plen;
+    81: list<u64>   vifr_fat_flow_dst_prefix_h;
+    82: list<u64>   vifr_fat_flow_dst_prefix_l;
+    83: list<byte>  vifr_fat_flow_dst_prefix_mask;
+    84: list<byte>  vifr_fat_flow_dst_aggregate_plen;
 }
 
 buffer sandesh vr_vxlan_req {

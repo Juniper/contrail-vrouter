@@ -447,6 +447,8 @@ list_get_print(vr_interface_req *req)
     int printed = 0, len;
     unsigned int i;
     uint64_t *tmp;
+    uint8_t aggr_data;
+    uint32_t *ip;
 
     if (rate_set) {
         print_zero = true;
@@ -608,40 +610,98 @@ list_get_print(vr_interface_req *req)
     }
 
     if (req->vifr_fat_flow_protocol_port_size) {
+        printf("\n");
         vr_interface_print_head_space();
-        printed = 0;
-        printed += printf("FatFlows (Protocol/Port): ");
+        printf("FatFlow rules: \n");
         for (i = 0; i < req->vifr_fat_flow_protocol_port_size; i++) {
             proto = VIF_FAT_FLOW_PROTOCOL(req->vifr_fat_flow_protocol_port[i]);
             port = VIF_FAT_FLOW_PORT(req->vifr_fat_flow_protocol_port[i]);
             port_data = VIF_FAT_FLOW_PORT_DATA(req->vifr_fat_flow_protocol_port[i]);
+            aggr_data = VIF_FAT_FLOW_PREFIX_AGGR_DATA(req->vifr_fat_flow_protocol_port[i]);
             if (!proto) {
                 proto = port;
                 port = 0;
             }
 
-            printed += printf("%d:", proto);
+            vr_interface_print_head_space();
+            printf("\t");
+            printf("%d:", proto);
             if (port) {
-                printed += printf("%d ", port);
+                printf("%d ", port);
             } else {
-                printed += printf("%c", '*');
+                printf("%c", '*');
             }
             if (port_data == VIF_FAT_FLOW_PORT_SIP_IGNORE)
-                printed += printf(" - Sip");
+                printf(" - Sip");
             if (port_data == VIF_FAT_FLOW_PORT_DIP_IGNORE)
-                printed += printf(" - Dip");
+                printf(" - Dip");
 
-            if (i == (req->vifr_fat_flow_protocol_port_size - 1)) {
-                printf("\n");
-            } else if (printed > 68) {
-                printf("\n");
-                printed = 0;
-                vr_interface_print_head_space();
-                /* %10 corresponds to "FatFlows: " */
-                printed += printf("%10c", ' ');
-            } else {
-                printf(", ");
+            switch (aggr_data) {
+                case VR_AGGREGATE_SRC_IPV4:
+                     ip = (uint32_t *) &req->vifr_fat_flow_src_prefix_l[i];
+                     printf(" AggrSrc %s/%d %d",
+                            inet_ntop(AF_INET, ip, ip_addr, INET_ADDRSTRLEN),
+                            req->vifr_fat_flow_src_prefix_mask[i],
+                            req->vifr_fat_flow_src_aggregate_plen[i]);
+                     break;
+                case VR_AGGREGATE_DST_IPV4:
+                     ip = (uint32_t *) &req->vifr_fat_flow_dst_prefix_l[i];
+                     printf(" AggrDst %s/%d %d",
+                            inet_ntop(AF_INET, ip, ip_addr, INET_ADDRSTRLEN),
+                            req->vifr_fat_flow_dst_prefix_mask[i],
+                            req->vifr_fat_flow_dst_aggregate_plen[i]);
+                     break;
+                case VR_AGGREGATE_SRC_DST_IPV4:
+                     ip = (uint32_t *) &req->vifr_fat_flow_src_prefix_l[i];
+                     printf(" AggrSrc %s/%d %d",
+                            inet_ntop(AF_INET, ip, ip_addr, INET_ADDRSTRLEN),
+                            req->vifr_fat_flow_src_prefix_mask[i],
+                            req->vifr_fat_flow_src_aggregate_plen[i]);
+                     ip = (uint32_t *) &req->vifr_fat_flow_dst_prefix_l[i];
+                     printf(" AggrDst %s/%d %d",
+                            inet_ntop(AF_INET, ip, ip_addr, INET_ADDRSTRLEN),
+                            req->vifr_fat_flow_dst_prefix_mask[i],
+                            req->vifr_fat_flow_dst_aggregate_plen[i]);
+                     break;
+                case VR_AGGREGATE_SRC_IPV6:
+                     tmp = (uint64_t *)ip6_ip;
+                     *tmp = req->vifr_fat_flow_src_prefix_h[i];
+                     *(tmp + 1) = req->vifr_fat_flow_src_prefix_l[i];
+                     printf(" AggrSrc %s/%d %d",
+                            inet_ntop(AF_INET6, ip6_ip, ip6_addr, INET6_ADDRSTRLEN),
+                            req->vifr_fat_flow_src_prefix_mask[i],
+                            req->vifr_fat_flow_src_aggregate_plen[i]);
+                     break;
+                case VR_AGGREGATE_DST_IPV6:
+                     tmp = (uint64_t *)ip6_ip;
+                     *tmp = req->vifr_fat_flow_dst_prefix_h[i];
+                     *(tmp + 1) = req->vifr_fat_flow_dst_prefix_l[i];
+                     printf(" AggrDst %s/%d %d",
+                            inet_ntop(AF_INET6, ip6_ip, ip6_addr, INET6_ADDRSTRLEN),
+                            req->vifr_fat_flow_dst_prefix_mask[i],
+                            req->vifr_fat_flow_dst_aggregate_plen[i]);
+                     break;
+                case VR_AGGREGATE_SRC_DST_IPV6:
+                     tmp = (uint64_t *)ip6_ip;
+                     *tmp = req->vifr_fat_flow_src_prefix_h[i];
+                     *(tmp + 1) = req->vifr_fat_flow_src_prefix_l[i];
+                     printf(" AggrSrc %s/%d %d",
+                            inet_ntop(AF_INET6, ip6_ip, ip6_addr, INET6_ADDRSTRLEN),
+                            req->vifr_fat_flow_src_prefix_mask[i],
+                            req->vifr_fat_flow_src_aggregate_plen[i]);
+                     tmp = (uint64_t *)ip6_ip;
+                     *tmp = req->vifr_fat_flow_dst_prefix_h[i];
+                     *(tmp + 1) = req->vifr_fat_flow_dst_prefix_l[i];
+                     printf(" AggrDst %s/%d %d",
+                            inet_ntop(AF_INET6, ip6_ip, ip6_addr, INET6_ADDRSTRLEN),
+                            req->vifr_fat_flow_dst_prefix_mask[i],
+                            req->vifr_fat_flow_dst_aggregate_plen[i]);
+                     break;
+                default:
+                     break;
             }
+
+            printf("\n");
         }
     }
     printf("\n");

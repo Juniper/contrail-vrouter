@@ -820,6 +820,55 @@ vr_interface_req_destroy(vr_interface_req *req)
         req->vifr_fat_flow_protocol_port_size = 0;
     }
 
+    if (req->vifr_fat_flow_src_prefix_h &&
+        req->vifr_fat_flow_src_prefix_h_size) {
+        free(req->vifr_fat_flow_src_prefix_h);
+        req->vifr_fat_flow_src_prefix_h = NULL;
+        req->vifr_fat_flow_src_prefix_h_size = 0;
+    }
+    if (req->vifr_fat_flow_src_prefix_l &&
+        req->vifr_fat_flow_src_prefix_l_size) {
+        free(req->vifr_fat_flow_src_prefix_l);
+        req->vifr_fat_flow_src_prefix_l = NULL;
+        req->vifr_fat_flow_src_prefix_l_size = 0;
+    }
+    if (req->vifr_fat_flow_src_prefix_mask &&
+        req->vifr_fat_flow_src_prefix_mask_size) {
+        free(req->vifr_fat_flow_src_prefix_mask);
+        req->vifr_fat_flow_src_prefix_mask = NULL;
+        req->vifr_fat_flow_src_prefix_mask_size = 0;
+    }
+    if (req->vifr_fat_flow_src_aggregate_plen &&
+        req->vifr_fat_flow_src_aggregate_plen_size) {
+        free(req->vifr_fat_flow_src_aggregate_plen);
+        req->vifr_fat_flow_src_aggregate_plen = NULL;
+        req->vifr_fat_flow_src_aggregate_plen_size = 0;
+    }
+    if (req->vifr_fat_flow_dst_prefix_h &&
+        req->vifr_fat_flow_dst_prefix_h_size) {
+        free(req->vifr_fat_flow_dst_prefix_h);
+        req->vifr_fat_flow_dst_prefix_h = NULL;
+        req->vifr_fat_flow_dst_prefix_h_size = 0;
+    }
+    if (req->vifr_fat_flow_dst_prefix_l &&
+        req->vifr_fat_flow_dst_prefix_l_size) {
+        free(req->vifr_fat_flow_dst_prefix_l);
+        req->vifr_fat_flow_dst_prefix_l = NULL;
+        req->vifr_fat_flow_dst_prefix_l_size = 0;
+    }
+    if (req->vifr_fat_flow_dst_prefix_mask &&
+        req->vifr_fat_flow_dst_prefix_mask_size) {
+        free(req->vifr_fat_flow_dst_prefix_mask);
+        req->vifr_fat_flow_dst_prefix_mask = NULL;
+        req->vifr_fat_flow_dst_prefix_mask_size = 0;
+    }
+    if (req->vifr_fat_flow_dst_aggregate_plen &&
+        req->vifr_fat_flow_dst_aggregate_plen_size) {
+        free(req->vifr_fat_flow_dst_aggregate_plen);
+        req->vifr_fat_flow_dst_aggregate_plen = NULL;
+        req->vifr_fat_flow_dst_aggregate_plen_size = 0;
+    }
+
     if (req->vifr_fat_flow_exclude_ip_list_size && 
            req->vifr_fat_flow_exclude_ip_list) {
         free(req->vifr_fat_flow_exclude_ip_list);
@@ -863,6 +912,22 @@ vr_interface_req_get_copy(vr_interface_req *src)
     dst->vifr_src_mac = NULL;
     dst->vifr_fat_flow_protocol_port_size = 0;
     dst->vifr_fat_flow_protocol_port = NULL;
+    dst->vifr_fat_flow_src_prefix_h = NULL;
+    dst->vifr_fat_flow_src_prefix_h_size = 0;
+    dst->vifr_fat_flow_src_prefix_l = NULL;
+    dst->vifr_fat_flow_src_prefix_l_size = 0;
+    dst->vifr_fat_flow_src_prefix_mask = NULL;
+    dst->vifr_fat_flow_src_prefix_mask_size = 0;
+    dst->vifr_fat_flow_src_aggregate_plen = NULL;
+    dst->vifr_fat_flow_src_aggregate_plen_size = 0;
+    dst->vifr_fat_flow_dst_prefix_h = NULL;
+    dst->vifr_fat_flow_dst_prefix_h_size = 0;
+    dst->vifr_fat_flow_dst_prefix_l = NULL;
+    dst->vifr_fat_flow_dst_prefix_l_size = 0;
+    dst->vifr_fat_flow_dst_prefix_mask = NULL;
+    dst->vifr_fat_flow_dst_prefix_mask_size = 0;
+    dst->vifr_fat_flow_dst_aggregate_plen = NULL;
+    dst->vifr_fat_flow_dst_aggregate_plen_size = 0;
     dst->vifr_fat_flow_exclude_ip_list_size = 0;
     dst->vifr_fat_flow_exclude_ip_list = NULL;
     dst->vifr_fat_flow_exclude_ip6_u_list_size = 0;
@@ -922,6 +987,88 @@ vr_interface_req_get_copy(vr_interface_req *src)
                 src->vifr_fat_flow_protocol_port_size);
         dst->vifr_fat_flow_protocol_port_size =
             src->vifr_fat_flow_protocol_port_size;
+    }
+
+    if (src->vifr_fat_flow_src_prefix_h_size &&
+        src->vifr_fat_flow_src_prefix_h) {
+        dst->vifr_fat_flow_src_prefix_h =
+                   malloc(src->vifr_fat_flow_src_prefix_h_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_src_prefix_h)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_src_prefix_h, src->vifr_fat_flow_src_prefix_h,
+               src->vifr_fat_flow_src_prefix_h_size);
+        dst->vifr_fat_flow_src_prefix_h_size = src->vifr_fat_flow_src_prefix_h_size;
+    }
+
+    if (src->vifr_fat_flow_src_prefix_l_size &&
+        src->vifr_fat_flow_src_prefix_l) {
+        dst->vifr_fat_flow_src_prefix_l =
+                  malloc(src->vifr_fat_flow_src_prefix_l_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_src_prefix_l)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_src_prefix_l, src->vifr_fat_flow_src_prefix_l,
+               src->vifr_fat_flow_src_prefix_l_size);
+        dst->vifr_fat_flow_src_prefix_l_size = src->vifr_fat_flow_src_prefix_l_size;
+    }
+    if (src->vifr_fat_flow_src_prefix_mask_size &&
+        src->vifr_fat_flow_src_prefix_mask) {
+        dst->vifr_fat_flow_src_prefix_mask =
+                   malloc(src->vifr_fat_flow_src_prefix_mask_size * sizeof(uint8_t));
+        if (!dst->vifr_fat_flow_src_prefix_mask)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_src_prefix_mask, src->vifr_fat_flow_src_prefix_mask,
+               src->vifr_fat_flow_src_prefix_mask_size);
+        dst->vifr_fat_flow_src_prefix_mask_size = src->vifr_fat_flow_src_prefix_mask_size;
+    }
+    if (src->vifr_fat_flow_src_aggregate_plen_size &&
+        src->vifr_fat_flow_src_aggregate_plen) {
+        dst->vifr_fat_flow_src_aggregate_plen =
+                   malloc(src->vifr_fat_flow_src_aggregate_plen_size * sizeof(uint8_t));
+        if (!dst->vifr_fat_flow_src_aggregate_plen)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_src_aggregate_plen, src->vifr_fat_flow_src_aggregate_plen,
+               src->vifr_fat_flow_src_aggregate_plen_size);
+        dst->vifr_fat_flow_src_aggregate_plen_size = src->vifr_fat_flow_src_aggregate_plen_size;
+    }
+    if (src->vifr_fat_flow_dst_prefix_h_size &&
+        src->vifr_fat_flow_dst_prefix_h) {
+        dst->vifr_fat_flow_dst_prefix_h =
+                malloc(src->vifr_fat_flow_dst_prefix_h_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_dst_prefix_h)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_dst_prefix_h, src->vifr_fat_flow_dst_prefix_h,
+               src->vifr_fat_flow_dst_prefix_h_size);
+        dst->vifr_fat_flow_dst_prefix_h_size = src->vifr_fat_flow_dst_prefix_h_size;
+    }
+    if (src->vifr_fat_flow_dst_prefix_l_size &&
+        src->vifr_fat_flow_dst_prefix_l) {
+        dst->vifr_fat_flow_dst_prefix_l =
+                 malloc(src->vifr_fat_flow_dst_prefix_l_size * sizeof(uint64_t));
+        if (!dst->vifr_fat_flow_dst_prefix_l)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_dst_prefix_l, src->vifr_fat_flow_dst_prefix_l,
+               src->vifr_fat_flow_dst_prefix_l_size);
+        dst->vifr_fat_flow_dst_prefix_l_size = src->vifr_fat_flow_dst_prefix_l_size;
+    }
+    if (src->vifr_fat_flow_dst_prefix_mask_size &&
+        src->vifr_fat_flow_dst_prefix_mask) {
+        dst->vifr_fat_flow_dst_prefix_mask =
+                 malloc(src->vifr_fat_flow_dst_prefix_mask_size * sizeof(uint8_t));
+        if (!dst->vifr_fat_flow_dst_prefix_mask)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_dst_prefix_mask, src->vifr_fat_flow_dst_prefix_mask,
+               src->vifr_fat_flow_dst_prefix_mask_size);
+        dst->vifr_fat_flow_dst_prefix_mask_size = src->vifr_fat_flow_dst_prefix_mask_size;
+    }
+    if (src->vifr_fat_flow_dst_aggregate_plen_size &&
+        src->vifr_fat_flow_dst_aggregate_plen) {
+        dst->vifr_fat_flow_dst_aggregate_plen =
+                  malloc(src->vifr_fat_flow_dst_aggregate_plen_size * sizeof(uint8_t));
+        if (!dst->vifr_fat_flow_dst_aggregate_plen)
+            goto free_vif;
+        memcpy(dst->vifr_fat_flow_dst_aggregate_plen, src->vifr_fat_flow_dst_aggregate_plen,
+               src->vifr_fat_flow_dst_aggregate_plen_size);
+        dst->vifr_fat_flow_dst_aggregate_plen_size = src->vifr_fat_flow_dst_aggregate_plen_size;
     }
 
     if (src->vifr_fat_flow_exclude_ip_list_size &&
