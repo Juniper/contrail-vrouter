@@ -13,7 +13,7 @@
 #include "vr_bridge.h"
 #include "vr_datapath.h"
 #include "vr_btable.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 unsigned int vr_mpls_labels = VR_DEF_LABELS;
 

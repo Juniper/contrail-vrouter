@@ -20,7 +20,7 @@
 #include "vr_ip_mtrie.h"
 #include "vr_bridge.h"
 
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 #define VR_NUM_FLOW_TABLES          1
 
