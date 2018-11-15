@@ -44,6 +44,7 @@ extern unsigned int vr_flow_hold_limit;
 extern unsigned int vr_interfaces;
 extern unsigned int vif_bridge_entries;
 extern unsigned int vif_bridge_oentries;
+extern unsigned int datapath_offloads;
 
 extern char *ContrailBuildInfo;
 
@@ -2662,6 +2663,9 @@ MODULE_PARM_DESC(vrouter_dbg, "Set 1 for pkt dumping and 0 to disable, default v
 
 module_param(vr_memory_alloc_checks, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_memory_alloc_checks, "Audit memory frees against allocs. Default is 0");
+
+module_param(datapath_offloads, uint, S_IRUGO);
+MODULE_PARM_DESC(datapath_offloads, "Enable hardware offloads. Default is disabled");
 
 module_init(vrouter_linux_init);
 module_exit(vrouter_linux_exit);
