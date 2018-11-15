@@ -7,7 +7,7 @@
 #include <vr_os.h>
 #include <vr_types.h>
 #include <vr_packet.h>
-#include <vr_offloads.h>
+#include <vr_offloads_dp.h>
 #include "vr_message.h"
 #include "vr_btable.h"
 

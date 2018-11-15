@@ -12,7 +12,7 @@
 #include "vr_vxlan.h"
 #include "vr_bridge.h"
 #include "vr_datapath.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 int
 vr_vxlan_input(struct vrouter *router, struct vr_packet *pkt,
