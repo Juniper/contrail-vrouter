@@ -133,6 +133,7 @@
     <ClInclude Include="win_csum.h" />
     <ClInclude Include="win_packet_splitting.h" />
     <ClInclude Include="win_interface.h" />
+    <ClInclude Include="win_packetdump.h" />
     <ClInclude Include="win_tx_postprocess.h" />
   </ItemGroup>
   <ItemGroup>
@@ -192,6 +193,7 @@
     <ClCompile Include="win_csum.c" />
     <ClCompile Include="win_packet_splitting.c" />
     <ClCompile Include="win_interface.c" />
+    <ClCompile Include="win_packetdump.c" />
     <ClCompile Include="win_tx_postprocess.c" />
   </ItemGroup>
   <ItemGroup>
