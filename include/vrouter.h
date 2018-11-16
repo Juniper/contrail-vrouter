@@ -233,7 +233,8 @@ struct host_os {
     int (*hos_offload_flow_create)(struct vr_offload_flow *oflow);
     int (*hos_offload_flow_destroy)(struct vr_offload_flow *oflow);
     void (*hos_offload_prepare)(struct vr_packet *pkt, struct vr_forwarding_md *fmd);
-
+    void (*hos_set_dump_packets)(int);
+    int (*hos_get_dump_packets)(void);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -289,6 +290,8 @@ struct host_os {
 #define vr_offload_flow_destroy         vrouter_host->hos_offload_flow_destroy
 #define vr_offload_flow_create          vrouter_host->hos_offload_flow_create
 #define vr_offload_prepare              vrouter_host->hos_offload_prepare
+#define vr_set_dump_packets             vrouter_host->hos_set_dump_packets
+#define vr_get_dump_packets             vrouter_host->hos_get_dump_packets
 
 extern struct host_os *vrouter_host;
 
