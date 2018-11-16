@@ -9,6 +9,7 @@
 #include "vr_windows.h"
 #include "vrouter.h"
 
+#include "win_packetdump.h"
 #include "win_callbacks.h"
 #include "win_packet.h"
 #include "win_packet_raw.h"
@@ -934,6 +935,24 @@ win_register_nic(struct vr_interface* vif, vr_interface_req* vifr)
     vif_attach(vif);
 }
 
+static void
+win_set_dump_packets(int packets_dump_flag)
+{
+    if(packets_dump_flag == 1)
+        EnablePacketDumping();
+    else
+        DisablePacketDumping();
+}
+
+static int
+win_get_dump_packets(void)
+{
+    if(IsPacketDumpingEnabled())
+        return 1;
+
+    return 0;
+}
+
 struct host_os windows_host = {
     .hos_printf = win_printf,
     .hos_malloc = win_malloc,
@@ -984,6 +1003,8 @@ struct host_os windows_host = {
     .hos_get_enabled_log_types = win_get_enabled_log_types,
     .hos_soft_reset = win_soft_reset,
     .hos_register_nic = win_register_nic,
+    .hos_set_dump_packets = win_set_dump_packets,
+    .hos_get_dump_packets = win_get_dump_packets,
 };
 
 struct host_os *

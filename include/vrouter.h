@@ -229,6 +229,8 @@ struct host_os {
     bool hos_nl_broadcast_supported;
     int (*hos_huge_page_config)(uint64_t *, int, int *, int);
     void *(*hos_huge_page_mem_get)(int);
+    void (*hos_set_dump_packets)(int);
+    int (*hos_get_dump_packets)(void);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -281,6 +283,8 @@ struct host_os {
 #define vr_nl_broadcast_supported       vrouter_host->hos_nl_broadcast_supported
 #define vr_huge_page_config             vrouter_host->hos_huge_page_config
 #define vr_huge_page_mem_get            vrouter_host->hos_huge_page_mem_get
+#define vr_set_dump_packets             vrouter_host->hos_set_dump_packets
+#define vr_get_dump_packets             vrouter_host->hos_get_dump_packets
 
 extern struct host_os *vrouter_host;
 
