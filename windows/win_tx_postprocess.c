@@ -12,6 +12,8 @@
 #include "win_packet_splitting.h"
 #include "win_packet.h"
 
+#include "vr_packetdump.h"
+
 static void
 fix_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
@@ -156,6 +158,8 @@ fix_ip_v4_csum(struct vr_packet *pkt)
 PWIN_MULTI_PACKET
 WinTxPostprocess(struct vr_packet *VrPacket)
 {
+    WriteVrPacketToFile(VrPacket, "before_postprocess");
+
     if (vr_pkt_type_is_overlay(VrPacket->vp_type)) {
         fix_tunneled_csum(VrPacket);
     } else if (VrPacket->vp_type == VP_TYPE_IP) {
