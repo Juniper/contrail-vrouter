@@ -20,7 +20,7 @@ env.Append(LIBS = 'cmocka')
 
 env.AppendENVPath('Path', Dir('#build/bin'))
 
-common_tests_src = ['fake_win_packet_raw.c', 'fake_win_memory.c', 'fake_vrouter.c']
+common_tests_src = ['fake_win_packet_raw.c', 'fake_win_memory.c', 'fake_vrouter.c', 'fake_win_packetdump.c']
 common_tests_obj = env.Object(common_tests_src)
 
 test_suite_base_names = [

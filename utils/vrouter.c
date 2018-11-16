@@ -56,6 +56,7 @@ enum opt_vrouter_index {
     SET_BURST_INTERVAL_INDEX,
     SET_BURST_STEP_INDEX,
     SET_PRIORITY_TAGGING_INDEX,
+    SET_PACKET_DUMP_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -124,6 +125,7 @@ static int perfr1 = -1, perfr2 = -1, perfr3 = -1, perfp = -1, perfq1 = -1;
 static int perfq2 = -1, perfq3 = -1, udp_coff = -1, flow_hold_limit = -1;
 static int mudp = -1, burst_tokens = -1, burst_interval = -1, burst_step = -1;
 static unsigned int priority_tagging = 0;
+static int packet_dump = -1;
 
 static int platform, vrouter_op = -1;
 
@@ -331,6 +333,7 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Burst Interval                       %u\n"
         "    Burst Step                           %u\n"
         "    NIC Priority Tagging                 %u\n"
+        "    Packet dump                          %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -341,7 +344,7 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_flow_used_entries, req->vo_flow_used_oentries,
         req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
         req->vo_burst_tokens, req->vo_burst_interval, req->vo_burst_step,
-        req->vo_priority_tagging
+        req->vo_priority_tagging, req->vo_packet_dump
     );
 
     return;
@@ -443,7 +446,7 @@ vr_vrouter_op(struct nl_client *cl)
                     perfr1, perfr2, perfr3, perfp, perfq1,
                     perfq2, perfq3, udp_coff, flow_hold_limit,
                     mudp, burst_tokens, burst_interval, burst_step,
-                    priority_tagging);
+                    priority_tagging, packet_dump);
         }
         break;
 
@@ -534,6 +537,9 @@ static struct option long_options[] = {
     [SET_PRIORITY_TAGGING_INDEX] = {
         "set-priority-tagging", required_argument, &opt[SET_PRIORITY_TAGGING_INDEX], 1
     },
+    [SET_PACKET_DUMP_INDEX] = {
+        "packet-dump", required_argument, &opt[SET_PACKET_DUMP_INDEX], 1
+    },
     [MAX_OPT_INDEX] = {NULL, 0, 0, 0}
 };
 
@@ -608,6 +614,7 @@ Usage(void)
                "--burst_interval <int> timer interval of burst tokens in ms\n"
                "--burst_step <int> burst tokens to add at every interval\n"
                "--set-priority-tagging <1 | 0> priority tagging on the NIC\n"
+               "--packet-dump <1 | 0> dumps packets\n"
                "--help Prints this message\n"
                "\n");
         break;
@@ -898,6 +905,16 @@ parse_long_opts(int opt_index, char *opt_arg)
             Usage();
         }
 
+        break;
+
+        case SET_PACKET_DUMP_INDEX:
+        vrouter_op = SANDESH_OP_ADD;
+        packet_dump = (int)strtol(opt_arg, NULL, 0);
+        if (errno != 0) {
+            printf("vrouter: Error parsing packet_dump: %s: %s (%d)\n", opt_arg,
+                    strerror(errno), errno);
+            Usage();
+        }
         break;
 
     case HELP_OPT_INDEX:

@@ -869,7 +869,7 @@ vr_interface_req_destroy(vr_interface_req *req)
         req->vifr_fat_flow_dst_aggregate_plen_size = 0;
     }
 
-    if (req->vifr_fat_flow_exclude_ip_list_size && 
+    if (req->vifr_fat_flow_exclude_ip_list_size &&
            req->vifr_fat_flow_exclude_ip_list) {
         free(req->vifr_fat_flow_exclude_ip_list);
         req->vifr_fat_flow_exclude_ip_list = NULL;
@@ -881,7 +881,7 @@ vr_interface_req_destroy(vr_interface_req *req)
         req->vifr_fat_flow_exclude_ip6_u_list = NULL;
         req->vifr_fat_flow_exclude_ip6_u_list_size = 0;
     }
-    if (req->vifr_fat_flow_exclude_ip6_l_list_size && 
+    if (req->vifr_fat_flow_exclude_ip6_l_list_size &&
            req->vifr_fat_flow_exclude_ip6_l_list) {
         free(req->vifr_fat_flow_exclude_ip6_l_list);
         req->vifr_fat_flow_exclude_ip6_l_list = NULL;
@@ -1077,7 +1077,7 @@ vr_interface_req_get_copy(vr_interface_req *src)
         if (!dst->vifr_fat_flow_exclude_ip_list) {
             goto free_vif;
         }
-        memcpy(dst->vifr_fat_flow_exclude_ip_list, src->vifr_fat_flow_exclude_ip_list, 
+        memcpy(dst->vifr_fat_flow_exclude_ip_list, src->vifr_fat_flow_exclude_ip_list,
                src->vifr_fat_flow_exclude_ip_list_size * sizeof(uint64_t));
         dst->vifr_fat_flow_exclude_ip_list_size = src->vifr_fat_flow_exclude_ip_list_size;
     }
@@ -1088,7 +1088,7 @@ vr_interface_req_get_copy(vr_interface_req *src)
         if (!dst->vifr_fat_flow_exclude_ip6_u_list) {
             goto free_vif;
         }
-        memcpy(dst->vifr_fat_flow_exclude_ip6_u_list, src->vifr_fat_flow_exclude_ip6_u_list, 
+        memcpy(dst->vifr_fat_flow_exclude_ip6_u_list, src->vifr_fat_flow_exclude_ip6_u_list,
                src->vifr_fat_flow_exclude_ip6_u_list_size * sizeof(uint64_t));
         dst->vifr_fat_flow_exclude_ip6_u_list_size = src->vifr_fat_flow_exclude_ip6_u_list_size;
     }
@@ -1098,7 +1098,7 @@ vr_interface_req_get_copy(vr_interface_req *src)
         if (!dst->vifr_fat_flow_exclude_ip6_l_list) {
             goto free_vif;
         }
-        memcpy(dst->vifr_fat_flow_exclude_ip6_l_list, src->vifr_fat_flow_exclude_ip6_l_list, 
+        memcpy(dst->vifr_fat_flow_exclude_ip6_l_list, src->vifr_fat_flow_exclude_ip6_l_list,
                src->vifr_fat_flow_exclude_ip6_l_list_size * sizeof(uint64_t));
         dst->vifr_fat_flow_exclude_ip6_l_list_size = src->vifr_fat_flow_exclude_ip6_l_list_size;
     }
@@ -2082,6 +2082,7 @@ vr_send_vrouter_set_logging(struct nl_client *cl, unsigned int router_id,
     req.vo_udp_coff = -1;
     req.vo_flow_hold_limit = -1;
     req.vo_mudp = -1;
+    req.vo_packet_dump = -1;
 
     return vr_sendmsg(cl, &req, "vrouter_ops");
 }
@@ -2092,7 +2093,7 @@ vr_send_vrouter_set_runtime_opts(struct nl_client *cl, unsigned int router_id,
         int perfr1, int perfr2, int perfr3, int perfp, int perfq1,
         int perfq2, int perfq3, int udp_coff, int flow_hold_limit,
         int mudp, int btokens, int binterval, int bstep,
-        unsigned int priority_tagging)
+        unsigned int priority_tagging, int packet_dump)
 {
     vrouter_ops req;
 
@@ -2124,6 +2125,7 @@ vr_send_vrouter_set_runtime_opts(struct nl_client *cl, unsigned int router_id,
     req.vo_burst_interval = binterval;
     req.vo_burst_step = bstep;
     req.vo_priority_tagging = priority_tagging;
+    req.vo_packet_dump = packet_dump;
 
     /*
      * We create request to change runtime (sysctl) options only. Log level
