@@ -4400,12 +4400,10 @@ vif_fat_flow_prefix_proto_port_match(uint8_t rule_type, int incoming_vif,
                     *fat_flow_mask =
                              (incoming_vif? VR_FAT_FLOW_DST_PORT_MASK: VR_FAT_FLOW_SRC_PORT_MASK);
                     if (src_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_SRC) {
-                        *fat_flow_mask |=
-                                (incoming_vif? VR_FAT_FLOW_SRC_IP_MASK: VR_FAT_FLOW_DST_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_SRC_IP_MASK;
                     }
                     if (src_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_DST) {
-                        *fat_flow_mask |=
-                                (incoming_vif? VR_FAT_FLOW_DST_IP_MASK: VR_FAT_FLOW_SRC_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_DST_IP_MASK;
                     }
                     return 1;
                 } else { /* src+dst rule */
@@ -4424,12 +4422,10 @@ vif_fat_flow_prefix_proto_port_match(uint8_t rule_type, int incoming_vif,
                     *fat_flow_mask =
                                 (incoming_vif? VR_FAT_FLOW_SRC_PORT_MASK: VR_FAT_FLOW_DST_PORT_MASK);
                     if (dst_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_SRC) {
-                        *fat_flow_mask |=
-                                (incoming_vif? VR_FAT_FLOW_SRC_IP_MASK: VR_FAT_FLOW_DST_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_SRC_IP_MASK;
                     }
                     if (dst_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_DST) {
-                        *fat_flow_mask |=
-                                (incoming_vif? VR_FAT_FLOW_DST_IP_MASK: VR_FAT_FLOW_SRC_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_DST_IP_MASK;
                     }
                     return 1;
                 } else {
@@ -4449,12 +4445,10 @@ vif_fat_flow_prefix_proto_port_match(uint8_t rule_type, int incoming_vif,
                     *fat_flow_mask =
                          (incoming_vif? VR_FAT_FLOW_SRC_PORT_MASK: VR_FAT_FLOW_DST_PORT_MASK);
                     if (dst_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_SRC) {
-                        *fat_flow_mask |=
-                         (incoming_vif? VR_FAT_FLOW_SRC_IP_MASK: VR_FAT_FLOW_DST_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_SRC_IP_MASK;
                     }
                     if (dst_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_DST) {
-                        *fat_flow_mask |=
-                          (incoming_vif? VR_FAT_FLOW_DST_IP_MASK: VR_FAT_FLOW_SRC_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_DST_IP_MASK;
                     }
                     return 1;
                 } else {
@@ -4473,12 +4467,10 @@ vif_fat_flow_prefix_proto_port_match(uint8_t rule_type, int incoming_vif,
                     *fat_flow_mask =
                              (incoming_vif? VR_FAT_FLOW_DST_PORT_MASK: VR_FAT_FLOW_SRC_PORT_MASK);
                     if (src_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_SRC) {
-                        *fat_flow_mask |=
-                             (incoming_vif? VR_FAT_FLOW_SRC_IP_MASK: VR_FAT_FLOW_DST_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_SRC_IP_MASK;
                     }
                     if (src_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_DST) {
-                        *fat_flow_mask |=
-                             (incoming_vif? VR_FAT_FLOW_DST_IP_MASK: VR_FAT_FLOW_SRC_IP_MASK);
+                        *fat_flow_mask |= VR_FAT_FLOW_DST_IP_MASK;
                     }
                     return 1;
                 } else {
@@ -4498,12 +4490,10 @@ vif_fat_flow_prefix_proto_port_match(uint8_t rule_type, int incoming_vif,
                 *fat_flow_mask =
                       (VR_FAT_FLOW_DST_PORT_MASK | VR_FAT_FLOW_SRC_PORT_MASK);
                 if (zero_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_SRC) {
-                    *fat_flow_mask |=
-                         (incoming_vif? VR_FAT_FLOW_SRC_IP_MASK: VR_FAT_FLOW_DST_IP_MASK);
+                    *fat_flow_mask |= VR_FAT_FLOW_SRC_IP_MASK;
                 }
                 if (zero_port_info->rule_type & PREFIX_RULE_HAS_IGNORE_DST) {
-                    *fat_flow_mask |=
-                         (incoming_vif? VR_FAT_FLOW_DST_IP_MASK: VR_FAT_FLOW_SRC_IP_MASK);
+                    *fat_flow_mask |= VR_FAT_FLOW_DST_IP_MASK;
                 }
                 return 1;
             } else {
