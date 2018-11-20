@@ -22,10 +22,10 @@ LONG WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet);
 
 BOOLEAN WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
-VOID WinPacketRawClearTcpChecksumFlags(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearTcpChecksumOffloading(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
-VOID WinPacketRawClearUdpChecksumFlags(PWIN_PACKET_RAW Packet);
-VOID WinPacketRawClearChecksumInfo(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearUdpChecksumOffloading(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet);
 
 ULONG WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket);
 ULONG WinPacketRawDataLength(PWIN_PACKET_RAW Packet);
@@ -34,7 +34,7 @@ PVOID WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG Buff
 
 PVOID WinPacketRawDataAtOffset(PWIN_PACKET_RAW Packet, UINT16 Offset);
 ULONG WinPacketRawGetMSS(PWIN_PACKET_RAW Packet);
-VOID WinPacketRawClearSegmentation(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawClearSegmentationOffloading(PWIN_PACKET_RAW Packet);
 
 BOOLEAN WinPacketRawIsOwned(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawIsMultiFragment(PWIN_PACKET_RAW Packet);
