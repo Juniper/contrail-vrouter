@@ -234,9 +234,12 @@ if sys.platform != 'darwin':
         else:
             rte_libs = ('-lrte_ethdev',)
 
-        year_matches = re.findall("define RTE_VER_YEAR 17", file_content)
-        month_matches = re.findall("define RTE_VER_MONTH 11", file_content)
-        if year_matches and month_matches:
+        year_matches = re.findall("define RTE_VER_YEAR .*", file_content)
+        month_matches = re.findall("define RTE_VER_MONTH .*", file_content)
+        year = int(year_matches[0].split(" ")[2])
+        month = int(month_matches[0].split(" ")[2])
+
+        if (year > 17) or (year == 17 and month >= 11):
             rte_libs = rte_libs + ('-lrte_mempool_ring', '-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
 
         #
