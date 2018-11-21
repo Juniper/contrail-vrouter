@@ -282,18 +282,22 @@ static void
 print_vrouter_parameters(vrouter_ops *req)
 {
     printf("Startup parameters\n"
-        "    Interfaces limit                     %u\n"
-        "    VRF tables limit                     %u\n"
-        "    NextHops limit                       %u\n"
-        "    MPLS Labels limit                    %u\n"
-        "    Bridge Table limit                   %u\n"
-        "    Bridge Table Overflow limit          %u\n"
-        "    Flow Table limit                     %u\n"
-        "    Flow Table overflow limit            %u\n"
-        "    Mirror entries limit                 %u\n"
-        "    Memroy Allocation Checks             %u\n"
-        "    Vif Bridge Table limit               %u\n"
-        "    Vif Bridge Table Overflow limit      %u\n"
+        "    Interfaces limit                       %u\n"
+        "    VRF tables limit                       %u\n"
+        "    NextHops limit                         %u\n"
+        "    MPLS Labels limit                      %u\n"
+        "    Bridge Table limit                     %u\n"
+        "    Bridge Table Overflow limit            %u\n"
+        "    Flow Table limit                       %u\n"
+        "    Flow Table overflow limit              %u\n"
+        "    Mirror entries limit                   %u\n"
+        "    Memroy Allocation Checks               %u\n"
+        "    Vif Bridge Table limit                 %u\n"
+        "    Vif Bridge Table Overflow limit        %u\n"
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+        "    Vrouter packet drops log bugger size   %u\n"
+        "    Enable/Disable packet drops debug log infra  %u\n"
+#endif
         "\n",
 
         req->vo_interfaces, req->vo_vrfs, req->vo_nexthops,
@@ -302,6 +306,10 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_oflow_entries, req->vo_mirror_entries,
         req->vo_memory_alloc_checks, req->vo_vif_bridge_entries,
 	req->vo_vif_oflow_bridge_entries
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+            ,req->vo_pkt_drops_log_buffer_size,
+        req->vo_pkt_drops_log_buffer_enable
+#endif
     );
 
     printf("Runtime parameters\n"
@@ -331,6 +339,10 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Burst Interval                       %u\n"
         "    Burst Step                           %u\n"
         "    NIC Priority Tagging                 %u\n"
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+        "    Vrouter packet drop log enable       %u\n"
+        "    Vrouter Packet drop log minimum enable %u\n"
+#endif
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -342,7 +354,11 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
         req->vo_burst_tokens, req->vo_burst_interval, req->vo_burst_step,
         req->vo_priority_tagging
-    );
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+            ,req->vo_pkt_drop_log_enable
+            ,req->vo_pkt_drop_log_min_enable
+#endif
+        );
 
     return;
 }

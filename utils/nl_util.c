@@ -135,6 +135,16 @@ vr_vrf_stats_req_process(void *s_req)
     }
 }
 
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+void
+vr_pkt_drop_stats_log_req_process(void *s_req)
+{
+   if (nl_cb.vr_pkt_drop_stats_log_req_process) {
+       nl_cb.vr_pkt_drop_stats_log_req_process(s_req);
+   }
+}
+#endif
+
 void
 vr_drop_stats_req_process(void *s_req)
 {
