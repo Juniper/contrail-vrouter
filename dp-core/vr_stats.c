@@ -10,6 +10,23 @@
 #include "vr_message.h"
 #include "vr_btable.h"
 
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+/* vr_config_pkt_drop_stats_log_buffer_size used for 
+ * changing packet buffer size for each core during load time */
+unsigned int vr_config_pkt_drop_stats_log_buffer_size = VP_PKT_DROP_STATS_LOG_MAX;
+
+/* Enabling/disbaling packet log during load time, If its disabled packet log
+ * memory buffers for each core wouldn't  be allocated */
+unsigned int vr_config_pkt_drop_stats_log_buffer_enable = 1;
+
+/* It's sysctl implementation of enabling/disabling log during runtime */
+unsigned int vr_pkt_drop_log_sysctl_enable = 1;
+
+/* It's sysctl implementation of enabling/disabling minimum log during runtime
+ * It will log only timestamp, drop reason, file & line no */
+unsigned int vr_pkt_drop_log_least_sysctl_enable = 0;
+#endif
+
 void vr_stats_exit(struct vrouter *, bool);
 int vr_stats_init(struct vrouter *);
 
@@ -142,7 +159,115 @@ exit_get:
 
     return;
 }
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
 
+/* Function to return buffer size and its used by sandesh for memory allocation */
+unsigned int vr_pkt_drop_stats_log_req_get_size(void *object)
+{
+    unsigned int size = 0;
+    vr_pkt_drop_stats_log_req *req = (vr_pkt_drop_stats_log_req *)object;
+
+    return size = 4 * sizeof(*req) + (vr_config_pkt_drop_stats_log_buffer_size * sizeof(struct vr_pkt_drop_log_st));
+}
+
+/* Function to repond packet drop log buffer for requested core */
+static void
+vr_pkt_drop_stats_log_get(unsigned int rid, short core, int index)
+{
+    int ret = 0, pkt_buffer_size = 0;
+    
+    struct vrouter *router = vrouter_get(rid);
+    vr_pkt_drop_stats_log_req *response;
+    
+    /* Allocate memory for response */
+    response = vr_zalloc(sizeof(*response), VR_DROP_STATS_LOG_REQ_OBJECT);
+    if (!response)
+    {
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, sizeof(*response));
+        goto exit_get;    
+    }
+
+    /* Check if sysctl for packet drop log is enabled*/
+    if(vr_pkt_drop_log_sysctl_enable == 1)
+    {
+        /* Check packet drop log is enabled at load time*/
+        if(vr_config_pkt_drop_stats_log_buffer_enable == 1)
+        {
+            /* Check if packet log buffer is greater than allowed buffer size */
+            if( vr_config_pkt_drop_stats_log_buffer_size - index > VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE )
+                pkt_buffer_size = VR_DROP_STATS_MAX_ALLOWED_BUFFER_SIZE;
+            else
+                pkt_buffer_size = vr_config_pkt_drop_stats_log_buffer_size - index;
+            
+            /* Calculate the buffer size in bytes for message transfer via sandesh*/
+            response->vds_pkt_drop_stats_log_arr_size = pkt_buffer_size * sizeof(struct vr_pkt_drop_log_st);
+
+            response->vds_pkt_drop_stats_log_arr = (char *)vr_zalloc(response->vds_pkt_drop_stats_log_arr_size, VR_DROP_STATS_LOG_REQ_OBJECT);
+            if(!response->vds_pkt_drop_stats_log_arr)
+            {   
+                vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, vr_config_pkt_drop_stats_log_buffer_size * sizeof(struct vr_pkt_drop_log_st));
+                goto exit_get;
+            }
+
+            /* When packet drop log is requested for 0, then we log for all cores
+             * Since physical core always starts with 0, so we decrement by 1 at request side
+             * and increment by 1n while sending respnse*/
+            response->vds_core = core+1;
+            response->vds_stats_index = index;
+            response->vds_max_num_cores = vr_num_cpus;
+            response->vds_drop_stats_support = vr_config_pkt_drop_stats_log_buffer_enable;
+            response->vds_pkt_drop_log_sysctl_enable = vr_pkt_drop_log_sysctl_enable;
+            response->vds_drop_stats_max_log_buffer_size = vr_config_pkt_drop_stats_log_buffer_size;
+            
+            if(core == -1){
+                /* When the core is requested as 0, need to process for all cores*/
+                core = 0;
+            }
+            memcpy(response->vds_pkt_drop_stats_log_arr, router->vr_pkt_drop_log_buffer[core]+(index), response->vds_pkt_drop_stats_log_arr_size);  
+            
+        }
+        else
+        {
+            /* When packet drop log is disabled, copy sysctl and buffer enable at load time value  in response
+             * so that corresponding message would be displayed at utils side*/
+            response->vds_pkt_drop_log_sysctl_enable = vr_pkt_drop_log_sysctl_enable;
+            response->vds_drop_stats_support = vr_config_pkt_drop_stats_log_buffer_enable;
+        }
+    }
+    else
+    {
+        /* Send response when sysctl for pkt drop log is not enabled */
+        response->vds_pkt_drop_log_sysctl_enable = vr_pkt_drop_log_sysctl_enable;
+    }
+    /* Response message for packet drop log */
+    ret = vr_message_response(VR_DROP_STATS_LOG_OBJECT_ID, response, 0, false);
+exit_get:
+    if(vr_config_pkt_drop_stats_log_buffer_enable == 1)
+        if(response->vds_pkt_drop_stats_log_arr != NULL)
+            vr_free(response->vds_pkt_drop_stats_log_arr,VR_DROP_STATS_LOG_REQ_OBJECT);
+
+    if(response != NULL)
+        vr_free(response,VR_DROP_STATS_LOG_REQ_OBJECT);
+}
+
+void
+vr_pkt_drop_stats_log_req_process(void *s_req)
+{
+    int ret=0,core=1,index=0;
+    vr_pkt_drop_stats_log_req *req = (vr_pkt_drop_stats_log_req *)s_req;
+    
+    if (req->h_op != SANDESH_OP_GET)
+        vr_send_response(ret);
+    core = req->vds_core;
+    index = req->vds_stats_index;
+
+    vr_pkt_drop_stats_log_get(req->vds_rid,core-1,index);
+
+}
+#else
+void  vr_pkt_drop_stats_log_req_process(void *s_req)
+{}
+#endif
 void
 vr_drop_stats_req_process(void *s_req)
 {
@@ -456,7 +581,24 @@ vr_pkt_drop_stats_exit(struct vrouter *router)
         vr_free(router->vr_pdrop_stats[i], VR_DROP_STATS_OBJECT);
         router->vr_pdrop_stats[i] = NULL;
     }
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+    for (i = 0; i < vr_num_cpus; i++) {
+        if(!router->vr_pkt_drop_log_buffer[i])
+            break;
 
+        vr_free(router->vr_pkt_drop_log_buffer[i], VR_DROP_STATS_LOG_OBJECT);
+        router->vr_pkt_drop_log_buffer[i] = NULL;
+    }
+
+    vr_free(router->vr_pkt_drop_log_buffer, VR_DROP_STATS_LOG_OBJECT);
+    vr_free(router->vr_pkt_drop_log_buf_index, VR_DROP_STATS_LOG_OBJECT);
+    vr_free(router->vr_pkt_drop, VR_DROP_STATS_LOG_OBJECT);
+
+    router->vr_pkt_drop_log_buffer = NULL;
+    router->vr_pkt_drop_log_buf_index = NULL;
+    router->vr_pkt_drop = NULL;
+#endif
+    
     vr_free(router->vr_pdrop_stats, VR_DROP_STATS_OBJECT);
     router->vr_pdrop_stats = NULL;
 
@@ -490,7 +632,52 @@ vr_pkt_drop_stats_init(struct vrouter *router)
             goto cleanup;
         }
     }
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+    if(vr_config_pkt_drop_stats_log_buffer_enable == 1)
+    {
+        /* Initialization of drop stats log buffer*/
+        size = sizeof(uint64_t *) * vr_num_cpus; /* Calculate the number of cores */
+        
+        router->vr_pkt_drop = vr_zalloc(sizeof(struct vr_pkt_drop_st), VR_DROP_STATS_LOG_OBJECT);
+        if (!router->vr_pkt_drop) {
+            vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, size);
+            goto cleanup;
+        }
 
+//       router->vr_pkt_drop->vr_pkt_drop_log = vr_zalloc(10, VR_DROP_STATS_LOG_OBJECT);
+        /* Create log buffer object for each core*/
+        router->vr_pkt_drop_log_buffer = vr_zalloc(size, VR_DROP_STATS_LOG_OBJECT);
+        if (!router->vr_pkt_drop_log_buffer) {
+            vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, size);
+            goto cleanup;
+        }
+        
+        /* Calculate the MAX STATS log buffer*/
+        size = vr_config_pkt_drop_stats_log_buffer_size * sizeof(struct vr_pkt_drop_log_st);
+        
+        for (i = 0; i < vr_num_cpus; i++) {
+            /* Create a MAX log buffer configured and assign to each core */
+            router->vr_pkt_drop_log_buffer[i] = vr_zalloc(size, VR_DROP_STATS_LOG_OBJECT);
+            if (!router->vr_pkt_drop_log_buffer[i]) {
+                vr_module_error(-ENOMEM, __FUNCTION__,
+                        __LINE__, i);
+                goto cleanup;
+            }
+        }
+        /* Creating the circular buffer for each core  */
+        size = sizeof(uint64_t) * vr_num_cpus;
+
+        router->vr_pkt_drop_log_buf_index = vr_zalloc(size, VR_DROP_STATS_LOG_OBJECT);
+        if (!router->vr_pkt_drop_log_buf_index) {
+            vr_module_error(-ENOMEM, __FUNCTION__,
+                    __LINE__, size);
+            goto cleanup;
+        }
+    }
+#endif
+    
     return 0;
 
 cleanup:
