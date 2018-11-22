@@ -854,6 +854,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
             (pkt->vp_type == VP_TYPE_ARP)) {
         pull_len = pkt_get_network_header_off(pkt) - pkt_head_space(pkt);
         if (pull_len && !pkt_pull(pkt, pull_len)) {
+            DS_LOG(VP_DROP_PULL, pkt, 0, VR_BRIDGE_C, __LINE__);
             vr_pfree(pkt, VP_DROP_PULL);
             return NULL;
         }
@@ -960,6 +961,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
                 vr_from_vm_mss_adj && vr_pkt_from_vm_tcp_mss_adj) {
 
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, overlay_len))) {
+                DS_LOG(reason, pkt, 0, VR_BRIDGE_C, __LINE__);
                 vr_pfree(pkt, reason);
                 return NULL;
             }
@@ -968,6 +970,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
         if (fmd->fmd_to_me) {
             handled = vr_l3_input(pkt, fmd);
             if (!handled) {
+                DS_LOG(VP_DROP_NOWHERE_TO_GO, pkt, 0, VR_BRIDGE_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
             }
             return NULL;
@@ -975,6 +978,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
     }
 
     if (pull_len && !pkt_push(pkt, pull_len)) {
+        DS_LOG(VP_DROP_PUSH, pkt, 0, VR_BRIDGE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PUSH);
         return NULL;
     }
