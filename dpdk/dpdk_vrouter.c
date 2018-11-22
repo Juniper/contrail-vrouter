@@ -87,6 +87,10 @@ enum vr_opt_index {
     NETLINK_PORT_OPT_INDEX,
 #define SOCKET_MEM_OPT          "socket-mem"
     SOCKET_MEM_OPT_INDEX,
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+#define PKT_DROP_LOG_BUFFER_SIZE_OPT "vr_dropstats_bufsz"
+    PKT_DROP_LOG_BUFFER_SIZE_OPT_INDEX,
+#endif
 #define LCORES_OPT              "lcores"
     LCORES_OPT_INDEX,
 #define MEMORY_ALLOC_CHECKS_OPT "vr_memory_alloc_checks"
@@ -100,6 +104,7 @@ extern unsigned int vr_bridge_oentries;
 extern unsigned int vr_mpls_labels;
 extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
+extern unsigned int vr_config_pkt_drop_stats_log_buffer_size;
 
 static int no_daemon_set;
 static int no_gro_set = 0;
@@ -620,6 +625,8 @@ dpdk_argv_update(void)
                 rss_mempool_sz);
     RTE_LOG(INFO, VROUTER, "Maximum packet size:         %" PRIu32 "\n",
                 vr_packet_sz);
+    RTE_LOG(INFO, VROUTER, "Maximum log buffer size:     %" PRIu32 "\n",
+                vr_config_pkt_drop_stats_log_buffer_size);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < RTE_DIM(dpdk_argv) - 1; i += 2) {
         if (dpdk_argv[i] == NULL)
@@ -956,6 +963,10 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [SOCKET_MEM_OPT_INDEX]          =   {SOCKET_MEM_OPT,        required_argument,
                                                     NULL,                   0},
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+    [PKT_DROP_LOG_BUFFER_SIZE_OPT_INDEX] =   {PKT_DROP_LOG_BUFFER_SIZE_OPT, required_argument,
+                                                    NULL,                   0},
+#endif
     [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
                                                     NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
@@ -993,6 +1004,7 @@ Usage(void)
         "    --"MEMORY_ALLOC_CHECKS_OPT"  Enable memory checks\n"
         "    --"MEMPOOL_SIZE_OPT" NUM     Main packet pool size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
+        "    --"PKT_DROP_LOG_BUFFER_SIZE_OPT" NUM Maximum debug log buffer size\n"
         );
 
     exit(1);
@@ -1122,6 +1134,14 @@ parse_long_opts(int opt_flow_index, char *optarg)
             vr_vrfs = VR_DEF_VRFS;
         }
         break;
+#if (VR_PKT_DROP_LOG_BUFFER_INFRA == STD_ON)
+    case PKT_DROP_LOG_BUFFER_SIZE_OPT_INDEX:
+        vr_config_pkt_drop_stats_log_buffer_size = (unsigned int)strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_config_pkt_drop_stats_log_buffer_size = VP_PKT_DROP_STATS_LOG_MAX;
+        }
+        break;
+#endif
 
     case SOCKET_DIR_OPT_INDEX:
         vr_socket_dir = optarg;
