@@ -49,6 +49,9 @@
                         <Component Id="VtestFiles" Guid="13BFC527-4B1B-44F4-80E7-975FA16EA99A" Win64="yes">
                             <File Id="VtestExe" Source="../vtest/vtest.exe"/>
                         </Component>
+                        <Component Id="ContrailAutostartScriptFiles" Guid="2871E4C1-9E78-4CB8-BC03-D6118582EF52" Win64="yes">
+                            <File Id="ContrailAutostartScript" Source="../../../../../windows/scripts/contrail-autostart.ps1"/>
+                        </Component>
                         <Component Id="ContrailStatusScriptFiles" Guid="2871E4C1-9E78-4CB8-BC03-D6118582EF52" Win64="yes">
                             <File Id="ContrailStatusScript" Source="../../../../../windows/scripts/contrail-status.ps1"/>
                         </Component>
@@ -78,6 +81,7 @@
             <ComponentRef Id="VtestFiles"/>
             <ComponentRef Id="Libxml2DLL"/>
             <ComponentRef Id="VRouterUtilsPath"/>
+            <ComponentRef Id="ContrailAutostartScriptFiles"/>
             <ComponentRef Id="ContrailStatusScriptFiles"/>
         </Feature>
     </Product>
