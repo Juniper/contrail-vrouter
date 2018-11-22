@@ -49,6 +49,9 @@
                         <Component Id="VtestFiles" Guid="13BFC527-4B1B-44F4-80E7-975FA16EA99A" Win64="yes">
                             <File Id="VtestExe" Source="../vtest/vtest.exe"/>
                         </Component>
+                        <Component Id="ContrailAutostartScriptFiles" Guid="849F20B3-F3A5-4344-A1C4-DE24C3B1A468" Win64="yes">
+                            <File Id="ContrailAutostartScript" Source="../../../../../windows/scripts/contrail-autostart.ps1"/>
+                        </Component>
                         <Component Id="ContrailStatusScriptFiles" Guid="2871E4C1-9E78-4CB8-BC03-D6118582EF52" Win64="yes">
                             <File Id="ContrailStatusScript" Source="../../../../../windows/scripts/contrail-status.ps1"/>
                         </Component>
@@ -78,7 +81,25 @@
             <ComponentRef Id="VtestFiles"/>
             <ComponentRef Id="Libxml2DLL"/>
             <ComponentRef Id="VRouterUtilsPath"/>
+            <ComponentRef Id="ContrailAutostartScriptFiles"/>
             <ComponentRef Id="ContrailStatusScriptFiles"/>
         </Feature>
+
+        <CustomAction Id="ContrailAutostartCreateTask"
+            Property="ContrailAutostartCreateTaskProperty"
+            Execute="immediate"
+            ExeCommand="&quot;C:\Windows\System32\SCHTASKS.exe&quot; /Create /TN contrail-autostart /SC ONSTART /RU SYSTEM /TR &quot;powershell.exe -File '[INSTALLFOLDER]contrail-autostart.ps1'&quot;"/>
+
+        <CustomAction Id="ContrailAutostartCreateTaskProperty"
+            BinaryKey="WixCA"
+            DllEntry="WixQuietExec64"
+            Execute="deferred"
+            Return="check"
+            Impersonate="no"/>
+
+        <InstallExecuteSequence>
+            <Custom Action="ContrailAutostartCreateTask" After="CostFinalize">NOT Installed</Custom>
+            <Custom Action="ContrailAutostartCreateTaskProperty" After="InstallFiles">NOT Installed</Custom>
+        </InstallExecuteSequence>
     </Product>
 </Wix>
