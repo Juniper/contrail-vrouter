@@ -516,7 +516,9 @@ HandleBasicNics(PSWITCH_OBJECT SwitchObject)
 
     for (arrIndex = 0; arrIndex < array->NumElements; ++arrIndex) {
         curNic = NDIS_SWITCH_NIC_AT_ARRAY_INDEX(array, arrIndex);
+        win_if_lock();
         HandleBasicNic(curNic);
+        win_if_unlock();
     }
     VrFreeNdisObject(array);
 
@@ -554,6 +556,7 @@ HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams)
             if (vif) {
                 vif->vif_port = NicParams->PortId;
                 vif->vif_nic = NicParams->NicIndex;
+                vif->vif_mtu = NicParams->MTU;
             }
         } else if (!VhostNicEntry.IsConnected) {
             VhostNicEntry.PortId = NicParams->PortId;
