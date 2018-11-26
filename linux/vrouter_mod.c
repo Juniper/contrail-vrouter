@@ -44,6 +44,8 @@ extern unsigned int vr_flow_hold_limit;
 extern unsigned int vr_interfaces;
 extern unsigned int vif_bridge_entries;
 extern unsigned int vif_bridge_oentries;
+extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int vr_pkt_droplog_buf_en;
 
 extern char *ContrailBuildInfo;
 
@@ -2539,6 +2541,20 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+        .procname       = "pkt_drop_log_enable",
+        .data           = &vr_pkt_droplog_sysctl_en,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "pkt_drop_log_least_enable",
+        .data           = &vr_pkt_droplog_min_sysctl_en,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 
@@ -2624,25 +2640,43 @@ init_fail:
 
 module_param(vr_flow_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_flow_entries, "Number of entries in the flow table. Default is "__stringify(VR_DEF_FLOW_ENTRIES));
+
 module_param(vr_oflow_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_oflow_entries, "Number of overflow entries in the flow table.");
 
 module_param(vr_bridge_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_bridge_entries, "Number of entries in the bridge table. Default is "__stringify(VR_DEF_BRIDGE_ENTRIES));
+
 module_param(vr_bridge_oentries, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_bridge_oentries, "Number of overflow entries in the bridge table.");
 
 module_param(vif_bridge_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vif_bridge_entries, "Number of entries in the per interface bridge table. Default is "__stringify(VIF_BRIDGE_ENTRIES));
+
 module_param(vif_bridge_oentries, uint, S_IRUGO);
 MODULE_PARM_DESC(vif_bridge_oentries, "Number of overflow entries in the per interface bridge table.");
 
+module_param(vr_pkt_droplog_bufsz, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_bufsz, "Vrouter Drop stats packet log buffer size");
+
+module_param(vr_pkt_droplog_buf_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_buf_en, "Enable/Disable vrouter dropstats log support");
+
+module_param(vr_pkt_droplog_sysctl_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_sysctl_en, "Sysctl implementation for Enable/Disable vrouter packet drop log support");
+
+module_param(vr_pkt_droplog_min_sysctl_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_min_sysctl_en, "Sysctl implementation for Enable/Disable minimum vrouter packet drop log support");
+
 module_param(vr_mpls_labels, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));
+
 module_param(vr_nexthops, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_nexthops, "Number of entries in the nexhop table. Default is "__stringify(VR_DEF_NEXTHOPS));
+
 module_param(vr_vrfs, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_vrfs, "Number of vrfs. Default is "__stringify(VR_DEF_VRFS));
+
 module_param(vr_flow_hold_limit, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_flow_hold_limit, "Maximum number of entries in the flow table that can be in the HOLD state. Default is 8192");
 module_param(vr_interfaces, uint, S_IRUGO);
