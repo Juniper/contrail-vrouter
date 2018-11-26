@@ -242,6 +242,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
     } else if (vr_ip_is_ip4(ip)) {
         family = AF_INET;
         if (!ip->ip_ttl) {
+            PKT_LOG(VP_DROP_TTL_EXCEEDED, pkt, 0, VR_PROTO_IP_C, __LINE__);
             vr_pfree(pkt, VP_DROP_TTL_EXCEEDED);
             return 0;
         }
@@ -249,10 +250,11 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
         ttl = vr_ip_decrement_ttl(ip);
         pkt->vp_type = VP_TYPE_IP;
     } else {
+        PKT_LOG(VP_DROP_INVALID_PROTOCOL, pkt, 0, VR_PROTO_IP_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
         return 0;
     }
- 
+
     pkt->vp_ttl = ttl;
 
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
@@ -297,6 +299,8 @@ vr_icmp_input(struct vrouter *router, struct vr_packet *pkt,
 
     icmph = (struct vr_icmp *)(pkt_data(pkt) + offset);
     pull_len += sizeof(*icmph);
+    
+    PKT_LOG(0,pkt, 0,VR_PROTO_IP_C,__LINE__);
 
     if (vr_icmp_error(icmph)) {
         pull_len += sizeof(*iph);
@@ -365,6 +369,7 @@ vr_udp_input(struct vrouter *router, struct vr_packet *pkt,
         }
 
         if (ret == PKT_RET_ERROR) {
+            PKT_LOG(VP_DROP_CKSUM_ERR, pkt, 0, VR_PROTO_IP_C, __LINE__);
             vr_pfree(pkt, VP_DROP_CKSUM_ERR);
             return 0;
         }
@@ -376,6 +381,7 @@ vr_udp_input(struct vrouter *router, struct vr_packet *pkt,
     udph = (struct vr_udp *)vr_pheader_pointer(pkt, sizeof(struct vr_udp),
                                                 &udp);
     if (udph == NULL) {
+        PKT_LOG(VP_DROP_MISC, pkt, 0, VR_PROTO_IP_C, __LINE__);
         vr_pfree(pkt, VP_DROP_MISC);
         return 0;
     }
@@ -432,6 +438,7 @@ vr_gre_input(struct vrouter *router, struct vr_packet *pkt,
         }
 
         if (ret == PKT_RET_ERROR) {
+            PKT_LOG(VP_DROP_CKSUM_ERR, pkt, 0, VR_PROTO_IP_C, __LINE__);
             vr_pfree(pkt, VP_DROP_CKSUM_ERR);
             return 0;
         }
@@ -444,6 +451,7 @@ vr_gre_input(struct vrouter *router, struct vr_packet *pkt,
     hdr_len = 4;
     gre_hdr = (unsigned short *) vr_pheader_pointer(pkt, hdr_len, buf);
     if (gre_hdr == NULL) {
+        PKT_LOG(VP_DROP_MISC, pkt, 0, VR_PROTO_IP_C, __LINE__);
         vr_pfree(pkt, VP_DROP_MISC);
         return 0;
     }
@@ -537,6 +545,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
          */
         if (!(ip = (struct vr_ip *)pkt_push(pkt, hlen))) {
             drop_reason = VP_DROP_PUSH;
+            PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
             goto drop_pkt;
         }
 
@@ -599,6 +608,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                 /* Get back the IP header */
                 if (!pkt_push(pkt, hlen)) {
                     drop_reason = VP_DROP_PUSH;
+                    PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
                     goto drop_pkt;
                 }
                 /* Subject it to flow */
@@ -615,6 +625,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                 if (fmd->fmd_to_me || relaxed_policy_found) {
                     if (!vr_l3_input(pkt, fmd)) {
                         drop_reason = VP_DROP_NOWHERE_TO_GO;
+                        PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
                         goto drop_pkt;
                     }
                     return 0;
@@ -631,6 +642,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
         if (!vif && !(vif = pkt->vp_if->vif_bridge) &&
                                 !(vif = router->vr_host_if)) {
             drop_reason = VP_DROP_TRAP_NO_IF;
+            PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
             goto drop_pkt;
         }
 
@@ -639,6 +651,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
             /* get the ip header back */
             if (!pkt_push(pkt, hlen)) {
                 drop_reason = VP_DROP_PUSH;
+                PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
                 goto drop_pkt;
             }
 
@@ -646,6 +659,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
             l2_hdr = pkt_push(pkt, sizeof(vif->vif_rewrite));
             if (!l2_hdr) {
                 drop_reason = VP_DROP_PUSH;
+                PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
                 goto drop_pkt;
             }
 
@@ -755,6 +769,7 @@ vr_inet_flow_nat(struct vr_flow_entry *fe, struct vr_packet *pkt,
     return FLOW_FORWARD;
 
 drop:
+    PKT_LOG(VP_DROP_FLOW_NAT_NO_RFLOW, pkt, 0, VR_PROTO_IP_C, __LINE__);
     vr_pfree(pkt, VP_DROP_FLOW_NAT_NO_RFLOW);
     return FLOW_CONSUMED;
 }
@@ -1088,6 +1103,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
             vr_enqueue_to_assembler(router, pkt, fmd);
         } else {
             /* unlikely to be hit. you can safely discount misc drops here */
+            PKT_LOG(VP_DROP_MISC, pkt, flow_p, VR_PROTO_IP_C, __LINE__);
             vr_pfree(pkt, VP_DROP_MISC);
         }
         return FLOW_CONSUMED;
@@ -1211,6 +1227,7 @@ vr_ip_input(struct vrouter *router, struct vr_packet *pkt,
 
     return vr_forward(router, pkt, fmd);
 corrupt_pkt:
+    PKT_LOG(VP_DROP_INVALID_PROTOCOL, pkt, 0, VR_PROTO_IP_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
     return 0;
 }

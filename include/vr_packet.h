@@ -1445,4 +1445,145 @@ pkt_drop_stats(struct vr_interface *vif, unsigned short reason, int cpu)
     return;
 }
 
+/* VR_PKT_DROP_STATS_LOG_MAX macro denotes the number of entry for Packet log buffer on each core*/
+#define VR_PKT_DROP_LOG_MAX 200
+
+/* Currently we couldn't transfer data more than 4KB through sandesh.
+ * so with the below VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ macro,
+ * we are processing those much of entries in a single transfer.
+ * Below values is arrived based on size of vr_pkt_drop_log_t.
+ * Currently, size is less than 4KB, If we add new entries as part of vr_pkt_drop_log_t structure, 
+ * then we need to consider the below macro size
+ * */
+#define VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ 20
+
+#define PKT_LOG(U, W, X, Y, Z) if(vr_pkt_droplog_sysctl_en == 1) { \
+vr_pkt_drop_log_func(U, W, X, Y, Z); \
+}
+extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int vr_pkt_droplog_buf_en;
+extern unsigned int vr_pkt_droplog_sysctl_en;
+extern unsigned int vr_pkt_droplog_min_sysctl_en;
+unsigned int vr_pkt_drop_log_req_get_size(void *);
+struct vr_drop_loc
+{
+    map_t file;
+    unsigned int line;
+};
+
+typedef struct vr_pkt_drop_log {
+    time_t timestamp;
+    unsigned char   vp_type;
+    unsigned short  drop_reason;
+    unsigned short  vif_idx;
+    unsigned int    nh_id;
+    union {
+        struct in_addr ipv4;
+        struct in6_addr ipv6;
+    }src;
+    union {
+        struct in_addr ipv4;
+        struct in6_addr ipv6;
+    }dst;
+    unsigned short  sport;
+    unsigned short  dport;
+    struct vr_drop_loc drop_loc;
+
+    unsigned short  pkt_len;
+    unsigned char   pkt_header[100];
+} vr_pkt_drop_log_t;
+
+struct vr_pkt_drop_st {
+    vr_pkt_drop_log_t **vr_pkt_drop_log;
+    uint64_t *vr_pkt_drop_log_buffer_index;
+};
+#define vr_pkt_drop_log_buffer vr_pkt_drop->vr_pkt_drop_log
+#define vr_pkt_drop_log_buf_index vr_pkt_drop->vr_pkt_drop_log_buffer_index
+#define PKT_LOG_FILL(X,Y) X=Y; 
+
+/* Below function logs the packet drops by getting packet information from vr_packet & vr_flow and logs in corresponding core */
+static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_packet *pkt, struct vr_flow *flow, map_t file, unsigned int line)
+{
+    int cpu = vr_get_cpu();
+    uint64_t m_sec = 0, n_sec = 0;
+    struct vr_ip *ip = NULL;
+    struct vr_ip6 *ip6 = NULL;
+
+    struct vrouter *router = vrouter_get(0);
+
+    /* Copying index valjue from circular buffer of corresponding core*/
+    int buf_idx = router->vr_pkt_drop_log_buf_index[cpu];
+    
+    memset(router->vr_pkt_drop_log_buffer[cpu] + buf_idx, 0, sizeof(vr_pkt_drop_log_t));
+
+    /* Check Packet drop log enabled at load time*/
+    if(vr_pkt_droplog_buf_en == 1)
+    {
+        /* Get the current time in epoch format */
+        vr_get_time(&m_sec, &n_sec);
+        
+        /* Copying epoch time into timestamp structure */
+        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].timestamp, (unsigned int)m_sec)
+        
+        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].drop_reason, drop_reason)
+
+        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.file, file)
+        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.line, line)
+        
+        if(pkt != NULL)
+        {
+            /* Check if dropped packet is IPV4*/
+            if (pkt->vp_type == VP_TYPE_IP) {
+                ip = (struct vr_ip *)pkt_network_header(pkt);
+                if(!ip)
+                    return;
+                
+                /* Copying Source & destination address from IPV4 packet header*/
+                PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv4.s_addr, ip->ip_saddr)
+                PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv4.s_addr, ip->ip_daddr)
+
+                /* If flow is available, copy source port and destination port*/
+                if(flow != NULL && flow->flow4_sport != 0) {
+                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow4_sport;
+                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow4_dport;
+                }
+            }
+            /* Check if dropped packet is IPV6 */
+            else if (pkt->vp_type == VP_TYPE_IP6)
+            {
+                ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+                if(!ip6)
+                    return;
+                memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv6.s6_addr, ip6->ip6_src, sizeof(ip6->ip6_src));
+                memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv6.s6_addr, ip6->ip6_dst, sizeof(ip6->ip6_dst));   
+            
+                if(flow != NULL && flow->flow6_sport != 0) {
+                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow6_sport;
+                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow6_dport;
+                } 
+            }
+        /* Log packet details into buffer, when drop least is diabled */
+        if(vr_pkt_droplog_min_sysctl_en != 1)
+        {
+                PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
+                if(pkt->vp_if != NULL) {
+                    PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].vif_idx, pkt->vp_if->vif_idx)
+                }
+                if(pkt->vp_nh != NULL) {
+                    PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].nh_id, pkt->vp_nh->nh_id)
+                }
+                    PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_len, pkt->vp_len)
+                if(pkt->vp_len < 100)
+                    memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header, pkt_network_header(pkt), pkt->vp_len);
+                else
+                    memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header, pkt_network_header(pkt), 100);
+            }
+        }
+        /* Circular buffer - buf_idx counter increments for every packet log, when it reaches max.
+         * configured value, it will start from zero and reach till max buffer size.
+         * circular buffer maintained for each core */
+        router->vr_pkt_drop_log_buf_index[cpu] = ((++buf_idx) % vr_pkt_droplog_bufsz);
+    }
+}
+
 #endif /* __VR_PACKET_H__ */
