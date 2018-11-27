@@ -489,7 +489,8 @@ FilterRestart(NDIS_HANDLE FilterModuleContext, PNDIS_FILTER_RESTART_PARAMETERS R
     return status;
 }
 
-NDIS_STATUS FilterNetPnpEvent(
+NDIS_STATUS
+FilterNetPnpEvent(
     NDIS_HANDLE FilterModuleContext,
     PNET_PNP_EVENT_NOTIFICATION NetPnPEventNotification)
 {
@@ -499,6 +500,11 @@ NDIS_STATUS FilterNetPnpEvent(
     if (NetPnPEventNotification->NetPnPEvent.NetEvent == NetEventSwitchActivate) {
         status = HandleBasicNics(switchObject);
     }
+
+    if (status == NDIS_STATUS_SUCCESS) {
+        status = NdisFNetPnPEvent(switchObject->NdisFilterHandle, NetPnPEventNotification);
+    }
+
     return status;
 }
 
