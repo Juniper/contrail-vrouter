@@ -489,17 +489,21 @@ FilterRestart(NDIS_HANDLE FilterModuleContext, PNDIS_FILTER_RESTART_PARAMETERS R
     return status;
 }
 
-NDIS_STATUS FilterNetPnpEvent(
+NDIS_STATUS
+FilterNetPnpEvent(
     NDIS_HANDLE FilterModuleContext,
     PNET_PNP_EVENT_NOTIFICATION NetPnPEventNotification)
 {
-    NDIS_STATUS status = NDIS_STATUS_SUCCESS;
     PSWITCH_OBJECT switchObject = (PSWITCH_OBJECT)FilterModuleContext;
 
     if (NetPnPEventNotification->NetPnPEvent.NetEvent == NetEventSwitchActivate) {
-        status = HandleBasicNics(switchObject);
+        // Return value of HandleBasicNics must be ignored, because returning anything other than
+        // NDIS_STATUS_SUCCESS breaks the overlying drivers. As a result, switch cannot be removed.
+        // TODO: Add failure handling of HandleBasicNics to FilterRestart handler.
+        HandleBasicNics(switchObject);
     }
-    return status;
+
+    return NdisFNetPnPEvent(switchObject->NdisFilterHandle, NetPnPEventNotification);
 }
 
 NDIS_STATUS
