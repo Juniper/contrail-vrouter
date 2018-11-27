@@ -23,6 +23,8 @@ extern "C" {
 #include "vr_mpls.h"
 #include "vr_index_table.h"
 #include "vr_mem.h"
+#include "vr_pkt_droplog.h"
+
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -54,6 +56,8 @@ enum vr_malloc_objects_t {
     VR_DEFER_OBJECT,
     VR_DROP_STATS_OBJECT,
     VR_DROP_STATS_REQ_OBJECT,
+    VR_PKT_DROP_LOG_OBJECT,
+    VR_PKT_DROP_LOG_REQ_OBJECT,
     VR_FLOW_QUEUE_OBJECT,
     VR_FLOW_REQ_OBJECT,
     VR_FLOW_REQ_PATH_OBJECT,
@@ -383,6 +387,7 @@ struct vrouter {
     struct vr_interface *vr_agent_if;
     struct vr_interface *vr_host_if;
     struct vr_interface *vr_eth_if;
+    struct vr_pkt_drop_st *vr_pkt_drop;
 };
 
 struct vr_defer_data {
