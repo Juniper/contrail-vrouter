@@ -643,12 +643,14 @@ vr_enqueue_flow(struct vrouter *router, struct vr_flow_entry *fe,
 
     if (!vfq) {
         drop_reason = VP_DROP_FLOW_UNUSABLE;
+        PKT_LOG(drop_reason, pkt, 0, VR_FLOW_C, __LINE__);
         goto drop;
     }
 
     i = vr_sync_fetch_and_add_32u(&vfq->vfq_entries, 1);
     if (i >= VR_MAX_FLOW_QUEUE_ENTRIES) {
         drop_reason = VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED;
+        PKT_LOG(drop_reason, pkt, 0, VR_FLOW_C, __LINE__);
         goto drop;
     }
 
@@ -670,6 +672,7 @@ vr_flow_nat(struct vr_flow_entry *fe,
     if (pkt->vp_type == VP_TYPE_IP)
         return vr_inet_flow_nat(fe, pkt, fmd);
 
+    PKT_LOG(VP_DROP_FLOW_ACTION_INVALID, pkt, 0, VR_FLOW_C, __LINE__);
     vr_pfree(pkt, VP_DROP_FLOW_ACTION_INVALID);
     return FLOW_CONSUMED;
 }
@@ -857,6 +860,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
     if (src_nh->nh_validate_src) {
         valid_src = src_nh->nh_validate_src(pkt, src_nh, fmd, &modified_index);
         if (valid_src == NH_SOURCE_INVALID) {
+            PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_FLOW_C, __LINE__);
             vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
             goto res;
         }
@@ -865,6 +869,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
             valid_src = vr_rflow_update_ecmp_index(router, fe,
                                             modified_index, fmd);
             if (valid_src == -1) {
+                PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_FLOW_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
                 goto res;
             }
@@ -899,6 +904,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
 
     switch (fe->fe_action) {
     case VR_FLOW_ACTION_DROP:
+        PKT_LOG(VP_DROP_FLOW_ACTION_DROP, pkt, 0, VR_FLOW_C, __LINE__);
         vr_pfree(pkt, VP_DROP_FLOW_ACTION_DROP);
         result = FLOW_CONSUMED;
         break;
@@ -912,6 +918,7 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         break;
 
     default:
+        PKT_LOG(VP_DROP_FLOW_ACTION_INVALID, pkt, 0, VR_FLOW_C, __LINE__);
         vr_pfree(pkt, VP_DROP_FLOW_ACTION_INVALID);
         result = FLOW_CONSUMED;
         break;
@@ -1380,6 +1387,7 @@ vr_flow_vif_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
     }
 
     if (vif_l && vif_drop_new_flows(vif_l)) {
+        PKT_LOG(VP_DROP_NEW_FLOWS, pkt, 0, VR_FLOW_C, __LINE__);
         *drop_reason = VP_DROP_NEW_FLOWS;
         return false;
     }
@@ -1448,13 +1456,13 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
     unsigned int hold_count;
     struct vr_flow_table_info *infop = router->vr_flow_table_info;
 
-
     *drop_reason = VP_DROP_FLOW_UNUSABLE;
     if (burst)
         *burst = false;
 
     if (pkt->vp_type == VP_TYPE_IP) {
         if (!vr_inet_flow_allow_new_flow(router, pkt)) {
+            PKT_LOG(VP_DROP_FLOW_UNUSABLE, pkt, 0, VR_FLOW_C, __LINE__);
             *drop_reason = VP_DROP_FLOW_UNUSABLE;
             return false;
         }
@@ -1464,6 +1472,7 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
         hold_count = vr_flow_table_hold_count(router);
         if (hold_count > vr_flow_hold_limit) {
             if (infop->vfti_burst_used >= vr_flow_burst_count(router)) {
+                PKT_LOG(VP_DROP_FLOW_UNUSABLE, pkt, 0, VR_FLOW_C, __LINE__);
                 *drop_reason = VP_DROP_FLOW_UNUSABLE;
                 return false;
             }
@@ -1495,6 +1504,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
             return FLOW_FORWARD;
 
         if (!vr_flow_allow_new_flow(router, pkt, &drop_reason, &burst)) {
+            PKT_LOG(drop_reason, pkt, key , VR_FLOW_C, __LINE__);
             vr_pfree(pkt, drop_reason);
             return FLOW_CONSUMED;
         }
@@ -1502,6 +1512,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
         flow_e = vr_flow_get_free_entry(router, key, pkt->vp_type,
                 true, &fe_index);
         if (!flow_e) {
+            PKT_LOG(VP_DROP_FLOW_TABLE_FULL, pkt, key, VR_FLOW_C, __LINE__);
             vr_pfree(pkt, VP_DROP_FLOW_TABLE_FULL);
             return FLOW_CONSUMED;
         }
@@ -1545,6 +1556,7 @@ __vr_flow_forward(flow_result_t result, struct vr_packet *pkt,
         break;
 
     case FLOW_EVICT_DROP:
+        PKT_LOG(VP_DROP_FLOW_EVICT, pkt, 0, VR_FLOW_C, __LINE__);
         vr_pfree(pkt, VP_DROP_FLOW_EVICT);
         break;
 
@@ -1554,6 +1566,7 @@ __vr_flow_forward(flow_result_t result, struct vr_packet *pkt,
 
     case FLOW_DROP:
     default:
+        PKT_LOG(VP_DROP_FLOW_UNUSABLE, pkt, 0, VR_FLOW_C, __LINE__);
         vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
         break;
     }
@@ -1684,6 +1697,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
     vif = __vrouter_get_interface(router, pnode->pl_vif_idx);
     if (!vif || (pkt->vp_if != vif)) {
         pkt->vp_if = NULL;
+        PKT_LOG(VP_DROP_INVALID_IF, pkt, 0, VR_FLOW_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_IF);
         return -ENODEV;
     }

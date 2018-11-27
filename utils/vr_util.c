@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -661,6 +662,117 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
     return;
 }
 
+void vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i)
+{
+    int j = 0;
+    vr_pkt_drop_log_t *pkt_log_utils = 
+        (vr_pkt_drop_log_t*)pkt_log->vdl_pkt_droplog_arr;
+    struct tm *ptr_time;
+    char ipv6_addr[VR_IP6_ADDRESS_LEN] = "";
+
+    /* String mapping for packet drop log */
+    char vr_pkt_droplog_str[][50] = {
+        FILE_MAP(string)
+    };
+
+    /* String mapping for Drop reasons */
+    char vr_pkt_droplog_rsn[][50] = {
+        DROP_RSN_MAP(string)
+    };
+
+    ptr_time = localtime(&(pkt_log_utils[i].timestamp));
+
+    printf("sl no: %d  ", pkt_log->vdl_log_idx+i);
+#ifdef _WIN32
+   printf("Epoch Time: %Id ", pkt_log_utils[i].timestamp);
+#else
+    printf("Epoch Time: %ld ", pkt_log_utils[i].timestamp);
+#endif    
+    printf("Local Time: %s ", asctime(ptr_time));
+    printf("Packet Type: %d  ", pkt_log_utils[i].vp_type);
+    if(pkt_log_utils[i].drop_reason)
+        printf("Drop reason: %s  ", vr_pkt_droplog_rsn[pkt_log_utils[i].drop_reason]);
+    else
+        printf("Drop reason: NULL  ");
+    printf("Vif idx: %d  ", pkt_log_utils[i].vif_idx);
+    printf("Nexthop id: %d  ", pkt_log_utils[i].nh_id);
+    if(pkt_log_utils[i].vp_type == VP_TYPE_IP)
+    {
+        printf("Src IP: %s  ", inet_ntoa(pkt_log_utils[i].src.ipv4));
+        printf("Dst IP: %s  ", inet_ntoa(pkt_log_utils[i].dst.ipv4));
+    }
+    else if (pkt_log_utils[i].vp_type == VP_TYPE_IP6)
+    {
+        inet_ntop(AF_INET6, &pkt_log_utils[i].src.ipv6, ipv6_addr, VR_IP6_ADDRESS_LEN);
+        printf("Src IPv6: %s  ", ipv6_addr);
+        inet_ntop(AF_INET6, &pkt_log_utils[i].dst.ipv6, ipv6_addr, VR_IP6_ADDRESS_LEN);
+        printf("Dst IPv6: %s  ", ipv6_addr);
+    }
+    else
+    {
+        printf("Src IP: NULL  ");
+        printf("Dst IP: NULL  ");
+
+    }
+    printf("Source port: %d  ", pkt_log_utils[i].sport);
+    printf("Dest port: %d  ", pkt_log_utils[i].dport);
+    if(pkt_log_utils[i].drop_loc.file)
+        printf("file: %s  ", vr_pkt_droplog_str[pkt_log_utils[i].drop_loc.file]);
+    else
+        printf("file: NULL  ");
+    printf("line no: %d  ", pkt_log_utils[i].drop_loc.line);
+    printf("Packet Length: %d  ", pkt_log_utils[i].pkt_len);
+    printf("Packet Data: ");
+
+    if(pkt_log_utils[i].pkt_len > 100)
+        for(j = 0; j < 100; j++)
+            printf("%02X  ", pkt_log_utils[i].pkt_header[j]);
+    else
+        for(j=0;j<pkt_log_utils[i].pkt_len;j++)
+            printf("%02X  ", pkt_log_utils[i].pkt_header[j]);
+
+    printf("\n\n");
+}
+void vr_print_pkt_drop_log_header(vr_pkt_drop_log_req *pkt_log)
+{
+    printf("**********PKT DROP LOG**********\n");
+    printf("Total No. of CPU's %d\n", pkt_log->vdl_max_num_cores);
+    /* When requested for core 0, it will try to log for all cores
+     * so here manually printing as core 1 */
+    if(pkt_log->vdl_core == 0)
+        printf("Pkt Drop Log for Core 1\n\n");
+    else
+        printf("Pkt Drop Log for Core %d\n\n", pkt_log->vdl_core);
+}
+void
+vr_print_pkt_drop_log(vr_pkt_drop_log_req *pkt_log)
+{
+    int i = 0, log_buffer_iter = 0;
+    static bool vr_header_include = 0;
+
+    /* When configured pkt buffer size is  than MAX_ALLOWED_BUFFER_SIZE*/    
+    if(pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx  < 
+            VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
+    {
+        log_buffer_iter = pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx;
+    }
+    else
+        log_buffer_iter = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+
+    if(pkt_log->vdl_log_idx == 0)
+        vr_header_include = 0;
+
+    if(!vr_header_include)
+    {
+        vr_print_pkt_drop_log_header(pkt_log);
+        vr_header_include = 1;
+    }
+    for(i = 0; i < log_buffer_iter; i++)
+        vr_print_pkt_drop_log_data(pkt_log, i);
+
+    return;
+}
+
 int
 vr_response_common_process(vr_response *resp, bool *dump_pending)
 {
@@ -778,6 +890,27 @@ vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
     req.vds_core = core;
 
     return vr_sendmsg(cl, &req, "vr_drop_stats_req");
+}
+int vr_pkt_drop_log_request(struct nl_client *cl, unsigned int router_id, 
+        unsigned int core, int log_idx )
+{
+    int ret = 0;
+    vr_pkt_drop_log_req req;
+
+    memset(&req,0,sizeof(req));
+
+    req.vdl_pkt_droplog_arr = (char *)malloc(1);
+
+    req.h_op = SANDESH_OP_GET;
+    req.vdl_rid = router_id;
+    req.vdl_core = core;
+    req.vdl_log_idx = log_idx;
+
+    ret =  vr_sendmsg(cl, &req, "vr_pkt_drop_log_req");
+
+    free(req.vdl_pkt_droplog_arr);
+
+    return ret;
 }
 /* dropstats end */
 
