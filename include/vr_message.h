@@ -36,6 +36,7 @@
 #define VR_FLOW_RESPONSE_OBJECT_ID      17
 #define VR_BRIDGE_TABLE_DATA_OBJECT_ID  18
 #define VR_HPAGE_CFG_OBJECT_ID          19
+#define VR_PKT_DROP_LOG_OBJECT_ID     20
 
 #define VR_MESSAGE_PAGE_SIZE            (4096 - 128)
 
