@@ -422,6 +422,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
             }
         } else if (mtype == MIRROR_TYPE_PORT_RX) {
             if (!pkt->vp_if) {
+                PKT_LOG(VP_DROP_INVALID_IF, pkt, 0, VR_MIRROR_C, __LINE__);
                 drop_reason = VP_DROP_INVALID_IF;
                 goto fail;
             }
@@ -430,6 +431,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
             mirror_md = pkt->vp_if->vif_in_mirror_md;
         } else {
             if (!pkt->vp_nh || !pkt->vp_nh->nh_dev) {
+                PKT_LOG(VP_DROP_INVALID_IF, pkt, 0, VR_MIRROR_C, __LINE__);
                 drop_reason = VP_DROP_INVALID_NH;
                 goto fail;
             }
@@ -467,6 +469,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
                 clone_len += pkt_nh->nh_encap_len;
 
                 if (vr_pcow(&pkt, clone_len)) {
+                    PKT_LOG(VP_DROP_PCOW_FAIL, pkt, 0, VR_MIRROR_C, __LINE__);
                     drop_reason = VP_DROP_PCOW_FAIL;
                     goto fail;
                 }
@@ -475,6 +478,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 
                 if (pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, &pkt, fmd,
                                     pkt_nh->nh_data, pkt_nh->nh_encap_len) < 0) {
+                    PKT_LOG(VP_DROP_REWRITE_FAIL, pkt, 0, VR_MIRROR_C, __LINE__);
                     drop_reason = VP_DROP_REWRITE_FAIL;
                     goto fail;
                 }
@@ -487,6 +491,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
 
     if (clone_len) {
         if (vr_pcow(&pkt, clone_len)) {
+            PKT_LOG(VP_DROP_PCOW_FAIL, pkt, 0, VR_MIRROR_C, __LINE__);
             drop_reason = VP_DROP_PCOW_FAIL;
             goto fail;
         }
@@ -496,6 +501,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
     if (mirror_md_len) {
         buf = pkt_push(pkt, mirror_md_len);
         if (!buf) {
+            PKT_LOG(VP_DROP_PUSH, pkt, 0, VR_MIRROR_C, __LINE__);
             drop_reason = VP_DROP_PUSH;
             goto fail;
         }

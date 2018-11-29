@@ -7,6 +7,7 @@
 #include "vr_types.h"
 #include "vr_message.h"
 #include "vr_sandesh.h"
+#include "vr_packet.h"
 #include "vrouter.h"
 
 struct sandesh_object_md sandesh_md[] = {
@@ -47,6 +48,11 @@ struct sandesh_object_md sandesh_md[] = {
     [VR_VRF_STATS_OBJECT_ID]    =   {
         .obj_len                =       4 * sizeof(vr_vrf_stats_req),
         .obj_type_string        =       "vr_vrf_stats_req",
+    },
+    [VR_PKT_DROP_LOG_OBJECT_ID]   =   {
+        .obj_len                =       4 * sizeof(vr_pkt_drop_log_req),
+        .obj_get_size           =       vr_pkt_drop_log_req_get_size,
+        .obj_type_string        =       "vr_pkt_drop_log_req",
     },
     [VR_DROP_STATS_OBJECT_ID]   =   {
         .obj_len                =       4 * sizeof(vr_drop_stats_req),
