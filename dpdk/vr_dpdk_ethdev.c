@@ -30,6 +30,7 @@
 #include <rte_udp.h>
 
 extern int vr_rxd_sz, vr_txd_sz;
+extern unsigned int datapath_offloads;
 
 struct rte_eth_conf ethdev_conf = {
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
@@ -1107,7 +1108,7 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
 {
     uint64_t mask_to_distribute = 0, mask_to_distribute_ret = 0,
              mask_to_drop = 0;
-    unsigned i, nb_pkts_ret = 0;
+    unsigned i, offload_en, nb_pkts_ret = 0;
     int ret;
 
     /* prefetch the mbufs */
@@ -1134,20 +1135,24 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
     if (unlikely(vr_dpdk.nb_fwd_lcores == 1))
         return 0;
 
+    offload_en = vif_is_fabric(vif) && datapath_offloads;
     /* parse packet headers and emulate RSS hash */
     for (i = 0; i < *nb_pkts; i++) {
-        ret = dpdk_mbuf_parse_and_hash_packets(pkts[i]);
+        /* datapath offloads calculated the RSS for flow tagged packets */
+        if (!(offload_en && (pkts[i]->ol_flags & PKT_RX_FDIR_ID))) {
+            ret = dpdk_mbuf_parse_and_hash_packets(pkts[i]);
 
-        /**
-         * ret:
-         *     -1 -> packet is invalid and needs to be dropped
-         *      1 -> packet to be distributed (bit in mask_to_distribute set)
-         *      0 -> packet to be routed (bit in mask_to_distribute not set)
-         */
-        if (ret == 1) {
-            mask_to_distribute |= 1ULL << i;
-        } else if (unlikely(ret == -1)) {
-            mask_to_drop |= 1ULL << i;
+            /**
+             * ret:
+             *     -1 -> packet is invalid and needs to be dropped
+             *      1 -> packet to be distributed (bit in mask_to_distribute set)
+             *      0 -> packet to be routed (bit in mask_to_distribute not set)
+             */
+            if (ret == 1) {
+                mask_to_distribute |= 1ULL << i;
+            } else if (unlikely(ret == -1)) {
+                mask_to_drop |= 1ULL << i;
+            }
         }
     }
 
