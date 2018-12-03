@@ -370,6 +370,10 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_udp_coff = vr_udp_coff;
     resp->vo_flow_hold_limit = vr_flow_hold_limit;
     resp->vo_mudp = vr_mudp;
+    resp->vo_packet_dump = 0;
+    if(vr_get_dump_packets != NULL) {
+        resp->vo_packet_dump = vr_get_dump_packets();
+    }
 
     /* Build info */
     strncpy(resp->vo_build_info, ContrailBuildInfo,
@@ -438,6 +442,8 @@ vrouter_ops_add_process(void *s_req)
             vr_set_log_type(req->vo_log_type_disable[i], 0);
 
     /* Runtime parameters */
+    if (req->vo_packet_dump != -1 && vr_set_dump_packets != NULL)
+        vr_set_dump_packets(req->vo_packet_dump);
     if (req->vo_perfr != -1)
         vr_perfr = req->vo_perfr;
     if (req->vo_perfs != -1)
@@ -679,4 +685,3 @@ vr_hugepage_config_process(void *s_req)
 
     return;
 }
-

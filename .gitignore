@@ -34,3 +34,4 @@ modules.order
 /sandesh/gen-c/*
 /test/cmocka
 /test/atomic-test/x64
+.vscode/*

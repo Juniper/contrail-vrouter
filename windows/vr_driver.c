@@ -6,6 +6,7 @@
 #include "windows_shmem.h"
 #include "windows_nbl.h"
 #include "win_interface.h"
+#include "win_packetdump.h"
 
 #include <vrouter.h>
 #include <vr_packet.h>
@@ -270,6 +271,8 @@ cleanup:
 static NDIS_STATUS
 InitializeWindowsComponents(PSWITCH_OBJECT Switch)
 {
+    InitPacketDumping();
+
     pvr_switch_context ctx = NULL;
 
     ctx = ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(vr_switch_context), VrAllocationTag);
