@@ -54,7 +54,8 @@ SRCS += vr_message.c \
        vr_vif_bridge.c \
        vr_htable.c \
        vr_vxlan.c \
-       vr_fragment.c
+       vr_fragment.c \
+       vr_pkt_droplog.c
 
 CFLAGS += -I${.CURDIR}/../include
 CFLAGS += -I$(BUILD_DIR)/vrouter/sandesh/gen-c
