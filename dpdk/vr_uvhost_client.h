@@ -41,6 +41,8 @@ typedef struct vr_uvh_client {
     unsigned int vruc_nrxqs;
     unsigned int vruc_ntxqs;
     unsigned int vruc_vif_gen;
+    unsigned int vruc_flags;
+#define VRUC_FLAG_SET_FEATURE_DONE 0x0001
     pthread_t vruc_owner;
 } vr_uvh_client_t;
 
