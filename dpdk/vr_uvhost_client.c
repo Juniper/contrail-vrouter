@@ -47,6 +47,7 @@ vr_uvhost_new_client(int fd, char *path, int cidx)
 
     vr_uvh_clients[cidx].vruc_fd = fd;
     strncpy(vr_uvh_clients[cidx].vruc_path, path, VR_UNIX_PATH_MAX - 1);
+    vr_uvh_clients[cidx].vruc_flags = 0;
 
     return &vr_uvh_clients[cidx];
 }
@@ -65,6 +66,7 @@ vr_uvhost_del_client(vr_uvh_client_t *vru_cl)
     vru_cl->vruc_fd = -1;
     if (vru_cl->vruc_vhostuser_mode == VRNU_VIF_MODE_CLIENT)
         unlink(vru_cl->vruc_path);
+    vru_cl->vruc_flags = 0;
 
     return;
 }

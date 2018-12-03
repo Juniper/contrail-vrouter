@@ -359,12 +359,18 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
     uint8_t is_gso_vm = 1;
     unsigned long stored_features = 0;
 
-    if (!vr_dpdk_load_persist_feature(uvhm_client_name(vru_cl),
-                                      &stored_features)) {
-        vru_cl->vruc_msg.u64 |= stored_features;
-    }
+    vr_uvhost_log("    SET FEATURES(original): 0x%"PRIx64"\n",
+                                            vru_cl->vruc_msg.u64);
 
-    vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
+    /* Load from cache only if mrgbuf is enabled */
+    if ((dpdk_check_rx_mrgbuf_disable() == 0) &&
+        !(vru_cl->vruc_flags & VRUC_FLAG_SET_FEATURE_DONE))
+        if (!vr_dpdk_load_persist_feature(uvhm_client_name(vru_cl),
+                                          &stored_features)) {
+            vru_cl->vruc_msg.u64 |= stored_features;
+        }
+
+    vr_uvhost_log("    SET FEATURES( updated): 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
     vif = __vrouter_get_interface(vrouter_get(0), vru_cl->vruc_idx);
@@ -391,8 +397,11 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
         vif->vif_flags &= ~VIF_FLAG_MRG_RXBUF;
         vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 0);
     }
-    vr_dpdk_store_persist_feature(uvhm_client_name(vru_cl),
-                                  vru_cl->vruc_msg.u64);
+    /* Save to cache only if mrgbuf is enabled */
+    if (dpdk_check_rx_mrgbuf_disable() == 0)
+        vr_dpdk_store_persist_feature(uvhm_client_name(vru_cl),
+                                      vru_cl->vruc_msg.u64);
+    vru_cl->vruc_flags |= VRUC_FLAG_SET_FEATURE_DONE;
     return 0;
 }
 
@@ -1154,8 +1163,19 @@ vr_uvh_cl_timer_handler(int fd, void *arg)
 
     ret = connect(vru_cl->vruc_fd, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
+        RTE_LOG_DP(DEBUG, UVHOST, "Error connecting uvhost socket FD %d to %s:"
+                " %s (%d)\n", vru_cl->vruc_fd, sun.sun_path, rte_strerror(errno), errno);
         ret = vr_uvh_cl_timer_setup(vru_cl);
     } else {
+
+        vr_uvhost_log("    connected to %s for uvhost socket FD %d\n",
+                  sun.sun_path, vru_cl->vruc_fd);
+        /*
+         * Remove the timer fd
+         */
+        vr_uvhost_del_fd(vru_cl->vruc_timer_fd, UVH_FD_READ);
+        vru_cl->vruc_timer_fd = -1;
+
         /*
          * socket connected
          * add to msg handler
@@ -1205,10 +1225,14 @@ vr_uvh_cl_timer_setup(vr_uvh_client_t *vru_cl)
         vru_cl->vruc_timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 
     if (vru_cl->vruc_timer_fd == -1) {
+        vr_uvhost_log("    timer create failed for uvhost socket FD %d:"
+                " %s (%d)\n", vru_cl->vruc_fd, rte_strerror(errno), errno);
         ret = -1;
     } else {
         ret = timerfd_settime(vru_cl->vruc_timer_fd, 0, &cl_timer, NULL);
         if (ret == -1) {
+            vr_uvhost_log("    timer setup failed for uvhost socket FD %d:"
+                " %s (%d)\n", vru_cl->vruc_fd, rte_strerror(errno), errno);
             close(vru_cl->vruc_timer_fd);
             vru_cl->vruc_timer_fd = -1;
         } else {
@@ -1292,7 +1316,12 @@ vr_uvh_nl_vif_add_handler(vrnu_vif_add_t *msg)
                         msg->vrnu_vif_idx, rte_strerror(errno), errno);
         goto error;
     }
-    vr_uvhost_log("    vif %u socket %s FD is %d\n",
+
+    if (msg->vrnu_vif_vhostuser_mode == VRNU_VIF_MODE_CLIENT)
+        vr_uvhost_log("    vif (client) %u socket %s FD is %d\n",
+                            msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
+    else
+        vr_uvhost_log("    vif (server) %u socket %s FD is %d\n",
                             msg->vrnu_vif_idx, msg->vrnu_vif_name, s);
 
     memset(&sun, 0, sizeof(sun));
