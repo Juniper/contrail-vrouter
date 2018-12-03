@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -25,10 +26,129 @@
 #include "ini_parser.h"
 #include "nl_util.h"
 #include "ini_parser.h"
+#include "vr_packet.h"
 
 static struct nl_client *cl;
-static int help_set, core_set, offload_set;
+static int help_set, core_set, offload_set, log_set;
 static unsigned int core = (unsigned)-1;
+static unsigned int stats_index = 0;
+static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index);
+
+static void pkt_drop_log_req_process(void *s_req) {
+
+    static int log_all_cores = 0, last_buffer_stats = 0, last_buffer_entry = 0;
+    vr_pkt_drop_log_req *stats = (vr_pkt_drop_log_req *)s_req;
+
+    /* Below check ensures that pkt drop log sysctl enabled during runtime*/
+    if(stats->vdl_pkt_droplog_sysctl_en == 1)
+    {
+        /* Below check ensures that drop stats support is enabled at load time*/
+        if(stats->vdl_pkt_droplog_en == 1)
+        {
+            /* Print the drop stats log*/
+            vr_print_pkt_drop_log(stats);
+
+            /* Since sandesh message doesn't support passing data more than 4KB,
+             * So the message request sent in serial manner.
+             * If the configured size  more than VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ,
+             * then index is maintained at utils side
+             * and request data based on index
+             * */
+            if(stats->vdl_pkt_droplog_max_bufsz > VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
+            {
+                /* If stats->index reached MAX size, it will not be processed.
+                 * stats->vdl_log_idx is used for printing serial numbers on
+                 * the console */
+                if(stats->vdl_log_idx < (stats->vdl_pkt_droplog_max_bufsz -
+                            VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ))
+                {
+                    /* Request packet drop buffer for next iteration by
+                     * incrementing with MAX_ALLOWED_BUFFER  */
+                    stats_index  = stats->vdl_log_idx +
+                        VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+                    vr_get_pkt_drop_log(cl, stats->vdl_core, stats_index);
+                }
+                /* Below condition will process last iteration buffer,
+                 * If modulus is non-zero */
+                else if( stats->vdl_pkt_droplog_max_bufsz %
+                        VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ != 0)
+                {
+                    /* Below condition to be processed only once per core */
+                    if( ! last_buffer_entry)
+                    {
+                        stats_index  = stats->vdl_log_idx +
+                            VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+                        last_buffer_entry = 1;
+                        vr_get_pkt_drop_log(cl, stats->vdl_core, stats_index);
+                    }
+                    else
+                    {
+                        /* Resetting index and last buffer entry because all
+                         * processing done for this particular core*/
+                        last_buffer_entry = 0;
+                        stats_index = 0;
+                    }
+                }
+                else
+                    stats_index = 0;
+            }
+            /* When packet drop log is requested for all cores, below
+             * condition would be enabled*/
+            if(stats->vdl_core ==0 || log_all_cores == 1)
+            {
+                /* Increment the core value*/
+                core++;
+
+                if(core < stats->vdl_max_num_cores){
+                    log_all_cores = 1;
+                    vr_get_pkt_drop_log(cl,core+1,stats_index);
+                }
+                else
+                {
+                    log_all_cores = 0;
+                }
+
+            }
+        }
+        else
+        {
+            printf("\n\nPkt drop stats log support is not enabled or misconfigured \
+                    in vrouter module parameters. Configured value is %d\n",
+                    stats->vdl_pkt_droplog_en);
+            printf("You can enable by providing \"options vrouter \
+                    vr_pkt_droplog_buf_en=1\" in /etc/modprobe.d/vrouter.conf\n");
+        }
+    }
+    else
+    {
+        printf("\n\nPacket Drop Log sysctl is not enabled or misconfigured, \
+                Configured value is %d\n",stats->vdl_pkt_droplog_sysctl_en);
+        printf("You can enable it by passing \"echo 1 > \
+                /proc/sys/net/vrouter/pkt_drop_log_enable\"\n");
+    }
+    return;
+}
+
+static void
+dropstats_log_nlutils_callbacks()
+{
+    /* Registering callback for packet drop log in netlink process*/
+    nl_cb.vr_pkt_drop_log_req_process = pkt_drop_log_req_process;
+}
+
+static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index) {
+    int ret = 0;
+
+    vr_pkt_drop_log_request(cl, 0, core, stats_index);
+    if(ret < 0)
+        return ret;
+
+    ret = vr_recvmsg(cl, false);
+    if(ret <= 0)
+        return ret;
+
+    return 0;
+}
 
 static void
 drop_stats_req_process(void *s_req)
@@ -165,6 +285,7 @@ enum opt_index {
     HELP_OPT_INDEX,
     CORE_OPT_INDEX,
     OFFL_OPT_INDEX,
+    LOG_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -172,6 +293,7 @@ static struct option long_options[] = {
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
     [CORE_OPT_INDEX]    =   {"core",    required_argument,  &core_set,      1},
     [OFFL_OPT_INDEX]    =   {"offload", no_argument,        &offload_set,   1},
+    [LOG_OPT_INDEX]     =   {"log",     required_argument,  &log_set,       1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
@@ -186,6 +308,9 @@ Usage()
         printf("--offload\t\t Show statistics for pkts offloaded on NIC\n");
         printf("\t\t\t (offload stats included if no flags given)\n");
     }
+    printf("--log <core number>\t Show Packet drops log for a specified core.. \
+		Core number starts from 1...n. If core number specified as zero, \
+		it will log for all cores \n");
     exit(-EINVAL);
 }
 
@@ -210,6 +335,14 @@ parse_long_opts(int opt_index, char *opt_arg)
         }
         core = -2;
         break;
+    case LOG_OPT_INDEX:
+	core = (unsigned)strtol(opt_arg, NULL, 0);
+	if (errno) {
+		printf("Error parsing log %s: %s (%d)\n", opt_arg,
+			strerror(errno), errno);
+		Usage();
+	}
+	break;
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -222,13 +355,13 @@ int
 main(int argc, char *argv[])
 {
     char opt;
-    int ret, option_index;
+    int ret, option_index, log_core = 0, i = 0;;
 
     dropstats_fill_nl_callbacks();
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "h:c:o",
+    while (((opt = getopt_long(argc, argv, "h:c:o:l:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 'c':
@@ -240,6 +373,23 @@ main(int argc, char *argv[])
             offload_set = 1;
             parse_long_opts(OFFL_OPT_INDEX, optarg);
             break;
+
+        case 'l':
+            log_set = 1;
+            parse_long_opts(LOG_OPT_INDEX, optarg);
+
+            log_core = atoi(argv[2]);
+
+            /* Register nl allback function for dropstats log buffer*/
+            dropstats_log_nlutils_callbacks();
+
+            /* Register with nlclient(socket message) for dropstats log buffer*/
+            cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+            if(!cl)
+                return -1;
+
+            vr_get_pkt_drop_log(cl,log_core,stats_index);
+            return 0;
 
         case 0:
             parse_long_opts(option_index, optarg);

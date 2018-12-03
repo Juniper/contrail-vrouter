@@ -127,6 +127,7 @@
     <ClInclude Include="..\include\vr_stats.h" />
     <ClInclude Include="..\include\vr_vxlan.h" />
     <ClInclude Include="..\include\vr_offloads.h" />
+    <ClInclude Include="..\include\vr_pkt_droplog.h" />
     <ClInclude Include="..\include\vr_windows.h" />
     <ClInclude Include="..\include\windows_devices.h" />
     <ClInclude Include="..\include\windows_builtins.h" />
@@ -172,6 +173,7 @@
     <ClCompile Include="..\dp-core\vr_vrf_assign.c" />
     <ClCompile Include="..\dp-core\vr_vxlan.c" />
     <ClCompile Include="..\dp-core\vr_offloads.c" />
+    <ClCompile Include="..\dp-core\vr_pkt_droplog.c" />
     <ClCompile Include="vr_devices.c" />
     <ClCompile Include="vr_driver.c" />
     <ClCompile Include="vr_shmem_devices.c" />

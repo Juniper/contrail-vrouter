@@ -44,6 +44,8 @@ extern unsigned int vr_flow_hold_limit;
 extern unsigned int vr_interfaces;
 extern unsigned int vif_bridge_entries;
 extern unsigned int vif_bridge_oentries;
+extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int vr_pkt_droplog_buf_en;
 
 extern char *ContrailBuildInfo;
 
@@ -2544,6 +2546,20 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+        .procname       = "pkt_drop_log_enable",
+        .data           = &vr_pkt_droplog_sysctl_en,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "pkt_drop_log_min_enable",
+        .data           = &vr_pkt_droplog_min_sysctl_en,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 
@@ -2641,6 +2657,18 @@ module_param(vif_bridge_entries, uint, S_IRUGO);
 MODULE_PARM_DESC(vif_bridge_entries, "Number of entries in the per interface bridge table. Default is "__stringify(VIF_BRIDGE_ENTRIES));
 module_param(vif_bridge_oentries, uint, S_IRUGO);
 MODULE_PARM_DESC(vif_bridge_oentries, "Number of overflow entries in the per interface bridge table.");
+
+module_param(vr_pkt_droplog_bufsz, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_bufsz, "Vrouter Drop stats packet log buffer size");
+
+module_param(vr_pkt_droplog_buf_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_buf_en, "Enable/Disable vrouter packet drop log support at load time");
+
+module_param(vr_pkt_droplog_sysctl_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_sysctl_en, "Sysctl implementation for Enable/Disable vrouter packet drop log support");
+
+module_param(vr_pkt_droplog_min_sysctl_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_pkt_droplog_min_sysctl_en, "Sysctl implementation for Enable/Disable minimum vrouter packet drop log support");
 
 module_param(vr_mpls_labels, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));
