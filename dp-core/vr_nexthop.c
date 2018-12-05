@@ -2494,15 +2494,13 @@ send_fail:
  * Returns 0 - Completion of pkt handling
  *        <0 - Error in pkt handling
  */
-static inline int
-nh_output_inline(struct vr_packet *pkt, struct vr_nexthop *nh,
+int
+nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
           struct vr_forwarding_md *fmd)
 {
-    bool need_flow_lookup;
+    bool need_flow_lookup = false;
     nh_processing_t res;
 
-loop:
-    need_flow_lookup = false;
     if (!pkt->vp_ttl) {
         vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_ZERO_TTL, NULL);
         return 0;
@@ -2556,8 +2554,7 @@ loop:
                  }
 
                  if (nh != pkt->vp_nh) {
-                     nh = pkt->vp_nh;
-                     goto loop;
+                     return nh_output(pkt, pkt->vp_nh, fmd);
                  }
              }
         }
@@ -2567,20 +2564,12 @@ loop:
     if (res == NH_PROCESSING_COMPLETE)
         return 0;
 
-    if ((nh->nh_flags & NH_FLAG_INDIRECT) && nh->nh_direct_nh) {
-        nh = nh->nh_direct_nh;
-        goto loop;
-    } else
+    if ((nh->nh_flags & NH_FLAG_INDIRECT) && nh->nh_direct_nh)
+        return nh_output(pkt, nh->nh_direct_nh, fmd);
+    else
         vr_pfree(pkt, VP_DROP_INVALID_NH);
 
     return 0;
-}
-
-int
-nh_output(struct vr_packet *pkt, struct vr_nexthop *nh,
-          struct vr_forwarding_md *fmd)
-{
-    return nh_output_inline(pkt, nh, fmd);
 }
 
 static nh_processing_t
