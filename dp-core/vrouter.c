@@ -39,6 +39,9 @@ extern unsigned int vr_bridge_entries;
 extern unsigned int vr_bridge_oentries;
 extern unsigned int vif_bridge_entries;
 extern unsigned int vif_bridge_oentries;
+extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int vr_pkt_droplog_buf_en;
+extern unsigned int vr_pkt_droplog_sysctl_en;
 extern const char *ContrailBuildInfo;
 
 void vrouter_exit(bool);
@@ -354,6 +357,8 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_mirror_entries = router->vr_max_mirror_indices;
     resp->vo_vif_bridge_entries = vif_bridge_entries;
     resp->vo_vif_oflow_bridge_entries = vif_bridge_oentries;
+    resp->vo_pkt_droplog_bufsz = vr_pkt_droplog_bufsz;
+    resp->vo_pkt_droplog_buf_en = vr_pkt_droplog_buf_en;
 
     /* Runtime parameters adjustable via sysctl or the vrouter utility */
     resp->vo_perfr = vr_perfr;
@@ -371,6 +376,8 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_flow_hold_limit = vr_flow_hold_limit;
     resp->vo_mudp = vr_mudp;
     resp->vo_packet_dump = 0;
+    resp->vo_pkt_droplog_en = vr_pkt_droplog_sysctl_en;
+    resp->vo_pkt_droplog_min_en = vr_pkt_droplog_min_sysctl_en;
     if(vr_get_dump_packets != NULL) {
         resp->vo_packet_dump = vr_get_dump_packets();
     }
