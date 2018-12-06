@@ -359,14 +359,18 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
     uint8_t is_gso_vm = 1;
     unsigned long stored_features = 0;
 
+    vr_uvhost_log("    SET FEATURES(original): 0x%"PRIx64"\n",
+                                            vru_cl->vruc_msg.u64);
+
     /* Load from cache only if mrgbuf is enabled */
-    if (dpdk_check_rx_mrgbuf_disable() == 0)
+    if ((dpdk_check_rx_mrgbuf_disable() == 0) &&
+        !(vru_cl->vruc_flags & VRUC_FLAG_SET_FEATURE_DONE))
         if (!vr_dpdk_load_persist_feature(uvhm_client_name(vru_cl),
                                           &stored_features)) {
             vru_cl->vruc_msg.u64 |= stored_features;
         }
 
-    vr_uvhost_log("    SET FEATURES: 0x%"PRIx64"\n",
+    vr_uvhost_log("    SET FEATURES( updated): 0x%"PRIx64"\n",
                                             vru_cl->vruc_msg.u64);
 
     vif = __vrouter_get_interface(vrouter_get(0), vru_cl->vruc_idx);
@@ -393,8 +397,11 @@ vr_uvmh_set_features(vr_uvh_client_t *vru_cl)
         vif->vif_flags &= ~VIF_FLAG_MRG_RXBUF;
         vr_dpdk_set_vhost_send_func(vru_cl->vruc_idx, 0);
     }
-    vr_dpdk_store_persist_feature(uvhm_client_name(vru_cl),
-                                  vru_cl->vruc_msg.u64);
+    /* Save to cache only if mrgbuf is enabled */
+    if (dpdk_check_rx_mrgbuf_disable() == 0)
+        vr_dpdk_store_persist_feature(uvhm_client_name(vru_cl),
+                                      vru_cl->vruc_msg.u64);
+    vru_cl->vruc_flags |= VRUC_FLAG_SET_FEATURE_DONE;
     return 0;
 }
 
@@ -1156,7 +1163,7 @@ vr_uvh_cl_timer_handler(int fd, void *arg)
 
     ret = connect(vru_cl->vruc_fd, (struct sockaddr *) &sun, sizeof(sun));
     if (ret == -1) {
-        vr_uvhost_log("    error connecting uvhost socket FD %d to %s:"
+        RTE_LOG_DP(DEBUG, UVHOST, "Error connecting uvhost socket FD %d to %s:"
                 " %s (%d)\n", vru_cl->vruc_fd, sun.sun_path, rte_strerror(errno), errno);
         ret = vr_uvh_cl_timer_setup(vru_cl);
     } else {
