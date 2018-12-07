@@ -22,6 +22,7 @@
 #include "vr_interface.h"
 #include "vr_packet.h"
 #include "vr_fragment.h"
+#include "vr_cpuid.h"
 
 #include <sys/queue.h>
 
@@ -962,6 +963,11 @@ uint16_t dpdk_ipv6_udptcp_cksum(struct rte_mbuf *m,
                        const struct ipv6_hdr *ipv6_hdr,
                        uint8_t *l4_hdr);
 int dpdk_check_rx_mrgbuf_disable(void);
+
+/*
+ * vr_dpdk_cpuflags.c
+ */
+void vr_dpdk_init_cpuid(struct vr_cpu_type_t *cpu);
 
 /*
  * Get bond interface port id by drv_name
