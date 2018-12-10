@@ -809,8 +809,8 @@ vr_bridge_learn(struct vrouter *router, struct vr_packet *pkt,
     return ml_res;
 }
 
-static inline struct vr_nexthop *
-vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
+unsigned int
+vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
     int reason, handled;
@@ -844,7 +844,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
             ml_res = vr_bridge_learn(router, pkt,
                     (struct vr_eth *)pkt_data(pkt), fmd);
             if (ml_res == MAC_TRAPPED)
-                return NULL;
+                return 0;
         }
     }
 
@@ -856,7 +856,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
         if (pull_len && !pkt_pull(pkt, pull_len)) {
             PKT_LOG(VP_DROP_PULL, pkt, 0, VR_BRIDGE_C, __LINE__);
             vr_pfree(pkt, VP_DROP_PULL);
-            return NULL;
+            return 0;
         }
     }
 
@@ -876,14 +876,14 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
             if (l4_type == L4_TYPE_DHCP_REQUEST) {
                 if (pkt->vp_if->vif_flags & VIF_FLAG_DHCP_ENABLED) {
                     vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return NULL;
+                    return 0;
                 }
             }
 
             if (l4_type == L4_TYPE_IGMP) {
                 if (pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED) {
                     vr_trap(pkt, fmd->fmd_dvrf,  AGENT_TRAP_L3_PROTOCOLS, NULL);
-                    return NULL;
+                    return 0;
                 }
             }
 
@@ -905,7 +905,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
                 }
 
                 if (handled)
-                    return NULL;
+                    return 0;
             }
         }
 
@@ -922,13 +922,13 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
             if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
                                  IS_MAC_BMCAST(dmac)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-                return NULL;
+                return 0;
             }
 
             be = bridge_lookup(vr_bcast_mac, fmd);
             if (!be || !(nh = be->be_nh)) {
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
-                return NULL;
+                return 0;
             }
             stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
             if (stats)
@@ -963,7 +963,7 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
             if ((reason = vr_pkt_from_vm_tcp_mss_adj(pkt, overlay_len))) {
                 PKT_LOG(reason, pkt, 0, VR_BRIDGE_C, __LINE__);
                 vr_pfree(pkt, reason);
-                return NULL;
+                return 0;
             }
         }
 
@@ -973,30 +973,17 @@ vr_bridge_input_inline(struct vrouter *router, struct vr_packet *pkt,
                 PKT_LOG(VP_DROP_NOWHERE_TO_GO, pkt, 0, VR_BRIDGE_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_NOWHERE_TO_GO);
             }
-            return NULL;
+            return 0;
         }
     }
 
     if (pull_len && !pkt_push(pkt, pull_len)) {
         PKT_LOG(VP_DROP_PUSH, pkt, 0, VR_BRIDGE_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PUSH);
-        return NULL;
+        return 0;
     }
 
-    return nh;
-}
-
-unsigned int
-vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
-                struct vr_forwarding_md *fmd)
-{
-    struct vr_nexthop *nh;
-
-    nh = vr_bridge_input_inline(router, pkt, fmd);
-
-    if (nh)
-        nh_output(pkt, nh, fmd);
-
+    nh_output(pkt, nh, fmd);
     return 0;
 }
 
