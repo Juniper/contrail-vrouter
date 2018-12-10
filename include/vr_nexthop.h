@@ -56,7 +56,7 @@ enum nexthop_type {
 #define NH_FLAG_RELAXED_POLICY              0x000100
 #define NH_FLAG_COMPOSITE_FABRIC            0x000200
 #define NH_FLAG_COMPOSITE_ECMP              0x000400
-/* 0x000800 is free */
+#define NH_FLAG_COMPOSITE_LU_ECMP           0x000800
 #define NH_FLAG_COMPOSITE_EVPN              0x001000
 #define NH_FLAG_COMPOSITE_ENCAP             0x002000
 #define NH_FLAG_COMPOSITE_TOR               0x004000
@@ -133,6 +133,15 @@ struct vr_nexthop {
             unsigned short  tun_dport;
             uint16_t        tun_encap_len;
         } nh_udp_tun;
+        
+        struct nh_mpls_o_mpls_tun_ {
+            unsigned int    tun_sip;
+            unsigned int    tun_dip;
+            unsigned short  tun_sport;
+            unsigned short  tun_dport;
+            uint16_t        tun_encap_len;
+            uint16_t        transport_label;
+        } nh_mpls_o_mpls_tun;
 
         struct {
             struct nh_udp_tun_ udp_tun;
@@ -188,6 +197,13 @@ struct vr_nexthop {
 #define nh_udp_tun_sport        nh_u.nh_udp_tun.tun_sport
 #define nh_udp_tun_dport        nh_u.nh_udp_tun.tun_dport
 #define nh_udp_tun_encap_len    nh_u.nh_udp_tun.tun_encap_len
+
+#define nh_mpls_o_mpls_tun_sip          nh_u.nh_mpls_o_mpls_tun.tun_sip
+#define nh_mpls_o_mpls_tun_dip          nh_u.nh_mpls_o_mpls_tun.tun_dip
+#define nh_mpls_o_mpls_tun_sport        nh_u.nh_mpls_o_mpls_tun.tun_sport
+#define nh_mpls_o_mpls_tun_dport        nh_u.nh_mpls_o_mpls_tun.tun_dport
+#define nh_mpls_o_mpls_tun_encap_len    nh_u.nh_mpls_o_mpls_tun.tun_encap_len
+#define nh_mpls_o_mpls_tun_label        nh_u.nh_mpls_o_mpls_tun.transport_label
 
 #define nh_udp_tun6_sip         nh_u.nh_udp_tun6.tun_sip6
 #define nh_udp_tun6_dip         nh_u.nh_udp_tun6.tun_dip6

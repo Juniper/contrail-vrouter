@@ -931,9 +931,15 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (!member_nh)
             goto drop;
     }
-
-    vr_fmd_set_label(fmd, nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh_label,
-            VR_LABEL_TYPE_UNKNOWN);
+    /*
+     * this composite nh does not have vpn mpls label which should be
+     * derived from routelook only, so not overriding label retrieved from
+     * route lookup for label unicast composite nh case
+     */
+    if (!(nh->nh_flags & NH_FLAG_COMPOSITE_LU_ECMP)) {
+        vr_fmd_set_label(fmd, nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh_label,
+               VR_LABEL_TYPE_UNKNOWN);
+    }
     nh_output(pkt, member_nh, fmd);
     return NH_PROCESSING_COMPLETE;
 
@@ -2294,6 +2300,154 @@ send_fail:
 
 }
 
+/*
+ * nh_mpls_over_mpls_udp_tunnel - tunnel packet with two MPLS label in UDP.
+ */
+static nh_processing_t
+nh_mpls_over_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
+                   struct vr_forwarding_md *fmd)
+{
+    unsigned int tun_sip, tun_dip, overhead_len, mudp_head_space;
+    uint16_t tun_encap_len, udp_src_port = VR_MPLS_OVER_UDP_SRC_PORT;
+    unsigned short reason = VP_DROP_PUSH;
+    uint16_t transport_label;
+
+    int tun_encap_rewrite;
+    struct vr_forwarding_class_qos *qos;
+    struct vr_interface *vif;
+    struct vr_vrf_stats *stats;
+    struct vr_packet *tmp_pkt;
+    struct vr_df_trap_arg trap_arg;
+
+    tun_sip = nh->nh_mpls_o_mpls_tun_sip;
+    tun_dip = nh->nh_mpls_o_mpls_tun_dip;
+    tun_encap_len = nh->nh_mpls_o_mpls_tun_encap_len;
+    transport_label = nh->nh_mpls_o_mpls_tun_label;
+
+    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    if (stats)
+        stats->vrf_udp_mpls_over_mpls_tunnels++;
+
+    if (!fmd || fmd->fmd_label < 0) {
+        vr_forward(nh->nh_router, pkt, fmd);
+        return NH_PROCESSING_COMPLETE;
+    }
+
+    vr_fmd_update_label_type(fmd, VR_LABEL_TYPE_MPLS);
+
+    if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, tun_dip))
+        return NH_PROCESSING_COMPLETE;
+
+    if (fmd->fmd_udp_src_port)
+        udp_src_port = fmd->fmd_udp_src_port;
+
+    /*
+     * The UDP source port is a hash of the inner IP src/dst address and
+     * vrf.
+     */
+    if ((!fmd->fmd_udp_src_port)  && vr_get_udp_src_port) {
+        udp_src_port = vr_get_udp_src_port(pkt, fmd, fmd->fmd_dvrf);
+        if (udp_src_port == 0) {
+            reason = VP_DROP_PULL;
+            goto send_fail;
+        }
+    }
+
+    /* Calculate the head space for  two mpls labels,udp ip and eth */
+    mudp_head_space = (2*VR_MPLS_HDR_LEN) + sizeof(struct vr_ip) + sizeof(struct vr_udp);
+    if (vr_fmd_l2_control_data_is_enabled(fmd))
+        mudp_head_space += VR_L2_CTRL_DATA_LEN;
+
+    if ((pkt->vp_type == VP_TYPE_IP) || (pkt->vp_type == VP_TYPE_IP6)) {
+        overhead_len = mudp_head_space;
+        if (vr_has_to_fragment(nh->nh_dev, pkt, overhead_len) &&
+                vr_ip_dont_fragment_set(pkt)) {
+            if (pkt->vp_flags & VP_FLAG_MULTICAST) {
+                reason = VP_DROP_MCAST_DF_BIT;
+                goto send_fail;
+            }
+            trap_arg.df_mtu = vif_get_mtu(nh->nh_dev) -
+                (overhead_len + pkt_get_network_header_off(pkt) - pkt->vp_data);
+            trap_arg.df_flow_index = fmd->fmd_flow_index;
+            vr_trap(pkt, fmd->fmd_dvrf, AGENT_TRAP_HANDLE_DF, (void *)&trap_arg);
+            return NH_PROCESSING_COMPLETE;
+        }
+    }
+
+    mudp_head_space += tun_encap_len;
+
+    if (pkt_head_space(pkt) < mudp_head_space) {
+        tmp_pkt = vr_pexpand_head(pkt, mudp_head_space - pkt_head_space(pkt));
+        if (!tmp_pkt)
+            goto send_fail;
+
+        pkt = tmp_pkt;
+    }
+
+    if (vr_fmd_l2_control_data_is_enabled(fmd)) {
+        if (!vr_l2_control_data_add(&pkt))
+            goto send_fail;
+    }
+
+    qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
+    /* insert inner label (VPN label) */
+    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos) < 0)
+        goto send_fail;
+    /* insert outer label (transport label) */
+    if (nh_push_mpls_header(pkt, transport_label, qos) < 0)
+        goto send_fail;
+
+    if (vr_perfs)
+        pkt->vp_flags |= VP_FLAG_GSO;
+
+
+    if (pkt->vp_type == VP_TYPE_IPOIP)
+        pkt->vp_type = VP_TYPE_IP;
+    else if (pkt->vp_type == VP_TYPE_IP6OIP)
+        pkt->vp_type = VP_TYPE_IP6;
+
+    /*
+     * Change the packet type
+     */
+    if (pkt->vp_type == VP_TYPE_IP6)
+        pkt->vp_type = VP_TYPE_IP6OIP;
+    else if (pkt->vp_type == VP_TYPE_IP)
+        pkt->vp_type = VP_TYPE_IPOIP;
+    else
+        pkt->vp_type = VP_TYPE_IP;
+
+    if (nh_udp_tunnel_helper(pkt, htons(udp_src_port),
+                             htons(VR_MPLS_OVER_UDP_DST_PORT),
+                             tun_sip, tun_dip, qos) == false) {
+        goto send_fail;
+    }
+
+    pkt_set_network_header(pkt, pkt->vp_data);
+
+    /* slap l2 header */
+    vif = nh->nh_dev;
+    if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
+        if (!nh->nh_crypt_dev) {
+            reason = VP_DROP_NO_CRYPT_PATH; 
+            goto send_fail;
+        }
+        vif = nh->nh_crypt_dev;
+    }
+    tun_encap_rewrite = vif->vif_set_rewrite(vif, &pkt, fmd,
+            nh->nh_data, tun_encap_len);
+    if (tun_encap_rewrite < 0) {
+        goto send_fail;
+    }
+
+    vif->vif_tx(vif, pkt, fmd);
+
+    return NH_PROCESSING_COMPLETE;
+
+send_fail:
+    vr_pfree(pkt, reason);
+    return NH_PROCESSING_COMPLETE;
+
+}
 static int
 nh_gre_tunnel_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
                            struct vr_forwarding_md *fmd, void *ret_data)
@@ -3152,6 +3306,10 @@ nh_tunnel_set_reach_nh(struct vr_nexthop *nh)
         }
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
         nh->nh_reach_nh = nh_pbb_tunnel;
+    } else if (nh->nh_flags & NH_FLAG_MPLS_O_MPLS) {
+        if (dev) {
+            nh->nh_reach_nh = nh_mpls_over_mpls_udp_tunnel;
+        }
     }
 
     return;
@@ -3286,6 +3444,18 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         if (vif) {
             vrouter_put_interface(vif);
         }
+    } else if (nh->nh_flags & NH_FLAG_MPLS_O_MPLS) {
+        if (!vif) {
+            ret = -ENODEV;
+            goto exit_add;
+        }
+
+        nh->nh_mpls_o_mpls_tun_sip = req->nhr_tun_sip;
+        nh->nh_mpls_o_mpls_tun_dip = req->nhr_tun_dip;
+        nh->nh_mpls_o_mpls_tun_encap_len = req->nhr_encap_size;
+        nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
+        nh->nh_dev = vif;
+        nh->nh_mpls_o_mpls_tun_label = req->nhr_transport_label;
     } else {
         /* Reference to VIf should be cleaned */
         if (vif)
