@@ -63,6 +63,7 @@ struct vr_vrf_stats {
     uint64_t vrf_arp_physical_flood;
     uint64_t vrf_uuc_floods;
     uint64_t vrf_pbb_tunnels;
+    uint64_t vrf_udp_mpls_over_mpls_tunnels;
 };
 
 struct vr_route {

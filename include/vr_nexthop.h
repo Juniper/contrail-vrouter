@@ -56,7 +56,7 @@ enum nexthop_type {
 #define NH_FLAG_RELAXED_POLICY              0x000100
 #define NH_FLAG_COMPOSITE_FABRIC            0x000200
 #define NH_FLAG_COMPOSITE_ECMP              0x000400
-/* 0x000800 is free */
+#define NH_FLAG_COMPOSITE_LU_ECMP           0x000800
 #define NH_FLAG_COMPOSITE_EVPN              0x001000
 #define NH_FLAG_COMPOSITE_ENCAP             0x002000
 #define NH_FLAG_COMPOSITE_TOR               0x004000
@@ -71,7 +71,7 @@ enum nexthop_type {
 #define NH_FLAG_L2_CONTROL_DATA             0x800000
 #define NH_FLAG_CRYPT_TRAFFIC               0x01000000
 #define NH_FLAG_L3_VXLAN                    0x02000000
-#define NH_FLAG_MPLS_O_MPLS                 0x04000000
+#define NH_FLAG_TUNNEL_MPLS_O_MPLS          0x04000000
 
 #define NH_SOURCE_INVALID                   0
 #define NH_SOURCE_VALID                     1
@@ -132,6 +132,7 @@ struct vr_nexthop {
             unsigned short  tun_sport;
             unsigned short  tun_dport;
             uint16_t        tun_encap_len;
+            uint16_t        transport_label;
         } nh_udp_tun;
 
         struct {
@@ -188,6 +189,7 @@ struct vr_nexthop {
 #define nh_udp_tun_sport        nh_u.nh_udp_tun.tun_sport
 #define nh_udp_tun_dport        nh_u.nh_udp_tun.tun_dport
 #define nh_udp_tun_encap_len    nh_u.nh_udp_tun.tun_encap_len
+#define nh_udp_tun_label        nh_u.nh_udp_tun.transport_label
 
 #define nh_udp_tun6_sip         nh_u.nh_udp_tun6.tun_sip6
 #define nh_udp_tun6_dip         nh_u.nh_udp_tun6.tun_dip6
