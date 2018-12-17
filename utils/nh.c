@@ -237,6 +237,9 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
         case NH_FLAG_CRYPT_TRAFFIC:
             strcat(ptr, "Encrypt Traffic, ");
             break;
+        case NH_FLAG_MPLS_O_MPLS:
+            strcat(ptr, "Mpls over Mpls, ");
+            break;
         }
     }
 
