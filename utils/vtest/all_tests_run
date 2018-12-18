@@ -23,7 +23,7 @@ DPDK_NETLINK_PORT="20914"
 ## Global vRouter/DPDK process ID.
 VROUTER_PID=""
 ## Global vRouter/DPDK startup timeout.
-VROUTER_TIMEOUT="5"
+VROUTER_TIMEOUT="10"
 ## Global build directory.
 BUILD_DIR="../../../build/debug"
 ## Global XML dir.
@@ -76,6 +76,16 @@ all_skip () {
     exit 0
 }
 
+_is_vrouter_dpdk_running() {
+    # check for NetLink TCP socket
+    #lsof -ni:${DPDK_NETLINK_TCP_PORT} -sTCP:LISTEN > /dev/null
+
+    # check for netlink uds socket usage
+    ret=`lsof ${BUILD_DIR}${VROUTER_SOCKETS}/dpdk_netlink | wc -l`
+    test ! $ret -eq 0
+    return $?
+}
+
 vrouter_run () {
     if [ -z "${1}" ]; then
         local vr_args="${VROUTER_DEF_ARGS}"
@@ -103,7 +113,8 @@ vrouter_run () {
     ## Wait for vRouter to start...
     _count=1
     sleep 1
-    while ! lsof -ni:${DPDK_NETLINK_PORT} -sTCP:LISTEN > /dev/null; do
+    while ! _is_vrouter_dpdk_running
+    do
         _count=$((${_count} + 1))
         if [ ${_count} -gt ${VROUTER_TIMEOUT} ]; then
             log "Error waiting for vRouter to start"

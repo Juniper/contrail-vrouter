@@ -36,7 +36,8 @@ env.Alias('install',
            env.InstallAs(env['INSTALL_SYSTEMD'] + '/contrail-vrouter-dpdk.service',
            '#/vrouter/systemd/contrail-vrouter-dpdk.service'))
 
-# Uncomment below lines to run unit tests
+# Comment the following lines till UT end if the build system doesnt have SSE3
+# TODO: Add libpcap-devel, libpcap to buildRequires in spec before enabling this.
 #vtest = Command(target = "all_tests.log",
 #                source = "../utils/vtest/vtest",
 #                action =
@@ -46,6 +47,7 @@ env.Alias('install',
 #                        + " -l $TARGET"
 #                )
 #Depends(vtest, dpdk_vrouter)
+# UT end 
 
 
 # Local Variables:
