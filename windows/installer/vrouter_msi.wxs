@@ -1,4 +1,9 @@
 <?xml version="1.0"?>
+<!--
+    vrouter_msi.wxs
+
+    Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
+-->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product Id="CB877445-6E69-4BA8-9C8F-DDA1C92539B3" UpgradeCode="54C1DE83-002C-4040-B6C6-93C649CF3BBA" Name="vRouter" Version="1.0.0" Manufacturer="Juniper Networks" Language="1033">
         <Package InstallerVersion="200" Compressed="yes" Comments="Windows Installer Package" Platform="x64"/>

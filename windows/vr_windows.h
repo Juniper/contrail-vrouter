@@ -77,6 +77,7 @@ typedef struct _VR_BASIC_NIC_ENTRY
     NDIS_SWITCH_NIC_INDEX   NicIndex;
 } VR_BASIC_NIC_ENTRY, *PVR_BASIC_NIC_ENTRY;
 extern VR_BASIC_NIC_ENTRY ExternalNicEntry, VhostNicEntry;
+VOID BasicNicsClean(void);
 NDIS_STATUS HandleBasicNics(PSWITCH_OBJECT SwitchObject);
 VOID HandleBasicNic(PNDIS_SWITCH_NIC_PARAMETERS NicParams);
 

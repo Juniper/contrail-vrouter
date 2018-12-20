@@ -237,6 +237,8 @@ InitializeVRouter(pvr_switch_context ctx)
     /* Before any initialization happens, clean the shared memory tables */
     ShmemClean();
 
+    BasicNicsClean();
+
     ctx->ksync_up = NT_SUCCESS(KsyncCreateDevice(VrDriverHandle));
     if (!ctx->ksync_up)
         goto cleanup;
@@ -507,6 +509,13 @@ FilterNetPnpEvent(
     }
 
     return NdisFNetPnPEvent(switchObject->NdisFilterHandle, NetPnPEventNotification);
+}
+
+VOID
+BasicNicsClean(void)
+{
+    ExternalNicEntry.IsConnected = FALSE;
+    VhostNicEntry.IsConnected = FALSE;
 }
 
 NDIS_STATUS
