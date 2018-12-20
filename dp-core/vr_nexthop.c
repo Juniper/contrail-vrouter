@@ -938,9 +938,15 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
         if (!member_nh)
             goto drop;
     }
-
-    vr_fmd_set_label(fmd, nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh_label,
-            VR_LABEL_TYPE_UNKNOWN);
+    /*
+     * this composite nh does not have vpn mpls label which should be
+     * derived from routelook only, so not overriding label retrieved from
+     * route lookup for label unicast composite nh case
+     */
+    if (!(nh->nh_flags & NH_FLAG_COMPOSITE_LU_ECMP)) {
+        vr_fmd_set_label(fmd, nh->nh_component_nh[fmd->fmd_ecmp_nh_index].cnh_label,
+               VR_LABEL_TYPE_UNKNOWN);
+    }
     nh_output(pkt, member_nh, fmd);
     return NH_PROCESSING_COMPLETE;
 
@@ -2205,6 +2211,8 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_vrf_stats *stats;
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
+    unsigned int label_count = 0;
+    uint16_t transport_label = 0;
 
     /*
      * If we are testing MPLS over UDP using the vr_mudp sysctl, use the
@@ -2219,11 +2227,17 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         tun_sip = nh->nh_udp_tun_sip;
         tun_dip = nh->nh_udp_tun_dip;
         tun_encap_len = nh->nh_udp_tun_encap_len;
+        transport_label = nh->nh_udp_tun_label;
     }
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
-    if (stats)
-        stats->vrf_udp_mpls_tunnels++;
+    if (stats) {
+        if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+            stats->vrf_udp_mpls_over_mpls_tunnels++;
+        } else {
+            stats->vrf_udp_mpls_tunnels++;
+        }
+    }
 
     if (!fmd || fmd->fmd_label < 0) {
         vr_forward(nh->nh_router, pkt, fmd);
@@ -2251,8 +2265,14 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         }
     }
 
+    if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+        label_count = 2;
+    } else {
+        label_count = 1;
+    }
     /* Calculate the head space for mpls,udp ip and eth */
-    mudp_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) + sizeof(struct vr_udp);
+    mudp_head_space = (label_count*VR_MPLS_HDR_LEN) +
+                sizeof(struct vr_ip) + sizeof(struct vr_udp);
     if (vr_fmd_l2_control_data_is_enabled(fmd))
         mudp_head_space += VR_L2_CTRL_DATA_LEN;
 
@@ -2291,6 +2311,12 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
     if (nh_push_mpls_header(pkt, fmd->fmd_label, qos) < 0)
         goto send_fail;
+    if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+        /* insert outer label (transport label) */
+        if (nh_push_mpls_header(pkt, transport_label, qos) < 0)
+            goto send_fail;
+    }
+
 
     if (vr_perfs)
         pkt->vp_flags |= VP_FLAG_GSO;
@@ -3209,6 +3235,10 @@ nh_tunnel_set_reach_nh(struct vr_nexthop *nh)
         }
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
         nh->nh_reach_nh = nh_pbb_tunnel;
+    } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+        if (dev) {
+            nh->nh_reach_nh = nh_mpls_udp_tunnel;
+        }
     }
 
     return;
@@ -3343,6 +3373,18 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         if (vif) {
             vrouter_put_interface(vif);
         }
+    } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+        if (!vif) {
+            ret = -ENODEV;
+            goto exit_add;
+        }
+
+        nh->nh_udp_tun_sip = req->nhr_tun_sip;
+        nh->nh_udp_tun_dip = req->nhr_tun_dip;
+        nh->nh_udp_tun_encap_len = req->nhr_encap_size;
+        nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
+        nh->nh_dev = vif;
+        nh->nh_udp_tun_label = req->nhr_transport_label;
     } else {
         /* Reference to VIf should be cleaned */
         if (vif)
