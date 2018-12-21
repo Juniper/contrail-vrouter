@@ -157,6 +157,7 @@ if sys.platform.startswith('freebsd'):
 if not sys.platform.startswith('win'):
     default_kernel_ver = shellCommand("uname -r").strip()
     kernel_build_dir = None
+
     (PLATFORM, VERSION, EXTRA) = platform.linux_distribution()
     if (PLATFORM.lower() == 'ubuntu' and VERSION.find('14.') == 0):
         if re.search('^4\.', default_kernel_ver):
@@ -170,11 +171,12 @@ if not sys.platform.startswith('win'):
                 kernel_build_dir = '/lib/modules/%s/build' % default_kernel_ver
 
     kernel_dir = GetOption('kernel-dir')
-    if kernel_dir:
+    if os.path.isdir(kernel_dir) and not kernel_build_dir:
         kern_version = shellCommand('cat %s/include/config/kernel.release' % kernel_dir)
     else:
         kern_version = default_kernel_ver
-        if kernel_build_dir: kernel_dir = kernel_build_dir
+        kernel_dir = kernel_build_dir
+
     kern_version = kern_version.strip()
 
 if sys.platform != 'darwin':
@@ -324,9 +326,9 @@ if sys.platform != 'darwin':
             + ' '
 
         # If this var is set, then we need to pass it to make cmd for libdpdk
-        if kernel_build_dir:
-            print("info: Adjusting libdpdk build to use RTE_KERNELDIR=%s" % kernel_build_dir)
-            make_cmd += "RTE_KERNELDIR=%s " % kernel_build_dir
+        if kernel_dir:
+            print("info: Adjusting libdpdk build to use RTE_KERNELDIR=%s" % kernel_dir)
+            make_cmd += "RTE_KERNELDIR=%s " % kernel_dir
 
         dpdk_lib = env.Command('dpdk_lib', None,
             make_cmd + 'config T=' + DPDK_TARGET
