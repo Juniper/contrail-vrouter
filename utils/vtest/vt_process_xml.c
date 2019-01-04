@@ -173,6 +173,7 @@ vt_post_process_message(struct vtest *test) {
         test->message_ptr_num++;
     }
 
+    test->message_ptr_num = test->message_ptr_start;
     return E_MAIN_OK;
 }
 
