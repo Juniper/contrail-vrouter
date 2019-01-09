@@ -538,8 +538,24 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
     struct ip_bucket_entry *tmp_ent;
     struct mtrie_bkt_info *ip_bkt_info = ip_bkt_info_get(rt->rtr_req.rtr_family);
 
-    if (!ENTRY_IS_BUCKET(ent))
-        return -ENOENT;
+    if (!ENTRY_IS_BUCKET(ent)) {
+        /* Cleanup the entry as it is valid */
+        if (ent->entry_prefix_len == rt->rtr_req.rtr_prefix_len) {
+            ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
+            ent->entry_label = rt->rtr_req.rtr_label;
+            ent->entry_prefix_len = rt->rtr_req.rtr_replace_plen;
+
+            if (ENTRY_IS_NEXTHOP(ent)) {
+                set_entry_to_nh(ent, rt->rtr_nh);
+            } else {
+                set_entry_to_vdata(ent, (void *)rt->rtr_nh);
+            }
+            ent->entry_bridge_index = rt->rtr_req.rtr_index;
+            return 0;
+        } else {
+            return -ENOENT;
+        }
+    }
 
     bkt = entry_to_bucket(ent);
     index = rt_to_index(rt, level);
