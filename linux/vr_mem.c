@@ -5,6 +5,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <linux/init.h>
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -22,10 +23,18 @@ short vr_flow_major = -1;
 static dev_t mem_dev;
 struct cdev *mem_cdev;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0))
 static int
 mem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
     struct vrouter *router = (struct vrouter *)vma->vm_private_data;
+#else
+static int
+mem_fault(struct vm_fault *vmf)
+{
+    struct vrouter *router =
+        (struct vrouter *)vmf->vma->vm_private_data;
+#endif /*KERNEL_4.11*/
     struct page *page;
     pgoff_t offset;
 
