@@ -36,6 +36,11 @@
 #define vr_sync_lock_test_and_set_p(a, b)               __sync_lock_test_and_set((a), (b))
 #define vr_sync_synchronize                             __sync_synchronize
 #define vr_ffs_32(a)                                    __builtin_ffs(a)
+#define vr_likely(a)                                    __builtin_expect(!!(a), 1)
+#define vr_unlikely(a)                                  __builtin_expect(!!(a), 0)
+#else
+#define vr_likely(a)                                    (a)
+#define vr_unlikely(a)                                  (a)
 #endif
 
 #if defined(__linux__)
