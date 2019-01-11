@@ -29,10 +29,10 @@ typedef void (*htable_trav_cb)(vr_htable_t , vr_hentry_t *, unsigned int,
 
 vr_htable_t vr_htable_create(struct vrouter *, unsigned int , unsigned int,
                                 unsigned int , unsigned int , unsigned int,
-                                get_hentry_key);
+                                get_hentry_key, int);
 vr_htable_t vr_htable_attach(struct vrouter *, unsigned int, void *,
         unsigned int, void *, unsigned int , unsigned int ,
-        unsigned int , get_hentry_key);
+        unsigned int , get_hentry_key, int);
 
 unsigned int vr_htable_used_oflow_entries(vr_htable_t);
 unsigned int vr_htable_used_total_entries(vr_htable_t);
@@ -49,5 +49,8 @@ void vr_htable_reset(vr_htable_t, htable_trav_cb , void *);
 void vr_htable_release_hentry(vr_htable_t, vr_hentry_t *);
 unsigned int vr_htable_size(vr_htable_t);
 void *vr_htable_get_address(vr_htable_t, uint64_t);
+void
+vr_htable_set_signature(vr_htable_t htable, vr_hentry_t *ent,
+                                        void *key, unsigned int key_size);
 
 #endif

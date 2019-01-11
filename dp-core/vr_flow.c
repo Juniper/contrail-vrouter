@@ -534,6 +534,8 @@ vr_flow_get_free_entry(struct vrouter *router, struct vr_flow *key, uint8_t type
 
         fe->fe_type = type;
         memcpy(&fe->fe_key, key, key->flow_key_len);
+        vr_htable_set_signature(router->vr_flow_table, (vr_hentry_t *)fe,
+                                                 key, key->flow_key_len);
         fe->fe_key.flow_key_len = key->flow_key_len;
     }
 
@@ -2690,7 +2692,7 @@ vr_flow_table_init(struct vrouter *router)
 
         router->vr_flow_table = vr_htable_attach(router, vr_flow_entries,
                 vr_flow_table, vr_oflow_entries, vr_oflow_table,
-                sizeof(struct vr_flow_entry), 0, 0, vr_flow_get_key);
+                sizeof(struct vr_flow_entry), 0, 0, vr_flow_get_key, 1);
 
         if (!router->vr_flow_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__,

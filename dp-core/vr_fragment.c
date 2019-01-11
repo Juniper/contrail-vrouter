@@ -829,7 +829,7 @@ vr_fragment_table_init(struct vrouter *router)
         router->vr_fragment_table = vr_htable_create(router,
                 FRAG_TABLE_ENTRIES, FRAG_OTABLE_ENTRIES,
                 sizeof(struct vr_fragment), sizeof(struct vr_fragment_key),
-                FRAG_TABLE_BUCKETS, vr_fragment_get_entry_key);
+                FRAG_TABLE_BUCKETS, vr_fragment_get_entry_key, 0);
         if (!router->vr_fragment_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
                     FRAG_TABLE_ENTRIES + FRAG_OTABLE_ENTRIES);

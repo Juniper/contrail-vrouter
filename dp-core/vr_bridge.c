@@ -653,7 +653,7 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     rtable->algo_data = vr_htable_attach(vrouter_get(0), vr_bridge_entries,
                 vr_bridge_table, vr_bridge_oentries, vr_bridge_otable,
                 sizeof(struct vr_bridge_entry),
-                sizeof(struct vr_bridge_entry_key), 0, bridge_entry_key);
+                sizeof(struct vr_bridge_entry_key), 0, bridge_entry_key, 0);
 
     if (!rtable->algo_data)
         return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,

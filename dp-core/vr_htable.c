@@ -8,7 +8,7 @@
 #include <vr_hash.h>
 #include <vrouter.h>
 
-#define VR_HENTRIES_PER_BUCKET 4
+#define VR_HENTRIES_PER_BUCKET 8
 
 #define VR_HENTRY_FLAG_VALID             0x1
 #define VR_HENTRY_FLAG_DELETE_MARKED     0x2
@@ -25,6 +25,8 @@ struct vr_htable {
     unsigned int ht_entry_size;
     unsigned int ht_key_size;
     unsigned int ht_bucket_size;
+    uint32_t *ht_sig_table;
+    uint32_t ht_use_sig;
     struct vr_btable *ht_htable;
     struct vr_btable *ht_otable;
     struct vr_btable *ht_dtable;
@@ -415,6 +417,27 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     return;
 }
 
+void
+vr_htable_set_signature(vr_htable_t htable, vr_hentry_t *ent,
+                                        void *key, unsigned int key_size)
+{
+    uint32_t hash;
+    struct vr_htable *table = (struct vr_htable *)htable;
+
+    if (!key_size) {
+        key_size = table->ht_key_size;
+        if (!key_size) {
+            table->ht_sig_table[ent->hentry_index] = 0;
+            return;
+        }
+    }
+
+    if (ent->hentry_index >= table->ht_hentries)
+        return;
+    hash = vr_hash(key, key_size, 0);
+    table->ht_sig_table[ent->hentry_index] = hash;
+}
+
 vr_hentry_t *
 vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
 {
@@ -584,9 +607,12 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
     /* Look into the hash table from hash*/
     tmp_hash = hash % table->ht_hentries;
     tmp_hash &= ~(table->ht_bucket_size - 1);
+    ind = tmp_hash;
     for (i = 0; i < table->ht_bucket_size; i++) {
 
         ind = tmp_hash + i;
+        if(vr_unlikely(table->ht_use_sig && (table->ht_sig_table[ind] != hash)))
+             continue;
 
         ent = vr_btable_get(table->ht_htable, ind);
         if (!(ent->hentry_flags & VR_HENTRY_FLAG_VALID))
@@ -599,6 +625,8 @@ vr_htable_find_hentry(vr_htable_t htable, void *key, unsigned int key_len)
         if (memcmp(ent_key, key, key_len) == 0)
             return ent;
     }
+
+    ent = vr_btable_get(table->ht_htable, ind);
 
     for (o_ent = ent->hentry_next; o_ent; o_ent = o_ent->hentry_next) {
 
@@ -676,7 +704,8 @@ vr_htable_t
 __vr_htable_create(struct vrouter *router, unsigned int entries,
         void *htable, unsigned int oentries, void *otable,
         unsigned int entry_size, unsigned int key_size,
-        unsigned int bucket_size, get_hentry_key get_entry_key)
+        unsigned int bucket_size, get_hentry_key get_entry_key,
+        unsigned int use_sig)
 {
     int i;
     struct vr_htable *table;
@@ -761,6 +790,14 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
         prev = ent;
     }
 
+    if (use_sig) {
+        table->ht_sig_table = vr_zalloc(sizeof(uint32_t) * entries, VR_HTABLE_OBJECT);
+        if (!table->ht_sig_table) {
+            vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, entries);
+            goto exit;
+        }
+    }
+
     table->ht_hentries = entries;
     table->ht_oentries = oentries;
     table->ht_entry_size = entry_size;
@@ -769,6 +806,7 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
     table->ht_bucket_size = bucket_size;
     table->ht_router = router;
     table->ht_used_oentries = 0;
+    table->ht_use_sig = use_sig;
 
     return (vr_htable_t)table;
 
@@ -782,14 +820,14 @@ vr_htable_t
 vr_htable_attach(struct vrouter *router, unsigned int entries,
         void *htable, unsigned int oentries, void *otable,
         unsigned int entry_size, unsigned int key_size,
-        unsigned int bucket_size, get_hentry_key get_entry_key)
+        unsigned int bucket_size, get_hentry_key get_entry_key, int use_sig)
 {
     if (!entries || (otable && !oentries)) {
         return NULL;
     }
 
     return __vr_htable_create(router, entries, htable, oentries, otable,
-            entry_size, key_size, bucket_size, get_entry_key);
+            entry_size, key_size, bucket_size, get_entry_key, use_sig);
 }
 
 void
@@ -809,6 +847,9 @@ vr_htable_delete(vr_htable_t htable)
     if (table->ht_dtable)
         vr_btable_free(table->ht_dtable);
 
+    if(table->ht_use_sig) {
+        vr_free(table->ht_sig_table, VR_HTABLE_OBJECT);
+    }
     vr_free(table, VR_HTABLE_OBJECT);
 
     return;
@@ -817,8 +858,8 @@ vr_htable_delete(vr_htable_t htable)
 vr_htable_t
 vr_htable_create(struct vrouter *router, unsigned int entries,
         unsigned int oentries, unsigned int entry_size, unsigned int key_size,
-        unsigned int bucket_size, get_hentry_key get_entry_key)
+        unsigned int bucket_size, get_hentry_key get_entry_key, int use_sig)
 {
     return __vr_htable_create(router, entries, NULL, oentries, NULL,
-            entry_size, key_size, bucket_size, get_entry_key);
+            entry_size, key_size, bucket_size, get_entry_key, use_sig);
 }

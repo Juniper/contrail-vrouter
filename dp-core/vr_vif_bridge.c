@@ -183,7 +183,7 @@ vif_bridge_init(struct vr_interface *vif)
 
     vif->vif_btable = vr_htable_create(vrouter_get(0), vif_bridge_entries,
             vif_bridge_oentries, sizeof(struct vif_bridge_entry),
-            sizeof(struct vif_bridge_key), 0, vif_bridge_get_key);
+            sizeof(struct vif_bridge_key), 0, vif_bridge_get_key, 0);
 
     if (!vif->vif_btable)
         return -ENOMEM;
