@@ -4659,6 +4659,13 @@ vif_fat_flow_lookup(int incoming_vif, struct vr_interface *vif, uint8_t proto,
         return fat_flow_mask;
 
     if (proto_index == VIF_FAT_FLOW_NOPROTO_INDEX) {
+        /*
+         * Both ICMPv6 and ICMP rules are stored with proto 1,
+         * hence override in case of ICMPv6
+         */
+        if (proto == VR_IP_PROTO_ICMP6) {
+            proto = VR_IP_PROTO_ICMP;
+        }
         h_sport = h_dport = proto;
     } else {
         h_sport = ntohs(sport);
