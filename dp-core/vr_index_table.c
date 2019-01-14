@@ -157,49 +157,29 @@ static void
 __vr_itable_exit(struct vr_itbl *table, vr_itable_del_cb_t func,
                         void **ptr, unsigned int cnt, unsigned int index)
 {
-    unsigned int i, j;
+    unsigned int i;
 
-    if (!ptr || cnt >= table->stride_cnt) {
-        return;
-    }
-
-    if (cnt == table->stride_cnt - 1) {
-
-        /* This handles the last stride which contain elements*/
-        for (j = 0; j < table->stride_len[cnt]; j++) {
-            if (ptr[j]) {
-
-                /* Call the user function which might cleanup index entry */
-                if (func) {
-                    func((index | (j << table->stride_shift[cnt])), ptr[j]);
-                }
-                ptr[j] = NULL;
-            }
-        }
-
-        /* All stride entries are delete invoked. Delete the stride now */
-        vr_free(ptr, VR_ITABLE_OBJECT);
+    if (!ptr) {
         return;
     }
 
     for (i = 0; i < table->stride_len[cnt]; i++) {
         if (ptr[i]) {
-            __vr_itable_exit(table, func, (void **)ptr[i], (cnt + 1),
+            if (cnt == table->stride_cnt - 1) {
+                /* Call the user function which might cleanup index entry */
+                if (func) {
+                    func((index | (i << table->stride_shift[cnt])), ptr[i]);
+                }
+            } else {
+                __vr_itable_exit(table, func, (void **)ptr[i], (cnt + 1),
                     (index | (i << table->stride_shift[cnt])));
-
-            /* Upper strides are deleted. Delete the current */
+            }
             ptr[i] = NULL;
-            vr_free(ptr[i], VR_ITABLE_OBJECT);
         }
     }
 
-    /* Destruct the head as well*/
-    if (cnt == 0) {
-        vr_free(table->data, VR_ITABLE_OBJECT);
-        table->data = NULL;
-    }
-
-    return;
+    /* Free the current node */
+    vr_free(ptr, VR_ITABLE_OBJECT);
 }
 
 void
