@@ -38,16 +38,19 @@ env.Alias('install',
 
 # Comment the following lines till UT end if the build system doesnt have SSE3
 # TODO: Add libpcap-devel, libpcap to buildRequires in spec before enabling this.
-#vtest = Command(target = "all_tests.log",
-#                source = "../utils/vtest/vtest",
-#                action =
-#                    "./vrouter/utils/vtest/all_tests_run"
-#                        + " -b " + Dir(env['TOP']).abspath
-#                        + " -x vrouter/utils/vtest/tests"
-#                        + " -l $TARGET"
-#                )
-#Depends(vtest, dpdk_vrouter)
-# UT end 
+if 'vrouter-ut' in COMMAND_LINE_TARGETS:
+    vtest = env.Command(target = "all_tests.log",
+                source = "../utils/vtest/vtest",
+                action =
+                    "./vrouter/utils/vtest/all_tests_run"
+                        + " -b " + Dir(env['TOP']).abspath
+                        + " -x vrouter/utils/vtest/tests"
+                        + " -l $TARGET"
+                )
+    env.Alias('vrouter-ut', vtest)
+    env.Requires(vtest, dpdk_vrouter)
+
+# UT end
 
 
 # Local Variables:
