@@ -401,14 +401,6 @@ dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     struct vr_nexthop *nh;
     struct vr_gro *gro;
 
-    if (vif) {
-        struct vr_interface_stats *gro_vif_stats;
-        gro_vif_stats = vif_get_stats(vif, vr_get_cpu());
-        if (gro_vif_stats) {
-            gro_vif_stats->vis_opackets++;
-            gro_vif_stats->vis_obytes += pkt_len(pkt);
-        }
-    }
 
     /* Normal processing for VMs if -
      * => They dont require GRO (like DPDK VM's)
@@ -690,6 +682,14 @@ create:
         }
     }
 
+    if (vif) {
+        struct vr_interface_stats *gro_vif_stats;
+        gro_vif_stats = vif_get_stats(vif, vr_get_cpu());
+        if (gro_vif_stats) {
+            gro_vif_stats->vis_opackets++;
+            gro_vif_stats->vis_obytes += pkt_len(pkt);
+        }
+    }
 func_exit:
     if (ret != GRO_MERGED) {
         pkt_push(pkt, sizeof(struct vr_gro));
