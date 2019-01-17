@@ -247,7 +247,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
             return 0;
         }
 
-        ttl = vr_ip_decrement_ttl(ip);
+        ttl = ip->ip_ttl;
         pkt->vp_type = VP_TYPE_IP;
     } else {
         PKT_LOG(VP_DROP_INVALID_PROTOCOL, pkt, 0, VR_PROTO_IP_C, __LINE__);
@@ -281,6 +281,17 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
         }
         vr_fmd_set_label(fmd, rt.rtr_req.rtr_label,
                 VR_LABEL_TYPE_UNKNOWN);
+    }
+
+    /*
+     * Do not decrement TTL if next nh is VRF Translate and family is INET,
+     * since we will again do another route lookup & forward (by calling
+     * vr_forward) and would end up decrementing TTL 2 times
+     */
+    if (vr_ip_is_ip4(ip)) {
+        if ((nh->nh_type != NH_VRF_TRANSLATE) || (nh->nh_family != AF_INET)) {
+            pkt->vp_ttl = vr_ip_decrement_ttl(ip);
+        }
     }
 
     return nh_output(pkt, nh, fmd);
