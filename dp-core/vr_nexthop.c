@@ -2058,7 +2058,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
-        stats->vrf_udp_mpls_tunnels++;
+        stats->vrf_vxlan_tunnels++;
 
     if (nh_tunnel_loop_detect_handle(pkt, nh, fmd, nh->nh_vxlan_tun_dip))
         return NH_PROCESSING_COMPLETE;
