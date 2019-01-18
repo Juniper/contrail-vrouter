@@ -1708,6 +1708,12 @@ lh_pull_inner_headers(struct vr_packet *pkt,
     if (mpls_pkt) {
         label = ntohl(*(uint32_t *)(skb->head + pkt->vp_data + hdr_len));
         hoff = pkt->vp_data + hdr_len + VR_MPLS_HDR_LEN;
+        if (!(label & VR_MPLS_LABEL_STACK_BIT_MASK)
+                && ((label >> VR_MPLS_LABEL_SHIFT) == VR_MPLS_LABEL_MASK)) {
+            label = ntohl(*(uint32_t *)(skb->head + pkt->vp_data +
+                                hdr_len + VR_MPLS_HDR_LEN));
+            hoff += VR_MPLS_HDR_LEN;
+        }
         control_data = *(uint32_t *)(skb->head + hoff);
 
         if (!tunnel_type_cb) {

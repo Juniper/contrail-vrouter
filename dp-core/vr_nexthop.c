@@ -70,7 +70,6 @@ __vrouter_set_nexthop(struct vrouter *router, unsigned int index,
         return -EINVAL;
 
     *nh_p = nh;
-
     return 0;
 }
 
@@ -422,11 +421,12 @@ nh_l3_rcv(struct vr_packet *pkt, struct vr_nexthop *nh,
 
 static int
 nh_push_mpls_header(struct vr_packet *pkt, unsigned int label,
-        struct vr_forwarding_class_qos *qos)
+        struct vr_forwarding_class_qos *qos, bool is_bottom_label)
 {
     uint32_t exp_qos = 0;
     unsigned int *lbl;
     unsigned int ttl;
+    unsigned int label_pos = 0;
 
     lbl = (unsigned int *)pkt_push(pkt, sizeof(unsigned int));
     if (!lbl)
@@ -443,9 +443,11 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label,
         exp_qos = qos->vfcq_mpls_qos;
         exp_qos <<= VR_MPLS_EXP_QOS_SHIFT;
     }
-
+    if (is_bottom_label) {
+	label_pos = 1;
+    }
     *lbl = htonl((label << VR_MPLS_LABEL_SHIFT) | exp_qos |
-            VR_MPLS_STACK_BIT | ttl);
+            (label_pos << 8) | ttl);
 
     return 0;
 }
@@ -2212,7 +2214,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
     unsigned int label_count = 0;
-    uint16_t transport_label = 0;
+    uint32_t transport_label = 0;
 
     /*
      * If we are testing MPLS over UDP using the vr_mudp sysctl, use the
@@ -2309,11 +2311,11 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos) < 0)
+    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos, true) < 0)
         goto send_fail;
     if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
         /* insert outer label (transport label) */
-        if (nh_push_mpls_header(pkt, transport_label, qos) < 0)
+        if (nh_push_mpls_header(pkt, transport_label, qos, false) < 0)
             goto send_fail;
     }
 
@@ -2397,14 +2399,20 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_vrf_stats *stats;
     struct vr_packet *tmp_pkt;
     struct vr_df_trap_arg trap_arg;
+    unsigned int label_count = 0;
 
     if (vr_mudp && vr_perfs) {
         return nh_mpls_udp_tunnel(pkt, nh, fmd);
     }
 
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
-    if (stats)
-        stats->vrf_gre_mpls_tunnels++;
+    if (stats) {
+        if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+            stats->vrf_udp_mpls_over_mpls_tunnels++;
+        } else {
+            stats->vrf_gre_mpls_tunnels++;
+        }
+    }
 
     /*
      * When the packet encounters a tunnel nexthop with policy enabled,
@@ -2438,8 +2446,13 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         id = htons(vr_generate_unique_ip_id());
     }
 
+    if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+        label_count = 2;
+    } else {
+        label_count = 1;
+    }
 
-    gre_head_space = VR_MPLS_HDR_LEN + sizeof(struct vr_ip) +
+    gre_head_space = (label_count *VR_MPLS_HDR_LEN) + sizeof(struct vr_ip) +
         sizeof(struct vr_gre);
     if (vr_fmd_l2_control_data_is_enabled(fmd))
         gre_head_space += VR_L2_CTRL_DATA_LEN;
@@ -2484,8 +2497,13 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     qos = vr_qos_get_forwarding_class(nh->nh_router, pkt, fmd);
-    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos) < 0)
+    if (nh_push_mpls_header(pkt, fmd->fmd_label, qos, true) < 0)
         goto send_fail;
+    if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+        /* insert outer label (transport label) */
+        if (nh_push_mpls_header(pkt, nh->nh_gre_tun_label, qos, false) < 0)
+            goto send_fail;
+    }
 
     gre_hdr = (struct vr_gre *)pkt_push(pkt, sizeof(struct vr_gre));
     if (!gre_hdr) {
@@ -3237,7 +3255,7 @@ nh_tunnel_set_reach_nh(struct vr_nexthop *nh)
         nh->nh_reach_nh = nh_pbb_tunnel;
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
         if (dev) {
-            nh->nh_reach_nh = nh_mpls_udp_tunnel;
+            nh->nh_reach_nh = nh_gre_tunnel;
         }
     }
 
@@ -3378,13 +3396,12 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
             ret = -ENODEV;
             goto exit_add;
         }
-
-        nh->nh_udp_tun_sip = req->nhr_tun_sip;
-        nh->nh_udp_tun_dip = req->nhr_tun_dip;
-        nh->nh_udp_tun_encap_len = req->nhr_encap_size;
-        nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
+        nh->nh_gre_tun_sip = req->nhr_tun_sip;
+        nh->nh_gre_tun_dip = req->nhr_tun_dip;
+        nh->nh_gre_tun_encap_len = req->nhr_encap_size;
+        nh->nh_validate_src = nh_gre_tunnel_validate_src;
         nh->nh_dev = vif;
-        nh->nh_udp_tun_label = req->nhr_transport_label;
+        nh->nh_gre_tun_label = req->nhr_transport_label;
     } else {
         /* Reference to VIf should be cleaned */
         if (vif)
@@ -3637,7 +3654,6 @@ vr_nexthop_add(vr_nexthop_req *req)
             if (ret)
                 goto error;
         }
-
         switch (nh->nh_type) {
         case NH_ENCAP:
             ret = nh_encap_add(nh, req);
@@ -3695,7 +3711,7 @@ error:
         nh->nh_flags |= NH_FLAG_VALID;
 
     ret = vrouter_add_nexthop(nh);
-
+    
     if (ret) {
         nh->nh_destructor(nh);
         goto generate_resp;
@@ -3900,6 +3916,15 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             if (!req->nhr_pbb_mac)
                 return -ENOMEM;
             VR_MAC_COPY(req->nhr_pbb_mac, nh->nh_pbb_mac);
+        } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+            req->nhr_tun_sip = nh->nh_gre_tun_sip;
+            req->nhr_tun_dip = nh->nh_gre_tun_dip;
+            req->nhr_encap_size = nh->nh_gre_tun_encap_len;
+            if (req->nhr_encap_size)
+                encap = nh->nh_data;
+            if (nh->nh_dev)
+                req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
+            req->nhr_transport_label = nh->nh_gre_tun_label;
         }
 
         break;

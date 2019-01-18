@@ -24,7 +24,8 @@
 
 #define VR_VXLAN_UDP_DST_PORT        4789
 #define VR_VXLAN_UDP_SRC_PORT       52000
-
+#define VR_MPLS_LABEL_STACK_BIT_MASK    0x100
+#define VR_MPLS_LABEL_MASK              0XFFFFF
 struct vrouter;
 struct vr_packet;
 struct vr_forwarding_md;
