@@ -359,10 +359,8 @@ struct vr_pkt_drop_st {
     vr_pkt_drop_log_t **vr_pkt_drop_log;
     uint64_t *vr_pkt_drop_log_buffer_index;
 };
-#define vr_pkt_drop_log_buffer vr_pkt_drop->vr_pkt_drop_log
-#define vr_pkt_drop_log_buf_index vr_pkt_drop->vr_pkt_drop_log_buffer_index
-#define PKT_LOG_FILL(X,Y) X=Y;
 
+#define PKT_LOG_FILL(X,Y) X=Y;
 
 #ifdef __cplusplus
 }

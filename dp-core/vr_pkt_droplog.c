@@ -96,7 +96,7 @@ vr_pkt_drop_log_get(unsigned int rid, short core, int index)
                 core = 0;
             }
             memcpy(response->vdl_pkt_droplog_arr,
-                    router->vr_pkt_drop_log_buffer[core]+(index),
+                    router->vr_pkt_drop->vr_pkt_drop_log[core]+(index),
                     response->vdl_pkt_droplog_arr_size);
             }
         else
@@ -156,9 +156,11 @@ int vr_pkt_drop_log_init(struct vrouter *router)
             goto cleanup;
         }
 
+        struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
+
         /* Create log buffer object for each core*/
-        router->vr_pkt_drop_log_buffer = vr_zalloc(size, VR_PKT_DROP_LOG_OBJECT);
-        if (!router->vr_pkt_drop_log_buffer) {
+        vr_pkt_drop->vr_pkt_drop_log = vr_zalloc(size, VR_PKT_DROP_LOG_OBJECT);
+        if (!vr_pkt_drop->vr_pkt_drop_log) {
             vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, size);
             goto cleanup;
@@ -169,9 +171,9 @@ int vr_pkt_drop_log_init(struct vrouter *router)
 
         for (i = 0; i < vr_num_cpus; i++) {
             /* Create a MAX log buffer configured and assign to each core */
-            router->vr_pkt_drop_log_buffer[i] = vr_zalloc(size,
+            vr_pkt_drop->vr_pkt_drop_log[i] = vr_zalloc(size,
                     VR_PKT_DROP_LOG_OBJECT);
-            if (!router->vr_pkt_drop_log_buffer[i]) {
+            if (!vr_pkt_drop->vr_pkt_drop_log[i]) {
                 vr_module_error(-ENOMEM, __FUNCTION__,
                         __LINE__, i);
                 goto cleanup;
@@ -180,9 +182,9 @@ int vr_pkt_drop_log_init(struct vrouter *router)
         /* Creating the circular buffer for each core  */
         size = sizeof(uint64_t) * vr_num_cpus;
 
-        router->vr_pkt_drop_log_buf_index = vr_zalloc(size,
+        vr_pkt_drop->vr_pkt_drop_log_buffer_index = vr_zalloc(size,
                 VR_PKT_DROP_LOG_OBJECT);
-        if (!router->vr_pkt_drop_log_buf_index) {
+        if (!vr_pkt_drop->vr_pkt_drop_log_buffer_index) {
             vr_module_error(-ENOMEM, __FUNCTION__,
                     __LINE__, size);
             goto cleanup;
@@ -199,19 +201,23 @@ void vr_pkt_drop_log_exit(struct vrouter *router)
 {
     unsigned int i = 0;
 
+    struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
+
     for (i = 0; i < vr_num_cpus; i++) {
-        if(!router->vr_pkt_drop_log_buffer[i])
+        if(!vr_pkt_drop->vr_pkt_drop_log[i])
             break;
 
-        vr_free(router->vr_pkt_drop_log_buffer[i], VR_PKT_DROP_LOG_OBJECT);
-        router->vr_pkt_drop_log_buffer[i] = NULL;
+        vr_free(vr_pkt_drop->vr_pkt_drop_log[i], VR_PKT_DROP_LOG_OBJECT);
+        vr_pkt_drop->vr_pkt_drop_log[i] = NULL;
     }
 
-    vr_free(router->vr_pkt_drop_log_buffer, VR_PKT_DROP_LOG_OBJECT);
-    vr_free(router->vr_pkt_drop_log_buf_index, VR_PKT_DROP_LOG_OBJECT);
+    vr_free(vr_pkt_drop->vr_pkt_drop_log, VR_PKT_DROP_LOG_OBJECT);
+    vr_free(vr_pkt_drop->vr_pkt_drop_log_buffer_index, VR_PKT_DROP_LOG_OBJECT);
+
+    vr_pkt_drop->vr_pkt_drop_log = NULL;
+    vr_pkt_drop->vr_pkt_drop_log_buffer_index = NULL;
+
     vr_free(router->vr_pkt_drop, VR_PKT_DROP_LOG_OBJECT);
 
-    router->vr_pkt_drop_log_buffer = NULL;
-    router->vr_pkt_drop_log_buf_index = NULL;
     router->vr_pkt_drop = NULL;
 }

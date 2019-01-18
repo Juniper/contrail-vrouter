@@ -1459,11 +1459,13 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
     struct vr_ip6 *ip6 = NULL;
 
     struct vrouter *router = vrouter_get(0);
+    struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
 
     /* Copying index valjue from circular buffer of corresponding core*/
-    int buf_idx = router->vr_pkt_drop_log_buf_index[cpu];
+    int buf_idx = vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu];
+    vr_pkt_drop_log_t **vr_pkt_drop_log_buffer = vr_pkt_drop->vr_pkt_drop_log;
 
-    memset(router->vr_pkt_drop_log_buffer[cpu] + buf_idx, 0, sizeof(vr_pkt_drop_log_t));
+    memset(vr_pkt_drop_log_buffer[cpu] + buf_idx, 0, sizeof(vr_pkt_drop_log_t));
 
     /* Check Packet drop log enabled at load time*/
     if(vr_pkt_droplog_buf_en == 1)
@@ -1472,13 +1474,13 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
         vr_get_time(&m_sec, &n_sec);
 
         /* Copying epoch time into timestamp structure */
-        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].timestamp, (unsigned int)m_sec)
+        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].timestamp, (unsigned int)m_sec)
 
 	/* Incremented drop_reason with 1, value 0 is invalid while displaying drop reason at utils side */
-        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].drop_reason, drop_reason+1)
+        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_reason, drop_reason+1)
 
-        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.file, file)
-        PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.line, line)
+        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.file, file)
+        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.line, line)
 
         if(pkt != NULL)
         {
@@ -1489,15 +1491,15 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
                     return;
 
                 /* Copying Source & destination address from IPV4 packet header*/
-                PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv4.s_addr,
+                PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv4.s_addr,
 			ip->ip_saddr)
-                PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv4.s_addr,
+                PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv4.s_addr,
 			ip->ip_daddr)
 
                 /* If flow is available, copy source port and destination port*/
                 if(flow != NULL && flow->flow4_sport != 0) {
-                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow4_sport;
-                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow4_dport;
+                    vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow4_sport;
+                    vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow4_dport;
                 }
             }
             /* Check if dropped packet is IPV6 */
@@ -1506,40 +1508,40 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
                 ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
                 if(!ip6)
                     return;
-                memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv6.s6_addr, ip6->ip6_src,
+                memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv6.s6_addr, ip6->ip6_src,
 			sizeof(ip6->ip6_src));
-                memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv6.s6_addr, ip6->ip6_dst,
+                memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv6.s6_addr, ip6->ip6_dst,
 			sizeof(ip6->ip6_dst));
 
                 if(flow != NULL && flow->flow6_sport != 0) {
-                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow6_sport;
-                    router->vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow6_dport;
+                    vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow6_sport;
+                    vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow6_dport;
                 }
             }
         /* Log packet details into buffer, when drop least is diabled */
         if(vr_pkt_droplog_min_sysctl_en != 1)
         {
-                PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
+                PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
                 if(pkt->vp_if != NULL) {
-                    PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].vif_idx,
+                    PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vif_idx,
 			pkt->vp_if->vif_idx)
                 }
                 if(pkt->vp_nh != NULL) {
-                    PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].nh_id, pkt->vp_nh->nh_id)
+                    PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].nh_id, pkt->vp_nh->nh_id)
                 }
-                    PKT_LOG_FILL(router->vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_len, pkt->vp_len)
+                    PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_len, pkt->vp_len)
                 if(pkt->vp_len < 100)
-                    memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
+                    memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
 			pkt_network_header(pkt), pkt->vp_len);
                 else
-                    memcpy(router->vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
+                    memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
 			pkt_network_header(pkt), 100);
             }
         }
         /* Circular buffer - buf_idx counter increments for every packet log, when it reaches max.
          * configured value, it will start from zero and reach till max buffer size.
          * circular buffer maintained for each core */
-        router->vr_pkt_drop_log_buf_index[cpu] = ((++buf_idx) % vr_pkt_droplog_bufsz);
+        vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu] = ((++buf_idx) % vr_pkt_droplog_bufsz);
     }
 }
 #endif /* __VR_PACKET_H__ */
