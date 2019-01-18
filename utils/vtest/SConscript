@@ -25,7 +25,11 @@ else:
     env.Append(CPPPATH = '/usr/include/libxml2')
     env.Append(CCFLAGS = '-g -std=gnu99')
 
-libvrutil = 'vrutil'
+if env['OPT'] == 'coverage':
+    libvrutil = ['vrutil', 'gcov']
+else:
+    libvrutil = 'vrutil'
+
 libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'), 
                   env.Object('udp_util.lo', '../udp_util.c'),
                   env.Object('ini_parser.lo', '../ini_parser.c'),
