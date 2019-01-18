@@ -219,7 +219,6 @@ KsyncHandleWrite(PKSYNC_DEVICE_CONTEXT ctx, uint8_t *buffer, size_t buffer_size)
             return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        response->vr_message_buf = NULL;
         vr_message_free(response);
     }
 
