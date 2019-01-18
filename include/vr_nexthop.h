@@ -124,6 +124,7 @@ struct vr_nexthop {
             unsigned int    tun_sip;
             unsigned int    tun_dip;
             uint16_t        tun_encap_len;
+            uint32_t        transport_label;
         } nh_gre_tun;
 
         struct nh_udp_tun_ {
@@ -132,7 +133,7 @@ struct vr_nexthop {
             unsigned short  tun_sport;
             unsigned short  tun_dport;
             uint16_t        tun_encap_len;
-            uint16_t        transport_label;
+            uint32_t        transport_label;
         } nh_udp_tun;
 
         struct {
@@ -183,6 +184,7 @@ struct vr_nexthop {
 
 #define nh_gre_tun_sip          nh_u.nh_gre_tun.tun_sip
 #define nh_gre_tun_dip          nh_u.nh_gre_tun.tun_dip
+#define nh_gre_tun_label        nh_u.nh_gre_tun.transport_label
 
 #define nh_udp_tun_sip          nh_u.nh_udp_tun.tun_sip
 #define nh_udp_tun_dip          nh_u.nh_udp_tun.tun_dip

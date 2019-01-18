@@ -330,6 +330,20 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     }
 
     label = ntohl(*(unsigned int *)pkt_data(pkt));
+    /* if outer label is 0xFFFFF, iterpret it as no label
+     * and parse packet to get inner label
+     */
+    if (!(label & 0x100)
+            && ((label >> VR_MPLS_LABEL_SHIFT) ==
+                0xFFFFF)) {
+	    /* drop the top Stack label */
+        if (!pkt_pull(pkt, VR_MPLS_HDR_LEN)) {
+            drop_reason = VP_DROP_PULL;
+            PKT_LOG(drop_reason, pkt, 0, VR_MPLS_C, __LINE__);
+            goto dropit;
+        }
+        label = ntohl(*(unsigned int *)pkt_data(pkt));
+    }
     ttl = label & 0xFF;
     label >>= VR_MPLS_LABEL_SHIFT;
     if (label >= router->vr_max_labels) {
