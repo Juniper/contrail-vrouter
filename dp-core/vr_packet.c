@@ -348,6 +348,7 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
     struct vr_ip6 *ip6h = NULL;
     struct vr_ip *iph = NULL;
     struct vr_eth *eth = NULL;
+    unsigned int mpls_label_len = VR_MPLS_HDR_LEN;
 
     if ((ip_proto == VR_IP_PROTO_GRE && gre_udp_encap == VR_GRE_PROTO_MPLS_NO) ||
         (ip_proto == VR_IP_PROTO_UDP && vr_mpls_udp_port(ntohs(gre_udp_encap)))) {
@@ -361,7 +362,14 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
         }
 
         label = ntohl(*(uint32_t *)(va + pull_len));
-        control_data = *(uint32_t *)(va + pull_len + VR_MPLS_HDR_LEN);
+        if (!(label & VR_MPLS_LABEL_STACK_BIT_MASK)
+              && ((label >> VR_MPLS_LABEL_SHIFT) == VR_MPLS_LABEL_MASK)) {
+            // ignore outer label
+            label = ntohl(*(uint32_t *)(va + pull_len + VR_MPLS_HDR_LEN));
+            mpls_label_len = 2*VR_MPLS_HDR_LEN;
+        }
+	
+        control_data = *(uint32_t *)(va + pull_len + mpls_label_len);
 
         /* Identify whether the packet is L2 or not using the label and
          * control data */
@@ -371,32 +379,32 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
 
         if (pkt_type == PKT_MPLS_TUNNEL_L3) {
             /* L3 packet */
-            iph = (struct vr_ip *) (va + pull_len + VR_MPLS_HDR_LEN);
+            iph = (struct vr_ip *) (va + pull_len + mpls_label_len);
             if (vr_ip_is_ip6(iph)) {
                 ip6h = (struct vr_ip6 *)iph;
-                pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip6);
+                pull_len += mpls_label_len + sizeof(struct vr_ip6);
             } else if (vr_ip_is_ip4(iph)) {
-                pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_ip);
+                pull_len += mpls_label_len + sizeof(struct vr_ip);
             } else {
                 return PKT_RET_UNHANDLED;
             }
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_MCAST) {
             /* L2 Multicast packet with control information and
              * Vxlan header. Vxlan header contains IP + UDP + Vxlan */
-            eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
+            eth = (struct vr_eth *)(va + pull_len + mpls_label_len +
                     VR_L2_CTRL_DATA_LEN + VR_VXLAN_HDR_LEN);
-            pull_len += VR_MPLS_HDR_LEN + VR_L2_CTRL_DATA_LEN +
+            pull_len += mpls_label_len + VR_L2_CTRL_DATA_LEN +
                             VR_VXLAN_HDR_LEN + sizeof(struct vr_eth);
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_CONTROL_DATA) {
             /* L2 packet with control information */
-            eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN +
+            eth = (struct vr_eth *)(va + pull_len + mpls_label_len +
                     VR_L2_CTRL_DATA_LEN);
-            pull_len += VR_MPLS_HDR_LEN + VR_L2_CTRL_DATA_LEN +
+            pull_len += mpls_label_len + VR_L2_CTRL_DATA_LEN +
                                             sizeof(struct vr_eth);
         } else if (pkt_type == PKT_MPLS_TUNNEL_L2_UCAST) {
             /* L2 packet with no control information */
-            eth = (struct vr_eth *)(va + pull_len + VR_MPLS_HDR_LEN);
-            pull_len += VR_MPLS_HDR_LEN + sizeof(struct vr_eth);
+            eth = (struct vr_eth *)(va + pull_len + mpls_label_len);
+            pull_len += mpls_label_len + sizeof(struct vr_eth);
         } else {
             return PKT_RET_UNHANDLED;
         }

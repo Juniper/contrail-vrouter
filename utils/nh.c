@@ -345,7 +345,7 @@ nexthop_req_process(void *s_req)
                     MAC_VALUE((uint8_t *)req->nhr_pbb_mac), i);
         }
         if(req->nhr_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
-            printf("Label:%d", req->nhr_transport_label);
+            printf(" Transport Label: %u", req->nhr_transport_label);
         }
         if (req->nhr_encap_crypt_oif_id != (int)-1 &&
             req->nhr_encap_crypt_oif_id != 0) {
