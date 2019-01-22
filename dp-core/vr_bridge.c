@@ -934,14 +934,15 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         be = NULL;
         lookup_mac = dmac;
         if (!(mac_flags & MAC_UC_BIT_SET)) {
-            if (pkt->vp_type == VP_TYPE_IP6) {
-                lookup_mac = (int8_t *)vr_bcast_mac;
-            } else {
+            if (pkt->vp_type == VP_TYPE_IP) {
                 if (!(pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED)) {
-                    /*
-                     * If IGMP is not enabled at VMI, packet has to be flooded.
-                     */
-                    lookup_mac = (int8_t *)vr_bcast_mac;
+                    if (!vif_is_fabric(pkt->vp_if) && vif_is_tap(pkt->vp_if)) {
+                        /*
+                         * If IGMP is not enabled at VMI, packet has to be
+                         * flooded.
+                         */
+                        lookup_mac = (int8_t *)vr_bcast_mac;
+                    }
                 } else {
                     if (!vif_is_fabric(pkt->vp_if) && vif_is_tap(pkt->vp_if)) {
                         /*
@@ -952,6 +953,8 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                         return 0;
                     }
                 }
+            } else {
+                lookup_mac = (int8_t *)vr_bcast_mac;
             }
             be = bridge_lookup(lookup_mac, fmd);
         }
