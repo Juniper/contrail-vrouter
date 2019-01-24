@@ -93,6 +93,10 @@ typedef enum {
 #define VR_FLOW_DR_OUT_FW_POLICY          0x1c
 #define VR_FLOW_DR_REVERSE_FW_POLICY      0x1d
 #define VR_FLOW_DR_REVERSE_OUT_FW_POLICY  0x1e
+#define VR_FLOW_DR_FWAAS_POLICY              0x1f
+#define VR_FLOW_DR_OUT_FWAAS_POLICY          0x20
+#define VR_FLOW_DR_REVERSE_FWAAS_POLICY      0x21
+#define VR_FLOW_DR_REVERSE_OUT_FWAAS_POLICY  0x22
 
 #define VR_IP6_ADDRESS_LEN               16
 
