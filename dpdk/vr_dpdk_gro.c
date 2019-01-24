@@ -301,6 +301,16 @@ dpdk_gro_flush(struct gro_ctrl *gro, void *key, struct gro_entry *entry)
         pkt_set_inner_network_header(pkt, pkt->vp_data);
     }
 
+    /* For GRO packet, count will be incremented once */
+    if (vif) {
+        struct vr_interface_stats *gro_vif_stats;
+        gro_vif_stats = vif_get_stats(vif, vr_get_cpu());
+        if (gro_vif_stats) {
+            gro_vif_stats->vis_opackets++;
+            gro_vif_stats->vis_obytes += pkt_len(pkt);
+        }
+    }
+
     pkt->vp_flags |= VP_FLAG_FLOW_SET | VP_FLAG_GROED;
     nh_output(pkt, nh, &fmd);
     rte_free(entry);
@@ -401,14 +411,6 @@ dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     struct vr_nexthop *nh;
     struct vr_gro *gro;
 
-    if (vif) {
-        struct vr_interface_stats *gro_vif_stats;
-        gro_vif_stats = vif_get_stats(vif, vr_get_cpu());
-        if (gro_vif_stats) {
-            gro_vif_stats->vis_opackets++;
-            gro_vif_stats->vis_obytes += pkt_len(pkt);
-        }
-    }
 
     /* Normal processing for VMs if -
      * => They dont require GRO (like DPDK VM's)
