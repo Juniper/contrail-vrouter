@@ -265,8 +265,10 @@ fix_packet_length_in_inner_ip_header_of_split_packet(
     if (more_new_packets) {
         inner_ip_packet_length += pctx->maximum_inner_payload_length;
     } else {
-        inner_ip_packet_length += pctx->total_payload_size
-            % pctx->maximum_inner_payload_length;
+        // get remainder but in range from 1 to pctx->maximum_inner_payload_length
+        // instead of from 0 to pctx->maximum_inner_payload_length - 1
+        inner_ip_packet_length += (pctx->total_payload_size - 1)
+            % pctx->maximum_inner_payload_length + 1;
     }
 
     fragment_inner_ip_header->ip_len = htons(inner_ip_packet_length);

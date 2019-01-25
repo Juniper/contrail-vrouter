@@ -14,7 +14,9 @@
 #include "win_packet.h"
 #include "win_packet_raw.h"
 #include "win_packet_impl.h"
+#include "win_memory.h"
 #include "windows_nbl.h"
+#include "win_csum.h"
 
 typedef void(*scheduled_work_cb)(void *arg);
 
@@ -779,11 +781,71 @@ win_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *md,
 static int
 win_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 {
-    UNREFERENCED_PARAMETER(pkt);
-    UNREFERENCED_PARAMETER(overlay_len);
+    int hlen, pull_len, proto, opt_len = 0;
+    struct vr_ip *iph;
+    struct vr_ip6 *ip6h;
+    struct vr_tcp *tcph;
 
-    // TODO(Windows): Implement
-    ASSERTMSG("Not implemented", FALSE);
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+
+    ULONG packet_data_size = WinPacketRawDataLength(winPacketRaw);
+    void *packet_data_buffer = WinRawAllocate(packet_data_size);
+
+    // If the data is in contiguous block but the WinRawAllocate
+    // function failed this function will still work ok.
+    uint8_t* packet_data = WinPacketRawGetDataBuffer(winPacketRaw, packet_data_buffer, packet_data_size);
+
+    if (packet_data == NULL) {
+        if (packet_data_buffer != NULL) {
+            WinRawFree(packet_data_buffer);
+        }
+        return 1;
+    }
+
+    iph = (struct vr_ip *) (packet_data + sizeof(struct vr_eth));
+
+    if (vr_ip_is_ip4(iph)) {
+        /*
+         * If this is a fragment and not the first one, it can be ignored
+         */
+        if (iph->ip_frag_off & htons(VR_IP_FRAG_OFFSET_MASK)) {
+            goto out;
+        }
+
+        proto = iph->ip_proto;
+        hlen = iph->ip_hl * 4;
+        opt_len = hlen - sizeof(struct vr_ip);
+    } else {
+        goto out;
+    }
+
+
+    if (proto != VR_IP_PROTO_TCP) {
+        goto out;
+    }
+
+    tcph = (struct vr_tcp *) ((char *) iph +  hlen);
+
+    if ((tcph->tcp_doff << 2) <= (sizeof(struct vr_tcp))) {
+        /*
+         * Nothing to do if there are no TCP options
+         */
+        goto out;
+    }
+
+    uint16_t old_mss, new_mss;
+    if (vr_adjust_tcp_mss(tcph, overlay_len + hlen, &old_mss, &new_mss)) {
+        if (!WinPacketRawShouldTcpChecksumBeOffloaded(winPacketRaw)) {
+            uint32_t csum_diff = htons(old_mss - new_mss);
+            tcph->tcp_csum = trim_csum(tcph->tcp_csum + csum_diff);
+        }
+    }
+
+out:
+    if (packet_data_buffer) {
+        WinRawFree(packet_data_buffer);
+    }
 
     return 0;
 }

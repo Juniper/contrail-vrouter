@@ -80,6 +80,7 @@ static bool fix_csum(struct vr_packet *pkt, unsigned offset)
     if (type == VR_IP_PROTO_UDP) {
         struct vr_udp* udp = (struct vr_udp*) win_data_at_offset(pkt, offset);
         udp->udp_csum = htons(~(trim_csum(csum)));
+        // fix checksum
     } else if (type == VR_IP_PROTO_TCP) {
         struct vr_tcp* tcp = (struct vr_tcp*) win_data_at_offset(pkt, offset);
         tcp->tcp_csum = htons(~(trim_csum(csum)));
