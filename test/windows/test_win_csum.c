@@ -54,7 +54,7 @@ create_tcp_ip_packet(uint16_t payload_length)
 }
 
 int
-Test_win_csum_TearDown(void** state)
+Test_TearDown(void** state)
 {
     if (network_packet != NULL) {
         free(network_packet);
@@ -64,25 +64,34 @@ Test_win_csum_TearDown(void** state)
 }
 
 void
-Test_win_csum_ReturnsCorrectCsum1(void **state)
+Test_ReturnsCorrectCsum1(void **state)
 {
     char some_bytes[] = {0x1, 0x2, 0x3, 0x4};
     uint16_t csum = calc_csum(some_bytes, 4);
-    uint16_t good_csum = 0x0406;
+    uint16_t good_csum = ~0x0604;
     assert_int_equal(csum, good_csum);
 }
 
 void
-Test_win_csum_ReturnsCorrectCsum2(void **state)
+Test_ReturnsCorrectCsum2(void **state)
 {
-    char some_bytes[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x01};
+    char some_bytes[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x0};
     uint16_t csum = calc_csum(some_bytes, 6);
-    uint16_t good_csum = 0x1;
+    uint16_t good_csum = ~0x1;
     assert_int_equal(csum, good_csum);
 }
 
 void
-Test_win_csum_CalculatesCorrectPartialTCPCsum(void **state)
+Test_csum_replace2(void **state)
+{
+    uint16_t csum = ~0x0406;
+    csum_replace2(&csum, 0x0304, 0x0506);
+    uint16_t good_csum = ~0x0608;
+    assert_int_equal(csum, good_csum);
+}
+
+void
+Test_CalculatesCorrectPartialTCPCsum(void **state)
 {
     uint16_t payload_length = 10;
     uint8_t* packet = create_tcp_ip_packet(payload_length);
@@ -96,7 +105,7 @@ Test_win_csum_CalculatesCorrectPartialTCPCsum(void **state)
 }
 
 void
-Test_win_csum_CalculatesCorrectTCPCsum(void **state)
+Test_CalculatesCorrectTCPCsum(void **state)
 {
     uint16_t payload_length = 10;
     uint8_t* packet = create_tcp_ip_packet(payload_length);
@@ -111,14 +120,15 @@ Test_win_csum_CalculatesCorrectTCPCsum(void **state)
 }
 
 #define win_csum_UnitTest_(p, f) cmocka_unit_test_teardown(p##f, p##TearDown)
-#define win_csum_UnitTest(f) win_csum_UnitTest_(Test_win_csum_, f)
+#define win_csum_UnitTest(f) win_csum_UnitTest_(Test_, f)
 
 int main(void) {
     const struct CMUnitTest tests[] = {
         win_csum_UnitTest(ReturnsCorrectCsum1),
         win_csum_UnitTest(ReturnsCorrectCsum2),
+        win_csum_UnitTest(csum_replace2),
         win_csum_UnitTest(CalculatesCorrectPartialTCPCsum),
-        win_csum_UnitTest(CalculatesCorrectTCPCsum)
+        win_csum_UnitTest(CalculatesCorrectTCPCsum),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

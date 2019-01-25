@@ -211,7 +211,7 @@ struct host_os {
     uint16_t (*hos_get_udp_src_port)(struct vr_packet *,
                                      struct vr_forwarding_md *,
                                      unsigned short);
-    int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *, unsigned short);
+    int (*hos_pkt_from_vm_tcp_mss_adj)(struct vr_packet *, uint16_t);
     int  (*hos_pull_inner_headers_fast)(struct vr_packet *,
                                         unsigned char, int
                                         (*is_label_l2)(unsigned int,

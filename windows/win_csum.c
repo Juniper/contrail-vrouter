@@ -13,8 +13,8 @@ trim_csum(uint32_t csum)
     return (uint16_t)csum;
 }
 
-uint16_t
-calc_csum(uint8_t* ptr, size_t size)
+static uint16_t
+calc_csum_no_negation(uint8_t* ptr, size_t size)
 {
     uint32_t csum = 0;
     for (int i = 0; i < size; i++)
@@ -25,7 +25,20 @@ calc_csum(uint8_t* ptr, size_t size)
             csum += ptr[i] << 8;
     }
 
-    return trim_csum(csum);
+    return htons(trim_csum(csum));
+}
+
+uint16_t
+calc_csum(uint8_t* ptr, size_t size)
+{
+    return ~calc_csum_no_negation(ptr, size);
+}
+
+void
+csum_replace2(uint16_t *csum, uint16_t old_val, uint16_t new_val) {
+    uint32_t old_csum_val = (~(*csum)) & 0x0000ffff;
+    uint32_t pre_csum = old_csum_val - (uint32_t)old_val + (uint32_t)new_val;
+    *csum = ~trim_csum(pre_csum);
 }
 
 static unsigned short
@@ -53,9 +66,8 @@ fill_partial_csum_of_tcp_packet(
 {
     struct tcp_pseudo_header tcp_pseudo_header;
     init_tcp_pseudo_header(ip_header, &tcp_pseudo_header);
-    uint16_t tcp_pseudo_hdr_csum = calc_csum(
+    tcp_header->tcp_csum = calc_csum_no_negation(
         (uint8_t*)&tcp_pseudo_header, sizeof(tcp_pseudo_header));
-    tcp_header->tcp_csum = htons(tcp_pseudo_hdr_csum);
 }
 
 void
@@ -66,9 +78,8 @@ fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
     unsigned tcp_offset = iph->ip_hl * 4;
     uint16_t tcp_packet_length = ntohs(iph->ip_len) - tcp_offset;
     uint8_t* tcp_packet = ip_packet + tcp_offset;
-    uint16_t csum = calc_csum(tcp_packet, tcp_packet_length);
     struct vr_tcp* tcph = (struct vr_tcp*) tcp_packet;
-    tcph->tcp_csum = htons(~(trim_csum(csum)));
+    tcph->tcp_csum = calc_csum(tcp_packet, tcp_packet_length);
 }
 
 // TODO: This is duplicated from vr_proto_ip.c because compilation and linking in tests.
