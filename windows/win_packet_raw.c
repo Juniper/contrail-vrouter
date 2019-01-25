@@ -173,30 +173,12 @@ WinPacketRawGetDataBuffer(PWIN_PACKET_RAW Packet, PVOID Buffer, ULONG BufferSize
 ULONG
 WinPacketRawGetMSS(PWIN_PACKET_RAW Packet)
 {
-    // PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
 
-    // NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
-    // lso_info.Value = NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo);
+    NDIS_TCP_LARGE_SEND_OFFLOAD_NET_BUFFER_LIST_INFO lso_info;
+    lso_info.Value = NET_BUFFER_LIST_INFO(nbl, TcpLargeSendNetBufferListInfo);
 
-    // return lso_info.LsoV2Transmit.MSS;
-
-    /*
-     * TODO - this value should not be fixed.
-     * This is temporary workaround as generally this is not correct.
-     * Better solution might modify MTU in container to some lower value.
-     *
-     * At this stage we are not able to force the OS to always enable LSO
-     * and provide reasonable value for MSS. Sometimes Windows concludes that
-     * LSO should be disabled and sets MSS equal to zero. That significantly
-     * affects performance of TCP transmission - below acceptable treshold.
-     * Because of that reasonable default is temporarily provided. Besides
-     * typical MTU, it was taken into account that headers (for Ethernet, IP,
-     * TCP) may have variable length. There's also additional "safety" margin.
-     *
-     * This optimization together with TCP segmentation implemented for Windows
-     * improves performance by order of magnitude.
-     */
-    return 1300;
+    return lso_info.LsoV2Transmit.MSS;
 }
 
 VOID
