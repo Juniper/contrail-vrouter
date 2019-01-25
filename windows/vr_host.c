@@ -776,14 +776,177 @@ win_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *md,
     return (port + VR_MUDP_PORT_RANGE_START);
 }
 
+__attribute__packed__open__
+struct tcphdr {
+    uint16_t source;
+    uint16_t dest;
+    uint32_t seq;
+    uint32_t ack_seq;
+    uint16_t res1:4,
+        doff:4,
+        fin:1,
+        syn:1,
+        rst:1,
+        psh:1,
+        ack:1,
+        urg:1,
+        ece:1,
+        cwr:1;
+    uint16_t window;
+    uint16_t check;
+    uint16_t urg_ptr;
+} __attribute__packed__close__;
+
+#define TCPOPT_EOL  0	/* End of options */
+#define TCPOPT_NOP  1	/* Padding */
+#define TCPOPT_MSS  2	/* Segment size negotiating */
+
+#define TCPOLEN_MSS 4
+
+uint16_t trim_csum(uint32_t csum);
+
+static void
+win_adjust_tcp_mss(struct vr_packet *pkt, struct tcphdr *tcph, unsigned short overlay_len, unsigned short hlen, BOOLEAN should_edit_checksum)
+{
+    int opt_off = sizeof(struct tcphdr);
+    uint8_t *opt_ptr = (uint8_t *) tcph;
+    uint16_t pkt_mss, max_mss;
+    struct vrouter *router = vrouter_get(0);
+
+    if ((tcph == NULL) || (!tcph->syn) || (router == NULL)) {
+        return;
+    }
+
+    if (router->vr_eth_if == NULL) {
+        return;
+    }
+
+    while (opt_off < (tcph->doff*4)) {
+        switch (opt_ptr[opt_off]) {
+            case TCPOPT_EOL:
+                return;
+
+            case TCPOPT_NOP:
+                opt_off++;
+                continue;
+
+            case TCPOPT_MSS:
+                if ((opt_off + TCPOLEN_MSS) > (tcph->doff*4)) {
+                    return;
+                }
+
+                if (opt_ptr[opt_off+1] != TCPOLEN_MSS) {
+                    return;
+                }
+
+                pkt_mss = (opt_ptr[opt_off+2] << 8) | opt_ptr[opt_off+3];
+                max_mss = router->vr_eth_if->vif_mtu - (overlay_len + hlen + sizeof(struct tcphdr));
+
+                if (pkt_mss > max_mss) {
+                    opt_ptr[opt_off+2] = (max_mss & 0xff00) >> 8;
+                    opt_ptr[opt_off+3] = max_mss & 0xff;
+
+                    if (should_edit_checksum) {
+                        uint32_t temp = tcph->check + 0x3e00;
+                        tcph->check = trim_csum(temp);
+                    }
+                    //inet_proto_csum_replace2(&tcph->check, skb,
+                    //                         htons(pkt_mss),
+                    //                         htons(max_mss), 0);
+                    //fix_csum(pkt, sizeof(struct vr_eth));
+                }
+
+                return;
+
+            default:
+
+                if ((opt_off + 1) == (tcph->doff*4)) {
+                    return;
+                }
+
+                if (opt_ptr[opt_off+1]) {
+                    opt_off += opt_ptr[opt_off+1];
+                } else {
+                    opt_off++;
+                }
+
+                continue;
+        } /* switch */
+    } /* while */
+
+    return;
+}
+
+#include "win_packet_impl.h"
+#include "win_packet_raw.h"
+#include "win_packet_splitting.h"
+#include "win_packet.h"
+#include "win_memory.h"
+
+#define IP_OFFSET	0x1FFF		/* "Fragment Offset" part	*/
+
 static int
 win_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
 {
-    UNREFERENCED_PARAMETER(pkt);
-    UNREFERENCED_PARAMETER(overlay_len);
+    int hlen, pull_len, proto, opt_len = 0;
+    struct vr_ip *iph;
+    struct vr_ip6 *ip6h;
+    struct tcphdr *tcph;
 
-    // TODO(Windows): Implement
-    ASSERTMSG("Not implemented", FALSE);
+    PWIN_PACKET winPacket = GetWinPacketFromVrPacket(pkt);
+    PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
+
+    ULONG packet_data_size = WinPacketRawDataLength(winPacketRaw);
+    void *packet_data_buffer = WinRawAllocate(packet_data_size);
+
+    // If the data is in contiguous block but the WinRawAllocate
+    // function failed this function will still work ok.
+    uint8_t* packet_data = WinPacketRawGetDataBuffer(winPacketRaw, packet_data_buffer, packet_data_size);
+
+    if (packet_data == NULL) {
+        if (packet_data_buffer != NULL) {
+            WinRawFree(packet_data_buffer);
+        }
+        return 1;
+    }
+
+    iph = (struct vr_ip *) (packet_data + sizeof(struct vr_eth));
+
+    if (vr_ip_is_ip4(iph)) {
+        /*
+         * If this is a fragment and not the first one, it can be ignored
+         */
+        if (iph->ip_frag_off & htons(IP_OFFSET)) {
+            goto out;
+        }
+
+        proto = iph->ip_proto;
+        hlen = iph->ip_hl * 4;
+        opt_len = hlen - sizeof(struct vr_ip);
+    } else {
+        goto out;
+    }
+
+
+    if (proto != VR_IP_PROTO_TCP) {
+        goto out;
+    }
+
+    tcph = (struct tcphdr *) ((char *) iph +  hlen);
+
+    if ((tcph->doff << 2) <= (sizeof(struct tcphdr))) {
+        /*
+         * Nothing to do if there are no TCP options
+         */
+        goto out;
+    }
+
+    win_adjust_tcp_mss(pkt, tcph, overlay_len, hlen, !WinPacketRawShouldTcpChecksumBeOffloaded(winPacketRaw));
+
+out:
+    if (packet_data_buffer) {
+        WinRawFree(packet_data_buffer);
+    }
 
     return 0;
 }

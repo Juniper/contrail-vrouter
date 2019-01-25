@@ -160,8 +160,8 @@ int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
 int vr_from_vm_mss_adj = 0; /* adjust TCP MSS on packets from VM */
 int vr_to_vm_mss_adj = 0;   /* adjust TCP MSS on packet sent to VM */
 #elif defined(_WIN32)
-int vr_from_vm_mss_adj = 0; /* adjust TCP MSS on packets from VM */
-int vr_to_vm_mss_adj = 0;   /* adjust TCP MSS on packet sent to VM */
+int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
+int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
 #endif
 /*
  * Following sysctls are to enable RPS. Based on empirical results,
