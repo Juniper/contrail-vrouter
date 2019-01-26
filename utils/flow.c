@@ -413,6 +413,14 @@ flow_get_drop_reason(uint8_t drop_code)
         return "SameFlowRflowKey";
     case VR_FLOW_DR_NO_MIRROR_ENTRY:
         return "NoMirrorentry";
+    case VR_FLOW_DR_FWAAS_POLICY:
+        return "FWAASPolicy";
+    case VR_FLOW_DR_OUT_FWAAS_POLICY:
+        return "OutFWAASPolicy";
+    case VR_FLOW_DR_REVERSE_FWAAS_POLICY:
+        return "RevFWAASPolicy";
+    case VR_FLOW_DR_REVERSE_OUT_FWAAS_POLICY:
+        return "RevOutFWAASPolicy";
     default:
         break;
     }
