@@ -118,6 +118,8 @@
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
+			 VIF_FLAG_GRO_NEEDED | \
+                         VIF_FLAG_MRG_RXBUF  | \
                          VIF_FLAG_VLAN_OFFLOAD)
 
 /* Only to be used from Agent/utility to request for Drop stats dump */
