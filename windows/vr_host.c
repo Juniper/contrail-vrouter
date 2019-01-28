@@ -184,7 +184,13 @@ win_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
     if (original_nbl == NULL)
         return NULL;
 
-    PNET_BUFFER_LIST new_nbl = CloneNetBufferList(original_nbl);
+    PNET_BUFFER_LIST new_nbl = NULL;
+    if (WinPacketRawIsOwned(rawPacket)) {
+        new_nbl = original_nbl;
+    } else {
+        new_nbl = CloneNetBufferList(original_nbl);
+    }
+
     if (new_nbl == NULL)
         goto cleanup;
 
