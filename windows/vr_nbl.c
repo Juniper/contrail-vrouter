@@ -267,6 +267,8 @@ AreAllHeadersInsideBuffer(struct vr_packet *pkt)
     return true;
 }
 
+#define MORE_THAN_LENGTH_OF_TUNNELING_HEADERS 100
+
 // Checks if all the headers needed by agent are in the first
 // MDL, otherwise reallocates the NBL.
 // This function always consumes the vr_packet and associated NBL
@@ -286,7 +288,9 @@ ReallocateHeaders(struct vr_packet *orig_vr_pkt)
     if (orig_pkt->VrPacket.vp_len == data_length || AreAllHeadersInsideBuffer(&orig_pkt->VrPacket))
         return &orig_pkt->VrPacket;
 
-    PNET_BUFFER_LIST new_nbl = CreateNetBufferList(data_length);
+    LONG initial_empty_space_lenght = MORE_THAN_LENGTH_OF_TUNNELING_HEADERS;
+    PNET_BUFFER_LIST new_nbl = CreateNetBufferList(
+        initial_empty_space_lenght + data_length);
     if (new_nbl == NULL)
         goto fail;
 
@@ -305,7 +309,7 @@ ReallocateHeaders(struct vr_packet *orig_vr_pkt)
     ULONG bytes_copied;
     status = NdisCopyFromNetBufferToNetBuffer(
         NET_BUFFER_LIST_FIRST_NB(new_nbl),
-        0,
+        initial_empty_space_lenght,
         data_length,
         orig_nb,
         0,
@@ -313,6 +317,13 @@ ReallocateHeaders(struct vr_packet *orig_vr_pkt)
     );
     if (status != NDIS_STATUS_SUCCESS || bytes_copied != data_length)
         goto fail;
+
+    NdisAdvanceNetBufferDataStart(
+        NET_BUFFER_LIST_FIRST_NB(new_nbl),
+        initial_empty_space_lenght,
+        FALSE,
+        0
+    );
 
     struct vr_interface *vif = orig_pkt->VrPacket.vp_if;
     PVR_PACKET_WRAPPER new_pkt = GetWrapperFromVrPacket(win_get_packet(new_nbl, vif));
