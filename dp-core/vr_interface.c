@@ -2085,7 +2085,8 @@ vif_set_flags(struct vr_interface *vif, vr_interface_req *req)
         }
     }
 
-    vif->vif_flags = (vif->vif_flags & VIF_VR_CAP_MASK) |
+    vif->vif_flags = (vif->vif_flags & VIF_VR_CAP_MASK | VIF_FLAG_GRO_NEEDED |
+                        VIF_FLAG_MRG_RXBUF ) |
                      (req->vifr_flags & ~VIF_VR_CAP_MASK);
 
     /*
