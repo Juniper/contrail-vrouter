@@ -24,3 +24,21 @@ WinRawAllocate(size_t size)
 {
     return WinRawAllocate_Callback(size);
 }
+
+void*
+WinRawAllocateWithTag(size_t size, ULONG tag)
+{
+    return test_malloc(size);
+}
+
+void *
+WinRawMemCpy(void *dst, void *src, size_t n)
+{
+    return memcpy(dst, src, n);
+}
+
+void *
+WinRawZeroMemory(void *str, size_t n)
+{
+    return memset(str, 0, n);
+}
