@@ -37,6 +37,21 @@ typedef BOOLEAN bool;
 #include <stdint.h>
 #include <stdbool.h>
 
+/* Those defines are necessary for testing functions using
+ * kernel functions using NTSTATUS. It's (probably) not possible
+ * to wisely include windows headers without redefining macros
+ */
+typedef LONG NTSTATUS;
+#ifndef STATUS_SUCCESS
+#define STATUS_SUCCESS      ((NTSTATUS)0x00000000L)
+#endif // ifndef STATUS_SUCCESS
+#ifndef STATUS_UNSUCCESSFUL
+#define STATUS_UNSUCCESSFUL ((NTSTATUS)0xC0000001L)
+#endif // ifndef STATUS_UNSUCCESSFUL
+#ifndef NT_ERROR
+#define NT_ERROR(Status) ((((ULONG)(Status)) >> 30) == 3)
+#endif // ifndef NT_ERROR
+
 #ifndef __BYTE_ORDER
 #define __LITTLE_ENDIAN     1
 #define __BIG_ENDIAN        0
