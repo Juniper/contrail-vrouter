@@ -8,9 +8,10 @@ env = VRouterEnv.Clone()
 
 env.Append(CPPPATH = [env['TOP_INCLUDE'], 'include'])
 env.Append(CPPPATH = [env['TOP_INCLUDE'], 'win_tx_postprocess_tests/include'])
+env.Append(CPPPATH = [env['TOP_INCLUDE'], '../../include'])
 
 # Treat warnings as errors
-env.Append(CPPFLAGS = '/WX')
+env.Append(CPPFLAGS = ['/WX'])
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../windows'])
@@ -22,7 +23,15 @@ env.Append(LIBS = 'cmocka')
 
 env.AppendENVPath('Path', Dir('#build/bin'))
 
-common_tests_src = ['fake_win_packet_raw.c', 'fake_win_memory.c', 'fake_vrouter.c', 'fake_win_packetdump.c']
+common_tests_src = [
+    'fake_win_packet_raw.c',
+    'fake_win_memory.c',
+    'fake_vrouter.c',
+    'fake_win_packetdump.c',
+    'fake_vr_ksync_kernel.c',
+    '../../windows/vr_ksync_user.c',
+]
+
 common_tests_obj = env.Object(common_tests_src)
 
 test_suite_base_names = [
@@ -33,6 +42,7 @@ test_suite_base_names = [
     'win_pclone',
     'win_pfree',
     'win_tx_postprocess',
+    'ksync_write_buffer',
 ]
 
 test_suite_additional_sources = {
