@@ -174,6 +174,12 @@
     <ClCompile Include="windows\vr_ksync.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="windows\vr_ksync_raw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\vr_ksync_parse.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="windows\vr_host.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -310,6 +316,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\win_memory.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\win_dbg_print.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\win_tx_postprocess.c">
