@@ -1,0 +1,20 @@
+#
+# Copyright (c) 2019 Juniper Networks, Inc. All rights reserved.
+#
+
+# This SConscript is used only for userspace tests of vrouter
+
+Import('VRWindowsEnv')
+
+env = VRWindowsEnv.Clone()
+
+# Treat warnings as errors
+env.Append(CPPFLAGS = '/WX')
+
+sources = [
+    'ksync_response.c',
+    'ksync_device_context.c',
+    'ksync_allocation.c',
+]
+
+env.StaticLibrary('winksync', source = sources)
