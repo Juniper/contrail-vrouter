@@ -1,8 +1,5 @@
 /*
- * windows_types.h -- typedefs, structs and defines needed for vRouter
- *                    to compile under MSVC
- *
- * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
+ * Copyright (c) 2019 Juniper Networks, Inc. All rights reserved.
  */
 #ifndef __WINDOWS_TYPES_H__
 #define __WINDOWS_TYPES_H__
@@ -37,6 +34,21 @@ typedef BOOLEAN bool;
 #include <stdint.h>
 #include <stdbool.h>
 
+/* Those defines are necessary for testing functions using
+ * kernel functions using NTSTATUS. It's (probably) not possible
+ * to wisely include windows headers without redefining macros
+ */
+typedef LONG NTSTATUS;
+#ifndef STATUS_SUCCESS
+#define STATUS_SUCCESS      ((NTSTATUS)0x00000000L)
+#endif // ifndef STATUS_SUCCESS
+#ifndef STATUS_UNSUCCESSFUL
+#define STATUS_UNSUCCESSFUL ((NTSTATUS)0xC0000001L)
+#endif // ifndef STATUS_UNSUCCESSFUL
+#ifndef NT_ERROR
+#define NT_ERROR(Status) ((((ULONG)(Status)) >> 30) == 3)
+#endif // ifndef NT_ERROR
+
 #ifndef __BYTE_ORDER
 #define __LITTLE_ENDIAN     1
 #define __BIG_ENDIAN        0
@@ -60,6 +72,7 @@ typedef INT32 int32_t;
 typedef UINT32 uint32_t;
 typedef INT64 int64_t;
 typedef UINT64 uint64_t;
+
 
 #define __attribute__packed__open__     __pragma(pack(push, 1))
 #define __attribute__packed__close__    __pragma(pack(pop))
