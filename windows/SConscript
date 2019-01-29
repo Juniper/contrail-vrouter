@@ -6,8 +6,19 @@
 
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
+VRWindowsEnv = env;
 
-env.Append(CPPPATH = [env['TOP_INCLUDE'], '../test/windows/include'])
+env.Append(CPPPATH = [
+    env['TOP_INCLUDE'],
+    '#vrouter/test/windows/include'
+])
+
+env.SConscript('ksync/SConscript', exports='VRWindowsEnv', duplicate=0)
+
+env.Append(LIBPATH = ['ksync'])
+
+# vRouter code
+env.Replace(LIBS = ['winksync'])
 
 # Treat warnings as errors
 env.Append(CPPFLAGS = '/WX')
@@ -21,6 +32,7 @@ sources = [
     'win_pclone.c',
     'win_pfree.c',
     'win_tx_postprocess.c',
+    'vr_ksync_user.c'
 ]
 
 env.StaticLibrary('win_packet', source = sources)
