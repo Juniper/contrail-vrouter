@@ -7,7 +7,7 @@
 #ifndef _VR_KSYNC_KERNEL_H_
 #define _VR_KSYNC_KERNEL_H_
 
-#include "ksync_device_context.h"
+#include "ksync/ksync_device_context.h"
 
 NTSTATUS KsyncHandleWrite(PKSYNC_DEVICE_CONTEXT ctx,
                           uint8_t *buffer,

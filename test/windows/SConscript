@@ -13,16 +13,23 @@ env.Append(CPPPATH = [env['TOP_INCLUDE'], 'win_tx_postprocess_tests/include'])
 env.Append(CPPFLAGS = '/WX')
 
 env.Replace(LIBPATH = env['TOP_LIB'])
-env.Append(LIBPATH = ['.', '../../windows'])
+env.Append(LIBPATH = ['.', '../../windows', '../../windows/ksync'])
 
 # vRouter code
-env.Replace(LIBS = ['win_packet', 'Ws2_32'])
+env.Replace(LIBS = ['win_packet', 'Ws2_32', 'winksync'])
 # 3rd party libs
 env.Append(LIBS = 'cmocka')
 
 env.AppendENVPath('Path', Dir('#build/bin'))
 
-common_tests_src = ['fake_win_packet_raw.c', 'fake_win_memory.c', 'fake_vrouter.c', 'fake_win_packetdump.c']
+common_tests_src = [
+    'fake_win_packet_raw.c',
+    'fake_win_memory.c',
+    'fake_vrouter.c',
+    'fake_win_packetdump.c',
+    'fake_vr_ksync_kernel.c',
+]
+
 common_tests_obj = env.Object(common_tests_src)
 
 test_suite_base_names = [
@@ -34,6 +41,7 @@ test_suite_base_names = [
     'win_pfree',
     'win_tx_postprocess',
     'segmentation',
+    'ksync_write_buffer',
 ]
 
 test_suite_additional_sources = {

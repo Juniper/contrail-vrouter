@@ -6,7 +6,7 @@
 #ifndef _VR_KSYNC_USER_H_
 #define _VR_KSYNC_USER_H_
 
-#include "ksync_device_context.h"
+#include "ksync/ksync_device_context.h"
 
 typedef struct _RESULT_STATUS_INFO RESULT_STATUS_INFO;
 typedef struct _RESULT_STATUS_INFO *PRESULT_STATUS_INFO;

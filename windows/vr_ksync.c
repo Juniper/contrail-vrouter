@@ -2,13 +2,10 @@
  * Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
  */
 #include "windows_devices.h"
-#include "ksync_device_context.h"
 #include "vr_ksync_user.h"
 #include "vr_ksync_kernel.h"
-
 #include "vr_genetlink.h"
 #include "vr_message.h"
-#include "vr_ksync_user.h"
 
 const WCHAR KsyncDeviceName[]    = L"\\Device\\vrouterKsync";
 const WCHAR KsyncDeviceSymLink[] = L"\\DosDevices\\vrouterKsync";
