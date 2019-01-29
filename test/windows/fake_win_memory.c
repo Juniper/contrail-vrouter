@@ -1,7 +1,7 @@
 /*
  * fake_win_memory.c
  *
- * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
+ * Copyright (c) 2019 Juniper Networks, Inc. All rights reserved.
  */
 
 #include "win_memory.h"
@@ -23,4 +23,22 @@ void *
 WinRawAllocate(size_t size)
 {
     return WinRawAllocate_Callback(size);
+}
+
+void*
+WinRawAllocateWithTag(size_t size, ULONG tag)
+{
+    return test_malloc(size);
+}
+
+void *
+WinRawMemCpy(void *dst, void *src, size_t n)
+{
+    return memcpy(dst, src, n);
+}
+
+void *
+WinRawZeroMemory(void *str, size_t n)
+{
+    return memset(str, 0, n);
 }
