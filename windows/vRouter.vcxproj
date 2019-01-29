@@ -179,6 +179,8 @@
     <ClCompile Include="vr_driver.c" />
     <ClCompile Include="vr_shmem_devices.c" />
     <ClCompile Include="vr_ksync.c" />
+    <ClCompile Include="vr_ksync_raw.c" />
+    <ClCompile Include="vr_ksync_parse.c" />
     <ClCompile Include="vr_host_interface.c" />
     <ClCompile Include="vr_shmem.c" />
     <ClCompile Include="vr_nbl.c" />
@@ -194,6 +196,7 @@
     <ClCompile Include="win_pclone.c" />
     <ClCompile Include="win_pfree.c" />
     <ClCompile Include="win_memory.c" />
+    <ClCompile Include="win_dbg_print.c" />
     <ClCompile Include="win_csum.c" />
     <ClCompile Include="win_packet_splitting.c" />
     <ClCompile Include="win_interface.c" />
