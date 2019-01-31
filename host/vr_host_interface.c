@@ -4,6 +4,7 @@
  * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
  */
 #include <sys/socket.h>
+#include <assert.h>
 
 #include "vr_os.h"
 #include "vr_packet.h"
@@ -82,12 +83,13 @@ hif_udp_rx(void *arg)
 static unsigned int
 hif_udp_tx(struct vr_hinterface *hif, struct vr_hpacket *hpkt)
 {
+#ifndef _WIN32
     int i = 0;
     struct msghdr msg;
     struct vr_hpacket *hpkt_tmp = hpkt;
     struct iovec msg_iov[64];
 
-    bzero(&msg, sizeof(msg));
+    memset(&msg, 0, sizeof(msg));
     msg.msg_iov = msg_iov;
     while (hpkt_tmp && i < 64) {
         msg_iov[i].iov_base = hpkt_data(hpkt);
@@ -99,6 +101,7 @@ hif_udp_tx(struct vr_hinterface *hif, struct vr_hpacket *hpkt)
     msg.msg_iovlen = i;
     sendmsg(hif->hif_fd, &msg, 0);
     vr_hpacket_free(hpkt);
+#endif
     return 0;
 }
 
@@ -121,14 +124,14 @@ vr_hif_udp_create(struct vr_hinterface *hif, unsigned int vif_type)
     if (sock < 0 && (ret = sock))
         goto cleanup;
 
-    bzero(&sock_addr, sizeof(sock_addr));
+    memset(&sock_addr, 0, sizeof(sock_addr));
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_port = htons(port);
     ret = bind(sock, (const struct sockaddr *)&sock_addr, sizeof(sock_addr));
     if (ret < 0)
         goto cleanup;
 
-    bzero(&sock_addr, sizeof(sock_addr));
+    memset(&sock_addr, 0, sizeof(sock_addr));
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_port = htons(port - HIF_SOURCE_UDP_PORT_START +
             HIF_DESTINATION_UDP_PORT_START);
