@@ -41,17 +41,23 @@ print_ind(unsigned int index, void *data, void *udata)
     return 1;
 }
 
-#ifdef __KERNEL__
+#if defined(__KERNEL__)
 static unsigned int
 get_page_shift(void)
 {
     return PAGE_SHIFT;
 }
-#else
+#elif !defined(_WIN32)
 static unsigned int
 get_page_shift(void)
 {
     return ffs(getpagesize());
+}
+#else
+static unsigned int
+get_page_shift(void)
+{
+    return 12;
 }
 #endif
 
