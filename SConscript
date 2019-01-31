@@ -201,6 +201,7 @@ if sys.platform != 'darwin':
         'sandesh',
         'utils',
         'test',
+        'host',
     ]
 
     if platform.system() == 'Windows':
@@ -209,7 +210,6 @@ if sys.platform != 'darwin':
         ]
     else:
         subdirs += [
-            'host',
             'linux',
             'uvrouter',
         ]
