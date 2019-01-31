@@ -243,7 +243,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
             return 0;
         }
 
-        ttl = vr_ip_decrement_ttl(ip);
+        ttl = ip->ip_ttl;
         pkt->vp_type = VP_TYPE_IP;
     } else {
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
@@ -276,6 +276,15 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
         }
         vr_fmd_set_label(fmd, rt.rtr_req.rtr_label,
                 VR_LABEL_TYPE_UNKNOWN);
+    }
+
+    /*
+     * Do not decrement TTL if nh is gw nh (for eg: for bgpaas case)
+     */
+    if (vr_ip_is_ip4(ip)) {
+        if (!vr_gateway_nexthop(nh)) {
+            pkt->vp_ttl = vr_ip_decrement_ttl(ip);
+        }
     }
 
     return nh_output(pkt, nh, fmd);
