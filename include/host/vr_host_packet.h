@@ -19,6 +19,7 @@ struct vr_hpacket_pool {
 #define VR_HPACKET_FLAGS_CLONED     0x1
 
 /* host packet representation */
+__attribute__packed__open__
 struct vr_hpacket {
     struct vr_hpacket *hp_next;
     struct vr_packet hp_packet;
@@ -40,7 +41,7 @@ struct vr_hpacket {
     unsigned int hp_flags;
     /* pool from where this packet came from */
     void *hp_pool;
-} __attribute__((packed));
+} __attribute__packed__close__;
 
 static inline unsigned char *
 hpkt_data(struct vr_hpacket *hpkt)
@@ -80,7 +81,7 @@ hpkt_head_len(struct vr_hpacket *hpkt)
  */
 struct vr_hpacket_tail {
     unsigned int hp_users;
-} __attribute__((packed));
+};
 
 int vr_hpacket_copy(unsigned char *, struct vr_hpacket *,
         unsigned int, unsigned int);

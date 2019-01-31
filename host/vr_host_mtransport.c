@@ -70,7 +70,7 @@ vr_send(unsigned int obj_type, void *object, unsigned int len)
 {
     struct request *request_i = &requests[0];
 
-    bzero(request_i, sizeof(*request_i));
+    memset(request_i, 0, sizeof(*request_i));
     request_i->req_obj_type = obj_type;
     request_i->req_obj = object;
     vr_queue_init(&request_i->req_responses);
