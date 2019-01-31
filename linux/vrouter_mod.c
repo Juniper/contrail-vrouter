@@ -788,81 +788,18 @@ error:
 
 /*
  * lh_adjust_tcp_mss - adjust the TCP MSS in the given packet based on
- * vrouter physical interface MTU. Returns 0 on success, non-zero
- * otherwise.
+ * vrouter physical interface MTU.
  */
 static void 
 lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb, unsigned short overlay_len, unsigned short hlen)
 {
-    int opt_off = sizeof(struct tcphdr);
-    u8 *opt_ptr = (u8 *) tcph;
-    u16 pkt_mss, max_mss;
-    struct net_device *dev;
-    struct vrouter *router = vrouter_get(0);
+    uint16_t old_mss, new_mss;
 
-    if ((tcph == NULL) || (!tcph->syn) || (router == NULL)) {
-        return;
+    if (vr_adjust_tcp_mss(tcph, overlay_len + hlen, &old_mss, &new_mss)) {
+        inet_proto_csum_replace2(&tcph->check, skb,
+                                 htons(old_mss),
+                                 htons(new_mss), 0);
     }
-
-    if (router->vr_eth_if == NULL) {
-        return;
-    }
-
-    while (opt_off < (tcph->doff*4)) {
-        switch (opt_ptr[opt_off]) {
-            case TCPOPT_EOL:
-                return;
-
-            case TCPOPT_NOP:
-                opt_off++;
-                continue;
-
-            case TCPOPT_MSS:
-                if ((opt_off + TCPOLEN_MSS) > (tcph->doff*4)) {
-                    return;
-                }
-
-                if (opt_ptr[opt_off+1] != TCPOLEN_MSS) {
-                    return;
-                }
-
-                pkt_mss = (opt_ptr[opt_off+2] << 8) | opt_ptr[opt_off+3];
-                dev = (struct net_device *) router->vr_eth_if->vif_os;
-                if (dev == NULL) {
-                    return;
-                }
-
-                max_mss = dev->mtu -
-                             (overlay_len + hlen + sizeof(struct tcphdr));
-
-                if (pkt_mss > max_mss) {
-                    opt_ptr[opt_off+2] = (max_mss & 0xff00) >> 8;
-                    opt_ptr[opt_off+3] = max_mss & 0xff;
-
-                    inet_proto_csum_replace2(&tcph->check, skb,
-                                             htons(pkt_mss),
-                                             htons(max_mss), 0);
-                }
-
-                return;
-
-            default:
-
-                if ((opt_off + 1) == (tcph->doff*4)) {
-                    return;
-                }
-
-                if (opt_ptr[opt_off+1]) {
-                    opt_off += opt_ptr[opt_off+1];
-                } else {
-                    opt_off++;
-                }
-
-                continue;
-        } /* switch */
-    } /* while */
-
-    return;
 }
 
 /*
