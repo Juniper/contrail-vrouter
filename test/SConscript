@@ -10,13 +10,16 @@ env = VRouterEnv.Clone()
 if platform.system() == 'Windows':
     env.SConscript('windows/SConscript', exports='VRouterEnv', duplicate=0)
 
-vrouter_suite = []
 
 # Include paths
 env.Append(CPPPATH = env['TOP_INCLUDE'])
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka'])
+env.Replace(LIBS = ['dp_core',
+                    'vrouter',
+                    'dp_sandesh_c',
+                    'sandesh-c',
+                    'cmocka'])
 
 if platform.system() == 'Windows':
     env.Append(LIBS = ['Ws2_32', 'windowsstubs'])
@@ -24,9 +27,16 @@ else:
     env.Append(LIBS = ['urcu-bp'])
 
 test_dep_srcs = ['common_test.c']
+test_dep_objs = env.Object(test_dep_srcs)
 
-dp_core_test = VRouterEnv.MakeTestCmd(env, 'dp_core_test', vrouter_suite, test_dep_srcs)
+test_suite_base_names = [ 'dp_core', 'vr_packet']
 
-test = env.TestSuite('vrouter-test', vrouter_suite)
+vrouter_suites = []
+for test_suite_name in test_suite_base_names:
+    test_suite_src = ['{}_test.c'.format(test_suite_name)] + test_dep_objs
+    test_suite = env.UnitTest('{}_tests'.format(test_suite_name), test_suite_src)
+    vrouter_suites.append(test_suite)
+
+test = env.TestSuite('vrouter-test', vrouter_suites)
 env.Alias('vrouter:test', test)
-Return('vrouter_suite')
+Return('vrouter_suites')

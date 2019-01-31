@@ -748,6 +748,12 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
 #define VR_TCP_FLAG_ECN         0x0040
 #define VR_TCP_FLAG_CWR         0x0080
 
+#define VR_TCP_OPT_EOL          0
+#define VR_TCP_OPT_NOP          1
+#define VR_TCP_OPT_MSS          2
+
+#define VR_TCP_OLEN_MSS         4
+
 #define VR_TCP_OFFSET(field)    ((ntohs(field) & 0xF000) >> 12)
 #define VR_TCP_FLAGS(field)     (ntohs(field) & 0x01FF)
 
@@ -757,7 +763,22 @@ struct vr_tcp {
     unsigned short tcp_dport;
     unsigned int tcp_seq;
     unsigned int tcp_ack;
-    uint16_t tcp_offset_r_flags;
+    union {
+        uint16_t tcp_offset_r_flags;
+        struct {
+            uint16_t
+                tcp_res1:4,
+                tcp_doff:4,
+                tcp_flag_fin:1,
+                tcp_flag_syn:1,
+                tcp_flag_rst:1,
+                tcp_flag_psh:1,
+                tcp_flag_ack:1,
+                tcp_flag_urg:1,
+                tcp_flag_ece:1,
+                tcp_flag_cwr:1;
+        };
+    };
     unsigned short tcp_win;
     unsigned short tcp_csum;
     unsigned short tcp_urg;
@@ -778,6 +799,10 @@ struct vr_sctp {
     unsigned int sctp_vtag;
     unsigned int sctp_csum;
 } __attribute__packed__close__;
+
+bool vr_adjust_tcp_mss(struct vr_tcp *tcph, uint16_t len_overhead, uint16_t *old_mss, uint16_t *new_mss);
+
+bool __vr_adjust_tcp_mss(struct vr_tcp *tcph, uint16_t len_overhead, uint16_t eth_mtu, uint16_t *old_mss, uint16_t *new_mss);
 
 #define VR_ICMP_TYPE_ECHO_REPLY     0
 #define VR_ICMP_TYPE_DEST_UNREACH   3
