@@ -2,22 +2,26 @@
 # Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
 #
 
+import platform
+
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
 vr_root = '../'
 
 libvrouter_sources = [
-                        'vr_host_interface.c',
-                        'vr_host_message.c',
-                        'vr_host_mtransport.c',
-                        'vr_host_packet.c',
-                        'vr_host_io.c',
-                        'vrouter_host_mod.c',
-                        'ulinux.c'
-                     ]
-# CFLAGS
-env.Append(CCFLAGS = '-g')
+    'vr_host_interface.c',
+    'vr_host_message.c',
+    'vr_host_mtransport.c',
+    'vr_host_packet.c',
+    'vrouter_host_mod.c',
+    'ulinux.c',
+]
+
+if platform.system() == 'Windows':
+    libvrouter_sources += ['windows/vr_host_io.c']
+else:
+    libvrouter_sources += ['nix/vr_host_io.c']
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh', '../dp-core'])

@@ -35,7 +35,7 @@ vr_lib_create_timer(struct vr_timer *vtimer)
     init_timer(timer);
 
     vtimer->vt_os_arg = (void *)timer;
-    timer->data = (unsigned long)vtimer;
+    timer->data = (uint64_t)vtimer;
     timer->function = ulinux_timer;
     timer->expires = get_time() + vtimer->vt_msecs;
     add_timer(timer);
@@ -208,7 +208,7 @@ vr_lib_pfrag_len(struct vr_packet *pkt)
 }
 
 static void
-vr_lib_get_time(unsigned long *sec, unsigned long *usec)
+vr_lib_get_time(uint64_t *sec, uint64_t *usec)
 {
     struct timeval tv;
 
