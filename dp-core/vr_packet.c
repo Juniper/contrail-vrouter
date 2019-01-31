@@ -476,3 +476,86 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
 
     return 0;
 }
+
+static bool
+__vr_adjust_tcp_mss(struct vr_tcp *tcph, uint16_t len_overhead, uint16_t eth_mtu, uint16_t *old_mss, uint16_t *new_mss)
+{
+    int opt_off = sizeof(struct vr_tcp);
+    uint8_t *opt_ptr = (uint8_t *) tcph;
+    uint16_t pkt_mss, max_mss;
+
+    if ((tcph == NULL) || (!tcph->tcp_flag_syn)) {
+        return false;
+    }
+
+    while (opt_off < (tcph->tcp_doff*4)) {
+        switch (opt_ptr[opt_off]) {
+            case VR_TCP_OPT_EOL:
+                return false;
+
+            case VR_TCP_OPT_NOP:
+                opt_off++;
+                continue;
+
+            case VR_TCP_OPT_MSS:
+                if ((opt_off + VR_TCP_OLEN_MSS) > (tcph->tcp_doff*4)) {
+                    return false;
+                }
+
+                if (opt_ptr[opt_off+1] != VR_TCP_OLEN_MSS) {
+                    return false;
+                }
+
+                pkt_mss = (opt_ptr[opt_off+2] << 8) | opt_ptr[opt_off+3];
+                max_mss = eth_mtu - (len_overhead + sizeof(struct vr_tcp));
+
+                if (pkt_mss > max_mss) {
+                    *old_mss = pkt_mss;
+                    *new_mss = max_mss;
+                    opt_ptr[opt_off+2] = (max_mss & 0xff00) >> 8;
+                    opt_ptr[opt_off+3] = max_mss & 0xff;
+
+                    return true;
+                }
+
+                return false;
+
+            default:
+
+                if ((opt_off + 1) == (tcph->tcp_doff*4)) {
+                    return false;
+                }
+
+                if (opt_ptr[opt_off+1]) {
+                    opt_off += opt_ptr[opt_off+1];
+                } else {
+                    opt_off++;
+                }
+
+                continue;
+        }
+    }
+
+    return false;
+}
+
+
+/*
+ * vr_adjust_tcp_mss - adjust the TCP MSS in the given packet based on
+ * vrouter physical interface MTU. If MSS was changed return true and sets
+ * old_mss and new_mss args, returns false otherwise.
+ */
+bool
+vr_adjust_tcp_mss(struct vr_tcp *tcph, uint16_t len_overhead, uint16_t *old_mss, uint16_t *new_mss)
+{
+    uint16_t eth_mtu;
+    struct vrouter *router = vrouter_get(0);
+
+    if ((router == NULL) || (router->vr_eth_if == NULL)) {
+        return false;
+    }
+
+    eth_mtu = router->vr_eth_if->vif_mtu;
+
+    return __vr_adjust_tcp_mss(tcph, len_overhead, eth_mtu, old_mss, new_mss);
+}
