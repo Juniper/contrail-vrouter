@@ -300,6 +300,9 @@ if sys.platform != 'darwin':
         #    '-lrte_pmd_pcap',
             '-lrte_pmd_af_packet'
         ]
+        if env['OPT'] == 'coverage':
+            DPDK_LIBS.append('-lgcov')
+
         if ADDNL_OPTION and 'enableMellanox' in ADDNL_OPTION:
             DPDK_LIBS.append('-lrte_pmd_mlx5')
             DPDK_LIBS.append('-libverbs')

@@ -141,7 +141,9 @@ vrouter_kill () {
     done
 
     if [ -n "${_pids_to_kill}" ]; then
-        kill -KILL ${_pids_to_kill}
+        # Terminate the process through SIGTERM to generate *.gcda file
+        # for code coverage.
+        kill -15 ${_pids_to_kill}
     fi
 
     VROUTER_PID=""

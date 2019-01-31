@@ -51,7 +51,16 @@ if 'vrouter-ut' in COMMAND_LINE_TARGETS:
     env.Requires(vtest, dpdk_vrouter)
 
 # UT end
+def vrouter_coverage(target, source, env):
+    os.system('lcov --base-directory . --directory' +  " ./build/coverage/vrouter/ " +
+                ' -c --ignore-errors gcov -o vrouter_test.info')
+    os.system('genhtml -o' + " ./build/coverage/vrouter/ " +
+                  ' -t "code coverage" --num-spaces 4 vrouter_test.info')
 
+if env['OPT'] == 'coverage':
+    code_coverage = env.Command(Dir('.'), '', vrouter_coverage)
+    env.AlwaysBuild(code_coverage)
+    env.Alias('vrouter-ut:code_coverage', code_coverage)
 
 # Local Variables:
 # mode: python
