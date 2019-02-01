@@ -3282,10 +3282,6 @@ nh_tunnel_set_reach_nh(struct vr_nexthop *nh)
         }
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_PBB) {
         nh->nh_reach_nh = nh_pbb_tunnel;
-    } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
-        if (dev) {
-            nh->nh_reach_nh = nh_gre_tunnel;
-        }
     }
 
     return;
@@ -3330,6 +3326,9 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_gre_tun_encap_len = req->nhr_encap_size;
         nh->nh_validate_src = nh_gre_tunnel_validate_src;
         nh->nh_dev = vif;
+        if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+            nh->nh_gre_tun_label = req->nhr_transport_label;
+        }
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
         if (req->nhr_family == AF_INET) {
             nh->nh_udp_tun_sip = req->nhr_tun_sip;
@@ -3380,6 +3379,9 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         nh->nh_udp_tun_encap_len = req->nhr_encap_size;
         nh->nh_validate_src = nh_mpls_udp_tunnel_validate_src;
         nh->nh_dev = vif;
+        if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+            nh->nh_udp_tun_label = req->nhr_transport_label;
+        }
     } else if (nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) {
         if (!vif) {
             ret = -ENODEV;
@@ -3420,17 +3422,6 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         if (vif) {
             vrouter_put_interface(vif);
         }
-    } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
-        if (!vif) {
-            ret = -ENODEV;
-            goto exit_add;
-        }
-        nh->nh_gre_tun_sip = req->nhr_tun_sip;
-        nh->nh_gre_tun_dip = req->nhr_tun_dip;
-        nh->nh_gre_tun_encap_len = req->nhr_encap_size;
-        nh->nh_validate_src = nh_gre_tunnel_validate_src;
-        nh->nh_dev = vif;
-        nh->nh_gre_tun_label = req->nhr_transport_label;
     } else {
         /* Reference to VIf should be cleaned */
         if (vif)
@@ -3881,6 +3872,9 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
                 encap = nh->nh_data;
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
+            if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+                req->nhr_transport_label = nh->nh_gre_tun_label;
+            }
         } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP) {
             if (nh->nh_family == AF_INET) {
                 req->nhr_tun_sip = nh->nh_udp_tun_sip;
@@ -3912,6 +3906,9 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
                 encap = nh->nh_data;
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
+            if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+                req->nhr_transport_label = nh->nh_udp_tun_label;
+            }
         } else if (nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) {
             req->nhr_tun_sip = nh->nh_vxlan_tun_sip;
             req->nhr_tun_dip = nh->nh_vxlan_tun_dip;
@@ -3945,15 +3942,6 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             if (!req->nhr_pbb_mac)
                 return -ENOMEM;
             VR_MAC_COPY(req->nhr_pbb_mac, nh->nh_pbb_mac);
-        } else if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
-            req->nhr_tun_sip = nh->nh_gre_tun_sip;
-            req->nhr_tun_dip = nh->nh_gre_tun_dip;
-            req->nhr_encap_size = nh->nh_gre_tun_encap_len;
-            if (req->nhr_encap_size)
-                encap = nh->nh_data;
-            if (nh->nh_dev)
-                req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
-            req->nhr_transport_label = nh->nh_gre_tun_label;
         }
 
         break;
