@@ -54,7 +54,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\debug\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\debug\vrouter\sandesh\gen-c;..\windows;..\include;.\ksync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
       <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
       <PreCompiledHeader></PreCompiledHeader>
@@ -117,7 +117,6 @@
     <ClInclude Include="..\include\vr_message.h" />
     <ClInclude Include="..\include\vr_mirror.h" />
     <ClInclude Include="..\include\vr_mpls.h" />
-    <ClInclude Include="..\include\windows_ksync.h" />
     <ClInclude Include="..\include\vr_nexthop.h" />
     <ClInclude Include="..\include\vr_os.h" />
     <ClInclude Include="..\include\vr_packet.h" />
@@ -133,6 +132,11 @@
     <ClInclude Include="..\include\vr_windows.h" />
     <ClInclude Include="..\include\windows_devices.h" />
     <ClInclude Include="..\include\windows_builtins.h" />
+    <ClInclude Include="ksync\ksync_response.h" />
+    <ClInclude Include="ksync\ksync_device_context.h" />
+    <ClInclude Include="ksync\ksync_allocation.h" />
+    <ClInclude Include="vr_ksync_kernel.h" />
+    <ClInclude Include="vr_ksync_user.h" />
     <ClInclude Include="win_packet.h" />
     <ClInclude Include="win_csum.h" />
     <ClInclude Include="win_packet_splitting.h" />
@@ -177,10 +181,15 @@
     <ClCompile Include="..\dp-core\vr_vxlan.c" />
     <ClCompile Include="..\dp-core\vr_offloads.c" />
     <ClCompile Include="..\dp-core\vr_pkt_droplog.c" />
+    <ClCompile Include="ksync\ksync_device_context.c" />
+    <ClCompile Include="ksync\ksync_response.c" />
+    <ClCompile Include="ksync\ksync_allocation.c" />
     <ClCompile Include="vr_devices.c" />
     <ClCompile Include="vr_driver.c" />
     <ClCompile Include="vr_shmem_devices.c" />
     <ClCompile Include="vr_ksync.c" />
+    <ClCompile Include="vr_ksync_kernel.c" />
+    <ClCompile Include="vr_ksync_user.c" />
     <ClCompile Include="vr_host_interface.c" />
     <ClCompile Include="vr_shmem.c" />
     <ClCompile Include="vr_nbl.c" />
