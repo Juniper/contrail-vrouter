@@ -3,7 +3,7 @@
  */
 #include "windows_devices.h"
 #include "windows_shmem_ioctl.h"
-#include "windows_ksync.h"
+#include "ksync_device_context.h"
 #include "windows_shmem.h"
 
 static const WCHAR ShmemFlowDeviceName[]    = L"\\Device\\vrouterFlow";
