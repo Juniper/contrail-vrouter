@@ -124,7 +124,19 @@
     <ClInclude Include="include\windows_mem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\windows_ksync.h">
+    <ClInclude Include="windows\ksync\ksync_response.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\ksync\ksync_device_context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\ksync\ksync_allocation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\vr_ksync_kernel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="windows\vr_ksync_user.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\genetlink.h">
@@ -172,6 +184,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\vr_ksync.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\vr_ksync_kernel.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\vr_ksync_user.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\vr_host.c">
@@ -277,6 +295,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\build\kbuild\sandesh\library\c\sandesh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\ksync\ksync_response.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\ksync\ksync_device_context.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="windows\ksync\ksync_allocation.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="windows\vr_win_transport.c">

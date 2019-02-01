@@ -16,6 +16,6 @@
     <ScriptDeviceQuery />
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <TestCertificate>..\..\third_party\certs\codilime.com-selfsigned-cert.pfx</TestCertificate>
-    <Password>$(cerp)</Password>
+    <Password>contrailwin</Password>
   </PropertyGroup>
 </Project>
