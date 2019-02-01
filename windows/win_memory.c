@@ -18,3 +18,21 @@ WinRawFree(void* buffer)
 {
     ExFreePool(buffer);
 }
+
+void*
+WinRawAllocateWithTag(size_t size, ULONG tag)
+{
+    return ExAllocatePoolWithTag(NonPagedPoolNx, size, tag);
+}
+
+void *
+WinRawMemCpy(void *dst, void *src, size_t n)
+{
+    return RtlCopyMemory(dst, src, n);
+}
+
+void *
+WinRawZeroMemory(void *str, size_t n)
+{
+    return RtlZeroMemory(str, n);
+}
