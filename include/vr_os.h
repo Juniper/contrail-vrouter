@@ -129,8 +129,13 @@ typedef unsigned int __u32;
 #pragma warning(disable : 4242)     // '=': conversion, possible loss of data
 #pragma warning(disable : 4244)     // same as above
 
-#endif /* __KERNEL__ */
+#else /* __KERNEL__ */
+
+#include <assert.h>
+#define ASSERT(x) assert(x)
+
 #endif
+#endif /* _WIN32 */
 
 extern int vrouter_dbg;
 
