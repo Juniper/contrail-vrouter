@@ -33,6 +33,7 @@ test_suite_base_names = [
     'win_pclone',
     'win_pfree',
     'win_tx_postprocess',
+    'segmentation',
 ]
 
 test_suite_additional_sources = {
