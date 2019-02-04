@@ -152,13 +152,21 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
             break;
 
         case NH_FLAG_TUNNEL_GRE:
-            if (type == NH_TUNNEL)
+            if (type == NH_TUNNEL) {
+                if (flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+                    strcat(ptr, "MPLSo");
+                }
                 strcat(ptr, "MPLSoGRE, ");
+            }
             break;
 
         case NH_FLAG_TUNNEL_UDP_MPLS:
-            if (type == NH_TUNNEL)
+            if (type == NH_TUNNEL) {
+                if (flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
+                    strcat(ptr, "MPLSo");
+                }
                 strcat(ptr, "MPLSoUDP, ");
+            }
             break;
 
         case NH_FLAG_TUNNEL_UDP:
@@ -236,9 +244,6 @@ nh_flags(uint32_t flags, uint8_t type, char *ptr)
 
         case NH_FLAG_CRYPT_TRAFFIC:
             strcat(ptr, "Encrypt Traffic, ");
-            break;
-        case NH_FLAG_TUNNEL_MPLS_O_MPLS:
-            strcat(ptr, "Mpls over Mpls, ");
             break;
         }
     }
@@ -345,7 +350,7 @@ nexthop_req_process(void *s_req)
                     MAC_VALUE((uint8_t *)req->nhr_pbb_mac), i);
         }
         if(req->nhr_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
-            printf(" Transport Label: %u", req->nhr_transport_label);
+            printf(" Transport Label:%u", req->nhr_transport_label);
         }
         if (req->nhr_encap_crypt_oif_id != (int)-1 &&
             req->nhr_encap_crypt_oif_id != 0) {
