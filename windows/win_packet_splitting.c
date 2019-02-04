@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
+
+#include "win_packet_splitting.h"
+
 #include "vr_interface.h"
 #include "vr_packet.h"
 #include "vr_mpls.h"
@@ -13,50 +16,6 @@
 #include "win_packet_impl.h"
 #include "win_packet_raw.h"
 #include "win_packet.h"
-
-struct SplittingContext {
-    struct vr_packet *pkt;
-    PWIN_PACKET original_pkt;
-    PWIN_MULTI_PACKET split_pkt;
-    int mtu;
-
-    // Original packet.
-    unsigned char* outer_headers;
-    struct vr_ip* outer_ip_header;
-    struct vr_ip* inner_ip_header;
-
-    // If we're performing TCP segmentation instead of
-    // IP fragmentation. In this case, we assume that TCP headers
-    // belong to inner headers and the payload is the TCP payload.
-    bool is_tcp_segmentation;
-
-    // Size for outer and inner headers is the same in original packet and
-    // in all new packets (fragments).
-    int outer_headers_size;
-    int inner_headers_size;
-    int inner_eth_header_size;
-
-    // Offset of the inner TCP header (only when segmenting)
-    int tcp_header_offset;
-
-    // Payload offset in original packet (excluding all headers).
-    int inner_payload_offset;
-
-    // Payload size of original packet (excluding all headers).
-    int total_payload_size;
-
-    // 'More fragments' flag from original inner IP header.
-    bool inner_ip_mf;
-
-    // Fragment offset from original inner IP header.
-    unsigned short inner_ip_frag_offset_in_bytes;
-
-    // Maximum size of payload in inner fragmented IP packet. It takes into
-    // account size of all headers (inner and outer) and MTU. Additionally
-    // maximum_inner_payload_length % 8 == 0 as required in fragment offset
-    // definition.
-    int maximum_inner_payload_length;
-};
 
 static void
 initialize_splitting_context(
@@ -253,7 +212,7 @@ set_fragment_offset(struct vr_ip* ip, unsigned short offset_in_bytes)
     ip->ip_frag_off |= htons(offset_in_bytes / 8);
 }
 
-static void
+void
 fix_packet_length_in_inner_ip_header_of_split_packet(
     struct SplittingContext* pctx,
     struct vr_ip* fragment_inner_ip_header,
@@ -265,8 +224,10 @@ fix_packet_length_in_inner_ip_header_of_split_packet(
     if (more_new_packets) {
         inner_ip_packet_length += pctx->maximum_inner_payload_length;
     } else {
-        inner_ip_packet_length += pctx->total_payload_size
-            % pctx->maximum_inner_payload_length;
+        // get remainder but in range from 1 to pctx->maximum_inner_payload_length
+        // instead of from 0 to pctx->maximum_inner_payload_length - 1
+        inner_ip_packet_length += (pctx->total_payload_size - 1)
+            % pctx->maximum_inner_payload_length + 1;
     }
 
     fragment_inner_ip_header->ip_len = htons(inner_ip_packet_length);
