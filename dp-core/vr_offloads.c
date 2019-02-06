@@ -4,7 +4,7 @@
  * Copyright 2018 Mellanox Technologies, Ltd
  */
 #include <vrouter.h>
-#include <vr_offloads.h>
+#include <vr_offloads_dp.h>
 #include <vr_btable.h>
 #include <vr_packet.h>
 
@@ -357,13 +357,25 @@ int
 vr_offloads_init(struct vrouter *router)
 {
     unsigned int entry_size;
+    struct vr_offload_ops *offload;
 
     if (!datapath_offloads)
         return 0;
 
+    /* Do not initialize twice. E.g. a soft reset would not have unregistered
+     * the offloads. */
+    offload = vr_rcu_dereference(offload_ops);
+    if (offload)
+        return 0;
+
     if (!vr_offload_flow_destroy || !vr_offload_flow_create ||
-        !vr_offload_prepare)
-        return -ENOSYS;
+        !vr_offload_prepare) {
+        /* Not an error necessarily. Offloads are not implemented for this host
+         * type, so don't register anything. External implementation can still
+         * be registered after initialization. */
+        vr_printf("offload: no built-in offload implementation for current context\n");
+        return 0;
+    }
 
     if (!offload_tags) {
         /* Round up to the next divisor */
@@ -387,14 +399,14 @@ vr_offloads_init(struct vrouter *router)
         }
     }
 
-    offload_ops = &vr_offload_ops;
+    vr_offload_register(&vr_offload_ops);
 
     return 0;
 
 }
 
-void
-vr_offloads_exit(struct vrouter *router, bool soft_reset)
+static void
+_vr_offloads_exit(struct vrouter *router, bool soft_reset)
 {
     struct vr_offload_flow *oflow;
     struct vr_offload_tag *otag;
@@ -443,7 +455,6 @@ vr_offloads_exit(struct vrouter *router, bool soft_reset)
 
     pvif = NULL;
     host_ip = 0;
-    offload_ops = NULL;
 }
 
 inline struct vr_offload_flow *
@@ -457,4 +468,69 @@ vr_offloads_flow_get(unsigned int index)
         return NULL;
 
     return  oflow;
+}
+
+/*
+ * Called by an external offload module to register itself with vrouter.
+ */
+int
+vr_offload_register(const struct vr_offload_ops *new_handler)
+{
+    struct vr_offload_ops *offload;
+
+    if (!datapath_offloads || !new_handler)
+        return -EINVAL;
+
+    offload = vr_rcu_dereference(offload_ops);
+    if (offload)
+        return -EBUSY;
+
+    offload = vr_malloc(sizeof(*offload), VR_MALLOC_OBJECT);
+    if (!offload)
+        return -ENOMEM;
+    *offload = *new_handler;
+    vr_rcu_assign_pointer(offload_ops, offload);
+    vr_synchronize_rcu();
+
+    return 0;
+}
+#if defined(__linux__) && defined(__KERNEL__)
+EXPORT_SYMBOL(vr_offload_register);
+#endif
+
+/*
+ * Called by an external offload module to unregister itself with vrouter.
+ */
+static void
+_vr_offload_unregister(void)
+{
+    struct vr_offload_ops *offload = vr_rcu_dereference(offload_ops);
+
+    if (offload) {
+        vr_rcu_assign_pointer(offload_ops, NULL);
+        vr_synchronize_rcu();
+        vr_free(offload, VR_MALLOC_OBJECT);
+    }
+}
+
+int
+vr_offload_unregister(void)
+{
+    struct vrouter *router = vrouter_get(0);
+
+    _vr_offloads_exit(router, false);
+    _vr_offload_unregister();
+
+    return 0;
+}
+#if defined(__linux__) && defined(__KERNEL__)
+EXPORT_SYMBOL(vr_offload_unregister);
+#endif
+
+void
+vr_offloads_exit(struct vrouter *router, bool soft_reset)
+{
+    _vr_offloads_exit(router, soft_reset);
+    if (!soft_reset)
+        _vr_offload_unregister();
 }

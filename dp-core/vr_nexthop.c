@@ -18,7 +18,7 @@
 #include "vr_route.h"
 #include "vr_hash.h"
 #include "vr_mirror.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);

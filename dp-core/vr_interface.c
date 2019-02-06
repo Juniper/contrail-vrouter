@@ -16,7 +16,7 @@
 #include "vr_btable.h"
 #include "vr_route.h"
 #include "vr_ip_mtrie.h"
-#include "vr_offloads.h"
+#include "vr_offloads_dp.h"
 
 unsigned int vr_interfaces = VR_MAX_INTERFACES;
 
