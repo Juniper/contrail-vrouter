@@ -16,10 +16,12 @@ vrouter_suite = []
 env.Append(CPPPATH = env['TOP_INCLUDE'])
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
-env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka', 'urcu-bp'])
+env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka'])
 
 if platform.system() == 'Windows':
     env.Append(LIBS = ['Ws2_32', 'windowsstubs'])
+else:
+    env.Append(LIBS = ['urcu-bp'])
 
 test_dep_srcs = ['common_test.c']
 
