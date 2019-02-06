@@ -954,8 +954,11 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
         if (ipv4_hdr->ip_proto == VR_IP_PROTO_GRE) {
             gre_hdr = (struct vr_gre *)((uintptr_t)ipv4_hdr + ipv4_len);
 
-            if (unlikely(mbuf_data_len < pull_len + VR_GRE_BASIC_HDR_LEN))
-                return -1;
+            /* For GRE fragmented packet, check the IP header for first packet.
+             * Packet will be queued by fragment assembler for further processing */
+            if (ipv4_hdr->ip_frag_off == 0)
+                if (unlikely(mbuf_data_len < pull_len + VR_GRE_BASIC_HDR_LEN))
+                    return -1;
 
             if (likely(gre_hdr->gre_proto == VR_GRE_PROTO_MPLS_NO)) {
                 /* We are not RFC 1701 compliant receiver. */
