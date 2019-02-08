@@ -3063,8 +3063,6 @@ nh_composite_mcast_validate(struct vr_component_nh *component_nh,
             if (req->nhr_flags & NH_FLAG_COMPOSITE_TOR) {
                 if ((tmp_nh->nh_flags & NH_FLAG_TUNNEL_VXLAN) == 0)
                     return -1;
-                if (l3_seen)
-                    return -1;
             }
         }
     }
