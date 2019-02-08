@@ -46,7 +46,7 @@ env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh', './vhost/lib/'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'xml2'])
 if sys.platform.startswith('win'):
-    env.Append(LIBS = ['windowsstubs', 'ws2_32', 'Iphlpapi'])
+    env.Append(LIBS = ['contrail-windows', 'ws2_32', 'Iphlpapi'])
 else:
     env.Append(LIBS = ['jnprvnet', 'pcap', 'rt', 'nl-3', 'nl-genl-3'])
 

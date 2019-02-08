@@ -45,7 +45,7 @@ env.Append(LIBPATH = ['.', '../sandesh'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
 
 if sys.platform.startswith('win'):
-    env.Append(LIBS = ['windowsstubs', 'ws2_32', 'Iphlpapi'])
+    env.Append(LIBS = ['contrail-windows', 'ws2_32', 'Iphlpapi'])
 
 # Build individual utils
 vif_sources = ['vif.c']

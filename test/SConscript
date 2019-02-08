@@ -19,7 +19,7 @@ env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
 env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka'])
 
 if platform.system() == 'Windows':
-    env.Append(LIBS = ['Ws2_32', 'windowsstubs'])
+    env.Append(LIBS = ['Ws2_32', 'contrail-windows'])
 else:
     env.Append(LIBS = ['urcu-bp'])
 
