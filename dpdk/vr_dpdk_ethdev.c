@@ -915,6 +915,12 @@ dpdk_mbuf_parse_and_hash_packets(struct rte_mbuf *mbuf)
         if (ipv4_hdr->ip_proto == VR_IP_PROTO_GRE) {
             gre_hdr = (struct vr_gre *)((uintptr_t)ipv4_hdr + ipv4_len);
 
+            /* Don't do hashing for GRE IP fragments since it may not have 
+             * the actual GRE header, do regular routing instead */
+            if (unlikely(vr_ip_fragment(ipv4_hdr))) {
+                    return 0;
+            }
+
             if (unlikely(mbuf_data_len < pull_len + VR_GRE_BASIC_HDR_LEN))
                 return -1;
 
