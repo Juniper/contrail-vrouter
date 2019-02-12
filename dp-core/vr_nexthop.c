@@ -4174,6 +4174,32 @@ vr_nexthop_req_process(void *s_req)
     }
 }
 
+int
+vr_is_local_ecmp_nh (struct vr_nexthop *nh)
+{
+    int i;
+
+    if (!nh || (nh->nh_type != NH_COMPOSITE) ||
+       (!(nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))) {
+        return 0;
+    }
+    for (i = 0; i < nh->nh_component_cnt; i++) {
+         if (nh->nh_component_nh[i].cnh->nh_type != NH_ENCAP) {
+             return 0;
+         }
+    }
+    return 1;
+}
+
+struct vr_interface *
+vr_get_ecmp_first_member_dev (struct vr_nexthop *nh)
+{
+    if (!nh || (nh->nh_type != NH_COMPOSITE) ||
+       (!(nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))) {
+        return NULL;
+    }
+    return nh->nh_component_nh[0].cnh->nh_dev;
+}
 
 static void
 nh_table_exit(struct vrouter *router, bool soft_reset)

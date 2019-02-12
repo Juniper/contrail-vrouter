@@ -1615,7 +1615,12 @@ vr_flow_fat_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         vif_l = pkt->vp_if;
     } else if (vif_is_fabric(pkt->vp_if)) {
         if ((nh = pkt->vp_nh) && (nh->nh_flags & NH_FLAG_VALID)) {
-            vif_l = nh->nh_dev;
+            /* In case of ECMP, check the vif within the ECMP member NH */
+            if (vr_is_local_ecmp_nh(nh)) {
+                vif_l = vr_get_ecmp_first_member_dev(nh);
+            } else {
+                vif_l = nh->nh_dev;
+            }
         }
     }
 
