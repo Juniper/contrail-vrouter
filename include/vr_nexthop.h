@@ -240,6 +240,8 @@ extern int vr_nexthop_dump(vr_nexthop_req *);
 extern bool vr_gateway_nexthop(struct vr_nexthop *);
 extern bool vr_hosted_nexthop(struct vr_nexthop *);
 extern unsigned int vr_nexthop_req_get_size(void *);
+extern int vr_is_local_ecmp_nh(struct vr_nexthop *nh);
+extern struct vr_interface *vr_get_ecmp_first_member_dev(struct vr_nexthop *nh);
 
 extern struct vr_nexthop *vr_discard_nh;
 #ifdef __cplusplus
