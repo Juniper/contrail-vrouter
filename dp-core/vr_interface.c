@@ -4566,7 +4566,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
             } else {
                 fat_flow_ipv6_plen_to_mask(aggr_mask, &ip6_mask_h, &ip6_mask_l);
                 *ip6_h = (*ip6_h) & ip6_mask_h;
-                *ip6_l = 0;
+                *ip6_l = (*ip6_l) & ip6_mask_l;
             }
             return fat_flow_mask;
         }
@@ -4601,7 +4601,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
             } else {
                 fat_flow_ipv6_plen_to_mask(aggr_mask, &ip6_mask_h, &ip6_mask_l);
                 *ip6_h = (*ip6_h) & ip6_mask_h;
-                *ip6_l = 0;
+                *ip6_l = (*ip6_l) & ip6_mask_l;
             }
             return fat_flow_mask;
         }
@@ -4622,7 +4622,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
                 ip6_h = (uint64_t *) sip6_flow;
                 ip6_l = (uint64_t *)((uint8_t *)sip6_flow+8);
                 *ip6_h = (*ip6_h) & ip6_mask_h;
-                *ip6_l = 0;
+                *ip6_l = (*ip6_l) & ip6_mask_l;
             }
             if (daddr) {
                 *dip_flow = (*dip_flow) & FAT_FLOW_IPV4_PLEN_TO_MASK(aggr_mask1);
@@ -4631,7 +4631,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
                 ip6_h = (uint64_t *)dip6_flow;
                 ip6_l = (uint64_t *)((uint8_t *)dip6_flow+8);
                 *ip6_h = (*ip6_h) & ip6_mask_h;
-                *ip6_l = 0;
+                *ip6_l = (*ip6_l) & ip6_mask_l;
             }
             return fat_flow_mask;
         }
