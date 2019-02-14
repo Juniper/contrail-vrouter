@@ -161,10 +161,11 @@ vr_fragment_queue_free(struct vr_fragment_queue *queue)
     queue->vfq_tail = NULL;
     while (vfqe) {
         next = vfqe->fqe_next;
-        if (vfqe->fqe_pnode.pl_packet)
+        if (vfqe->fqe_pnode.pl_packet) {
             PKT_LOG(VP_DROP_MISC, 0, 0, VR_FRAGMENT_C, __LINE__);
             vr_pfree(vfqe->fqe_pnode.pl_packet, VP_DROP_MISC);
-        vfqe->fqe_pnode.pl_packet = NULL;
+            vfqe->fqe_pnode.pl_packet = NULL;
+        }
         vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
         vfqe = next;
     }
