@@ -669,13 +669,17 @@ win_get_time(uint64_t *sec, uint64_t *usec)
 static void
 win_get_mono_time(uint64_t *sec, uint64_t *nsec)
 {
-    LARGE_INTEGER i;
-    KeQueryTickCount(&i);
+    enum { NANOSECONDS_PER_SECOND = 1000 * 1000 * 1000 };
 
-    i.QuadPart *= 100;
+    ULONG increment = KeQueryTimeIncrement();
 
-    *sec = i.HighPart;
-    *nsec = i.LowPart;
+    LARGE_INTEGER ticks;
+    KeQueryTickCount(&ticks);
+
+    uint64_t nanoseconds = ticks.QuadPart * increment * 100;
+
+    *sec = nanoseconds / NANOSECONDS_PER_SECOND;
+    *nsec = nanoseconds % NANOSECONDS_PER_SECOND;
 }
 
 unsigned int
