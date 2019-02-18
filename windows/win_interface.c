@@ -1,5 +1,5 @@
 /*
- * win_interface.h
+ * win_interface.c
  *
  * Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
  */
