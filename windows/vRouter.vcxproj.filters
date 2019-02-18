@@ -315,6 +315,9 @@
     <ClCompile Include="windows\win_tx_postprocess.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="windows\win_work_item.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="windows\vRouter.inf">

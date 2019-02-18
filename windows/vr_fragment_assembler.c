@@ -7,6 +7,7 @@
 #include <vr_fragment.h>
 
 #include "vr_windows.h"
+#include "win_work_item.h"
 
 struct vr_win_fragment_bucket {
     KSPIN_LOCK vfb_lock;
@@ -15,11 +16,7 @@ struct vr_win_fragment_bucket {
 static struct vr_win_fragment_bucket *VrAssemblerTable;
 
 struct vr_win_fragment_queue {
-    KSPIN_LOCK vrwfq_lock;
-    NDIS_HANDLE vrwfq_work;
-    BOOLEAN vrwfq_pending;
-    BOOLEAN vrwfq_initialized;
-    UINT vrwfq_running;
+    PWIN_WORK_ITEM vrwfq_work;
     struct vr_fragment_queue vrwfq_queue;
 };
 struct vr_win_fragment_queue *vr_wfq_pcpu_queues;
@@ -27,10 +24,8 @@ struct vr_win_fragment_queue *vr_wfq_pcpu_queues;
 static unsigned int vr_win_assembler_scan_index;
 static int vr_win_assembler_scan_thresh = 1024;
 
-static NDIS_IO_WORKITEM_FUNCTION VrFragmentAssembler;
-
-static VOID
-VrFragmentAssembler(PVOID Context, NDIS_HANDLE NdisIoWorkItemHandle)
+static void
+VrFragmentAssembler(void *Context)
 {
     KIRQL old_irql;
     uint32_t hash, index;
@@ -38,15 +33,10 @@ VrFragmentAssembler(PVOID Context, NDIS_HANDLE NdisIoWorkItemHandle)
     struct vr_packet_node *pnode;
     struct vr_win_fragment_bucket *vfb;
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
-    struct vr_win_fragment_queue *wfq = (struct vr_win_fragment_queue *)Context;
+    struct vr_fragment_queue *fq = (struct vr_fragment_queue *)Context;
 
-    InterlockedIncrement(&wfq->vrwfq_running);
-    wfq->vrwfq_pending = FALSE;
-    vr_sync_synchronize();
-
-    tail = InterlockedExchangePointer(&wfq->vrwfq_queue.vfq_tail, NULL);
+    tail = InterlockedExchangePointer(&fq->vfq_tail, NULL);
     if (!tail) {
-        InterlockedDecrement(&wfq->vrwfq_running);
         return;
     }
 
@@ -81,15 +71,12 @@ VrFragmentAssembler(PVOID Context, NDIS_HANDLE NdisIoWorkItemHandle)
 
         tail = tail_n;
     }
-
-    InterlockedDecrement(&wfq->vrwfq_running);
 }
 
 int
 win_enqueue_to_assembler(struct vrouter *router, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    KIRQL old_irql;
     int ret;
     unsigned int cpu;
 
@@ -104,13 +91,7 @@ win_enqueue_to_assembler(struct vrouter *router, struct vr_packet *pkt,
 
     ret = vr_fragment_enqueue(router, &fq->vrwfq_queue, pkt, fmd);
     if (!ret) {
-        KeAcquireSpinLock(&fq->vrwfq_lock, &old_irql);
-        if (fq->vrwfq_initialized) {
-            if (vr_sync_bool_compare_and_swap_8u(&fq->vrwfq_pending, FALSE, TRUE)) {
-                NdisQueueIoWorkItem(fq->vrwfq_work, VrFragmentAssembler, fq);
-            }
-        }
-        KeReleaseSpinLock(&fq->vrwfq_lock, old_irql);
+        WinWorkItemQueueWork(fq->vrwfq_work);
     }
 
     return 0;
@@ -154,12 +135,14 @@ VrFragmentQueueInit(void)
     }
 
     for (i = 0; i < vr_num_cpus; i++) {
-        KeInitializeSpinLock(&vr_wfq_pcpu_queues[i].vrwfq_lock);
-        vr_wfq_pcpu_queues[i].vrwfq_work = NdisAllocateIoWorkItem(VrDriverHandle);
-        if (vr_wfq_pcpu_queues[i].vrwfq_work == NULL) {
+        struct vr_win_fragment_queue *fq = &vr_wfq_pcpu_queues[i];
+        PWIN_WORK_ITEM work = WinWorkItemCreate(
+            VrFragmentAssembler, &fq->vrwfq_queue);
+        if (work == NULL) {
             return -ENOMEM;
         }
-        vr_wfq_pcpu_queues[i].vrwfq_initialized = TRUE;
+
+        fq->vrwfq_work = work;
     }
 
     return 0;
@@ -172,24 +155,9 @@ VrFragmentQueueExit(void)
 
     if (vr_wfq_pcpu_queues) {
         for (i = 0; i < vr_num_cpus; i++) {
-            KIRQL old_irql;
             struct vr_win_fragment_queue *fq = &vr_wfq_pcpu_queues[i];
 
-            if (fq->vrwfq_initialized) {
-                KeAcquireSpinLock(&fq->vrwfq_lock, &old_irql);
-                fq->vrwfq_initialized = FALSE;
-                KeReleaseSpinLock(&fq->vrwfq_lock, old_irql);
-
-                while (fq->vrwfq_pending) {
-                    vr_sync_synchronize();
-                }
-
-                while (fq->vrwfq_running) {
-                    vr_sync_synchronize();
-                }
-
-                NdisFreeIoWorkItem(fq->vrwfq_work);
-            }
+            WinWorkItemWaitDestroy(fq->vrwfq_work);
             vr_fragment_queue_free(&fq->vrwfq_queue);
         }
 
@@ -205,7 +173,7 @@ VrAssemblerTableInit(void)
 
     VrAssemblerTable = vr_zalloc(size, VR_ASSEMBLER_TABLE_OBJECT);
     if (!VrAssemblerTable) {
-        return 1;
+        return -ENOMEM;
     }
 
     for (unsigned int i = 0; i < VR_ASSEMBLER_BUCKET_COUNT; ++i) {
