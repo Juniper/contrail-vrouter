@@ -33,6 +33,7 @@
 #define vr_sync_bool_compare_and_swap_p(a, b, c)        __sync_bool_compare_and_swap((a), (b), (c))
 #define vr_sync_val_compare_and_swap_16u(a, b, c)       __sync_val_compare_and_swap((a), (b), (c))
 #define vr_sync_lock_test_and_set_8u(a, b)              __sync_lock_test_and_set((a), (b))
+#define vr_sync_lock_test_and_set_p(a, b)               __sync_lock_test_and_set((a), (b))
 #define vr_sync_synchronize                             __sync_synchronize
 #define vr_ffs_32(a)                                    __builtin_ffs(a)
 #endif

@@ -35,7 +35,7 @@ VrFragmentAssembler(void *Context)
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
     struct vr_fragment_queue *fq = (struct vr_fragment_queue *)Context;
 
-    tail = InterlockedExchangePointer(&fq->vfq_tail, NULL);
+    tail = vr_sync_lock_test_and_set_p(&fq->vfq_tail, NULL);
     if (!tail) {
         return;
     }

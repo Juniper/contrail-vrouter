@@ -43,7 +43,7 @@ dpdk_fragment_assembler(void *arg)
     struct per_cpu_fragment_queue *queue =
             (struct per_cpu_fragment_queue *)arg;
 
-    tail = __sync_lock_test_and_set(&queue->queue.vfq_tail, NULL);
+    tail = vr_sync_lock_test_and_set_p(&queue->queue.vfq_tail, NULL);
     if (!tail)
         return;
 
