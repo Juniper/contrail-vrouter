@@ -36,40 +36,9 @@ static int assembler_scan_thresh = 1024;
 static void
 dpdk_fragment_assemble_queue(void *arg)
 {
-    struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
-    struct per_cpu_fragment_queue *queue =
-            (struct per_cpu_fragment_queue *)arg;
-
-    tail = vr_sync_lock_test_and_set_p(&queue->queue.vfq_tail, NULL);
-    if (!tail)
-        return;
-
-    /*
-     * first, reverse the list, since packets that came later are at the
-     * head of the list
-     */
-    tail_p = tail->fqe_next;
-    tail->fqe_next = NULL;
-    while (tail_p) {
-        tail_pn = tail_p->fqe_next;
-        tail_p->fqe_next = tail;
-        tail = tail_p;
-        tail_p = tail_pn;
-    }
-
-    /* go through the list and insert it in the assembler work area */
-    while (tail) {
-        tail_n = tail->fqe_next;
-        tail->fqe_next = NULL;
-
-        if (tail->fqe_pnode.pl_packet) {
-            vr_fragment_sync_assemble(tail);
-        }
-
-        tail = tail_n;
-    }
-
-    return;
+    struct per_cpu_fragment_queue *queue = (struct per_cpu_fragment_queue *)arg;
+    struct vr_fragment_queue *fq = &queue->queue;
+    vr_fragment_assemble_queue(fq);
 }
 
 static void
