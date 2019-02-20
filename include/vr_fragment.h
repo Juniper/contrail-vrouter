@@ -70,7 +70,7 @@ int vr_v6_fragment_add(struct vrouter *, unsigned short, struct vr_ip6 *,
                 unsigned short, unsigned short);
 void vr_fragment_del(vr_htable_t, struct vr_fragment *);
 uint32_t vr_fragment_get_hash(struct vr_packet_node *);
-int vr_fragment_assembler(struct vr_fragment **,
+int vr_fragment_assemble(struct vr_fragment **,
         struct vr_fragment_queue_element *);
 unsigned int vr_assembler_table_scan(struct vr_fragment **);
 int vr_fragment_enqueue(struct vrouter *, struct vr_fragment_queue *,

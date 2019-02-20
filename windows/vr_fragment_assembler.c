@@ -24,14 +24,25 @@ struct vr_win_fragment_queue *vr_wfq_pcpu_queues;
 static unsigned int vr_win_assembler_scan_index;
 static int vr_win_assembler_scan_thresh = 1024;
 
+void
+win_fragment_sync_assemble(struct vr_fragment_queue_element *vfqe)
+{
+    KIRQL old_irql;
+
+    uint32_t hash = vr_fragment_get_hash(&vfqe->fqe_pnode);
+    uint32_t index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
+
+    struct vr_win_fragment_bucket *vfb = &VrAssemblerTable[index];
+
+    KeAcquireSpinLock(&vfb->vfb_lock, &old_irql);
+    vr_fragment_assemble(&vfb->vfb_frag_list, vfqe);
+    KeReleaseSpinLock(&vfb->vfb_lock, old_irql);
+}
+
 static void
 VrFragmentAssembler(void *Context)
 {
-    KIRQL old_irql;
-    uint32_t hash, index;
-
     struct vr_packet_node *pnode;
-    struct vr_win_fragment_bucket *vfb;
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
     struct vr_fragment_queue *fq = (struct vr_fragment_queue *)Context;
 
@@ -60,13 +71,7 @@ VrFragmentAssembler(void *Context)
 
         pnode = &tail->fqe_pnode;
         if (pnode->pl_packet) {
-            hash = vr_fragment_get_hash(pnode);
-            index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
-            vfb = &VrAssemblerTable[index];
-
-            KeAcquireSpinLock(&vfb->vfb_lock, &old_irql);
-            vr_fragment_assembler(&vfb->vfb_frag_list, tail);
-            KeReleaseSpinLock(&vfb->vfb_lock, old_irql);
+            vr_fragment_sync_assemble(tail);
         }
 
         tail = tail_n;

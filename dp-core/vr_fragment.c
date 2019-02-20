@@ -306,7 +306,7 @@ exit_flush:
 }
 
 int
-vr_fragment_assembler(struct vr_fragment **head_p,
+vr_fragment_assemble(struct vr_fragment **head_p,
         struct vr_fragment_queue_element *vfqe)
 {
     int ret = 0;
