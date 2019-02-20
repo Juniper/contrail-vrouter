@@ -70,7 +70,7 @@ dpdk_fragment_assembler(void *arg)
 
         if (tail->fqe_pnode.pl_packet) {
             hash = vr_fragment_get_hash(&tail->fqe_pnode);
-            index = (hash % VR_LINUX_ASSEMBLER_BUCKETS);
+            index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
             bucket = &assembler_table[cpu][index];
 
             vr_fragment_assembler(&bucket->frag_list, tail);
@@ -120,7 +120,7 @@ dpdk_assembler_table_init(void)
     }
 
     /* Now allocate the assembler tables for each fwd lcore */
-    size = sizeof(struct fragment_bucket) * VR_LINUX_ASSEMBLER_BUCKETS;
+    size = sizeof(struct fragment_bucket) * VR_ASSEMBLER_BUCKET_COUNT;
     for (i = 0; i < vr_dpdk.nb_fwd_lcores; ++i) {
         assembler_table[i] = vr_zalloc(size, VR_ASSEMBLER_TABLE_OBJECT);
         if (!assembler_table[i]) {
@@ -229,8 +229,8 @@ dpdk_fragment_assembler_table_scan(void *arg)
     assert(cpu >= 0 && cpu < (vr_num_cpus - VR_DPDK_FWD_LCORE_ID));
 
     i = assembler_scan_index;
-    for (j = 0; j < VR_LINUX_ASSEMBLER_BUCKETS; j++) {
-        vfb = &assembler_table[cpu][(i + j) % VR_LINUX_ASSEMBLER_BUCKETS];
+    for (j = 0; j < VR_ASSEMBLER_BUCKET_COUNT; j++) {
+        vfb = &assembler_table[cpu][(i + j) % VR_ASSEMBLER_BUCKET_COUNT];
 
         if (vfb->frag_list)
             scanned += vr_assembler_table_scan(&vfb->frag_list);
@@ -241,7 +241,7 @@ dpdk_fragment_assembler_table_scan(void *arg)
         }
     }
 
-    assembler_scan_index = (i + j) % VR_LINUX_ASSEMBLER_BUCKETS;
+    assembler_scan_index = (i + j) % VR_ASSEMBLER_BUCKET_COUNT;
     return;
 }
 

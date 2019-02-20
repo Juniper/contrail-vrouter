@@ -1690,7 +1690,7 @@ dpdk_lcore_fwd_loop(void)
         * VR_DPDK_BOND_TX_MS / MS_PER_S;
     /* timeout for IP fragment assembler */
     const uint64_t assembler_cycles = (rte_get_timer_hz() + MS_PER_S - 1)
-        * (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_LINUX_ASSEMBLER_BUCKETS
+        * (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_ASSEMBLER_BUCKET_COUNT
         / MS_PER_S;
 #if VR_DPDK_USE_TIMER
     /* calculate timeouts in CPU cycles */
@@ -2026,4 +2026,3 @@ vr_dpdk_lcore_schedule_assembler_work(struct vr_dpdk_lcore *lcore,
     lcore->fragment_assembly_func = fun;
     lcore->fragment_assembly_arg = arg;
 }
-

@@ -266,7 +266,7 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
     vtimer->vt_timer = scanner;
     vtimer->vt_vr_arg = NULL;
     vtimer->vt_msecs =
-        (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_LINUX_ASSEMBLER_BUCKETS;
+        (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_ASSEMBLER_BUCKET_COUNT;
     if (vr_create_timer(vtimer)) {
         vr_free(vtimer, VR_TIMER_OBJECT);
         vr_assembler_table_scan_timer = NULL;

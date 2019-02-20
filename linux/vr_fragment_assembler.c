@@ -66,7 +66,7 @@ vr_linux_fragment_assembler(struct work_struct *work)
         pnode = &tail->fqe_pnode;
         if (pnode->pl_packet) {
             hash = vr_fragment_get_hash(pnode);
-            index = (hash % VR_LINUX_ASSEMBLER_BUCKETS);
+            index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
             vfb = &vr_linux_assembler_table[index];
 
             spin_lock_bh(&vfb->vfb_lock);
@@ -110,8 +110,8 @@ vr_linux_assembler_table_scan(void *arg)
     struct vr_linux_fragment_bucket *vfb;
 
     i = vr_linux_assembler_scan_index;
-    for (j = 0; j < VR_LINUX_ASSEMBLER_BUCKETS; j++) {
-        vfb = &vr_linux_assembler_table[(i + j) % VR_LINUX_ASSEMBLER_BUCKETS];
+    for (j = 0; j < VR_ASSEMBLER_BUCKET_COUNT; j++) {
+        vfb = &vr_linux_assembler_table[(i + j) % VR_ASSEMBLER_BUCKET_COUNT];
         spin_lock_bh(&vfb->vfb_lock);
         if (vfb->vfb_frag_list)
             scanned += vr_assembler_table_scan(&vfb->vfb_frag_list);
@@ -122,7 +122,7 @@ vr_linux_assembler_table_scan(void *arg)
         }
     }
 
-    vr_linux_assembler_scan_index = (i + j) % VR_LINUX_ASSEMBLER_BUCKETS;
+    vr_linux_assembler_scan_index = (i + j) % VR_ASSEMBLER_BUCKET_COUNT;
     return;
 }
 
@@ -144,7 +144,7 @@ vr_linux_assembler_table_init(void)
 {
     unsigned int i, size;
 
-    size = sizeof(struct vr_linux_fragment_bucket) * VR_LINUX_ASSEMBLER_BUCKETS;
+    size = sizeof(struct vr_linux_fragment_bucket) * VR_ASSEMBLER_BUCKET_COUNT;
     vr_linux_assembler_table = vr_zalloc(size, VR_ASSEMBLER_TABLE_OBJECT);
     if (!vr_linux_assembler_table) {
         printk("%s:%d Allocation for %u failed\n",
@@ -152,7 +152,7 @@ vr_linux_assembler_table_init(void)
         return -ENOMEM;
     }
 
-    for (i = 0; i < VR_LINUX_ASSEMBLER_BUCKETS; i++) {
+    for (i = 0; i < VR_ASSEMBLER_BUCKET_COUNT; i++) {
         spin_lock_init(&vr_linux_assembler_table[i].vfb_lock);
     }
 
@@ -236,4 +236,3 @@ vr_assembler_init(void)
 
     return 0;
 }
-

@@ -8,8 +8,6 @@
 
 #include "vr_windows.h"
 
-#define VR_ASSEMBLER_BUCKET_COUNT VR_LINUX_ASSEMBLER_BUCKETS
-
 struct vr_win_fragment_bucket {
     KSPIN_LOCK vfb_lock;
     struct vr_fragment *vfb_frag_list;

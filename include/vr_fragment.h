@@ -10,7 +10,7 @@
 #include "vr_os.h"
 
 #define VR_ASSEMBLER_TIMEOUT_TIME               5
-#define VR_LINUX_ASSEMBLER_BUCKETS              1024
+#define VR_ASSEMBLER_BUCKET_COUNT               1024
 #define VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE    256
 #define VR_MAX_FRAGMENTS_PER_CPU_QUEUE          256
 #define VR_FRAG_ENQUEUE_ATTEMPTS                3
