@@ -22,7 +22,7 @@
 
 extern bool vr_has_to_fragment(struct vr_interface *, struct vr_packet *,
         unsigned int);
-extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
+extern struct vr_vrf_stats* vr_inet_vrf_stats(unsigned short, unsigned int);
 extern struct vr_nexthop *vr_inet6_ip_lookup(unsigned short, uint8_t *);
 extern struct vr_nexthop *vr_inet_ip_lookup(unsigned short, uint32_t);
 extern struct vr_nexthop *vr_inet_src_lookup(unsigned short,

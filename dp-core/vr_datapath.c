@@ -13,7 +13,7 @@
 #include <vr_packet.h>
 
 extern unsigned int vr_inet_route_flags(unsigned int, unsigned int);
-extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short,
+extern struct vr_vrf_stats* vr_inet_vrf_stats(unsigned short,
                                                  unsigned int);
 mac_response_t
 vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,

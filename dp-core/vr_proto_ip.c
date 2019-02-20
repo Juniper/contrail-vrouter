@@ -17,7 +17,7 @@
 
 static unsigned short vr_ip_id;
 
-extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
+extern struct vr_vrf_stats* vr_inet_vrf_stats(unsigned short, unsigned int);
 extern struct vr_nexthop *vr_inet6_ip_lookup(unsigned short, uint8_t *);
 
 unsigned short

@@ -27,7 +27,7 @@ int bridge_table_init(struct vr_rtable *, struct rtable_fspec *);
 void bridge_table_deinit(struct vr_rtable *, struct rtable_fspec *, bool);
 struct vr_bridge_entry *vr_find_bridge_entry(struct vr_bridge_entry_key *);
 struct vr_bridge_entry *vr_find_free_bridge_entry(unsigned int, char *);
-extern struct vr_vrf_stats *(*vr_inet_vrf_stats)(unsigned short, unsigned int);
+extern struct vr_vrf_stats* vr_inet_vrf_stats(unsigned short, unsigned int);
 extern l4_pkt_type_t vr_ip_well_known_packet(struct vr_packet *);
 extern l4_pkt_type_t vr_ip6_well_known_packet(struct vr_packet *);
 extern int vr_bridge_get_mac_type(char *mac);
