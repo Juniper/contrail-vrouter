@@ -72,6 +72,7 @@ void vr_fragment_del(vr_htable_t, struct vr_fragment *);
 uint32_t vr_fragment_get_hash(struct vr_packet_node *);
 int vr_fragment_assemble(struct vr_fragment **,
         struct vr_fragment_queue_element *);
+void vr_fragment_assemble_queue(struct vr_fragment_queue *);
 unsigned int vr_assembler_table_scan(struct vr_fragment **);
 int vr_fragment_enqueue(struct vrouter *, struct vr_fragment_queue *,
         struct vr_packet *, struct vr_forwarding_md *);
