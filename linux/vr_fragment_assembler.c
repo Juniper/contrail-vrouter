@@ -30,13 +30,25 @@ struct vr_linux_fragment_queue {
 };
 struct vr_linux_fragment_queue *vr_lfq_pcpu_queues;
 
+void
+lh_fragment_sync_assemble(struct vr_fragment_queue_element *vfqe)
+{
+    uint32_t hash, index;
+    struct vr_linux_fragment_bucket *vfb;
+
+    hash = vr_fragment_get_hash(&vfqe->fqe_pnode);
+    index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
+    vfb = &vr_linux_assembler_table[index];
+
+    spin_lock_bh(&vfb->vfb_lock);
+    vr_fragment_assemble(&vfb->vfb_frag_list, vfqe);
+    spin_unlock_bh(&vfb->vfb_lock);
+}
+
 static void
 vr_linux_fragment_assembler(struct work_struct *work)
 {
-    uint32_t hash, index;
-
     struct vr_packet_node *pnode;
-    struct vr_linux_fragment_bucket *vfb;
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
     struct vr_linux_fragment_queue *lfq = CONTAINER_OF(vrlfq_work,
             struct vr_linux_fragment_queue, work);
@@ -65,13 +77,7 @@ vr_linux_fragment_assembler(struct work_struct *work)
 
         pnode = &tail->fqe_pnode;
         if (pnode->pl_packet) {
-            hash = vr_fragment_get_hash(pnode);
-            index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
-            vfb = &vr_linux_assembler_table[index];
-
-            spin_lock_bh(&vfb->vfb_lock);
-            vr_fragment_assembler(&vfb->vfb_frag_list, tail);
-            spin_unlock_bh(&vfb->vfb_lock);
+            vr_fragment_sync_assemble(tail);
         }
 
         tail = tail_n;
