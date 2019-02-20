@@ -29,16 +29,30 @@ static int assembler_scan_thresh = 1024;
 
 /** @} */
 
+void
+dpdk_fragment_sync_assemble(struct vr_fragment_queue_element *vfqe)
+{
+    uint32_t hash, index;
+    unsigned int cpu;
+    struct fragment_bucket *bucket;
+
+    cpu = vr_get_cpu() - VR_DPDK_FWD_LCORE_ID;
+    assert(cpu >= 0 && cpu < (vr_num_cpus - VR_DPDK_FWD_LCORE_ID));
+
+    hash = vr_fragment_get_hash(&vfqe->fqe_pnode);
+    index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
+    bucket = &assembler_table[cpu][index];
+
+    vr_fragment_assemble(&bucket->frag_list, tail);
+}
+
 /**
  * @name Private functions
  * @{
  */
 static void
-dpdk_fragment_assembler(void *arg)
+dpdk_fragment_assemble_queue(void *arg)
 {
-    uint32_t hash, index;
-    unsigned int cpu;
-    struct fragment_bucket *bucket;
     struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
     struct per_cpu_fragment_queue *queue =
             (struct per_cpu_fragment_queue *)arg;
@@ -46,9 +60,6 @@ dpdk_fragment_assembler(void *arg)
     tail = vr_sync_lock_test_and_set_p(&queue->queue.vfq_tail, NULL);
     if (!tail)
         return;
-
-    cpu = vr_get_cpu() - VR_DPDK_FWD_LCORE_ID;
-    assert(cpu >= 0 && cpu < (vr_num_cpus - VR_DPDK_FWD_LCORE_ID));
 
     /*
      * first, reverse the list, since packets that came later are at the
@@ -69,11 +80,7 @@ dpdk_fragment_assembler(void *arg)
         tail->fqe_next = NULL;
 
         if (tail->fqe_pnode.pl_packet) {
-            hash = vr_fragment_get_hash(&tail->fqe_pnode);
-            index = (hash % VR_ASSEMBLER_BUCKET_COUNT);
-            bucket = &assembler_table[cpu][index];
-
-            vr_fragment_assembler(&bucket->frag_list, tail);
+            vr_fragment_sync_assemble(tail);
         }
 
         tail = tail_n;
@@ -206,7 +213,8 @@ dpdk_fragment_assembler_enqueue(struct vrouter *router, struct vr_packet *pkt,
 
     if (!ret) {
         lcore = vr_dpdk.lcores[cpu];
-        vr_dpdk_lcore_schedule_assembler_work(lcore, dpdk_fragment_assembler,
+        vr_dpdk_lcore_schedule_assembler_work(lcore,
+                dpdk_fragment_assemble_queue,
                 &per_cpu_queues[cpu - VR_DPDK_FWD_LCORE_ID].queue);
     }
 
