@@ -25,6 +25,7 @@ extern "C" {
 #include "vr_mem.h"
 #include "vr_offloads.h"
 #include "vr_pkt_droplog.h"
+#include "vr_fragment.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -223,6 +224,7 @@ struct host_os {
     void (*hos_del_mpls)(struct vrouter *, unsigned);
     int (*hos_enqueue_to_assembler)(struct vrouter *, struct vr_packet *,
             struct vr_forwarding_md *);
+    void (*hos_fragment_sync_assemble)(struct vr_fragment_queue_element *);
     void (*hos_set_log_level)(unsigned int vr_log_level);
     void (*hos_set_log_type)(unsigned int vr_log_type, int enable);
     unsigned int (*hos_get_log_level)(void);
@@ -281,6 +283,7 @@ struct host_os {
 #define vr_pkt_may_pull                 vrouter_host->hos_pkt_may_pull
 #define vr_gro_process                  vrouter_host->hos_gro_process
 #define vr_enqueue_to_assembler         vrouter_host->hos_enqueue_to_assembler
+#define vr_fragment_sync_assemble       vrouter_host->hos_fragment_sync_assemble
 #define vr_set_log_level                vrouter_host->hos_set_log_level
 #define vr_set_log_type                 vrouter_host->hos_set_log_type
 #define vr_get_log_level                vrouter_host->hos_get_log_level
