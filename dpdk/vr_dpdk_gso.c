@@ -191,10 +191,15 @@ dpdk_split_chained_mbuf(struct rte_mbuf *pkt_in, struct rte_mbuf **pkts_out,
             rte_memcpy(pkt_addr, in_hdr, hdr_len);
         }
         pkts_out[nb_segs++] = curr_pkt;
-        if (nb_segs >= nb_pkts_out)
+        if ((nb_segs >= nb_pkts_out) || (i >= total_segs)) {
+            for(j=1;j<(i+1);j++)
+                /* We cannot use dpdk_pfree() since the
+                 * fragments may not have vr_packet info
+                 */
+                rte_pktmbuf_free(pkts_out[j]);
+            rte_pktmbuf_free(next_pkt);
             return -1;
-        if (i >= total_segs)
-            return -1;
+        }
         curr_pkt = next_pkt;
         i++;
     }
