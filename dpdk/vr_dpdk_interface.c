@@ -1788,22 +1788,33 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             return -1;
         }
     } else if (unlikely(num_of_segs > 1)) {
-        uint64_t mask = (uint64_t)((uint64_t) (1ULL << (uint64_t)num_of_segs) - 1);
+        uint64_t segs_sent = 0;
+        uint64_t segs_to_send;
+        while (segs_sent < num_of_segs)  {
+            if ((num_of_segs - segs_sent) > VR_DPDK_TX_BURST_SZ) {
+                segs_to_send = VR_DPDK_TX_BURST_SZ;
+            } else {
+                segs_to_send = num_of_segs - segs_sent;
+            }
+            uint64_t mask = (uint64_t)((uint64_t) (1ULL << (uint64_t)segs_to_send) - 1);
 
-        if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
-            tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, mbufs_segs_out, mask);
-            if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
-                tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
-        } else {
-            RTE_LOG_DP(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
-                    "for lcore %u\n", __func__, vif->vif_name, lcore_id);
-            /* Can not do vif_drop_pkt() on segments as mbufs after
-             * segmentation does not have pkt structure */
-            for (i = 0; i < num_of_segs; ++i)
-                rte_pktmbuf_free(mbufs_segs_out[i]);
+            if (likely(tx_queue->txq_ops.f_tx_bulk != NULL)) {
+                    tx_queue->txq_ops.f_tx_bulk(tx_queue->q_queue_h, &mbufs_segs_out[segs_sent], mask);
+                if (unlikely(lcore_id < VR_DPDK_FWD_LCORE_ID))
+                    tx_queue->txq_ops.f_flush(tx_queue->q_queue_h);
+                segs_sent += segs_to_send;
 
-            vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
-            return -1;
+            } else {
+                RTE_LOG_DP(DEBUG, VROUTER,"%s: error TXing to interface %s: no queue "
+                        "for lcore %u\n", __func__, vif->vif_name, lcore_id);
+                /* Can not do vif_drop_pkt() on segments as mbufs after
+                 * segmentation does not have pkt structure */
+                for (i = 0; i < num_of_segs; ++i)
+                    rte_pktmbuf_free(mbufs_segs_out[i]);
+
+                vr_dpdk_pfree(m, pkt->vp_if, VP_DROP_INTERFACE_DROP);
+                return -1;
+            }
         }
     } else {
         if (likely(tx_queue->txq_ops.f_tx != NULL)) {
