@@ -222,7 +222,10 @@ extern unsigned vr_packet_sz;
  * allow for standard jumbo frame size (9000 / 1500 = 6) + 1 additional segment
  * for outer headers. */
 #define VR_DPDK_FRAG_MAX_IP_FRAGS   7
-#define VR_DPDK_FRAG_MAX_IP_SEGS    128
+/* Set to 256 just to ensure we have enough buffers in case mss is set
+ * to 256, if the packet size is 64K.
+ */
+#define VR_DPDK_FRAG_MAX_IP_SEGS    256
 #define VR_DPDK_VLAN_FWD_DEF_NAME   "vfw0"
 /*
  * Use IO lcores:
