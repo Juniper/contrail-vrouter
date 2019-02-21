@@ -935,23 +935,13 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         lookup_mac = dmac;
         if (!(mac_flags & MAC_UC_BIT_SET)) {
             if (pkt->vp_type == VP_TYPE_IP) {
-                if (!(pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED)) {
-                    if (!vif_is_fabric(pkt->vp_if) && vif_is_tap(pkt->vp_if)) {
-                        /*
-                         * If IGMP is not enabled at VMI, packet has to be
-                         * flooded.
-                         */
-                        lookup_mac = (int8_t *)vr_bcast_mac;
-                    }
-                } else {
-                    if (!vif_is_fabric(pkt->vp_if) && vif_is_tap(pkt->vp_if)) {
-                        /*
-                         * Not expected to receive mcast packets from VMs in
-                         * P1. Only from BMS can mcast packets be received.
-                         */
-                        vr_pfree(pkt, VP_DROP_INVALID_IF);
-                        return 0;
-                    }
+                if (!vif_is_fabric(pkt->vp_if) && vif_is_tap(pkt->vp_if)) {
+                    /*
+                     * Locally generated multicast packets are not handled
+                     * by EVPN multicast in P1. We should do lookup for
+                     * broadcast mac to be able to use IMET route
+                     */
+                    lookup_mac = (int8_t *)vr_bcast_mac;
                 }
             } else {
                 lookup_mac = (int8_t *)vr_bcast_mac;
