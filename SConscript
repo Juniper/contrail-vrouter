@@ -356,8 +356,18 @@ if sys.platform != 'darwin':
                 '/p:Platform=x64',
                 '/p:Configuration=' + env['VS_BUILDMODE']
             ]
-
             subprocess.call(msbuild, cwd=Dir('#/vrouter').abspath)
+
+            signtool = [
+                'signtool.exe',
+                'sign',
+                '/debug',
+                '/f', os.environ['CERT_FILEPATH'],
+                '/p', os.environ['CERT_PASSWORD'],
+                File('#/build/debug/vrouter/extension/vRouter/vrouter.sys').abspath
+            ]
+            subprocess.call(signtool)
+
         vrouter_target = File('#/build/' + env['OPT'] + '/vrouter/extension/vRouter/vRouter.sys')
     else:
         make_cmd = 'cd ' + make_dir + ' && make'
