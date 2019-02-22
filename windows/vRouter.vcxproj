@@ -65,9 +65,9 @@
     <Link>
       <AdditionalDependencies>ndis.lib;ntstrsafe.lib;Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <DriverSign>
-      <AdditionalOptions>/debug</AdditionalOptions>
-    </DriverSign>
+    <PostBuildEvent>
+      <Command>"C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign /debug /f ..\..\third_party\certs\codilime.com-selfsigned-cert.pfx /p contrailwin ..\..\build\debug\vrouter\extension\vRouter\vrouter.sys</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
