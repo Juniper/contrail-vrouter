@@ -65,9 +65,6 @@
     <Link>
       <AdditionalDependencies>ndis.lib;ntstrsafe.lib;Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <DriverSign>
-      <AdditionalOptions>/debug</AdditionalOptions>
-    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
