@@ -67,9 +67,6 @@
     <Link>
       <AdditionalDependencies>ndis.lib;ntstrsafe.lib;Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <DriverSign>
-      <AdditionalOptions>/debug</AdditionalOptions>
-    </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
