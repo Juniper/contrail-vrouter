@@ -32,6 +32,9 @@ unsigned int vhost_num_interfaces;
 
 extern struct vr_interface vr_reset_interface;
 
+extern bool vr_hpage_config_inited;
+extern bool vr_hpage_req_recv;
+
 extern int linux_to_vr(struct vr_interface *, struct sk_buff *);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
@@ -384,6 +387,12 @@ vhost_remove_xconnect(void)
         vp = vhost_priv_db[i];
         if (vp) {
             if (vp->vp_vifp) {
+                if(vr_huge_page_config && (vr_hpage_config_inited == false))
+                {
+                    vr_printf("Hugepage is not initialized \n");
+                    if(vr_hpage_req_recv != vr_hpage_req_resp)
+                        vr_printf("Hugepage request not processed by vrouter \n");
+                }
                 vif_remove_xconnect(vp->vp_vifp);
                 if ((bridge = vp->vp_vifp->vif_bridge))
                     vif_remove_xconnect(bridge);

@@ -50,6 +50,11 @@ extern const char *ContrailBuildInfo;
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
+
+/* Below hugepage req recv and resp variables are added for debug purpose */
+int vr_hpage_req_recv = 0;
+int vr_hpage_req_resp = 0;
+
 unsigned int vr_memory_alloc_checks = 0;
 unsigned int vr_priority_tagging = 0;
 
@@ -619,6 +624,9 @@ vr_hugepage_config_process(void *s_req)
     vr_hugepage_config *req= (vr_hugepage_config *)s_req;
     struct vrouter *router = vrouter_get(0);
 
+    /* Debug purpose: Increment below variable when we get hugepage req from agent */
+    vr_hpage_req_recv++;
+
     /* Only addition of huge pages is supported */
     if (req->vhp_op != SANDESH_OP_ADD) {
         vr_send_response(-EOPNOTSUPP);
@@ -693,6 +701,11 @@ vr_hugepage_config_process(void *s_req)
         hcfg_resp.vhp_resp = VR_HPAGE_CFG_RESP_MEM_FAILURE;
         ret = mret;
     }
+
+    /* Debug purpose: Increment below variable before sending response */
+    vr_hpage_req_resp++;
+    vr_printf("Huge page req_recv_cntr:%d resp_cntr:%d resp: %d ret: %d\n", vr_hpage_req_recv,
+            vr_hpage_req_resp, hcfg_resp.vhp_resp, ret);
 
     vr_message_response(VR_HPAGE_CFG_OBJECT_ID, &hcfg_resp, ret,
                 false);
