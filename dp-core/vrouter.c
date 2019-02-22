@@ -50,6 +50,7 @@ extern const char *ContrailBuildInfo;
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
+bool vr_hpage_req_recv = false;
 unsigned int vr_memory_alloc_checks = 0;
 unsigned int vr_priority_tagging = 0;
 
@@ -619,6 +620,7 @@ vr_hugepage_config_process(void *s_req)
     vr_hugepage_config *req= (vr_hugepage_config *)s_req;
     struct vrouter *router = vrouter_get(0);
 
+    vr_hpage_req_recv = true;
     /* Only addition of huge pages is supported */
     if (req->vhp_op != SANDESH_OP_ADD) {
         vr_send_response(-EOPNOTSUPP);
