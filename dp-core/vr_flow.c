@@ -2801,3 +2801,40 @@ vr_flow_init(struct vrouter *router)
 {
     return 0;
 }
+
+/*
+ * Called by offload module to update flow stats with packets which have been
+ * offloaded. over_flow_bytes and over_flow_packets account for overflows which
+ * happen in firmware between updates using this function.
+ */
+int
+vr_flow_incr_stats(int fe_index, uint32_t flow_bytes, uint16_t over_flow_bytes,
+                   uint32_t flow_packets, uint8_t over_flow_packets)
+{
+    struct vrouter *router = vrouter_get(0);
+    struct vr_flow_entry *fe;
+    uint32_t new_stats;
+
+    if (router == NULL)
+        return -EINVAL;
+
+    fe = vr_flow_get_entry(router, fe_index);
+    if (fe == NULL)
+        return -ENOENT;
+
+    if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE))
+        return -ENOENT;
+
+    new_stats = vr_sync_add_and_fetch_32u(&fe->fe_stats.flow_bytes, flow_bytes);
+    if (new_stats < flow_bytes)
+        ++fe->fe_stats.flow_bytes_oflow;
+    fe->fe_stats.flow_bytes_oflow += over_flow_bytes;
+
+    new_stats = vr_sync_add_and_fetch_32u(&fe->fe_stats.flow_packets,
+                                          flow_packets);
+    if (new_stats < flow_packets)
+        ++fe->fe_stats.flow_packets_oflow;
+    fe->fe_stats.flow_packets_oflow += over_flow_packets;
+
+    return 0;
+}
