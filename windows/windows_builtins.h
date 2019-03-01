@@ -162,6 +162,11 @@ vr_sync_lock_test_and_set_8u(volatile UINT8 *ptr, UINT8 val)
     return InterlockedExchange8((volatile CHAR *)ptr, val);
 }
 
+__forceinline PVOID
+vr_sync_lock_test_and_set_p(volatile PVOID *ptr, PVOID val)
+{
+    return InterlockedExchangePointer(ptr, val);
+}
 
 __forceinline void
 vr_sync_synchronize()

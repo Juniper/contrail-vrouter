@@ -41,7 +41,7 @@ vr_linux_fragment_assembler(struct work_struct *work)
     struct vr_linux_fragment_queue *lfq = CONTAINER_OF(vrlfq_work,
             struct vr_linux_fragment_queue, work);
 
-    tail = __sync_lock_test_and_set(&lfq->vrlfq_queue.vfq_tail, NULL);
+    tail = vr_sync_lock_test_and_set_p(&lfq->vrlfq_queue.vfq_tail, NULL);
     if (!tail)
         return;
 
