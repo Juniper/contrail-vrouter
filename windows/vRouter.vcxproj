@@ -143,6 +143,7 @@
     <ClInclude Include="win_interface.h" />
     <ClInclude Include="win_packetdump.h" />
     <ClInclude Include="win_tx_postprocess.h" />
+    <ClInclude Include="win_work_item.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c" />
@@ -210,6 +211,7 @@
     <ClCompile Include="win_interface.c" />
     <ClCompile Include="win_packetdump.c" />
     <ClCompile Include="win_tx_postprocess.c" />
+    <ClCompile Include="win_work_item.c" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="vRouter.inf" />
