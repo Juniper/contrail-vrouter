@@ -346,7 +346,8 @@ vr_dpdk_init_sw_tx_rings(struct vr_interface *vif, unsigned int least_used_id)
                 tx_queue = vr_dpdk_ring_tx_queue_init(lcore_id, vif,
                         queue, host_lcore_id);
                 if (tx_queue == NULL) {
-                    lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue] = -1;
+                    if (lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx])
+                        lcore->lcore_hw_queue_to_dpdk_index[vif->vif_idx][queue] = -1;
                     return -EFAULT;
                 }
 
