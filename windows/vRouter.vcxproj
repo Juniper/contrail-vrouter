@@ -73,7 +73,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\production\vrouter\sandesh\gen-c;..\windows;..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\..\build\production\vrouter\sandesh\gen-c;..\windows;..\include;.\ksync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
       <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
       <PreCompiledHeader></PreCompiledHeader>
