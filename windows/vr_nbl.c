@@ -267,11 +267,14 @@ AreAllHeadersInsideBuffer(struct vr_packet *pkt)
     return true;
 }
 
-// Checks if all the headers needed by agent are in the first
-// MDL, otherwise reallocates the NBL.
-// This function always consumes the vr_packet and associated NBL
-// (both in the case of a success and in the case of an error).
-// Returns a "fixed" vr_packet (could be original one) or NULL on failure.
+// Function creates new NBL and copies data from original NBL.
+// As a result all data in a copy is contained in one continuous
+// memory segment. These steps are needed for two reasons:
+// 1. We need to pass modified packet, but original packet should be
+//    left unmodified.
+// 2. All headers are expected to be in continuous memory segment
+//    (this is assumption of cross-platform code).
+// Return value: new packet or NULL on failure.
 static struct vr_packet *
 ReallocateHeaders(struct vr_packet *orig_vr_pkt)
 {
@@ -280,11 +283,15 @@ ReallocateHeaders(struct vr_packet *orig_vr_pkt)
     PWIN_PACKET_RAW raw_packet = WinPacketToRawPacket(orig_pkt->WinPacket);
     PNET_BUFFER_LIST original_nbl = WinPacketRawToNBL(raw_packet);
 
+    // TODO: we may avoid copying NBL as it was done before, but it requires
+    //       reverting changes applied to original packet once it is handled.
+    //       Such a modification might improve performance and is worth
+    //       investigating.
+    //if (orig_pkt->VrPacket.vp_len == data_length || AreAllHeadersInsideBuffer(&orig_pkt->VrPacket))
+    //    return &orig_pkt->VrPacket;
+
     PNET_BUFFER orig_nb = NET_BUFFER_LIST_FIRST_NB(original_nbl);
     LONG data_length = NET_BUFFER_DATA_LENGTH(orig_nb);
-
-    if (orig_pkt->VrPacket.vp_len == data_length || AreAllHeadersInsideBuffer(&orig_pkt->VrPacket))
-        return &orig_pkt->VrPacket;
 
     PNET_BUFFER_LIST new_nbl = CreateNetBufferList(data_length);
     if (new_nbl == NULL)
