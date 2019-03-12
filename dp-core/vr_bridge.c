@@ -935,15 +935,19 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
         lookup_mac = dmac;
         if (!(mac_flags & MAC_UC_BIT_SET)) {
             if (pkt->vp_type == VP_TYPE_IP) {
-                if (!(pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED) ||
-                        vif_is_tap(pkt->vp_if)) {
-                    /*
-                     * Locally generated multicast packets are not handled
-                     * by EVPN multicast in P1. We should do lookup for
-                     * broadcast mac to be able to use IMET route.
-                     * Same if igmp is not enabled
-                     */
-                    lookup_mac = (int8_t *)vr_bcast_mac;
+                if (!(pkt->vp_if->vif_flags & VIF_FLAG_IGMP_ENABLED)) {
+                    if (!vif_is_fabric(pkt->vp_if) && vif_is_tap(pkt->vp_if)) {
+                        /*
+                         * - Comes here for VxLAN tunnel based multicast data.
+                         * For this, IGMP is always disabled on fabric vif.
+                         *
+                         * - Packets originating from VM with IGMP disabled.
+                         * Locally generated multicast packets are not handled
+                         * by EVPN multicast in P1. We should do lookup for
+                         * broadcast mac to be able to use IMET route.
+                         */
+                        lookup_mac = (int8_t *)vr_bcast_mac;
+                    }
                 }
             } else {
                 lookup_mac = (int8_t *)vr_bcast_mac;
@@ -951,7 +955,8 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             be = bridge_lookup(lookup_mac, fmd);
         }
         if (!be) {
-            lookup_mac = dmac;
+            /* Fallback MAC lookup */
+            lookup_mac = (int8_t *)vr_bcast_mac;
             be = bridge_lookup(lookup_mac, fmd);
         }
         if (be)
