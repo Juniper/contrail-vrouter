@@ -547,6 +547,16 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
     memcpy(&sarp, pkt_data(pkt), sizeof(struct vr_arp));
 
+    /* Validate the arp pkt */
+    if (((htons(sarp.arp_hw) == VR_ARP_HW_TYPE_ETHER) &&
+          (sarp.arp_hwlen != VR_ARP_HW_LEN)) ||
+         ((htons(sarp.arp_proto) == VR_ETH_PROTO_IP) &&
+          (sarp.arp_protolen != VR_ARP_PROTO_LEN_IPV4))) {
+        PKT_LOG(VP_DROP_INVALID_ARP, pkt, 0, VR_DATAPATH_C, __LINE__);
+        vr_pfree(pkt, VP_DROP_INVALID_ARP);
+        return handled;
+    }
+
     switch (ntohs(sarp.arp_op)) {
     case VR_ARP_OP_REQUEST:
         return vr_handle_arp_request(&sarp, pkt, fmd, eth_dmac);
