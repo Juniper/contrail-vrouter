@@ -20,6 +20,7 @@ struct tcp_pseudo_header {
 
 uint16_t trim_csum(uint32_t csum);
 uint16_t calc_csum(uint8_t* ptr, size_t size);
+void csum_replace2(uint16_t *csum, uint16_t old_val, uint16_t new_val);
 
 void init_tcp_pseudo_header(
     struct vr_ip* ip_hdr,
