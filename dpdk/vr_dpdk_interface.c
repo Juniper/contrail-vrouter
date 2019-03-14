@@ -498,12 +498,6 @@ dpdk_vif_attach_ethdev(struct vr_interface *vif,
         vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
     }
 
-    /* 
-     * TODO: Workaround for CEM-3470
-     * Disable Hw Checksum calculation until we fix this in dpdk 18.05
-     */
-    vif->vif_flags &= ~VIF_FLAG_TX_CSUM_OFFLOAD;
-
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_VLAN_INSERT
         && dev_info.rx_offload_capa & DEV_RX_OFFLOAD_VLAN_STRIP) {
         /*
