@@ -68,7 +68,7 @@ struct rte_eth_conf ethdev_conf = {
     .txmode = { /* Port TX configuration. */
         .mq_mode            = ETH_MQ_TX_NONE, /* TX multi-queues mode */
 #if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
-        .offloads = 0,
+        .offloads = DEV_TX_OFFLOAD_UDP_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM | DEV_TX_OFFLOAD_IPV4_CKSUM,
 #endif
         /* For i40e specifically */
         .pvid               = 0,
@@ -127,8 +127,8 @@ static const struct rte_eth_txconf tx_queue_conf = {
         .wthresh = 0,   /* Ring writeback threshold */
     },
 #if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
-    .offloads = 0,
-    .txq_flags = ETH_TXQ_FLAGS_IGNORE,
+    .offloads  = DEV_TX_OFFLOAD_UDP_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM | DEV_TX_OFFLOAD_IPV4_CKSUM,
+    .txq_flags = 0, /* Reverting to older API as newer api doesnt work ETH_TXQ_FLAGS_IGNORE, */
 #else
     .txq_flags = 0,          /* Set flags for the Tx queue */
 #endif
