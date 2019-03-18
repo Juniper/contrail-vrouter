@@ -691,6 +691,7 @@ dpdk_pcow(struct vr_packet **pktp, unsigned short head_room)
     struct rte_mbuf *mbuf = vr_dpdk_pkt_to_mbuf(pkt);
     struct rte_mbuf *m_copy;
     struct vr_packet *p_copy;
+    struct rte_mbuf *mbuf_new;
 
     /*
      * If this is an indirect mbuf, allocate a new mbuf and copy
@@ -712,7 +713,26 @@ dpdk_pcow(struct vr_packet **pktp, unsigned short head_room)
     }
 
     if (head_room > rte_pktmbuf_headroom(mbuf)) {
-        return -ENOMEM;
+
+        /* When requested headroom is higher than configured pktmuf_headroom,
+         * Create a new memory buffer and link to the old mbuf */
+        mbuf_new = rte_pktmbuf_alloc(vr_dpdk.rss_mempool);
+        if (!mbuf_new) {
+            return -ENOMEM;
+        }
+
+        pkt = vr_dpdk_packet_get(mbuf_new, pkt->vp_if);
+        if(!pkt)
+            return -ENOMEM;
+
+        mbuf_new->next = mbuf;
+        mbuf_new->nb_segs++;
+        mbuf_new->ol_flags |= mbuf->ol_flags;
+        mbuf_new->data_off += head_room;
+        mbuf_new->pkt_len +=  mbuf->data_len;
+
+        pkt->vp_data = mbuf_new->data_off;
+        *pktp = pkt;
     }
 
     return 0;

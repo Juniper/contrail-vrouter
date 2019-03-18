@@ -1149,6 +1149,52 @@ dpdk_ipv4_sw_iphdr_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     iph->ip_csum = vr_ip_csum(iph);
 }
 
+/**
+ * Process the IPv4 UDP or TCP checksum in a **chained** mbuf.
+ *
+ * The IPv4 header should not contains options. The IP and layer 4
+ * checksum must be set to 0 in the packet by the caller.
+ *
+ * @param ipv4_hdr
+ *   The pointer to the contiguous IPv4 header.
+ * @param l4_hdr
+ *   The pointer to the beginning of the L4 header.
+ * @return
+ *   The complemented checksum to set in the IP packet.
+ */
+inline uint16_t
+dpdk_ipv4_udptcp_cksum(struct rte_mbuf *m,
+                       const struct ipv4_hdr *ipv4_hdr,
+                       uint8_t *l4_hdr)
+{
+    uint32_t cksum = 0;
+    uint32_t l4_len;
+    uint32_t data_len = 0, rem_len = 0;
+    uint8_t *data_ptr = NULL;
+
+    l4_len = rte_be_to_cpu_16(ipv4_hdr->total_length) -
+        ((ipv4_hdr->version_ihl & 0xf) << 2);
+
+    do {
+        data_ptr = likely(!!data_ptr)? rte_pktmbuf_mtod(m, uint8_t*):l4_hdr;
+        data_len = likely(!!data_len)? rte_pktmbuf_data_len(m):
+                   rte_pktmbuf_mtod(m, uint8_t*) + rte_pktmbuf_data_len(m) - l4_hdr ;
+        if (rem_len + data_len > l4_len)
+            data_len = l4_len - rem_len;
+        cksum += rte_raw_cksum(data_ptr, data_len);
+        rem_len += data_len;
+        m = m->next;
+    } while (m && rem_len < l4_len);
+
+    cksum += rte_ipv4_phdr_cksum(ipv4_hdr, 0);
+    cksum = ((cksum & 0xffff0000) >> 16) + (cksum & 0xffff);
+    cksum = (~cksum) & 0xffff;
+    if (cksum == 0)
+        cksum = 0xffff;
+
+    return cksum;
+}
+
 static inline void
 dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
 {
@@ -1157,6 +1203,7 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     unsigned char iph_len = 0, iph_proto = 0;
     struct vr_udp *udph;
     struct vr_tcp *tcph;
+    struct rte_mbuf *m = vr_dpdk_pkt_to_mbuf(pkt);
 
     RTE_VERIFY(0 < offset);
 
@@ -1178,14 +1225,14 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
         udph = (struct vr_udp *)pkt_data_at_offset(pkt, offset + iph_len);
         udph->udp_csum = 0;
         if (iph)
-            udph->udp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, udph);
+            udph->udp_csum = dpdk_ipv4_udptcp_cksum(m, (struct ipv4_hdr *)iph, (uint8_t *)udph);
         else if (ip6h)
             udph->udp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, udph);
     } else if (iph_proto == VR_IP_PROTO_TCP) {
         tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
         tcph->tcp_csum = 0;
         if (iph)
-            tcph->tcp_csum = rte_ipv4_udptcp_cksum((struct ipv4_hdr *)iph, tcph);
+            tcph->tcp_csum = dpdk_ipv4_udptcp_cksum(m, (struct ipv4_hdr *)iph, (uint8_t *)tcph);
         else if (ip6h)
             tcph->tcp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, tcph);
     }
@@ -1396,9 +1443,8 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
 
     /* reset mbuf data pointer and length */
     m->data_off = pkt_head_space(pkt);
+    m->pkt_len = pkt_len(pkt);
     m->data_len = pkt_head_len(pkt);
-    /* TODO: we do not support mbuf chains */
-    m->pkt_len = pkt_head_len(pkt);
 
     if (unlikely(vif->vif_flags & VIF_FLAG_MONITORED)) {
         monitoring_tx_queue = &lcore->lcore_tx_queues[vr_dpdk.monitorings[vif_idx]];
