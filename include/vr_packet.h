@@ -292,6 +292,7 @@ vr_vlan_get_tos(uint8_t *eth_data)
 #endif
 
 #define VR_ARP_HW_TYPE_ETHER    1
+#define VR_ARP_PROTO_LEN_IPV4   4
 
 __attribute__packed__open__
 struct vr_arp {
