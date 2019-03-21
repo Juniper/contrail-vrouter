@@ -285,12 +285,15 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Flow Table limit                     %u\n"
         "    Flow Table overflow limit            %u\n"
         "    Mirror entries limit                 %u\n"
+        "    Vrouter pkt drop log buf size   	  %u\n"
+        "    En/Dis pkt drop debug log infra      %u\n"
         "\n",
 
         req->vo_interfaces, req->vo_vrfs, req->vo_nexthops,
         req->vo_mpls_labels, req->vo_bridge_entries,
         req->vo_oflow_bridge_entries, req->vo_flow_entries,
-        req->vo_oflow_entries, req->vo_mirror_entries
+        req->vo_oflow_entries, req->vo_mirror_entries,
+        req->vo_pkt_droplog_bufsz, req->vo_pkt_droplog_buf_en
     );
 
     printf("Runtime parameters\n"
@@ -316,6 +319,8 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Used Over Flow entries               %u\n"
         "    Used Bridge entries                  %u\n"
         "    Used Over Flow bridge entries        %u\n"
+	"    Vrouter packet drop log enable       %u\n"
+	"    Vrouter Packet drop log minimum enable %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -324,7 +329,8 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_perfq1, req->vo_perfq2, req->vo_perfq3,
         req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp,
         req->vo_flow_used_entries, req->vo_flow_used_oentries,
-        req->vo_bridge_used_entries, req->vo_bridge_used_oentries
+        req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
+        req->vo_pkt_droplog_en, req->vo_pkt_droplog_min_en
     );
 
     return;
