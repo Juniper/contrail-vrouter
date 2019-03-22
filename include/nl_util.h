@@ -201,7 +201,7 @@ extern void vr_drop_stats_req_destroy(vr_drop_stats_req *);
 extern vr_drop_stats_req *vr_drop_stats_req_get_copy(vr_drop_stats_req *);
 extern int vr_send_drop_stats_get(struct nl_client *, unsigned int,
         short);
-
+extern int vr_drop_stats_reset(struct nl_client *);
 extern int vr_send_interface_dump(struct nl_client *, unsigned int, int, int);
 extern int vr_send_interface_get(struct nl_client *, unsigned int,
                 int, int, int, int);

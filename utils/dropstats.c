@@ -29,7 +29,7 @@
 #include "vr_packet.h"
 
 static struct nl_client *cl;
-static int help_set, core_set, offload_set, log_set;
+static int help_set, core_set, offload_set, log_set, clear_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
 static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index);
@@ -155,6 +155,13 @@ drop_stats_req_process(void *s_req)
 {
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
     int platform = get_platform();
+
+    if(stats->h_op == SANDESH_OP_RESET)
+    {
+        printf("\nDropstats counters cleared successfully on all cores \n\n");
+        return;
+    }
+
     if (core == (unsigned)-2)
         printf("Statistics for NIC offloads\n\n");
     else if (core != (unsigned)-1)
@@ -281,11 +288,22 @@ vr_get_drop_stats(struct nl_client *cl)
     return 0;
 }
 
+static int
+vr_clear_drop_stats(struct nl_client *cl)
+{
+    int ret = 0;
+    ret = vr_drop_stats_reset(cl);
+    if (ret < 0)
+        return ret;
+    return 0;
+}
+
 enum opt_index {
     HELP_OPT_INDEX,
     CORE_OPT_INDEX,
     OFFL_OPT_INDEX,
     LOG_OPT_INDEX,
+    CLEAR_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -294,6 +312,7 @@ static struct option long_options[] = {
     [CORE_OPT_INDEX]    =   {"core",    required_argument,  &core_set,      1},
     [OFFL_OPT_INDEX]    =   {"offload", no_argument,        &offload_set,   1},
     [LOG_OPT_INDEX]     =   {"log",     required_argument,  &log_set,       1},
+    [CLEAR_OPT_INDEX]   =   {"clear",   no_argument,        &clear_set,     1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
@@ -311,6 +330,7 @@ Usage()
     printf("--log <core number>\t Show Packet drops log for a specified core.. \
 		Core number starts from 1...n. If core number specified as zero, \
 		it will log for all cores \n");
+    printf("--clear\t To clear stats counters on all cores\n");
     exit(-EINVAL);
 }
 
@@ -343,6 +363,8 @@ parse_long_opts(int opt_index, char *opt_arg)
 		Usage();
 	}
 	break;
+    case CLEAR_OPT_INDEX:
+        break;
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -355,7 +377,7 @@ int
 main(int argc, char *argv[])
 {
     char opt;
-    int ret, option_index, log_core = 0, i = 0;;
+    int ret, option_index, log_core = 0, i = 0;
 
     dropstats_fill_nl_callbacks();
 
@@ -405,7 +427,16 @@ main(int argc, char *argv[])
     if (!cl)
         return -1;
 
-    vr_get_drop_stats(cl);
+    if (option_index == CLEAR_OPT_INDEX)
+    {
+        vr_clear_drop_stats(cl);
+
+        ret = vr_recvmsg(cl, false);
+        if (ret <= 0)
+            return ret;
+    }
+    else
+        vr_get_drop_stats(cl);
 
     return 0;
 }
