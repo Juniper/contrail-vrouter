@@ -350,7 +350,13 @@ if sys.platform != 'darwin':
                        duplicate = 0)
 
     if sys.platform.startswith('win'):
-        vrouter_target = File('#/build/' + env['OPT'] + '/vrouter/extension/vRouter/vRouter.sys')
+        vrouter_folder = '#/build/' + env['OPT'] + '/vrouter/extension/vRouter/'
+        vrouter_files = [
+            'vrouter.cat',
+            'vRouter.sys',
+            'vRouter.inf',
+        ]
+        vrouter_target = [File(vrouter_folder + f) for f in vrouter_files]
 
         def make_cmd(target, source, env):
             msbuild = [
@@ -360,16 +366,6 @@ if sys.platform != 'darwin':
                 '/p:Configuration=' + env['VS_BUILDMODE']
             ]
             subprocess.call(msbuild, cwd=Dir('#/vrouter').abspath)
-
-            signtool = [
-                'signtool.exe',
-                'sign',
-                '/debug',
-                '/f', os.environ['CERT_FILEPATH'],
-                '/p', os.environ['CERT_PASSWORD'],
-                vrouter_target.abspath
-            ]
-            subprocess.call(signtool)
 
     else:
         make_cmd = 'cd ' + make_dir + ' && make'
