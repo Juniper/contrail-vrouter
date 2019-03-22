@@ -152,11 +152,47 @@ exit_get:
     return;
 }
 
+static void
+vr_drop_stats_clear(vr_drop_stats_req *req)
+{
+
+    int i = 0, size = 0, ret = 0;
+    struct vrouter *router = vrouter_get(0);
+    vr_drop_stats_req *response = NULL;
+
+    response = vr_zalloc(sizeof(*response), VR_DROP_STATS_REQ_OBJECT);
+    if (!response && (ret = -ENOMEM))
+        goto exit_get;
+
+    if (!router->vr_pdrop_stats)
+        return;
+
+    size = VP_DROP_MAX * sizeof(uint64_t);
+    for (i = 0; i < vr_num_cpus; i++) {
+        memset(&router->vr_pdrop_stats[i], 0, size);
+    }
+    response->h_op = SANDESH_OP_RESET;
+
+exit_get:
+    vr_message_response(VR_DROP_STATS_OBJECT_ID, ret ? NULL : response, ret, false);
+
+    if (response != NULL)
+        vr_free(response, VR_DROP_STATS_REQ_OBJECT);
+
+    return;
+}
+
 void
 vr_drop_stats_req_process(void *s_req)
 {
-    int ret;
+    int ret = 0;
     vr_drop_stats_req *req = (vr_drop_stats_req *)s_req;
+
+    if(req->h_op == SANDESH_OP_RESET)
+    {
+        vr_drop_stats_clear(req);
+        return;
+    }
 
     if ((req->h_op != SANDESH_OP_GET) && (ret = -EOPNOTSUPP))
         vr_send_response(ret);
