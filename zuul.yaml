@@ -1,0 +1,7 @@
+- project:
+    name: Juniper/contrail-vrouter
+    templates:
+      - unittests
+      - systests
+      - windows-sanity
+      - openshift-systests
