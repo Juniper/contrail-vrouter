@@ -555,7 +555,7 @@ vr_adjust_tcp_mss(struct vr_tcp *tcph, uint16_t len_overhead, uint16_t *old_mss,
         return false;
     }
 
-    eth_mtu = router->vr_eth_if->vif_mtu;
+    eth_mtu = router->vr_eth_if->vif_mtu - VR_ETHER_HLEN;
 
     return __vr_adjust_tcp_mss(tcph, len_overhead, eth_mtu, old_mss, new_mss);
 }
