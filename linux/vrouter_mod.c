@@ -796,7 +796,7 @@ lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb, unsigned short overl
 {
     uint16_t old_mss, new_mss;
 
-    if (vr_adjust_tcp_mss(tcph, overlay_len + hlen, &old_mss, &new_mss)) {
+    if (vr_adjust_tcp_mss((struct vr_tcp*)tcph, overlay_len + hlen, &old_mss, &new_mss)) {
         inet_proto_csum_replace2(&tcph->check, skb,
                                  htons(old_mss),
                                  htons(new_mss), 0);
