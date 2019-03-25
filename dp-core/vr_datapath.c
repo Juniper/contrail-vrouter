@@ -203,6 +203,7 @@ vr_arp_proxy(struct vr_arp *sarp, struct vr_packet *pkt,
 
     eth = (struct vr_eth *)pkt_push(pkt, sizeof(*eth));
     if (!eth) {
+        PKT_LOG(VP_DROP_PUSH, pkt, 0, VR_DATAPATH_C, __LINE__);
         vr_pfree(pkt, VP_DROP_PUSH);
         return;
     }
@@ -267,6 +268,7 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
         break;
 
     case MR_DROP:
+        PKT_LOG(VP_DROP_INVALID_ARP, pkt, 0, VR_DATAPATH_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_ARP);
         break;
 
@@ -279,6 +281,7 @@ vr_handle_arp_request(struct vr_arp *sarp, struct vr_packet *pkt,
         if (!vif_is_service(pkt->vp_if)) {
             handled = false;
         } else {
+            PKT_LOG(VP_DROP_INVALID_ARP, pkt, 0, VR_DATAPATH_C, __LINE__);
             vr_pfree(pkt, VP_DROP_INVALID_ARP);
         }
         break;
@@ -370,6 +373,7 @@ vr_handle_arp_reply(struct vr_arp *sarp, struct vr_packet *pkt,
     }
 
     /* Any other Response can be dropped */
+    PKT_LOG(VP_DROP_INVALID_IF, pkt, 0, VR_DATAPATH_C, __LINE__);
     vr_pfree(pkt, VP_DROP_INVALID_IF);
 
     return handled;
@@ -538,6 +542,7 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         return !handled;
 
     if (pkt->vp_len < sizeof(struct vr_arp)) {
+        PKT_LOG(VP_DROP_INVALID_ARP, pkt, 0, VR_DATAPATH_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_ARP);
         return handled;
     }
@@ -553,6 +558,7 @@ vr_arp_input(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
         break;
 
     default:
+        PKT_LOG(VP_DROP_INVALID_ARP, pkt, 0, VR_DATAPATH_C, __LINE__);
         vr_pfree(pkt, VP_DROP_INVALID_ARP);
     }
 
@@ -574,6 +580,7 @@ vr_trap(struct vr_packet *pkt, unsigned short trap_vrf,
         return router->vr_agent_if->vif_send(router->vr_agent_if, pkt,
                         &params);
     } else {
+        PKT_LOG(VP_DROP_TRAP_NO_IF, pkt, 0, VR_DATAPATH_C, __LINE__);
         vr_pfree(pkt, VP_DROP_TRAP_NO_IF);
     }
 
@@ -589,6 +596,7 @@ vr_reinject_packet(struct vr_packet *pkt, struct vr_forwarding_md *fmd)
     if (pkt->vp_nh) {
         /* If nexthop does not have valid data, drop it */
         if (!(pkt->vp_nh->nh_flags & NH_FLAG_VALID)) {
+            PKT_LOG(VP_DROP_INVALID_NH, pkt, 0, VR_DATAPATH_C, __LINE__);
             vr_pfree(pkt, VP_DROP_INVALID_NH);
             return 0;
         }
