@@ -48,6 +48,7 @@ extern void vr_nexthop_req_process(void *s_req) __attribute__((weak));
 extern void vr_vrf_assign_req_process(void *s_req) __attribute__((weak));
 extern void vr_vrf_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_drop_stats_req_process(void *s_req) __attribute__((weak));
+extern void vr_pkt_drop_log_req_process(void *s_req) __attribute__((weak));
 extern void vr_vxlan_req_process(void *s_req) __attribute__((weak));
 extern void vr_mem_stats_req_process(void *s_req) __attribute__((weak));
 extern void vr_fc_map_req_process(void *s_req) __attribute__((weak));
@@ -124,6 +125,12 @@ vr_vrf_assign_req_process(void *s_req)
 
 void
 vr_vrf_stats_req_process(void *s_req)
+{
+    return;
+}
+
+void
+vr_pkt_drop_log_req_process(void *s_req)
 {
     return;
 }
