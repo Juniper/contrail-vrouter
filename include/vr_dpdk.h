@@ -952,17 +952,18 @@ int dpdk_fragment_assembler_init(void);
 void dpdk_fragment_assembler_exit(void);
 int dpdk_fragment_assembler_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd);
+void dpdk_fragment_sync_assemble(struct vr_fragment_queue_element *vfqe);
 void dpdk_fragment_assembler_table_scan(void *);
 void dpdk_gro_free_all_flows(struct vr_dpdk_lcore *lcore);
 void dpdk_gro_flush_all_inactive(struct vr_dpdk_lcore *lcore);
 int dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt);
-int dpdk_segment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in, 
-                struct rte_mbuf **mbuf_out, const unsigned short out_num, 
+int dpdk_segment_packet(struct vr_packet *pkt, struct rte_mbuf *mbuf_in,
+                struct rte_mbuf **mbuf_out, const unsigned short out_num,
                 const unsigned short mss_size, bool do_outer_ip_csum);
-uint16_t dpdk_ipv4_udptcp_cksum(struct rte_mbuf *m, 
-                       const struct ipv4_hdr *ipv4_hdr, 
+uint16_t dpdk_ipv4_udptcp_cksum(struct rte_mbuf *m,
+                       const struct ipv4_hdr *ipv4_hdr,
                        uint8_t *l4_hdr);
-uint16_t dpdk_ipv6_udptcp_cksum(struct rte_mbuf *m, 
+uint16_t dpdk_ipv6_udptcp_cksum(struct rte_mbuf *m,
                        const struct ipv6_hdr *ipv6_hdr,
                        uint8_t *l4_hdr);
 int dpdk_check_rx_mrgbuf_disable(void);

@@ -1465,6 +1465,7 @@ struct host_os dpdk_host = {
     .hos_add_mpls                   =    dpdk_add_mpls,
     .hos_del_mpls                   =    dpdk_del_mpls, /* not implemented */
     .hos_enqueue_to_assembler       =    dpdk_fragment_assembler_enqueue,
+    .hos_fragment_sync_assemble     =    dpdk_fragment_sync_assemble,
     .hos_set_log_level              =    dpdk_set_log_level,
     .hos_set_log_type               =    dpdk_set_log_type,
     .hos_get_log_level              =    dpdk_get_log_level,
@@ -1752,4 +1753,3 @@ int vr_dpdk_ulog(uint32_t level, uint32_t logtype, uint32_t *last_hash,
 
     return ret;
 }
-

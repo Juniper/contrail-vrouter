@@ -57,6 +57,7 @@ extern struct vr_packet *linux_get_packet(struct sk_buff *,
 
 extern int lh_enqueue_to_assembler(struct vrouter *, struct vr_packet *,
         struct vr_forwarding_md *);
+extern void lh_fragment_sync_assemble(struct vr_fragment_queue_element *);
 extern int vr_assembler_init(void);
 extern void vr_assembler_exit(void);
 
@@ -600,7 +601,7 @@ lh_pcow(struct vr_packet **pktp, unsigned short head_room)
 #else
     old_off = skb->network_header - skb->head;
 #endif
-    if (skb_cow(skb, head_room)) 
+    if (skb_cow(skb, head_room))
         return -ENOMEM;
     /* Now manipulate the offsets as data pointers are modified */
     pkt->vp_head = skb->head;
@@ -722,7 +723,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
             /*
              * If this fragment required flow lookup, get the source and
              * dst port from the frag entry. Otherwise, use 0 as the source
-             * dst port (which could result in fragments getting a different 
+             * dst port (which could result in fragments getting a different
              * outer UDP source port than non-fragments in the same flow).
              */
             frag = vr_fragment_get(router, vrf, iph);
@@ -742,7 +743,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
 
         hash_key[0] = vrf;
         hash_key[1] = (sport << 16) | dport;
-        if (pkt->vp_type == VP_TYPE_IP) 
+        if (pkt->vp_type == VP_TYPE_IP)
             memcpy(&hash_key[2], (char*)&iph->ip_saddr, 2 * VR_IP_ADDRESS_LEN);
         else
             memcpy(&hash_key[2], (char*)&ip6h->ip6_src, 2 * VR_IP6_ADDRESS_LEN);
@@ -774,7 +775,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     port = (__u16) (((u64) hashval * port_range) >> 32);
 
     if (port > port_range) {
-        /* 
+        /*
          * Shouldn't happen...
          */
         port = 0;
@@ -791,7 +792,7 @@ error:
  * lh_adjust_tcp_mss - adjust the TCP MSS in the given packet based on
  * vrouter physical interface MTU.
  */
-static void 
+static void
 lh_adjust_tcp_mss(struct tcphdr *tcph, struct sk_buff *skb, unsigned short overlay_len, unsigned short hlen)
 {
     uint16_t old_mss, new_mss;
@@ -828,7 +829,7 @@ lh_pkt_from_vm_tcp_mss_adj(struct vr_packet *pkt, unsigned short overlay_len)
     pull_len += sizeof(struct vr_ip);
 
     if (!pskb_may_pull(skb, pull_len)) {
-        return VP_DROP_PULL; 
+        return VP_DROP_PULL;
     }
 
     iph = (struct vr_ip *) (skb->head + pkt->vp_data);
@@ -894,7 +895,7 @@ out:
 
     return 0;
 }
-    
+
 /*
  * lh_reset_skb_fields - if the skb changes, possibley due to pskb_may_pull,
  * reset fields of the pkt structure that point at the skb fields.
@@ -983,7 +984,7 @@ lh_csum_verify(struct sk_buff *skb, struct vr_ip *iph)
 
 /*
  * lh_handle_checksum_complete_skb - if the skb has CHECKSUM_COMPLETE set,
- * set it to CHECKSUM_NONE. 
+ * set it to CHECKSUM_NONE.
  */
 static void
 lh_handle_checksum_complete_skb(struct sk_buff *skb)
@@ -1028,7 +1029,7 @@ vr_kmap_atomic(struct page *page)
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
     return kmap_atomic(page, KM_SKB_DATA_SOFTIRQ);
-#else 
+#else
     return NULL;
 #endif
 #else
@@ -1047,8 +1048,8 @@ vr_kunmap_atomic(void *va)
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 #if defined(RHEL_MAJOR) && defined(RHEL_MINOR) && \
            (RHEL_MAJOR == 6) && (RHEL_MINOR >= 4)
-    kunmap_atomic(va, KM_SKB_DATA_SOFTIRQ); 
-#else 
+    kunmap_atomic(va, KM_SKB_DATA_SOFTIRQ);
+#else
     return;
 #endif
 #else
@@ -2084,7 +2085,7 @@ lh_data_at_offset(struct vr_packet *pkt, unsigned short off)
 
     if (off < pkt->vp_end)
         return pkt->vp_head + off;
-    
+
     off = off - pkt->vp_end;
     skb = vp_os_packet(pkt);
 
@@ -2301,7 +2302,7 @@ struct host_os linux_host = {
     .hos_pcopy                      =       lh_pcopy,
     .hos_pfrag_len                  =       lh_pfrag_len,
     .hos_phead_len                  =       lh_phead_len,
-    .hos_pset_data                  =       lh_pset_data,  
+    .hos_pset_data                  =       lh_pset_data,
     .hos_pgso_size                  =       lh_pgso_size,
 
     .hos_get_cpu                    =       lh_get_cpu,
@@ -2328,6 +2329,7 @@ struct host_os linux_host = {
     .hos_pkt_may_pull               =       lh_pkt_may_pull,
     .hos_gro_process                =       lh_gro_process,
     .hos_enqueue_to_assembler       =       lh_enqueue_to_assembler,
+    .hos_fragment_sync_assemble     =       lh_fragment_sync_assemble,
     .hos_set_log_level              =       lh_set_log_level,
     .hos_set_log_type               =       lh_set_log_type,
     .hos_get_log_level              =       lh_get_log_level,
@@ -2338,7 +2340,7 @@ struct host_os linux_host = {
     .hos_huge_page_config           =       lh_huge_page_config,
     .hos_huge_page_mem_get          =       lh_huge_mem_get,
 };
-    
+
 struct host_os *
 vrouter_get_host(void)
 {
