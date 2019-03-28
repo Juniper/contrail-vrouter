@@ -42,40 +42,8 @@ win_fragment_sync_assemble(struct vr_fragment_queue_element *vfqe)
 static void
 VrFragmentAssembler(void *Context)
 {
-    struct vr_packet_node *pnode;
-    struct vr_fragment_queue_element *tail, *tail_n, *tail_p, *tail_pn;
     struct vr_fragment_queue *fq = (struct vr_fragment_queue *)Context;
-
-    tail = vr_sync_lock_test_and_set_p(&fq->vfq_tail, NULL);
-    if (!tail) {
-        return;
-    }
-
-    /*
-     * first, reverse the list, since packets that came later are at the
-     * head of the list
-     */
-    tail_p = tail->fqe_next;
-    tail->fqe_next = NULL;
-    while (tail_p) {
-        tail_pn = tail_p->fqe_next;
-        tail_p->fqe_next = tail;
-        tail = tail_p;
-        tail_p = tail_pn;
-    }
-
-    /* go through the list and insert it in the assembler work area */
-    while (tail) {
-        tail_n = tail->fqe_next;
-        tail->fqe_next = NULL;
-
-        pnode = &tail->fqe_pnode;
-        if (pnode->pl_packet) {
-            vr_fragment_sync_assemble(tail);
-        }
-
-        tail = tail_n;
-    }
+    vr_fragment_assemble_queue(fq);
 }
 
 int
