@@ -4,6 +4,7 @@
 #include "win_packet_raw.h"
 #include "win_packet.h"
 #include "win_packet_impl.h"
+#include "win_assert.h"
 #include "vr_windows.h"
 
 #define TEMP_BUFFER_SIZE 512
@@ -38,13 +39,13 @@ WritePacketToFileWork(PVOID work_item_context, NDIS_HANDLE work_item_handle)
                             FILE_SYNCHRONOUS_IO_NONALERT,
                             NULL, 0);
 
-    if(NT_SUCCESS(ntstatus)) {
+    if (NT_SUCCESS(ntstatus)) {
         LARGE_INTEGER byteOffset;
         byteOffset.LowPart = FILE_USE_FILE_POINTER_POSITION;
         byteOffset.HighPart = -1;
         size_t cb;
         ntstatus = RtlStringCbLengthA(outputBuffer, OUTPUT_BUFFER_SIZE, &cb);
-        if(NT_SUCCESS(ntstatus)) {
+        if (NT_SUCCESS(ntstatus)) {
             ntstatus = ZwWriteFile(handle, NULL, NULL, NULL, &ioStatusBlock,
             outputBuffer, cb, &byteOffset, NULL);
         }
@@ -91,7 +92,7 @@ AddVrPacketJSONInformation(struct vr_packet *packet, char* outputBuffer, size_t 
                                     (unsigned long)packet->vp_queue,
                                     (unsigned long)packet->vp_priority,
                                     (unsigned long)packet->vp_if->vif_mtu);
-    if(!NT_SUCCESS(ntstatus)) {
+    if (!NT_SUCCESS(ntstatus)) {
         return ntstatus;
     }
 
@@ -134,7 +135,7 @@ AddPacketMetaDataJSONInformation(struct vr_packet *packet, char* outputBuffer, s
                                     (unsigned long)settings.Transmit.IpHeaderChecksum,
                                     (unsigned long)settings.Transmit.TcpHeaderOffset);
 
-    if(!NT_SUCCESS(ntstatus)) {
+    if (!NT_SUCCESS(ntstatus)) {
         return ntstatus;
     }
 
@@ -143,27 +144,26 @@ AddPacketMetaDataJSONInformation(struct vr_packet *packet, char* outputBuffer, s
     return ntstatus;
 }
 
-static NTSTATUS
+static inline char
+NibbleToHex(uint8_t value)
+{
+    static const char * const nibbles = "0123456789ABCDEF";
+
+    WinAssert(value < 16);
+
+    return nibbles[value];
+}
+
+static void
 DumpBufferToHex(uint8_t* buffer, size_t bufferSize, char* outputBuffer, size_t outputBufferSize)
 {
-    char tempBuffer[4];
-    NTSTATUS ntstatus;
-
-    ntstatus = RtlStringCbPrintfA(outputBuffer, outputBufferSize, "");
-    if(NT_SUCCESS(ntstatus)) {
-        for (int i = 0; i < bufferSize; i++) {
-            ntstatus = RtlStringCbPrintfA(tempBuffer, 4, "%02X ", buffer[i]);
-            if(!NT_SUCCESS(ntstatus)) {
-                return ntstatus;
-            }
-            ntstatus = RtlStringCbCatA(outputBuffer, outputBufferSize, tempBuffer);
-            if(!NT_SUCCESS(ntstatus)) {
-                return ntstatus;
-            }
-        }
+    for (int i = 0; i < bufferSize; i++) {
+        *outputBuffer++ = NibbleToHex((buffer[i] >> 4) & 0x0F);
+        *outputBuffer++ = NibbleToHex(buffer[i] & 0x0F);
+        *outputBuffer++ = ' ';
     }
 
-    return ntstatus;
+    *outputBuffer = 0;
 }
 
 static NTSTATUS
@@ -183,10 +183,10 @@ AddBytesJSONInformation(struct vr_packet *packet, char* outputBuffer, size_t out
         if (packetBuffer != NULL) {
             WinRawFree(packetBuffer);
         }
-        if(packetBytesAsCharBuffer != NULL) {
+        if (packetBytesAsCharBuffer != NULL) {
             WinRawFree(packetBytesAsCharBuffer);
         }
-        if(tempBuffer != NULL) {
+        if (tempBuffer != NULL) {
             WinRawFree(tempBuffer);
         }
         return STATUS_INSUFFICIENT_RESOURCES;
@@ -194,13 +194,10 @@ AddBytesJSONInformation(struct vr_packet *packet, char* outputBuffer, size_t out
 
     vr_pcopy(packetBuffer, packet, packet->vp_data, packetBufferSize);
 
-    NTSTATUS ntstatus;
-    ntstatus = DumpBufferToHex(packetBuffer, packetBufferSize, packetBytesAsCharBuffer, packetBytesAsCharBufferSize);
-    if(NT_SUCCESS(ntstatus)) {
-        ntstatus = RtlStringCbPrintfA(tempBuffer, OUTPUT_BUFFER_SIZE, ",\"bytes\":\"%s\"", packetBytesAsCharBuffer);
-        if(NT_SUCCESS(ntstatus)) {
-            ntstatus = RtlStringCbCatA(outputBuffer, outputBufferSize, tempBuffer);
-        }
+    DumpBufferToHex(packetBuffer, packetBufferSize, packetBytesAsCharBuffer, packetBytesAsCharBufferSize);
+    NTSTATUS ntstatus = RtlStringCbPrintfA(tempBuffer, OUTPUT_BUFFER_SIZE, ",\"bytes\":\"%s\"", packetBytesAsCharBuffer);
+    if (NT_SUCCESS(ntstatus)) {
+        ntstatus = RtlStringCbCatA(outputBuffer, outputBufferSize, tempBuffer);
     }
 
     WinRawFree(packetBuffer);
@@ -225,33 +222,33 @@ WriteVrPacketToFile(struct vr_packet *packet, char tag[])
         return;
     }
 
-    if(!NT_SUCCESS(RtlStringCbPrintfA(outputBuffer, OUTPUT_BUFFER_SIZE, "{\"number\":%d,\"tag\":\"%s\"", packetNumber, tag))) {
+    if (!NT_SUCCESS(RtlStringCbPrintfA(outputBuffer, OUTPUT_BUFFER_SIZE, "{\"number\":%d,\"tag\":\"%s\"", packetNumber, tag))) {
         goto clean;
     }
 
-    if(!NT_SUCCESS(AddVrPacketJSONInformation(packet, outputBuffer, OUTPUT_BUFFER_SIZE))) {
+    if (!NT_SUCCESS(AddVrPacketJSONInformation(packet, outputBuffer, OUTPUT_BUFFER_SIZE))) {
         goto clean;
     }
 
-    if(!NT_SUCCESS(AddPacketMetaDataJSONInformation(packet, outputBuffer, OUTPUT_BUFFER_SIZE))) {
+    if (!NT_SUCCESS(AddPacketMetaDataJSONInformation(packet, outputBuffer, OUTPUT_BUFFER_SIZE))) {
         goto clean;
     }
 
-    if(!NT_SUCCESS(AddBytesJSONInformation(packet, outputBuffer, OUTPUT_BUFFER_SIZE))) {
+    if (!NT_SUCCESS(AddBytesJSONInformation(packet, outputBuffer, OUTPUT_BUFFER_SIZE))) {
         goto clean;
     }
 
-    if(!NT_SUCCESS(RtlStringCbCatA(outputBuffer, OUTPUT_BUFFER_SIZE, "},\n"))) {
+    if (!NT_SUCCESS(RtlStringCbCatA(outputBuffer, OUTPUT_BUFFER_SIZE, "},\n"))) {
         goto clean;
     }
 
     workItem = NdisAllocateIoWorkItem(VrDriverHandle);
-    if(workItem) {
+    if (workItem) {
         NdisQueueIoWorkItem(workItem, WritePacketToFileWork, (PVOID)(outputBuffer));
     }
 
-    clean:
-    if(outputBuffer != NULL && workItem == NULL) {
+clean:
+    if (outputBuffer != NULL && workItem == NULL) {
         WinRawFree(outputBuffer);
     }
 }
