@@ -133,8 +133,15 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, struct page *
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0))
     spages = get_user_pages(uspace_vmem, npages, FOLL_WRITE, pmem, NULL);
 #else
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,168))
+    spages = get_user_pages(current, current->mm, uspace_vmem,
+                                        npages, 1, pmem, NULL);
+#else
     spages = get_user_pages(current, current->mm, uspace_vmem,
                                         npages, 1, 0, pmem, NULL);
+#endif
+
 #endif
     up_read(&current->mm->mmap_sem);
 
