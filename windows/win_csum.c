@@ -4,28 +4,72 @@
 #include "vr_packet.h"
 #include "win_csum.h"
 
-uint16_t
-trim_csum(uint32_t csum)
+static inline uint32_t
+trim_csum64(uint64_t csum)
 {
-    while (csum & 0xffff0000)
-        csum = (csum >> 16) + (csum & 0x0000ffff);
+    while (csum & 0xFFFFFFFF00000000L) {
+        csum = (csum >> 32) + (csum & 0x00000000FFFFFFFFL);
+    }
+
+    return (uint32_t)csum;
+}
+
+static inline uint16_t
+trim_csum32(uint32_t csum)
+{
+    while (csum & 0xFFFF0000) {
+        csum = (csum >> 16) + (csum & 0x0000FFFF);
+    }
 
     return (uint16_t)csum;
 }
 
 static uint16_t
-calc_csum_no_negation(uint8_t* ptr, size_t size)
+calc_csum_no_negation(const uint8_t *ptr, size_t size)
 {
-    uint32_t csum = 0;
-    for (int i = 0; i < size; i++)
-    {
-        if (i & 1)
-            csum += ptr[i];
-        else
-            csum += ptr[i] << 8;
+    uint64_t csum = 0;
+    const uint64_t *ptr8 = (const uint64_t *)ptr;
+
+    // Calculate checksum for all 8-bytes blocks
+    for (; size >= 8; size -= 8, ptr8++) {
+        csum += *ptr8;
+        if (csum < *ptr8) {
+            csum++;
+        }
     }
 
-    return htons(trim_csum(csum));
+    ptr = (const uint8_t *)ptr8;
+
+    // Add checksum for 4-bytes, 2-bytes and 1-byte blocks
+    if (size & 4) {
+        uint32_t tmp = *(uint32_t *)ptr;
+        ptr += 4;
+
+        csum += tmp;
+        if (csum < tmp) {
+            csum++;
+        }
+    }
+
+    if (size & 2) {
+        uint16_t tmp = *(uint16_t *)ptr;
+        ptr += 2;
+
+        csum += tmp;
+        if (csum < tmp) {
+            csum++;
+        }
+    }
+
+    if (size & 1) {
+        uint8_t tmp = *(uint8_t *)ptr;
+        csum += tmp;
+        if (csum < tmp) {
+            csum++;
+        }
+    }
+
+    return trim_csum32(trim_csum64(csum));
 }
 
 uint16_t
@@ -38,7 +82,7 @@ void
 csum_replace2(uint16_t *csum, uint16_t old_val, uint16_t new_val) {
     uint32_t old_csum_val = (~(*csum)) & 0x0000ffff;
     uint32_t pre_csum = old_csum_val - (uint32_t)old_val + (uint32_t)new_val;
-    *csum = ~trim_csum(pre_csum);
+    *csum = ~trim_csum32(pre_csum);
 }
 
 static unsigned short
