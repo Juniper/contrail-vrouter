@@ -36,7 +36,8 @@ zero_ip_csum_at_offset(struct vr_packet *pkt, unsigned offset)
     iph->ip_csum = 0;
 }
 
-static bool fix_csum(struct vr_packet *pkt, unsigned offset)
+static bool
+fix_csum(struct vr_packet *pkt, unsigned offset)
 {
     uint32_t csum;
     uint16_t size;
