@@ -47,6 +47,7 @@ struct rte_eth_conf ethdev_conf = {
 #if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
         .offloads           = DEV_RX_OFFLOAD_CHECKSUM | DEV_RX_OFFLOAD_JUMBO_FRAME |
                               DEV_RX_OFFLOAD_CRC_STRIP,
+        .ignore_offload_bitfield = 1,
 #else
         .hw_ip_checksum     = 1, /* Enable IP/UDP/TCP checksum offload */
         .hw_vlan_filter     = 0, /* Disabel VLAN filter */
@@ -110,7 +111,8 @@ static const struct rte_eth_rxconf rx_queue_conf = {
     /* Do not immediately free RX descriptors */
     .rx_free_thresh = VR_DPDK_RX_BURST_SZ,
 #if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
-    .offloads = 0,
+    .offloads           = DEV_RX_OFFLOAD_CHECKSUM | DEV_RX_OFFLOAD_JUMBO_FRAME |
+                          DEV_RX_OFFLOAD_CRC_STRIP,
 #endif
 };
 
