@@ -1851,12 +1851,12 @@ dpdk_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             uint64_t segs_to_send;
             uint64_t mask;
             /* Pkts mask has a limit for sending 64 packets.
-             * and the burst size is RTE_PORT_IN_BURST_SIZE_MAX.
-             * Send only max of RTE_PORT_IN_BURST_SIZE_MAX.
+             * and the burst size is VR_DPDK_TX_BURST_SZ.
+             * Send only max of VR_DPDK_TX_BURST_SZ.
              */
             while (segs_sent < num_of_segs)  {
-                if ((num_of_segs - segs_sent) > RTE_PORT_IN_BURST_SIZE_MAX) {
-                    segs_to_send = RTE_PORT_IN_BURST_SIZE_MAX;
+                if ((num_of_segs - segs_sent) > VR_DPDK_TX_BURST_SZ) {
+                    segs_to_send = VR_DPDK_TX_BURST_SZ;
                 } else {
                     segs_to_send = num_of_segs - segs_sent;
                 }
