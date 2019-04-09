@@ -745,6 +745,85 @@ win_pull_inner_headers_fast(struct vr_packet *pkt, unsigned char proto,
 }
 
 /*
+ * Helper functions for win_get_udp_src_port.
+ */
+
+void
+initialize_hashrnd_if_needed()
+{
+    if (hashrnd_inited == 0) {
+        get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
+        hashrnd_inited = 1;
+    }
+}
+
+static uint16_t
+calculate_udp_src_port_from_hash_value(uint32_t hashval)
+{
+    uint16_t port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
+    uint16_t port = (uint16_t) (((uint64_t) hashval * port_range) >> 32);
+    return (port + VR_MUDP_PORT_RANGE_START);
+}
+
+static uint32_t
+calculate_hashval_for_ip_packet(
+    struct vr_packet *pkt,
+    unsigned short vrf)
+{
+    uint16_t sport = 0, dport = 0;
+    unsigned char* outer_l2_header = pkt_data(pkt);
+    unsigned char* outer_l3_header = (unsigned char*)(
+        (struct vr_eth*)outer_l2_header + 1);
+    int outer_l3_hdr_len = 0;
+    struct vr_ip* outer_ip_header = NULL;
+    struct vr_ip6* outer_ip6_header = NULL;
+    uint8_t l4_protocol = 0;
+    if (pkt->vp_type == VP_TYPE_IP) {
+        outer_ip_header = (struct vr_ip*)outer_l3_header;
+        outer_l3_hdr_len = outer_ip_header->ip_hl * 4;
+        l4_protocol = outer_ip_header->ip_proto;
+    } else {
+        outer_ip6_header = (struct vr_ip6*)outer_l3_header;
+        outer_l3_hdr_len = sizeof(struct vr_ip6);
+        l4_protocol = outer_ip6_header->ip6_nxt;
+    }
+    unsigned char* outer_l4_header = outer_l3_header + outer_l3_hdr_len;
+
+    if ((pkt->vp_type == VP_TYPE_IP6 ||
+        vr_ip_transport_header_valid((struct vr_ip*)outer_l3_header)) &&
+        (l4_protocol == VR_IP_PROTO_TCP || l4_protocol == VR_IP_PROTO_UDP)) {
+            sport = *(uint16_t*)outer_l4_header;
+            dport = *((uint16_t*)outer_l4_header + 1);
+    } else {
+        /*
+         * If this fragment required flow lookup, get the source and
+         * dst port from the frag entry. Otherwise, use 0 as the source
+         * dst port (which could result in fragments getting a different
+         * outer UDP source port than non-fragments in the same flow).
+         */
+        struct vrouter *router = vrouter_get(0);
+        struct vr_fragment* frag = vr_fragment_get(router, vrf, outer_ip_header);
+        if (frag) {
+            sport = frag->f_sport;
+            dport = frag->f_dport;
+        }
+    }
+
+    uint32_t hash_key[10];
+    hash_key[0] = vrf;
+    hash_key[1] = (sport << 16) | dport;
+    int hash_len = 2 * sizeof(hash_key[0]);
+    if (pkt->vp_type == VP_TYPE_IP) {
+        memcpy(&hash_key[2], (char*)&outer_ip_header->ip_saddr, 2 * VR_IP_ADDRESS_LEN);
+        hash_len += 2 * VR_IP_ADDRESS_LEN;
+    } else {
+        memcpy(&hash_key[2], (char*)&outer_ip6_header->ip6_src, 2 * VR_IP6_ADDRESS_LEN);
+        hash_len += 2 * VR_IP6_ADDRESS_LEN;
+    }
+    return vr_hash(hash_key, hash_len, vr_hashrnd);
+}
+
+/*
  * This function should hash some src/dest addresses to get a UDP src port
  * that would nicely hash on MX but for now we only do some very basic hashing
  *
@@ -754,32 +833,35 @@ win_pull_inner_headers_fast(struct vr_packet *pkt, unsigned char proto,
  * another. That's why we should differentiate the port very carefully.
  */
 static uint16_t
-win_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *md,
+win_get_udp_src_port(
+    struct vr_packet *pkt,
+    struct vr_forwarding_md *fmd,
     unsigned short vrf)
 {
-    UNREFERENCED_PARAMETER(md);
+    initialize_hashrnd_if_needed();
 
-    uint32_t hashval, port_range;
-    uint16_t port;
+    uint32_t hashval;
+    if (pkt->vp_type == VP_TYPE_IP || pkt->vp_type == VP_TYPE_IP6) {
+        if (fmd && fmd->fmd_flow_index >= 0) {
+            struct vrouter *router = vrouter_get(0);
+            struct vr_flow_entry* fentry
+                = vr_flow_get_entry(router, fmd->fmd_flow_index);
+            if (fentry) {
+                return fentry->fe_udp_src_port;
+            }
+        }
 
-    if (hashrnd_inited == 0) {
-        get_random_bytes(&vr_hashrnd, sizeof(vr_hashrnd));
-        hashrnd_inited = 1;
+        hashval = calculate_hashval_for_ip_packet(pkt, vrf);
+    } else {
+        // We treat all non-ip packets as L2 here.
+        if (pkt_head_len(pkt) < ETH_HLEN)
+            return 0;
+
+        hashval = vr_hash(pkt_data(pkt), ETH_HLEN, vr_hashrnd);
+        hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
     }
 
-    if (pkt_head_len(pkt) < ETH_HLEN)
-        return 0;
-
-    hashval = vr_hash(pkt_data(pkt), ETH_HLEN, vr_hashrnd);
-    hashval = vr_hash_2words(hashval, vrf, vr_hashrnd);
-
-    port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
-    port = (uint16_t)(((uint64_t)hashval * port_range) >> 32);
-
-    if (port > port_range)
-        return 0;
-
-    return (port + VR_MUDP_PORT_RANGE_START);
+    return calculate_udp_src_port_from_hash_value(hashval);
 }
 
 static int
