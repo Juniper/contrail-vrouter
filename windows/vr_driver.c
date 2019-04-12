@@ -47,6 +47,8 @@ FILTER_DETACH FilterDetach;
 FILTER_PAUSE FilterPause;
 FILTER_RESTART FilterRestart;
 
+static VOID UninitializeVRouter(pvr_switch_context ctx);
+
 NTSTATUS
 DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
@@ -126,6 +128,17 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 VOID
 DriverUnload(PDRIVER_OBJECT DriverObject)
 {
+    if (VrSwitchObject) {
+        VrSwitchObject->Running = FALSE;
+
+        KeMemoryBarrier();
+        while (VrSwitchObject->PendingOidCount > 0) {
+            NdisMSleep(1000);
+        }
+
+        UninitializeVRouter(VrSwitchObject->ExtensionContext);
+    }
+
     NdisFDeregisterFilterDriver(VrDriverHandle);
 
     ShmemExit();
@@ -185,23 +198,35 @@ VrFreeNetBufferPool(NDIS_HANDLE pool)
 static VOID
 UninitializeVRouter(pvr_switch_context ctx)
 {
-    if (ctx->assembler_up)
+    if (ctx->assembler_up) {
         VrAssemblerExit();
+        ctx->assembler_up = FALSE;
+    }
 
-    if (ctx->vrouter_up)
+    if (ctx->vrouter_up) {
         vrouter_exit(false);
+        ctx->vrouter_up = FALSE;
+    }
 
-    if (ctx->message_up)
+    if (ctx->message_up) {
         vr_message_exit();
+        ctx->message_up = FALSE;
+    }
 
-    if (ctx->shmem_devices_up)
+    if (ctx->shmem_devices_up) {
         ShmemDestroyDevices();
+        ctx->shmem_devices_up = FALSE;
+    }
 
-    if (ctx->pkt0_up)
+    if (ctx->pkt0_up) {
         Pkt0DestroyDevice();
+        ctx->pkt0_up = FALSE;
+    }
 
-    if (ctx->ksync_up)
+    if (ctx->ksync_up) {
         KsyncDestroyDevice();
+        ctx->ksync_up = FALSE;
+    }
 }
 
 static VOID
