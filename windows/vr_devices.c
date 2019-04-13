@@ -6,6 +6,12 @@
 #include <wdmsec.h>
 #include "windows_devices.h"
 
+/*
+ * Test change 2
+ *
+ *
+ */
+
 NTSTATUS
 VRouterSetUpNamedDevice(NDIS_HANDLE DriverHandle,
                         PCWSTR DeviceName,
