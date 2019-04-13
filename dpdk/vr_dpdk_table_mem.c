@@ -71,7 +71,7 @@ vr_hugepage_info_init(void)
             hp->mnt = malloc(strlen(mnt) + 1);
             memcpy(hp->mnt, mnt, strlen(mnt) + 1);
 
-            if (strstr(options, "pagesize=1G")) {
+            if (strstr(options, "pagesize=1G") || strstr(options, "pagesize=1024M")) {
                 hp->page_size = (1024 * 1024 * 1024);
                 sys_hp_file =
                     "/sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages";
