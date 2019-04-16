@@ -72,22 +72,6 @@ unsigned int vr_trap_flow(struct vrouter *, struct vr_flow_entry *,
 
 void get_random_bytes(void *buf, int nbytes);
 
-#if (defined(__FreeBSD__) || defined(_WIN32)) && defined(__KERNEL__)
-uint32_t
-jhash(void *key, uint32_t length, uint32_t initval)
-{
-  uint32_t ret = 0;
-  int i;
-  unsigned char *data = (unsigned char *)key;
-
-  for (i = 0; i < length; i ++)
-    ret += data[i];
-
-  return ret;
-}
-#endif
-
-
 bool
 vr_valid_link_local_port(struct vrouter *router, int family,
                          int proto, int port)
@@ -2190,7 +2174,7 @@ vr_flow_udp_src_port (struct vrouter *router, struct vr_flow_entry *fe)
     memcpy(&hash_key[2], fe->fe_key.flow_ip, 2 * VR_IP_ADDR_SIZE(fe->fe_type));
     hash_len = VR_FLOW_HASH_SIZE(fe->fe_type);
 
-    hashval = jhash(hash_key, hash_len, vr_hashrnd);
+    hashval = vr_hash(hash_key, hash_len, vr_hashrnd);
     port_range = VR_MUDP_PORT_RANGE_END - VR_MUDP_PORT_RANGE_START;
     port = (uint16_t ) (((uint64_t ) hashval * port_range) >> 32);
 
