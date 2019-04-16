@@ -665,6 +665,8 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
                                struct vr_forwarding_md *fmd, void *ret_data)
 {
     int i;
+    int status = NH_SOURCE_INVALID;
+    unsigned int inner_ecmp_index = -1;/* reset to invalid */
     struct vr_nexthop *cnh = NULL;
 
     /* the first few checks are straight forward */
@@ -698,11 +700,22 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
              * if the source has moved to a present and valid source,
              * return mismatch
              */
-            if ((NH_SOURCE_VALID ==
-                 cnh->nh_validate_src(pkt, cnh, fmd, NULL))) {
+            status = cnh->nh_validate_src(pkt, cnh, fmd, &inner_ecmp_index);
+            if (status == NH_SOURCE_VALID) {
                 if (ret_data) {
                     *(unsigned int *)ret_data = i;
-                }
+		        }
+                return NH_SOURCE_MISMATCH;
+            }
+            /*
+             * Handle multi level ECMP,
+             * inner ecmp returns NH_SOURCE_MISMATCH, return the
+             * same error. copy inner_ecmp_value for NH mismatch case only.
+             */
+            if (status == NH_SOURCE_MISMATCH) {
+                if (ret_data) {
+                    *(unsigned int *)ret_data = inner_ecmp_index;
+		        }
                 return NH_SOURCE_MISMATCH;
             }
         }
