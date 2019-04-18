@@ -444,7 +444,7 @@ nh_push_mpls_header(struct vr_packet *pkt, unsigned int label,
         exp_qos <<= VR_MPLS_EXP_QOS_SHIFT;
     }
     if (is_bottom_label) {
-	label_pos = 1;
+        label_pos = 1;
     }
     *lbl = htonl((label << VR_MPLS_LABEL_SHIFT) | exp_qos |
             (label_pos << 8) | ttl);
@@ -704,7 +704,7 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (status == NH_SOURCE_VALID) {
                 if (ret_data) {
                     *(unsigned int *)ret_data = i;
-		        }
+                }
                 return NH_SOURCE_MISMATCH;
             }
             /*
@@ -715,7 +715,7 @@ nh_composite_ecmp_validate_src(struct vr_packet *pkt, struct vr_nexthop *nh,
             if (status == NH_SOURCE_MISMATCH) {
                 if (ret_data) {
                     *(unsigned int *)ret_data = inner_ecmp_index;
-		        }
+                }
                 return NH_SOURCE_MISMATCH;
             }
         }
@@ -2149,7 +2149,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     vif = nh->nh_dev;
     if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
         if (!nh->nh_crypt_dev) {
-            reason = VP_DROP_NO_CRYPT_PATH; 
+            reason = VP_DROP_NO_CRYPT_PATH;
             PKT_LOG(reason, pkt, 0, VR_NEXTHOP_C, __LINE__);
             goto send_fail;
         }
@@ -2393,7 +2393,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     vif = nh->nh_dev;
     if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
         if (!nh->nh_crypt_dev) {
-            reason = VP_DROP_NO_CRYPT_PATH; 
+            reason = VP_DROP_NO_CRYPT_PATH;
             PKT_LOG(reason, pkt, 0, VR_NEXTHOP_C, __LINE__);
             goto send_fail;
         }
@@ -2610,7 +2610,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
     vif = nh->nh_dev;
     if (nh->nh_flags & NH_FLAG_CRYPT_TRAFFIC) {
         if (!nh->nh_crypt_dev) {
-            drop_reason = VP_DROP_NO_CRYPT_PATH; 
+            drop_reason = VP_DROP_NO_CRYPT_PATH;
             PKT_LOG(drop_reason, pkt, 0, VR_NEXTHOP_C, __LINE__);
             goto send_fail;
         }
@@ -3742,7 +3742,7 @@ error:
         nh->nh_flags |= NH_FLAG_VALID;
 
     ret = vrouter_add_nexthop(nh);
-    
+
     if (ret) {
         nh->nh_destructor(nh);
         goto generate_resp;

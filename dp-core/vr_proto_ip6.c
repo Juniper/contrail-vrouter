@@ -472,7 +472,7 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
             if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
                 vr_enqueue_to_assembler(router, pkt, fmd);
             } else {
-		PKT_LOG(VP_DROP_MISC, pkt, flow_p, VR_PROTO_IP6_C, __LINE__);
+                PKT_LOG(VP_DROP_MISC, pkt, flow_p, VR_PROTO_IP6_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_MISC);
             }
             return FLOW_CONSUMED;
@@ -789,4 +789,3 @@ vr_ip6_well_known_packet(struct vr_packet *pkt)
 
     return L4_TYPE_UNKNOWN;
 }
-

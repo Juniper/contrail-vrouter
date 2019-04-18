@@ -1,7 +1,7 @@
 /*
- * vr_ip_mtrie.c -- 	VRF mtrie management
+ * vr_ip_mtrie.c -- VRF mtrie management
  *
- * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.	
+ * Copyright (c) 2014 Juniper Networks, Inc. All rights reserved.
  */
 #include <vr_os.h>
 #include "vr_sandesh.h"
@@ -25,8 +25,8 @@ struct vr_vrf_stats *(*vr_inet_vrf_stats)(int, unsigned int);
 static struct ip_mtrie *mtrie_alloc_vrf(unsigned int, unsigned int);
 
 /* mtrie specific, bucket_info for v4 and v6 */
-#define IP4_BKT_LEVELS  (IP4_PREFIX_LEN / IPBUCKET_LEVEL_BITS) 
-#define IP6_BKT_LEVELS  (IP6_PREFIX_LEN / IPBUCKET_LEVEL_BITS) 
+#define IP4_BKT_LEVELS  (IP4_PREFIX_LEN / IPBUCKET_LEVEL_BITS)
+#define IP6_BKT_LEVELS  (IP6_PREFIX_LEN / IPBUCKET_LEVEL_BITS)
 
 struct mtrie_bkt_info ip4_bkt_info[IP4_BKT_LEVELS];
 struct mtrie_bkt_info ip6_bkt_info[IP6_BKT_LEVELS];
@@ -50,7 +50,7 @@ mtrie_ip_bkt_info_init(struct mtrie_bkt_info *ip_bkt_info, int pfx_len)
 
     for (level = 1; level < (pfx_len/IPBUCKET_LEVEL_BITS); level++) {
         ip_bkt_info[level].bi_bits = IPBUCKET_LEVEL_BITS;
-        ip_bkt_info[level].bi_pfx_len = ip_bkt_info[level-1].bi_pfx_len 
+        ip_bkt_info[level].bi_pfx_len = ip_bkt_info[level-1].bi_pfx_len
                                               + IPBUCKET_LEVEL_BITS;
         ip_bkt_info[level].bi_shift =  ip_bkt_info[level-1].bi_shift - IPBUCKET_LEVEL_BITS;
         ip_bkt_info[level].bi_size = IPBUCKET_LEVEL_SIZE;
@@ -61,7 +61,7 @@ mtrie_ip_bkt_info_init(struct mtrie_bkt_info *ip_bkt_info, int pfx_len)
 /*
  * given a vrf id, get the routing table corresponding to the id
  */
-static inline struct ip_mtrie * 
+static inline struct ip_mtrie *
 vrfid_to_mtrie(unsigned int vrf_id, unsigned int family)
 {
     int index = 0;
@@ -76,7 +76,7 @@ vrfid_to_mtrie(unsigned int vrf_id, unsigned int family)
     return mtrie_table[vrf_id];
 }
 
-#define PREFIX_TO_INDEX(prefix, level) (prefix[level]) 
+#define PREFIX_TO_INDEX(prefix, level) (prefix[level])
 
 static inline unsigned int
 ip_bkt_get_max_level(int family)
@@ -87,7 +87,7 @@ ip_bkt_get_max_level(int family)
         return(IP4_BKT_LEVELS);
 }
 
-static struct mtrie_bkt_info * 
+static struct mtrie_bkt_info *
 ip_bkt_info_get(unsigned int family)
 {
     if (family == AF_INET6)
@@ -95,7 +95,7 @@ ip_bkt_info_get(unsigned int family)
     else
         return ip4_bkt_info;
 }
-    
+
 /*
  * we have to be careful about 'level' here. assumption is that level
  * will be passed sane from whomever is calling
@@ -324,7 +324,7 @@ mtrie_alloc_bucket(struct mtrie_bkt_info *ip_bkt_info, unsigned char level,
     struct ip_bucket_entry     *ent;
 
     bkt_size = ip_bkt_info[level].bi_size;
-    bkt = vr_zalloc(sizeof(struct ip_bucket) 
+    bkt = vr_zalloc(sizeof(struct ip_bucket)
                     + sizeof(struct ip_bucket_entry) * bkt_size,
                     VR_MTRIE_BUCKET_OBJECT);
     if (!bkt)
@@ -498,7 +498,7 @@ __mtrie_add(struct ip_mtrie *mtrie, struct vr_route_req *rt, int data_is_nh)
             if ((rt->rtr_req.rtr_prefix_len >
                         (ip_bkt_info[level].bi_pfx_len - ip_bkt_info[level].bi_bits)) &&
                     (rt->rtr_req.rtr_prefix_len <= ip_bkt_info[level].bi_pfx_len)) {
-                fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+                fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len);
             }
 
             i = index;
@@ -567,7 +567,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
         if ((rt->rtr_req.rtr_prefix_len >
                 (ip_bkt_info[level].bi_pfx_len - ip_bkt_info[level].bi_bits)) &&
                 (rt->rtr_req.rtr_prefix_len <= ip_bkt_info[level].bi_pfx_len)) {
-            fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len); 
+            fin = 1 << (ip_bkt_info[level].bi_pfx_len - rt->rtr_req.rtr_prefix_len);
             index &= ~(fin - 1);
         } else {
             fin = ip_bkt_info[level].bi_size;
@@ -817,7 +817,7 @@ mtrie_stats(int vrf, unsigned int cpu)
     if ((unsigned int)vrf >= vr_vrfs)
         return &invalid_vrf_stats[cpu];
 
-    if (mtrie_vrf_stats) 
+    if (mtrie_vrf_stats)
        return &((mtrie_vrf_stats[vrf])[cpu]);
 
     return NULL;
@@ -1184,7 +1184,7 @@ mtrie_free_vrf(struct vr_rtable *rtable, unsigned int vrf_id)
         mtrie = vrf_tables[vrf_id];
         if (!mtrie)
             continue;
-    
+
         mtrie_free_entry(&mtrie->root, 0);
         vrf_tables[vrf_id] = NULL;
         vr_free(mtrie, VR_MTRIE_OBJECT);
@@ -1453,4 +1453,3 @@ vdata_mtrie_delete_all(struct ip_mtrie *mtrie)
     mtrie_free_entry(&mtrie->root, 0);
     vr_free(mtrie, VR_MTRIE_OBJECT);
 }
-

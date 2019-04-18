@@ -336,7 +336,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     if (!(label & VR_MPLS_LABEL_STACK_BIT_MASK)
             && ((label >> VR_MPLS_LABEL_SHIFT) ==
                 VR_MPLS_LABEL_MASK)) {
-	    /* drop the top Stack label */
+        /* drop the top Stack label */
         if (!pkt_pull(pkt, VR_MPLS_HDR_LEN)) {
             drop_reason = VP_DROP_PULL;
             PKT_LOG(drop_reason, pkt, 0, VR_MPLS_C, __LINE__);
@@ -368,7 +368,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
     /* drop the TOStack label */
     if (!pkt_pull(pkt, VR_MPLS_HDR_LEN)) {
         drop_reason = VP_DROP_PULL;
-	PKT_LOG(drop_reason, pkt, 0, VR_MPLS_C, __LINE__);
+        PKT_LOG(drop_reason, pkt, 0, VR_MPLS_C, __LINE__);
         goto dropit;
     }
 
@@ -376,7 +376,7 @@ vr_mpls_input(struct vrouter *router, struct vr_packet *pkt,
         nh = __vrouter_get_label(router, label);
         if (!nh) {
             drop_reason = VP_DROP_INVALID_LABEL;
-	    PKT_LOG(drop_reason, pkt, 0, VR_MPLS_C, __LINE__);
+            PKT_LOG(drop_reason, pkt, 0, VR_MPLS_C, __LINE__);
             goto dropit;
         }
     } else

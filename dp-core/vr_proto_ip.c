@@ -120,7 +120,7 @@ vr_ip_update_csum(struct vr_packet *pkt, unsigned int ip_inc, unsigned int inc)
          */
         if (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL) {
             csum = (*csump) & 0xffff;
-            inc = ip_inc; 
+            inc = ip_inc;
         } else {
             csum = ~(*csump) & 0xffff;
         }
@@ -254,7 +254,7 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
         vr_pfree(pkt, VP_DROP_INVALID_PROTOCOL);
         return 0;
     }
- 
+
     pkt->vp_ttl = ttl;
 
     rt.rtr_req.rtr_vrf_id = fmd->fmd_dvrf;
@@ -610,7 +610,7 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                                          ip->ip_proto, ntohs(l4_port))) {
                             flow_processing = true;
                             relaxed_policy_found = true;
-			}
+                        }
                     }
                 }
             }
@@ -811,7 +811,7 @@ vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 }
 
 void
-vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id, 
+vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
         uint32_t sip, uint32_t dip, uint8_t proto, uint16_t sport,
         uint16_t dport, uint8_t valid_fkey_params)
 {
@@ -1002,7 +1002,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
 }
 
 int
-vr_inet_form_flow(struct vrouter *router, unsigned short vrf, 
+vr_inet_form_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p,
         uint8_t valid_fkey_params, bool frag_calc)
 {
@@ -1120,7 +1120,7 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
                 vr_enqueue_to_assembler(router, pkt, fmd);
             } else {
                 /* unlikely to be hit. you can safely discount misc drops here */
-		PKT_LOG(VP_DROP_MISC, pkt, flow_p, VR_PROTO_IP_C, __LINE__);
+                PKT_LOG(VP_DROP_MISC, pkt, flow_p, VR_PROTO_IP_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_MISC);
             }
             return FLOW_CONSUMED;
@@ -1235,7 +1235,7 @@ vr_ip_input(struct vrouter *router, struct vr_packet *pkt,
      */
     if (pkt->vp_flags & VP_FLAG_TO_ME)
         return vr_ip_rcv(router, pkt, fmd);
-    
+
     if (fmd->fmd_dscp < 0)
         fmd->fmd_dscp = vr_inet_get_tos(ip);
 
@@ -1375,4 +1375,3 @@ vr_ip_well_known_packet(struct vr_packet *pkt)
 
     return L4_TYPE_UNKNOWN;
 }
-

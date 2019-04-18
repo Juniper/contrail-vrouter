@@ -368,7 +368,7 @@ vr_inner_pkt_parse(unsigned char *va, int (*tunnel_type_cb)(unsigned int,
             label = ntohl(*(uint32_t *)(va + pull_len + VR_MPLS_HDR_LEN));
             mpls_label_len = 2*VR_MPLS_HDR_LEN;
         }
-	
+
         control_data = *(uint32_t *)(va + pull_len + mpls_label_len);
 
         /* Identify whether the packet is L2 or not using the label and

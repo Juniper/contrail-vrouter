@@ -1499,14 +1499,14 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
 
             if (!vr_flow_allow_new_flow(router, pkt, &drop_reason, &burst)) {
                 PKT_LOG(drop_reason, pkt, key , VR_FLOW_C, __LINE__);
-		vr_pfree(pkt, drop_reason);
+                vr_pfree(pkt, drop_reason);
                 return FLOW_CONSUMED;
             }
 
             flow_e = vr_flow_get_free_entry(router, key, pkt->vp_type,
                     true, &fe_index);
             if (!flow_e) {
-		PKT_LOG(VP_DROP_FLOW_TABLE_FULL, pkt, key, VR_FLOW_C, __LINE__);
+                PKT_LOG(VP_DROP_FLOW_TABLE_FULL, pkt, key, VR_FLOW_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_FLOW_TABLE_FULL);
                 return FLOW_CONSUMED;
             }
