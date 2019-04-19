@@ -464,6 +464,13 @@ vhost_setup(struct net_device *dev)
 
     dev->needed_headroom = sizeof(struct vr_eth) + sizeof(struct agent_hdr);
     dev->netdev_ops = &vhost_dev_ops;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,9))
+    dev->priv_destructor = vhost_dev_destructor;
+    /* free_netdev executed by destructor */
+    dev->needs_free_netdev = false;
+#else
+    dev->destructor = vhost_dev_destructor;
+#endif /*KERNEL_4.11*/
     dev->destructor = vhost_dev_destructor;
 #ifdef CONFIG_XEN
     dev->ethtool_ops = &vhost_ethtool_ops;
