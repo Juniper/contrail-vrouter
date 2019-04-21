@@ -800,9 +800,9 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     }
 
     if (!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) {
-        rt->rtr_req.rtr_label = 0xFFFFF;
+        rt->rtr_req.rtr_label = 0xFFFFFF;
     } else {
-        rt->rtr_req.rtr_label &= 0xFFFFF;
+        rt->rtr_req.rtr_label &= 0xFFFFFF;
     }
 
     __mtrie_delete(rt, &rtable->root, 0, 0, 1);
@@ -1103,9 +1103,9 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     }
 
     if (!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) {
-        rt->rtr_req.rtr_label = 0xFFFFF;
+        rt->rtr_req.rtr_label = 0xFFFFFF;
     } else {
-        rt->rtr_req.rtr_label &= 0xFFFFF;
+        rt->rtr_req.rtr_label &= 0xFFFFFF;
     }
 
     ret = __mtrie_add(mtrie, rt, 1);
@@ -1164,7 +1164,7 @@ mtrie_alloc_vrf(unsigned int vrf_id, unsigned int family)
         mtrie->root.entry_type = ENTRY_TYPE_NEXTHOP;
         mtrie_table = vn_rtable[index];
         mtrie_table[vrf_id] = mtrie;
-        mtrie->root.entry_label = 0xFFFFF;
+        mtrie->root.entry_label = 0xFFFFFF;
         mtrie->root.entry_label_flags = 0;
     }
 
@@ -1389,7 +1389,7 @@ vdata_mtrie_init (unsigned int prefix_len, void *data)
         mtrie->root.entry_prefix_len = prefix_len;
         mtrie->root.entry_vdata_p = data;
         mtrie->root.entry_bridge_index =  VR_BE_INVALID_INDEX;
-        mtrie->root.entry_label = 0xFFFFF;
+        mtrie->root.entry_label = 0xFFFFFF;
     }
 
     return mtrie;
