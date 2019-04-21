@@ -32,7 +32,7 @@ struct ip_bucket_entry {
 
     unsigned int entry_prefix_len:8;
     unsigned int entry_label_flags:4;
-    unsigned int entry_label:20;
+    unsigned int entry_label:24;
     unsigned int entry_bridge_index;
 };
 
