@@ -2671,7 +2671,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
     for (i = 0; i < req->vifr_fat_flow_exclude_ip_list_size; i++) {
         req->vifr_fat_flow_exclude_ip_list[i] = (uint64_t) intf->vif_fat_flow_ipv4_exclude_list[i];
     }
- 
+
     for (i = 0; i < req->vifr_fat_flow_exclude_ip6_u_list_size; i++) {
         req->vifr_fat_flow_exclude_ip6_u_list[i] = intf->vif_fat_flow_ipv6_high_exclude_list[i];
         req->vifr_fat_flow_exclude_ip6_l_list[i] = intf->vif_fat_flow_ipv6_low_exclude_list[i];
@@ -3687,7 +3687,7 @@ __vif_fat_flow_alloc_prefix_rule_data(vr_fat_flow_cfg_t *cfg)
 
     port_data = vr_zalloc(sizeof(*port_data), VR_INTERFACE_FAT_FLOW_CONFIG_OBJECT);
     if (!port_data) {
-        goto err;   
+        goto err;
     }
     port_data->second_prefix = NULL;
     /* Add the port data to itable */
@@ -4071,7 +4071,7 @@ vif_fat_flow_rules_build(vr_fat_flow_cfg_t *new_cfg, uint16_t new_cfg_size,
     uint8_t proto, proto_index, port_data;
     uint16_t port;
     int i, ret = 0;
- 
+
     for (i = 0; i < new_cfg_size; i++) {
          prefix_aggr = VIF_FAT_FLOW_CFG_PREFIX_AGGR_DATA(new_cfg[i].port_aggr_info);
          switch (prefix_aggr) {
@@ -4188,9 +4188,9 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
 
     /* Populate the ipv4 & ipv6 exclude lists */
     if (!req->vifr_fat_flow_exclude_ip_list_size) {
-        memset(vif->vif_fat_flow_ipv4_exclude_list, 0, 
+        memset(vif->vif_fat_flow_ipv4_exclude_list, 0,
                FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE * sizeof(uint32_t));
-        memset(vif->vif_fat_flow_ipv4_exclude_plen_list, 0, 
+        memset(vif->vif_fat_flow_ipv4_exclude_plen_list, 0,
                FAT_FLOW_IPV4_EXCLUDE_LIST_MAX_SIZE * sizeof(uint8_t));
         vif->vif_fat_flow_ipv4_exclude_list_size = 0;
     } else {
@@ -4209,9 +4209,9 @@ vif_fat_flow_add(struct vr_interface *vif, vr_interface_req *req)
     }
 
     if (!req->vifr_fat_flow_exclude_ip6_l_list_size) {
-        memset(vif->vif_fat_flow_ipv6_low_exclude_list, 0, 
+        memset(vif->vif_fat_flow_ipv6_low_exclude_list, 0,
                FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE * sizeof(uint64_t));
-        memset(vif->vif_fat_flow_ipv6_high_exclude_list, 0, 
+        memset(vif->vif_fat_flow_ipv6_high_exclude_list, 0,
                FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE * sizeof(uint64_t));
         memset(vif->vif_fat_flow_ipv6_exclude_plen_list, 0,
                FAT_FLOW_IPV6_EXCLUDE_LIST_MAX_SIZE * sizeof(uint8_t));
@@ -4277,7 +4277,7 @@ vif_fat_flow_port_get(struct vr_interface *vif, uint8_t proto_index,
             byte = ((port % VIF_FAT_FLOW_PORTS_PER_BITMAP) * 2) / 8;
             bit = ((port % VIF_FAT_FLOW_PORTS_PER_BITMAP) * 2) % 8;
             return (vif->vif_fat_flow_no_prefix_rules[row][column][byte] >> bit) &
-							VIF_FAT_FLOW_DATA_MASK;
+                VIF_FAT_FLOW_DATA_MASK;
         }
     }
 
@@ -4292,7 +4292,6 @@ vif_fat_flow_exclude_list_lookup (struct vr_interface *vif, unsigned int *saddr,
     int i;
     uint64_t v6_prefix_h, v6_prefix_l, v6_mask_h, v6_mask_l;
     uint32_t v4_mask;
-    
 
     if (saddr) {
         if (!vif->vif_fat_flow_ipv4_exclude_list_size) {
@@ -4556,7 +4555,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
     rdata_src = vdata_mtrie_lookup(mtrie_src, &vr_req);
     if (rdata_src && (vr_req.rtr_req.rtr_prefix_len != 0)) {
 
-	if (vif_fat_flow_prefix_proto_port_match(PREFIX_RULE_TYPE_SINGLE_PREFIX,
+        if (vif_fat_flow_prefix_proto_port_match(PREFIX_RULE_TYPE_SINGLE_PREFIX,
                                                  incoming_vif, rdata_src, NULL,
                                                  NULL, proto, *sport_flow,
                                                  *dport_flow, &aggr_mask, NULL,
@@ -4591,7 +4590,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
     rdata_dst = vdata_mtrie_lookup(mtrie_dst, &vr_req);
 
     if (rdata_dst && (vr_req.rtr_req.rtr_prefix_len != 0)) {
-	if (vif_fat_flow_prefix_proto_port_match(PREFIX_RULE_TYPE_SINGLE_PREFIX,
+        if (vif_fat_flow_prefix_proto_port_match(PREFIX_RULE_TYPE_SINGLE_PREFIX,
                                                  incoming_vif, rdata_dst, NULL,
                                                  NULL, proto, *sport_flow,
                                                  *dport_flow, &aggr_mask, NULL,
@@ -4609,7 +4608,7 @@ vif_fat_flow_prefix_rule_match(int incoming_vif, struct vr_interface *vif, uint8
 
     /* Check for src+dst rule now */
     if (rdata_src) {
-	if (vif_fat_flow_prefix_proto_port_match(PREFIX_RULE_TYPE_DUAL_PREFIX,
+        if (vif_fat_flow_prefix_proto_port_match(PREFIX_RULE_TYPE_DUAL_PREFIX,
                                                  incoming_vif, rdata_src,
                                                  dip_flow, dip6_flow, proto,
                                                  *sport_flow, *dport_flow,
@@ -4653,7 +4652,7 @@ vif_fat_flow_lookup(int incoming_vif, struct vr_interface *vif, uint8_t proto,
     if (vif_fat_flow_exclude_list_lookup(vif, saddr, daddr, ip6_src, ip6_dst)) {
         return fat_flow_mask;
     }
-    
+
     proto_index = vif_fat_flow_get_proto_index(proto);
     if (!vif->fat_flow_num_rules[proto_index])
         return fat_flow_mask;
@@ -4855,4 +4854,3 @@ cleanup:
 
     return ret;
 }
-

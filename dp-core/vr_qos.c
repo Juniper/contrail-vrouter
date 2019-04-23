@@ -439,7 +439,7 @@ generate_response:
     vr_send_response(ret);
     return;
 }
-        
+
 void
 vr_qos_map_req_process(void *s_req)
 {

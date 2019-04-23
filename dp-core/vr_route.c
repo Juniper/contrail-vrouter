@@ -101,7 +101,7 @@ vr_route_delete(vr_route_req *req)
             goto error;
         }
 
-        if (req ->rtr_family == AF_BRIDGE && 
+        if (req ->rtr_family == AF_BRIDGE &&
                 (!req->rtr_mac_size  || !req->rtr_mac)) {
             ret = -EINVAL;
             goto error;
@@ -173,7 +173,7 @@ vr_route_get(vr_route_req *req)
 
     struct vr_route_req vr_req;
     struct vrouter *router;
-	struct vr_rtable *rtable = NULL;
+    struct vr_rtable *rtable = NULL;
 
     if (!req->rtr_mac)
         mac_mem_free = true;
@@ -242,7 +242,7 @@ vr_route_dump(vr_route_req *req)
     } else {
         vr_req.rtr_req.rtr_prefix = NULL;
     }
-        
+
     vr_req.rtr_req.rtr_marker_size = req->rtr_marker_size;
     if (req->rtr_marker_size) {
         vr_req.rtr_req.rtr_marker = (uint8_t*)&rt_marker;
@@ -250,7 +250,7 @@ vr_route_dump(vr_route_req *req)
     } else {
         vr_req.rtr_req.rtr_marker = NULL;
     }
-        
+
     router = vrouter_get(req->rtr_rid);
     if (!router) {
         ret = -ENOENT;
@@ -480,7 +480,7 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
     struct vr_rtable *rtable;
     struct vrouter *router;
 
-    if (((unsigned int)(req->rtr_req.rtr_prefix_len) > 
+    if (((unsigned int)(req->rtr_req.rtr_prefix_len) >
                             (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)) ||
             (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs)
         return -EINVAL;
@@ -673,4 +673,3 @@ vr_fib_init(struct vrouter *router)
 {
     return 0;
 }
-
