@@ -177,7 +177,13 @@ struct vr_nexthop {
     struct vr_interface *nh_dev;
     struct vr_interface *nh_crypt_dev;
     void                (*nh_destructor)(struct vr_nexthop *);
-    uint8_t             nh_data[0];
+
+    /*
+     * There is a variable-length data array after the end of the structure.
+     * Since zero-length arrays and flexible-length arrays at the end of
+     * the struct are non standard C/C++ extensions, we are not declaring
+     * this member here. Use vr_nexthop_get_data_ptr function to access it.
+     */
 };
 
 #define nh_encap_family         nh_u.nh_encap.encap_family
@@ -215,6 +221,12 @@ struct vr_nexthop {
 #define nh_vxlan_tun_dip        nh_u.nh_vxlan_tun.udp_tun.tun_dip
 #define nh_vxlan_tun_encap_len  nh_u.nh_vxlan_tun.udp_tun.tun_encap_len
 #define nh_vxlan_tun_l3_mac     nh_u.nh_vxlan_tun.tun_l3_mac
+
+static inline uint8_t *
+vr_nexthop_get_data_ptr(struct vr_nexthop *nh)
+{
+    return (uint8_t *)(nh + 1);
+}
 
 static inline bool
 vr_nexthop_is_vcp(struct vr_nexthop *nh)

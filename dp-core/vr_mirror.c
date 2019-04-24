@@ -477,7 +477,8 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
                 clone_len = 0;
 
                 if (pkt_nh->nh_dev->vif_set_rewrite(pkt_nh->nh_dev, &pkt, fmd,
-                                    pkt_nh->nh_data, pkt_nh->nh_encap_len) < 0) {
+                        vr_nexthop_get_data_ptr(pkt_nh),
+                        pkt_nh->nh_encap_len) < 0) {
                     PKT_LOG(VP_DROP_REWRITE_FAIL, pkt, 0, VR_MIRROR_C, __LINE__);
                     drop_reason = VP_DROP_REWRITE_FAIL;
                     goto fail;
@@ -562,4 +563,3 @@ vr_mirror_init(struct vrouter *router)
     return 0;
 
 }
-

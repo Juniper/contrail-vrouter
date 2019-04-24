@@ -2156,7 +2156,7 @@ nh_vxlan_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         vif = nh->nh_crypt_dev;
     }
     if (vif->vif_set_rewrite(vif, &pkt, fmd,
-                nh->nh_data, nh->nh_udp_tun_encap_len) < 0) {
+            vr_nexthop_get_data_ptr(nh), nh->nh_udp_tun_encap_len) < 0) {
         goto send_fail;
     }
 
@@ -2400,7 +2400,7 @@ nh_mpls_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         vif = nh->nh_crypt_dev;
     }
     tun_encap_rewrite = vif->vif_set_rewrite(vif, &pkt, fmd,
-            nh->nh_data, tun_encap_len);
+            vr_nexthop_get_data_ptr(nh), tun_encap_len);
     if (tun_encap_rewrite < 0) {
         goto send_fail;
     }
@@ -2617,7 +2617,7 @@ nh_gre_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
         vif = nh->nh_crypt_dev;
     }
     tun_encap_rewrite = vif->vif_set_rewrite(vif, &pkt, fmd,
-            nh->nh_data, nh->nh_gre_tun_encap_len);
+            vr_nexthop_get_data_ptr(nh), nh->nh_gre_tun_encap_len);
     if (tun_encap_rewrite < 0) {
         drop_reason = VP_DROP_PUSH;
         PKT_LOG(drop_reason, pkt, 0, VR_NEXTHOP_C, __LINE__);
@@ -2938,7 +2938,8 @@ nh_encap_l3(struct vr_packet *pkt, struct vr_nexthop *nh,
      */
     vr_pkt_unset_gro(pkt);
 
-    rewrite_len = vif->vif_set_rewrite(vif, &pkt, fmd, nh->nh_data, nh->nh_encap_len);
+    rewrite_len = vif->vif_set_rewrite(vif, &pkt, fmd,
+        vr_nexthop_get_data_ptr(nh), nh->nh_encap_len);
     if (rewrite_len < 0) {
         PKT_LOG(VP_DROP_REWRITE_FAIL, pkt, 0, VR_NEXTHOP_C, __LINE__);
         vr_pfree(pkt, VP_DROP_REWRITE_FAIL);
@@ -3443,7 +3444,7 @@ nh_tunnel_add(struct vr_nexthop *nh, vr_nexthop_req *req)
         return -EINVAL;
     }
 
-    memcpy(nh->nh_data, req->nhr_encap, req->nhr_encap_size);
+    memcpy(vr_nexthop_get_data_ptr(nh), req->nhr_encap, req->nhr_encap_size);
     if (old_vif)
         vrouter_put_interface(old_vif);
 
@@ -3522,8 +3523,8 @@ nh_encap_add(struct vr_nexthop *nh, vr_nexthop_req *req)
 
     nh->nh_encap_family = req->nhr_encap_family;
     nh->nh_encap_len = req->nhr_encap_size;
-    if (nh->nh_encap_len && nh->nh_data) {
-        memcpy(nh->nh_data, req->nhr_encap, nh->nh_encap_len);
+    if (nh->nh_encap_len && vr_nexthop_get_data_ptr(nh)) {
+        memcpy(vr_nexthop_get_data_ptr(nh), req->nhr_encap, nh->nh_encap_len);
     }
 
     nh->nh_dev = vif;
@@ -3834,7 +3835,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
         req->nhr_encap_size = nh->nh_encap_len;
         req->nhr_encap_family = nh->nh_encap_family;
         if (req->nhr_encap_size)
-            encap = nh->nh_data;
+            encap = vr_nexthop_get_data_ptr(nh);
         break;
 
     case NH_COMPOSITE:
@@ -3880,7 +3881,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             req->nhr_tun_dip = nh->nh_gre_tun_dip;
             req->nhr_encap_size = nh->nh_gre_tun_encap_len;
             if (req->nhr_encap_size)
-                encap = nh->nh_data;
+                encap = vr_nexthop_get_data_ptr(nh);
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
             if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
@@ -3906,7 +3907,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             }
 
             if (req->nhr_encap_size)
-                encap = nh->nh_data;
+                encap = vr_nexthop_get_data_ptr(nh);
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
         } else if (nh->nh_flags & NH_FLAG_TUNNEL_UDP_MPLS) {
@@ -3914,7 +3915,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             req->nhr_tun_dip = nh->nh_udp_tun_dip;
             req->nhr_encap_size = nh->nh_udp_tun_encap_len;
             if (req->nhr_encap_size)
-                encap = nh->nh_data;
+                encap = vr_nexthop_get_data_ptr(nh);
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
             if (nh->nh_flags & NH_FLAG_TUNNEL_MPLS_O_MPLS) {
@@ -3925,7 +3926,7 @@ vr_nexthop_make_req(vr_nexthop_req *req, struct vr_nexthop *nh)
             req->nhr_tun_dip = nh->nh_vxlan_tun_dip;
             req->nhr_encap_size = nh->nh_vxlan_tun_encap_len;
             if (req->nhr_encap_size)
-                encap = nh->nh_data;
+                encap = vr_nexthop_get_data_ptr(nh);
             if (nh->nh_dev)
                 req->nhr_encap_oif_id = nh->nh_dev->vif_idx;
             if (nh->nh_flags & NH_FLAG_L3_VXLAN) {
