@@ -13,12 +13,12 @@ bool ArpPacket();
 
 int main(void) {
 
-    bool result = true;
+    int result = 0;
 
-    result = TcpOverMplsOverUdp() && result;
-    result = UdpOverMplsOverUdp() && result;
-    result = SmallIpUdpOverTunnelPacket() && result;
-    result = ArpPacket() && result;
+    result |= TcpOverMplsOverUdp();
+    result |= UdpOverMplsOverUdp();
+    result |= SmallIpUdpOverTunnelPacket();
+    result |= ArpPacket();
 
     return result;
 }

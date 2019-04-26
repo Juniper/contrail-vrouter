@@ -285,7 +285,7 @@ fix_headers_of_outer_split_packet(
             fragment_outer_ip_header->ip_hl * 4);
     }
 
-    fill_csum_of_ip_header(fragment_outer_ip_header);
+    fragment_outer_ip_header->ip_csum = 0;
 }
 
 static void
@@ -400,9 +400,10 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
     PWIN_SUB_PACKET curSubPkt;
     PWIN_SUB_PACKET nextSubPkt;
 
-    // Disable checksum calculation offloading, so it doesn't interefere
-    // with our checksum calculation.
+    // Enable offloading of outer IP checksum.
+    // Clear all other offloadings.
     WinPacketRawClearChecksumOffloading(splitRawPacket);
+    WinPacketRawSetIpChecksumOffloading(splitRawPacket);
 
     unsigned short byte_offset_for_next_inner_ip_header
         = pctx->inner_ip_frag_offset_in_bytes;

@@ -100,15 +100,13 @@ fix_tunneled_csum(struct vr_packet *pkt)
     PWIN_PACKET_RAW winPacketRaw = WinPacketToRawPacket(winPacket);
 
     if (WinPacketRawShouldIpChecksumBeOffloaded(winPacketRaw)) {
-        // Zero the outer checksum, it'll be offloaded
-        zero_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
         // Fix the inner checksum, it will not be offloaded
         fix_ip_csum_at_offset(pkt, pkt->vp_inner_network_h);
-    } else {
-        // Fix the outer checksum
-        fix_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
-        // Inner checksum is OK
     }
+
+    // Zero the outer IP checksum, it'll be offloaded.
+    WinPacketRawSetIpChecksumOffloading(winPacketRaw);
+    zero_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
 
     if (WinPacketRawShouldTcpChecksumBeOffloaded(winPacketRaw)) {
         // Calculate the header/data csum and turn off HW acceleration
