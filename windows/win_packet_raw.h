@@ -23,6 +23,7 @@ LONG WinPacketRawDecrementChildCountOf(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawShouldIpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawShouldTcpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearTcpChecksumOffloading(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawSetTcpChecksumOffloading(PWIN_PACKET_RAW Packet, ULONG Offset);
 BOOLEAN WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearUdpChecksumOffloading(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet);

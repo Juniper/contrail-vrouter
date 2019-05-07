@@ -51,7 +51,7 @@ AssertMultiPktOffloadStatus(PWIN_MULTI_PACKET packet, OffloadFlag offload)
         assert_false(WinPacketRawShouldUdpChecksumBeOffloaded(rawPkt));
     }
 
-    if (offload & TCPPCHKSUM_OFFLOADED) {
+    if (offload & TCPCHKSUM_OFFLOADED) {
         assert_true(WinPacketRawShouldTcpChecksumBeOffloaded(rawPkt));
     } else {
         assert_false(WinPacketRawShouldTcpChecksumBeOffloaded(rawPkt));
