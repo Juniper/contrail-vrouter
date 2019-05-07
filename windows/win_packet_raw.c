@@ -127,6 +127,19 @@ WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet)
     NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = 0;
 }
 
+VOID
+WinPacketRawSetIpChecksumOffloading(PWIN_PACKET_RAW Packet)
+{
+    PNET_BUFFER_LIST nbl = WinPacketRawToNBL(Packet);
+
+    NDIS_TCP_IP_CHECKSUM_NET_BUFFER_LIST_INFO settings;
+    settings.Value = NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo);
+    settings.Transmit.IsIPv4 = 1;
+    settings.Transmit.IpHeaderChecksum = 1;
+
+    NET_BUFFER_LIST_INFO(nbl, TcpIpChecksumNetBufferListInfo) = settings.Value;
+}
+
 ULONG
 WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket)
 {

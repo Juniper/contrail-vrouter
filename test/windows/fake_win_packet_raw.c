@@ -251,6 +251,12 @@ WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet)
 }
 
 VOID
+WinPacketRawSetIpChecksumOffloading(PWIN_PACKET_RAW Packet)
+{
+    Packet->IsIpChecksumOffloaded = true;
+}
+
+VOID
 WinPacketRawClearSegmentationOffloading(PWIN_PACKET_RAW Packet)
 {
     Packet->IsSegmentationOffloaded = false;

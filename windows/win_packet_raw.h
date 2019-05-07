@@ -26,6 +26,7 @@ VOID WinPacketRawClearTcpChecksumOffloading(PWIN_PACKET_RAW Packet);
 BOOLEAN WinPacketRawShouldUdpChecksumBeOffloaded(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearUdpChecksumOffloading(PWIN_PACKET_RAW Packet);
 VOID WinPacketRawClearChecksumOffloading(PWIN_PACKET_RAW Packet);
+VOID WinPacketRawSetIpChecksumOffloading(PWIN_PACKET_RAW Packet);
 
 ULONG WinSubPacketRawDataLength(PWIN_SUB_PACKET SubPacket);
 ULONG WinPacketRawDataLength(PWIN_PACKET_RAW Packet);

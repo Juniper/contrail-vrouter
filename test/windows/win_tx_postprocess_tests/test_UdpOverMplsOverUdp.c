@@ -67,7 +67,7 @@ FillFragmentHeaders_Test1_Fragment1(struct PacketHeaders *headers, size_t dataSi
     FillHeaders_Test1(headers, dataSize);
 
     headers->outerIpHeader.ip_len = htons(1498);
-    headers->outerIpHeader.ip_csum = htons(0x1CC4);
+    headers->outerIpHeader.ip_csum = htons(0);
 
     headers->outerUdpHeader.udp_length = htons(1478);
 
@@ -81,7 +81,7 @@ FillFragmentHeaders_Test1_Fragment2(struct PacketHeaders *headers, size_t dataSi
     FillHeaders_Test1(headers, dataSize);
 
     headers->outerIpHeader.ip_len = htons(114);
-    headers->outerIpHeader.ip_csum = htons(0x222C);
+    headers->outerIpHeader.ip_csum = htons(0);
 
     headers->outerUdpHeader.udp_length = htons(94);
 
@@ -139,7 +139,7 @@ AssertInsideUdpHeaders(struct vr_packet *OriginalPacket, PWIN_MULTI_PACKET Resul
 
 static void Assert(struct vr_packet *originalVrPacket, struct vr_packet *processedVrPacket, PWIN_MULTI_PACKET result)
 {
-    AssertMultiPktOffloadStatus(result, NO_OFFLOADS);
+    AssertMultiPktOffloadStatus(result, IPCHKSUM_OFFLOADED);
     AssertInsideUdpHeaders(originalVrPacket, result);
 }
 
