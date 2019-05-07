@@ -353,6 +353,7 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
     unsigned char *buf, default_mme[2] = {0xff, 0x0};
     unsigned int captured_len, clone_len = 0;
     unsigned int mirror_md_len = 0, drop_reason;
+    unsigned short *proto_p;
     struct vr_nexthop *nh, *pkt_nh;
     struct vr_mirror_entry *mirror;
     struct vr_mirror_meta_entry *mme;
@@ -461,6 +462,10 @@ vr_mirror(struct vrouter *router, uint8_t mirror_id, struct vr_packet *pkt,
                     PKT_LOG(VP_DROP_REWRITE_FAIL, pkt, 0, VR_MIRROR_C, __LINE__);
                     drop_reason = VP_DROP_REWRITE_FAIL;
                     goto fail;
+                }
+                if (pkt->vp_type == VP_TYPE_IP6) {
+                    proto_p = (unsigned short *)(pkt_data(pkt) + pkt_nh->nh_encap_len - 2);
+                    *proto_p = htons(VR_ETH_PROTO_IP6);
                 }
             }
         }
