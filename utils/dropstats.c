@@ -130,7 +130,7 @@ static void pkt_drop_log_req_process(void *s_req) {
 }
 
 static void
-dropstats_log_nlutils_callbacks()
+pkt_drop_log_nlutils_callbacks()
 {
     /* Registering callback for packet drop log in netlink process*/
     nl_cb.vr_pkt_drop_log_req_process = pkt_drop_log_req_process;
@@ -326,19 +326,7 @@ main(int argc, char *argv[])
         case 'l':
             log_set = 1;
             parse_long_opts(LOG_OPT_INDEX, optarg);
-
-            log_core = atoi(argv[2]);
-
-            /* Register nl allback function for dropstats log buffer*/
-            dropstats_log_nlutils_callbacks();
-
-            /* Register with nlclient(socket message) for dropstats log buffer*/
-            cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
-            if(!cl)
-                return -1;
-
-            vr_get_pkt_drop_log(cl,log_core,stats_index);
-            return 0;
+            break;
 
         case 0:
             parse_long_opts(option_index, optarg);
@@ -353,6 +341,17 @@ main(int argc, char *argv[])
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
     if (!cl)
         return -1;
+    
+    if ((option_index == LOG_OPT_INDEX) || (log_set == 1))
+    {
+        log_core = atoi(argv[2]);
+
+        /* Register nl allback function for pkt drop log buffer*/
+        pkt_drop_log_nlutils_callbacks();
+
+        vr_get_pkt_drop_log(cl,log_core,stats_index);
+        return 0;
+    }
 
     if (option_index == CLEAR_OPT_INDEX)
     {
