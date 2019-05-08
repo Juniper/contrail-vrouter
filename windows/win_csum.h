@@ -27,8 +27,6 @@ void init_tcp_pseudo_header(
 void fill_partial_csum_of_tcp_packet(
     struct vr_ip* ip_header,
     struct vr_tcp* tcp_header);
-void fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
-    uint8_t* ip_packet);
 
 void fill_csum_of_ip_header(struct vr_ip* iph);
 
