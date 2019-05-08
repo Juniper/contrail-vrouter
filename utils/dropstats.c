@@ -257,17 +257,7 @@ main(int argc, char *argv[])
         case 'l':
             log_set = 1;
             parse_long_opts(LOG_OPT_INDEX, optarg);
-
-            log_core = atoi(argv[2]);
-
-            /* Register with nlclient(socket message) for dropstats log buffer*/
-            cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
-            if(!cl)
-                return -1;
-
-            vr_get_pkt_drop_log(cl,log_core,stats_index);
-            return 0;
-
+            break;
 
         case 0:
             parse_long_opts(option_index, optarg);
@@ -282,6 +272,14 @@ main(int argc, char *argv[])
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
     if (!cl)
         return -1;
+
+    if ((option_index == LOG_OPT_INDEX) || (log_set == 1))
+    {
+        log_core = atoi(argv[2]);
+
+        vr_get_pkt_drop_log(cl,log_core,stats_index);
+        return 0;
+    }
 
     vr_get_drop_stats(cl);
 
