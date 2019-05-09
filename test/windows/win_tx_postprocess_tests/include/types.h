@@ -19,7 +19,7 @@ typedef enum
     NO_OFFLOADS   = 0,
     IPCHKSUM_OFFLOADED  = 1 << 0,
     UDPCHKSUM_OFFLOADED = 1 << 1,
-    TCPPCHKSUM_OFFLOADED = 1 << 2,
+    TCPCHKSUM_OFFLOADED = 1 << 2,
     SEG_OFFLOADED = 1 << 3,
 } OffloadFlag;
 

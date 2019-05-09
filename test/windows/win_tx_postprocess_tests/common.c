@@ -34,6 +34,7 @@ CreateVrPacket(size_t headersSize, size_t dataSize, PHEADERFILLERFUNCTION Header
     Fake_WinPacketRawSetOffloadInfo(rawPkt,
         offload & IPCHKSUM_OFFLOADED,
         offload & UDPCHKSUM_OFFLOADED,
+        offload & TCPCHKSUM_OFFLOADED,
         offload & SEG_OFFLOADED);
 
     return vrPacket;
