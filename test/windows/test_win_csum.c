@@ -104,21 +104,6 @@ Test_CalculatesCorrectPartialTCPCsum(void **state)
     assert_int_equal(tcph->tcp_csum, good_csum);
 }
 
-void
-Test_CalculatesCorrectTCPCsum(void **state)
-{
-    uint16_t payload_length = 10;
-    uint8_t* packet = create_tcp_ip_packet(payload_length);
-    assert_non_null(packet);
-    struct vr_ip* iph = (struct vr_ip*) packet;
-    struct vr_tcp* tcph = (struct vr_tcp*) (packet + iph->ip_hl * 4);
-
-    fill_partial_csum_of_tcp_packet(iph, tcph);
-    fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(packet);
-    uint16_t good_csum = 0xc978;
-    assert_int_equal(tcph->tcp_csum, good_csum);
-}
-
 #define win_csum_UnitTest_(p, f) cmocka_unit_test_teardown(p##f, p##TearDown)
 #define win_csum_UnitTest(f) win_csum_UnitTest_(Test_, f)
 
@@ -128,7 +113,6 @@ int main(void) {
         win_csum_UnitTest(ReturnsCorrectCsum2),
         win_csum_UnitTest(csum_replace2),
         win_csum_UnitTest(CalculatesCorrectPartialTCPCsum),
-        win_csum_UnitTest(CalculatesCorrectTCPCsum),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
