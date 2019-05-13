@@ -195,6 +195,7 @@ buffer sandesh vr_flow_req {
    34: u16          fr_rflow_dport;
    35: u16          fr_qos_id;
    36: byte         fr_ttl;
+   37: i16          fr_extflags;
 }
 
 buffer sandesh vr_vrf_assign_req {

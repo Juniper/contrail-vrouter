@@ -90,7 +90,6 @@ jhash(void *key, uint32_t length, uint32_t initval)
 }
 #endif
 
-
 bool
 vr_valid_link_local_port(struct vrouter *router, int family,
                          int proto, int port)
@@ -925,7 +924,6 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
             }
         }
     }
-
 
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe, index);
@@ -1954,7 +1952,6 @@ vr_flow_delete(struct vrouter *router, vr_flow_req *req,
 
     fe->fe_action = VR_FLOW_ACTION_DROP;
     vr_flow_reset_mirror(router, fe, req->fr_index);
-
     return vr_flow_schedule_transition(router, req, fe);
 }
 
@@ -2023,6 +2020,45 @@ vr_flow_update_link_local_port(struct vrouter *router, vr_flow_req *req,
     return;
 }
 
+static int
+vr_flow_force_evict (struct vrouter *router, vr_flow_req *req)
+{
+    struct vr_flow_entry *fe = NULL;
+
+    fe = vr_flow_get_entry(router, req->fr_index);
+    if (fe) {
+        /* Do force eviction only for TCP flows with dead flag set */
+        if (fe->fe_key.flow_proto != VR_IP_PROTO_TCP) {
+            return -EINVAL;
+        }
+        if (!(fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)) {
+            return -EINVAL;
+        }
+        if (!(fe->fe_flags & VR_FLOW_FLAG_ACTIVE)) {
+            return -EINVAL;
+        }
+        /*
+         * We have a TCP flow which is dead,
+         * Evict Candidate may or may not be set
+         */
+        vr_flow_start_modify(router, fe);
+        /*
+         * Reset flow's reverse flow index as we don't want to
+         * touch reverse flow
+         */
+        fe->fe_flags &= ~VR_RFLOW_VALID;
+        fe->fe_rflow = -1;
+        if (!(fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
+            __vr_flow_mark_evict(router, fe);
+        }
+        __vr_flow_schedule_transition(router, fe, req->fr_index, fe->fe_flags);
+    } else {
+        return -EINVAL;
+    }
+    return 0;
+}
+
+
 /* command from agent */
 static int
 vr_flow_set(struct vrouter *router, vr_flow_req *req,
@@ -2041,6 +2077,10 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
         return -EINVAL;
 
     flow_resp->fresp_index = req->fr_index;
+
+    if (req->fr_extflags & VR_FLOW_EXT_FLAG_FORCE_EVICT) {
+        return vr_flow_force_evict(router, req);
+    }
 
     fe = vr_flow_get_entry(router, req->fr_index);
     if (fe) {

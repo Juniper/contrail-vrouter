@@ -56,7 +56,7 @@
 static int mem_fd;
 
 static int dvrf_set, mir_set, show_evicted_set;
-static int help_set, match_set, get_set;
+static int help_set, match_set, get_set, force_evict_set;
 static unsigned short dvrf;
 static int list, flow_cmd, mirror = -1;
 static unsigned long flow_index;
@@ -1905,6 +1905,10 @@ fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action)
         req->fr_action = VR_FLOW_ACTION_DROP;
         break;
 
+    case 'e':
+        req->fr_extflags = VR_FLOW_EXT_FLAG_FORCE_EVICT;
+        break;
+
     default:
         return -1;
     }
@@ -2138,6 +2142,7 @@ Usage(void)
     printf("Usage:flow [-f flow_index]\n");
     printf("           [-d flow_index]\n");
     printf("           [-i flow_index]\n");
+    printf("           [-e flow_index]\n");
     printf("           [--mirror=mirror table index]\n");
     printf("           [--match \"match_string\"\n");
     printf("           [-l]\n");
@@ -2152,6 +2157,7 @@ Usage(void)
     printf("-f <flow_index>  Set forward action for flow at flow_index <flow_index>\n");
     printf("-d <flow_index>  Set drop action for flow at flow_index <flow_index>\n");
     printf("-i <flow_index>  Invalidate flow at flow_index <flow_index>\n");
+    printf("-e <flow_index>  force evict flow at flow_index <flow_index>\n");
     printf("-p <flow_count>  Profile time to add/delete flow entries\n");
     printf("-b <bunch_count> Bunch flow messages in one netlink message\n");
     printf("-F               Flush all the flows\n");
@@ -2181,6 +2187,7 @@ enum opt_flow_index {
     SHOW_EVICTED_OPT_INDEX,
     MATCH_OPT_INDEX,
     HELP_OPT_INDEX,
+    FORCE_EVICT_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -2191,6 +2198,7 @@ static struct option long_options[] = {
     [SHOW_EVICTED_OPT_INDEX]    = {"show-evicted",  no_argument,       &show_evicted_set,   1},
     [MATCH_OPT_INDEX]           = {"match",         required_argument, &match_set,          1},
     [HELP_OPT_INDEX]            = {"help",          no_argument,       &help_set,           1},
+    [FORCE_EVICT_OPT_INDEX]     = {"force-evict",   required_argument, &force_evict_set,    1},
     [MAX_OPT_INDEX]             = { NULL,           0,                 0,                   0}
 };
 
@@ -2482,6 +2490,14 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     case SHOW_EVICTED_OPT_INDEX:
         break;
 
+    case FORCE_EVICT_OPT_INDEX:
+        flow_index = strtoul(opt_arg, NULL, 0);
+        if (errno)
+            Usage();
+
+        flow_cmd = 'e';
+        break;
+
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -2497,13 +2513,14 @@ main(int argc, char *argv[])
     int ret;
     int option_index;
 
-    while ((opt = getopt_long(argc, argv, "d:f:g:i:p:b:lrsF",
+    while ((opt = getopt_long(argc, argv, "d:f:g:i:e:p:b:lrsF",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
         case 'g':
         case 'd':
         case 'i':
+        case 'e':
             flow_cmd = opt;
             flow_index = strtoul(optarg, NULL, 0);
             break;
