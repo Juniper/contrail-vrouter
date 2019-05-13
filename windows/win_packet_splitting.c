@@ -100,7 +100,8 @@ extract_inner_ip_payload_offset_and_size_from_original_packet(
 static void
 extract_inner_tcp_header_from_original_packet(struct SplittingContext* pctx)
 {
-    struct vr_tcp *tcp = (struct vr_tcp*)(pctx->inner_ip_header + 1);
+    struct vr_tcp *tcp =
+        (struct vr_tcp *)get_next_header_after_ip(pctx->inner_ip_header);
     pctx->inner_headers_size += VR_TCP_OFFSET(tcp->tcp_offset_r_flags) * 4;
     pctx->tcp_header_offset = (unsigned char*)(tcp) - pctx->outer_headers;
 }
