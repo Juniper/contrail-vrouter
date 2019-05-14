@@ -300,6 +300,39 @@ remove_split_nbl(struct SplittingContext* pctx)
     WinPacketRawDecrementChildCountOf(originalRawPacket);
 }
 
+static bool
+fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
+    struct SplittingContext* pctx, struct vr_tcp* tcp_hdr,
+    PWIN_SUB_PACKET SubPacket, unsigned inner_ip_offset_in_nb)
+{
+    ULONG packetDataSize = WinSubPacketRawDataLength(SubPacket);
+    PVOID packetDataBuff = WinRawAllocate(packetDataSize);
+
+    uint8_t* packetData = WinSubPacketRawGetDataBuffer(
+        SubPacket, packetDataBuff, packetDataSize);
+
+    if (packetData == NULL) {
+        if (packetDataBuff != NULL) {
+            WinRawFree(packetDataBuff);
+        }
+        return false;
+    }
+
+    fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
+        packetData + inner_ip_offset_in_nb);
+
+    struct vr_tcp* tcpHdrCopy =
+        (struct vr_tcp *)(packetData + pctx->tcp_header_offset);
+
+    tcp_hdr->tcp_csum = tcpHdrCopy->tcp_csum;
+
+    if (packetDataBuff) {
+        WinRawFree(packetDataBuff);
+    }
+
+    return true;
+}
+
 static void
 fill_partial_csum_of_inner_tcp_packet(
     struct SplittingContext* pctx,
@@ -309,6 +342,21 @@ fill_partial_csum_of_inner_tcp_packet(
     struct vr_ip* inner_ip_header = (struct vr_ip*)(headers +
         ((uint8_t *)pctx->inner_ip_header - (uint8_t *)pctx->outer_headers));
     fill_partial_csum_of_tcp_packet(inner_ip_header, inner_tcp_header);
+}
+
+static void
+fill_checksum_of_inner_tcp_packet(
+    struct SplittingContext* pctx,
+    PWIN_SUB_PACKET SubPacket,
+    unsigned char* headers)
+{
+    struct vr_tcp* inner_tcp_header =
+        (struct vr_tcp*) (headers + pctx->tcp_header_offset);
+
+    fill_partial_csum_of_inner_tcp_packet(pctx, inner_tcp_header, headers);
+    fill_csum_of_inner_tcp_packet_provided_that_partial_csum_is_computed(
+        pctx, inner_tcp_header, SubPacket,
+        (uint8_t*)pctx->inner_ip_header - (uint8_t*)pctx->outer_headers);
 }
 
 static void
@@ -331,7 +379,7 @@ fix_headers_of_inner_tcp_packet(
 
     inner_tcp_header->tcp_offset_r_flags = htons(flags);
 
-    fill_partial_csum_of_inner_tcp_packet(pctx, inner_tcp_header, headers);
+    fill_checksum_of_inner_tcp_packet(pctx, SubPacket, headers);
 }
 
 static unsigned int
@@ -396,11 +444,6 @@ fix_headers_of_new_packets(struct SplittingContext* pctx)
                 += pctx->maximum_inner_payload_length;
         }
         fix_headers_of_outer_split_packet(pctx, headers);
-    }
-
-    if (pctx->is_tcp_segmentation) {
-        WinPacketRawSetTcpChecksumOffloading(
-            splitRawPacket, pctx->tcp_header_offset);
     }
 }
 
