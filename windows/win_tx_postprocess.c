@@ -109,10 +109,11 @@ fix_tunneled_csum(struct vr_packet *pkt)
     zero_ip_csum_at_offset(pkt, sizeof(struct vr_eth));
 
     if (WinPacketRawShouldTcpChecksumBeOffloaded(winPacketRaw)) {
-        // Set offloading of inner TCP packet checksum
-        struct vr_ip *inner_ip = (struct vr_ip *)(pkt_data(pkt) + pkt->vp_inner_network_h);
-        uint8_t *inner_tcp = ((uint8_t *)inner_ip + inner_ip->ip_hl * 4);
-        WinPacketRawSetTcpChecksumOffloading(winPacketRaw, inner_tcp - pkt_data(pkt));
+        // Calculate the header/data csum and turn off HW acceleration
+        if (fix_csum(pkt, pkt->vp_inner_network_h)) {
+            WinPacketRawClearTcpChecksumOffloading(winPacketRaw);
+        }
+        // else try to offload it even though it's tunneled.
     }
 
     if (WinPacketRawShouldUdpChecksumBeOffloaded(winPacketRaw)) {

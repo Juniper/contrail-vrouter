@@ -114,6 +114,18 @@ fill_partial_csum_of_tcp_packet(
         (uint8_t*)&tcp_pseudo_header, sizeof(tcp_pseudo_header));
 }
 
+void
+fill_csum_of_tcp_packet_provided_that_partial_csum_is_computed(
+    uint8_t* ip_packet)
+{
+    struct vr_ip *iph = (struct vr_ip*) ip_packet;
+    unsigned tcp_offset = iph->ip_hl * 4;
+    uint16_t tcp_packet_length = ntohs(iph->ip_len) - tcp_offset;
+    uint8_t* tcp_packet = ip_packet + tcp_offset;
+    struct vr_tcp* tcph = (struct vr_tcp*) tcp_packet;
+    tcph->tcp_csum = calc_csum(tcp_packet, tcp_packet_length);
+}
+
 // TODO: This is duplicated from vr_proto_ip.c because compilation and linking in tests.
 static unsigned short
 vr_ip_csum(struct vr_ip *ip)

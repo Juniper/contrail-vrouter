@@ -79,7 +79,7 @@ FillSegmentHeaders_Test1_Segment1(struct PacketHeaders *headers, size_t dataSize
     headers->innerIpHeader.ip_csum = htons(0x9EA1);
 
     headers->innerTcpHeader.tcp_offset_r_flags = htons(VR_TCP_FLAG_ACK | ((20/4) << 12));
-    headers->innerTcpHeader.tcp_csum = htons(0x1B35);
+    headers->innerTcpHeader.tcp_csum = htons(0xFFA5);
 }
 
 static void
@@ -96,7 +96,7 @@ FillSegmentHeaders_Test1_Segment4(struct PacketHeaders *headers, size_t dataSize
     headers->innerIpHeader.ip_csum = htons(0x9F69);
 
     headers->innerTcpHeader.tcp_offset_r_flags = htons(VR_TCP_FLAG_PSH | VR_TCP_FLAG_ACK | ((20/4) << 12));
-    headers->innerTcpHeader.tcp_csum = htons(0x1A6D);
+    headers->innerTcpHeader.tcp_csum = htons(0xD470);
 
     headers->innerTcpHeader.tcp_seq = htonl(0xAC5CADF3);
 }
@@ -114,7 +114,7 @@ FillVrPacket_Test1(struct vr_packet* packet, struct PacketHeaders* headers)
 
 static void Assert(struct vr_packet *originalVrPacket, struct vr_packet *processedVrPacket, PWIN_MULTI_PACKET result)
 {
-    AssertMultiPktOffloadStatus(result, IPCHKSUM_OFFLOADED | TCPCHKSUM_OFFLOADED);
+    AssertMultiPktOffloadStatus(result, IPCHKSUM_OFFLOADED);
 }
 
 static PHEADERFILLERFUNCTION outputPacketHeaderFillers_Test1[] = { FillSegmentHeaders_Test1_Segment1, NULL, NULL, FillSegmentHeaders_Test1_Segment4 };
