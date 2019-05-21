@@ -9,6 +9,8 @@ import copy
 import re
 import platform
 
+
+
 AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
           help='Linux kernel source directory for vrouter.ko')
 
