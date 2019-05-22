@@ -58,6 +58,8 @@ typedef enum {
 #define VR_FLOW_FLAG_DELETE_MARKED  0x40
 #define VR_FLOW_BGP_SERVICE         0x80
 
+#define VR_FLOW_EXT_FLAG_FORCE_EVICT    0x0001
+
 /* Flow Action Reason code */
 #define VR_FLOW_DR_UNKNOWN              0x00
 #define VR_FLOW_DR_UNAVIALABLE_INTF     0x01
