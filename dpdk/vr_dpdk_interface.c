@@ -735,7 +735,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 {
     int ret;
     uint8_t port_id;
-    uint16_t mtu;
+    uint16_t mtu = 0;
     struct rte_pci_addr pci_address;
     struct vr_dpdk_ethdev *ethdev;
     struct ether_addr mac_addr;
@@ -788,17 +788,6 @@ dpdk_fabric_if_add(struct vr_interface *vif)
                 MAC_VALUE(mac_addr.addr_bytes), MAC_VALUE(vif->vif_mac));
     }
 
-    if (rte_eth_dev_get_mtu(port_id, &mtu) == 0 && mtu > 0) {
-         /* Ethernet header size */
-         mtu += sizeof(struct vr_eth);
-         if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
-             /* 802.1q header size */
-             mtu += sizeof(uint32_t);
-         }
-         vif->vif_mtu = mtu;
-         if (vif->vif_bridge)
-             vif->vif_bridge->vif_mtu = mtu;
-    }
     ethdev = &vr_dpdk.ethdevs[port_id];
     if (ethdev->ethdev_ptr != NULL) {
         RTE_LOG(ERR, VROUTER, "    error adding eth dev %s: already added\n",
@@ -820,6 +809,27 @@ dpdk_fabric_if_add(struct vr_interface *vif)
     ret = dpdk_vif_queue_setup(vif);
     if (ret < 0)
         return ret;
+
+    if (vr_dpdk.vr_eth_mtu <= 0) {
+        ret = rte_eth_dev_get_mtu(port_id, &vr_dpdk.vr_eth_mtu);
+    } else {
+        ret = dpdk_if_set_mtu(vif, vr_dpdk.vr_eth_mtu);
+    }
+
+    if (!ret) {
+        /* Ethernet header size */
+        mtu = vr_dpdk.vr_eth_mtu;
+        mtu += sizeof(struct vr_eth);
+        if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+            /* 802.1q header size */
+            mtu += sizeof(uint32_t);
+        }
+        vif->vif_mtu = mtu;
+        if (vif->vif_bridge)
+            vif->vif_bridge->vif_mtu = mtu;
+    } else {
+        RTE_LOG(ERR, VROUTER, "    error setting VIF MTU ret=%d\n", ret);
+    }
 
     ret = rte_eth_dev_start(port_id);
     if (ret < 0) {
@@ -1978,6 +1988,91 @@ dpdk_if_get_settings(struct vr_interface *vif,
         settings->vis_speed = 1000;
         settings->vis_duplex = 1;
     }
+    return 0;
+}
+
+unsigned int
+dpdk_if_set_mtu(struct vr_interface *vif, uint32_t mtu)
+{
+    struct vr_dpdk_ethdev *ethdev = NULL;
+    uint8_t port_id = 0, slave_port_id;
+    int ret = 0, i;
+    struct vrouter *router = vrouter_get(0);
+
+    vr_dpdk.vr_eth_mtu = mtu;
+    if (vif == NULL) {
+        RTE_LOG(ERR, VROUTER, "%s error: NULL vif\n", __func__);
+        return -1;
+    }
+
+    ethdev = (struct vr_dpdk_ethdev *)vif->vif_os;
+
+    if (ethdev == NULL) {
+        RTE_LOG(ERR, VROUTER, "%s error: NULL ethdev\n", __func__);
+        return -1;
+    }
+
+    port_id = ethdev->ethdev_port_id;
+
+    /*
+     * TODO: DPDK bond PMD does not implement mtu_set op, so we need to
+     * set the MTU manually for all the slaves.
+     */
+    if (ethdev->ethdev_nb_slaves > 0) {
+        RTE_LOG(INFO, VROUTER, "Changing bond eth device %" PRIu8 " MTU\n", port_id);
+
+        rte_eth_devices[port_id].data->mtu = mtu;
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+            slave_port_id = ethdev->ethdev_slaves[i];
+            RTE_LOG(INFO, VROUTER,
+                    "    changing bond member eth device %" PRIu8 " MTU to %u\n",
+                    slave_port_id, mtu);
+
+            ret =  rte_eth_dev_set_mtu(slave_port_id, mtu);
+            if (ret < 0) {
+                /*
+                 * Do not return error as some NICs (such as X710) do not allow setting
+                 * the MTU while the NIC is up and running. The max_rx_pkt_len is anyway
+                 * set to support jumbo frames, so continue further here to set vif_mtu.
+                 */
+                RTE_LOG(DEBUG, VROUTER,
+                        "    error changing bond member eth device %" PRIu8 " MTU: %s (%d)\n",
+                        slave_port_id, rte_strerror(-ret), -ret);
+            }
+        }
+    } else {
+        RTE_LOG(INFO, VROUTER, "Changing eth device MTU to %u\n", mtu);
+
+        rte_eth_devices[port_id].data->mtu = mtu;
+        ret =  rte_eth_dev_set_mtu(port_id, mtu);
+        if (ret < 0) {
+            /*
+             * Do not return error as some NICs (such as X710) do not allow setting
+             * the MTU while the NIC is up and running. The max_rx_pkt_len is anyway
+             * set to support jumbo frames, so continue further here to set vif_mtu.
+             */
+            RTE_LOG(DEBUG, VROUTER,
+                    "Error changing eth device MTU: %s (%d)\n",
+                    rte_strerror(-ret), -ret);
+        }
+    }
+
+    /* On success, inform vrouter about new MTU */
+    for (i = 0; i < router->vr_max_interfaces; i++) {
+        vif = __vrouter_get_interface(router, i);
+        if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+           /* Ethernet header size */
+           mtu += sizeof(struct vr_eth);
+           if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+               /* 802.1q header size */
+               mtu += sizeof(uint32_t);
+           }
+           vif->vif_mtu = mtu;
+           if (vif->vif_bridge)
+               vif->vif_bridge->vif_mtu = mtu;
+        }
+    }
+
     return 0;
 }
 
