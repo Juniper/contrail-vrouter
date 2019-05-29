@@ -412,7 +412,7 @@ vr_flow_defer_cb(struct vrouter *router, void *arg)
 
     if (vfdd->vfdd_delete) {
         vr_flow_reset_entry(router, fe);
-    } else {
+    } else if (vfdd->vfdd_evict_flow) {
         rfe = vr_flow_get_entry(router, fe->fe_rflow);
         vr_flow_evict_flow(router, fe);
         if (rfe)
@@ -1886,6 +1886,7 @@ __vr_flow_schedule_transition(struct vrouter *router, struct vr_flow_entry *fe,
 {
     struct vr_flow_md *flmd;
     struct vr_defer_data *defer = NULL;
+    struct vr_flow_entry *rfe = NULL;
 
     flmd = (struct vr_flow_md *)vr_malloc(sizeof(*flmd),
             VR_FLOW_METADATA_OBJECT);
@@ -1903,6 +1904,20 @@ __vr_flow_schedule_transition(struct vrouter *router, struct vr_flow_entry *fe,
             if (!(flmd->flmd_flags & VR_FLOW_FLAG_ACTIVE)) {
                 ((struct vr_flow_defer_data *)defer->vdd_data)->vfdd_delete =
                     true;
+            }
+            /*
+             * Set vfdd_evict_flow to true only if there is only one flow
+             * or both flows have EVICT_CANDIDATE flag set;
+             * This is to avoid a race condition which can lead to non
+             * eviction of one of the flows. See CEM-4275 for more details.
+             */
+            if ((fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
+                if ((fe->fe_rflow < 0) ||
+                    ((rfe = vr_flow_get_entry(router, fe->fe_rflow)) &&
+                     (rfe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE))) {
+                    ((struct vr_flow_defer_data *)defer->vdd_data)->vfdd_evict_flow =
+                             true;
+                }
             }
         }
     }
