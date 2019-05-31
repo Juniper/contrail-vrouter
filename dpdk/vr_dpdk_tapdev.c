@@ -577,12 +577,88 @@ vr_dpdk_tapdev_rxtx(void)
 
 static void vr_dpdk_handle_vhost0_notification(uint32_t mtu, uint32_t if_up)
 {
-    struct vrouter *router = vrouter_get(0);
+    static int vhost_mtu = 1500; /* Default MTU */
 
-    if ((vr_dpdk.vr_eth_mtu != mtu) &&
-            (dpdk_if_set_mtu(router->vr_eth_if, mtu) < 0)) {
+    struct vr_interface *vif;
+    struct vrouter *router = vrouter_get(0);
+    struct vr_dpdk_ethdev *ethdev = NULL;
+    uint8_t slave_port_id, port_id = 0;
+    int ret = 0, i;
+
+    if (router->vr_eth_if)
+        ethdev = (struct vr_dpdk_ethdev *)router->vr_eth_if->vif_os;
+
+    if (ethdev == NULL) {
+        RTE_LOG(ERR, VROUTER, "%s error: NULL ethdev\n", __func__);
         return;
     }
+
+    port_id = ethdev->ethdev_port_id;
+
+    if (vhost_mtu != mtu) {
+        /*
+         * TODO: DPDK bond PMD does not implement mtu_set op, so we need to
+         * set the MTU manually for all the slaves.
+         */
+        if (ethdev->ethdev_nb_slaves > 0) {
+            RTE_LOG(INFO, VROUTER, "Changing bond eth device %" PRIu8 " MTU\n", port_id);
+
+            rte_eth_devices[port_id].data->mtu = mtu;
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                slave_port_id = ethdev->ethdev_slaves[i];
+                RTE_LOG(INFO, VROUTER,
+                        "    changing bond member eth device %" PRIu8 " MTU to %u\n",
+                        slave_port_id, mtu);
+
+                ret =  rte_eth_dev_set_mtu(slave_port_id, mtu);
+                if (ret < 0) {
+                    /*
+                     * Do not return error as some NICs (such as X710) do not allow setting 
+                     * the MTU while the NIC is up and running. The max_rx_pkt_len is anyway
+                     * set to support jumbo frames, so continue further here to set vif_mtu.
+                     */
+                    RTE_LOG(DEBUG, VROUTER,
+                            "    error changing bond member eth device %" PRIu8 " MTU: %s (%d)\n",
+                            slave_port_id, rte_strerror(-ret), -ret);
+                }
+            }
+        } else {
+            RTE_LOG(INFO, VROUTER, "Changing eth device MTU to %u\n", mtu);
+
+            rte_eth_devices[port_id].data->mtu = mtu;
+            ret =  rte_eth_dev_set_mtu(port_id, mtu);
+            if (ret < 0) {
+                /*
+                 * Do not return error as some NICs (such as X710) do not allow setting 
+                 * the MTU while the NIC is up and running. The max_rx_pkt_len is anyway
+                 * set to support jumbo frames, so continue further here to set vif_mtu.
+                 */
+                RTE_LOG(DEBUG, VROUTER,
+                        "Error changing eth device MTU: %s (%d)\n",
+                        rte_strerror(-ret), -ret);
+            }
+        }
+
+        /* On success, inform vrouter about new MTU */
+        for (i = 0; i < router->vr_max_interfaces; i++) {
+            vif = __vrouter_get_interface(router, i);
+            if (vif && (vif->vif_type == VIF_TYPE_PHYSICAL)) {
+               /* Ethernet header size */
+               mtu += sizeof(struct vr_eth);
+               if (vr_dpdk.vlan_tag != VLAN_ID_INVALID) {
+                   /* 802.1q header size */
+                   mtu += sizeof(uint32_t);
+               }
+               vif->vif_mtu = mtu;
+               if (vif->vif_bridge)
+                   vif->vif_bridge->vif_mtu = mtu;
+            }
+        }
+
+        /* Save the new MTU */
+        vhost_mtu = mtu;
+    }
+
 }
 
 void vr_dpdk_tapdev_handle_notifications(void)
@@ -641,7 +717,7 @@ void vr_dpdk_tapdev_handle_notifications(void)
             }
 
             if (ifname && (strncmp(ifname, VHOST_IFNAME, (strlen(VHOST_IFNAME) + 1)) == 0)) {
-                RTE_LOG(INFO, VROUTER, "Notification received for vhost0 MTU %d\n", mtu);
+                RTE_LOG(INFO, VROUTER, "Notification received for vhost0\n");
                 vr_dpdk_handle_vhost0_notification
                                  (mtu, (ifi->ifi_flags & IFF_UP));
             }
