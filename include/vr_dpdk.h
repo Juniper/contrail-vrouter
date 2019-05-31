@@ -609,6 +609,7 @@ struct vr_dpdk_global {
      * -1 - KNI is not available, so TAP interfaces are used instead
      */
     int kni_state;
+    uint16_t vr_eth_mtu;
 };
 
 extern struct vr_dpdk_global vr_dpdk;
@@ -947,5 +948,6 @@ int dpdk_check_rx_mrgbuf_disable(void);
  * Get bond interface port id by drv_name
  */
 uint8_t dpdk_find_port_id_by_drv_name(void);
+unsigned int dpdk_if_set_mtu(struct vr_interface *vif, uint32_t mtu);
 
 #endif /*_VR_DPDK_H_ */

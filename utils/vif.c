@@ -419,7 +419,7 @@ static void
 list_get_print(vr_interface_req *req)
 {
     char ip6_addr[INET6_ADDRSTRLEN], ip_addr[INET_ADDRSTRLEN],
-         name[50] = {0}, ip6_ip[16];
+         name[50] = {0}, ip6_ip[16], mtu_str[50] = {0};
     bool print_zero = false;
     uint16_t proto, port;
     int printed = 0, len;
@@ -503,10 +503,12 @@ list_get_print(vr_interface_req *req)
                                                     INET6_ADDRSTRLEN));
     }
     vr_interface_print_head_space();
-    printf("Vrf:%d Mcast Vrf:%d Flags:%s QOS:%d Ref:%d", req->vifr_vrf,
+    sprintf(mtu_str,"MTU:%d",req->vifr_mtu);
+    printf("Vrf:%d Mcast Vrf:%d Flags:%s QOS:%d Ref:%d %s", req->vifr_vrf,
             req->vifr_mcast_vrf, req->vifr_flags ?
             vr_if_flags(req->vifr_flags) : "NULL" ,
-            req->vifr_qos_map_index, req->vifr_ref_cnt);
+            req->vifr_qos_map_index, req->vifr_ref_cnt,
+            !req->vifr_idx?mtu_str:"");
     if (req->vifr_flags & (VIF_FLAG_MIRROR_TX | VIF_FLAG_MIRROR_RX)) {
         printf(" Mirror index %d\n", req->vifr_mir_id);
     } else {
