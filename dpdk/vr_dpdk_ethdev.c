@@ -681,7 +681,7 @@ vr_dpdk_ethdev_filtering_init(struct vr_interface *vif,
 static void
 dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
 {
-    int i, slave_port_id;
+    int i, slave_port_id, ret;
     int port_id = ethdev->ethdev_port_id;
     uint16_t mtu = 0;
     struct rte_pci_addr *pci_addr;
@@ -719,17 +719,24 @@ dpdk_ethdev_bond_info_update(struct vr_dpdk_ethdev *ethdev)
                 pci_addr->devid, pci_addr->function,
                 MAC_VALUE(mac_addr.addr_bytes));
 
-            /* try to add bond mac and LACP multicast MACs */
-            if (rte_eth_dev_mac_addr_add(slave_port_id, &bond_mac, 0) == 0
-                && rte_eth_dev_set_mc_addr_list(slave_port_id, &lacp_mac, 1) == 0) {
-                /* disable the promisc mode enabled by default */
+            /* We just try to add the mc address. In any case, the bond driver would
+             * enable the 'all multicast' mode
+             */
+            if ((ret=rte_eth_dev_set_mc_addr_list(slave_port_id, &lacp_mac, 1)) != 0)
+                RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
+                    ": unable to add multicast addresses %d\n", slave_port_id,ret);
+
+            /*
+             * Need to set the dev mac to disable the promiscuous mode
+             */
+            if ((ret=rte_eth_dev_mac_addr_add(slave_port_id, &bond_mac, 0)) != 0)
+                RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
+                    ": unable to add MAC addresses %d\n", slave_port_id,ret);
+            else {
+                RTE_LOG(INFO, VROUTER, "    disabling promiscuous mode for device %d\n", slave_port_id);
                 rte_eth_promiscuous_disable(ethdev->ethdev_port_id);
-                RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
-                    " promisc mode disabled\n", slave_port_id);
-            } else {
-                RTE_LOG(INFO, VROUTER, "    bond member eth device %" PRIu8
-                    ": unable to add MAC addresses\n", slave_port_id);
             }
+
         }
     }
 }
