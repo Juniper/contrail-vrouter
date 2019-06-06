@@ -33,6 +33,8 @@ struct vr_hugepage_info {
 extern void *vr_flow_table, *vr_oflow_table;
 extern void *vr_bridge_table, *vr_bridge_otable;
 extern unsigned char *vr_flow_path, *vr_bridge_table_path;
+char flow_mem_file[VR_UNIX_PATH_MAX];
+char bridge_mem_file[VR_UNIX_PATH_MAX];
 
 static int
 vr_hugepage_info_init(void)
@@ -71,7 +73,7 @@ vr_hugepage_info_init(void)
             hp->mnt = malloc(strlen(mnt) + 1);
             memcpy(hp->mnt, mnt, strlen(mnt) + 1);
 
-            if (strstr(options, "pagesize=1G") || strstr(options, "pagesize=1024M")) {
+            if (strstr(options, "pagesize=1G")) {
                 hp->page_size = (1024 * 1024 * 1024);
                 sys_hp_file =
                     "/sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages";
@@ -144,7 +146,7 @@ vr_dpdk_table_mem_init(unsigned int table, unsigned int entries,
     int ret, i, fd;
 
     void **table_p;
-    char shm_file[VR_UNIX_PATH_MAX];
+    char *shm_file;
     char *file_name, *touse_file_name = NULL;
     char *shmem_name, *hp_file_name;
     unsigned char **path;
@@ -166,6 +168,7 @@ vr_dpdk_table_mem_init(unsigned int table, unsigned int entries,
         table_p = &vr_dpdk.flow_table;
         path = &vr_flow_path;
         vr_oflow_entries = oentries;
+        shm_file = flow_mem_file;
         break;
 
     case VR_MEM_BRIDGE_TABLE_OBJECT:
@@ -174,6 +177,7 @@ vr_dpdk_table_mem_init(unsigned int table, unsigned int entries,
         table_p = &vr_dpdk.bridge_table;
         path = &vr_bridge_table_path;
         vr_bridge_oentries = oentries;
+        shm_file = bridge_mem_file;
         break;
 
     default:
@@ -182,9 +186,9 @@ vr_dpdk_table_mem_init(unsigned int table, unsigned int entries,
 
     if (no_huge_set) {
         /* Create a shared memory under the socket directory. */
-        ret = snprintf(shm_file, sizeof(shm_file), "%s/%s",
+        ret = snprintf(shm_file, VR_UNIX_PATH_MAX, "%s/%s",
                 vr_socket_dir, shmem_name);
-        if (ret >= sizeof(shm_file)) {
+        if (ret >= VR_UNIX_PATH_MAX) {
             RTE_LOG(ERR, VROUTER, "Error creating shared memory file\n");
             return -ENOMEM;
         }
