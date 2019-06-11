@@ -47,6 +47,7 @@
 
 /* Suppress NetLink error messages */
 bool vr_ignore_nl_errors = false;
+static int local_iter = 0;
 
 char *
 vr_extract_token(char *string, char token_separator)
@@ -682,7 +683,7 @@ void vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i)
 
     ptr_time = localtime(&(pkt_log_utils[i].timestamp));
 
-    printf("sl no: %d  ", pkt_log->vdl_log_idx+i);
+    printf("sl no: %d  ", pkt_log->vdl_log_idx + (++local_iter));
 #ifdef _WIN32
    printf("Epoch Time: %Id ", pkt_log_utils[i].timestamp);
 #else
@@ -751,13 +752,20 @@ vr_print_pkt_drop_log(vr_pkt_drop_log_req *pkt_log)
     static bool vr_header_include = 0;
 
     /* When configured pkt buffer size is than MAX_ALLOWED_BUFFER_SIZE */
-    if(pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx  <
+    if(pkt_log->vdl_pkt_droplog_stats_cur_idx - pkt_log->vdl_log_idx <
             VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
     {
-        log_buffer_iter = pkt_log->vdl_pkt_droplog_max_bufsz - pkt_log->vdl_log_idx;
+        log_buffer_iter = pkt_log->vdl_pkt_droplog_stats_cur_idx - pkt_log->vdl_log_idx;
     }
     else
         log_buffer_iter = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+
+    /* If timestamp is empty in very first entry, then dont log anything on that core*/
+     if(((vr_pkt_drop_log_t*)pkt_log->vdl_pkt_droplog_arr)[0].timestamp == 0 )
+     {
+         printf("Timestamp is empty on core\n");
+        return;
+     }
 
     if(pkt_log->vdl_log_idx == 0)
         vr_header_include = 0;
@@ -767,9 +775,13 @@ vr_print_pkt_drop_log(vr_pkt_drop_log_req *pkt_log)
         vr_print_pkt_drop_log_header(pkt_log);
         vr_header_include = 1;
     }
-    for(i = 0; i < log_buffer_iter; i++)
+    for(i = log_buffer_iter-1; i >= 0; i--) {
+        if(((vr_pkt_drop_log_t*)pkt_log->vdl_pkt_droplog_arr)[i].timestamp == NULL) {
+            printf("Timestamp is empty on further entries\n");
+            return;}
         vr_print_pkt_drop_log_data(pkt_log, i);
-
+    }
+    local_iter = 0;
     return;
 }
 
