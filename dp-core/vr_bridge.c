@@ -969,12 +969,14 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             /* If Flooding of unknown unicast not allowed, drop the packet */
             if (!vr_unknown_uc_flood(pkt->vp_if, pkt->vp_nh) ||
                                  (mac_flags & MAC_BMC_BIT_SET)) {
+                PKT_LOG(VP_DROP_L2_NO_ROUTE, pkt, 0, VR_BRIDGE_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return 0;
             }
 
             be = bridge_lookup(vr_bcast_mac, fmd);
             if (!be || !(nh = be->be_nh)) {
+                PKT_LOG(VP_DROP_L2_NO_ROUTE, pkt, 0, VR_BRIDGE_C, __LINE__);
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return 0;
             }

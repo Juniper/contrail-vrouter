@@ -42,7 +42,8 @@ unsigned int vr_pkt_drop_log_req_get_size(void *object)
 static void
 vr_pkt_drop_log_get(unsigned int rid, short core, int index)
 {
-    int ret = 0, pkt_buffer_size = 0;
+    int ret = 0, pkt_buffer_size = 0, pkt_buf_remain_size = 0;
+    uint64_t vr_pkt_droplog_cur_idx;
 
     struct vrouter *router = vrouter_get(rid);
     vr_pkt_drop_log_req *response;
@@ -61,26 +62,6 @@ vr_pkt_drop_log_get(unsigned int rid, short core, int index)
         /* Check packet drop log is enabled at load time*/
         if(vr_pkt_droplog_buf_en == 1)
         {
-            /* Check if packet log buffer is greater than allowed buffer size */
-            if( vr_pkt_droplog_bufsz - index > VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ )
-                pkt_buffer_size = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
-            else
-                pkt_buffer_size = vr_pkt_droplog_bufsz - index;
-
-            /* Calculate the buffer size in bytes for message transfer via
-             * sandesh*/
-            response->vdl_pkt_droplog_arr_size = pkt_buffer_size *
-                sizeof(vr_pkt_drop_log_t);
-
-            response->vdl_pkt_droplog_arr = (char *)vr_zalloc(
-                response->vdl_pkt_droplog_arr_size, VR_PKT_DROP_LOG_REQ_OBJECT);
-            if(!response->vdl_pkt_droplog_arr)
-            {
-                vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
-                        vr_pkt_droplog_bufsz * sizeof(vr_pkt_drop_log_t));
-                goto exit_get;
-            }
-
             /* When packet drop log is requested for 0, it log for all cores
              * Since physical core always starts with 0, so we decrement by 1
              * at request side and increment by 1n while sending respnse*/
@@ -90,15 +71,99 @@ vr_pkt_drop_log_get(unsigned int rid, short core, int index)
             response->vdl_pkt_droplog_en = vr_pkt_droplog_buf_en;
             response->vdl_pkt_droplog_sysctl_en = vr_pkt_droplog_sysctl_en;
             response->vdl_pkt_droplog_max_bufsz = vr_pkt_droplog_bufsz;
-
+            
             if(core == -1){
                 /* When the core is requested as 0, process for all cores*/
                 core = 0;
             }
-            memcpy(response->vdl_pkt_droplog_arr,
-                    router->vr_pkt_drop->vr_pkt_drop_log[core]+(index),
-                    response->vdl_pkt_droplog_arr_size);
+
+            vr_pkt_droplog_cur_idx = router->vr_pkt_drop->vr_pkt_drop_log_buffer_index[core];
+            
+            /* Index value would be maintained at utils side, For every iteration index would be incremented 
+             * with VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ */
+            //if((vr_pkt_droplog_cur_idx > VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ) && ((index +VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ) < vr_pkt_droplog_cur_idx))
+            if( index < vr_pkt_droplog_cur_idx)
+            {
+                if(vr_pkt_droplog_cur_idx - index > VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
+                    pkt_buffer_size = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+                else
+                    pkt_buffer_size = vr_pkt_droplog_cur_idx - index;
             }
+            else
+            {
+                /* Calculate the number of entries to read from backwards */
+               // if(index < (vr_pkt_droplog_bufsz - VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ))
+                 //   pkt_buffer_size = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+                if((vr_pkt_droplog_bufsz - index) > VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
+                {
+                    pkt_buffer_size = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
+                }
+                else
+                    pkt_buffer_size = vr_pkt_droplog_bufsz - index;
+            }
+
+           vr_printf("pkt buffer size %d core %d No. Entry: %d index: %d\n",pkt_buffer_size,core,router->vr_pkt_drop->vr_pkt_drop_log_buffer_index[core],index); 
+            response->vdl_pkt_droplog_stats_cur_idx = vr_pkt_droplog_cur_idx;
+            
+            if(pkt_buffer_size)
+            {
+                /* Calculate the buffer size in bytes for message transfer via
+                 * sandesh*/
+                response->vdl_pkt_droplog_arr_size = pkt_buffer_size *
+                    sizeof(vr_pkt_drop_log_t);
+
+                if(router->vr_pkt_drop->vr_pkt_drop_log[core][((vr_pkt_droplog_cur_idx + 1) % vr_pkt_droplog_bufsz)].timestamp != 0)
+                {
+                    if( vr_pkt_droplog_bufsz > (index - VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ))
+                        response->vdl_pkt_droplog_buf_overflow = true;
+                    else
+                        response->vdl_pkt_droplog_buf_overflow = false;
+                    
+                    pkt_buf_remain_size = VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ - pkt_buffer_size;
+
+                    if (pkt_buf_remain_size)
+                    {
+                        response->vdl_pkt_droplog_arr_size += pkt_buf_remain_size *
+                            sizeof(vr_pkt_drop_log_t);
+                    }
+                    vr_printf("circular buffer is overwritten\n");
+                }
+                response->vdl_pkt_droplog_arr = (char *)vr_zalloc(
+                    response->vdl_pkt_droplog_arr_size, VR_PKT_DROP_LOG_REQ_OBJECT);
+                if(!response->vdl_pkt_droplog_arr)
+                {
+                    vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
+                            vr_pkt_droplog_bufsz * sizeof(vr_pkt_drop_log_t));
+                    goto exit_get;
+                }
+            
+
+            if( index < vr_pkt_droplog_cur_idx)
+            {
+                memcpy(response->vdl_pkt_droplog_arr,
+                        router->vr_pkt_drop->vr_pkt_drop_log[core] + (vr_pkt_droplog_cur_idx - pkt_buffer_size - index),
+                        (pkt_buffer_size * sizeof(vr_pkt_drop_log_t)));
+
+            }
+            else
+                memcpy(response->vdl_pkt_droplog_arr,
+                        router->vr_pkt_drop->vr_pkt_drop_log[core] + ((vr_pkt_droplog_bufsz - pkt_buffer_size) - 
+                            (((index - vr_pkt_droplog_cur_idx) / VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ) * VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)),
+                        (pkt_buffer_size * sizeof(vr_pkt_drop_log_t)));
+
+                if(router->vr_pkt_drop->vr_pkt_drop_log[core][((vr_pkt_droplog_cur_idx + 1) % vr_pkt_droplog_bufsz)].timestamp != 0)
+                {
+                    if (pkt_buf_remain_size)
+                    {
+                        memcpy(response->vdl_pkt_droplog_arr + (pkt_buffer_size * sizeof(vr_pkt_drop_log_t)),
+                                router->vr_pkt_drop->vr_pkt_drop_log[core] + (vr_pkt_droplog_bufsz - pkt_buf_remain_size),
+                                (pkt_buf_remain_size * sizeof(vr_pkt_drop_log_t)));
+
+                    }
+                }
+            }
+        vr_printf("response sent for droplog \n");
+        }
         else
         {
             /* When packet drop log is disabled, copy sysctl and buffer enable
@@ -128,6 +193,7 @@ void
 vr_pkt_drop_log_req_process(void *s_req)
 {
     int ret=0,core=1,index=0;
+    vr_printf("droplog request received\n");
     vr_pkt_drop_log_req *req = (vr_pkt_drop_log_req *)s_req;
 
     if (req->h_op != SANDESH_OP_GET)
