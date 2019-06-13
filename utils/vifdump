@@ -32,9 +32,14 @@ monitoring_stop () {
     fi
     MONITORING_VIF_ID=${1##vif0/}
     MONITORING_VIF_ID=${MONITORING_VIF_ID##mon}
-    echo "Deleting vif ${MONITORING_VIF_ID}..."
-    sudo vif --delete ${MONITORING_VIF_ID}
-    exit 0
+    vif --get ${MONITORING_VIF_ID}|grep "mon"
+    if [ $? -ne 0 ]; then
+        error "Invalid Monitoring Interface Id"
+    else
+        echo "Deleting vif ${MONITORING_VIF_ID}..."
+        sudo vif --delete ${MONITORING_VIF_ID}
+        exit 0
+    fi
 }
 
 ## parse the arguments
