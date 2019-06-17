@@ -1,0 +1,11 @@
+- project:
+    name: Juniper/contrail-vrouter
+    check:
+      jobs:
+        - contrail-vrouter-ut-centos7-base
+
+
+- job:
+    name: contrail-vrouter-ut-centos7-base
+    parent: contrail-vrouter-ut-centos7
+    voting: False
