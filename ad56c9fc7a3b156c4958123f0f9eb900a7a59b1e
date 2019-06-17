@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9f5c4f37_b7f0f8fe",
+        "filename": "dp-core/vr_htable.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-17T04:37:52Z",
+      "side": 1,
+      "message": "any reason for changing this?",
+      "revId": "ad56c9fc7a3b156c4958123f0f9eb900a7a59b1e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9f5c4f37_97f5f4ef",
+        "filename": "dp-core/vr_htable.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 368,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-17T04:37:52Z",
+      "side": 1,
+      "message": "Will be good to mark the signature entry as 0 to the sake of completeness.",
+      "revId": "ad56c9fc7a3b156c4958123f0f9eb900a7a59b1e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    }
+  ]
+}
