@@ -1,0 +1,5 @@
+- project:
+    name: Juniper/contrail-vrouter
+    check:
+      jobs:
+        - contrail-vrouter-ut-centos7
