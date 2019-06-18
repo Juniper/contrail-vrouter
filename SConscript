@@ -12,6 +12,9 @@ import platform
 AddOption('--kernel-dir', dest = 'kernel-dir', action='store',
           help='Linux kernel source directory for vrouter.ko')
 
+AddOption('--dpdk-dir', dest = 'dpdk-dir', action='store',
+          help='third party dpdk built library')
+
 AddOption('--system-header-path', dest = 'system-header-path', action='store',
           help='Linux kernel headers for applications')
 
@@ -214,9 +217,19 @@ if sys.platform != 'darwin':
             'uvrouter',
         ]
 
-    if dpdk_exists and not GetOption('without-dpdk'):
-        subdirs.append('dpdk')
-        exports.append('dpdk_lib')
+    skip_dpdk_build = False
+    link_dpdk = False
+    dpdk_dir = GetOption('dpdk-dir')
+    if dpdk_dir:
+        skip_dpdk_build = True
+        rte_ver_filename = dpdk_dir + '/include/rte_version.h'
+        link_dpdk = True
+        DPDK_INC_DIR = dpdk_dir + '/include'
+        DPDK_LIB_DIR = dpdk_dir + '/lib'
+        dpdk_lib = env.Command('dpdk_lib', None, 'echo "*** Skipping DPDK Build, using provided DPDK directory ***"')
+
+    if dpdk_exists and not GetOption('without-dpdk') and not skip_dpdk_build:
+        link_dpdk = True
         dpdk_src_dir = Dir(DPDK_SRC_DIR).abspath
         if ADDNL_OPTION and 'enableMellanox' in ADDNL_OPTION:
             thrd_prt_dir = Dir(THRD_PRT_DIR).abspath
@@ -224,6 +237,34 @@ if sys.platform != 'darwin':
             os.system(mlnx_patch_cmd)
 
         rte_ver_filename = '../third_party/dpdk/lib/librte_eal/common/include/rte_version.h'
+
+        # Pass -g and -O flags if present to DPDK
+        DPDK_FLAGS = ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
+
+        # Make DPDK
+        dpdk_dst_dir = Dir(DPDK_DST_DIR).abspath
+
+        make_cmd = 'make -C ' + dpdk_src_dir \
+            + ' EXTRA_CFLAGS="' + DPDK_FLAGS + '"' \
+            + ' ARCH=x86_64' \
+            + ' O=' + dpdk_dst_dir \
+            + ' '
+
+        # If this var is set, then we need to pass it to make cmd for libdpdk
+        if kernel_build_dir:
+            print("info: Adjusting libdpdk build to use RTE_KERNELDIR=%s" % kernel_build_dir)
+            make_cmd += "RTE_KERNELDIR=%s " % kernel_build_dir
+
+        dpdk_lib = env.Command('dpdk_lib', None,
+            make_cmd + 'config T=' + DPDK_TARGET
+            + ' && ' + make_cmd)
+
+        if GetOption('clean'):
+            os.system(make_cmd + 'clean')
+
+    if link_dpdk:
+        subdirs.append('dpdk')
+        exports.append('dpdk_lib')
         rte_ver_file = open(rte_ver_filename, 'r')
         file_content = rte_ver_file.read()
         rte_ver_file.close()
@@ -315,33 +356,9 @@ if sys.platform != 'darwin':
         if year_matches and month_matches:
             DPDK_LIBS.append('-Wl,-lnuma')
 
-        # Pass -g and -O flags if present to DPDK
-        DPDK_FLAGS = ' '.join(o for o in env['CCFLAGS'] if ('-g' in o or '-O' in o))
-
-        # Make DPDK
-        dpdk_dst_dir = Dir(DPDK_DST_DIR).abspath
-
-        make_cmd = 'make -C ' + dpdk_src_dir \
-            + ' EXTRA_CFLAGS="' + DPDK_FLAGS + '"' \
-            + ' ARCH=x86_64' \
-            + ' O=' + dpdk_dst_dir \
-            + ' '
-
-        # If this var is set, then we need to pass it to make cmd for libdpdk
-        if kernel_build_dir:
-            print("info: Adjusting libdpdk build to use RTE_KERNELDIR=%s" % kernel_build_dir)
-            make_cmd += "RTE_KERNELDIR=%s " % kernel_build_dir
-
-        dpdk_lib = env.Command('dpdk_lib', None,
-            make_cmd + 'config T=' + DPDK_TARGET
-            + ' && ' + make_cmd)
-
         env.Append(CPPPATH = DPDK_INC_DIR);
         env.Append(LIBPATH = DPDK_LIB_DIR)
         env.Append(DPDK_LINKFLAGS = DPDK_LIBS)
-
-        if GetOption('clean'):
-            os.system(make_cmd + 'clean')
 
     for sdir in subdirs:
         env.SConscript(sdir + '/SConscript',
