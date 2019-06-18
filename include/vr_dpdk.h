@@ -130,6 +130,10 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_MAX_BONDS           2
 /* Max size of a single packet used by default */
 #define VR_DEF_MAX_PACKET_SZ        (9 * 1024)
+/* check availability of enough HEADROOM in MBUF */
+#if (RTE_PKTMBUF_HEADROOM < 256)
+#error "vrouter needs to have atleast 256 HEADROOM in MBUF to fit mirror metadata"
+#endif
 /* Number of bytes needed for each mbuf header */
 #define VR_DPDK_MBUF_HDR_SZ         (sizeof(struct rte_mbuf)   \
                                     + sizeof(struct vr_packet) \
@@ -312,6 +316,23 @@ enum {
 
 /* Maximum number of IO lcores */
 #define VR_DPDK_MAX_IO_LORES (VR_DPDK_LAST_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
+
+
+/*
+ * As we cannot ensure re-usuage of these flags in an easy way, for now check that DPDK
+ * used is below 18.05.2 version to ensure avoiding re-usage of same bit
+ * Note: section below kicks in only if we are using DPDK from upstream
+ */
+/* TODO(prabhjot) need to check if these flags can move more towards upstream code */
+#if !(RTE_VERSION > RTE_VERSION_NUM(18, 5, 2, 0))
+/* needs to have a place holder for RX flags, to allow usuage of dpdk from upstream */
+#ifndef PKT_RX_GSO_TCP4
+#define PKT_RX_GSO_TCP4      (1ULL << 21)  /**< RX packet with TCPv4 segment offload */
+#endif /* PKT_RX_GSO_TCP4 */
+#ifndef PKT_RX_GSO_TCP6
+#define PKT_RX_GSO_TCP6      (1ULL << 22)  /**< RX packet with TCPv6 segment offload */
+#endif /* PKT_RX_GSO_TCP6 */
+#endif /* RTE_VERSION check */
 
 
 /*
