@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "9f5c4f37_bdda1748",
+        "filename": "dp-core/vr_htable.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 660
+      },
+      "writtenOn": "2019-06-18T19:17:07Z",
+      "side": 1,
+      "message": "The reason I changed the bucket entry count from 4 to 8 is because with signature table, we can afford to use larger\nBucket. Without signature table, each key needs to be compared, large bucket will increase the loop iteration time a lot for keys that locate at the end of the bucket and the linked list.\nSignature table reduces this overhead.\n\nLarger table will effectively reduce key collision, which will reduce the frequency that a key ends up in the linked list.",
+      "parentUuid": "9f5c4f37_b7f0f8fe",
+      "revId": "ad56c9fc7a3b156c4958123f0f9eb900a7a59b1e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9f5c4f37_97f5f4ef",
         "filename": "dp-core/vr_htable.c",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2019-06-17T04:37:52Z",
       "side": 1,
       "message": "Will be good to mark the signature entry as 0 to the sake of completeness.",
+      "revId": "ad56c9fc7a3b156c4958123f0f9eb900a7a59b1e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9f5c4f37_9ddf5339",
+        "filename": "dp-core/vr_htable.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 368,
+      "author": {
+        "id": 660
+      },
+      "writtenOn": "2019-06-18T19:17:07Z",
+      "side": 1,
+      "message": "Will do!",
+      "parentUuid": "9f5c4f37_97f5f4ef",
       "revId": "ad56c9fc7a3b156c4958123f0f9eb900a7a59b1e",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
