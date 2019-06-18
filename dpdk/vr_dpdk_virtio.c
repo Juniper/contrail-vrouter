@@ -730,8 +730,10 @@ vr_dpdk_guest_phys_to_host_virt(vr_uvh_client_t *vru_cl, uint64_t paddr)
 
 #else
 
-#define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val)
-#define DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(port, val)
+#define DPDK_VIRTIO_READER_STATS_PKTS_IN_ADD(port, val) \
+        (void)(val)
+#define DPDK_VIRTIO_READER_STATS_PKTS_DROP_ADD(port, val) \
+        (void)(val)
 
 #endif
 
@@ -1098,8 +1100,10 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 
 #else
 
-#define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val)
-#define DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(port, val)
+#define DPDK_VIRTIO_WRITER_STATS_PKTS_IN_ADD(port, val) \
+        (void)(val)
+#define DPDK_VIRTIO_WRITER_STATS_PKTS_DROP_ADD(port, val) \
+        (void)(val)
 
 #endif
 

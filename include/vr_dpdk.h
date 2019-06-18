@@ -314,6 +314,10 @@ enum {
 #define VR_DPDK_MAX_IO_LORES (VR_DPDK_LAST_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
 
 
+#define PKT_RX_GSO_TCP4      (1ULL << 21)  /**< RX packet with TCPv4 segment offload */
+#define PKT_RX_GSO_TCP6      (1ULL << 22)  /**< RX packet with TCPv6 segment offload */
+
+
 /*
  * VRouter/DPDK Data Structures
  * ============================
