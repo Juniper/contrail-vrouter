@@ -196,6 +196,21 @@ dpdk_virtual_if_add(struct vr_interface *vif)
                                      nrxqs, ntxqs, vif->vif_vhostuser_mode);
 }
 
+/* Creating mock physical device used for simulating physical 
+ * interfaces through vtest */
+static int
+dpdk_mock_physical_vif_add(struct vr_interface *vif)
+{
+    int ret = 0;
+    
+    ret = dpdk_virtual_if_add(vif);
+    
+    if(ret != 0)
+        RTE_LOG(ERR, VROUTER, "Error adding mock physical device vif %u for name %s\n",
+                vif->vif_idx, vif->vif_name);
+    return ret;
+}
+
 /*
  * dpdk_virtual_vlan_if_add - add a virtual VLAN interface to vRouter.
  * Returns 0 on success, < 0 otherwise.
@@ -746,6 +761,13 @@ dpdk_fabric_if_add(struct vr_interface *vif)
 #else
     ports_num = rte_eth_dev_count();
 #endif
+
+    /* When there is no PCI ports for DPDK, considered to be running on 
+     * vtest(Vrouter Unit Test simulation framework) and create virtual port instead
+     * of physical port */
+    if(ports_num == 0)
+        return dpdk_mock_physical_vif_add(vif);
+
     memset(&pci_address, 0, sizeof(pci_address));
     memset(&mac_addr, 0, sizeof(mac_addr));
     if (vif->vif_flags & VIF_FLAG_PMD) {
@@ -1991,12 +2013,33 @@ static unsigned int
 dpdk_if_get_mtu(struct vr_interface *vif)
 {
     uint8_t port_id;
-    uint16_t mtu;
+    uint16_t mtu, ports_num;
     unsigned l3_mtu;
 
     l3_mtu = vif->vif_mtu;
 
     if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+        ports_num = rte_eth_dev_count_avail();
+#else
+        ports_num = rte_eth_dev_count();
+#endif
+
+        /* When there is no PCI ports for DPDK, considered to be running on 
+         * vtest(Vrouter Unit Test simulation framework) and directly return mtu size */
+        if(ports_num == 0)
+        {
+            if(l3_mtu)
+                return l3_mtu;
+            else
+            {
+                /* Default MTU size is 1500*/
+                l3_mtu = 1500;
+                return l3_mtu;
+            }
+        }
+
         port_id = (((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id);
         /* TODO: DPDK bond interfaces does not provide MTU (MTU is 0) */
         if (rte_eth_dev_get_mtu(port_id, &mtu) == 0 && mtu > 0)
