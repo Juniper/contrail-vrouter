@@ -42,6 +42,12 @@ enum vr_opt_index {
     SOCKET_DIR_OPT_INDEX,
 #define NETLINK_PORT_OPT        "vr_netlink_port"
     NETLINK_PORT_OPT_INDEX,
+#define SEND_SANDESH_REQ        "send_sandesh_req"
+    SEND_SANDESH_REQ_INDEX,
+#define RECV_SANDESH_RESP       "recv_sandesh_resp"
+    RECV_SANDESH_RESP_INDEX,
+#define SEND_RECV_PKT           "send_recv_pkt"
+    SEND_RECV_PKT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -91,7 +97,6 @@ static int
 vt_init(struct vtest *test)
 {
 
-    memset(test, 0, sizeof(struct vtest));
     (test->messages).data = calloc(sizeof(struct message_element), VT_MESSAGES_MAX);
     if(test->messages.data == NULL) {
         return E_MAIN_ERR_ALLOC;
@@ -126,9 +131,13 @@ static void
 vt_Usage(void)
 {
     printf(
-        "Usage: "VT_PROG_NAME" [options] <XML-file with test definition>\n"
+        "Usage: "VT_PROG_NAME" [options]\n"
+        "    <xml file> [deprecated]\n"
         "    --"HELP_OPT"       This help\n"
         "\n"
+        "    --"SEND_SANDESH_REQ" <xml file>\n"
+        "    --"RECV_SANDESH_RESP" <xml file>\n"
+        "    --"SEND_RECV_PKT" <xml file>\n"
         "    --"SOCKET_DIR_OPT" DIR        Socket directory to use\n"
         "    --"NETLINK_PORT_OPT" PORT     Netlink TCP port to use\n"
         );
@@ -137,7 +146,7 @@ vt_Usage(void)
 }
 
 static void
-parse_long_opts(int opt_flow_index, char *optarg)
+parse_long_opts(int opt_flow_index, char *optarg, vtest_cli_opt_t *cli_opt)
 {
     errno = 0;
 
@@ -153,6 +162,31 @@ parse_long_opts(int opt_flow_index, char *optarg)
         }
         break;
 
+    case SEND_SANDESH_REQ_INDEX:
+        if (strlen(optarg) >= VT_MAX_FILENAME) {
+            printf("Filename size exceeded limit of 128\n");
+        } else {
+            cli_opt->cli_cmd = VTEST_CLI_CMD_SANDESH_REQ;
+            strcpy(cli_opt->req_file, optarg);
+        }
+        break;
+    case RECV_SANDESH_RESP_INDEX:
+        if (strlen(optarg) >= VT_MAX_FILENAME) {
+            printf("Filename size exceeded limit of 128\n");
+        } else {
+            cli_opt->cli_cmd = VTEST_CLI_CMD_SANDESH_REQ;
+            strcpy(cli_opt->resp_file, optarg);
+        }
+        break;
+    case SEND_RECV_PKT_INDEX:
+        if (strlen(optarg) >= VT_MAX_FILENAME) {
+            printf("Filename size exceeded limit of 128\n");
+        } else {
+            cli_opt->cli_cmd = VTEST_CLI_CMD_PACKET_REQ;
+            strcpy(cli_opt->req_file, optarg);
+        }
+        break;
+
     case HELP_OPT_INDEX:
     default:
         vt_Usage();
@@ -161,6 +195,12 @@ parse_long_opts(int opt_flow_index, char *optarg)
 
 static struct option long_options[] = {
     [HELP_OPT_INDEX]                =   {HELP_OPT,              no_argument,
+                                                    NULL,                   0},
+    [SEND_SANDESH_REQ_INDEX]        =   {SEND_SANDESH_REQ,      required_argument,
+                                                    NULL,                   0},
+    [RECV_SANDESH_RESP_INDEX]       =   {RECV_SANDESH_RESP,     required_argument,
+                                                    NULL,                   0},
+    [SEND_RECV_PKT_INDEX]           =   {SEND_RECV_PKT,         required_argument,
                                                     NULL,                   0},
     [SOCKET_DIR_OPT_INDEX]          =   {SOCKET_DIR_OPT,        required_argument,
                                                     NULL,                   0},
@@ -175,10 +215,11 @@ main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     unsigned int i;
-    char *xml_file;
 
     struct stat stat_buf;
     struct vtest vtest;
+
+    memset(&vtest, 0, sizeof(struct vtest));
 
     vt_fill_nl_callbacks();
 
@@ -186,7 +227,7 @@ main(int argc, char *argv[])
             >= 0) {
         switch (opt) {
         case 0:
-            parse_long_opts(option_index, optarg);
+            parse_long_opts(option_index, optarg, &vtest.cli_opt);
             break;
 
         case '?':
@@ -195,14 +236,19 @@ main(int argc, char *argv[])
             vt_Usage();
         }
     }
-    if (optind >= argc) {
-        vt_Usage();
-    }
-    xml_file = argv[optind];
 
-    ret = stat(xml_file, &stat_buf);
+    /* Backward compatiblity stuff */
+    if ((vtest.cli_opt.cli_cmd != VTEST_CLI_CMD_SANDESH_REQ) &&
+        (vtest.cli_opt.cli_cmd != VTEST_CLI_CMD_PACKET_REQ) &&
+        (strcmp((argv[argc-1] + strlen(argv[argc-1]) - 3),
+                "xml") == 0)) {
+         vtest.cli_opt.cli_cmd = VTEST_CLI_CMD_SINGLE_TEST_FILE;
+         strcpy(vtest.cli_opt.req_file, argv[argc-1]); 
+    }
+
+    ret = stat(vtest.cli_opt.req_file, &stat_buf);
     if (ret) {
-        fprintf(stderr, "%s: File not found: %s\n", __func__, xml_file);
+        fprintf(stderr, "%s: File not found: %s\n", __func__, vtest.cli_opt.req_file);
         return E_MAIN_ERR_XML;
     }
     ret = vt_init(&vtest);
@@ -228,7 +274,7 @@ main(int argc, char *argv[])
         }
     }
 
-    vt_parse_file(xml_file, &vtest);
+    vt_parse_file(vtest.cli_opt.req_file, &vtest);
 
     nl_free_client(vtest.vrouter_cl);
     vt_dealloc_test(&vtest);

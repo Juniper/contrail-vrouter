@@ -288,7 +288,13 @@
     <ClCompile Include="..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\build\kbuild\sandesh\library\c\protocol\thrift_xml_protocol.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_file_transport.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c">

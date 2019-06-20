@@ -1,0 +1,72 @@
+#
+# Copyright (c) 2019 Juniper Networks, Inc. All rights reserved.
+#
+
+#
+# NOTE: The vrouter-py-ut target has the following dependencies/requirements:-
+#       1) DPDK vrouter and vtest binaries must be built already (aka scons vrouter)
+#       2) pysandesh library should be built (This is taken care by this script)
+#       3) pysandesh library dependencies (eg pip packages like gevent) should be installed 
+#          (see setup.py in pysandesh dir for list of packages). These packages would
+#          be already available on the build m/c.
+#       4) scapy and its dependencies should be installed. Again this would be already
+#          available on the build m/c.
+#
+
+import os
+import sys
+
+Import('VTestEnv')
+env = VTestEnv.Clone()
+VTestPyEnv = env;
+
+src_root = Dir('#').srcnode().abspath
+build_root = Dir(env['TOP']).abspath
+
+print "src_root %s" %(src_root)
+print "build_root %s" %(build_root)
+
+# copy vr.sandesh file as vr_py.sandesh file
+copy_sandesh = env.Command("copy_sandesh", [],
+                           Copy(src_root+"/vrouter/utils/vtest/vtest_py/" + "vr_py.sandesh",
+                                src_root+"/vrouter/sandesh/vr.sandesh"))
+
+# replace "buffer sandesh" with "struct" in sandesh file
+replace_sandesh = env.Command("replace_sandesh", [],
+                              src_root+"/vrouter/utils/vtest/vtest_py/"+"file_sub.py "+
+                              src_root+"/vrouter/utils/vtest/vtest_py/" + "vr_py.sandesh")
+                              
+# create dir for vrouter sandesh py files
+create_dir = env.Command("create_dir", [],
+                         Mkdir(src_root+"/vrouter/utils/vtest/vtest_py/vr_py_sandesh"))
+
+# generate vrouter sandesh py files
+gen_sandesh = env.Command("gen_sandesh", [],
+                          src_root+"/build/bin/sandesh --gen py:new_style \
+                          -I controller/src/ \
+                          -I src/contrail-common/ \
+                          --out "+ src_root+"/vrouter/utils/vtest/vtest_py/vr_py_sandesh/ " +
+                          src_root+"/vrouter/utils/vtest/vtest_py/vr_py.sandesh")  
+# run the ut tests
+# set the env variables used by run_tests.py
+env.AppendENVPath('VROUTER_DPDK_PATH', build_root+"/vrouter/dpdk/contrail-vrouter-dpdk")
+env.AppendENVPath('VTEST_PATH', build_root+"/vrouter/utils/vtest/vtest")
+env.AppendENVPath('VROUTER_SOCKET_PATH', build_root)
+env.AppendENVPath('VROUTER_SOCKET_PORT', 32000)
+env.AppendENVPath('VTEST_PY_SRC_PATH', src_root+"/vrouter/utils/vtest/vtest_py")
+vtest_py_ut = env.Command("vtest_py_ut", [], src_root+"/vrouter/utils/vtest/vtest_py/run_tests.py")
+#vtest_py_ut = env.Command("vtest_py_ut", [], [])
+
+gen_py_sandesh = env.Command("gen_py_sandesh", [], "scons sandesh/library/python:pysandesh")
+
+env.Depends(replace_sandesh, copy_sandesh)
+env.Depends(create_dir, replace_sandesh)
+env.Depends(gen_sandesh, create_dir)
+env.Depends(vtest_py_ut, gen_sandesh)
+
+env.Requires(vtest_py_ut, gen_py_sandesh)
+env.Alias('vrouter-py-ut', vtest_py_ut)
+
+# Local Variables:
+# mode: python
+# End:

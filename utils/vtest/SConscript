@@ -77,6 +77,13 @@ vtest = env.Program('vtest', vtest_src)
 Export('vtest')
 env.Requires(vtest, sandesh_gen_output)
 
+if 'vrouter-py-ut' in COMMAND_LINE_TARGETS:
+    subdirs = ['vtest_py']
+    for sdir in  subdirs:
+        env.SConscript(sdir + '/SConscript',
+                       exports='VTestEnv',
+                       duplicate = 0)
+
 # Local Variables:
 # mode: python
 # End:

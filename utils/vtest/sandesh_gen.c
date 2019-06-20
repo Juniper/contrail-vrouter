@@ -211,6 +211,7 @@ gen(FILE *fp)
     unsigned int len, start = 0, end = 0;
     unsigned int type_len, sub_type_len = 0, var_len;
     unsigned int nesting = 0;
+    unsigned int sub_type_size = 0;
 
     char *marker, *type, *var, *sub_type = NULL;
     FILE *ofp, *fp_expect, *fp_message, *fp_message_hdr;
@@ -295,6 +296,11 @@ gen(FILE *fp)
             gen_write(fp_expect, nesting, "{\n");
 
             gen_write(ofp, ++nesting, "unsigned int list_size;\n");
+            gen_write(ofp, nesting, "xmlNodePtr elemptr = NULL;\n");
+            gen_write(ofp, nesting, "int elem_count = 0;\n");
+            gen_write(ofp, nesting, "uint8_t *tmp_list = NULL;\n");
+            gen_write(ofp, nesting, "int list_index = 0;\n");
+
             gen_raw_write(ofp, nesting, &line[start], end - start);
             gen_write(ofp, 0, " *req;\n\n");
             gen_write(ofp, 0, part_gen);
@@ -411,11 +417,9 @@ gen(FILE *fp)
             gen_write(fp_expect, 0, ", strlen(node->name))) {\n");
 
             gen_write(ofp, nesting, "if (node->children && node->children->content)\n");
-
             gen_write(ofp, ++nesting, "req->");
             gen_raw_write(ofp, 0, var, var_len);
             gen_write(ofp, 0, " = ");
-
             gen_write(fp_expect, nesting, "");
 
             if (!strncmp(type, "i32", strlen("i32"))) {
@@ -489,15 +493,19 @@ gen(FILE *fp)
                 char* size = NULL;
                 if (!strncmp(sub_type, "byte", strlen("byte"))) {
                     size = "8";
+                    sub_type_size = 1;
                 } else if (!strncmp(sub_type, "i16", strlen("i16")) ||
                         !strncmp(sub_type, "u16", strlen("u16"))) {
                     size = "16";
+                    sub_type_size = 2;
                 } else if (!strncmp(sub_type, "i32", strlen("i32")) ||
                         !strncmp(sub_type, "u32", strlen("u32"))) {
                     size = "32";
+                    sub_type_size = 4;
                 } else if (!strncmp(sub_type, "i64", strlen("i64")) ||
                         !strncmp(sub_type, "u64", strlen("u64"))) {
                     size = "64";
+                    sub_type_size = 8;
                 }
 
                 gen_write(ofp, 0, "vt_gen_list(node->children->content, GEN_TYPE_U");
@@ -514,6 +522,72 @@ gen(FILE *fp)
                 gen_write(fp_expect, 0, ", node->children->content, GEN_TYPE_U");
                 gen_write(fp_expect, 0, size);
                 gen_write(fp_expect, 0, ");\n");
+
+                /* Add logic for case when list has children of <element> nodes */
+                gen_write(ofp, nesting,
+                          "if (node->children && !(node->children->content)) {\n");
+                gen_write(ofp, nesting+1, "elemptr = node->children->children;\n");
+                gen_write(ofp, nesting+1, "elem_count = 0;\n");
+                gen_write(ofp, nesting+1, "while (elemptr) {\n");
+                gen_write(ofp, nesting+2, "elem_count++;\n");
+                gen_write(ofp, nesting+2, "elemptr = elemptr->next;\n");
+                gen_write(ofp, nesting+1, "}\n");
+                gen_write(ofp, nesting+1, "list_size = elem_count;\n");
+                gen_write(ofp, nesting+1, "if (elem_count) {\n");
+                switch (sub_type_size) {
+                case 1:
+                    gen_write(ofp, nesting+2,
+                              "tmp_list = (uint8_t*) calloc(elem_count, 1);\n");
+                    break;
+                case 2:
+                    gen_write(ofp, nesting+2,
+                              "tmp_list = (uint8_t*) calloc(elem_count, 2);\n");
+                    break;
+                case 4:
+                    gen_write(ofp, nesting+2,
+                              "tmp_list = (uint8_t*) calloc(elem_count, 4);\n");
+                    break;
+                case 8:
+                    gen_write(ofp, nesting+2,
+                              "tmp_list = (uint8_t*) calloc(elem_count, 8);\n");
+                    break;
+                default:
+                    return EINVAL;
+                }
+                gen_write(ofp, nesting+2, "if (!tmp_list) {\n");
+                gen_write(ofp, nesting+3, "return NULL;\n");
+                gen_write(ofp, nesting+2, "}\n");
+                gen_write(ofp, nesting+2, "elemptr = node->children->children;\n");
+                gen_write(ofp, nesting+2, "list_index = 0;\n");
+                gen_write(ofp, nesting+2, "while (elemptr) {\n");
+                gen_write(ofp, nesting+3,
+                          "tmp_list[list_index] = strtoul(elemptr->children->content, NULL, 0);\n");
+                switch (sub_type_size) {
+                case 1:
+                    gen_write(ofp, nesting+3, "list_index += 1;\n");
+                    break;
+                case 2:
+                    gen_write(ofp, nesting+3, "list_index += 2;\n");
+                    break;
+                case 4:
+                    gen_write(ofp, nesting+3, "list_index += 4;\n");
+                    break;
+                case 8:
+                    gen_write(ofp, nesting+3, "list_index += 8;\n");
+                    break;
+                default:
+                    return EINVAL;
+                }
+                gen_write(ofp, nesting+3, "elemptr = elemptr->next;\n");
+                gen_write(ofp, nesting+2, "}\n");
+             
+                gen_write(ofp, nesting+2, "req->");
+                gen_raw_write(ofp, 0, var, var_len);
+                gen_write(ofp, 0, " = ");
+                gen_write(ofp, 0, "(void *) tmp_list;\n");
+
+                gen_write(ofp, nesting+1, "}\n");
+                gen_write(ofp, nesting, "}\n");
 
                 gen_write(ofp, nesting, "req->");
                 gen_raw_write(ofp, 0, var, var_len);
