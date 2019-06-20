@@ -287,6 +287,9 @@ extern unsigned vr_packet_sz;
         for (p = 0; p < rte_eth_dev_count(); p++)
 #endif
 
+/* VHOST Default MTU size*/
+#define VR_DPDK_VHOST_DEFAULT_MTU_SIZE 1500
+
 /*
  * DPDK LCore IDs
  */
