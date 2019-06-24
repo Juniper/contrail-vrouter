@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9f5c4f37_800c8741",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 696,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-06-24T10:17:00Z",
+      "side": 1,
+      "message": "Remove all these empty line changes from your diff. These lines shouldn\u0027t be appearing in your diff.",
+      "revId": "866213bd808fb3362ff1c27de488c2928eac5b09",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9f5c4f37_0306611e",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 912,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-06-24T10:17:00Z",
+      "side": 1,
+      "message": "So in case your cli dies in midst of reading the log from one core. Next read call will continue from the previous half read point? and not from beginning? Is that acceptable?",
+      "revId": "866213bd808fb3362ff1c27de488c2928eac5b09",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    }
+  ]
+}
