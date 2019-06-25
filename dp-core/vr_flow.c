@@ -2425,6 +2425,10 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
 
     vr_flow_udp_src_port(router, fe);
 
+    /* Mock Src UDP port used for vrouter simulation - vtest */
+    if(req->fr_extflags & VR_FLOW_EXT_FLAG_MOCK_SRC_UDP)
+        fe->fe_udp_src_port = VR_FLOW_MOCK_SRC_UDP_PORT;
+
     if (fe->fe_flags & VR_FLOW_FLAG_NEW_FLOW)
         fe->fe_flags &= ~VR_FLOW_FLAG_NEW_FLOW;
 
