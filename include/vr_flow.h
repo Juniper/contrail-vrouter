@@ -62,6 +62,10 @@ typedef enum {
 #define VR_FLOW_BGP_SERVICE         0x80
 
 #define VR_FLOW_EXT_FLAG_FORCE_EVICT    0x0001
+/* Mock src UDP port used to set constant port value
+ * for vtest(vrouter simulation framework) */
+#define VR_FLOW_EXT_FLAG_MOCK_SRC_UDP   0x0002
+#define VR_FLOW_MOCK_SRC_UDP_PORT       0x12b5
 
 /* Flow Action Reason code */
 #define VR_FLOW_DR_UNKNOWN                0x00
