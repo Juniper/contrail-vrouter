@@ -142,6 +142,21 @@ if sys.platform.startswith('freebsd'):
     make_dir = make_dir + '/freebsd'
     env['ENV']['MAKEOBJDIR'] = make_dir
 
+# The function to explicitly invoke candle.exe and light.exe has been created
+# to provide direct control over location of intermediate file (wixobj), which
+# should be created in build directory instead of source directory.
+def createVRouterMSINode():
+    build_dir = Dir(env['TOP']).abspath + '/vrouter/extension'
+    wixobj_path = os.path.join(build_dir, 'vrouter_msi.wixobj')
+    msi_path = os.path.join(build_dir, 'vRouter.msi')
+    wxs_path = 'windows/installer/vrouter_msi.wxs'
+    wix_candle_cmd = env['WIXCANDLE'] + ' ' + ' '.join(env['WIXCANDLEFLAGS']) + \
+        ' -I ' + ' '.join(env['WIXCANDLEINCLUDE']) + ' -o ' + wixobj_path + \
+        ' ' + 'vrouter/' + wxs_path
+    wix_light_cmd = env['WIXLIGHT'] + ' ' + ' '.join(env['WIXLIGHTFLAGS']) + \
+        ' -out ' + msi_path + ' ' + wixobj_path
+    return env.Command(msi_path, wxs_path, [wix_candle_cmd, wix_light_cmd])
+
 # XXX Temporary/transitional support for Ubuntu14.04.4 w/ kernel v4.*
 #
 # The logic here has to handle two different invocation models:
@@ -418,7 +433,9 @@ if sys.platform != 'darwin':
     else:
         env.Append(WIXCANDLEFLAGS = ['-doptimization=' + env['OPT']])
         env.Append(WIXLIGHTFLAGS = ['-ext', 'WixUtilExtension.dll'])
-        msi_command = env.WiX(File('#/build/' + env['OPT'] + '/vrouter/extension/vRouter.msi'), ['windows/installer/vrouter_msi.wxs'])
+
+        msi_command = createVRouterMSINode()
+
         env.Depends(msi_command, kern)
         env.Alias('vrouter.msi', msi_command)
 
