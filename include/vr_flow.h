@@ -127,6 +127,7 @@ struct vr_flow_defer_data {
     struct vr_flow_entry *vfdd_fe;
     unsigned int vfdd_fe_index;
     bool vfdd_delete;
+    bool vfdd_evict_flow;
 };
 
 __attribute__packed__open__
