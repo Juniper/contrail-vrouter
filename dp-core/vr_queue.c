@@ -15,9 +15,8 @@ vr_queue_init(struct vr_qhead *head)
 
 void
 vr_queue_enqueue(struct vr_qhead *head, struct vr_qelem *p)
-{
+{    
     struct vr_qelem *elem = head->q_first;
-
     p->q_next = NULL;
 
     if (!elem) {
@@ -27,7 +26,6 @@ vr_queue_enqueue(struct vr_qhead *head, struct vr_qelem *p)
 
     while (elem && elem->q_next)
         elem = elem->q_next;
-
     elem->q_next = p;
     return;
 }

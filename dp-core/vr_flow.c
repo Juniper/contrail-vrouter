@@ -19,8 +19,8 @@
 #include "vr_hash.h"
 #include "vr_ip_mtrie.h"
 #include "vr_bridge.h"
-
 #include "vr_offloads_dp.h"
+#include "vr_logger.h"
 
 #define VR_NUM_FLOW_TABLES          1
 
@@ -1652,7 +1652,10 @@ vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
     flow_result_t result = FLOW_FORWARD;
-
+    uint64_t m_sec = 0, n_sec = 0; \
+    vr_get_time(&m_sec, &n_sec); \
+    unsigned int time = (unsigned int) m_sec;
+    VR_LOG(0, "%d vr_flow.c file", time);
     if ((!(pkt->vp_flags & VP_FLAG_MULTICAST))
         && ((fmd->fmd_vlan == VLAN_ID_INVALID) || vif_is_service(pkt->vp_if)))
         result = vr_do_flow_lookup(router, pkt, fmd);

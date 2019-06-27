@@ -84,7 +84,6 @@ vr_message_queue_response(char *buf, int len, bool broadcast)
     response = vr_zalloc(sizeof(*response), VR_MESSAGE_RESPONSE_OBJECT);
     if (!response)
         return -ENOMEM;
-
     response->vr_message_buf = buf;
     response->vr_message_len = len;
     response->vr_message_broadcast = broadcast;

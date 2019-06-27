@@ -119,7 +119,23 @@ vr_route_delete(vr_route_req *req)
     if (!ret)
         vr_offload_route_del(req);
 
+unsigned char prefix[150];
 error:
+     if(req->rtr_prefix_size) {
+          int i, len, j=0;
+          for(i=0;i<req->rtr_prefix_size;i++) {
+              len = sprintf(&prefix[j], "0x%X ", req->rtr_prefix[i]);
+              j += len;
+          }
+     }
+     if(ret != -ENOENT || ret != -EINVAL) {
+         if(req->rtr_prefix_size) {
+             VR_LOG(5, "DEL OP: %d  family: %d  prefix: %s:  rid: %d  label: %d  nh_id: %d", req->h_op, req->rtr_family, prefix, req->rtr_rid, req->rtr_label, req->rtr_nh_id);
+         }
+     }
+     else {
+         VR_LOG(5, "DEL OP: %d  family: %d  prefix: %s   rid: %d  label: %d  nh_id: %d  Err code: %d", req->h_op, req->rtr_family, prefix, req->rtr_rid, req->rtr_label, req->rtr_nh_id, ret);
+     }
     vr_send_response(ret);
     vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_DEL, ret);
 
@@ -157,7 +173,26 @@ vr_route_add(vr_route_req *req)
         if (ret)
             fs->route_del(fs, &vr_req);
     }
-
+    unsigned char prefix[150];
+    if(req->rtr_prefix_size) {
+//	prefix = vr_zalloc(req->rtr_prefix_size, VR_LOG_REQ_OBJECT);
+        int i, len, j=0;
+        for(i=0;i<req->rtr_prefix_size;i++) {
+            len = sprintf(&prefix[j], "0x%X ", req->rtr_prefix[i]);
+            j += len;
+        }
+    }
+     uint64_t m_sec = 0, n_sec = 0; 
+     vr_get_time(&m_sec, &n_sec); 
+     unsigned int time = (unsigned int) m_sec;
+    if(ret != -ENOENT) {
+	if(req->rtr_prefix_size) {
+	VR_LOG(5, "%d ADD OP: %d  family: %d  prefix: %s:  rid: %d  label: %d  nh_id: %d", time, req->h_op, req->rtr_family, prefix, req->rtr_rid, req->rtr_label, req->rtr_nh_id);
+        }
+    }
+    else {
+	VR_LOG(5, "%d ADD OP: %d  family: %d  prefix: %s   rid: %d  label: %d  nh_id: %d  Err code: %d", time, req->h_op, req->rtr_family, prefix, req->rtr_rid, req->rtr_label, req->rtr_nh_id, ret);
+    }
     vr_send_response(ret);
     vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_ADD, ret);
 
