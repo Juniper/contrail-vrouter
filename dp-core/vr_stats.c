@@ -15,6 +15,8 @@ void vr_stats_exit(struct vrouter *, bool);
 int vr_stats_init(struct vrouter *);
 int vr_pkt_drop_log_init(struct vrouter *);
 void vr_pkt_drop_log_exit(struct vrouter *router);
+int vr_logger_init(struct vrouter *);
+void vr_logger_exit(struct vrouter *router);
 
 static void
 vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
@@ -506,7 +508,7 @@ vr_pkt_drop_stats_exit(struct vrouter *router)
     router->vr_pdrop_stats = NULL;
 
     vr_pkt_drop_log_exit(router);
-
+    vr_logger_exit(router);
     return;
 }
 
@@ -539,11 +541,11 @@ vr_pkt_drop_stats_init(struct vrouter *router)
     }
 
     vr_pkt_drop_log_init(router);
-
     return 0;
 
 cleanup:
     vr_pkt_drop_stats_exit(router);
+    vr_logger_exit(router);
     return -ENOMEM;
 }
 
@@ -585,5 +587,6 @@ vr_stats_init(struct vrouter *router)
     if (ret)
         return ret;
 
+    vr_logger_init(router);    
     return vr_pkt_drop_stats_init(router);
 }

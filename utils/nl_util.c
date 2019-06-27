@@ -39,6 +39,14 @@ char *vr_socket_dir = VR_DEF_SOCKET_DIR;
 struct nl_sandesh_callbacks nl_cb;
 
 void
+vr_log_req_process(void *s_req)
+{
+    if(nl_cb.vr_log_req_process) {
+	nl_cb.vr_log_req_process(s_req);
+    }
+}
+
+void
 vrouter_ops_process(void *s_req)
 {
     if (nl_cb.vrouter_ops_process) {

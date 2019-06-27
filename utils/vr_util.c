@@ -33,6 +33,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
+#include "vrouter.h"
 #include "vr_types.h"
 #include "nl_util.h"
 #include "vr_message.h"
@@ -44,7 +45,10 @@
 #include "vr_bridge.h"
 #include "vr_mem.h"
 #include "ini_parser.h"
-
+short level[VR_NUM_MODS];
+unsigned int entries[VR_NUM_MODS];
+unsigned int vr_logger_en;
+mod_log_ctrl log_ctrl[VR_NUM_MODS];
 /* Suppress NetLink error messages */
 bool vr_ignore_nl_errors = false;
 
@@ -278,6 +282,7 @@ vr_sendmsg(struct nl_client *cl, void *request,
     ret = sandesh_encode(request, request_string, vr_find_sandesh_info,
                              (nl_get_buf_ptr(cl) + attr_len),
                              (nl_get_buf_len(cl) - attr_len), &error);
+
     if (ret <= 0)
         return ret;
 
@@ -2484,3 +2489,62 @@ vr_send_qos_map_add(struct nl_client *cl, unsigned int router_id,
 
     return vr_sendmsg(cl, &req, "vr_qos_map_req");
 }
+
+int vr_get_log_request(struct nl_client *cl, unsigned int router_id, int module, int index, int cur_index)
+{
+    int ret = 0;
+    vr_log_req req;
+    memset(&req, 0, sizeof(req));
+    req.vdl_vr_log = (char *) malloc(1);
+    req.h_op = SANDESH_OP_GET;
+    req.vdl_rid = router_id;
+    req.vdl_module = module;
+    req.vdl_log_idx = index;
+    req.vdl_clear_buf = 0;
+    req.vdl_cur_idx = cur_index;
+    ret = vr_sendmsg(cl, &req, "vr_log_req");
+    free(req.vdl_vr_log);
+    return ret;
+}
+
+int vr_set_log_request(struct nl_client *cl, unsigned int router_id)
+{
+    vrouter_ops req;
+    int i;
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_ADD;
+    req.vo_rid = router_id;
+    req.vo_logger_en = vr_logger_en;
+    req.vo_log_mod_level_size = sizeof(short)*VR_NUM_MODS;
+    req.vo_log_mod_len_size = sizeof(int)*VR_NUM_MODS;
+    req.vo_log_mod_level = (short *) malloc(req.vo_log_mod_level_size);
+    req.vo_log_mod_len = (unsigned int *) malloc(req.vo_log_mod_len_size);
+    for(i=0;i<VR_NUM_MODS;i++) {
+        entries[i] = 2000;
+        if(log_ctrl[i].cli) {
+	    req.vo_log_mod_level[i] = log_ctrl[i].level;
+            req.vo_log_mod_len[i] = entries[i]*VR_LOG_ENTRY_LEN;
+        }
+        else{
+            req.vo_log_mod_level[i] = -1;
+            req.vo_log_mod_len[i] = -1;
+        }
+    }
+    return vr_sendmsg(cl, &req, "vrouter_ops");
+}
+
+int vr_clear_log_request(struct nl_client *cl, unsigned int router_id, int module)
+{
+     vr_log_req req;
+     memset(&req, 0, sizeof(req));
+     req.h_op = SANDESH_OP_ADD;
+     req.vdl_rid = router_id;
+     req.vdl_module = module;
+     req.vdl_clear_buf = 1;
+     return vr_sendmsg(cl, &req, "vr_log_req");
+}
+
+//int vr_realloc_memory(struct nl_client *cl, unsigned int rid, int module)
+//{
+
+//}
