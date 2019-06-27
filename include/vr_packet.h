@@ -15,6 +15,7 @@
 #include "vr_mirror.h"
 #include "vr_os.h"
 #include "vr_pkt_droplog.h"
+#include "vr_logger.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -1487,7 +1488,7 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
     struct vrouter *router = vrouter_get(0);
     struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
 
-    /* Copying index valjue from circular buffer of corresponding core*/
+    /* Copying index value from circular buffer of corresponding core*/
     int buf_idx = vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu];
     vr_pkt_drop_log_t **vr_pkt_drop_log_buffer = vr_pkt_drop->vr_pkt_drop_log;
 
@@ -1570,4 +1571,5 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
         vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu] = ((++buf_idx) % vr_pkt_droplog_bufsz);
     }
 }
+
 #endif /* __VR_PACKET_H__ */
