@@ -24,13 +24,20 @@
 #include "vr_os.h"
 #include "ini_parser.h"
 #include "vrouter.h"
+#include "vr_logger.h"
 
 #define BUILD_VERSION_STRING    "\"build-version\":"
 #define BUILD_USER_STRING       "\"build-user\":"
 #define BUILD_HOST_NAME_STRING  "\"build-hostname\":"
 #define BUILD_TIME_STRING       "\"build-time\":"
 
+int vr_logger_en;
+mod_log_ctrl log_ctrl[VR_NUM_MODS];
+bool retrieve_logs[VR_NUM_MODS];
+
 enum opt_vrouter_index {
+    SET_VROUTER_LOG,
+    GET_VROUTER_LOG,
     INFO_OPT_INDEX,
     HELP_OPT_INDEX,
     GET_LOG_LEVEL_INDEX,
@@ -74,6 +81,8 @@ typedef struct name_id_pair {
 } log_type_name_id_t;
 
 typedef struct name_id_pair log_level_name_id_t;
+typedef struct name_id_pair log_module_name_id_t;
+
 
 static struct nl_client *cl;
 
@@ -81,6 +90,7 @@ static int opt[MAX_OPT_INDEX];
 
 static int write_options[] = {
     SET_LOG_LEVEL_INDEX,
+    SET_VROUTER_LOG,
     LOG_ENABLE_INDEX,
     LOG_DISABLE_INDEX,
     -1
@@ -88,6 +98,7 @@ static int write_options[] = {
 
 static int read_options[] = {
     INFO_OPT_INDEX,
+    GET_VROUTER_LOG,
     GET_LOG_LEVEL_INDEX,
     GET_ENABLED_LOGS_INDEX,
     -1
@@ -360,7 +371,7 @@ static void
 print_log_level(vrouter_ops *req)
 {
     char *str = log_level_id_to_name(req->vo_log_level);
-
+    
     if (platform != DPDK_PLATFORM)
         return;
 
@@ -393,6 +404,44 @@ print_enabled_log_types(vrouter_ops *req)
     return;
 }
 
+char*  vr_module_id_to_name(int m)
+{
+    char *a;
+    if(m == 0) return "Flow";
+    else if(m == 1) return "Interface";
+    else if(m == 2) return "Mirror";
+    else if(m == 3) return "NextHop";
+    else if(m == 4) return "Qos";
+    else if(m == 5) return "Route";
+    return "Not found";
+}
+
+char*  vr_level_id_to_name(int m)
+{
+    if(m == 0) return "none";
+    if(m == 1) return "error";
+    if(m == 2) return "warning";
+    if(m == 3) return "info";
+    if(m == 4) return "debug";
+    return "Not found";
+}
+
+static void
+print_log_status(vrouter_ops *req)
+{
+    printf("Maximum Log Buffer size: %d\n", req->vo_log_buf_maxsz);
+    printf("Logging status: %d\n", req->vo_logger_en);
+}
+
+static void
+print_module_log_status(vrouter_ops *req)
+{
+    int i;
+    printf("Module                Log Level            Log Type             Log Size\n");
+    for(i = 0; i < VR_NUM_MODS; i++)
+    	printf("%-22s %-22s %-22d %u\n", vr_module_id_to_name(i), vr_level_id_to_name(req->vo_log_mod_level[i]&LOG_LVL_MASK), (req->vo_log_mod_level[i]&LOG_CON_MASK)>>3, req->vo_log_mod_len[i]);
+}
+
 static void
 _vrouter_ops_process(void *s_req)
 {
@@ -403,9 +452,10 @@ _vrouter_ops_process(void *s_req)
             print_build_info(req->vo_build_info);
 
         print_vrouter_parameters(req);
-
         print_log_level(req);
         print_enabled_log_types(req);
+	print_log_status(req);
+	print_module_log_status(req);
     } else {
         if (opt[GET_LOG_LEVEL_INDEX])
             print_log_level(req);
@@ -424,25 +474,45 @@ _response_process(void *s)
     return;
 }
 
+//Sandesh callback function
+ static void
+_vr_pkt_log_req_process(void *s_req)
+{
+     int i;
+     vr_pkt_log_req *req = (vr_pkt_log_req *) s_req;
+     printf("%s", req->vdl_vr_log);
+}
+
 static void
 vrouter_fill_nl_callbacks()
 {
     nl_cb.vrouter_ops_process = _vrouter_ops_process;
     nl_cb.vr_response_process = _response_process;
+    nl_cb.vr_pkt_log_req_process = _vr_pkt_log_req_process;
 }
 
 static int
 vr_vrouter_op(struct nl_client *cl)
 {
     int ret = 0;
-
     switch (vrouter_op) {
     case SANDESH_OP_GET:
-        ret = vr_send_vrouter_get(cl, 0);
+	if(opt[GET_VROUTER_LOG]) {
+	    int i;
+	    for(i=0;i<VR_NUM_MODS;i++) {
+		if(retrieve_logs[i])
+			ret = vr_get_log_request(cl, 0, i, 0);
+	    }
+	}
+	else
+            ret = vr_send_vrouter_get(cl, 0);
         break;
 
     case SANDESH_OP_ADD:
-        if (opt[SET_LOG_LEVEL_INDEX] || opt[LOG_ENABLE_INDEX]) {
+	if(opt[SET_VROUTER_LOG]) {
+	    ret = vr_set_log_request(cl, 0);
+	}
+        else if (opt[SET_LOG_LEVEL_INDEX] || opt[LOG_ENABLE_INDEX]) {
             ret = vr_send_vrouter_set_logging(cl, 0, log_level,
                     log_types_to_enable.types, log_types_to_enable.size,
                     log_types_to_disable.types, log_types_to_disable.size);
@@ -460,14 +530,18 @@ vr_vrouter_op(struct nl_client *cl)
         ret = -EINVAL;
         break;
     }
-
-    if (ret < 0)
+     if (ret < 0)
         return ret;
-
     return vr_recvmsg(cl, false);
 }
 
 static struct option long_options[] = {
+    [SET_VROUTER_LOG] = {
+	"set_vrouter_log", required_argument, &opt[SET_VROUTER_LOG], 1
+    },
+    [GET_VROUTER_LOG] = {
+	"get_vrouter_log", required_argument, &opt[GET_VROUTER_LOG], 1
+    },
     [INFO_OPT_INDEX] = {
         "info", no_argument, &opt[INFO_OPT_INDEX], 1
     },
@@ -672,6 +746,139 @@ assert_platform_for_option(int required_platform, int opt_index)
     }
 }
 
+int vr_module_name_to_id(char *s)
+{
+    if(strcmp("Flow", s) == 0) return Flow;
+    if(strcmp("Interface", s) == 0) return Interface;
+    if(strcmp("Mirror", s) == 0) return Mirror;
+    if(strcmp("NextHop", s) == 0) return NextHop;
+    if(strcmp("Qos", s) == 0) return Qos;
+    if(strcmp("Route", s) == 0) return Route;
+
+    return -1;
+}
+
+int vr_level_name_to_id(char *s)
+{
+    if(strcmp("error", s) == 0) return error;
+    if(strcmp("warning", s) == 0) return warning;
+    if(strcmp("info", s) == 0) return info;
+    if(strcmp("debug", s) == 0) return debug;
+    if(strcmp("none", s) == 0) return none;
+
+    return -1;
+}
+
+//CLI parsing for --set_vrouter_log
+void parse_command_line_set(char *opt_arg)
+{
+    char *temp_arg = opt_arg;
+    char parser[MAX_PARS_PER_MOD][MAXLEN_COMMAND] = {'0'};
+    int i = 0, j, k;
+
+    int count = 0, ind = 0;
+    while(*temp_arg)
+    {
+        if(*temp_arg == '/' || *temp_arg == ',' || *(temp_arg+1) == '\0')
+        {
+            if(*(temp_arg+1) == '\0') count++;
+            memcpy(parser[i], opt_arg, count);
+            opt_arg += (count+1);
+            i++;
+            count = 0;
+            if(*temp_arg == '/')
+            {
+                temp_arg++;
+                continue;
+            }
+        }
+        if(*temp_arg == ',' || *(temp_arg+1) == '\0')
+        {
+            if(strcmp(parser[0], "default") == 0)
+            {
+                for(i=0;i<VR_NUM_MODS;i++)
+                {
+                    SET_MOD_LOG(i, info);
+                }
+                return;
+            }
+            else if(strcmp(parser[0], "none") == 0)
+            {
+		  for(i=0;i<VR_NUM_MODS;i++)
+		  {
+		      SET_MOD_LOG(i, none);
+		  }
+                  vr_logger_en = 0;
+    		  return;
+            }
+	    vr_logger_en = 1;
+            int mod = vr_module_name_to_id(parser[0]);
+            if(mod == -1)
+            {
+                printf("vrouter: Invalid Module: '%s'\n\n", parser[0]);
+            }
+
+            if(strlen(parser[1]) != 0)
+            {
+                int lev = vr_level_name_to_id(parser[1]);
+                if(lev == -1)
+                {
+                    printf("vrouter: Invalid log level: '%s'\n\n", parser[1]);
+                }
+                SET_MOD_LOG(mod, lev);
+            }
+            else
+            {
+                SET_MOD_LOG(mod, info);
+            }
+            if(strlen(parser[2]) != 0) SET_CON_LOG(mod);
+            i = 0;
+            count = 0;
+            temp_arg++;
+            for(j=0;j<MAX_PARS_PER_MOD;j++)
+            {
+                for(k=0;k<MAXLEN_COMMAND;k++) parser[j][k] = '\0';
+            }
+            continue;
+        }
+        count++;
+        temp_arg++;
+    }
+}
+
+//CLI parsing for --get_vrouter_log
+void
+parse_command_line_get(char *opt_arg)
+{
+    char *temp_arg = opt_arg;
+    char parser[MAXLEN_COMMAND] = {'0'};
+    memset(retrieve_logs, false, VR_NUM_MODS*sizeof(bool));
+   int j = 0, count = 0, i = 0, ind = 0;
+   while(*temp_arg)
+   {
+        if(*temp_arg == ',' || *(temp_arg+1) == '\0')
+        {
+	    if(*(temp_arg+1) == '\0') count++;
+            memcpy(parser, opt_arg+ind, count);
+            ind += (count+1);
+            int mod = vr_module_name_to_id(parser);
+            if(mod == -1)
+            {
+                printf("vrouter: Invalid Module: '%s'\n", parser);
+		Usage();
+		return;
+            }
+	    retrieve_logs[mod] = true;
+            count = 0;
+            temp_arg++;
+	    for(j=0;j<MAXLEN_COMMAND;j++) parser[j] = '\0';
+            continue;
+        }
+        count++;
+        temp_arg++;
+   }
+}
+
 static void
 parse_long_opts(int opt_index, char *opt_arg)
 {
@@ -679,6 +886,17 @@ parse_long_opts(int opt_index, char *opt_arg)
 
     errno = 0;
     switch (opt_index) {
+    case SET_VROUTER_LOG:
+	vrouter_op = SANDESH_OP_ADD;
+	parse_command_line_set(opt_arg);
+	break;
+
+    case GET_VROUTER_LOG:
+	vrouter_op = SANDESH_OP_GET;
+	parse_command_line_get(opt_arg);
+	break;
+
+
     case INFO_OPT_INDEX:
         vrouter_op = SANDESH_OP_GET;
         break;
