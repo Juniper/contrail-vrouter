@@ -100,6 +100,11 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_hugepage_config),
         .obj_type_string        =       "vr_hugepage_config",
     },
+    [VR_LOG_OBJECT_ID] = {
+	.obj_len                =       (4 * sizeof(vr_pkt_log_req) +
+                                        VR_LOG_MAX),
+	.obj_type_string        =       "vr_pkt_log_req",
+    },
 };
 
 static unsigned int

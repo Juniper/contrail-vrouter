@@ -1,8 +1,8 @@
 /*
- * vr_sandesh.h --
- *
- * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
- */
+ *  * vr_sandesh.h --
+ *   *
+ *    * Copyright (c) 2013 Juniper Networks, Inc. All rights reserved.
+ *     */
 #ifndef __VR_SANDESH_H__
 #define __VR_SANDESH_H__
 
