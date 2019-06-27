@@ -91,6 +91,7 @@ struct genl_ctrl_message {
 #define GENLMSG_DATA(buf)               ((char *)buf + GENL_HDRLEN)
 
 struct nl_sandesh_callbacks {
+    void (*vr_pkt_log_req_process)(void *);
     void (*vrouter_ops_process)(void *);
     void (*vr_flow_req_process)(void *);
     void (*vr_flow_response_process)(void *);
@@ -275,6 +276,8 @@ extern int vr_send_vrouter_get(struct nl_client *, unsigned int);
 extern int vr_send_vrouter_set_logging(struct nl_client *, unsigned int,
         unsigned int, unsigned int *, unsigned int,
         unsigned int *, unsigned int);
+
+extern int vr_set_log_request(struct nl_client *, unsigned int);
 
 extern int vr_send_vxlan_add(struct nl_client *, unsigned int,
         unsigned int, unsigned int);

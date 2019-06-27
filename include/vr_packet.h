@@ -15,6 +15,7 @@
 #include "vr_mirror.h"
 #include "vr_os.h"
 #include "vr_pkt_droplog.h"
+#include "vr_logger.h"
 
 /* ethernet header */
 #define VR_ETHER_DMAC_OFF       0
@@ -213,7 +214,6 @@ struct vr_packet {
     unsigned char vp_priority:4,
                   vp_notused:4;
 };
-
 
 #define VP_QUEUE_INVALID    0xFF
 #define VP_PRIORITY_INVALID 0xF
@@ -1487,7 +1487,7 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
     struct vrouter *router = vrouter_get(0);
     struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
 
-    /* Copying index valjue from circular buffer of corresponding core*/
+    /* Copying index value from circular buffer of corresponding core*/
     int buf_idx = vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu];
     vr_pkt_drop_log_t **vr_pkt_drop_log_buffer = vr_pkt_drop->vr_pkt_drop_log;
 
@@ -1570,4 +1570,23 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
         vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu] = ((++buf_idx) % vr_pkt_droplog_bufsz);
     }
 }
+
+//Function for populating Log Buffers
+static inline void vr_log_mod_func(map_t file, unsigned int line, int mod)
+{
+    struct vrouter *router = vrouter_get(0);
+    struct vr_log_buf_st *vr_log = router->vr_logger;
+    uint64_t m_sec = 0, n_sec = 0;
+    int lev = (level[mod] & LOG_LVL_MASK);
+    if(lev == 0) return;
+    if(vr_log != NULL)
+    {
+        vr_get_time(&m_sec, &n_sec);
+	int idx = vr_log->vr_log_buf[mod].buf_idx;
+	char *log = vr_log->vr_log_buf[mod].buf;
+	unsigned int time = (unsigned int) m_sec;
+	VR_LOG(idx, log, mod, lev, "Time: %d   Line: %d\n", time, line);
+    }
+}
+
 #endif /* __VR_PACKET_H__ */
