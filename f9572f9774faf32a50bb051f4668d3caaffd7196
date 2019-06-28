@@ -1,0 +1,548 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9f5c4f37_f49c210f",
+        "filename": "utils/vif.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1422,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "Port is deprecated. We use Unix sockets now instead of TCP.",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9f5c4f37_d4a11d48",
+        "filename": "utils/vif.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1438,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "Not needed",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_23b1eae2",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 527,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "what is the need for this logic? is there some limitation with the current implemenation?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_a3c4ba41",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 564,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "this is uint8*, but you are assigning unsigned long? Didnt understand the intent here.",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3f4b6375_0445d617",
+        "filename": "utils/vtest/vtest_py/SConscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "Why not use sed command here instead of creating a separate file_sub.py?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_230d6a90",
+        "filename": "utils/vtest/vtest_py/SConscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "pl use build directory to generate this since these are tmp files",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3f4b6375_e4499a32",
+        "filename": "utils/vtest/vtest_py/SConscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "remove this commented line",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3f4b6375_c4469e22",
+        "filename": "utils/vtest/vtest_py/file_sub.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "As mentioned earlier, this will not be needed if we use sed in SConscript",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3f4b6375_a453a2e2",
+        "filename": "utils/vtest/vtest_py/run_tests.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "1. This file has to be enhanced to activate venv, install pip packages (netaddr, bottle, scapy, upgrade pip)\n\n2. Pl enhance this to run just a single UT supplied in cmdline arg",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_2321eaa0",
+        "filename": "utils/vtest/vtest_py/run_tests.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "port not needed",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_e3263217",
+        "filename": "utils/vtest/vtest_py/tests/test1.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "1. this needs to be integrated with testtools\n\n2. Can you put some basic #defines in a file?\neg. SANDESH_OP_XXX, NH_TYPE etc. They will be more readable.",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_a3495a61",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "1) the file needs to be in pep8/flake8 format\n\n2) needs to be integrated with testtools.. need to have base methods like setUpClass(), tearDownClass() etc.\n\n3) Pl have a function to take list of objects and generate xml from it.. Eg: list of vifs, nh, pkts etc.",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_a39dda67",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "no need of port",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_e33f52b3",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "can save the pid here (ret2.pid) and use that to kill during stop().\nAlso, need to handle exception gracefully here (try/except)",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_a3c83a74",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "What is this 2? Generally we need to see the returncode",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_c33c56c1",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "In case we want to run multiple testcases in parallel, this method may kill wrong dpdk process. better way is to save the pid when it starts and use that to kill",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_6375a298",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "temp XML/pcap files needs to be created in build directory. We can create a directory for each test case name and save the xml. Eg: build/debug/vrouter/utils/vtest_py/tests/tc1",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_03af0e95",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "paths can be global variables",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_23aa0a85",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "this is a static method",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_438e262f",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 85,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "static method",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_638ec228",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 87,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "use TXMLProtocol.TXMLProtocolFactory()\nRef: sandesh_encode_decode_test.py",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_83d65ef1",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "static method",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_431866d2",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 99,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "Pl format xml file using prettyxml -\nhttps://stackoverflow.com/questions/17402323/use-xml-etree-elementtree-to-print-nicely-formatted-xml-files/17402424\n\nSame for the response message xml file",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_6305a27a",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 102,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "this has to be static method",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_430aa68a",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "static method",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_83ef7eaf",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "this may need to be refractored in case we want to send an object(say vif) + pkt at the same time",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_83a89e77",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 134,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "port not needed",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_0304ae7a",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 142,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "catch exception",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_432f46f6",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 146,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "is there a way to reconstruct the object from xml?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_632a42e8",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 151,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "can we put this in a list structure?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_03394e40",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 155,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "Pl define a constant or enum here",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_e33d122d",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 175,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-28T18:43:17Z",
+      "side": 1,
+      "message": "enum",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    }
+  ]
+}
