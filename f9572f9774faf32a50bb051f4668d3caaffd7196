@@ -2,6 +2,23 @@
   "comments": [
     {
       "key": {
+        "uuid": "5b5f3212_87ed2648",
+        "filename": "utils/vif.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-29T13:07:21Z",
+      "side": 1,
+      "message": "Do we plan to have this option of other vrouter utils like flow, mpls, vxlan etc.?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9f5c4f37_f49c210f",
         "filename": "utils/vif.c",
         "patchSetId": 1
