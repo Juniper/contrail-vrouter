@@ -444,6 +444,23 @@
     },
     {
       "key": {
+        "uuid": "293db5c6_31b00663",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 121,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-29T13:06:09Z",
+      "side": 1,
+      "message": "Can we define a vtest.sandesh for these type of custom xmls\u0027 required for vtest?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1f485f77_430aa68a",
         "filename": "utils/vtest/vtest_py/vtest_lib.py",
         "patchSetId": 1
