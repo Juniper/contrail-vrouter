@@ -402,14 +402,15 @@ buffer sandesh vr_pkt_drop_log_req {
     1:  sandesh_op      h_op;
     2:  i16             vdl_rid;
     3:  i16             vdl_core;
-    4:  i16             vdl_log_idx;
+    4:  i16             vdl_buf_prev_idx;
     5:  i16             vdl_max_num_cores;
-    6:  i16             vdl_pkt_droplog_max_bufsz;
-    7:  i16             vdl_pkt_droplog_en;
-    8:  i16             vdl_pkt_droplog_sysctl_en;
-    9:  list <byte>     vdl_pkt_droplog_arr;
+    6:  i16             vdl_pkt_droplog_en;
+    7:  i16             vdl_pkt_droplog_sysctl_en;
+    8:  list <byte>     vdl_pkt_droplog_arr;
+    9:  i16             vdl_pkt_droplog_repeat;
+    10: i16             vdl_pkt_droplog_bufsz;
+    11: u32             vdl_pkt_droplog_stats_cntr;
 }
-
 buffer sandesh vr_drop_stats_req {
     1:  sandesh_op      h_op;
     2:  i16             vds_rid;

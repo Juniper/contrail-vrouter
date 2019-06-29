@@ -1487,15 +1487,14 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
     struct vrouter *router = vrouter_get(0);
     struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
 
-    /* Copying index valjue from circular buffer of corresponding core*/
+    /* Copying index value from circular buffer of corresponding core */
     int buf_idx = vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu];
     vr_pkt_drop_log_t **vr_pkt_drop_log_buffer = vr_pkt_drop->vr_pkt_drop_log;
 
     memset(vr_pkt_drop_log_buffer[cpu] + buf_idx, 0, sizeof(vr_pkt_drop_log_t));
 
-    /* Check Packet drop log enabled at load time*/
-    if(vr_pkt_droplog_buf_en == 1)
-    {
+    /* Check Packet drop log enabled at load time */
+    if(vr_pkt_droplog_buf_en == 1) {
         /* Get the current time in epoch format */
         vr_get_time(&m_sec, &n_sec);
 
@@ -1508,29 +1507,27 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
         PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.file, file)
         PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.line, line)
 
-        if(pkt != NULL)
-        {
-            /* Check if dropped packet is IPV4*/
+        if(pkt != NULL) {
+            /* Check if dropped packet is IPV4 */
             if (pkt->vp_type == VP_TYPE_IP) {
                 ip = (struct vr_ip *)pkt_network_header(pkt);
                 if(!ip)
                     return;
 
-                /* Copying Source & destination address from IPV4 packet header*/
+                /* Copying Source & destination address from IPV4 packet header */
                 PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv4.s_addr,
 			ip->ip_saddr)
                 PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv4.s_addr,
 			ip->ip_daddr)
 
-                /* If flow is available, copy source port and destination port*/
+                /* If flow is available, copy source port and destination port */
                 if(flow != NULL && flow->flow4_sport != 0) {
                     vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow4_sport;
                     vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow4_dport;
                 }
             }
             /* Check if dropped packet is IPV6 */
-            else if (pkt->vp_type == VP_TYPE_IP6)
-            {
+            else if (pkt->vp_type == VP_TYPE_IP6) {
                 ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
                 if(!ip6)
                     return;
@@ -1544,24 +1541,25 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
                     vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow6_dport;
                 }
             }
-        /* Log packet details into buffer, when drop least is diabled */
-        if(vr_pkt_droplog_min_sysctl_en != 1)
-        {
-                PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
-                if(pkt->vp_if != NULL) {
-                    PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vif_idx,
-			pkt->vp_if->vif_idx)
-                }
-                if(pkt->vp_nh != NULL) {
-                    PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].nh_id, pkt->vp_nh->nh_id)
-                }
-                    PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_len, pkt->vp_len)
-                if(pkt->vp_len < 100)
-                    memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
-			pkt_network_header(pkt), pkt->vp_len);
-                else
-                    memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
-			pkt_network_header(pkt), 100);
+
+            PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
+
+            /* Log packet details into buffer, when drop least is diabled */
+            if(vr_pkt_droplog_min_sysctl_en != 1) {
+                    if(pkt->vp_if != NULL) {
+                        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vif_idx,
+                            pkt->vp_if->vif_idx)
+                    }
+                    if(pkt->vp_nh != NULL) {
+                        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].nh_id, pkt->vp_nh->nh_id)
+                    }
+                        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_len, pkt->vp_len)
+                    if(pkt->vp_len < 100)
+                        memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
+                            pkt_network_header(pkt), pkt->vp_len);
+                    else
+                        memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].pkt_header,
+                            pkt_network_header(pkt), 100);
             }
         }
         /* Circular buffer - buf_idx counter increments for every packet log, when it reaches max.
