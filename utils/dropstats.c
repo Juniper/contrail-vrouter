@@ -30,88 +30,53 @@
 
 static struct nl_client *cl;
 static int help_set, core_set, offload_set, log_set, clear_set;
-static unsigned int core = (unsigned)-1;
+static int core = -1;
 static unsigned int stats_index = 0;
-static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index);
+static int vr_get_pkt_drop_log(struct nl_client *cl, int core, unsigned int cur_stats_idx);
 
-static void pkt_drop_log_req_process(void *s_req) {
+static void pkt_drop_log_req_process(void *s_req)
+{
 
     static int log_all_cores = 0, last_buffer_stats = 0, last_buffer_entry = 0;
     vr_pkt_drop_log_req *stats = (vr_pkt_drop_log_req *)s_req;
 
-    /* Below check ensures that pkt drop log sysctl enabled during runtime*/
-    if(stats->vdl_pkt_droplog_sysctl_en == 1)
-    {
-        /* Below check ensures that drop stats support is enabled at load time*/
-        if(stats->vdl_pkt_droplog_en == 1)
-        {
-            /* Print the drop stats log*/
-            vr_print_pkt_drop_log(stats);
+    /* Below check ensures that pkt drop log sysctl enabled during runtime */
+    if(stats->vdl_pkt_droplog_sysctl_en == 1) {
+        /* Below check ensures that drop stats support is enabled at load time */
+        if(stats->vdl_pkt_droplog_en == 1) {
+            /* Print the drop stats log */
+            if(stats->vdl_pkt_droplog_bufsz)
+                vr_print_pkt_drop_log(stats);
 
-            /* Since sandesh message doesn't support passing data more than 4KB,
-             * So the message request sent in serial manner.
-             * If the configured size  more than VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ,
-             * then index is maintained at utils side
-             * and request data based on index
-             * */
-            if(stats->vdl_pkt_droplog_max_bufsz > VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ)
-            {
-                /* If stats->index reached MAX size, it will not be processed.
-                 * stats->vdl_log_idx is used for printing serial numbers on
-                 * the console */
-                if(stats->vdl_log_idx < (stats->vdl_pkt_droplog_max_bufsz -
-                            VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ))
-                {
-                    /* Request packet drop buffer for next iteration by
-                     * incrementing with MAX_ALLOWED_BUFFER  */
-                    stats_index  = stats->vdl_log_idx +
-                        VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
-                    vr_get_pkt_drop_log(cl, stats->vdl_core, stats_index);
-                }
-                /* Below condition will process last iteration buffer,
-                 * If modulus is non-zero */
-                else if( stats->vdl_pkt_droplog_max_bufsz %
-                        VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ != 0)
-                {
-                    /* Below condition to be processed only once per core */
-                    if( ! last_buffer_entry)
-                    {
-                        stats_index  = stats->vdl_log_idx +
-                            VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ;
-                        last_buffer_entry = 1;
-                        vr_get_pkt_drop_log(cl, stats->vdl_core, stats_index);
-                    }
-                    else
-                    {
-                        /* Resetting index and last buffer entry because all
-                         * processing done for this particular core*/
-                        last_buffer_entry = 0;
-                        stats_index = 0;
-                    }
-                }
-                else
-                    stats_index = 0;
-            }
+            /* Sandesh message supports passing data less than 4KB,
+             * So message sent in serial manner.
+             * Macro: VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ number of records transferred per
+             * iteration. Stats index is maintained at kernel/DPDK side */
+            if(stats->vdl_pkt_droplog_repeat == 1)
+                vr_get_pkt_drop_log(cl, stats->vdl_core, stats->vdl_pkt_droplog_cur_stats_idx);
+
             /* When packet drop log is requested for all cores, below
-             * condition would be enabled*/
-            if(stats->vdl_core ==0 || log_all_cores == 1)
-            {
-                /* Increment the core value*/
+             * condition would be enabled */
+            if(stats->vdl_core == 0 || log_all_cores == 1) {
+                /* Increment the core value */
                 core++;
 
-                if(core < stats->vdl_max_num_cores){
+                if(core < stats->vdl_max_num_cores) {
+
                     log_all_cores = 1;
-                    vr_get_pkt_drop_log(cl,core+1,stats_index);
+
+                    /* dropstats --log 0 -->Log for all cores
+                     * To acheive above case, core value is incremented by 1 and the same will
+                     * be decremented at kernel/DPDK side */
+                    vr_get_pkt_drop_log(cl, core+1, stats->vdl_pkt_droplog_cur_stats_idx);
                 }
-                else
-                {
+                else {
                     log_all_cores = 0;
                 }
 
             }
         }
-        else
-        {
+        else {
             printf("\n\nPkt drop stats log support is not enabled or misconfigured \
                     in vrouter module parameters. Configured value is %d\n",
                     stats->vdl_pkt_droplog_en);
@@ -119,8 +84,7 @@ static void pkt_drop_log_req_process(void *s_req) {
                     vr_pkt_droplog_buf_en=1\" in /etc/modprobe.d/vrouter.conf\n");
         }
     }
-    else
-    {
+    else {
         printf("\n\nPacket Drop Log sysctl is not enabled or misconfigured, \
                 Configured value is %d\n",stats->vdl_pkt_droplog_sysctl_en);
         printf("You can enable it by passing \"echo 1 > \
@@ -136,10 +100,12 @@ pkt_drop_log_nlutils_callbacks()
     nl_cb.vr_pkt_drop_log_req_process = pkt_drop_log_req_process;
 }
 
-static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index) {
+static int vr_get_pkt_drop_log(struct nl_client *cl, int core, unsigned int cur_stats_idx)
+{
     int ret = 0;
 
-    vr_pkt_drop_log_request(cl, 0, core, stats_index);
+    ret = vr_pkt_drop_log_request(cl, 0, core, cur_stats_idx);
+
     if(ret < 0)
         return ret;
 
@@ -156,8 +122,7 @@ drop_stats_req_process(void *s_req)
     vr_drop_stats_req *stats = (vr_drop_stats_req *)s_req;
     int platform = get_platform();
 
-    if(stats->h_op == SANDESH_OP_RESET)
-    {
+    if(stats->h_op == SANDESH_OP_RESET) {
         printf("\nDropstats counters cleared successfully on all cores \n\n");
         return;
     }
@@ -305,6 +270,7 @@ main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index, log_core = 0, i = 0;
+    unsigned int cur_stats_idx = 0;
 
     dropstats_fill_nl_callbacks();
 
@@ -342,19 +308,17 @@ main(int argc, char *argv[])
     if (!cl)
         return -1;
     
-    if ((option_index == LOG_OPT_INDEX) || (log_set == 1))
-    {
+    if ((option_index == LOG_OPT_INDEX) || (log_set == 1)) {
         log_core = atoi(argv[2]);
 
-        /* Register nl allback function for pkt drop log buffer*/
+        /* Register nl allback function for pkt drop log buffer */
         pkt_drop_log_nlutils_callbacks();
 
-        vr_get_pkt_drop_log(cl,log_core,stats_index);
+        vr_get_pkt_drop_log(cl, log_core, cur_stats_idx);
         return 0;
     }
 
-    if (option_index == CLEAR_OPT_INDEX)
-    {
+    if (option_index == CLEAR_OPT_INDEX) {
         vr_clear_drop_stats(cl);
 
         ret = vr_recvmsg(cl, false);
