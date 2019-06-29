@@ -70,6 +70,40 @@
     },
     {
       "key": {
+        "uuid": "1f485f77_03870eda",
+        "filename": "utils/vtest/vt_packet.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 245,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-29T13:01:28Z",
+      "side": 1,
+      "message": "this is static function?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1f485f77_e36bd21c",
+        "filename": "utils/vtest/vt_packet.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 266,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-06-29T13:01:28Z",
+      "side": 1,
+      "message": "this if condition can be removed since its checked in the caller?",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3f4b6375_0445d617",
         "filename": "utils/vtest/vtest_py/SConscript",
         "patchSetId": 1
