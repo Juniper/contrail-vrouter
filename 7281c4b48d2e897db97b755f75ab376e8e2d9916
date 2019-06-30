@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8129010a_a3a19480",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 219,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-06-30T09:30:23Z",
+      "side": 1,
+      "message": "These sort of changes, shouldnt be part of your diff. Take care to remove them please.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    }
+  ]
+}
