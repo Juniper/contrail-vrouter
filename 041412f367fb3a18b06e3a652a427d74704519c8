@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9d79b7e6_bb393732",
+        "filename": "utils/README.md",
+        "patchSetId": 1
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 382
+      },
+      "writtenOn": "2019-07-01T09:49:54Z",
+      "side": 1,
+      "message": "what does it mean?",
+      "range": {
+        "startLine": 2,
+        "startChar": 0,
+        "endLine": 2,
+        "endChar": 41
+      },
+      "revId": "041412f367fb3a18b06e3a652a427d74704519c8",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a7dc8da_4a306888",
+        "filename": "utils/README.md",
+        "patchSetId": 1
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 382
+      },
+      "writtenOn": "2019-07-01T09:49:54Z",
+      "side": 1,
+      "message": "please remove all spaces at end of string",
+      "revId": "041412f367fb3a18b06e3a652a427d74704519c8",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    }
+  ]
+}
