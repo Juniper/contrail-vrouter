@@ -2,6 +2,57 @@
   "comments": [
     {
       "key": {
+        "uuid": "704fcc27_bfe52f73",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "Right now your cur_idx is agnostic to the core no. If your cli crashes exits while requesting for a particular core, and in the next run you request for another core, this stale cur_idx will still hold.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "4cdce031_5baf79d2",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 68,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "Do you really need the log_idx now that you can send back the updated stats_idx member itself.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9e4b8e55_6c1aa176",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "I think you need add a note to explain your interplay between cur_idx, local_idx, stats_idx and next idx.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "8129010a_a3a19480",
         "filename": "dp-core/vr_pkt_droplog.c",
         "patchSetId": 4
@@ -13,6 +64,108 @@
       "writtenOn": "2019-06-30T09:30:23Z",
       "side": 1,
       "message": "These sort of changes, shouldnt be part of your diff. Take care to remove them please.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "47edfe15_75eaf5a6",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 1490,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "Spell correct \u0027value\u0027.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "2c7b9b75_53d1cac1",
+        "filename": "sandesh/vr.sandesh",
+        "patchSetId": 4
+      },
+      "lineNbr": 412,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "What\u0027s the difference between  vdl_log_idx and cur_stats_idx?",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "35730f92_a0e1b3e3",
+        "filename": "utils/dropstats.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "What Macro are you referring to? You can remove the reference to VR_PKT_DROPLOG_MAX_ALLOW_BUFSZ if its not used anymore in this function.",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "0c42766e_410e6f5e",
+        "filename": "utils/dropstats.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "Whats the logic behind passing cur_stats_idx after the logic change?",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "cd45bb4d_282b3a2c",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 763,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "I think your intention here is to print the buffer reverse chronologically. Since you are going to fetch the buffer in chunks of 20 entries each, from the beginning of buffer and then print these 20 entries before requesting the next chunk. How will the timestamps map then, for the next batch of 20 entries?",
+      "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "94972014_da88f4a0",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 912,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-01T05:40:22Z",
+      "side": 1,
+      "message": "Why are we still passing the idx along with the request if kernel is maintaining the index now?",
       "revId": "7281c4b48d2e897db97b755f75ab376e8e2d9916",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
