@@ -463,11 +463,14 @@ list_get_print(vr_interface_req *req)
     } else if (platform == DPDK_PLATFORM) {
         switch (req->vifr_type) {
             case VIF_TYPE_PHYSICAL:
-                printf("PCI: ""%.4" PRIx16 ":%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8,
-                        (uint16_t)(req->vifr_os_idx >> 16),
-                        (uint8_t)(req->vifr_os_idx >> 8) & 0xFF,
-                        (uint8_t)(req->vifr_os_idx >> 3) & 0x1F,
-                        (uint8_t)(req->vifr_os_idx & 0x7));
+                if(req->vifr_flags & VIF_FLAG_MOCK_PHYSICAL)
+                    printf("PCI: Mock Physical Device");
+                else
+                    printf("PCI: ""%.4" PRIx16 ":%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8,
+                            (uint16_t)(req->vifr_os_idx >> 16),
+                            (uint8_t)(req->vifr_os_idx >> 8) & 0xFF,
+                            (uint8_t)(req->vifr_os_idx >> 3) & 0x1F,
+                            (uint8_t)(req->vifr_os_idx & 0x7));
                 break;
 
             case VIF_TYPE_MONITORING:
@@ -490,7 +493,8 @@ list_get_print(vr_interface_req *req)
         }
     }
 
-    if (req->vifr_type == VIF_TYPE_PHYSICAL) {
+    if ((req->vifr_type == VIF_TYPE_PHYSICAL) &&
+            (!(req->vifr_flags & VIF_FLAG_MOCK_PHYSICAL))) {
         if (req->vifr_speed >= 0) {
             printf(" (Speed %d,", req->vifr_speed);
             if (req->vifr_duplex >= 0)
