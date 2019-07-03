@@ -1569,6 +1569,12 @@ dpdk_virtio_to_vm_tx(void *port, struct rte_mbuf *pkt)
     const unsigned lcore_id = rte_lcore_id();
     struct vr_dpdk_lcore *lcore = NULL;
 
+    if (unlikely(port == NULL)) {
+        vr_dpdk_pfree(pkt, vr_dpdk_mbuf_to_pkt(pkt)->vp_if,
+                                           VP_DROP_INTERFACE_DROP);
+        return 0;
+    }
+
     if (lcore_id >= VR_DPDK_FWD_LCORE_ID) {
         lcore = vr_dpdk.lcores[lcore_id];
         p->last_pkt_tx = lcore->lcore_fwd_loops;
