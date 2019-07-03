@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<!-- Testing mirror packet using physical interface
+     Source is configured as physical interface
+     Analyzer VM is configured as virtual interface -->
+<test>
+    <test_name>Mirror and communication using physical interface</test_name>
+        <message>
+        <vr_interface_req>
+            <h_op>Add</h_op>
+            <vifr_type>2</vifr_type>
+            <vifr_idx>1</vifr_idx>
+            <vifr_name>1</vifr_name>
+            <vifr_transport>2</vifr_transport>
+            <vifr_vrf>0</vifr_vrf>
+            <vifr_mac>de:ad:be:ef:00:02</vifr_mac>
+            <vifr_mtu>2514</vifr_mtu>
+            <vifr_flags>0</vifr_flags>
+        </vr_interface_req>
+        <return>0</return>
+    </message> 
+    <message>
+        <vr_interface_req>
+            <h_op>Add</h_op>
+            <vifr_type>3</vifr_type>
+            <vifr_idx>3</vifr_idx>
+            <vifr_transport>2</vifr_transport>
+            <vifr_name>3</vifr_name>
+            <vifr_vrf>2</vifr_vrf>
+            <vifr_mac>de:ad:be:ef:00:01</vifr_mac>
+            <vifr_mtu>2514</vifr_mtu>
+            <vifr_nh_id>21</vifr_nh_id>
+            <vifr_flags>1</vifr_flags>
+        </vr_interface_req>
+        <return>0</return>
+    </message> 
+   <message>
+        <vr_nexthop_req>
+            <h_op>Add</h_op>
+            <nhr_type>2</nhr_type>
+            <nhr_id>21</nhr_id>
+            <nhr_encap_oif_id>3</nhr_encap_oif_id>
+            <nhr_encap>de:ad:be:ef:00:02:de:ad:be:ef:00:01:08:00</nhr_encap>
+            <nhr_vrf>2</nhr_vrf>
+            <nhr_flags>3</nhr_flags>
+            <nhr_family>2</nhr_family>
+          </vr_nexthop_req>
+        <return>0</return>
+    </message> 
+
+    <message>
+        <vr_nexthop_req>
+            <h_op>Add</h_op>
+            <nhr_type>3</nhr_type>
+            <nhr_id>14</nhr_id>
+            <nhr_family>2</nhr_family>
+            <nhr_encap_oif_id>3</nhr_encap_oif_id>
+            <nhr_encap>de:ad:be:ef:00:02:de:ad:be:ef:00:01:08:00</nhr_encap>
+            <nhr_tun_sip>33685761</nhr_tun_sip>
+            <nhr_tun_dip>16843266</nhr_tun_dip>
+            <nhr_vrf>0</nhr_vrf>
+            <nhr_flags>129</nhr_flags>
+        </vr_nexthop_req>
+        <return>0</return>
+    </message>
+
+    <message>
+        <vr_mirror_req>
+            <h_op>Add</h_op>
+            <mirr_index>1</mirr_index>
+            <mirr_nhid>14</mirr_nhid>
+            <mirr_flags>0</mirr_flags>
+            <mirr_vni>50</mirr_vni>
+        </vr_mirror_req>
+    </message>
+   <message>
+        <vr_mpls_req>
+            <h_op>Add</h_op>
+            <mr_label>48</mr_label>
+            <mr_nhid>21</mr_nhid>
+        </vr_mpls_req>
+        <return>0</return>
+    </message>
+    <message>
+        <vr_nexthop_req>
+            <h_op>Add</h_op>
+            <nhr_type>1</nhr_type>
+            <nhr_id>15</nhr_id>
+            <nhr_family>2</nhr_family>
+            <nhr_encap_oif_id>1</nhr_encap_oif_id>
+            <nhr_vrf>0</nhr_vrf>
+            <nhr_flags>257</nhr_flags>
+        </vr_nexthop_req>
+        <return>0</return>
+    </message>
+    <message>
+        <vr_route_req>
+            <h_op>Add</h_op>
+            <rtr_family>2</rtr_family>
+            <rtr_nh_id>15</rtr_nh_id>
+            <rtr_prefix>2:2:1:1</rtr_prefix>
+            <rtr_prefix_len>32</rtr_prefix_len>
+            <rtr_vrf_id>0</rtr_vrf_id>
+        </vr_route_req>
+        <return>0</return>
+    </message>
+
+    <message>
+        <vr_flow_req>
+            <fr_op>flow_set</fr_op>
+            <fr_flow_sip_l>72057594037927936</fr_flow_sip_l><!--00:00:00:00:00:00:00:01 -->
+            <fr_flow_sip_u>17221973885176569344</fr_flow_sip_u><!--00:DE:00:AD:00:BE:00:EF -->
+            <fr_flow_dip_l>144115188075855872</fr_flow_dip_l><!--00:00:00:00:00:00:00:02 -->
+            <fr_flow_dip_u>17221973885176569344</fr_flow_dip_u><!--00:DE:00:AD:00:BE:00:EF -->
+            <fr_family>10</fr_family>
+            <fr_index>-1</fr_index>
+            <fr_flags>8193</fr_flags>
+            <fr_extflags>2</fr_extflags>
+            <fr_flow_proto>17</fr_flow_proto>
+            <fr_flow_sport>108</fr_flow_sport>
+            <fr_flow_nh_id>21</fr_flow_nh_id>
+            <fr_action>2</fr_action>
+            <fr_flow_dport>1</fr_flow_dport>
+            <fr_mir_id>1</fr_mir_id>
+            <fr_pcap_meta_data>FF:DE:AD:DE:AD:FF</fr_pcap_meta_data>
+        </vr_flow_req>
+        <return>0</return>
+    </message>
+    <packet>
+        <pcap_input_file>../../pcaps/mirror_v6_src.pcap</pcap_input_file>
+        <pcap_expected_file>../../pcaps/mirror_v6_dst.pcap</pcap_expected_file>
+        <tx_interface>
+            <vif_index>1</vif_index>
+        </tx_interface>
+        <rx_interface>
+            <vif_index>3</vif_index>
+        </rx_interface>
+    </packet> 
+</test>
