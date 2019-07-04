@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2b5383ca_22beb974",
+        "filename": "utils/vtest/vt_message.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 142,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-04T14:00:12Z",
+      "side": 0,
+      "message": "Why is this removed?",
+      "revId": "36e77d907b9e89096f06a25f27558b213c3869ce",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
