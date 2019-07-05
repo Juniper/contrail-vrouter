@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6199ce90_e2d20beb",
+        "filename": "dp-core/vr_mirror.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 488,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-05T04:16:43Z",
+      "side": 1,
+      "message": "Can you use a #define for \u00272\u0027?",
+      "revId": "d05edc4f2388ed13fe38b1f5359b3522a06b166f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
