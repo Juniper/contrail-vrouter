@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "4b93f1eb_a10a7416",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 43,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-05T10:15:24Z",
+      "side": 1,
+      "message": "What is stats_cntr being used for? Can you add a comment in the beginning to explain it? When the first request is made, what the stats_cntr value is set to from CLI?",
+      "revId": "43057db6a932e0bfc3e10fd680d316cd28d90201",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a94c5ace_b502f9a6",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-05T10:15:24Z",
+      "side": 1,
+      "message": "What are these static variables being used for? Its very very hard to infer what are they being used for. Adding some comment will make it easier to read code.",
+      "revId": "43057db6a932e0bfc3e10fd680d316cd28d90201",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4eb95a11_0ab53b16",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-05T10:15:24Z",
+      "side": 1,
+      "message": "Why do you need to maintain a buf_prev_idx. Since you are using it maintain the old value of stats_cntr, this value can also be extracted from vdl_pkt_droplog_bufsz \u0026 vdl_pkt_droplog_stats_cntr.\nTowards the end in the code you are sending back both these values:\n           response-\u003evdl_pkt_droplog_bufsz \u003d pkt_buffer_size;\n           response-\u003evdl_pkt_droplog_stats_cntr \u003d stats_cntr;\n\nSo buf_prev_idx \u003d stats_cntr - pkt_buffer_size;",
+      "revId": "43057db6a932e0bfc3e10fd680d316cd28d90201",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1d431dc0_880d2658",
+        "filename": "dp-core/vr_pkt_droplog.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-05T10:15:24Z",
+      "side": 1,
+      "message": "You are not checking next index in the next line. Can you explain the logic for \nif(buf_cur_idx || buf_underflow) {\nand add comment.",
+      "revId": "43057db6a932e0bfc3e10fd680d316cd28d90201",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
