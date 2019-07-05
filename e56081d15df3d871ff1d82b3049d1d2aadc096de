@@ -52,6 +52,24 @@
       "revId": "e56081d15df3d871ff1d82b3049d1d2aadc096de",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8683ad4d_155158be",
+        "filename": "utils/vtest/include/vtest.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-07-05T11:20:46Z",
+      "side": 1,
+      "message": "I run all the test cases, it worked without any issues..(i.e) we have test cases with IPV4 address and it works fine.",
+      "parentUuid": "4e41654f_35675299",
+      "revId": "e56081d15df3d871ff1d82b3049d1d2aadc096de",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
