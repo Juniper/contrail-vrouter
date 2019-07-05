@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "587241ef_b96ea498",
+        "filename": "utils/vtest/include/vtest.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-05T09:39:59Z",
+      "side": 1,
+      "message": "Does this work -\n\nuint64_t htonll(uint64_t val) {\n    return (((uint64_t) htonl(val)) \u003c\u003c 32) + htonl(val \u003e\u003e 32);\n}\n\nuint64_t ntohll(uint64_t val) {\n    return (((uint64_t) ntohl(val)) \u003c\u003c 32) + ntohl(val \u003e\u003e 32);\n}",
+      "revId": "e56081d15df3d871ff1d82b3049d1d2aadc096de",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
