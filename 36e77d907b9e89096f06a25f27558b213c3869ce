@@ -16,6 +16,24 @@
       "revId": "36e77d907b9e89096f06a25f27558b213c3869ce",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "53859b38_f5434fe6",
+        "filename": "utils/vtest/vt_message.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 142,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-07-05T09:41:10Z",
+      "side": 0,
+      "message": "I tried by removing this code as a temporary workaround and it worked.\nhtonl does 32 bit conversion, so the configured values in xml getting lost here.\nFrom my understanding, they should not modify the \"req-\u003efr_flow_sip_l\" value. From the commit message of this change, I understand, they are trying to track multiple flows through this variable. Now I have changed to htonll which does 64 bit conversion.",
+      "parentUuid": "2b5383ca_22beb974",
+      "revId": "36e77d907b9e89096f06a25f27558b213c3869ce",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
