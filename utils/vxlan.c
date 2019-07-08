@@ -28,7 +28,7 @@ unsigned int dump_marker= 0;
 static int vxlan_vnid;
 static int vxlan_nh;
 
-static int create_set, delete_set, dump_set;
+static int create_set, delete_set, dump_set, sock_dir_set;
 static int get_set, nh_set, vnid_set;
 static int help_set, cmd_set;
 static int vxlan_op = -1;
@@ -111,6 +111,7 @@ enum opt_vxlan_index {
     GET_OPT_INDEX,
     HELP_OPT_INDEX,
     NEXTHOP_OPT_INDEX,
+    SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -122,6 +123,7 @@ static struct option long_options[] = {
     [GET_OPT_INDEX]         =       {"get",     required_argument,  &get_set,       1},
     [HELP_OPT_INDEX]        =       {"help",    no_argument,        &help_set,      1},
     [NEXTHOP_OPT_INDEX]     =       {"nh",      required_argument,  &nh_set,        1},
+    [SOCK_DIR_OPT_INDEX]    =       {"sock-dir",required_argument,  &sock_dir_set,  1},
     [MAX_OPT_INDEX]         =       { NULL,     0,                  0,              0},
 };
 
@@ -147,6 +149,7 @@ Usage(void)
     printf("\n");
     printf("--dump  Dumps the vxlan table\n");
     printf("--get   Dumps the entry corresponding to <vnid>\n");
+    printf("--sock-dir <netlink sock dir>\n");
     printf("--help  Prints this help message\n");
 
     exit(1);
@@ -196,6 +199,10 @@ parse_long_opts(int opt_index, char *opt_arg)
             usage_internal();
         break;
 
+    case SOCK_DIR_OPT_INDEX:
+        vr_socket_dir = opt_arg;
+        break;
+
     default:
         Usage();
         break;
@@ -227,10 +234,11 @@ validate_options(void)
 int main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    int proto = VR_NETLINK_PROTO_DEFAULT;
 
     vxlan_fill_nl_callbacks();
 
-    while ((opt = getopt_long(argc, argv, "bcdgn:l:",
+    while ((opt = getopt_long(argc, argv, "bcdgn:l:s:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':
@@ -275,6 +283,11 @@ int main(int argc, char *argv[])
                 vnid_set = 1;
                 break;
 
+            case 's':
+                sock_dir_set = 1;
+                parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+                break;
+
             case 0:
                 parse_long_opts(option_index, optarg);
                 break;
@@ -294,7 +307,10 @@ int main(int argc, char *argv[])
         printf("----------------\n");
     }
 
-    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (sock_dir_set)
+        proto = VR_NETLINK_PROTO_TEST;
+
+    cl = vr_get_nl_client(proto);
     if (!cl) {
         exit(1);
     }

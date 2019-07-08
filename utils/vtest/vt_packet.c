@@ -23,6 +23,9 @@
 
 #include "vt_packet.h"
 
+static int
+tx_rx_pcap_test(struct vtest *test);
+
 /**
  * vt_file_name_assign - assign relative file name by concatinating
  * test file directory and relative PCAP file name.
@@ -43,7 +46,13 @@ vt_fname_assign(struct vtest *test, char *fname, char *rel_name)
             if (test->file_name[i] == '/')
                 break;
         }
-        strncpy(fname, test->file_name, i);
+        /* If there is no '/' in path, use curr dir */
+        if (i == 0) {
+            strncpy(fname, "." , 1);
+            i++;
+        } else {
+            strncpy(fname, test->file_name, i);
+        }
         fname[i] = '/'; fname[i + 1] = '\0';
 
         /* Append relative file name. */
@@ -224,6 +233,9 @@ run_pcap_test(struct vtest *test) {
         } else {
             test->vtest_return = E_MAIN_TEST_PASS;
         }
+    } else {
+        test->vtest_return = E_MAIN_TEST_PASS;
+        ret = 0;
     }
 
     clean_vtest_struct_packet(test);
@@ -233,13 +245,8 @@ run_pcap_test(struct vtest *test) {
 
 
 /* TODO Multicast, return parameter */
-int
+static int
 tx_rx_pcap_test(struct vtest *test) {
-
-    if (!test) {
-        return E_PACKET_FARG_ERR;
-    }
-
     typedef enum {
         S_SEND,
         S_RECV,
@@ -247,32 +254,38 @@ tx_rx_pcap_test(struct vtest *test) {
         S_RECV_TIMEOUT
     } TX_RX_AUTOMATA_STATE;
 
+    char src_vif_ctrl_sock[UNIX_PATH_MAX] = {0};
+    char dst_vif_ctrl_sock[UNIX_PATH_MAX] = {0};
+
+    struct tx_rx_handler tx_rx_handler;
+    vhost_net_state rx_state = E_VHOST_NET_OK;
+    vhost_net_state tx_state = E_VHOST_NET_OK;
+
     /* Path variable */
 
     char pcap_dest[PATH_MAX] = {0};
+    bool send_only = false;
 
     snprintf(pcap_dest, PATH_MAX, "/tmp/dest_%u.pcap", (unsigned)(time(NULL)));
     strncpy(test->packet.pcap_dest_file, pcap_dest, strlen(pcap_dest));
 
-
-    char src_vif_ctrl_sock[UNIX_PATH_MAX] = {0};
-    char dst_vif_ctrl_sock[UNIX_PATH_MAX] = {0};
+    if (test->packet.pcap_ref_file[0] == '\0') {
+        send_only = true;
+    }
 
     snprintf(src_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
         vr_socket_dir, test->packet_tx.vif_id);
-    snprintf(dst_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
-        vr_socket_dir, test->packet_rx[0].vif_id);
-
-
-    struct tx_rx_handler tx_rx_handler;
-
-    vhost_net_state rx_state = E_VHOST_NET_OK;
-    vhost_net_state tx_state = E_VHOST_NET_OK;
+    if (!send_only) {
+        snprintf(dst_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
+                 vr_socket_dir, test->packet_rx[0].vif_id);
+    }
 
     memset(&tx_rx_handler, 0, sizeof(struct tx_rx_handler));
 
     tx_state = init_vhost_net(&tx_rx_handler.send_data, src_vif_ctrl_sock, 1);
-    rx_state = init_vhost_net(&tx_rx_handler.recv_data, dst_vif_ctrl_sock, 1);
+    if (!send_only) {
+        rx_state = init_vhost_net(&tx_rx_handler.recv_data, dst_vif_ctrl_sock, 1);
+    }
 
     if (tx_state != E_VHOST_NET_OK || rx_state != E_VHOST_NET_OK) {
         return E_PACKET_ERR;
@@ -323,7 +336,11 @@ tx_rx_pcap_test(struct vtest *test) {
                         tx_rx_handler.send_data->context,
                         (u_char *)tx_rx_handler.pkt_data,
                         (size_t *) &(tx_rx_handler.pkt_header->len)));
-            tx_rx_state = S_RECV;
+            if (!send_only) {
+                tx_rx_state = S_RECV;
+            } else {
+                usleep(100);
+            }
         } else if (tx_rx_state == S_RECV) {
             return_val_rx = (tx_rx_handler.recv_data->rx(
                         tx_rx_handler.recv_data->context,
@@ -364,7 +381,9 @@ tx_rx_pcap_test(struct vtest *test) {
     pcap_close(tx_rx_handler.pd);
     pcap_dump_close(tx_rx_handler.dumper);
     deinit_vhost_net(tx_rx_handler.send_data);
-    deinit_vhost_net(tx_rx_handler.recv_data);
+    if (!send_only) {
+        deinit_vhost_net(tx_rx_handler.recv_data);
+    }
 
     return E_PACKET_OK;
 }

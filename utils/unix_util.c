@@ -35,6 +35,8 @@
 #define VROUTER_GENETLINK_FAMILY_NAME      "vrouter"
 #define GENL_ID_VROUTER                    (NLMSG_MIN_TYPE + 0x10)
 
+int test_env = 0;
+
 const char *
 vr_table_map(int major, unsigned int table, const char *table_path, size_t size, void **mem)
 {
@@ -52,8 +54,10 @@ vr_table_map(int major, unsigned int table, const char *table_path, size_t size,
         return error_msg;
     }
 
-    if (platform != LINUX_PLATFORM) {
+    if ((platform != LINUX_PLATFORM) || test_env) {
         path = table_path;
+        if (test_env)
+            test_env = 0;
     } else {
         switch (table) {
         case VR_MEM_BRIDGE_TABLE_OBJECT:

@@ -27,7 +27,7 @@ static struct nl_client *cl;
 static bool dump_pending = false;
 static int dump_marker = -1;
 
-static int create_set, delete_set, dump_set;
+static int create_set, delete_set, dump_set, sock_dir_set;
 static int get_set, nh_set, mirror_set;
 static int dynamic_set, help_set, cmd_set, vni_set;
 static int mirror_op = -1, mirror_nh;
@@ -129,6 +129,7 @@ enum opt_mirror_index {
     NEXTHOP_OPT_INDEX,
     DYNAMIC_OPT_INDEX,
     VNI_OPT_INDEX,
+    SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -142,6 +143,7 @@ static struct option long_options[] = {
     [NEXTHOP_OPT_INDEX]     =       {"nh",      required_argument,  &nh_set,        1},
     [DYNAMIC_OPT_INDEX]     =       {"dyn",     no_argument,        &dynamic_set,   1},
     [VNI_OPT_INDEX]         =       {"vni",     required_argument,  &vni_set,       1},
+    [SOCK_DIR_OPT_INDEX]    =       {"sock-dir", required_argument, &sock_dir_set,  1},
     [MAX_OPT_INDEX]         =       { NULL,     0,                  0,              0},
 };
 
@@ -166,6 +168,7 @@ Usage(void)
     printf("\n");
     printf("--dump  Dumps the mirror table\n");
     printf("--get   Dumps the mirror entry corresponding to index <index>\n");
+    printf("--sock-dir  <netlink sock dir>\n");
     printf("--help  Prints this help message\n");
 
     exit(1);
@@ -227,6 +230,10 @@ parse_long_opts(int opt_index, char *opt_arg)
             usage_internal();
         break;
 
+    case SOCK_DIR_OPT_INDEX:
+        vr_socket_dir = opt_arg;
+        break;
+
     default:
         Usage();
         break;
@@ -258,10 +265,11 @@ validate_options(void)
 int main(int argc, char *argv[])
 {
     int ret, opt, option_index;
+    int proto = VR_NETLINK_PROTO_DEFAULT;
 
     mirror_fill_nl_callbacks();
 
-    while ((opt = getopt_long(argc, argv, "bcdgn:m:",
+    while ((opt = getopt_long(argc, argv, "bcdgn:m:s:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':
@@ -306,6 +314,11 @@ int main(int argc, char *argv[])
                 mirror_set = 1;
                 break;
 
+            case 's':
+                sock_dir_set = 1;
+                parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+                break;
+
             case 0:
                 parse_long_opts(option_index, optarg);
                 break;
@@ -327,7 +340,10 @@ int main(int argc, char *argv[])
         printf("------------------------------------------------\n");
     }
 
-    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (sock_dir_set)
+        proto = VR_NETLINK_PROTO_TEST;
+
+    cl = vr_get_nl_client(proto);
     if (!cl) {
         exit(1);
     }

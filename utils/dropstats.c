@@ -29,7 +29,7 @@
 #include "vr_packet.h"
 
 static struct nl_client *cl;
-static int help_set, core_set, offload_set, log_set, clear_set;
+static int help_set, core_set, offload_set, log_set, clear_set, sock_dir_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
 static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index);
@@ -231,6 +231,7 @@ enum opt_index {
     OFFL_OPT_INDEX,
     LOG_OPT_INDEX,
     CLEAR_OPT_INDEX,
+    SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -240,6 +241,7 @@ static struct option long_options[] = {
     [OFFL_OPT_INDEX]    =   {"offload", no_argument,        &offload_set,   1},
     [LOG_OPT_INDEX]     =   {"log",     required_argument,  &log_set,       1},
     [CLEAR_OPT_INDEX]   =   {"clear",   no_argument,        &clear_set,     1},
+    [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
@@ -250,6 +252,7 @@ Usage()
     printf("Usage: dropstats [--core|-c] <core number> %s\n\n",
             get_offload_enabled()?"[--offload|-o]":"");
     printf("--core <core number>\t Show statistics for a specified CPU core\n");
+    printf("--sock-dir <netlink socket dir>\n");
     if (get_offload_enabled()) {
         printf("--offload\t\t Show statistics for pkts offloaded on NIC\n");
         printf("\t\t\t (offload stats included if no flags given)\n");
@@ -292,6 +295,9 @@ parse_long_opts(int opt_index, char *opt_arg)
 	break;
     case CLEAR_OPT_INDEX:
         break;
+    case SOCK_DIR_OPT_INDEX:
+        vr_socket_dir = opt_arg;
+        break;
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -305,12 +311,13 @@ main(int argc, char *argv[])
 {
     char opt;
     int ret, option_index, log_core = 0, i = 0;
+    int proto = VR_NETLINK_PROTO_DEFAULT;
 
     dropstats_fill_nl_callbacks();
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "h:c:o:l:",
+    while (((opt = getopt_long(argc, argv, "h:c:o:l:s:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 'c':
@@ -328,6 +335,11 @@ main(int argc, char *argv[])
             parse_long_opts(LOG_OPT_INDEX, optarg);
             break;
 
+        case 's':
+            sock_dir_set = 1;
+            parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+            break;
+
         case 0:
             parse_long_opts(option_index, optarg);
             break;
@@ -338,7 +350,10 @@ main(int argc, char *argv[])
         }
     }
 
-    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+    if (sock_dir_set) {
+        proto = VR_NETLINK_PROTO_TEST;
+    }
+    cl = vr_get_nl_client(proto);
     if (!cl)
         return -1;
     

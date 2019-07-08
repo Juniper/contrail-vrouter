@@ -127,6 +127,45 @@ vt_post_process_message_expect(struct vtest *test) {
 
 }
 
+static void
+vt_post_process_write_response_xml(struct vtest *test)
+{
+    sandesh_info_t *sinfo = NULL;
+    int resp_index = test->messages.received_vrouter_msg->ptr_num;
+    int err = 0;
+    ThriftXMLProtocol xml_proto;
+    ThriftFileTransport file_transport;
+
+    if ((test->cli_opt.resp_file[0] == '\0') || (resp_index < 0)) {
+        return;
+    }
+
+    sinfo = vr_find_sandesh_info(test->messages.data[test->message_ptr_num].type);
+    if (!sinfo) {
+        fprintf(stderr, "Failed to find sandesh info for %s\n",
+                test->messages.data[test->message_ptr_num].type);
+        return;
+    }
+
+    fprintf(stdout, "Found sandesh info for %s\n", 
+            test->messages.data[test->message_ptr_num].type);
+
+    fprintf(stdout, "Write response to xml file %s\n", test->cli_opt.resp_file);
+    if (thrift_file_transport_init(&file_transport,
+                                   test->cli_opt.resp_file) < 0) {
+        fprintf(stderr, "Failed to open file %s\n", test->cli_opt.resp_file);
+        return;
+    }
+    thrift_protocol_init((ThriftProtocol *)&xml_proto, T_PROTOCOL_XML,
+                         (ThriftTransport *)&file_transport);
+    sinfo->write((void *)test->messages.received_vrouter_msg->\
+                 mem_handles[resp_index].mem, (ThriftProtocol *)&xml_proto, &err);
+    if (err != 0) {
+        fprintf(stderr, "Sandesh write returned error %d\n", err);
+    }
+    thrift_file_transport_close(&file_transport);
+}
+
 static int inline
 vt_post_process_message(struct vtest *test) {
 
@@ -168,6 +207,8 @@ vt_post_process_message(struct vtest *test) {
 
                 return ret;
             }
+            /* Write the response in XML file */
+            vt_post_process_write_response_xml(test);
         }
         tot_cnt--;
         test->message_ptr_num++;

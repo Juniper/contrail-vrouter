@@ -96,6 +96,7 @@ static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, drop_set;
+static int sock_dir_set;
 #ifdef _WIN32
 static int guid_set;
 #endif
@@ -1148,6 +1149,7 @@ Usage()
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate] [--get-drop-stats]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
     printf("\t   [--list][--core <core number>][--rate]\n");
+    printf("\t   [--sock-dir <sock dir>]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -1182,6 +1184,7 @@ enum if_opt_index {
 #ifdef _WIN32
     GUID_OPT_INDEX,
 #endif
+    SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -1213,6 +1216,7 @@ static struct option long_options[] = {
 #ifdef _WIN32
     [GUID_OPT_INDEX]        =   {"guid",        required_argument,  &guid_set,          1},
 #endif
+    [SOCK_DIR_OPT_INDEX]    =   {"sock-dir",    required_argument,  &sock_dir_set,      1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -1414,7 +1418,9 @@ parse_long_opts(int option_index, char *opt_arg)
             strcpy_s(vr_if_guid, 256, opt_arg);
             break;
 #endif
-
+        case SOCK_DIR_OPT_INDEX:
+            vr_socket_dir = opt_arg;
+            break;
         default:
             break;
     }
@@ -1430,6 +1436,14 @@ validate_options(void)
     for (i = 0; i < (sizeof(long_options) / sizeof(long_options[0])); i++) {
         if (long_options[i].flag)
             sum_opt += *(long_options[i].flag);
+    }
+
+    /*
+     * Reduce sum_opt by 1 so that rest of the validation logic doesn't take
+     * sock_dir_set into account
+     */
+    if (sock_dir_set) {
+        sum_opt -=1;
     }
 
     if (!sum_opt || help_set)
@@ -1709,7 +1723,7 @@ main(int argc, char *argv[])
     parse_ini_file();
     platform = get_platform();
 
-    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:T:v:p:C:DPi:",
+    while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:T:v:p:C:DPi:s:",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
             case 'a':
@@ -1787,7 +1801,10 @@ main(int argc, char *argv[])
                 core_set = 1;
                 parse_long_opts(CORE_OPT_INDEX, optarg);
                 break;
-
+            case 's':
+                sock_dir_set = 1;
+                parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+                break;
             case 0:
                 parse_long_opts(option_index, optarg);
                 break;
@@ -1805,6 +1822,10 @@ main(int argc, char *argv[])
     if (create_set)
         sock_proto = NETLINK_ROUTE;
 #endif
+
+    if (sock_dir_set) {
+        sock_proto = VR_NETLINK_PROTO_TEST;
+    }
     cl = vr_get_nl_client(sock_proto);
     if (!cl) {
         printf("Error registering NetLink client: %s (%d)\n",
