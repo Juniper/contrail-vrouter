@@ -40,6 +40,8 @@
 #include "vr_mem.h"
 #include "vrouter.h"
 
+extern int test_env;
+
 static struct nl_client *cl;
 static int resp_code;
 
@@ -50,7 +52,7 @@ static bool cmd_trap_set = false;
 static bool cmd_flood_set = false;
 
 static int cmd_set, dump_set, get_set, monitor_set;
-static int family_set, help_set, vrf_set;
+static int family_set, help_set, vrf_set, sock_dir_set;
 static int cust_flags;
 
 static int cmd_prefix_set;
@@ -678,6 +680,7 @@ enum opt_flow_index {
     GET_OPT_INDEX,
     VRF_OPT_INDEX,
     HELP_OPT_INDEX,
+    SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -689,6 +692,7 @@ static struct option long_options[] = {
     [GET_OPT_INDEX]           = {"get",     required_argument, &get_set,     1},
     [VRF_OPT_INDEX]           = {"vrf",     required_argument, &vrf_set,     1},
     [HELP_OPT_INDEX]          = {"help",    no_argument,       &help_set,    1},
+    [SOCK_DIR_OPT_INDEX]      = {"sock-dir", required_argument, &sock_dir_set, 1},
     [MAX_OPT_INDEX]           = { NULL,     0,                 0,            0},
 };
 
@@ -704,6 +708,7 @@ Usage(void)
     printf("--family  Optional family specification to --dump command\n");
     printf("          Specification should be one of \"inet\" or \"bridge\"\n");
     printf("--monitor Watch for netlink broadcasted messages\n");
+    printf("--sock-dir <netlink sock dir>\n");
     printf("--help    Prints this help message\n");
 
     exit(1);
@@ -753,6 +758,9 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
     case MONITOR_OPT_INDEX:
         monitor = 1;
             break;
+    case SOCK_DIR_OPT_INDEX:
+        vr_socket_dir = opt_arg;
+        break;
 
     case HELP_OPT_INDEX:
     default:
@@ -769,6 +777,7 @@ main(int argc, char *argv[])
     int opt;
     int option_index;
     struct ether_addr *cmd_eth;
+    int proto = VR_NETLINK_PROTO_DEFAULT;
 
     rt_fill_nl_callbacks();
 
@@ -776,7 +785,7 @@ main(int argc, char *argv[])
     cmd_label = -1;
     cmd_family_id = AF_INET;
 
-    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:r:Fx:",
+    while ((opt = getopt_long(argc, argv, "TcdbmPn:p:l:v:t:s:e:f:u:r:Fx:",
                     long_options, &option_index)) >= 0) {
             switch (opt) {
             case 'c':
@@ -871,6 +880,10 @@ main(int argc, char *argv[])
             case 'x':
                 cust_flags = strtoul(optarg, NULL, 16);
                 break;
+            case 'u':
+                sock_dir_set = 1;
+                parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+                break;
             case 0:
                 parse_long_opts(option_index, optarg);
                 break;
@@ -883,7 +896,13 @@ main(int argc, char *argv[])
     }
 
     validate_options();
-    cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
+
+    if (sock_dir_set) {
+        test_env = 1;
+        proto = VR_NETLINK_PROTO_TEST;
+    }
+
+    cl = vr_get_nl_client(proto);
     if (!cl) {
         exit(1);
     }

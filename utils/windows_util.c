@@ -19,6 +19,8 @@ const LPCTSTR KSYNC_PATH = TEXT("\\\\.\\vrouterKsync");
 const LPCTSTR FLOW_PATH  = TEXT("\\\\.\\vrouterFlow");
 const LPCTSTR BRIDGE_PATH  = TEXT("\\\\.\\vrouterBridge");
 
+int test_env = 0;
+
 static DWORD
 print_and_get_error_code()
 {

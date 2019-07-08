@@ -397,8 +397,10 @@ if sys.platform != 'darwin':
     sandesh_lib = [
         'protocol/thrift_binary_protocol.c',
         'protocol/thrift_protocol.c',
+        'protocol/thrift_xml_protocol.c',
         'sandesh.c',
         'transport/thrift_fake_transport.c',
+        'transport/thrift_file_transport.c',
         'transport/thrift_memory_buffer.c',
         ]
     for src in sandesh_lib:
