@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "764ad914_c905f65d",
+        "filename": "utils/nh.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 750,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-09T10:39:22Z",
+      "side": 1,
+      "message": "This would violate semantics of zero_opt. A better way is to remove \"\u0026opt[SOCK_DIR_OPT_IND]\" in long_options and use a stack variable like \u0026sock_dir_set. Then remove this zero_opt setting here.\n\nAlternatively, just call opt_set(SOCK_DIR_OPT_IND) in the begining of validate_options()",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "909e8946_f865fafd",
+        "filename": "utils/unix_util.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-09T10:39:22Z",
+      "side": 1,
+      "message": "This does not look good. Can you define wrapper functions for this?\n\nstatic bool vtest_env \u003d false;\n\nbool is_vtest_env()\n{\n    return vtest_env;\n}\n\nvoid set_vtest_env()\n{\n    vtest_env \u003d true;\n}\n\nIn the nl_util.h, you can define the prototypes for these.\nThe utils (mpls,nh,flow etc.) can just call set_vtest_env() if vr_socket_dir is set.\n\nYou can remove all the references of VR_NETLINK_PROTO_TEST and instead, add is_vtest_env() code in get_domain(), get_protocol(), get_type() etc. to return the appropriate value. \n\nThis method would be lot cleaner and less confusing.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f5f4e711_f2fb7304",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-09T10:39:22Z",
+      "side": 1,
+      "message": "Pl print the usage and do command-line validation.\nUse python\u0027s argparse library",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3e71e52a_bef2ebd8",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-09T10:39:22Z",
+      "side": 1,
+      "message": "Pl add checks to see if they are set. If not, throw a meaningful error",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "86c9841a_aeb466d7",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-09T10:39:22Z",
+      "side": 1,
+      "message": "Pl add a comment on why it\u0027s 2.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
