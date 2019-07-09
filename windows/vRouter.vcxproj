@@ -132,8 +132,10 @@
     <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c" />
     <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_binary_protocol.c" />
     <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_xml_protocol.c" />
     <ClCompile Include="..\..\build\kbuild\sandesh\library\c\sandesh.c" />
     <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_file_transport.c" />
     <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c" />
     <ClCompile Include="..\dp-core\vrouter.c" />
     <ClCompile Include="..\dp-core\vr_bitmap.c" />

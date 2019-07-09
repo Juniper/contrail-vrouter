@@ -27,8 +27,10 @@ SRCS += vr_types.c
 SRCS += sandesh.c \
 	thrift_protocol.c \
 	thrift_binary_protocol.c \
+	thrift_xml_protocol.c \
 	thrift_memory_buffer.c \
-	thrift_fake_transport.c
+	thrift_fake_transport.c \
+	thrift_file_transport.c
 
 SRCS += vr_message.c \
        vr_sandesh.c \

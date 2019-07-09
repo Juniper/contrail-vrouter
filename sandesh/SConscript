@@ -20,11 +20,15 @@ sandesh_protocol_sources = [
                     '#src/contrail-common/sandesh/library/c/protocol/thrift_binary_protocol.h',
                     '#src/contrail-common/sandesh/library/c/protocol/thrift_protocol.c',
                     '#src/contrail-common/sandesh/library/c/protocol/thrift_protocol.h',
+                    '#src/contrail-common/sandesh/library/c/protocol/thrift_xml_protocol.c',
+                    '#src/contrail-common/sandesh/library/c/protocol/thrift_xml_protocol.h',
                   ]
 
 sandesh_transport_sources = [
                     '#src/contrail-common/sandesh/library/c/transport/thrift_fake_transport.h',
                     '#src/contrail-common/sandesh/library/c/transport/thrift_fake_transport.c',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_file_transport.h',
+                    '#src/contrail-common/sandesh/library/c/transport/thrift_file_transport.c',
                     '#src/contrail-common/sandesh/library/c/transport/thrift_memory_buffer.c',
                     '#src/contrail-common/sandesh/library/c/transport/thrift_memory_buffer.h',
                     '#src/contrail-common/sandesh/library/c/transport/thrift_transport.h',
