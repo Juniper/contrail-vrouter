@@ -284,6 +284,74 @@
     },
     {
       "key": {
+        "uuid": "8ae6eca8_c32af3c8",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:53:29Z",
+      "side": 1,
+      "message": "Why do we need to do this os.environ assignment here? Why not in vtest constructor?\nThe test should just initialize vtest -\nvt \u003d vtest(\"test1\")",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7663b14f_e8f44ec1",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:53:29Z",
+      "side": 1,
+      "message": "Pl see if this works -\nmac_addr_str \u003d \"de:ad:be:ef:00:02\"\nvif.vifr_mac \u003d mac_addr_str.replace(\u0027:\u0027, \u0027\u0027).decode(\u0027hex\u0027)\n\nThis would be more friendly for others to use.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f1f927bd_80bd093d",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:53:29Z",
+      "side": 1,
+      "message": "Pl use the utility python class ipaddress here. It will help other test case writers who use this as an example.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "945bef71_a481c5c9",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:53:29Z",
+      "side": 1,
+      "message": "User has just 1 object to send. No need to put in list. Ref my comment in vtest_lib send_sandesh_req()",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "f2a0ec56_542edd5c",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -295,6 +363,24 @@
       "writtenOn": "2019-07-11T04:15:44Z",
       "side": 1,
       "message": "I didn\u0027t see any method to take a list of objects and generate xml and do a send in 1-shot. It would be very good to add that in the first commit itself.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d624ce60_9572504c",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:53:29Z",
+      "side": 1,
+      "message": "Ignore this. I see you have addressed it.",
+      "parentUuid": "f2a0ec56_542edd5c",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -482,6 +568,23 @@
       "writtenOn": "2019-07-10T11:02:52Z",
       "side": 1,
       "message": "put try/except for all usages of wrpcap",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ae86fe02_99c03737",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 247,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:53:29Z",
+      "side": 1,
+      "message": "Pl dont enforce to use a list always. You can use python\u0027s isinstance() method to check if the parameter is list or not. If its a list, iterate and write xml. If not, just write xml.\n\nIf the user has just 1 object to send, he can send as-is without putting it in a list.",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
