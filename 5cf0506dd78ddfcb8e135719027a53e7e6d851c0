@@ -94,6 +94,23 @@
     },
     {
       "key": {
+        "uuid": "e4b88e6c_303cd241",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 501,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T03:53:18Z",
+      "side": 1,
+      "message": "No need of this variable. In the below switch statement, you can just do:\nswitch(atoi(size)\u003e\u003e3)\n{\n    ...\n}",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "3c55484c_89b97313",
         "filename": "utils/vtest/sandesh_gen.c",
         "patchSetId": 3
