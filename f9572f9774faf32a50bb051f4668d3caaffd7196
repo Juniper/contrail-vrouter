@@ -527,6 +527,24 @@
     },
     {
       "key": {
+        "uuid": "d0a9dfb4_0799e333",
+        "filename": "utils/vtest/vtest_py/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "Can you point out those errors where flake can\u0027t be avoided?",
+      "parentUuid": "d2d2d416_ad0c73de",
+      "revId": "f9572f9774faf32a50bb051f4668d3caaffd7196",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1f485f77_a39dda67",
         "filename": "utils/vtest/vtest_py/vtest_lib.py",
         "patchSetId": 1

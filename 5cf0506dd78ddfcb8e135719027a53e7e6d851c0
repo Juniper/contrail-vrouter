@@ -163,6 +163,24 @@
     },
     {
       "key": {
+        "uuid": "d57fe9bd_036bf408",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 568,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "Ofcourse there will be no warning since you are doing an explicit cast. Compiler will think that you know what you are doing!! :-)",
+      "parentUuid": "82e3a445_bb863833",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "71f71fd0_d8219ec2",
         "filename": "utils/vtest_py/SConscript",
         "patchSetId": 3
@@ -266,6 +284,23 @@
     },
     {
       "key": {
+        "uuid": "f2a0ec56_542edd5c",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "I didn\u0027t see any method to take a list of objects and generate xml and do a send in 1-shot. It would be very good to add that in the first commit itself.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "19dfc5a0_a30aca9f",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -283,6 +318,23 @@
     },
     {
       "key": {
+        "uuid": "9c20d810_9a472894",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "This raises an oserror exception I think. Check and handle.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "86c9841a_aeb466d7",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -294,6 +346,108 @@
       "writtenOn": "2019-07-09T10:39:22Z",
       "side": 1,
       "message": "Pl add a comment on why it\u0027s 2.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "35835e3f_441d3270",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "This too raises an oserror exception I think. Check and handle.",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "19fcd65d_a46013c2",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 130,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "Do you need to define vtest_binary_path and socket_dir?",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "268bc6ad_9d87c5e9",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 143,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "This raises ioexception",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c557dfaa_168558f2",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "This raises oserror exception",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "93c379e4_20b46210",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 146,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "Does this need to be static method?",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0f862107_67581b4c",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 156,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T04:15:44Z",
+      "side": 1,
+      "message": "Ref prev comment on changing this to factory method",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
