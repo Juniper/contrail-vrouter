@@ -217,6 +217,24 @@
     },
     {
       "key": {
+        "uuid": "853e91e6_940dd56b",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 568,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-11T05:31:03Z",
+      "side": 1,
+      "message": ":-)\n\n[anandrao@nodem1 ~]$ cat test_prog.c\n\n#include \u003cstdio.h\u003e\n#include \u003cstdlib.h\u003e\n\nint main (int argc, char *argv[])\n{\n    unsigned char *tmp_list \u003d NULL;\n    tmp_list \u003d (unsigned char *) calloc(1, 2);\n    tmp_list[0] \u003d (unsigned short) 0xabcd;\n    printf(\"val \u003d %x %x\\n\", tmp_list[0], tmp_list[1]);\n    return 0;\n}\n\n[anandrao@nodem1 ~]$ gcc test_prog.c -o test_prog\ntest_prog.c: In function ‘main’:\ntest_prog.c:9:5: warning: large integer implicitly truncated to unsigned type [-Woverflow]\n     tmp_list[0] \u003d (unsigned short) 0xabcd;\n     ^",
+      "parentUuid": "5444be03_3636abdc",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "71f71fd0_d8219ec2",
         "filename": "utils/vtest_py/SConscript",
         "patchSetId": 3
@@ -283,6 +301,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "013c0d0e_a296e2d3",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-11T05:31:03Z",
+      "side": 1,
+      "message": "This is a bash script, not python script",
+      "parentUuid": "605adbec_c098bc84",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
