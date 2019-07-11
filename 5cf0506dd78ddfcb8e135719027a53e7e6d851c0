@@ -270,6 +270,24 @@
     },
     {
       "key": {
+        "uuid": "0148d4cb_0f2b969f",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 3
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "I was thinking this can be done -\n\ndef copy_dir(target, source, env):\n    shutil.rmtree(...)\n    shutil.copytree(...)\n\nenv.Command(\"copy_pysandesh\", [], copy_dir...)\n\nHow is this different from calling an external file?",
+      "parentUuid": "6c7fdbc9_e902648c",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "44d3d830_baa5e756",
         "filename": "utils/vtest_py/copy_dir.py",
         "patchSetId": 3
@@ -428,6 +446,24 @@
     },
     {
       "key": {
+        "uuid": "2289d5c2_f9193ca0",
+        "filename": "utils/vtest_py/setup_venv.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "For the sake of completeness. Will leave it upto you.",
+      "parentUuid": "647a0b4f_76222ecc",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8ae6eca8_c32af3c8",
         "filename": "utils/vtest_py/tests/test1.py",
         "patchSetId": 3
@@ -463,6 +499,24 @@
     },
     {
       "key": {
+        "uuid": "ca7e92aa_2d21ac05",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "There are ways to solve this. You can have a vtest_base class. But lets not put this env variable in every test case. User should just initialize the vtest with the name.",
+      "parentUuid": "c9612b78_1a0e4fd9",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7663b14f_e8f44ec1",
         "filename": "utils/vtest_py/tests/test1.py",
         "patchSetId": 3
@@ -492,6 +546,24 @@
       "side": 1,
       "message": "Am I missing something? The one line assignment is more simpler.",
       "parentUuid": "7663b14f_e8f44ec1",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3f004a29_a3cbbb7a",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "Users would prefer natural way of writing mac addresses.\nyou can write a function mac_bytes() which takes a string representation of mac address and give the list. Will leave it upto you to implement.",
+      "parentUuid": "500b1c2b_efa7a3b2",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -585,6 +657,24 @@
     },
     {
       "key": {
+        "uuid": "19829005_21afdd92",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "2bed3d78_70a8734a",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "19dfc5a0_a30aca9f",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -631,6 +721,24 @@
       "side": 1,
       "message": "If exception is raised, this is a serious problem.\nBetter to terminate the processing rather than handling the exception?",
       "parentUuid": "9c20d810_9a472894",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "488a8289_2c68ce40",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "Sure, you can display a suitable error and terminate using exit() call",
+      "parentUuid": "bd70d573_632d8197",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -723,6 +831,24 @@
     },
     {
       "key": {
+        "uuid": "4d7277b9_b8a01987",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 143,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "Would be good to catch the exception and report it to user.",
+      "parentUuid": "5ca8a903_e9cbd7a1",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "c557dfaa_168558f2",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -769,6 +895,24 @@
       "side": 1,
       "message": "No, because we are referring and modifying an instance variable.",
       "parentUuid": "93c379e4_20b46210",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "832b7e12_fd793c81",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 146,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "abefbc16_e4f2b687",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
@@ -838,6 +982,24 @@
       "side": 1,
       "message": "Do you know what exception is raised by wrpcap? Not able to find it.",
       "parentUuid": "af8dfff6_4f505ab5",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "520576c1_1a18bc03",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 183,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-11T06:54:49Z",
+      "side": 1,
+      "message": "Check -\nhttps://stackoverflow.com/questions/28736188/python-supress-warnings-while-creating-a-empty-pcap-file-with-scapy\n\nYou can add it just to be safe",
+      "parentUuid": "ac86bcf6_bf1024e8",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
