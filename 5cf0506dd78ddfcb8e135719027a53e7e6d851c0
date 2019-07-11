@@ -181,6 +181,24 @@
     },
     {
       "key": {
+        "uuid": "8e544047_c2ddaf1e",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 568,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-11T05:14:23Z",
+      "side": 1,
+      "message": "No, even with explicit cast, compiler should report the warning.\nHeres the output from my test prog.\n\ngcc test_prog.c -o test_prog\ntest_prog.c: In function ‘main’:\ntest_prog.c:9:5: warning: large integer implicitly truncated to unsigned type [-Woverflow]\n     tmp_list[0] \u003d (unsigned short) 0xabcd;\n     ^",
+      "parentUuid": "d57fe9bd_036bf408",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "71f71fd0_d8219ec2",
         "filename": "utils/vtest_py/SConscript",
         "patchSetId": 3
