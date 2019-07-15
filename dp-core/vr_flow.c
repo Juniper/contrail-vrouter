@@ -826,7 +826,7 @@ vr_flow_update_ecmp_index(struct vrouter *router, struct vr_flow_entry *fe,
 }
 
 static flow_result_t
-vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
+vr_flow_action_default(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
@@ -938,6 +938,65 @@ res:
     return result;
 }
 
+static struct vr_interface*
+vr_get_hbf_left_vif(struct vrouter *router)
+{
+    return vif_find(router, "tap1589a2b3-22");
+}
+
+static struct vr_interface*
+vr_get_hbf_right_vif(struct vrouter *router)
+{
+    return vif_find(router, "tap8b05a86b-36");
+}
+
+static bool
+vr_is_hbf_left_vif(char* name)
+{
+    return (strcmp(name, "tap1589a2b3-22") == 0);
+}
+
+static bool
+vr_is_hbf_right_vif(char* name)
+{
+    return (strcmp(name, "tap8b05a86b-36") == 0);
+}
+
+static flow_result_t
+vr_flow_action_hbf(struct vrouter *router, struct vr_flow_entry *fe,
+        unsigned int index, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    if (vif_is_virtual(pkt->vp_if)) {
+        /* Src is vmi, encode flow in src_mac and send to hbf-l */
+        struct vr_interface *hbf_l = vr_get_hbf_left_vif(router);
+        if (hbf_l) {
+            struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
+            uint32_t *index_ptr = (uint32_t*)eth->eth_smac;
+            *index_ptr = htonl(index);
+            pkt->vp_if = hbf_l;
+            hbf_l->vif_tx(hbf_l, pkt, fmd);
+            
+        }
+        return FLOW_HELD;
+    } else if (vif_is_fabric(pkt->vp_if)) {
+        /* Src is fabric, encode flow in dst_mac and send to hbf-r */
+        return FLOW_FORWARD;
+    }
+    return FLOW_FORWARD;
+}
+
+static flow_result_t
+vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
+        unsigned int index, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    flow_result_t ret;
+    if ((ret = vr_flow_action_hbf(router, fe, index, pkt, fmd)) == FLOW_HELD){
+        return ret;
+    }
+    return vr_flow_action_default(router, fe, index, pkt, fmd);
+}
 
 unsigned int
 vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
@@ -1647,12 +1706,51 @@ vr_do_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     return result;
 }
 
+static void
+vr_reinit_forwarding_md(struct vrouter *router, struct vr_packet *pkt, 
+                        struct vr_flow_entry *fe, uint32_t flow_index,
+                        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
+{
+    fmd->fmd_dvrf = nh->nh_dev->vif_vrf;
+    fmd->fmd_vlan = 0;
+    fmd->fmd_dotonep = -1;
+    vr_flow_set_forwarding_md(router, fe, flow_index, fmd);
+}
+
 bool
 vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
     flow_result_t result = FLOW_FORWARD;
 
+    if (vr_is_hbf_right_vif(pkt->vp_if->vif_name)) {
+        /* Pkt coming out of hbf-r */
+        /* restore smac from flow_index and continue
+         * flow action
+         */ 
+        struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
+        unsigned int flow_index = ntohl(*(uint32_t*)eth->eth_smac);  
+        uint32_t nh_id;
+        struct vr_flow_entry *fe = NULL;
+        if (vr_htable_get_hentry_by_index(router->vr_flow_table, flow_index)) {
+            struct vr_nexthop *nh;
+            fe = CONTAINER_OF(
+                           fe_hentry, 
+                           struct vr_flow_entry,
+                           vr_htable_get_hentry_by_index(
+                                router->vr_flow_table, flow_index)
+                             );
+            nh_id = fe->fe_key.flow_nh_id;
+            nh = vrouter_get_nexthop(0, nh_id);
+            vr_reinit_forwarding_md(router, pkt, fe, flow_index, nh, fmd);
+            pkt->vp_if = nh->nh_dev;
+            memcpy(eth->eth_smac, nh->nh_data, VR_ETHER_ALEN);
+            result = vr_flow_action_default(router, fe, flow_index, pkt, fmd);
+            return __vr_flow_forward(result, pkt, fmd);
+        }
+    } else if (vr_is_hbf_right_vif(pkt->vp_if->vif_name)) {
+        /* Pkt coming out of hbf-l */
+    }
     if ((!(pkt->vp_flags & VP_FLAG_MULTICAST))
         && ((fmd->fmd_vlan == VLAN_ID_INVALID) || vif_is_service(pkt->vp_if)))
         result = vr_do_flow_lookup(router, pkt, fmd);
