@@ -28,6 +28,7 @@
 #include "vr_nexthop.h"
 #include "vr_os.h"
 #include "nl_util.h"
+#include "ini_parser.h"
 
 static int8_t src_mac[6], dst_mac[6], l3_vxlan_mac[6];
 static uint16_t sport, dport;
@@ -547,6 +548,7 @@ usage()
            "       nh --help\n\n"
            "--list Lists All Nexthops\n"
            "--get  <nh_id> Displays nexthop corresponding to <nh_id>\n"
+           "--sock-dir <netlink sock dir>\n"
            "--help Displays this help message\n\n");
 
     exit(-EINVAL);
@@ -588,6 +590,7 @@ enum opt_index {
     ROOT_OPT_IND,
     ML_OPT_IND,
     HLP_OPT_IND,
+    SOCK_DIR_OPT_IND,
     MAX_OPT_IND
 };
 
@@ -643,6 +646,7 @@ static struct option long_options[] = {
     [ROOT_OPT_IND]      = {"root",  no_argument,        &opt[ROOT_OPT_IND],     1},
     [ML_OPT_IND]        = {"ml",    no_argument,        &opt[ML_OPT_IND],       1},
     [HLP_OPT_IND]       = {"help",  no_argument,        &opt[HLP_OPT_IND],      1},
+    [SOCK_DIR_OPT_IND]  = {"sock-dir", required_argument, &opt[SOCK_DIR_OPT_IND], 1},
     [MAX_OPT_IND]       = { NULL,   0,                  0,                      0}
 };
 
@@ -742,6 +746,9 @@ parse_long_opts(int ind, char *opt_arg)
             memcpy(l3_vxlan_mac, mac, sizeof(l3_vxlan_mac));
         else
             cmd_usage();
+        break;
+    case SOCK_DIR_OPT_IND:
+        vr_socket_dir = opt_arg;
         break;
     }
 
@@ -949,6 +956,9 @@ main(int argc, char *argv[])
         }
     }
 
+    if (opt_set(SOCK_DIR_OPT_IND)) {
+        set_platform_vtest();
+    }
     validate_options();
 
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
