@@ -169,15 +169,20 @@ vt_gen_op(unsigned char *string)
     if (!string)
         return -1;
 
-    if (!strncasecmp(string, "Add", strlen("Add"))) {
+    if (!strncasecmp(string, "Add", strlen("Add")) ||
+        !strncasecmp(string, "0", strlen("0"))) {
         return SANDESH_OP_ADD;
-    } else if (!strncasecmp(string, "Get", strlen("Get"))) {
+    } else if (!strncasecmp(string, "Get", strlen("Get")) ||
+               !strncasecmp(string, "1", strlen("1"))) {
         return SANDESH_OP_GET;
-    } else if (!strncasecmp(string, "Delete", strlen("Delete"))) {
+    } else if (!strncasecmp(string, "Delete", strlen("Delete")) ||
+               !strncasecmp(string, "2", strlen("2"))) {
         return SANDESH_OP_DEL;
-    } else if (!strncasecmp(string, "Dump", strlen("Dump"))) {
+    } else if (!strncasecmp(string, "Dump", strlen("Dump")) ||
+               !strncasecmp(string, "3", strlen("3"))) {
         return SANDESH_OP_DUMP;
-    } else if (!strncasecmp(string, "Reset", strlen("Reset"))) {
+    } else if (!strncasecmp(string, "Reset", strlen("Reset")) ||
+               !strncasecmp(string, "5", strlen("5"))) {
         return SANDESH_OP_RESET;
     }
 

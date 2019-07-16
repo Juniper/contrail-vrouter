@@ -55,7 +55,7 @@
 
 static int mem_fd;
 
-static int dvrf_set, mir_set, show_evicted_set;
+static int dvrf_set, mir_set, show_evicted_set, sock_dir_set;
 static int help_set, match_set, get_set, force_evict_set;
 static unsigned short dvrf;
 static int list, flow_cmd, mirror = -1;
@@ -134,7 +134,6 @@ vr_flow_req flow_req;
 vr_flow_table_data ftable;
 static struct flow_md flow_md_mem[MAX_FLOWS];
 static int array_index;
-
 
 static void flow_dump_nexthop(vr_nexthop_req *, vr_interface_req *,
         char *, bool);
@@ -1842,30 +1841,21 @@ flow_table_get(void)
 static int
 flow_table_setup(void)
 {
-    int ret;
+    int ret = 0;
 
-#ifndef _WIN32
-    cl = nl_register_client();
-    if (!cl)
-        return -ENOMEM;
+    if (sock_dir_set) {
+        set_platform_vtest();
+    }
 
-    parse_ini_file();
-    ret = nl_socket(cl, get_domain(), get_type(), get_protocol());
-    if (ret <= 0)
-        return ret;
-
-    ret = nl_connect(cl, get_ip(), get_port());
-    if (ret < 0)
-        return ret;
-#else
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
     if (cl == NULL)
         return -ENOMEM;
-#endif
 
-    ret = vrouter_obtain_family_id(cl);
-    if (ret <= 0)
-        return ret;
+    if (get_platform() != VTEST_PLATFORM) {
+        ret = vrouter_obtain_family_id(cl);
+        if (ret <= 0)
+            return ret;
+    }
 
     cl->cl_buf_offset = 0;
     return ret;
@@ -2177,6 +2167,7 @@ Usage(void)
     printf("           [-d flow_index]\n");
     printf("           [-i flow_index]\n");
     printf("           [-e flow_index]\n");
+    printf("           [--sock-dir <netlink socket dir>\n");
     printf("           [--mirror=mirror table index]\n");
     printf("           [--match \"match_string\"\n");
     printf("           [-l]\n");
@@ -2222,6 +2213,7 @@ enum opt_flow_index {
     MATCH_OPT_INDEX,
     HELP_OPT_INDEX,
     FORCE_EVICT_OPT_INDEX,
+    SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -2233,6 +2225,7 @@ static struct option long_options[] = {
     [MATCH_OPT_INDEX]           = {"match",         required_argument, &match_set,          1},
     [HELP_OPT_INDEX]            = {"help",          no_argument,       &help_set,           1},
     [FORCE_EVICT_OPT_INDEX]     = {"force-evict",   required_argument, &force_evict_set,    1},
+    [SOCK_DIR_OPT_INDEX]        = {"sock-dir",      required_argument, &sock_dir_set,       1},
     [MAX_OPT_INDEX]             = { NULL,           0,                 0,                   0}
 };
 
@@ -2532,6 +2525,10 @@ parse_long_opts(int opt_flow_index, char *opt_arg)
         flow_cmd = 'e';
         break;
 
+    case SOCK_DIR_OPT_INDEX:
+        vr_socket_dir = opt_arg;
+        break;
+
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -2549,7 +2546,7 @@ main(int argc, char *argv[])
 
     flow_fill_nl_callbacks();
 
-    while ((opt = getopt_long(argc, argv, "d:f:g:i:e:p:b:lrsF",
+    while ((opt = getopt_long(argc, argv, "d:f:g:i:e:p:u:b:lrsF",
                     long_options, &option_index)) >= 0) {
         switch (opt) {
         case 'f':
@@ -2596,6 +2593,10 @@ main(int argc, char *argv[])
                         MAX_FLOW_NL_MSG_BUNCH);
                 bunch = MAX_FLOW_NL_MSG_BUNCH;
             }
+            break;
+        case 'u':
+            sock_dir_set = 1;
+            parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
             break;
 
         case 0:
