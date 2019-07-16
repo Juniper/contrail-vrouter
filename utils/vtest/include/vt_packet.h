@@ -67,8 +67,6 @@ typedef int (*tx_rx_automata_handler)(struct tx_rx_handler *);
 
 
 int run_pcap_test(struct vtest *);
-int tx_rx_pcap_test(struct vtest *test);
-
 
 #endif
 
