@@ -23,6 +23,25 @@
 static char value[BUF_LENGTH];
 static char *ini_data = NULL;
 static char ini_file[] = "/etc/contrail/contrail-vrouter-agent.conf";
+static bool platform_vtest = false;
+
+/*
+ * API to set plafform as vtest; Used in vtest UT executions
+ */
+void
+set_platform_vtest (void)
+{
+    platform_vtest = true;
+}
+
+/*
+ * API to check if platform is vtest
+ */
+bool
+platform_is_vtest (void)
+{
+    return platform_vtest;
+}
 
 static void
 copy_line(char *buffer, const char *line, uint32_t *index)
@@ -184,6 +203,9 @@ get_domain(void)
         return AF_UNIX;
 #endif
     }
+    if (platform_is_vtest()) {
+        return AF_UNIX;
+    }
     return AF_NETLINK;
 }
 
@@ -194,6 +216,9 @@ get_type(void)
     if (platform &&
         (strcmp(platform, PLATFORM_DPDK) == 0 ||
          strcmp(platform, PLATFORM_NIC) == 0)) {
+        return SOCK_STREAM;
+    }
+    if (platform_is_vtest()) {
         return SOCK_STREAM;
     }
     return SOCK_DGRAM;
@@ -226,6 +251,9 @@ get_protocol(void)
          strcmp(platform, PLATFORM_NIC) == 0)) {
         return 0;
     }
+    if (platform_is_vtest()) {
+        return 0;
+    }
     return NETLINK_GENERIC;
 }
 
@@ -242,6 +270,9 @@ get_platform(void)
         else
             return LINUX_PLATFORM;
     }
+    if (platform_is_vtest()) {
+        return VTEST_PLATFORM;
+    }
 
     return LINUX_PLATFORM;
 }
@@ -249,6 +280,9 @@ get_platform(void)
 const char *
 get_platform_str(void)
 {
+    if (platform_is_vtest()) {
+        return PLATFORM_VTEST;
+    }
     return read_string(DEFAULT_SECTION, PLATFORM_KEY);
 }
 

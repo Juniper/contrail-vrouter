@@ -299,19 +299,6 @@ vr_get_nl_client(int proto)
     if (!cl)
         return NULL;
 
-    /* Do not use ini file if we are in a test mode. */
-    if (proto == VR_NETLINK_PROTO_TEST) {
-        ret = nl_socket(cl, AF_UNIX, SOCK_STREAM, 0);
-        if (ret <= 0)
-            goto fail;
-
-        ret = nl_connect(cl, get_ip(), vr_netlink_port);
-        if (ret < 0)
-            goto fail;
-
-        return cl;
-    }
-
     parse_ini_file();
 
     if (proto == VR_NETLINK_PROTO_DEFAULT)
@@ -325,7 +312,7 @@ vr_get_nl_client(int proto)
     if (ret < 0)
         goto fail;
 
-    if ((proto == VR_NETLINK_PROTO_DEFAULT) &&
+    if ((get_platform() != VTEST_PLATFORM) &&
             (vrouter_obtain_family_id(cl) <= 0))
         goto fail;
 
