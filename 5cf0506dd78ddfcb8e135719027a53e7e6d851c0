@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "19e5e346_657a9042",
+        "filename": "utils/nh.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 750,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "I have changed the code now",
+      "parentUuid": "764ad914_c905f65d",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "909e8946_f865fafd",
         "filename": "utils/unix_util.c",
         "patchSetId": 3
@@ -54,6 +72,24 @@
     },
     {
       "key": {
+        "uuid": "3862e050_258c43ab",
+        "filename": "utils/unix_util.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "I have defined a new platform type for vtest and used it to cleanup this.",
+      "parentUuid": "bca4090a_d43bcf64",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "24ec92d0_aec8581a",
         "filename": "utils/unix_util.c",
         "patchSetId": 3
@@ -77,6 +113,30 @@
     },
     {
       "key": {
+        "uuid": "f6585ec3_92aa8296",
+        "filename": "utils/unix_util.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "I have cleaned this using the new platform type",
+      "parentUuid": "24ec92d0_aec8581a",
+      "range": {
+        "startLine": 57,
+        "startChar": 37,
+        "endLine": 57,
+        "endChar": 38
+      },
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "8876408c_7bb3789d",
         "filename": "utils/vtest/sandesh_gen.c",
         "patchSetId": 3
@@ -91,6 +151,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6541f110_a0030ed4",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 204,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Sure",
+      "parentUuid": "8876408c_7bb3789d",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -125,6 +203,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5fc09dcc_86224dda",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 521,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Fixed",
+      "parentUuid": "3c55484c_89b97313",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -235,6 +331,24 @@
     },
     {
       "key": {
+        "uuid": "ce6fcc0d_1bf95e15",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 568,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "853e91e6_940dd56b",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "71f71fd0_d8219ec2",
         "filename": "utils/vtest_py/SConscript",
         "patchSetId": 3
@@ -282,6 +396,24 @@
       "side": 1,
       "message": "I was thinking this can be done -\n\ndef copy_dir(target, source, env):\n    shutil.rmtree(...)\n    shutil.copytree(...)\n\nenv.Command(\"copy_pysandesh\", [], copy_dir...)\n\nHow is this different from calling an external file?",
       "parentUuid": "6c7fdbc9_e902648c",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "af07e41f_82be73db",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 3
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "If it is external file, it gets called only in phase2 of scons processing i.e after sandesh library is generated. If we do it inline, it will happen in phase 1 of scons processing i.e before sandesh library is generated.",
+      "parentUuid": "0148d4cb_0f2b969f",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
@@ -394,6 +526,24 @@
     },
     {
       "key": {
+        "uuid": "b3b3ce1f_719669f8",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3101909f_6139aa19",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3e71e52a_bef2ebd8",
         "filename": "utils/vtest_py/run_test.sh",
         "patchSetId": 3
@@ -408,6 +558,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d8b648a2_ec15bf95",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3e71e52a_bef2ebd8",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -464,6 +632,24 @@
     },
     {
       "key": {
+        "uuid": "e0830549_33be595a",
+        "filename": "utils/vtest_py/setup_venv.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "As it is an internal script of infra and pretty straightforward, not adding anything more",
+      "parentUuid": "2289d5c2_f9193ca0",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "8ae6eca8_c32af3c8",
         "filename": "utils/vtest_py/tests/test1.py",
         "patchSetId": 3
@@ -511,6 +697,24 @@
       "side": 1,
       "message": "There are ways to solve this. You can have a vtest_base class. But lets not put this env variable in every test case. User should just initialize the vtest with the name.",
       "parentUuid": "c9612b78_1a0e4fd9",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ff97af0a_76e36d27",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Actually i am doing it for pytest fixtures, so moved this to vtest class as well",
+      "parentUuid": "ca7e92aa_2d21ac05",
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
@@ -570,6 +774,24 @@
     },
     {
       "key": {
+        "uuid": "f9d811ed_e57f6467",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "It is a matter of style. I prefer the one liner. Will go with it :-)",
+      "parentUuid": "3f004a29_a3cbbb7a",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "f1f927bd_80bd093d",
         "filename": "utils/vtest_py/tests/test1.py",
         "patchSetId": 3
@@ -587,6 +809,24 @@
     },
     {
       "key": {
+        "uuid": "0a57b239_fe08f2f0",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "We need python3 for this. Right now venv has 2.7.5 which doesn\u0027t support ipaddress.\nWe can do this when we move to python3.",
+      "parentUuid": "f1f927bd_80bd093d",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "945bef71_a481c5c9",
         "filename": "utils/vtest_py/tests/test1.py",
         "patchSetId": 3
@@ -601,6 +841,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "20385679_9c43c27a",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "945bef71_a481c5c9",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -692,6 +950,24 @@
     },
     {
       "key": {
+        "uuid": "d09286a4_b1edf8a9",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "19dfc5a0_a30aca9f",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9c20d810_9a472894",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -745,6 +1021,24 @@
     },
     {
       "key": {
+        "uuid": "3fba0fbb_07698582",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "The python exception traceback has enough details to display the error.\nNothing more is required.",
+      "parentUuid": "488a8289_2c68ce40",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "86c9841a_aeb466d7",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -759,6 +1053,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "40e47833_c31175c7",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "86c9841a_aeb466d7",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -779,6 +1091,24 @@
     },
     {
       "key": {
+        "uuid": "f32af033_d962fd44",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "35835e3f_441d3270",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "19fcd65d_a46013c2",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -793,6 +1123,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "562bb8ba_e98ad476",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 130,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Just for completeness sake",
+      "parentUuid": "19fcd65d_a46013c2",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -849,6 +1197,24 @@
     },
     {
       "key": {
+        "uuid": "9d1f1410_ee0a41f3",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 143,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Since ignore_errors \u003d true, no exceptions would be raised by python",
+      "parentUuid": "4d7277b9_b8a01987",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "c557dfaa_168558f2",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -863,6 +1229,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cefec631_eb15ba27",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c557dfaa_168558f2",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -936,6 +1320,24 @@
     },
     {
       "key": {
+        "uuid": "9f55f772_d3799339",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 156,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0f862107_67581b4c",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "73ce4b33_d724cca7",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -950,6 +1352,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fa8857aa_1ff83de5",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 163,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Sure. Done.",
+      "parentUuid": "73ce4b33_d724cca7",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -1006,6 +1426,24 @@
     },
     {
       "key": {
+        "uuid": "2c41ec38_50622f87",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 183,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "I think this may not be a good idea since it can lead to misuse of wrpcap() as given in the link. If the user is passing wrong argument, it is better to fail and let him know the error rather than handling the exception.",
+      "parentUuid": "520576c1_1a18bc03",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ae86fe02_99c03737",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -1020,6 +1458,24 @@
       "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ff574b86_1ba010d1",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 247,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-16T11:58:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ae86fe02_99c03737",
+      "revId": "5cf0506dd78ddfcb8e135719027a53e7e6d851c0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
