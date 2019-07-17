@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8cc09c7c_17059f99",
+        "filename": "dpdk/vr_dpdk_virtio.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1592,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2019-07-17T09:50:44Z",
+      "side": 1,
+      "message": "Is this a cut-n-paste problem as the exact same NULL check is right above this?",
+      "revId": "3e4fedaadca62134ec2ce0a4bcc0d40cae1d49c6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
