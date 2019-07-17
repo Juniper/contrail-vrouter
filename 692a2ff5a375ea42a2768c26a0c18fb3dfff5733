@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "351fef73_52a19c4b",
+        "filename": "include/ini_parser.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "faf00867_17031dc5",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "d08a7f49_d05e4371",
         "filename": "utils/ini_parser.c",
         "patchSetId": 5
@@ -33,6 +51,24 @@
       "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e1d4f549_38c5694c",
+        "filename": "utils/ini_parser.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "d08a7f49_d05e4371",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "c829038b_f90e985d",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 583,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "yes, we can use list_index itself, provided we rewind the pointer again.\nI think it should be ok to have one additional variable to hold the base address.\nIt would be less error prone in future.",
+      "parentUuid": "e6d105ba_4c15f582",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "111756bb_23d5c4e2",
         "filename": "utils/vtest_py/tests/test1.py",
         "patchSetId": 5
@@ -67,6 +121,24 @@
       "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6ab28132_e6d6a129",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "I haven\u0027t tried it. Probably a good exercise for someone using this infra :-)",
+      "parentUuid": "111756bb_23d5c4e2",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -87,6 +159,24 @@
     },
     {
       "key": {
+        "uuid": "6f034a28_d3b3ce19",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "Yes, please refer this https://docs.pytest.org/en/latest/fixture.html#scope-sharing-a-fixture-instance-across-tests-in-a-class-module-or-session\n\nPytest allows you to add fixtures at function, class, module, package or session level.\nIt is very flexible.",
+      "parentUuid": "0f78c704_726c1ed5",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "72e33cdf_84c002e3",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 5
@@ -101,6 +191,24 @@
       "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "199bee26_5a06e68c",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "We can enhance it later if required. Right now the run_test.sh script checks for this and throws error if the env variables are not set.",
+      "parentUuid": "72e33cdf_84c002e3",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -124,6 +232,30 @@
       "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f5c4dd66_f76ab4f8",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 277,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-17T16:10:20Z",
+      "side": 1,
+      "message": "Doing this in a loop allows the user to check for the individual response values.\nAlso debugging is easier since we can see at which point the command failed.",
+      "parentUuid": "c2f75835_12839823",
+      "range": {
+        "startLine": 277,
+        "startChar": 12,
+        "endLine": 277,
+        "endChar": 16
+      },
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
