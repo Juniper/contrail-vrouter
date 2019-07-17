@@ -580,6 +580,8 @@ vr_dpdk_virtio_tx_queue_set(void *arg)
     lcore = vr_dpdk.lcores[rte_lcore_id()];
     tx_queue = &lcore->lcore_tx_queues[p->vif_id];
     port = (struct dpdk_virtio_writer *)tx_queue->q_queue_h;
+    if (port == NULL)
+        goto queue_set_end;
 
     /* Assign new queue to the lcore's tx_queue handler */
     port->tx_virtioq = &vr_dpdk_virtio_txqs[p->vif_id][p->queue_id];
@@ -594,6 +596,7 @@ vr_dpdk_virtio_tx_queue_set(void *arg)
         RTE_LOG(ERR, VROUTER, "%s: Flush function for tx_queue(%p) unavailable\n",
                 __func__, tx_queue);
 
+queue_set_end:
     rte_free(arg);
 }
 
@@ -740,7 +743,7 @@ static int
 dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
 {
     struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
-    vr_dpdk_virtioq_t *vq = p->rx_virtioq;
+    vr_dpdk_virtioq_t *vq;
     uint16_t vq_hard_avail_idx, i;
     uint16_t avail_pkts, next_desc_idx, next_avail_idx;
     struct vring_desc *desc;
@@ -749,6 +752,12 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
     uint32_t pkt_len, nb_pkts = 0;
     vr_uvh_client_t *vru_cl;
 
+    if (unlikely(port == NULL)) {
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
+        return -EINVAL;
+    }
+
+    vq = p->rx_virtioq;
     if (unlikely(vq->vdv_ready_state == VQ_NOT_READY)) {
         DPDK_UDEBUG(VROUTER, &vq->vdv_hash, "%s: queue %p is not ready\n",
                 __func__, vq);
@@ -1607,6 +1616,11 @@ dpdk_virtio_to_vm_flush(void *port)
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore = NULL;
 
+    if (unlikely(port == NULL)) {
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
+        return 0;
+    }
+
     if (p->tx_buf_count == 0) {
         return 0;
     }
@@ -1953,6 +1967,11 @@ dpdk_virtio_reader_stats_read(void *port,
 {
     struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
 
+    if (unlikely(port == NULL)) {
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
+        return 0;
+    }
+
     if (stats != NULL)
         memcpy(stats, &p->stats, sizeof(p->stats));
 
@@ -1967,6 +1986,11 @@ dpdk_virtio_writer_stats_read(void *port,
     struct rte_port_out_stats *stats, int clear)
 {
     struct dpdk_virtio_reader *p = (struct dpdk_virtio_reader *)port;
+
+    if (unlikely(port == NULL)) {
+        RTE_LOG(ERR, PORT, "%s: port is NULL\n", __func__);
+        return 0;
+    }
 
     if (stats != NULL)
         memcpy(stats, &p->stats, sizeof(p->stats));
@@ -1987,10 +2011,14 @@ vr_dpdk_virtio_xstats_update(struct vr_interface_stats *stats,
 
     if (queue->rxq_ops.f_rx == vr_dpdk_virtio_reader_ops.f_rx) {
         reader = (struct dpdk_virtio_reader *)queue->q_queue_h;
+        if (unlikely(reader == NULL))
+            return;
         stats->vis_port_isyscalls = reader->nb_syscalls;
         stats->vis_port_inombufs = reader->nb_nombufs;
     } else if (queue->txq_ops.f_tx == vr_dpdk_virtio_writer_ops.f_tx) {
         writer = (struct dpdk_virtio_writer *)queue->q_queue_h;
+        if (unlikely(writer == NULL))
+            return;
         stats->vis_port_osyscalls = writer->nb_syscalls;
     }
 }
