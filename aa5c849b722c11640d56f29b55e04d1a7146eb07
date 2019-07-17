@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "23c98884_13d340f8",
+        "filename": "utils/flow.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 1846,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 0,
+      "message": "The below is removed. Is this intended?",
+      "revId": "aa5c849b722c11640d56f29b55e04d1a7146eb07",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "faf00867_17031dc5",
+        "filename": "include/ini_parser.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "convention followed is : platform_is_vtest()",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d08a7f49_d05e4371",
+        "filename": "utils/ini_parser.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "Pl rename to platform_is_vtest()",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e6d105ba_4c15f582",
+        "filename": "utils/vtest/sandesh_gen.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 583,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "What is the user of tmp_list? Can we not use list_index directly?",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "111756bb_23d5c4e2",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "Does vtest allow SANDESH_OP_DUMP?\nThis requires repeated query based on the marker from the previous query.\nEg: vif --list, dropstats --log \u003c\u003e\nIf it does not support, we have to document it and file a bug to address it in future.",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0f78c704_726c1ed5",
+        "filename": "utils/vtest_py/tests/test1.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "Is this the proper pytest format? \n\nIn testtools, we just need to define functions that start with test_* and that is considered as a test case. For each test case there is a setup() and teardown() called when it begins and ends. For the whole file there is another setupclass() and teardownclass() called. By this, you can define multiple testcases in a single file. How do you do this here?",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "72e33cdf_84c002e3",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "Is it possible to assign this env variable in a separate \"initialize\" method which can throw exceptions? Do we need to throw exceptions if this variable is not set? Usually constructors are designed to always succeed and not throw any exceptions.",
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c2f75835_12839823",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 277,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-17T10:16:18Z",
+      "side": 1,
+      "message": "What are the pros n cons of running this command in the loop vs constructing the xml having all objects and running this command just once?",
+      "range": {
+        "startLine": 277,
+        "startChar": 12,
+        "endLine": 277,
+        "endChar": 16
+      },
+      "revId": "692a2ff5a375ea42a2768c26a0c18fb3dfff5733",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
