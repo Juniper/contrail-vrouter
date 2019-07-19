@@ -23,6 +23,8 @@
 #define VT_MESSAGES_MAX             (1024 * 512)
 #define VT_MAX_FLOW                 500000
 
+#define VT_MAX_FILENAME             129
+
 struct packet_interface {
    unsigned short vif_id;
    //Todo send a message for map interface id to name interface
@@ -77,7 +79,24 @@ struct message {
     struct return_vrouter *return_vrouter_msg;
 };
 
+typedef enum vtest_cli_cmd_ {
+    VTEST_CLI_CMD_SINGLE_TEST_FILE = 1,  /*
+                                          * To maintain backward compatibility, this option
+                                          * represents the old way of specifying the test
+                                          * in a single xml file. This is deprecated now
+                                          */
+    VTEST_CLI_CMD_SANDESH_REQ,
+    VTEST_CLI_CMD_PACKET_REQ
+} vtest_cli_cmd_t;
+
+typedef struct vtest_cli_opt_ {
+    vtest_cli_cmd_t  cli_cmd;
+    char req_file[VT_MAX_FILENAME];
+    char resp_file[VT_MAX_FILENAME];
+} vtest_cli_opt_t;
+
 struct vtest {
+    vtest_cli_opt_t cli_opt;
     int vtest_iteration;
     int vtest_return;
     bool vtest_break;

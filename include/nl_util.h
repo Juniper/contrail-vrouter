@@ -28,7 +28,6 @@ extern "C" {
 #define NL_MSG_TYPE_FMLY            3
 
 #define VR_NETLINK_PROTO_DEFAULT    -1
-#define VR_NETLINK_PROTO_TEST       -2
 
 #define BRIDGE_TABLE_DEV            "/dev/vr_bridge"
 #define FLOW_TABLE_DEV              "/dev/flow"
