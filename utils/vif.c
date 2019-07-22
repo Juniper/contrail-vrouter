@@ -436,6 +436,33 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
     }
     printf("\n");
 }
+static void
+vr_interface_bond_info(vr_interface_req *req)
+{
+
+    int i;
+    char *p_name, *p_drv_name ;
+    const char *bond_link[] = {"DOWN", "UP"};
+
+    if(req->vifr_type != VIF_TYPE_PHYSICAL)
+        return;
+
+    vr_interface_print_head_space();
+    printf("Fabric Interface: %s  Status: %s  Driver: %s\n", req->vifr_fab_name,
+            bond_link[(req->vifr_intf_status & 0x01)], req->vifr_fab_drv_name);
+
+    p_name = req->vifr_bond_slave_name;
+    p_drv_name = req->vifr_bond_slave_drv_name;
+
+    for(i = 0; i < req->vifr_num_bond_slave; i++) {
+        vr_interface_print_head_space();
+        printf("Slave Interface(%d): %s  Status: %s  Driver: %s\n", i, p_name,
+                bond_link[(req->vifr_intf_status >> (i + 1)) & 0x01], p_drv_name);
+
+        p_name = strchr(p_name, '\0'); p_name++;
+        p_drv_name = strchr(p_drv_name, '\0'); p_drv_name++;
+    }
+}
 
 static void
 list_get_print(vr_interface_req *req)
@@ -554,6 +581,7 @@ list_get_print(vr_interface_req *req)
         vr_interface_e_per_lcore_counters_print("RX queue", print_zero,
                 req->vifr_queue_ierrors_to_lcore,
                 req->vifr_queue_ierrors_to_lcore_size);
+        vr_interface_bond_info(req);
     }
 
     vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,

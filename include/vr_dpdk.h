@@ -313,6 +313,17 @@ enum {
     VR_DPDK_FWD_LCORE_ID,
 };
 
+/* Fabric(Master) & Slave Interface Type */
+enum {
+    VR_DPDK_FABRIC = 1,
+    VR_DPDK_BOND_SLAVES,
+};
+
+struct vr_dpdk_bond_member_info {
+    char intf_name[VR_INTERFACE_NAME_LEN];
+    char intf_drv_name[VR_INTERFACE_NAME_LEN];
+};
+
 /* Maximum number of IO lcores */
 #define VR_DPDK_MAX_IO_LORES (VR_DPDK_LAST_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
 
