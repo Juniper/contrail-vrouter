@@ -146,6 +146,9 @@
 */
 #define VIF_ENCAP_TYPE_L3_DECRYPT   3
 
+
+#define VR_INTERFACE_BOND_MAX_SLAVES    6
+
 typedef enum {
     MR_DROP,
     MR_FLOOD,
@@ -429,6 +432,25 @@ struct vr_interface_settings {
     uint32_t vis_duplex;
 };
 
+/* To get info of Master and Slave bond interfaces */
+struct vr_interface_bond_info {
+    char *vif_fab_name;
+     const char *vif_fab_drv_name;
+    uint8_t vif_intf_link_status;
+    uint8_t vif_num_slave;
+    char *vif_slave_name[VR_INTERFACE_BOND_MAX_SLAVES];
+    const char *vif_slave_drv_name[VR_INTERFACE_BOND_MAX_SLAVES];
+    /* vif_intf_idx denote master index for slave,
+     * used for multihoming(mul. masters involved)*/
+    uint8_t vif_intf_idx;
+};
+
+/* Display vlan info as part of physical interface */
+struct vr_interface_vlan_info {
+    int  vlan_id;
+    char vlan_name[VR_INTERFACE_NAME_LEN];
+};
+
 struct vr_host_interface_ops {
     void (*hif_lock)(void);
     void (*hif_unlock)(void);
@@ -443,6 +465,10 @@ struct vr_host_interface_ops {
     unsigned int (*hif_get_mtu)(struct vr_interface *);
     unsigned short (*hif_get_encap)(struct vr_interface *);
     void (*hif_stats_update)(struct vr_interface *, unsigned int);
+    int (*hif_get_bond_info)(struct vr_interface *vif,
+            struct vr_interface_bond_info *bond_info);
+    int (*hif_get_vlan_info)(struct vr_interface *vif,
+            struct vr_interface_vlan_info *vlan_info);
 };
 
 extern int vr_interface_init(struct vrouter *);
