@@ -2497,14 +2497,77 @@ vr_interface_get_drops(struct vr_interface *vif)
     return total_drops;
 }
 
-static void
+static int
+vr_interface_copy_bond_info(vr_interface_req *req,
+        struct vr_interface_bond_info *bond_info)
+{
+    unsigned int i, len, sl_name_iter = 0, sl_drv_name_iter = 0;
+
+    req->vifr_num_bond_slave = bond_info->vif_num_slave;
+    req->vifr_intf_status = bond_info->vif_intf_link_status;
+    len = strlen(bond_info->vif_fab_name);
+    req->vifr_fab_name_size = (len + 1);
+    req->vifr_fab_name =
+        vr_zalloc(req->vifr_fab_name_size * sizeof(uint8_t),
+            VR_INTERFACE_BOND_OBJECT);
+    if(!req->vifr_fab_name)
+        return -ENOMEM;
+    memcpy(req->vifr_fab_name, bond_info->vif_fab_name, len);
+    len = strlen(bond_info->vif_fab_drv_name);
+    req->vifr_fab_drv_name_size = (len + 1);
+    req->vifr_fab_drv_name =
+        vr_zalloc(req->vifr_fab_drv_name_size * sizeof(uint8_t),
+                VR_INTERFACE_BOND_OBJECT);
+    if(!req->vifr_fab_drv_name)
+        return -ENOMEM;
+    memcpy(req->vifr_fab_drv_name, bond_info->vif_fab_drv_name, len);
+
+    if(bond_info->vif_num_slave) {
+        for(i = 0; i < bond_info->vif_num_slave; i++) {
+            len = strlen(bond_info->vif_slave_name[i]);
+            sl_name_iter += (len + 1);
+            len = strlen(bond_info->vif_slave_drv_name[i]);
+            sl_drv_name_iter += (len + 1);
+        }
+        req->vifr_bond_slave_name_size = sl_name_iter;
+        req->vifr_bond_slave_drv_name_size = sl_drv_name_iter;
+        req->vifr_bond_slave_name =
+            vr_zalloc(req->vifr_bond_slave_name_size * sizeof(uint8_t),
+                    VR_INTERFACE_BOND_OBJECT);
+        if(!req->vifr_bond_slave_name)
+            return -ENOMEM;
+        req->vifr_bond_slave_drv_name =
+            vr_zalloc(req->vifr_bond_slave_drv_name_size * sizeof(uint8_t),
+                    VR_INTERFACE_BOND_OBJECT);
+        if(!req->vifr_bond_slave_drv_name)
+            return -ENOMEM;
+
+        sl_name_iter = 0;
+        sl_drv_name_iter = 0;
+
+        for(i = 0; i < bond_info->vif_num_slave; i++) {
+            len = strlen(bond_info->vif_slave_name[i]);
+            memcpy((req->vifr_bond_slave_name + sl_name_iter), bond_info->vif_slave_name[i], (len + 1));
+            sl_name_iter += (len + 1);
+            len = strlen(bond_info->vif_slave_drv_name[i]);
+            memcpy((req->vifr_bond_slave_drv_name + sl_drv_name_iter), bond_info->vif_slave_drv_name[i], (len + 1));
+            sl_drv_name_iter += (len + 1);
+        }
+    }
+    return 0;
+
+}
+static int
 __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         unsigned int core)
 {
     unsigned int cpu, i;
     uint64_t *ip6;
+    int ret;
 
     struct vr_interface_settings settings;
+    struct vr_interface_bond_info bond_info;
+    struct vr_interface_vlan_info vlan_info;
 
     req->vifr_core = core;
     req->vifr_type = intf->vif_type;
@@ -2644,6 +2707,21 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
             req->vifr_speed = settings.vis_speed;
             req->vifr_duplex = settings.vis_duplex;
         }
+        if (!hif_ops->hif_get_bond_info(intf, &bond_info)) {
+            ret = vr_interface_copy_bond_info(req, &bond_info);
+            if(ret != 0)
+                return -ENOMEM;
+        }
+        if (!hif_ops->hif_get_vlan_info(intf, &vlan_info)) {
+            req->vifr_vlan_tag = vlan_info.vlan_id;
+            req->vifr_vlan_name_size = strlen(vlan_info.vlan_name);
+            req->vifr_vlan_name =
+                vr_zalloc(req->vifr_vlan_name_size * sizeof(uint8_t),
+                    VR_INTERFACE_OBJECT);
+            if(!req->vifr_vlan_name)
+                return -ENOMEM;
+            strcpy(req->vifr_vlan_name, vlan_info.vlan_name);
+        }
     }
 
     for (i = 0; i < intf->fat_flow_cfg_size; i++) {
@@ -2679,7 +2757,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
 
     req->vifr_qos_map_index = intf->vif_qos_map_index;
     req->vifr_dpackets = vr_interface_get_drops(intf);
-    return;
+    return 0;
 }
 
 static int
@@ -2687,6 +2765,7 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
         unsigned int core)
 {
     unsigned int fat_flow_config_size;
+    int ret;
 
     fat_flow_config_size = vif->fat_flow_cfg_size;
 
@@ -2788,8 +2867,9 @@ vr_interface_make_req(vr_interface_req *req, struct vr_interface *vif,
         req->vifr_fat_flow_exclude_ip6_l_list_size = vif->vif_fat_flow_ipv6_exclude_list_size;
     }
 
-    __vr_interface_make_req(req, vif, core);
-
+    ret = __vr_interface_make_req(req, vif, core);
+    if(ret != 0)
+        return -ENOMEM;
     return 0;
 }
 
@@ -2989,6 +3069,36 @@ vr_interface_req_destroy(vr_interface_req *req)
                 VR_INTERFACE_REQ_PBB_MAC_OBJECT);
         req->vifr_pbb_mac = NULL;
         req->vifr_pbb_mac_size = 0;
+    }
+
+    if(req->vifr_fab_name) {
+        vr_free(req->vifr_fab_name,
+                VR_INTERFACE_BOND_OBJECT);
+        req->vifr_fab_name_size = 0;
+    }
+
+    if(req->vifr_fab_drv_name) {
+        vr_free(req->vifr_fab_drv_name,
+                VR_INTERFACE_BOND_OBJECT);
+        req->vifr_fab_name_size = 0;
+    }
+
+    if(req->vifr_bond_slave_name) {
+        vr_free(req->vifr_bond_slave_name,
+                VR_INTERFACE_BOND_OBJECT);
+        req->vifr_bond_slave_name_size = 0;
+    }
+
+    if(req->vifr_bond_slave_drv_name) {
+        vr_free(req->vifr_bond_slave_drv_name,
+                VR_INTERFACE_BOND_OBJECT);
+        req->vifr_bond_slave_drv_name_size = 0;
+    }
+
+    if(req->vifr_vlan_name) {
+        vr_free(req->vifr_vlan_name,
+                VR_INTERFACE_OBJECT);
+        req->vifr_vlan_name_size = 0;
     }
 
     vr_interface_req_free_fat_flow_config(req);
