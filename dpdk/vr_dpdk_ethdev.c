@@ -15,6 +15,7 @@
  */
 
 #include "vr_dpdk.h"
+#include "vr_dpdk_usocket.h"
 
 #include <vr_mpls.h>
 
@@ -28,6 +29,8 @@
 #include <rte_ip.h>
 #include <rte_port_ethdev.h>
 #include <rte_udp.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 
 extern int vr_rxd_sz, vr_txd_sz;
 extern unsigned int datapath_offloads;
@@ -760,6 +763,135 @@ vr_dpdk_ethdev_bond_port_match(uint8_t port_id, struct vr_dpdk_ethdev *ethdev)
     return false;
 }
 
+
+/*
+ * Function to send bond interface state to Agent
+ * state 0 - down
+ * state 1 - up
+ * Called when the VM goes down or comes up
+ */
+static void
+vr_dpdk_nl_send_bond_intf_state(int state, char *intf_name)
+{
+    int nl_fd;
+    char buf[1024];
+    struct nlmsghdr *nlh;
+    struct ifinfomsg *ifinfo;
+    struct nlattr *nla;
+    int len, n;
+    char *if_name_buf;
+    struct sockaddr_nl sa;
+
+    if (intf_name == NULL)
+        return;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.nl_family = AF_NETLINK;
+    sa.nl_pid = 0;
+    sa.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_IFADDR;
+
+
+
+    nl_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (nl_fd < 0) {
+        RTE_LOG(ERR, VROUTER, "Error creating netlink socket\n");
+        goto error;
+    }
+    bind(nl_fd, (struct sockaddr *)&sa, sizeof(sa));
+    nlh = (struct nlmsghdr *)buf;
+
+    nlh->nlmsg_len = NLMSG_HDRLEN + sizeof(struct ifinfomsg);
+    nlh->nlmsg_type = RTM_NEWLINK;
+    nlh->nlmsg_flags = NLM_F_REQUEST;
+    nlh->nlmsg_seq = 1;
+    nlh->nlmsg_pid = 0;
+    ifinfo = (struct ifinfomsg *)(buf + NLMSG_HDRLEN);
+
+    ifinfo->ifi_family = 0;
+    ifinfo->ifi_type = 1;
+
+    /* Set index to -1 as agent needs only the interface name */
+    ifinfo->ifi_index = -1;
+
+    if (state)
+        ifinfo->ifi_flags = IFF_MULTICAST|IFF_RUNNING|IFF_BROADCAST|IFF_UP;
+    else
+        ifinfo->ifi_flags = IFF_BROADCAST|IFF_UP;
+    /* ifi_change needs to be set to 0xFFFFFFFF by default
+     * as its a reserved field
+     */
+    ifinfo->ifi_change = 0xFFFFFFFF;
+
+    nla = (struct nlattr *)(buf + NLMSG_HDRLEN + sizeof(struct ifinfomsg));
+
+    len = NLA_HDRLEN + NLA_ALIGN(strlen(intf_name) + 1);
+
+    nla->nla_len = len;
+    nla->nla_type = IFLA_IFNAME;
+
+    if_name_buf = (char *)nla + NLA_HDRLEN;
+    strcpy(if_name_buf, intf_name);
+
+    len += (NLMSG_HDRLEN + sizeof(struct ifinfomsg));
+
+    nlh->nlmsg_len = len;
+
+    n = sendto(nl_fd, buf, len, 0, (struct sockaddr *)&sa, sizeof(sa));
+    if (n != len) {
+        RTE_LOG(ERR, VROUTER, "Error sending netlink bond interface message\n");
+    }
+
+    close(nl_fd);
+error:
+    return;
+}
+
+static int
+vr_dpdk_bond_intf_callback(uint16_t port_id, enum rte_eth_event_type type, void *param, void *ret_param __rte_unused)
+{
+    int ret;
+    char *str[] = {"UP", "DOWN"};
+    char bond_intf_name[VR_INTERFACE_NAME_LEN];
+    struct rte_eth_link link;
+    RTE_LOG(INFO, VROUTER, "Received callback notificatin for Interface:  %s\n", rte_eth_devices[port_id].data->name);
+
+    rte_eth_link_get(port_id, &link);
+
+    ret = rte_eth_dev_get_name_by_port(port_id, bond_intf_name);
+    if(ret != 0)
+        RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+
+    RTE_LOG(INFO, VROUTER, "Port ID: %d Link Status: %s \n\n", port_id, (link.link_status?str[0]:str[1]));
+
+    vr_dpdk_nl_send_bond_intf_state(link.link_status, bond_intf_name);
+
+    return 0;
+}
+
+static void
+vr_dpdk_bond_intf_cb_register(struct vr_dpdk_ethdev *ethdev)
+{
+    int i = 0, ret = 0;
+    /* Fetching port-id for master bond interface */
+    uint8_t port_id = ethdev->ethdev_port_id;
+
+    /* Registering callback notification for Master bond interface */
+    ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, vr_dpdk_bond_intf_callback, NULL);
+
+    if(ret)
+        RTE_LOG(ERR, VROUTER, "Failed to setup callback for event RTE_ETH_EVENT_INTR_LSC for portid: %d\n", port_id);
+
+    /* For slave interface*/
+    for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+
+        port_id = ethdev->ethdev_slaves[i];
+        /* Registering callback notification for slave bond interfaces */
+        ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC, vr_dpdk_bond_intf_callback, NULL);
+        if(ret)
+            RTE_LOG(ERR, VROUTER, "Failed to setup callback for event RTE_ETH_EVENT_INTR_LSC for portid: %d\n", port_id);
+    }
+}
+
 /* Init ethernet device */
 int
 vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf)
@@ -789,6 +921,8 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
 #endif
         dpdk_ethdev_bond_info_update(ethdev);
     }
+
+    vr_dpdk_bond_intf_cb_register(ethdev);
   
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
