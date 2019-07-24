@@ -45,7 +45,7 @@ static inline bool
 vr_mpls_udp_port(unsigned short port)
 {
     if ((port == VR_MPLS_OVER_UDP_OLD_DST_PORT) ||
-            (port == VR_MPLS_OVER_UDP_NEW_DST_PORT))
+        (port == VR_MPLS_OVER_UDP_NEW_DST_PORT))
         return true;
 
     return false;

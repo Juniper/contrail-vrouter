@@ -1063,6 +1063,7 @@ struct vr_forwarding_md {
     int8_t fmd_dotonep;
     int8_t fmd_dmac[VR_ETHER_ALEN];
     int8_t fmd_smac[VR_ETHER_ALEN];
+    int8_t fmd_local_ttl;
 };
 
 static inline void
@@ -1083,6 +1084,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_flags = 0;
     fmd->fmd_dscp = -1;
     fmd->fmd_dotonep = -1;
+    fmd->fmd_local_ttl = 3;
     VR_MAC_RESET(fmd->fmd_dmac);
     VR_MAC_RESET(fmd->fmd_smac);
 
