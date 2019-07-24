@@ -16,8 +16,7 @@
 #define VR_MPLS_STACK_BIT           (0x1 << 8)
 
 #define VR_MPLS_OVER_UDP_OLD_DST_PORT   51234
-#define VR_MPLS_OVER_UDP_NEW_DST_PORT   6635
-#define VR_MPLS_OVER_UDP_DST_PORT       VR_MPLS_OVER_UDP_NEW_DST_PORT
+#define VR_MPLS_OVER_UDP_DST_PORT       6635
 #define VR_MPLS_OVER_UDP_SRC_PORT       51000
 #define VR_MUDP_PORT_RANGE_START        49152
 #define VR_MUDP_PORT_RANGE_END          65535
@@ -44,8 +43,7 @@ extern int vr_mpls_input(struct vrouter *, struct vr_packet *,
 static inline bool
 vr_mpls_udp_port(unsigned short port)
 {
-    if ((port == VR_MPLS_OVER_UDP_OLD_DST_PORT) ||
-            (port == VR_MPLS_OVER_UDP_NEW_DST_PORT))
+    if (port == VR_MPLS_OVER_UDP_DST_PORT)
         return true;
 
     return false;

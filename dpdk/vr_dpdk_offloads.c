@@ -334,7 +334,7 @@ dpdk_offload_flow_create(struct vr_offload_flow *oflow)
             ipv4_spec.hdr.next_proto_id = VR_IP_PROTO_UDP;
             pattern[GRE].type = RTE_FLOW_ITEM_TYPE_VOID;
             pattern[UDP].type = RTE_FLOW_ITEM_TYPE_UDP;
-            udp_spec.hdr.dst_port = RTE_BE16(VR_MPLS_OVER_UDP_NEW_DST_PORT);
+            udp_spec.hdr.dst_port = RTE_BE16(VR_MPLS_OVER_UDP_DST_PORT);
             rss_action.level = 1; /* RSS on outer */
             rss_action.types = ETH_RSS_IPV4 |
                                ETH_RSS_FRAG_IPV4 |
