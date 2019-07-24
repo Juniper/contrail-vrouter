@@ -637,6 +637,11 @@ vr_ip_rcv(struct vrouter *router, struct vr_packet *pkt,
                  * processing again.
                  */
                 if (fmd->fmd_to_me || relaxed_policy_found) {
+                    if (--fmd->fmd_local_ttl <=0 ) {
+                        drop_reason = VP_DROP_PKT_LOOP;
+                        PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
+                        goto drop_pkt;
+                    }
                     if (!vr_l3_input(pkt, fmd)) {
                         drop_reason = VP_DROP_NOWHERE_TO_GO;
                         PKT_LOG(drop_reason, pkt, 0, VR_PROTO_IP_C, __LINE__);
@@ -1131,8 +1136,8 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         if (flow_p->flow4_proto == VR_IP_PROTO_GRE) {
             return FLOW_FORWARD;
         } else if (flow_p->flow4_proto == VR_IP_PROTO_UDP) {
-            if (vr_mpls_udp_port(flow_p->flow4_dport) ||
-                    (flow_p->flow4_dport == htons(VR_VXLAN_UDP_DST_PORT))) {
+            if (vr_mpls_udp_port(ntohs(flow_p->flow4_dport)) ||
+                    (vr_vxlan_udp_port(ntohs(flow_p->flow4_dport)))) {
                 return FLOW_FORWARD;
             }
         }
