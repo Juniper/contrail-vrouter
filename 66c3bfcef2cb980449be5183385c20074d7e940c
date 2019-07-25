@@ -46,6 +46,30 @@
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e524fa62_43812e4a",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 787
+      },
+      "writtenOn": "2019-07-25T16:41:13Z",
+      "side": 1,
+      "message": "More than changing the value, I wanted to understand / confirm where the value came from, to make sure we\u0027re not breaking some other functionality. Consider I know very little about this code base.\n\nIt seems like you don\u0027t expect the flow lookup to ever happen more than twice, correct?\n\nDo we have customers using multiple encapsulations? Can packet hit more than one NATty thing? does that result in more than 2 lookups?\n\nIf no... sounds great.",
+      "parentUuid": "513ccb1d_cfa4d528",
+      "range": {
+        "startLine": 1087,
+        "startChar": 25,
+        "endLine": 1087,
+        "endChar": 26
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
