@@ -2,6 +2,74 @@
   "comments": [
     {
       "key": {
+        "uuid": "67039a93_61050ffd",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 640,
+      "author": {
+        "id": 5
+      },
+      "writtenOn": "2019-07-25T21:41:30Z",
+      "side": 1,
+      "message": "s/\u003c\u003d0/\u003c\u003d 0/",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5c9acda1_9cf1fe8f",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 641,
+      "author": {
+        "id": 5
+      },
+      "writtenOn": "2019-07-25T21:41:30Z",
+      "side": 1,
+      "message": "Is VP_DROP_PKT_LOOP dedicated for internal packet loops ? I see that it is also used in vr_nexthop.c when source and dest ip matches to each other. Shouldn\u0027t this be a separate/new drop-reason code ?",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d9d721cf_762b2b30",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 1140,
+      "author": {
+        "id": 5
+      },
+      "writtenOn": "2019-07-25T21:41:30Z",
+      "side": 1,
+      "message": "is this exercisable in a vrouter unit test ?",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "11388cd2_687ed835",
+        "filename": "dpdk/vr_dpdk_offloads.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 337,
+      "author": {
+        "id": 5
+      },
+      "writtenOn": "2019-07-25T21:41:30Z",
+      "side": 1,
+      "message": "Isn\u0027t there any backward compatibility issue here between older receiver and new sender agent ?",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b6193c70_32a347b4",
         "filename": "include/vr_packet.h",
         "patchSetId": 5
@@ -61,6 +129,30 @@
       "side": 1,
       "message": "More than changing the value, I wanted to understand / confirm where the value came from, to make sure we\u0027re not breaking some other functionality. Consider I know very little about this code base.\n\nIt seems like you don\u0027t expect the flow lookup to ever happen more than twice, correct?\n\nDo we have customers using multiple encapsulations? Can packet hit more than one NATty thing? does that result in more than 2 lookups?\n\nIf no... sounds great.",
       "parentUuid": "513ccb1d_cfa4d528",
+      "range": {
+        "startLine": 1087,
+        "startChar": 25,
+        "endLine": 1087,
+        "endChar": 26
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "76b60ec2_958dd9ee",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 5
+      },
+      "writtenOn": "2019-07-25T21:41:30Z",
+      "side": 1,
+      "message": "if it is never ever suppose to go more than 3, can you [soft] assert ? at least in any testing-mode ?",
+      "parentUuid": "e524fa62_43812e4a",
       "range": {
         "startLine": 1087,
         "startChar": 25,
