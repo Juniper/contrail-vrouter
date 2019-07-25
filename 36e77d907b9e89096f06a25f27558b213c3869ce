@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9526aefd_fc3bb9e7",
+        "filename": "include/vr_mpls.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-25T16:49:01Z",
+      "side": 0,
+      "message": "I see this check has been removed. Are we sure no one is using the old port number?",
+      "revId": "36e77d907b9e89096f06a25f27558b213c3869ce",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
