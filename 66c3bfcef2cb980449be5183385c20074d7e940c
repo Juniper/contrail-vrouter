@@ -435,6 +435,24 @@
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3f5dce7b_5e9dd4d3",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-26T07:01:34Z",
+      "side": 1,
+      "message": "Yes, fmd is a stack variable. I haven\u0027t checked the code to see if indeed someone is doing reinit. It is more of a defensive check.",
+      "parentUuid": "396ccb94_19ab22d0",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
