@@ -59,6 +59,30 @@
     },
     {
       "key": {
+        "uuid": "6fa12dcb_589dd042",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 641,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-26T05:02:21Z",
+      "side": 1,
+      "message": "We can have a bt/vr_printf log. But we may want to throttle the log?",
+      "parentUuid": "6f162582_fd9c34d2",
+      "range": {
+        "startLine": 641,
+        "startChar": 38,
+        "endLine": 641,
+        "endChar": 54
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d9d721cf_762b2b30",
         "filename": "dp-core/vr_proto_ip.c",
         "patchSetId": 5
