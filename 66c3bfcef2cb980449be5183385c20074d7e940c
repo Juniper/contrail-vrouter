@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "dcf4d9d3_4e9c2227",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 640,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "ok",
+      "parentUuid": "67039a93_61050ffd",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5c9acda1_9cf1fe8f",
         "filename": "dp-core/vr_proto_ip.c",
         "patchSetId": 5
@@ -83,6 +101,48 @@
     },
     {
       "key": {
+        "uuid": "1063d34c_141c2e37",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 641,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "Same comment as above.",
+      "parentUuid": "6fa12dcb_589dd042",
+      "range": {
+        "startLine": 641,
+        "startChar": 38,
+        "endLine": 641,
+        "endChar": 54
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "45bbf0b7_b03fd345",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 641,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "No need, we have PKT_LOG() macro which logs the file/line number and first few bytes of the packet.",
+      "parentUuid": "5c9acda1_9cf1fe8f",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d9d721cf_762b2b30",
         "filename": "dp-core/vr_proto_ip.c",
         "patchSetId": 5
@@ -94,6 +154,24 @@
       "writtenOn": "2019-07-25T21:41:30Z",
       "side": 1,
       "message": "is this exercisable in a vrouter unit test ?",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "294d07a6_1b309c99",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 1140,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "yes",
+      "parentUuid": "d9d721cf_762b2b30",
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -117,6 +195,24 @@
     },
     {
       "key": {
+        "uuid": "05a08e1b_ce93e64c",
+        "filename": "dpdk/vr_dpdk_offloads.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 337,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "VR_MPLS_OVER_UDP_DST_PORT is defined as VR_MPLS_OVER_UDP_NEW_DST_PORT, so we are fine.",
+      "parentUuid": "11388cd2_687ed835",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5eb12c4e_9b983440",
         "filename": "include/vr_mpls.h",
         "patchSetId": 5
@@ -128,6 +224,30 @@
       "writtenOn": "2019-07-26T00:06:25Z",
       "side": 1,
       "message": "Till 3.1 our default mpls udp port is 51234. Since some customers are using 3.1, we need to have the support for port 51234 for inter-operability. Either we can reserve the port in linux using ip_local_reserved_ports sysctl or agent can do the bind for all reserverd ports in the initialization. Please take care of this.",
+      "range": {
+        "startLine": 19,
+        "startChar": 8,
+        "endLine": 19,
+        "endChar": 33
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ad37abe0_c640d940",
+        "filename": "include/vr_mpls.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "\u003e Till 3.1 our default mpls udp port is 51234. Since some customers are using 3.1, we need to have the support for port 51234 for inter-operability. Either we can reserve the port in linux using ip_local_reserved_ports sysctl or agent can do the bind for all reserverd ports in the initialization. Please take care of this.\n\nok, we can retain this. We need an agent fix to block this port from allocation.",
+      "parentUuid": "5eb12c4e_9b983440",
       "range": {
         "startLine": 19,
         "startChar": 8,
@@ -270,6 +390,48 @@
       "writtenOn": "2019-07-26T05:16:09Z",
       "side": 1,
       "message": "Can you initialize the ttl only if the value is 0 and not reset it unconditionally? This would catch cases if someone is doing reinit again on the same fmd.",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "396ccb94_19ab22d0",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "Can you pl let me know which case the same fmd is reinitialized? Generally, fmd is a stack variable.",
+      "parentUuid": "1a535cf0_6d0b3ef7",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "75a523fd_b1be0950",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 1,
+      "message": "As per the call today with Sachin, we decided to make it 4.\n@Carlo - Correct, as per my understanding, it cannot happen more than twice. We don\u0027t have multiple IP based encaps (Eg: IPoIP), The encaps we support, you would be aware are MPLSoUDP, MPLSoGRE, VXLAN.",
+      "parentUuid": "7a6101c8_86857a70",
+      "range": {
+        "startLine": 1087,
+        "startChar": 25,
+        "endLine": 1087,
+        "endChar": 26
+      },
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true

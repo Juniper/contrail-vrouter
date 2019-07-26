@@ -16,6 +16,24 @@
       "revId": "36e77d907b9e89096f06a25f27558b213c3869ce",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1304f5d6_a1341653",
+        "filename": "include/vr_mpls.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-26T06:29:07Z",
+      "side": 0,
+      "message": "Yes, we wanted to discuss with PLM if we are ok with this. Looks like PLM suggested to retain this.",
+      "parentUuid": "9526aefd_fc3bb9e7",
+      "revId": "36e77d907b9e89096f06a25f27558b213c3869ce",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
