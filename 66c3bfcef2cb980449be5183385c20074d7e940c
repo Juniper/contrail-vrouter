@@ -453,6 +453,48 @@
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "11f03d5d_228d5505",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 787
+      },
+      "writtenOn": "2019-07-26T15:30:21Z",
+      "side": 1,
+      "message": "vr_init_forwarding_md must set the value for fmd_local_ttl unconditionally, don\u0027t add the check \"if not zero\".\n\nI spot checked where vr_init_forwarding_md is invoked, and it is normally called to initialize \"newly provided memory\", which will, normally, have random values inside?\n\nEg:\n\nvr_fragment_flush_queue_element(struct vr_fragment_queue_element *vfqe)\n{   \n    [...]\n    struct vr_forwarding_md fmd;\n\n    [...]    \n    // fmd_local_ttl may be non-0 here because fmd has memory filled with random values.\n    vr_init_forwarding_md(\u0026fmd);",
+      "parentUuid": "3f5dce7b_5e9dd4d3",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3480e3a4_589c4599",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 787
+      },
+      "writtenOn": "2019-07-26T15:30:21Z",
+      "side": 1,
+      "message": "Can you put a comment to explain why 4? Sounded like 2 was the max expected in earlier comments. \n\nWe want to avoid the risk of someone else looking at the code a year from now and just changing the value to 2, if 4 is correct.\n\nEncap supported: I actually have no idea of what we support :) thanks for the explanation. And if VXLAN or MPLSoUDP or MPLSoGRE inside contains another layer of VXLAN or GRE, the code is probably not supposed to look further inside, as that header would belong to the VM. And NAT probably follows a different path.",
+      "parentUuid": "75a523fd_b1be0950",
+      "range": {
+        "startLine": 1087,
+        "startChar": 25,
+        "endLine": 1087,
+        "endChar": 26
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
