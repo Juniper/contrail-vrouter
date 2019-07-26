@@ -495,6 +495,24 @@
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "22f98da5_6f87cb7a",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-26T15:46:53Z",
+      "side": 1,
+      "message": "Yes, my bad. We need to unconditionally set it. Pls ignore my earlier comment.",
+      "parentUuid": "11f03d5d_228d5505",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
