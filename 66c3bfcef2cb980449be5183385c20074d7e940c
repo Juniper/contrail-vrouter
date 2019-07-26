@@ -36,6 +36,29 @@
     },
     {
       "key": {
+        "uuid": "6f162582_fd9c34d2",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 641,
+      "author": {
+        "id": 175
+      },
+      "writtenOn": "2019-07-26T00:06:25Z",
+      "side": 1,
+      "message": "as anath suggested, we need a special drop code and also can we have a packet and bt. should we consider do panic based on sysctl param?",
+      "range": {
+        "startLine": 641,
+        "startChar": 38,
+        "endLine": 641,
+        "endChar": 54
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d9d721cf_762b2b30",
         "filename": "dp-core/vr_proto_ip.c",
         "patchSetId": 5
@@ -64,6 +87,29 @@
       "writtenOn": "2019-07-25T21:41:30Z",
       "side": 1,
       "message": "Isn\u0027t there any backward compatibility issue here between older receiver and new sender agent ?",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5eb12c4e_9b983440",
+        "filename": "include/vr_mpls.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 175
+      },
+      "writtenOn": "2019-07-26T00:06:25Z",
+      "side": 1,
+      "message": "Till 3.1 our default mpls udp port is 51234. Since some customers are using 3.1, we need to have the support for port 51234 for inter-operability. Either we can reserve the port in linux using ip_local_reserved_ports sysctl or agent can do the bind for all reserverd ports in the initialization. Please take care of this.",
+      "range": {
+        "startLine": 19,
+        "startChar": 8,
+        "endLine": 19,
+        "endChar": 33
+      },
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -153,6 +199,30 @@
       "side": 1,
       "message": "if it is never ever suppose to go more than 3, can you [soft] assert ? at least in any testing-mode ?",
       "parentUuid": "e524fa62_43812e4a",
+      "range": {
+        "startLine": 1087,
+        "startChar": 25,
+        "endLine": 1087,
+        "endChar": 26
+      },
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7a6101c8_86857a70",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 175
+      },
+      "writtenOn": "2019-07-26T00:06:25Z",
+      "side": 1,
+      "message": "can we have a macro instead of hardcoded value? also can we move the fmd_local_ttl close to fmd_flags?",
+      "parentUuid": "76b60ec2_958dd9ee",
       "range": {
         "startLine": 1087,
         "startChar": 25,
