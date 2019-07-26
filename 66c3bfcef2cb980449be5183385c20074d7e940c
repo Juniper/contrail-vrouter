@@ -256,6 +256,23 @@
       "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1a535cf0_6d0b3ef7",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 1087,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-26T05:16:09Z",
+      "side": 1,
+      "message": "Can you initialize the ttl only if the value is 0 and not reset it unconditionally? This would catch cases if someone is doing reinit again on the same fmd.",
+      "revId": "66c3bfcef2cb980449be5183385c20074d7e940c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
