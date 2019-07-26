@@ -137,9 +137,9 @@ vt_message(xmlNodePtr node, struct vtest *test)
 
                 } else if (buf) {
                     vr_flow_req *req = (vr_flow_req *)buf;
-                    uint64_t temp = ntohl(req->fr_flow_sip_l);
+                    uint64_t temp = ntohll(req->fr_flow_sip_l);
                     temp += i;
-                    req->fr_flow_sip_l = htonl(temp);
+                    req->fr_flow_sip_l = htonll(temp);
                     test->message_ptr_num++;
                     test->messages.data[test->message_ptr_num].mem = buf;
                     test->messages.data[test->message_ptr_num].type =
