@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d0c2d1d1_04013e8d",
+        "filename": "utils/vtest_py/tests/mirror_v6_intf_phy.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 135,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-27T05:54:01Z",
+      "side": 1,
+      "message": "Let us create the pkt in the test case itself, instead of using the pcap file",
+      "revId": "e55bf737f1de1198f29377a7ca0e1d0dbd19b89c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7197f945_84aec43a",
+        "filename": "utils/vtest_py/tests/mirror_v6_intf_phy.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-27T05:54:01Z",
+      "side": 1,
+      "message": "Can you put the appropriate comment here?",
+      "revId": "e55bf737f1de1198f29377a7ca0e1d0dbd19b89c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
