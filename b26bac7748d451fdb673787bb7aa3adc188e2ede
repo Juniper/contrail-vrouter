@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f72fc72f_d3735266",
+        "filename": "utils/vif.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 440,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-29T04:36:17Z",
+      "side": 1,
+      "message": "Pl change name to vr_interface_fabric_info()",
+      "revId": "b26bac7748d451fdb673787bb7aa3adc188e2ede",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "54f913e1_e9172591",
+        "filename": "utils/vif.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 445,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-29T04:36:17Z",
+      "side": 1,
+      "message": "Change name to fabric_link[]",
+      "revId": "b26bac7748d451fdb673787bb7aa3adc188e2ede",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5af901ad_85d5c5ea",
+        "filename": "utils/vif.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 464,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-07-29T04:36:17Z",
+      "side": 1,
+      "message": "What will this function output when run in the context of vtest?",
+      "revId": "b26bac7748d451fdb673787bb7aa3adc188e2ede",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
