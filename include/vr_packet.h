@@ -1045,6 +1045,12 @@ enum {
 
 #define FMD_MIRROR_INVALID_DATA 0xFFFF
 
+/* We don't expect packet to loop through the same set
+ * of functions more than twice. To be conservative,
+ * make it value as 4
+ */
+#define FMD_PKT_LOOP_TTL 4
+
 struct vr_forwarding_md {
     struct vr_flow_entry *fmd_fe;
     int32_t fmd_flow_index;
@@ -1063,6 +1069,7 @@ struct vr_forwarding_md {
     int8_t fmd_dotonep;
     int8_t fmd_dmac[VR_ETHER_ALEN];
     int8_t fmd_smac[VR_ETHER_ALEN];
+    int8_t fmd_local_ttl;
 };
 
 static inline void
@@ -1083,6 +1090,7 @@ vr_init_forwarding_md(struct vr_forwarding_md *fmd)
     fmd->fmd_flags = 0;
     fmd->fmd_dscp = -1;
     fmd->fmd_dotonep = -1;
+    fmd->fmd_local_ttl = FMD_PKT_LOOP_TTL;
     VR_MAC_RESET(fmd->fmd_dmac);
     VR_MAC_RESET(fmd->fmd_smac);
 
