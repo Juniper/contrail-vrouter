@@ -211,7 +211,7 @@ class vtest:
                 fh.write("<pcap_input_file>" + inp_pcap_filestr +
                          "</pcap_input_file>\n")
                 if (output_pkt_list is not None):
-                    fh.write("<pcap_excepted_file>" + out_pcap_filestr
+                    fh.write("<pcap_expected_file>" + out_pcap_filestr
                              + "</pcap_expected_file>\n")
                 fh.write("<tx_interface> <vif_index>" + input_if_idx
                          + "</vif_index></tx_interface>\n")
