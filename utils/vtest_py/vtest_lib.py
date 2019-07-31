@@ -5,7 +5,8 @@ import time
 import os
 import shutil
 import signal
-from enum import IntEnum
+import socket
+import ipaddress
 
 from vr_py_sandesh.vr_py.ttypes import *
 from pysandesh.transport.TTransport import *
@@ -18,81 +19,54 @@ import pytest
 
 
 ############################################
-# Sandesh enums
-############################################
-class sandeshenum(IntEnum):
-    """Class for sandesh enums"""
-
-    SANDESH_OPER_ADD = 0
-    SANDESH_OPER_GET = 1
-    SANDESH_OPER_DEL = 2
-
-    SANDESH_FLOW_OPER_SET = 0
-    SANDESH_FLOW_OPER_LIST = 1
-    SANDESH_FLOW_OPER_TABLE_GET = 2
-
-    SANDESH_NH_TYPE_DEAD = 0
-    SANDESH_NH_TYPE_RCV = 1
-    SANDESH_NH_TYPE_ENCAP = 2
-    SANDESH_NH_TYPE_TUNNEL = 3
-    SANDESH_NH_TYPE_RESOLVE = 4
-    SANDESH_NH_TYPE_DISCARD = 5
-    SANDESH_NH_TYPE_COMPOSITE = 6
-    SANDESH_NH_TYPE_VRF_TRANSLATE = 7
-    SANDESH_NH_TYPE_L2_RCV = 8
-
-    SANDESH_AF_UNIX = 1
-    SANDESH_AF_INET = 2
-    SANDESH_AF_BRIDGE = 7
-    SANDESH_AF_INET6 = 10
-
-    SANDESH_VIF_TYPE_HOST = 0
-    SANDESH_VIF_TYPE_AGENT = 1
-    SANDESH_VIF_TYPE_PHYSICAL = 2
-    SANDESH_VIF_TYPE_VIRTUAL = 3
-    SANDESH_VIF_TYPE_XEN_LL_HOST = 4
-    SANDESH_VIF_TYPE_GATEWAY = 5
-    SANDESH_VIF_TYPE_VIRTUAL_VLAN = 6
-    SANDESH_VIF_TYPE_STATS = 7
-    SANDESH_VIF_TYPE_VLAN = 8
-    SANDESH_VIF_TYPE_MONITORING = 9
-
-    SANDESH_VIF_TRANSPORT_VIRTUAL = 0
-    SANDESH_VIF_TRANSPORT_ETH = 1
-    SANDESH_VIF_TRANSPORT_PMD = 2
-    SANDESH_VIF_TRANSPORT_SOCKET = 3
-
-
-############################################
 # Vrouter class
 ############################################
+def vt_encap(str):
+    blist = list(str.replace(' ', '').decode('hex'))
+    for i in range(len(blist)):
+        blist[i] = ord(blist[i])
+    return blist
+
+
+def vt_mac(str):
+    blist = list(str.replace(':', '').decode('hex'))
+    for i in range(len(blist)):
+        blist[i] = ord(blist[i])
+    return blist
+
+def vt_ipv4(str):
+   return socket.htonl(int(ipaddress.IPv4Address(unicode(str))))
+
 class vrouter:
     """Class which abstracts DPDK Vrouter actions"""
 
     dpdk_binary_path = ""
     socket_dir = ""
 
-    def __init__(self, path, sock_dir):
+    def __init__(self, path, sock_dir, vtest_only):
         self.dpdk_binary_path = path
         self.socket_dir = sock_dir
+        self.vtest_only = vtest_only
         self.pid = 0
-        print "Creating vrouter obj path %s \
-               sock_dir %s" % (path, sock_dir)
 
     def run(self):
+        if (self.vtest_only):
+            return 0
         cpid = os.fork()
         if cpid == 0:
             os.execlp("taskset", "taskset", "0x1", self.dpdk_binary_path,
                       "--no-daemon", "--no-huge", "--vr_packet_sz",
                       "2048", "--vr_socket_dir", self.socket_dir)
         else:
-            print "pid of dpdk process = ", cpid
+            print "Running cmd - taskset 0x1 %s --no-daemon --no-huge --vr_packet_sz 2048 "\
+                  "--vr_socket_dir %s" % (self.dpdk_binary_path, self.socket_dir)
+            print "pid = " + str(cpid)
             self.pid = cpid
             count = 0
             ret2 = 0
             while (count < 10):
                 cmd2 = "lsof " + self.socket_dir + "/dpdk_netlink | wc -l"
-                print "Running cmd ", cmd2
+                print "Running cmd - ", cmd2
                 try:
                     ret2 = subprocess.check_output(cmd2, shell=True)
                     # check if the netlink is up using the ret value
@@ -112,6 +86,8 @@ class vrouter:
                 return 0
 
     def stop(self):
+        if (self.vtest_only):
+            return
         if (self.pid > 0):
             print "Stopping vrouter pid=" + str(self.pid)
             try:
@@ -311,7 +287,8 @@ def vrouter_test_fixture():
     # launch vrouter
     vr_path = os.environ['VROUTER_DPDK_PATH']
     sock_dir = os.environ['VROUTER_SOCKET_PATH']
-    vr = vrouter(vr_path, sock_dir)
+    vtest_only = os.environ['VTEST_ONLY_MODE']
+    vr = vrouter(vr_path, sock_dir, int(vtest_only))
     print "Launching vrouter"
     vr.run()
     yield vrouter_test_fixture
