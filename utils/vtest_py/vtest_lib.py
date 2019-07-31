@@ -76,8 +76,6 @@ class vrouter:
         self.dpdk_binary_path = path
         self.socket_dir = sock_dir
         self.pid = 0
-        print "Creating vrouter obj path %s \
-               sock_dir %s" % (path, sock_dir)
 
     def run(self):
         cpid = os.fork()
@@ -86,13 +84,15 @@ class vrouter:
                       "--no-daemon", "--no-huge", "--vr_packet_sz",
                       "2048", "--vr_socket_dir", self.socket_dir)
         else:
-            print "pid of dpdk process = ", cpid
+            print "Running cmd - taskset 0x1 %s --no-daemon --no-huge --vr_packet_sz 2048 "\
+                  "--vr_socket_dir %s" % (self.dpdk_binary_path, self.socket_dir)
+            print "pid = " + str(cpid)
             self.pid = cpid
             count = 0
             ret2 = 0
             while (count < 10):
                 cmd2 = "lsof " + self.socket_dir + "/dpdk_netlink | wc -l"
-                print "Running cmd ", cmd2
+                print "Running cmd - ", cmd2
                 try:
                     ret2 = subprocess.check_output(cmd2, shell=True)
                     # check if the netlink is up using the ret value
@@ -311,6 +311,12 @@ def vrouter_test_fixture():
     # launch vrouter
     vr_path = os.environ['VROUTER_DPDK_PATH']
     sock_dir = os.environ['VROUTER_SOCKET_PATH']
+    vtest_only = os.environ['VTEST_ONLY_MODE']
+    # If DPDK vRouter is already running separately, 
+    # don't start it
+    if vtest_only:
+        yield vrouter_test_fixture
+        return
     vr = vrouter(vr_path, sock_dir)
     print "Launching vrouter"
     vr.run()
