@@ -4,6 +4,7 @@ import os
 import sys
 sys.path.append(os.getcwd())
 from vtest_lib import *
+import vtconst
 
 
 def test2(vrouter_test_fixture):
@@ -12,15 +13,15 @@ def test2(vrouter_test_fixture):
 
     # Add a Vif interface
     vif = vr_interface_req()
-    vif.h_op = sandeshenum.SANDESH_OPER_ADD
-    vif.vifr_type = sandeshenum.SANDESH_VIF_TYPE_VIRTUAL
+    vif.h_op = vtconst.SANDESH_OPER_ADD
+    vif.vifr_type = vtconst.VIF_TYPE_VIRTUAL
     vif.vifr_idx = 1
-    vif.vifr_name = "1"
-    vif.vifr_transport = sandeshenum.SANDESH_VIF_TRANSPORT_PMD
+    vif.vifr_name = "tap_1"
+    vif.vifr_transport = vtconst.VIF_TRANSPORT_PMD
     vif.vifr_vrf = 0
-    vif.vifr_mac = [0xde, 0xad, 0xbe, 0xef, 0x00, 0x02]
+    vif.vifr_mac = vt_mac("de:ad:be:ef:00:02")
     vif.vifr_mtu = 1514
-    vif.vifr_ip = 16843018
+    vif.vifr_ip = vt_ipv4("1.1.1.10")
 
     vt.send_sandesh_req(vif)
 
@@ -35,11 +36,11 @@ def test2(vrouter_test_fixture):
     pkt = ether/arp
     pkt.show()
 
-    vt.send_pkt(pkt, "1")
+    vt.send_pkt(pkt, "tap_1")
 
     # get the dropstats
     drop_stats = vr_drop_stats_req()
-    drop_stats.h_op = sandeshenum.SANDESH_OPER_GET
+    drop_stats.h_op = vtconst.SANDESH_OPER_GET
 
     drop_stats_resp = vt.send_sandesh_req(drop_stats, vt.VT_RESPONSE_REQD)
 

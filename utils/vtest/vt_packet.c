@@ -101,9 +101,8 @@ vt_packet(xmlNodePtr node, struct vtest *test)
                     continue;
                 }
                 if (l_node_interface->children && l_node_interface->children->content) {
-
-                    (test->packet_tx.vif_id =
-                     strtoul(l_node_interface->children->content, NULL, 0));
+                    strncpy(test->packet_tx.un_socket,
+                            l_node_interface->children->content, UNIX_PATH_MAX);
                     break;
                 }
                 l_node_interface = l_node_interface->next;
@@ -119,8 +118,9 @@ vt_packet(xmlNodePtr node, struct vtest *test)
                     continue;
                 }
                 if (l_node_interface->children && l_node_interface->children->content) {
-                    (test->packet_rx[test->packet.rx_client_num].vif_id =
-                     strtoul(l_node_interface->children->content, NULL, 0));
+                    strncpy(test->packet_rx[test->packet.rx_client_num].un_socket,
+                            l_node_interface->children->content, UNIX_PATH_MAX);
+                    break;
                     //for multicast purpose 1:M, multicast is not implemented
                     test->packet.rx_client_num += 1;
                     break;
@@ -273,11 +273,11 @@ tx_rx_pcap_test(struct vtest *test) {
         send_only = true;
     }
 
-    snprintf(src_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
-        vr_socket_dir, test->packet_tx.vif_id);
+    snprintf(src_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%s",
+        vr_socket_dir, test->packet_tx.un_socket);
     if (!send_only) {
-        snprintf(dst_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%d",
-                 vr_socket_dir, test->packet_rx[0].vif_id);
+        snprintf(dst_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%s",
+                 vr_socket_dir, test->packet_rx[0].un_socket);
     }
 
     memset(&tx_rx_handler, 0, sizeof(struct tx_rx_handler));

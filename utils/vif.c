@@ -461,7 +461,7 @@ list_get_print(vr_interface_req *req)
 
     if (req->vifr_flags & VIF_FLAG_PMD) {
         printf("PMD: %d", req->vifr_os_idx);
-    } else if (platform == DPDK_PLATFORM) {
+    } else if (platform == DPDK_PLATFORM || platform == VTEST_PLATFORM) {
         switch (req->vifr_type) {
             case VIF_TYPE_PHYSICAL:
                 if(req->vifr_flags & VIF_FLAG_MOCK_PHYSICAL)
@@ -542,7 +542,7 @@ list_get_print(vr_interface_req *req)
         printf("\n");
     }
 
-    if (platform == DPDK_PLATFORM) {
+    if (platform == DPDK_PLATFORM || platform == VTEST_PLATFORM) {
         vr_interface_pbem_counters_print("RX device", print_zero,
                 req->vifr_dev_ipackets, req->vifr_dev_ibytes,
                 req->vifr_dev_ierrors, req->vifr_dev_inombufs);
@@ -603,7 +603,7 @@ list_get_print(vr_interface_req *req)
 
     }
 
-    if (platform == DPDK_PLATFORM) {
+    if (platform == DPDK_PLATFORM || platform == VTEST_PLATFORM) {
         vr_interface_pe_counters_print("TX queue ", print_zero,
                 req->vifr_queue_opackets, req->vifr_queue_oerrors);
         vr_interface_pesm_counters_print("TX port  ", print_zero,
@@ -1721,7 +1721,6 @@ main(int argc, char *argv[])
     vif_fill_nl_callbacks();
 
     parse_ini_file();
-    platform = get_platform();
 
     while ((opt = getopt_long(argc, argv, "ba:c:d:g:klm:t:T:v:p:C:DPi:s:",
                     long_options, &option_index)) >= 0) {
@@ -1826,6 +1825,7 @@ main(int argc, char *argv[])
     if (sock_dir_set) {
         set_platform_vtest();
     }
+    platform = get_platform();
     cl = vr_get_nl_client(sock_proto);
     if (!cl) {
         printf("Error registering NetLink client: %s (%d)\n",
