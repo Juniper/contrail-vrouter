@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a679054b_1a47a186",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-07-31T06:11:04Z",
+      "side": 1,
+      "message": "Test, temp_en -  I assume these are some test/tmp variables for your testing/verification. Please clean them up or add appropriate names with comments to clear the context.",
+      "revId": "721303d6d40aad1e92630099e54921cd1fa9a208",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
