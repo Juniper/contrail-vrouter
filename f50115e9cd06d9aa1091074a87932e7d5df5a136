@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "70f0f94e_f015c631",
+        "filename": "utils/vtest_py/tests/mirror_v6_intf_phy.py",
+        "patchSetId": 5
+      },
+      "lineNbr": 176,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-07-31T06:24:52Z",
+      "side": 1,
+      "message": "Minor nit: Can you put the appropriate test name?",
+      "revId": "f50115e9cd06d9aa1091074a87932e7d5df5a136",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
