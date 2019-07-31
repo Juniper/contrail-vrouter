@@ -34,27 +34,21 @@ goto the virtual env and run the test (method2)
 
 Method 1 (using run_test.sh)
 
- - Export the following variables to bash
-             For eg: VROUTER_DPDK_PATH=/home/anandrao/mainline_new/build/debug/vrouter/dpdk/contrail-vrouter-dpdk
-                     VROUTER_SOCKET_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest_py_venv/var/run/vrouter
-                     VTEST_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest/vtest
-                     VTEST_PY_VENV_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest_py_venv
-
- - Run the following command from $SB/vrouter/utils/vtest_py
+ - Run the following command from `$SB/vrouter/utils/vtest_py`
 ./run_test.sh test_file_name.py
 
 Method 2
-
+`
  - cd $SB/build/debug/vrouter/utils/vtest_py_venv
  - source bin/activate
  - Export the following variables to bash
-             For eg: VROUTER_DPDK_PATH=/home/anandrao/mainline_new/build/debug/vrouter/dpdk/contrail-vrouter-dpdk
+             `For eg: VROUTER_DPDK_PATH=/home/anandrao/mainline_new/build/debug/vrouter/dpdk/contrail-vrouter-dpdk
                      VROUTER_SOCKET_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest_py_venv/var/run/vrouter
                      VTEST_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest/vtest
-                     VTEST_PY_VENV_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest_py_venv
+                     VTEST_PY_VENV_PATH=/home/anandrao/mainline_new/build/debug/vrouter/utils/vtest_py_venv`
  - pytest -s tests/test_file_name.py
  - deactivate
-
+`
 ## Workflow for adding new tests
 
  - Run **scons vrouter** to build the dpdk and vtest binaries
@@ -66,4 +60,10 @@ Method 2
  - Once the test case is ready, copy the test case file to the source
    **vtest_py/tests** directory for commit
 
-
+## Tips and tricks
+ - To run vRouter alone in background, run the following command from `$SB/vrouter/utils/vtest_py`
+   `VROUTER_ONLY_MODE=1 ./run_test.sh &`
+ - To run vtest alone, run the following command from `$SB/vrouter/utils/vtest_py`
+   `VTEST_ONLY_MODE=1 ./run_test.sh test1.py`
+ - Then the vif, nh, rt etc. commands can be executed with the sock-dir option
+ - Before running another UT, the vRouter needs to be stopped manually
