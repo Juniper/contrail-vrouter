@@ -72,27 +72,30 @@ class vrouter:
     dpdk_binary_path = ""
     socket_dir = ""
 
-    def __init__(self, path, sock_dir):
+    def __init__(self, path, sock_dir, vtest_only):
         self.dpdk_binary_path = path
         self.socket_dir = sock_dir
+        self.vtest_only = vtest_only
         self.pid = 0
-        print "Creating vrouter obj path %s \
-               sock_dir %s" % (path, sock_dir)
 
     def run(self):
+        if (self.vtest_only):
+            return 0
         cpid = os.fork()
         if cpid == 0:
             os.execlp("taskset", "taskset", "0x1", self.dpdk_binary_path,
                       "--no-daemon", "--no-huge", "--vr_packet_sz",
                       "2048", "--vr_socket_dir", self.socket_dir)
         else:
-            print "pid of dpdk process = ", cpid
+            print "Running cmd - taskset 0x1 %s --no-daemon --no-huge --vr_packet_sz 2048 "\
+                  "--vr_socket_dir %s" % (self.dpdk_binary_path, self.socket_dir)
+            print "pid = " + str(cpid)
             self.pid = cpid
             count = 0
             ret2 = 0
             while (count < 10):
                 cmd2 = "lsof " + self.socket_dir + "/dpdk_netlink | wc -l"
-                print "Running cmd ", cmd2
+                print "Running cmd - ", cmd2
                 try:
                     ret2 = subprocess.check_output(cmd2, shell=True)
                     # check if the netlink is up using the ret value
@@ -112,6 +115,8 @@ class vrouter:
                 return 0
 
     def stop(self):
+        if (self.vtest_only):
+            return
         if (self.pid > 0):
             print "Stopping vrouter pid=" + str(self.pid)
             try:
@@ -311,7 +316,8 @@ def vrouter_test_fixture():
     # launch vrouter
     vr_path = os.environ['VROUTER_DPDK_PATH']
     sock_dir = os.environ['VROUTER_SOCKET_PATH']
-    vr = vrouter(vr_path, sock_dir)
+    vtest_only = os.environ['VTEST_ONLY_MODE']
+    vr = vrouter(vr_path, sock_dir, int(vtest_only))
     print "Launching vrouter"
     vr.run()
     yield vrouter_test_fixture
