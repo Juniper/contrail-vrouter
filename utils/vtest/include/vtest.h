@@ -27,8 +27,6 @@
 
 struct packet_interface {
    unsigned short vif_id;
-   //Todo send a message for map interface id to name interface
-   //Socket name is created with vif_name parameter.
    char un_socket[UNIX_PATH_MAX];
 };
 
