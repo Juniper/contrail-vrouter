@@ -1,0 +1,144 @@
+
+SANDESH_OPER_ADD = 0
+SANDESH_OPER_GET = 1
+SANDESH_OPER_DEL = 2
+
+VIF_TYPE_HOST              = 0
+VIF_TYPE_AGENT             = 1
+VIF_TYPE_PHYSICAL          = 2
+VIF_TYPE_VIRTUAL           = 3
+VIF_TYPE_XEN_LL_HOST       = 4
+VIF_TYPE_GATEWAY           = 5
+VIF_TYPE_VIRTUAL_VLAN      = 6
+VIF_TYPE_STATS             = 7
+VIF_TYPE_VLAN              = 8
+VIF_TYPE_MONITORING        = 9
+VIF_TYPE_MAX               = 10
+
+
+VR_INTERFACE_NAME_LEN      = 64
+VIF_MAX_MIRROR_MD_SIZE     = 255
+
+VIF_SRC_MACS               = 4
+
+VIF_TRANSPORT_VIRTUAL      = 0
+VIF_TRANSPORT_ETH          = 1
+VIF_TRANSPORT_PMD          = 2
+VIF_TRANSPORT_SOCKET       = 3
+
+VR_IF_ADD                  = 0
+VR_IF_DEL                  = 1
+
+VIF_FLAG_POLICY_ENABLED    = 0x1
+VIF_FLAG_XCONNECT          = 0x2
+VIF_FLAG_SERVICE_IF        = 0x4
+VIF_FLAG_MIRROR_RX         = 0x8
+VIF_FLAG_MIRROR_TX         = 0x10
+VIF_FLAG_TX_CSUM_OFFLOAD   = 0x20
+VIF_FLAG_L3_ENABLED        = 0x40
+VIF_FLAG_L2_ENABLED        = 0x80
+VIF_FLAG_DHCP_ENABLED      = 0x100
+VIF_FLAG_VHOST_PHYS        = 0x200
+VIF_FLAG_PROMISCOUS        = 0x400
+VIF_FLAG_NATIVE_VLAN_TAG   = 0x800
+VIF_FLAG_NO_ARP_PROXY      = 0x1000
+VIF_FLAG_PMD               = 0x2000
+VIF_FLAG_FILTERING_OFFLOAD = 0x4000
+
+VIF_FLAG_MONITORED         = 0x8000
+VIF_FLAG_UNKNOWN_UC_FLOOD  = 0x10000
+VIF_FLAG_VLAN_OFFLOAD      = 0x20000
+
+VIF_FLAG_DROP_NEW_FLOWS    = 0x40000
+VIF_FLAG_MAC_LEARN         = 0x80000
+VIF_FLAG_MAC_PROXY         = 0x100000
+VIF_FLAG_ETREE_ROOT        = 0x200000
+VIF_FLAG_GRO_NEEDED        = 0x400000
+VIF_FLAG_MRG_RXBUF         = 0x800000
+VIF_FLAG_MIRROR_NOTAG      = 0x1000000
+VIF_FLAG_IGMP_ENABLED      = 0x2000000
+
+VIF_FLAG_MOCK_PHYSICAL     = 0x4000000
+
+VIF_FLAG_GET_DROP_STATS    = 0x01
+
+VIF_VRF_TABLE_ENTRIES      = 1024
+VIF_VRF_INVALID            = 65535
+
+VIF_ENCAP_TYPE_ETHER       = 1
+VIF_ENCAP_TYPE_L3          = 2
+VIF_ENCAP_TYPE_L3_DECRYPT  = 3
+
+VR_DEF_NEXTHOPS                = 65536
+NH_TABLE_ENTRIES               = VR_DEF_NEXTHOPS
+VR_NEXTHOP_COMPONENT_DUMP_LIMIT = 16
+NH_DISCARD_ID                   = 0
+
+NH_DEAD                    = 0      
+NH_RCV                     = 1
+NH_ENCAP                   = 2
+NH_TUNNEL                  = 3
+NH_RESOLVE                 = 4
+NH_DISCARD                 = 5
+NH_COMPOSITE               = 6
+NH_VRF_TRANSLATE           = 7
+NH_L2_RCV                  = 8
+NH_MAX                     = 9
+
+NH_VXLAN_VRF                       =  NH_VRF_TRANSLATE
+
+NH_FLAG_VALID                      =  0x000001
+NH_FLAG_POLICY_ENABLED             =  0x000002
+# 0x000004 is free
+NH_FLAG_TUNNEL_GRE                 =  0x000008
+NH_FLAG_TUNNEL_UDP                 =  0x000010
+NH_FLAG_MCAST                      =  0x000020
+NH_FLAG_TUNNEL_UDP_MPLS            =  0x000040
+NH_FLAG_TUNNEL_VXLAN               =  0x000080
+NH_FLAG_RELAXED_POLICY             =  0x000100
+NH_FLAG_COMPOSITE_FABRIC           =  0x000200
+NH_FLAG_COMPOSITE_ECMP             =  0x000400
+NH_FLAG_COMPOSITE_LU_ECMP          =  0x000800
+NH_FLAG_COMPOSITE_EVPN             =  0x001000
+NH_FLAG_COMPOSITE_ENCAP            =  0x002000
+NH_FLAG_COMPOSITE_TOR              =  0x004000
+NH_FLAG_ROUTE_LOOKUP               =  0x008000
+NH_FLAG_UNKNOWN_UC_FLOOD           =  0x010000
+NH_FLAG_TUNNEL_SIP_COPY            =  0x020000
+NH_FLAG_FLOW_LOOKUP                =  0x040000
+NH_FLAG_TUNNEL_PBB                 =  0x080000
+NH_FLAG_MAC_LEARN                  =  0x100000
+NH_FLAG_ETREE_ROOT                 =  0x200000
+NH_FLAG_INDIRECT                   =  0x400000
+NH_FLAG_L2_CONTROL_DATA            =  0x800000
+NH_FLAG_CRYPT_TRAFFIC              =  0x01000000
+NH_FLAG_L3_VXLAN                   =  0x02000000
+NH_FLAG_TUNNEL_MPLS_O_MPLS         =  0x04000000
+NH_FLAG_VALIDATE_MCAST_SRC         =  0x08000000
+
+NH_SOURCE_INVALID                  =  0
+NH_SOURCE_VALID                    =  1
+NH_SOURCE_MISMATCH                 =  2
+
+NH_ECMP_CONFIG_HASH_BITS           =  5
+NH_ECMP_CONFIG_HASH_MASK           =  ((1 << NH_ECMP_CONFIG_HASH_BITS) - 1)
+NH_ECMP_CONFIG_HASH_PROTO          =  0x01
+NH_ECMP_CONFIG_HASH_SRC_IP         =  0x02
+NH_ECMP_CONFIG_HASH_SRC_PORT       =  0x04
+NH_ECMP_CONFIG_HASH_DST_IP         =  0x08
+NH_ECMP_CONFIG_HASH_DST_PORT       =  0x10
+
+AF_BRIDGE                          = 7
+
+VR_RT_LABEL_VALID_FLAG             = 0x1
+VR_RT_ARP_PROXY_FLAG               = 0x2
+VR_RT_ARP_TRAP_FLAG                = 0x4
+VR_RT_ARP_FLOOD_FLAG               = 0x8
+
+VR_BE_VALID_FLAG                   = 0x01
+VR_BE_LABEL_VALID_FLAG             = 0x02
+VR_BE_FLOOD_DHCP_FLAG              = 0x04
+VR_BE_MAC_MOVED_FLAG               = 0x08
+VR_BE_L2_CONTROL_DATA_FLAG         = 0x10
+VR_BE_MAC_NEW_FLAG                 = 0x20
+VR_BE_EVPN_CONTROL_PROCESSING_FLAG = 0x40

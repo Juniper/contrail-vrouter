@@ -6,3 +6,4 @@ scapy
 pytest
 pycodestyle
 flake8
+ipaddress
