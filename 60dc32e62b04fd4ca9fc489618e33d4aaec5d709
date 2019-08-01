@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a83bebb3_bad7f70b",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-01T12:29:31Z",
+      "side": 1,
+      "message": "what is the usecase of vtest_only and vrouter_only mode?",
+      "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e3912567_6751d554",
+        "filename": "utils/vtest_py/vtconst.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-01T12:29:31Z",
+      "side": 1,
+      "message": "These are also defined in sandeshenum class. Lets have only one set.\nIf we are going with this, please delete the sandeshenum class and update accordingly.",
+      "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ad55cf34_3be72478",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-01T12:29:31Z",
+      "side": 1,
+      "message": "You can directly print cpid, no need of doing str()",
+      "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
