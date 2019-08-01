@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "30769464_8cced26e",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 3
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-08-01T13:34:35Z",
+      "side": 1,
+      "message": "In one window, I can run vrouter only using the command:\nVROUTER_ONLY_MODE\u003d1 ./run_test.sh \u0026\n\nIn another window, I can run vtest only using the command:\nVTEST_ONLY_MODE\u003d1 ./run_test.sh test1.py\n\nThen we can check the programming of the vRouter using the vif, rt, nh cmds in the first window.\nThis helps in development of vrouter using vtest alone.",
+      "parentUuid": "a83bebb3_bad7f70b",
+      "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e3912567_6751d554",
         "filename": "utils/vtest_py/vtconst.py",
         "patchSetId": 3
@@ -36,6 +54,24 @@
     },
     {
       "key": {
+        "uuid": "a961af92_aee6347a",
+        "filename": "utils/vtest_py/vtconst.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-08-01T13:34:35Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e3912567_6751d554",
+      "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ad55cf34_3be72478",
         "filename": "utils/vtest_py/vtest_lib.py",
         "patchSetId": 3
@@ -47,6 +83,24 @@
       "writtenOn": "2019-08-01T12:29:31Z",
       "side": 1,
       "message": "You can directly print cpid, no need of doing str()",
+      "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "521f8a18_4935eeec",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-08-01T13:34:35Z",
+      "side": 1,
+      "message": "No, its an integer. The + operator works only on strings.",
+      "parentUuid": "ad55cf34_3be72478",
       "revId": "60dc32e62b04fd4ca9fc489618e33d4aaec5d709",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
