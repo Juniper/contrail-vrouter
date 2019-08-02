@@ -36,6 +36,10 @@ typedef enum {
 #define VR_FLOW_FLAG_VRFT               0x4000
 #define VR_FLOW_FLAG_LINK_LOCAL         0x8000
 
+/* fe_flags1 */
+#define VR_FLOW_FLAG1_HBS_LEFT          0x1000
+#define VR_FLOW_FLAG1_HBS_RIGHT         0x2000
+
 #define VR_FLOW_FLAG_DP_FLAGS           (VR_FLOW_FLAG_EVICT_CANDIDATE |\
                                             VR_FLOW_FLAG_EVICTED |\
                                             VR_FLOW_FLAG_NEW_FLOW |\
@@ -460,6 +464,10 @@ struct vr_flow_trap_arg {
 #define VR_FAT_FLOW_SRC_IP_MASK    0x4
 #define VR_FAT_FLOW_DST_IP_MASK    0x8
 #define VR_FAT_FLOW_MAX_MASK       0x9
+
+#define VR_HBS_FROM_VMI            0x1
+#define VR_HBS_FROM_FABRIC         0x2
+#define VR_HBS_L3_PKT              0x4
 
 struct vr_packet;
 struct vrouter;
