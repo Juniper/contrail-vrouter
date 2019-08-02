@@ -22,6 +22,7 @@
 #include <vr_bridge.h>
 #include <vr_packet.h>
 #include <vr_mirror.h>
+#include <vr_vrf_table.h>
 #include <vr_vxlan.h>
 #include <vr_qos.h>
 #include <vr_offloads_dp.h>
@@ -126,8 +127,11 @@ static struct vr_module modules[] = {
         .init           =       vr_offloads_init,
         .exit           =       vr_offloads_exit,
     },
-
-
+    {
+        .mod_name       =       "Vrf",
+        .init           =       vr_vrf_table_init,
+        .exit           =       vr_vrf_table_exit,
+    },
 };
 
 
