@@ -58,6 +58,9 @@ VIF_FLAG_MRG_RXBUF                 = 0x800000
 VIF_FLAG_MIRROR_NOTAG              = 0x1000000
 VIF_FLAG_IGMP_ENABLED              = 0x2000000
 VIF_FLAG_MOCK_PHYSICAL             = 0x4000000
+VIF_FLAG_HBS_LEFT                  = 0x8000000
+VIF_FLAG_HBS_RIGHT                 = 0x10000000
+
 VIF_FLAG_GET_DROP_STATS            = 0x01
 
 VIF_VRF_TABLE_ENTRIES              = 1024
@@ -175,6 +178,10 @@ VR_RFLOW_VALID                     = 0x1000
 VR_FLOW_FLAG_MIRROR                = 0x2000
 VR_FLOW_FLAG_VRFT                  = 0x4000
 VR_FLOW_FLAG_LINK_LOCAL            = 0x8000
+
+# fe_flags1
+VR_FLOW_FLAG1_HBS_LEFT             = 0x1000
+VR_FLOW_FLAG1_HBS_RIGHT            = 0x2000
 
 # for NAT
 VR_FLOW_FLAG_SNAT                  = 0x2

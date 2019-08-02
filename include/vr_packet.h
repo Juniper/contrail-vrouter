@@ -188,7 +188,8 @@
 #define VP_DROP_BMAC_ISID_MISMATCH          46
 #define VP_DROP_PKT_LOOP                    47
 #define VP_DROP_NO_CRYPT_PATH               48
-#define VP_DROP_MAX                         49
+#define VP_DROP_INVALID_HBS_PKT             49
+#define VP_DROP_MAX                         50
 
 
 /*
