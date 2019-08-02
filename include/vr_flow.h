@@ -36,6 +36,10 @@ typedef enum {
 #define VR_FLOW_FLAG_VRFT               0x4000
 #define VR_FLOW_FLAG_LINK_LOCAL         0x8000
 
+/* fe_flags1 */
+#define VR_FLOW_FLAG1_HBS_LEFT          0x1000
+#define VR_FLOW_FLAG1_HBS_RIGHT         0x2000
+
 #define VR_FLOW_FLAG_DP_FLAGS           (VR_FLOW_FLAG_EVICT_CANDIDATE |\
                                             VR_FLOW_FLAG_EVICTED |\
                                             VR_FLOW_FLAG_NEW_FLOW |\
@@ -377,9 +381,10 @@ struct vr_dummy_flow_entry {
     unsigned short fe_udp_src_port;
     uint32_t fe_src_info;
     struct vr_mirror_meta_entry *fe_mme;
+    unsigned short fe_flags1;
 } __attribute__packed__close__;
 
-#define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
+#define VR_FLOW_ENTRY_PACK (256 - sizeof(struct vr_dummy_flow_entry))
 
 /* do not change. any field positions as it might lead to incompatibility */
 __attribute__packed__open__
@@ -413,6 +418,7 @@ struct vr_flow_entry {
      */
     uint32_t fe_src_info;
     struct vr_mirror_meta_entry *fe_mme;
+    unsigned short fe_flags1;
     unsigned char fe_pack[VR_FLOW_ENTRY_PACK];
 } __attribute__packed__close__;
 
@@ -455,6 +461,9 @@ struct vr_flow_trap_arg {
 #define VR_FAT_FLOW_SRC_IP_MASK    0x4
 #define VR_FAT_FLOW_DST_IP_MASK    0x8
 #define VR_FAT_FLOW_MAX_MASK       0x9
+
+#define VR_HBS_FROM_VMI            1
+#define VR_HBS_FROM_FABRIC         2
 
 struct vr_packet;
 struct vrouter;
