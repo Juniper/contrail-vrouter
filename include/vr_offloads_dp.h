@@ -353,6 +353,49 @@ static inline int vr_offload_mirror_get(vr_mirror_req * resp)
     return ret;
 }
 
+static inline int vr_offload_vrf_table_entry_add(struct vr_vrf_table_entry * vrf_entry,
+                                        unsigned int index)
+{
+    struct vr_offload_ops *offload;
+    int ret = 0;
+
+    vr_rcu_read_lock();
+    offload = vr_rcu_dereference(offload_ops);
+    if (offload && offload->voo_vrf_table_entry_add)
+        ret = offload->voo_vrf_table_entry_add(vrf_entry, index);
+    vr_rcu_read_unlock();
+
+    return ret;
+}
+
+static inline int vr_offload_vrf_table_entry_del(unsigned int index)
+{
+    struct vr_offload_ops *offload;
+    int ret = 0;
+
+    vr_rcu_read_lock();
+    offload = vr_rcu_dereference(offload_ops);
+    if (offload && offload->voo_vrf_table_entry_del)
+        ret = offload->voo_vrf_table_entry_del(index);
+    vr_rcu_read_unlock();
+
+    return ret;
+}
+
+static inline int vr_offload_vrf_table_entry_get(vr_vrf_req * resp)
+{
+    struct vr_offload_ops *offload;
+    int ret = 0;
+
+    vr_rcu_read_lock();
+    offload = vr_rcu_dereference(offload_ops);
+    if (offload && offload->voo_vrf_table_entry_get)
+        ret = offload->voo_vrf_table_entry_get(resp);
+    vr_rcu_read_unlock();
+
+    return ret;
+}
+
 static inline int vr_offload_route_del(vr_route_req * req)
 {
     struct vr_offload_ops *offload;
