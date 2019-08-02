@@ -5,13 +5,13 @@ import sys
 import ipaddress
 import socket
 sys.path.append(os.getcwd())
+sys.path.append(os.getcwd() + '/lib/')
 import vtconst
 from vtest_lib import *
 
 '''
 vif --list
 -----------
-[root@10c591d9a769 vtest_py]# /root/contrail/build/debug/vrouter/utils/vif --sock-dir /root/contrail/build/debug/vrouter/utils/vtest_py_venv/sock_dir --list
 Vrouter Interface Table
 
 Flags: P=Policy, X=Cross Connect, S=Service Chain, Mr=Receive Mirror
@@ -23,10 +23,11 @@ Flags: P=Policy, X=Cross Connect, S=Service Chain, Mr=Receive Mirror
 
 vif0/0      PCI: Mock
             Type:Physical HWaddr:00:1b:21:bb:f9:48 IPaddr:0.0.0.0
-            Vrf:0 Mcast Vrf:65535 Flags:L3L2Vp QOS:0 Ref:6
+            Vrf:0 Mcast Vrf:65535 Flags:L3L2Vp QOS:0 Ref:7
+            RX port   packets:1 errors:0 syscalls:1
             RX queue errors to lcore 0 0 0 0 0 0 0 0 0 0 0
-            RX packets:0  bytes:0 errors:0
-            TX packets:1  bytes:0 errors:0
+            RX packets:1  bytes:88 errors:0
+            TX packets:0  bytes:0 errors:0
             Drops:0
 
 vif0/1      PMD: vhost0 Mock
@@ -47,32 +48,41 @@ vif0/2      Socket: unix Mock
 
 vif0/5      PMD: tapc2234cd0-55
             Type:Virtual HWaddr:00:00:5e:00:01:00 IPaddr:1.1.1.3
-            Vrf:5 Mcast Vrf:5 Flags:PL3L2D QOS:0 Ref:6
+            Vrf:5 Mcast Vrf:5 Flags:PL3L2D QOS:0 Ref:7
             RX queue errors to lcore 0 0 0 0 0 0 0 0 0 0 0
-            RX packets:1  bytes:0 errors:0
-            TX packets:0  bytes:0 errors:0
+            RX packets:0  bytes:0 errors:0
+            TX packets:1  bytes:42 errors:0
             Drops:0
-
+            TX port   packets:1 errors:0 syscalls:1
 
 nh --list
 ---------
-[root@10c591d9a769 vtest_py]# /root/contrail/build/debug/vrouter/utils/nh --sock-dir /root/contrail/build/debug/vrouter/utils/vtest_py_venv/sock_dir --list
-Id:0          Type:Drop           Fmly: AF_INET  Rid:0  Ref_cnt:1          Vrf:0
+[root@090c8246aecd vtest_py]# $utils/nh --sock-dir $sock --list
+Id:0          Type:Drop           Fmly: AF_INET  Rid:0  Ref_cnt:1021       Vrf:0
               Flags:Valid,
 
-Id:21         Type:Tunnel         Fmly: AF_INET  Rid:0  Ref_cnt:2          Vrf:0
+Id:10         Type:Receive        Fmly: AF_INET  Rid:0  Ref_cnt:2          Vrf:1
+              Flags:Valid, Policy(R), Etree Root,
+              Oif:1
+
+Id:21         Type:Tunnel         Fmly: AF_INET  Rid:0  Ref_cnt:1          Vrf:0
               Flags:Valid, MPLSoUDP, Etree Root,
-              Oif:1 Len:14 Data:00 1b 21 bb f9 46 00 1b 21 bb f9 48 08 00
+              Oif:0 Len:14 Data:00 1b 21 bb f9 46 00 1b 21 bb f9 48 08 00
               Sip:8.0.0.2 Dip:8.0.0.3
 
 Id:38         Type:Encap          Fmly: AF_INET  Rid:0  Ref_cnt:1          Vrf:5
-              Flags:Valid, Policy,
+              Flags:Valid, Policy, Etree Root,
+              EncapFmly:0000 Oif:5 Len:14
+              Encap Data: 02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00
+
+Id:44         Type:Encap          Fmly:AF_BRIDGE  Rid:0  Ref_cnt:2          Vrf:5
+              Flags:Valid, Policy, Etree Root,
               EncapFmly:0000 Oif:5 Len:14
               Encap Data: 02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00
 
 flow -l
 -------
-[root@10c591d9a769 vtest_py]# /root/contrail/build/debug/vrouter/utils/flow --sock-dir /root/contrail/build/debug/vrouter/utils/vtest_py_venv/sock_dir -l
+[root@090c8246aecd vtest_py]# $utils/flow --sock-dir $sock -l
 Flow table(size 80609280, entries 629760)
 
 Entries: Created 0 Added 2 Deleted 0 Changed 1Processed 0 Used Overflow entries 0
@@ -85,28 +95,34 @@ TCP(r=reverse):S=SYN, F=FIN, R=RST, C=HalfClose, E=Established, D=Dead
 
     Index                Source:Port/Destination:Port                      Proto(V)
 -----------------------------------------------------------------------------------
-    55764<=>385300       1.1.1.3:4145                                        1 (5)
+   255616<=>410748       1.1.1.3:4145                                        1 (5)
                          1.1.1.5:0
-(Gen: 1, K(nh):38, Action:F, Flags:, QOS:-1, S(nh):38,  Stats:0/0,  SPort 52018,
+(Gen: 1, K(nh):38, Action:F, Flags:, QOS:-1, S(nh):38,  Stats:0/0,  SPort 60847,
  TTL 0, Sinfo 0.0.0.0)
 
-   385300<=>55764        1.1.1.5:4145                                        1 (5)
+   410748<=>255616       1.1.1.5:4145                                        1 (5)
                          1.1.1.3:0
-(Gen: 1, K(nh):38, Action:F, Flags:, QOS:-1, S(nh):21,  Stats:0/0,  SPort 55597,
- TTL 0, Sinfo 0.0.0.0)
+(Gen: 1, K(nh):38, Action:F, Flags:, QOS:-1, S(nh):21,  Stats:1/42,  SPort 50789,
+ TTL 0, Sinfo 8.0.0.3)
 
-rt --dump 5
+rt --dump 0
 -----------
-[root@10c591d9a769 vtest_py]# /root/contrail/build/debug/vrouter/utils/rt --sock-dir /root/contrail/build/debug/vrouter/utils/vtest_py_venv/sock_dir --dump 5 --family bridge
-Flags: L=Label Valid, Df=DHCP flood, Mm=Mac Moved, L2c=L2 Evpn Control Word, N=New Entry, Ec=EvpnControlProcessing
-vRouter bridge table 0/5
-Index       DestMac                  Flags           Label/VNID      Nexthop           Stats
-92304       2:e7:3:ea:67:f1            LDf                   27           21               1
+[root@090c8246aecd vtest_py]# $utils/rt --sock-dir $sock --dump 0 --family inet | grep "8.0.0.2\>"
+8.0.0.2/32             32            T          -             10        -
+
+mpls --dump
+-----------
+[root@090c8246aecd vtest_py]# $utils/mpls --sock-dir $sock --dump
+MPLS Input Label Map
+
+   Label    NextHop
+-------------------
+      42        44
 
 '''
-def test_vm_to_fabric_tx(vrouter_test_fixture):
+def test_fabric_to_vm_rx(vrouter_test_fixture):
 
-    vt = vtest("test_vm_to_fabric_tx")
+    vt = vtest("test_fabric_to_vm_rx")
 
     # Add fabric interface
     vif = vr_interface_req()
@@ -179,12 +195,61 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
     nh.nhr_encap_oif_id = 5
     nh.nhr_encap = vt_encap("02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00")
     nh.nhr_vrf = 5
-    nh.nhr_flags = vtconst.NH_FLAG_VALID | vtconst.NH_FLAG_POLICY_ENABLED
+    nh.nhr_flags = vtconst.NH_FLAG_VALID | \
+                   vtconst.NH_FLAG_POLICY_ENABLED |\
+                   vtconst.NH_FLAG_ETREE_ROOT
     nh.nhr_family = socket.AF_INET
 
     vt.send_sandesh_req(nh)
 
-    # Add tunnel NH
+    # Add underlay Receive NH
+    nh = vr_nexthop_req()
+    nh.h_op = vtconst.SANDESH_OPER_ADD
+    nh.nhr_type = vtconst.NH_RCV
+    nh.nhr_id = 10
+    nh.nhr_encap_oif_id = 1
+    nh.nhr_vrf = 1
+    nh.nhr_family = socket.AF_INET
+    nh.nhr_flags = vtconst.NH_FLAG_VALID |\
+                   vtconst.NH_FLAG_RELAXED_POLICY|\
+                   vtconst.NH_FLAG_ETREE_ROOT
+    vt.send_sandesh_req(nh)
+
+    # Add underlay Route
+    route = vr_route_req()
+    route.h_op = vtconst.SANDESH_OPER_ADD
+    route.rtr_family = socket.AF_INET
+    route.rtr_nh_id = 10
+    route.rtr_prefix = vt_encap("08 00 00 02")
+    route.rtr_prefix_len = 32
+    route.rtr_vrf_id = 0
+    route.rtr_label_flags = vtconst.VR_RT_ARP_TRAP_FLAG
+
+    vt.send_sandesh_req(route)
+
+    # Add Encap L2 Nexthop for overlay
+    nh = vr_nexthop_req()
+    nh.h_op = vtconst.SANDESH_OPER_ADD
+    nh.nhr_type = vtconst.NH_ENCAP
+    nh.nhr_id = 44
+    nh.nhr_encap_oif_id = 5
+    nh.nhr_encap = vt_encap("02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00")
+    nh.nhr_vrf = 5
+    nh.nhr_family = vtconst.AF_BRIDGE
+    nh.nhr_flags = vtconst.NH_FLAG_VALID |\
+                   vtconst.NH_FLAG_POLICY_ENABLED|\
+                   vtconst.NH_FLAG_ETREE_ROOT
+    vt.send_sandesh_req(nh)
+
+    # Add MPLS entry for overlay
+    mpls = vr_mpls_req()
+    mpls.h_op = vtconst.SANDESH_OPER_ADD
+    mpls.mr_label = 42
+    mpls.mr_rid = 0
+    mpls.mr_nhid = 44
+    vt.send_sandesh_req(mpls)
+
+    # Add tunnel NH (for src validation)
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
     nh.nhr_type = vtconst.NH_TUNNEL
@@ -199,20 +264,6 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
                    vtconst.NH_FLAG_TUNNEL_UDP_MPLS |\
                    vtconst.NH_FLAG_ETREE_ROOT
     vt.send_sandesh_req(nh)
-
-    # Add bridge Route
-    route = vr_route_req()
-    route.h_op = vtconst.SANDESH_OPER_ADD
-    route.rtr_family = vtconst.AF_BRIDGE
-    route.rtr_nh_id = 21
-    route.rtr_mac = vt_mac("02:e7:03:ea:67:f1")
-    route.rtr_label = 27
-    route.rtr_vrf_id = 5
-    route.rtr_label_flags = vtconst.VR_RT_LABEL_VALID_FLAG |\
-                            vtconst.VR_RT_ARP_PROXY_FLAG |\
-                            vtconst.VR_BE_FLOOD_DHCP_FLAG
-
-    vt.send_sandesh_req(route)
 
     #Add forward Flow
     flow = vr_flow_req()
@@ -309,19 +360,25 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
 
     fr_indx = vt.parse_xml_field(resp_file, "fresp_index")
 
-    eth = Ether(dst='02:e7:03:ea:67:f1', src='02:c2:23:4c:d0:55', type=0x800)
-    ip = IP(version=4, ihl=5, id=1, ttl=64, proto='icmp', src='1.1.1.3', dst='1.1.1.5')
-    icmp = ICMP(type=8, code=0, id=4145)
-    pkt = eth/ip/icmp
+    # send mplsoudp packet from fabric
+    load_contrib("mpls")
+    eth_outer = Ether(dst='00:1b:21:bb:f9:48', src='00:1b:21:bb:f9:46', type=0x800)
+    ip_outer = IP(version=4, ihl=5, id=10, ttl=64, proto='udp', src='8.0.0.3', dst='8.0.0.2')
+    udp_outer = UDP(sport=53363, dport=6635)
+    mpls = MPLS(label=42, ttl=64)
+    eth_inner = Ether(dst='02:e7:03:ea:67:f1', src='02:c2:23:4c:d0:55', type=0x800)
+    ip_inner = IP(version=4, ihl=5, id=1, ttl=64, proto='icmp', src='1.1.1.5', dst='1.1.1.3')
+    icmp = ICMP(type=0, code=0, id=4145)
+    pkt = eth_outer/ip_outer/udp_outer/mpls/eth_inner/ip_inner/icmp
     pkt.show()
 
     # send packet
-    vt.send_pkt(pkt, "tapc2234cd0-55")
+    vt.send_recv_pkt(pkt, "eth1", pkt, "tapc2234cd0-55")
 
-    # Check if the packet was sent to tenant vif
+    # Check if the packet was received at tenant vif
     vif = vr_interface_req()
     vif.h_op = vtconst.SANDESH_OPER_GET
-    vif.vifr_idx = 0
+    vif.vifr_idx = 5
     vif_resp_file = vt.send_sandesh_req(vif, vt.VT_RESPONSE_REQD)
     vif_opackets = vt.parse_xml_field(vif_resp_file, "vifr_opackets")
     assert (vif_opackets.find("1") != -1), "Failed to receive packet"

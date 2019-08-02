@@ -119,7 +119,9 @@
 
 /* Mock physical would be used for simulating physical/vhost
  * interface in vtest */
-#define VIF_FLAG_MOCK_DEVICE      0x4000000
+#define VIF_FLAG_MOCK_DEVICE        0x4000000
+#define VIF_FLAG_HBS_LEFT           0x8000000
+#define VIF_FLAG_HBS_RIGHT          0x10000000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
@@ -132,6 +134,9 @@
 
 #define vif_mode_xconnect(vif)      (vif->vif_flags & VIF_FLAG_XCONNECT)
 #define vif_dhcp_enabled(vif)       (vif->vif_flags & VIF_FLAG_DHCP_ENABLED)
+
+#define vif_is_hbs_left(vif)        (vif->vif_flags & VIF_FLAG_HBS_LEFT)
+#define vif_is_hbs_right(vif)       (vif->vif_flags & VIF_FLAG_HBS_RIGHT)
 
 #define VIF_VRF_TABLE_ENTRIES       1024
 #define VIF_VRF_INVALID             ((unsigned short)-1)
