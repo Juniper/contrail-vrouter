@@ -104,9 +104,9 @@ Index       DestMac                  Flags           Label/VNID      Nexthop    
 92304       2:e7:3:ea:67:f1            LDf                   27           21               1
 
 '''
-def test_vm_to_fabric_tx(vrouter_test_fixture):
+def test_vm_to_fabric_intra_vn(vrouter_test_fixture):
 
-    vt = vtest("test_vm_to_fabric_tx")
+    vt = vtest("test_vm_to_fabric_intra_vn")
 
     # Add fabric interface
     vif = vr_interface_req()
@@ -324,4 +324,4 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
     vif.vifr_idx = 0
     vif_resp_file = vt.send_sandesh_req(vif, vt.VT_RESPONSE_REQD)
     vif_opackets = vt.parse_xml_field(vif_resp_file, "vifr_opackets")
-    assert (vif_opackets.find("1") != -1), "Failed to receive NATed packet"
+    assert (vif_opackets.find("1") != -1), "Failed to receive packet"
