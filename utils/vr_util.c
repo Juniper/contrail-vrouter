@@ -1449,6 +1449,64 @@ vr_send_mirror_add(struct nl_client *cl, unsigned int router_id,
 /* mirror end */
 
 int
+vr_send_vrf_dump(struct nl_client *cl, unsigned int router_id,
+        int marker)
+{
+    vr_vrf_req req;
+
+    req.h_op = SANDESH_OP_DUMP;
+    req.vrf_rid = router_id;
+    req.vrf_marker = marker;
+
+    return vr_sendmsg(cl, &req, "vr_vrf_req");
+}
+
+int
+vr_send_vrf_get(struct nl_client *cl, unsigned int router_id,
+        unsigned int vrf_index)
+{
+    vr_vrf_req req;
+
+    req.h_op = SANDESH_OP_GET;
+    req.vrf_rid = router_id;
+    req.vrf_idx = vrf_index;
+
+    return vr_sendmsg(cl, &req, "vr_vrf_req");
+}
+
+int
+vr_send_vrf_delete(struct nl_client *cl, unsigned int router_id,
+        unsigned int vrf_index)
+{
+    vr_vrf_req req;
+
+    req.h_op = SANDESH_OP_DEL;
+    req.vrf_rid = router_id;
+    req.vrf_idx = vrf_index;
+
+    return vr_sendmsg(cl, &req, "vr_vrf_req");
+}
+
+int
+vr_send_vrf_add(struct nl_client *cl, unsigned int router_id,
+        unsigned int vrf_index, int hbfl_idx, int hbfr_idx,
+        unsigned int vrf_flags)
+{
+    vr_vrf_req req;
+
+    memset(&req, 0, sizeof(req));
+
+    req.h_op = SANDESH_OP_ADD;
+    req.vrf_rid = router_id;
+    req.vrf_idx = vrf_index;
+    req.vrf_flags = vrf_flags;
+    req.vrf_hbfl_vif_idx = hbfl_idx;
+    req.vrf_hbfr_vif_idx = hbfr_idx;
+
+    return vr_sendmsg(cl, &req, "vr_vrf_req");
+}
+
+int
 vr_send_mpls_delete(struct nl_client *cl, unsigned int router_id,
         unsigned int label)
 {
