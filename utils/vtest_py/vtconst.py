@@ -142,3 +142,7 @@ VR_BE_MAC_MOVED_FLAG               = 0x08
 VR_BE_L2_CONTROL_DATA_FLAG         = 0x10
 VR_BE_MAC_NEW_FLAG                 = 0x20
 VR_BE_EVPN_CONTROL_PROCESSING_FLAG = 0x40
+
+VRF_FLAG_VALID                     = 0x0001
+VRF_FLAG_HBF_L_VALID               = 0x0002
+VRF_FLAG_HBF_R_VALID               = 0x0004
