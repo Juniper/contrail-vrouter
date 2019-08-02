@@ -73,6 +73,7 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_bmac_isid_mismatch += stats[VP_DROP_BMAC_ISID_MISMATCH];
     response->vds_pkt_loop += stats[VP_DROP_PKT_LOOP];
     response->vds_no_crypt_path += stats[VP_DROP_NO_CRYPT_PATH];
+    response->vds_invalid_hbs_pkt += stats[VP_DROP_INVALID_HBS_PKT];
     return;
 }
 
