@@ -1487,6 +1487,10 @@ flow_dump_table(struct flow_table *ft)
             printed = print_new_line_if_required(printed, 70);
             printf(" TTL %d,", fe->fe_ttl);
             printed = print_new_line_if_required(printed, 70);
+            if (fe->fe_flags1 & VR_FLOW_FLAG1_HBS_LEFT)
+                printed += printf(" HbsLeft,");
+            else if (fe->fe_flags1 & VR_FLOW_FLAG1_HBS_RIGHT)
+                printed += printf(" HbsRight,");
             inet_ntop(AF_INET, &fe->fe_src_info, in_dest, sizeof(in_dest));
             printf(" Sinfo %s", in_dest);
             printf(")");

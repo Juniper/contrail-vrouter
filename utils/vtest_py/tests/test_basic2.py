@@ -8,9 +8,9 @@ from vtest_lib import *
 import vtconst
 
 
-def test2(vrouter_test_fixture):
+def test_basic2(vrouter_test_fixture):
 
-    vt = vtest("test2")
+    vt = vtest("test_basic2")
 
     # Add a Vif interface
     vif = VIF(1, "tap_1", vt_ipv4("1.1.1.10"), vt_mac("de:ad:be:ef:00:02"))
