@@ -15,6 +15,7 @@
 #include <vr_flow.h>
 #include <vr_mirror.h>
 #include <vr_route.h>
+#include <vr_vrf_table.h>
 
 enum vr_offloads_tag_type {
     VR_OFFLOADS_TAG_TYPE_MPLS_L2,
@@ -80,6 +81,11 @@ struct vr_offload_ops {
     int (*voo_mirror_add)(struct vr_mirror_entry *, unsigned int);
     int (*voo_mirror_del)(unsigned int);
     int (*voo_mirror_get)(vr_mirror_req *);
+
+    /* Vrf table */
+    int (*voo_vrf_table_entry_add)(struct vr_vrf_table_entry *, unsigned int);
+    int (*voo_vrf_table_entry_del)(unsigned int);
+    int (*voo_vrf_table_entry_get)(vr_vrf_req *);
 
     /* NHOP */
     int (*voo_nexthop_add)(struct vr_nexthop *);

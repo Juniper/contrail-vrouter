@@ -127,6 +127,8 @@ enum vr_malloc_objects_t {
     VR_FC_OBJECT,
     VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT,
     VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT,
+    VR_VRF_TABLE_ENTRY_OBJECT,
+    VR_VRF_TABLE_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 
@@ -384,6 +386,7 @@ struct vrouter {
     unsigned int vr_max_vrfs;
     unsigned int vr_max_mirror_indices;
     struct vr_mirror_entry **vr_mirrors;
+    struct vr_vrf_table_entry **vr_vrf_table;
     vr_itable_t vr_vxlan_table;
 
     vr_htable_t vr_fragment_table;
