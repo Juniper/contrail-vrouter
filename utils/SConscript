@@ -91,6 +91,9 @@ vrmemstats = env.Program(target = 'vrmemstats', source = vrmemstats_sources)
 mirror_sources = ['mirror.c']
 mirror = env.Program(target = 'mirror', source = mirror_sources)
 
+vrftable_sources = ['vrftable.c']
+mirror = env.Program(target = 'vrftable', source = vrftable_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, vxlan,
              vrouter, vrmemstats, mirror]
