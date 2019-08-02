@@ -112,6 +112,14 @@ vr_mirror_req_process(void *s_req)
 }
 
 void
+vr_vrf_req_process(void *s_req)
+{
+    if (nl_cb.vr_vrf_req_process) {
+        nl_cb.vr_vrf_req_process(s_req);
+    }
+}
+
+void
 vr_response_process(void *s_req)
 {
     if (nl_cb.vr_response_process) {
