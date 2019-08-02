@@ -188,7 +188,8 @@
 #define VP_DROP_BMAC_ISID_MISMATCH          46
 #define VP_DROP_PKT_LOOP                    47
 #define VP_DROP_NO_CRYPT_PATH               48
-#define VP_DROP_MAX                         49
+#define VP_DROP_INVALID_HBS_PKT             49
+#define VP_DROP_MAX                         50
 
 
 /*
@@ -259,6 +260,14 @@ struct vr_pbb_itag {
     uint32_t   pbbi_isid:24;
 } __attribute__packed__close__;
 
+__attribute__packed__open__
+struct vr_eth_hbs_md {
+    unsigned short magic_dmac;
+    unsigned int flow_id_dmac;
+    unsigned short magic_smac;
+    unsigned int flow_id_smac;
+    unsigned short eth_proto;
+} __attribute__packed__close__;
 
 #define VR_ARP_HW_LEN           6
 #define VR_ARP_OP_REQUEST       1

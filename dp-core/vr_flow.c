@@ -19,6 +19,7 @@
 #include "vr_hash.h"
 #include "vr_ip_mtrie.h"
 #include "vr_bridge.h"
+#include "vr_vrf_table.h"
 
 #include "vr_offloads_dp.h"
 
@@ -220,6 +221,8 @@ __vr_flow_reset_entry(struct vrouter *router, struct vr_flow_entry *fe)
     fe->fe_flags &=
         (VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_EVICTED |
          VR_FLOW_FLAG_NEW_FLOW | VR_FLOW_FLAG_DELETE_MARKED);
+    fe->fe_flags1 &=
+        ~(VR_FLOW_FLAG1_HBS_LEFT | VR_FLOW_FLAG1_HBS_RIGHT);
     fe->fe_ttl = 0;
     fe->fe_src_info = 0;
 
@@ -826,48 +829,21 @@ vr_flow_update_ecmp_index(struct vrouter *router, struct vr_flow_entry *fe,
 }
 
 static flow_result_t
-vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
+vr_flow_action_default(struct vrouter *router, struct vr_flow_entry *fe,
         unsigned int index, struct vr_packet *pkt,
         struct vr_forwarding_md *fmd)
 {
-    int valid_src, modified_index = -1;
     unsigned int ip_inc_diff_cksum = 0;
     struct vr_ip *ip;
     flow_result_t result = FLOW_CONSUMED;
 
     struct vr_forwarding_md mirror_fmd;
-    struct vr_nexthop *src_nh;
 
     fmd->fmd_dvrf = fe->fe_vrf;
     /*
      * for now, we will not use dvrf if VRFT is set, because the RPF
      * check needs to happen in the source vrf
      */
-    src_nh = __vrouter_get_nexthop(router, fe->fe_src_nh_index);
-    if (!src_nh) {
-        vr_pfree(pkt, VP_DROP_INVALID_NH);
-        goto res;
-    }
-
-    if (src_nh->nh_validate_src) {
-        valid_src = src_nh->nh_validate_src(pkt, src_nh, fmd, &modified_index);
-        if (valid_src == NH_SOURCE_INVALID) {
-            PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_FLOW_C, __LINE__);
-            vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
-            goto res;
-        }
-
-        if (valid_src == NH_SOURCE_MISMATCH) {
-            valid_src = vr_rflow_update_ecmp_index(router, fe,
-                                            modified_index, fmd);
-            if (valid_src == -1) {
-                PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_FLOW_C, __LINE__);
-                vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
-                goto res;
-            }
-        }
-    }
-
 
     if (fe->fe_flags & VR_FLOW_FLAG_VRFT) {
         if (fmd->fmd_dvrf != fe->fe_dvrf) {
@@ -931,13 +907,183 @@ vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
         }
     }
 
-res:
     if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
         vr_flow_mark_evict(router, fe, index);
 
     return result;
 }
 
+static flow_result_t
+vr_flow_action_hbs(struct vrouter *router, struct vr_flow_entry *fe,
+        unsigned int index, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    struct vr_vrf_table_entry *vrf_entry = NULL;
+
+    /* If not HBS flow, return */
+    if (!(fe->fe_flags1 & VR_FLOW_FLAG1_HBS_MASK))
+            return FLOW_FORWARD;
+
+    vrf_entry = vrouter_get_vrf_table(router, fmd->fmd_dvrf);
+
+    /* Packet entering vrouter and going to hbs-l or hbs-r 
+     * for hbs-flows
+     */
+    if (fe->fe_flags1 & VR_FLOW_FLAG1_HBS_LEFT) {
+        struct vr_interface *hbs_l;
+
+        /* Flow is marked as HBS, but there is no HBS instance,
+         * so drop the packet
+         */
+        if (!vrf_entry) {
+            PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
+            goto drop_pkt;
+        }
+
+        hbs_l = vrf_entry->hbf_l_vif;
+        if (hbs_l) {
+            /* Packet entering vrouter from vmi and going to hbs-l,
+             * encode flow_id in src mac */
+            struct vr_eth_hbs_md *eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
+            eth_hbs->flow_id_smac = htonl(index);
+            /* Encode packet source in the header */
+            if (vif_is_virtual(pkt->vp_if))
+                eth_hbs->magic_smac = htons(VR_HBS_SMAC_MAGIC | VR_HBS_FROM_VMI);
+            else if (vif_is_fabric(pkt->vp_if)) {
+                /* There is no case where pkt enters fabric and goes to hbf-l.
+                 * Drop packet in this case
+                 */
+                PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
+                goto drop_pkt;
+            }
+            pkt->vp_if = hbs_l;
+            /*
+             * If for some reason, we have GRO flag set and we have not invoked
+             * the GRO, we need to unset
+             */
+            vr_pkt_unset_gro(pkt);
+            pkt->vp_nh = NULL;
+            hbs_l->vif_tx(hbs_l, pkt, fmd);
+            return FLOW_HELD;
+        }
+        return FLOW_FORWARD;
+    } else if (fe->fe_flags1 & VR_FLOW_FLAG1_HBS_RIGHT) {
+        struct vr_interface *hbs_r;
+
+        /* Flow is marked as HBS, but there is no HBS instance,
+         * so drop the packet
+         */
+        if (!vrf_entry) {
+            PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
+            goto drop_pkt;
+        }
+
+        hbs_r = vrf_entry->hbf_r_vif;
+        if (hbs_r) {
+            /* Packet entering vrouter from fabric and going to hbs-r,
+             * encode flow_id in dst mac 
+             *
+             * Note: packet can also enter vrouter and goto hbs-r
+             * from vmi (instead of fabric) in case of intra-compute
+             */
+            struct vr_eth *eth;
+            struct vr_eth_hbs_md *eth_hbs;
+            bool pkt_is_l3 = false;
+
+            /* Add ethernet header if there is none */
+            if (pkt_data(pkt) == pkt_network_header(pkt)) {
+                eth = (struct vr_eth *)pkt_push(pkt, VR_ETHER_HLEN);
+                memcpy(eth->eth_dmac, hbs_r->vif_mac, VR_ETHER_ALEN);
+                memcpy(eth->eth_smac, hbs_r->vif_mac, VR_ETHER_ALEN);
+                if (pkt->vp_type == VP_TYPE_IP) {
+                    eth->eth_proto = htons(VR_ETH_PROTO_IP);
+                } else if (pkt->vp_type == VP_TYPE_IP6) {
+                    eth->eth_proto = htons(VR_ETH_PROTO_IP6);
+                }
+                pkt_is_l3 = true;
+            }
+
+            eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
+
+            eth = (struct vr_eth*)pkt_data(pkt);
+            if (!pkt_is_l3 && !memcmp(eth->eth_dmac, hbs_r->vif_mac, VR_ETHER_ALEN))
+                pkt_is_l3 = true;
+
+            eth_hbs->flow_id_dmac = htonl(index);
+
+            /* Encode packet source in the header */
+            if (vif_is_virtual(pkt->vp_if))
+                eth_hbs->magic_dmac = htons(VR_HBS_DMAC_MAGIC | VR_HBS_FROM_VMI);
+            else if (vif_is_fabric(pkt->vp_if))
+                eth_hbs->magic_dmac = htons(VR_HBS_DMAC_MAGIC | VR_HBS_FROM_FABRIC);
+            /* If it's L3 packet, encode it */
+            if (pkt_is_l3)
+                eth_hbs->magic_dmac |= htons(VR_HBS_L3_PKT);
+
+            pkt->vp_if = hbs_r;
+            /*
+             * If for some reason, we have GRO flag set and we have not invoked
+             * the GRO, we need to unset
+             */
+            vr_pkt_unset_gro(pkt);
+            pkt->vp_nh = NULL;
+            hbs_r->vif_tx(hbs_r, pkt, fmd);
+            return FLOW_HELD;
+        }
+        return FLOW_FORWARD;
+    }
+    return FLOW_FORWARD;
+
+drop_pkt:
+    vr_pfree(pkt, VP_DROP_INVALID_HBS_PKT);
+    return FLOW_HELD;
+}
+
+static flow_result_t
+vr_flow_action(struct vrouter *router, struct vr_flow_entry *fe,
+        unsigned int index, struct vr_packet *pkt,
+        struct vr_forwarding_md *fmd)
+{
+    flow_result_t ret = FLOW_CONSUMED;
+    struct vr_nexthop *src_nh;
+    int valid_src, modified_index = -1;
+
+    src_nh = __vrouter_get_nexthop(router, fe->fe_src_nh_index);
+    if (!src_nh) {
+        vr_pfree(pkt, VP_DROP_INVALID_NH);
+        goto res;
+    }
+
+    if (src_nh->nh_validate_src) {
+        valid_src = src_nh->nh_validate_src(pkt, src_nh, fmd, &modified_index);
+        if (valid_src == NH_SOURCE_INVALID) {
+            PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_FLOW_C, __LINE__);
+            vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
+            goto res;
+        }
+
+        if (valid_src == NH_SOURCE_MISMATCH) {
+            valid_src = vr_rflow_update_ecmp_index(router, fe,
+                                            modified_index, fmd);
+            if (valid_src == -1) {
+                PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_FLOW_C, __LINE__);
+                vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
+                goto res;
+            }
+        }
+    }
+
+
+    if ((fe->fe_action == VR_FLOW_ACTION_DROP) ||
+            ((ret = vr_flow_action_hbs(router, fe, index, pkt, fmd)) != FLOW_HELD))
+        ret = vr_flow_action_default(router, fe, index, pkt, fmd);
+
+res:
+    if (fe->fe_tcp_flags & VR_FLOW_TCP_DEAD)
+        vr_flow_mark_evict(router, fe, index);
+
+    return ret;
+}
 
 unsigned int
 vr_trap_flow(struct vrouter *router, struct vr_flow_entry *fe,
@@ -1647,17 +1793,119 @@ vr_do_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
     return result;
 }
 
+static void
+vr_reinit_forwarding_md(struct vrouter *router, struct vr_packet *pkt, 
+                        struct vr_flow_entry *fe, uint32_t flow_index,
+                        struct vr_nexthop *nh, struct vr_forwarding_md *fmd)
+{
+    struct vr_nexthop *src_nh = __vrouter_get_nexthop(router, fe->fe_src_nh_index);
+    fmd->fmd_dvrf = nh->nh_dev->vif_vrf;
+    fmd->fmd_vlan = 0;
+    fmd->fmd_dotonep = -1;
+    fmd->fmd_outer_src_ip = src_nh->nh_udp_tun_dip;
+    vr_flow_set_forwarding_md(router, fe, flow_index, fmd);
+}
+
 bool
 vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
                 struct vr_forwarding_md *fmd)
 {
     flow_result_t result = FLOW_FORWARD;
 
-    if ((!(pkt->vp_flags & VP_FLAG_MULTICAST))
+    if (vif_is_hbs_right(pkt->vp_if)) {
+        /* Pkt entering vrouter from hbs-r
+         *   - SMAC of the packet contains flow_index
+         *   - Restore actual SMAC from flow_index and continue
+         *     flow action
+         */ 
+        struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
+        struct vr_eth_hbs_md *eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
+        uint16_t magic = ntohs(eth_hbs->magic_smac);
+        unsigned int flow_index = ntohl(eth_hbs->flow_id_smac);
+        uint32_t nh_id;
+        struct vr_flow_entry *fe = NULL;
+        if ((magic & VR_HBS_MAGIC_MASK) != VR_HBS_SMAC_MAGIC) {
+            PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
+            goto drop_pkt;
+        }
+        if (vr_htable_get_hentry_by_index(router->vr_flow_table, flow_index)) {
+            struct vr_nexthop *nh;
+            fe = CONTAINER_OF(
+                           fe_hentry, 
+                           struct vr_flow_entry,
+                           vr_htable_get_hentry_by_index(
+                                router->vr_flow_table, flow_index)
+                             );
+            nh_id = fe->fe_key.flow_nh_id;
+            nh = vrouter_get_nexthop(0, nh_id);
+            vr_reinit_forwarding_md(router, pkt, fe, flow_index, nh, fmd);
+            pkt->vp_if = nh->nh_dev;
+            memcpy(eth->eth_smac, nh->nh_data, VR_ETHER_ALEN);
+            result = vr_flow_action_default(router, fe, flow_index, pkt, fmd);
+            return __vr_flow_forward(result, pkt, fmd);
+        }
+    } else if (vif_is_hbs_left(pkt->vp_if)) {
+        /* Pkt entering vrouter from hbs-l
+         *   - DMAC of the packet contains flow_index
+         *   - Restore actual DMAC from flow_index and continue
+         *     flow action
+         * If VR_HBS_FROM_VMI is set in the DMAC - 
+         *   - The packet originated from VMI (instead of fabric)
+         *   - Happens if both src and dst tenant VMs are in
+         *     the same compute (intra-compute case)
+         *   - Restore actual DMAC from "reverse flow_index"  
+         */ 
+        struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
+        struct vr_eth_hbs_md *eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
+        uint16_t magic = ntohs(eth_hbs->magic_dmac);
+        unsigned int flow_index = ntohl(eth_hbs->flow_id_dmac);
+        uint32_t nh_id;
+        struct vr_flow_entry *fe = NULL;
+        if ((magic & VR_HBS_MAGIC_MASK) != VR_HBS_DMAC_MAGIC) {
+            PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
+            goto drop_pkt;
+        }
+
+        if (vr_htable_get_hentry_by_index(router->vr_flow_table, flow_index)) {
+            struct vr_nexthop *nh;
+            fe = CONTAINER_OF(
+                           fe_hentry, 
+                           struct vr_flow_entry,
+                           vr_htable_get_hentry_by_index(
+                                router->vr_flow_table, flow_index)
+                             );
+            /* If packet is coming from VMI instead of fabric,
+             * restore DMAC using reverse flow
+             */
+            if (magic & VR_HBS_FROM_VMI) {
+                flow_index = fe->fe_rflow;
+                fe = vr_flow_get_entry(router, fe->fe_rflow);
+                if (!fe) {
+                    PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
+                    goto drop_pkt;
+                }
+            }
+
+            nh_id = fe->fe_key.flow_nh_id;
+            nh = vrouter_get_nexthop(0, nh_id);
+            vr_reinit_forwarding_md(router, pkt, fe, flow_index, nh, fmd);
+            pkt->vp_if = nh->nh_dev;
+            if (magic & VR_HBS_L3_PKT)
+               memcpy(eth->eth_dmac, pkt->vp_if->vif_mac, VR_ETHER_ALEN);
+            else 
+                memcpy(eth->eth_dmac, nh->nh_data, VR_ETHER_ALEN);
+            result = vr_flow_action_default(router, fe, flow_index, pkt, fmd);
+            return __vr_flow_forward(result, pkt, fmd);
+        }
+    } else if ((!(pkt->vp_flags & VP_FLAG_MULTICAST))
         && ((fmd->fmd_vlan == VLAN_ID_INVALID) || vif_is_service(pkt->vp_if)))
         result = vr_do_flow_lookup(router, pkt, fmd);
 
     return __vr_flow_forward(result, pkt, fmd);
+
+drop_pkt:
+    vr_pfree(pkt, VP_DROP_INVALID_HBS_PKT);
+    return false;
 }
 
 int
@@ -2417,6 +2665,7 @@ vr_flow_set(struct vrouter *router, vr_flow_req *req,
 
     fe->fe_flags = VR_FLOW_FLAG_DP_BITS(fe) |
         VR_FLOW_FLAG_MASK(req->fr_flags);
+    fe->fe_flags1 = req->fr_flags1;
     if (new_flow) {
 
         flow_resp->fresp_bytes = fe->fe_stats.flow_bytes;
