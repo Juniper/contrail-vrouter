@@ -117,10 +117,12 @@ vt_gen_flow_op_compare(int op, unsigned char *string)
     if (!string)
         return -1;
 
-    if (!strncasecmp(string, "flow_set", strlen("flow_set"))) {
+    if (!strncasecmp(string, "flow_set", strlen("flow_set")) ||
+        !strncasecmp(string, "0", strlen("0"))) {
         expected_op = FLOW_OP_FLOW_SET;
     } else if (!strncasecmp(string, "flow_table_get",
-                strlen("flow_table_get"))) {
+                strlen("flow_table_get"))  ||
+               !strncasecmp(string, "2", strlen("2"))) {
         expected_op = FLOW_OP_FLOW_TABLE_GET;
     }
 
@@ -133,10 +135,12 @@ vt_gen_flow_op(unsigned char *string)
     if (!string)
         return -1;
 
-    if (!strncasecmp(string, "flow_set", strlen("flow_set"))) {
+    if (!strncasecmp(string, "flow_set", strlen("flow_set")) ||
+        !strncasecmp(string, "0", strlen("0"))) {
         return FLOW_OP_FLOW_SET;
     } else if (!strncasecmp(string, "flow_table_get",
-                strlen("flow_table_get"))) {
+                strlen("flow_table_get")) ||
+               !strncasecmp(string, "2", strlen("2"))) {
         return FLOW_OP_FLOW_TABLE_GET;
     }
 

@@ -131,6 +131,7 @@ static void
 vt_post_process_write_response_xml(struct vtest *test)
 {
     sandesh_info_t *sinfo = NULL;
+    char* node_name = NULL;
     int resp_index = test->messages.received_vrouter_msg->ptr_num;
     int err = 0;
     ThriftXMLProtocol xml_proto;
@@ -140,7 +141,10 @@ vt_post_process_write_response_xml(struct vtest *test)
         return;
     }
 
-    sinfo = vr_find_sandesh_info(test->messages.data[test->message_ptr_num].type);
+    node_name = test->messages.data[test->message_ptr_num].type;
+    if (!strncmp(node_name, "vr_flow_req", sizeof("vr_flow_req")))
+        node_name = "vr_flow_response";
+    sinfo = vr_find_sandesh_info(node_name);
     if (!sinfo) {
         fprintf(stderr, "Failed to find sandesh info for %s\n",
                 test->messages.data[test->message_ptr_num].type);
