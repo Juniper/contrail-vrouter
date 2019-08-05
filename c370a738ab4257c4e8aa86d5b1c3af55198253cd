@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9f1f576d_339f24d7",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 7
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-05T14:57:02Z",
+      "side": 1,
+      "message": "Lets create a directory for holding all the infra py files so that we don\u0027t have to do this always. Say \"lib\" directory under \"vtest_py\"",
+      "revId": "c370a738ab4257c4e8aa86d5b1c3af55198253cd",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
