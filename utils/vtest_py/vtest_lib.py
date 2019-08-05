@@ -7,6 +7,7 @@ import shutil
 import signal
 import socket
 import ipaddress
+import netaddr
 
 from vr_py_sandesh.vr_py.ttypes import *
 from pysandesh.transport.TTransport import *
@@ -21,6 +22,13 @@ import pytest
 ############################################
 # Vrouter class
 ############################################
+def htonll(val):
+    return (socket.htonl(val & 0xFFFFFFFF) << 32) + (socket.htonl(val >> 32))
+
+
+def ntohll(val):
+    return (socket.ntohl(val & 0xFFFFFFFF) << 32) + (socket.ntohl(val >> 32))
+
 def vt_encap(str):
     blist = list(str.replace(' ', '').decode('hex'))
     for i in range(len(blist)):
@@ -36,6 +44,12 @@ def vt_mac(str):
 
 def vt_ipv4(str):
    return socket.htonl(int(ipaddress.IPv4Address(unicode(str))))
+
+def vt_ipv6(str):
+    ip6_u = int(bin(netaddr.IPAddress(str) >> 64),2)
+    ip6_l = int(bin(netaddr.IPAddress(str) & (1 << 64) - 1), 2)
+    return htonll(ip6_u), htonll(ip6_l)
+
 
 class vrouter:
     """Class which abstracts DPDK Vrouter actions"""
