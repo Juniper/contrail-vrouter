@@ -74,18 +74,18 @@ NH_TABLE_ENTRIES               = VR_DEF_NEXTHOPS
 VR_NEXTHOP_COMPONENT_DUMP_LIMIT = 16
 NH_DISCARD_ID                   = 0
 
-NH_DEAD                    = 0      
-NH_RCV                     = 1
-NH_ENCAP                   = 2
-NH_TUNNEL                  = 3
-NH_RESOLVE                 = 4
-NH_DISCARD                 = 5
-NH_COMPOSITE               = 6
-NH_VRF_TRANSLATE           = 7
-NH_L2_RCV                  = 8
-NH_MAX                     = 9
+NH_TYPE_DEAD                    = 0      
+NH_TYPE_RCV                     = 1
+NH_TYPE_ENCAP                   = 2
+NH_TYPE_TUNNEL                  = 3
+NH_TYPE_RESOLVE                 = 4
+NH_TYPE_DISCARD                 = 5
+NH_TYPE_COMPOSITE               = 6
+NH_TYPE_VRF_TRANSLATE           = 7
+NH_TYPE_L2_RCV                  = 8
+NH_TYPE_MAX                     = 9
 
-NH_VXLAN_VRF                       =  NH_VRF_TRANSLATE
+NH_VXLAN_VRF                       =  NH_TYPE_VRF_TRANSLATE
 
 NH_FLAG_VALID                      =  0x000001
 NH_FLAG_POLICY_ENABLED             =  0x000002
@@ -128,7 +128,10 @@ NH_ECMP_CONFIG_HASH_SRC_PORT       =  0x04
 NH_ECMP_CONFIG_HASH_DST_IP         =  0x08
 NH_ECMP_CONFIG_HASH_DST_PORT       =  0x10
 
+AF_UNIX                            = 1
+AF_INET                            = 2
 AF_BRIDGE                          = 7
+AF_INET6                           = 10
 
 VR_RT_LABEL_VALID_FLAG             = 0x1
 VR_RT_ARP_PROXY_FLAG               = 0x2
@@ -142,3 +145,8 @@ VR_BE_MAC_MOVED_FLAG               = 0x08
 VR_BE_L2_CONTROL_DATA_FLAG         = 0x10
 VR_BE_MAC_NEW_FLAG                 = 0x20
 VR_BE_EVPN_CONTROL_PROCESSING_FLAG = 0x40
+
+FLOW_OPER_SET = 0
+FLOW_OPER_LIST = 1
+FLOW_OPER_TABLE_GET = 2
+

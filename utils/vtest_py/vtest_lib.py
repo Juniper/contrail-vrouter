@@ -8,6 +8,8 @@ import signal
 import socket
 import ipaddress
 
+import vtconst
+
 from vr_py_sandesh.vr_py.ttypes import *
 from pysandesh.transport.TTransport import *
 from pysandesh.protocol.TProtocol import *
@@ -17,10 +19,6 @@ import xml.etree.ElementTree as ET
 from scapy.all import *
 import pytest
 
-
-############################################
-# Vrouter class
-############################################
 def vt_encap(str):
     blist = list(str.replace(' ', '').decode('hex'))
     for i in range(len(blist)):
@@ -37,6 +35,10 @@ def vt_mac(str):
 def vt_ipv4(str):
    return socket.htonl(int(ipaddress.IPv4Address(unicode(str))))
 
+
+############################################
+# Vrouter class
+############################################
 class vrouter:
     """Class which abstracts DPDK Vrouter actions"""
 
@@ -276,7 +278,60 @@ class vtest:
         # run the vtest cmd
         return self.run_command(self.VT_PKT_CMD, req_filename)
 
+    @staticmethod
+    def get_default_vif_obj(idx, name, op=vtconst.SANDESH_OPER_GET, mac=[], ip=0):
+        vif_obj = vr_interface_req()
+        vif_obj.h_op = op
+        vif_obj.vifr_type = vtconst.VIF_TYPE_VIRTUAL
+        vif_obj.vifr_idx = idx
+        vif_obj.vifr_name = name
+        vif_obj.vifr_transport = vtconst.VIF_TRANSPORT_PMD
+        vif_obj.vifr_vrf = 0
+        vif_obj.vifr_mac = mac
+        vif_obj.vifr_mtu = 1514
+        vif_obj.vifr_ip = ip
+        return vif_obj
 
+    @staticmethod
+    def get_default_nh_obj(id, type, family, op=vtconst.SANDESH_OPER_GET):
+        nh_obj = vr_nexthop_req()
+        nh_obj.h_op = op
+        nh_obj.nhr_id = id
+        nh_obj.nhr_family = family
+        nh_obj.nhr_type = type
+        nh_obj.nhr_vrf = 0
+        nh_obj.nhr_flags = 1
+        return nh_obj
+
+    @staticmethod
+    def get_default_rt_obj(family, vrf, prefix=None, prefix_len=None, mac=None, nh_id=None, \
+                           op=vtconst.SANDESH_OPER_GET):
+        rt_obj = vr_route_req()
+        rt_obj.h_op = op
+        rt_obj.rtr_family = family
+        rt_obj.rtr_vrf_id = vrf
+        rt_obj.rtr_mac = mac
+        rt_obj.rtr_prefix = prefix
+        rt_obj.rtr_prefix_len = prefix_len
+        rt_obj.rtr_nh_id = nh_id
+        return rt_obj
+
+    @staticmethod
+    def get_default_flow_obj(src_ip, dst_ip, family, proto, sport, dport, \
+                             op=vtconst.FLOW_OPER_TABLE_GET):
+        flow_obj = vr_flow_req()
+        flow_obj.fr_op = op
+        flow_obj.fr_flow_sip_l = src_ip[0]
+        flow_obj.fr_flow_sip_h = src_ip[1]
+        flow_obj.fr_flow_dip_l = dst_ip[0]
+        flow_obj.fr_flow_dip_h = dst_ip[1]
+        flow_obj.fr_family = family
+        flow_obj.fr_flow_proto = proto
+        flow_obj.fr_flow_sport = sport
+        flow_obj.fr_flow_dport = dport
+        flow_obj.fr_flags = 1
+        return flow_obj
+    
 
 ############################################
 # Pytest fixtures
