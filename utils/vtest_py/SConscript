@@ -78,6 +78,10 @@ copy_vtest_lib = env.Command("copy_vtest_lib", [],
                              Copy(vtest_py_venv_root + "/vtest_lib.py",
                                   vtest_py_src_root + "/vtest_lib.py"))
 
+# copy vtest lib to venv
+copy_vtconst = env.Command("copy_vtconst", [],
+                             Copy(vtest_py_venv_root + "/vtconst.py",
+                                  vtest_py_src_root + "/vtconst.py"))
 # create sock dir in venv for vrouter to run
 create_sock_dir = env.Command("create_sock_dir", [],
                               [Mkdir(vtest_py_venv_root + "/var"),
@@ -108,7 +112,8 @@ env.Depends(gen_sandesh, create_vr_py_dir)
 env.Depends(copy_pysandesh, gen_sandesh)
 env.Depends(copy_test_files, copy_pysandesh)
 env.Depends(copy_vtest_lib, copy_test_files)
-env.Depends(create_sock_dir, copy_vtest_lib)
+env.Depends(copy_vtconst, copy_vtest_lib)
+env.Depends(create_sock_dir, copy_vtconst)
 env.Depends(setup_venv, create_sock_dir)
 env.Depends(vtest_py_ut, setup_venv)
 

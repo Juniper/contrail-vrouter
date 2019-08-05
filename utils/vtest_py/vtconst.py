@@ -69,23 +69,27 @@ VIF_ENCAP_TYPE_ETHER       = 1
 VIF_ENCAP_TYPE_L3          = 2
 VIF_ENCAP_TYPE_L3_DECRYPT  = 3
 
+FLOW_OPER_SET = 0
+FLOW_OPER_LIST = 1
+FLOW_OPER_TABLE_GET = 2
+
 VR_DEF_NEXTHOPS                = 65536
 NH_TABLE_ENTRIES               = VR_DEF_NEXTHOPS
 VR_NEXTHOP_COMPONENT_DUMP_LIMIT = 16
 NH_DISCARD_ID                   = 0
 
-NH_DEAD                    = 0      
-NH_RCV                     = 1
-NH_ENCAP                   = 2
-NH_TUNNEL                  = 3
-NH_RESOLVE                 = 4
-NH_DISCARD                 = 5
-NH_COMPOSITE               = 6
-NH_VRF_TRANSLATE           = 7
-NH_L2_RCV                  = 8
-NH_MAX                     = 9
+NH_TYPE_DEAD                    = 0
+NH_TYPE_RCV                     = 1
+NH_TYPE_ENCAP                   = 2
+NH_TYPE_TUNNEL                  = 3
+NH_TYPE_RESOLVE                 = 4
+NH_TYPE_DISCARD                 = 5
+NH_TYPE_COMPOSITE               = 6
+NH_TYPE_VRF_TRANSLATE           = 7
+NH_TYPE_L2_RCV                  = 8
+NH_TYPE_MAX                     = 9
 
-NH_VXLAN_VRF                       =  NH_VRF_TRANSLATE
+NH_VXLAN_VRF                       =  NH_TYPE_VRF_TRANSLATE
 
 NH_FLAG_VALID                      =  0x000001
 NH_FLAG_POLICY_ENABLED             =  0x000002
