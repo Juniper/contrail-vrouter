@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e6a3b0fa_8d6d5c6e",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-06T10:16:33Z",
+      "side": 1,
+      "message": "As discussed, return (socket.htonl(val \u0026 0x00000000FFFFFFFF) \u003c\u003c 32) + socket.htonl(val \u003e\u003e 32)\nto avoid overflow error. Test val: \"FFFF::02\"",
+      "revId": "2793cf7d70483cae1c18f121d2e0aa0ca04245f5",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "59ad8a73_c26e58ef",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-06T10:16:33Z",
+      "side": 1,
+      "message": "Same as above",
+      "revId": "2793cf7d70483cae1c18f121d2e0aa0ca04245f5",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eab0f711_afef43ee",
+        "filename": "utils/vtest_py/vtest_lib.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-06T10:16:33Z",
+      "side": 1,
+      "message": "Can you indent this properly?",
+      "revId": "2793cf7d70483cae1c18f121d2e0aa0ca04245f5",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
