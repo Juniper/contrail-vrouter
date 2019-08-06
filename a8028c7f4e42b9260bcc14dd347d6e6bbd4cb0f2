@@ -19,6 +19,74 @@
     },
     {
       "key": {
+        "uuid": "d688b8bb_060baa11",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 402,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 0,
+      "message": "remove the change.",
+      "revId": "a8028c7f4e42b9260bcc14dd347d6e6bbd4cb0f2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9a7f83bd_e37b695d",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 494,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 0,
+      "message": "cleanup.",
+      "revId": "a8028c7f4e42b9260bcc14dd347d6e6bbd4cb0f2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2445453b_6d9f9be9",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 0,
+      "message": "cleanup.",
+      "revId": "a8028c7f4e42b9260bcc14dd347d6e6bbd4cb0f2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e7741a22_1a6405bc",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 217,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 0,
+      "message": "cleanup.",
+      "revId": "a8028c7f4e42b9260bcc14dd347d6e6bbd4cb0f2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "cbcac78b_c0c34254",
         "filename": "utils/vr_util.c",
         "patchSetId": 1

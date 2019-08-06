@@ -19,6 +19,193 @@
     },
     {
       "key": {
+        "uuid": "acc404c8_76c27423",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "Take care of indentation. Dont use tabs.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5a2c52b1_283483f5",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "You need to address the module parameters and properly initialise.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "21fb16db_44bc62ba",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "please change the name and remove pkt_drop.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "01a6115a_e79808c8",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "This is not a global, you can drop the vr_ prefix.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a9513aad_f2ed3d3d",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 84,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "IMO, you should not do a level check here. Someone could have disabled the log level but wants to fetch the existing logged messages.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a6a571b8_41e9f2f2",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 85,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "fix the tab",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a326454d_225e8328",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "fix the indentation for this whole function.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "de3d3ca4_e8c27726",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "can you add appropriate comments though this whole function that would make it easier to understand the code flow and your design.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4afe7893_d3281483",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 173,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "correct the formatting.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e3c4488f_1d1a6912",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 183,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "remove space at end.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b6a90294_00f2b544",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "remove pkt ref.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8b52009b_d4e7730b",
         "filename": "dp-core/vr_queue.c",
         "patchSetId": 1
@@ -132,6 +319,448 @@
       "writtenOn": "2019-08-06T06:22:24Z",
       "side": 1,
       "message": "Why is this change here? your infra is not tied with pkt_log infra?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1e692af7_847f00b3",
+        "filename": "dp-core/vr_stats.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 511,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "Move the call to where vr_pkt_drop_stats_exit is invoked from.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d2558a4a_927153a6",
+        "filename": "dp-core/vr_stats.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 544,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "Can we move out init and exit to the code where vr_pkt_drop_stats_init is called from.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bb4f4acc_fa6f5a04",
+        "filename": "dp-core/vr_stats.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 549,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "By the time cleanup is called, vr_logger_init has not been invoked, does it even make sense to call logger exit? You will crash the code. ideally move these calls outside.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0cc2a3ce_3e65e75b",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "a tmp variable and a global? Doest make sense. since vr_logger_en is accessible, why have this one?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "52092bf1_a45f6de1",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 401,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "remove extra space.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3bfbfadc_02befc07",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 473,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "indentation. mix of tab/space.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e0b1ec0c_4e22a0ec",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1051,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "why is this a global? Instead of i, rename it something thats relevant to way you are using it.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bdbacdf0_0b37cc11",
+        "filename": "include/nl_util.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 94,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "Why do we have pkt_log here?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a77caf97_8eac7237",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "THis is wrong. YOu are defining the size !\u003d 200 here i guess to accomodate null byte. but then VR_LOG_MAX uses the same value that likely you are using to allocate memory. This will screw up the assumption what VR_LOG_MAX should hold true for.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6bb3dc73_f6ca19b8",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "Isnt this tunable via the module parameters? Since we have size as one of the inputs to the module, then how do you reconcile no. of records with size?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "193b66ff_8b26a3f9",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "space around *",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dd0c3cf9_1fcfc82b",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "why not 4k?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "edd5416c_7e6d68ef",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "space around \u0026",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1c2ad123_c2e22af9",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "i needed?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7cfcb595_48bb66d4",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "You need to pass level as one of the arguments to VR_LOG and then compare with the global log level to see if you want to log or suppress.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f488a79e_1ff9b742",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "You need to use atomic operations to read the current buf_idx and then update it. Look how vr_fetch_and_add calls are being used in our code for reference.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3fb64405_88b03f66",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "make the levels in CAPS. and you can prefix them with VR. and resuse them in util/dpdk code as well.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0dbf745d_565d3e41",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 130,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "remove space at end.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "81e08406_23337137",
+        "filename": "include/vr_message.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "take care of indentation for \u002721\u0027",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a3eaa16e_2d883a9f",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1490,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "If there are no other changes in this file, skip this change as well.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b10a38b2_c27247a3",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1574,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "cleanup and remove if this piece of code is not needed.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d316efe6_ff083d03",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1575,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "whats the purpose of this function?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dd90a865_2d769e82",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1585,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "remove tabs.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e0a0cccb_7849f65f",
+        "filename": "include/vr_sandesh.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "please remove these changes.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fac3be3e_acd38745",
+        "filename": "include/vrouter.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 234,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "remove the change.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "02a71bde_1e694158",
+        "filename": "linux/vrouter_mod.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2636,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T09:34:28Z",
+      "side": 1,
+      "message": "this cannot work as uint, it has to be module parameter array. https://devarea.com/linux-kernel-development-kernel-module-parameters/ refer this.",
       "revId": "6a242d93823270419818df10f636d95f1a55db3f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
