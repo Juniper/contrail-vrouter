@@ -1,0 +1,310 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7834c30d_ec0ae18f",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1655,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "This was test code. Please clean up.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8b52009b_d4e7730b",
+        "filename": "dp-core/vr_queue.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "remove.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ab3932d0_c1f8891a",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Create a separate locally defined macro to handle all of this, which can in turn call VR_LOG. THis will simplify the whole block to 2-3 lines.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "21e8419f_0e63e302",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Can remove spaces between prefix.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e6af93e9_9c0267d3",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Please follow conventions on restricting line length to 80 columns. Please reformat the line. Dont no\u0027s, use 3 define to include Module name. \nInclude log priority.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "505d59aa_31dcbef5",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "reformat.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "902d3edb_b19b61ab",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 178,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "remove comment.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9f5249a9_edbcbfe9",
+        "filename": "dp-core/vr_sandesh.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 103,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Why is this change here? your infra is not tied with pkt_log infra?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dfc79992_396a10e9",
+        "filename": "sandesh/vr.sandesh",
+        "patchSetId": 1
+      },
+      "lineNbr": 553,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "What\u0027s vr_test for?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1e21e35c_80b3a253",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 283,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "remove this change.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8f8728bb_08d36cd5",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2519,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Why are we sending max size here? What will the vrouter module do here with these sizes?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "30846439_fda862ef",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 410,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Can we use # defines or enums instead of hard coded numbers?",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eb1d0b56_150230be",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 421,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "again a #define or an enum, would be reusable in vrouter code as well. when we specify level as part of VR_LOG macro.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9a4eb2c4_b8affebf",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 478,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "* Sandesh ...\n\nPlease follow proper c style comment convention.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4b7e41c3_7c73dfc5",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 486,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "indentation.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "35042632_84f909b5",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 519,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "We use space and not tabs for indentation. Please clean up this.\n\nWhere is retrieve_log_module being initialised.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "da66d1bc_e717602c",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 789,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Add in some comments to help understand, how the parsing is being done.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "badcc007_533f49c9",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 823,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-08-06T06:22:24Z",
+      "side": 1,
+      "message": "Please take of indentation, use space instead of tabs.",
+      "revId": "6a242d93823270419818df10f636d95f1a55db3f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
