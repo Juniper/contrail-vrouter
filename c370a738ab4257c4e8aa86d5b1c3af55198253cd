@@ -34,6 +34,24 @@
       "revId": "c370a738ab4257c4e8aa86d5b1c3af55198253cd",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e032d72f_8d9e20b8",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 7
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-08-07T09:40:27Z",
+      "side": 1,
+      "message": "The plan is to aggregrate all the infra lib files under /lib directory. That way it is easier to know/update all the infra files.",
+      "parentUuid": "8863af0c_cb902e5f",
+      "revId": "c370a738ab4257c4e8aa86d5b1c3af55198253cd",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
