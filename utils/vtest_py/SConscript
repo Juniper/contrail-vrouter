@@ -17,6 +17,7 @@
 
 import os
 import sys
+import platform
 
 Import('VRutilsEnv')
 env = VRutilsEnv.Clone()
@@ -26,7 +27,7 @@ src_root = Dir('#').srcnode().abspath
 build_root = Dir(env['TOP']).abspath
 vtest_py_venv_root = build_root + "/vrouter/utils/vtest_py_venv"
 vtest_py_src_root = src_root + "/vrouter/utils/vtest_py"
-vtest_py_venv_sock_dir = vtest_py_venv_root + "/sock_dir"
+vtest_py_venv_sock_dir = vtest_py_venv_root + "/var/run/vrouter"
 
 print "src_root %s" %(src_root)
 print "build_root %s" %(build_root)
@@ -75,8 +76,9 @@ copy_test_files = env.Command("copy_test_files", [],
 
 # copy vtest lib to venv
 copy_vtest_lib = env.Command("copy_vtest_lib", [],
-                             Copy(vtest_py_venv_root + "/vtest_lib.py",
-                                  vtest_py_src_root + "/vtest_lib.py"))
+                              vtest_py_src_root + "/copy_dir.py "+
+                              vtest_py_src_root + "/lib " +
+                              vtest_py_venv_root + "/lib")
 
 # create sock dir in venv for vrouter to run
 create_sock_dir = env.Command("create_sock_dir", [],
