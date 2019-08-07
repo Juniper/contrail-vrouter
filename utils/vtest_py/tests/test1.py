@@ -3,9 +3,10 @@
 import os
 import sys
 sys.path.append(os.getcwd())
+sys.path.append(os.getcwd() + '/lib/')
+
 from vtest_lib import *
 import vtconst
-
 
 # anything with *test* will be assumed by pytest as a test
 # The vrouter_test_fixture is passed as an argument to the test
@@ -39,7 +40,7 @@ def test1(vrouter_test_fixture):
     # parse the fields and validate the response
     vif_name = vt.parse_xml_field(vif_resp_file, "vifr_name")
     print "Got vif name ", vif_name
-    assert (vif_name.find("1") != -1), "Failed to get vif name"
+    assert (vif_name.find("tap_1") != -1), "Failed to get vif name"
     vif_mtu = vt.parse_xml_field(vif_resp_file, "vifr_mtu")
     print "Got vif mtu ", vif_mtu
     assert (vif_mtu.find("1514") != -1), "Failed to get mtu value"
