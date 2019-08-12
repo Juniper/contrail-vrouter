@@ -196,23 +196,24 @@ dpdk_virtual_if_add(struct vr_interface *vif)
                                      nrxqs, ntxqs, vif->vif_vhostuser_mode);
 }
 
-/* Creating mock physical device used for simulating physical
+/* Creating mock physical/vhost/agent device used for simulating
  * interfaces through vtest */
 static int
-dpdk_mock_physical_vif_add(struct vr_interface *vif)
+dpdk_mock_vif_add(struct vr_interface *vif)
 {
     int ret = 0;
 
-    /* A virtual interface is being added for mock physical device,
-     * For upper layers, it looks like packet being sent/receive on physical interface*/
-    vif->vif_flags |= VIF_FLAG_MOCK_PHYSICAL;
+    /* A virtual interface is being added for mock physical/vhost device,
+     * For upper layers, it looks like packet being sent/receive on 
+     * physical/vhost interface*/
+    vif->vif_flags |= VIF_FLAG_MOCK_DEVICE;
     ret = dpdk_virtual_if_add(vif);
 
     if(ret != 0)
-        RTE_LOG(ERR, VROUTER, "Error adding mock physical device vif: %u for vif_name: %s\n",
+        RTE_LOG(ERR, VROUTER, "Error adding mock device vif: %u for vif_name: %s\n",
                 vif->vif_idx, vif->vif_name);
     else
-        RTE_LOG(INFO, VROUTER, "Added Mock physical device vif: %u for vif_name: %s\n",
+        RTE_LOG(INFO, VROUTER, "Added Mock device vif: %u for vif_name: %s\n",
                 vif->vif_idx, vif->vif_name);
 
     return ret;
@@ -773,7 +774,7 @@ dpdk_fabric_if_add(struct vr_interface *vif)
      * vtest(Vrouter Unit Test simulation framework) and create virtual port instead
      * of physical port */
     if(ports_num == 0)
-        return dpdk_mock_physical_vif_add(vif);
+        return dpdk_mock_vif_add(vif);
 
     memset(&pci_address, 0, sizeof(pci_address));
     memset(&mac_addr, 0, sizeof(mac_addr));
@@ -970,7 +971,19 @@ dpdk_vhost_if_add(struct vr_interface *vif)
     int ret;
     struct ether_addr mac_addr;
     struct vr_dpdk_ethdev *ethdev;
-    uint16_t nb_txqs;
+    uint16_t nb_txqs, ports_num;
+
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    ports_num = rte_eth_dev_count_avail();
+#else
+    ports_num = rte_eth_dev_count();
+#endif
+
+    /* When there is no PCI ports for DPDK, considered to be running on
+     * vtest(Vrouter Unit Test simulation framework) and create virtual port instead
+     * of physical port */
+    if(ports_num == 0)
+        return dpdk_mock_vif_add(vif);
 
     /*
      * The Agent passes xconnect fabric interface in cross_connect_idx,
@@ -1222,11 +1235,24 @@ static int
 dpdk_agent_if_add(struct vr_interface *vif)
 {
     int ret;
+    uint16_t ports_num;
+
+#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
+    ports_num = rte_eth_dev_count_avail();
+#else
+    ports_num = rte_eth_dev_count();
+#endif
 
     RTE_LOG(INFO, VROUTER, "Adding vif %u (gen. %u) packet device %s\n",
                 vif->vif_idx, vif->vif_gen, vif->vif_name);
 
-    /* check if packet device is already added */
+    /* When there is no PCI ports for DPDK, considered to be running on
+     * vtest(Vrouter Unit Test simulation framework) and create virtual port instead
+     * of physical port */
+    if(ports_num == 0)
+        return dpdk_mock_vif_add(vif);
+
+   /* check if packet device is already added */
     if (vr_dpdk.packet_transport != NULL) {
         RTE_LOG(ERR, VROUTER, "    error adding packet device %s: already exist\n",
             vif->vif_name);
@@ -2002,7 +2028,7 @@ dpdk_if_get_settings(struct vr_interface *vif,
     uint8_t port_id;
     struct rte_eth_link link;
 
-    if(vif->vif_flags & VIF_FLAG_MOCK_PHYSICAL)
+    if(vif->vif_flags & VIF_FLAG_MOCK_DEVICE)
         return 0;
 
     port_id = ((struct vr_dpdk_ethdev*)(vif->vif_os))->ethdev_port_id;
@@ -2029,7 +2055,7 @@ dpdk_if_get_mtu(struct vr_interface *vif)
 
     l3_mtu = vif->vif_mtu;
 
-    if(vif->vif_flags & VIF_FLAG_MOCK_PHYSICAL) {
+    if(vif->vif_flags & VIF_FLAG_MOCK_DEVICE) {
         /* If Mock physical flag enabled, running on
          * vtest(Vrouter Unit Test simulation framework) and directly return mtu size */
         return l3_mtu?l3_mtu:VR_DPDK_VHOST_DEFAULT_MTU_SIZE;
