@@ -116,8 +116,9 @@
 #define VIF_FLAG_MIRROR_NOTAG       0x1000000
 #define VIF_FLAG_IGMP_ENABLED       0x2000000
 
-/* Mock physical would be used for simulating physical interface in vtest */
-#define VIF_FLAG_MOCK_PHYSICAL      0x4000000
+/* Mock physical would be used for simulating physical/vhost
+ * interface in vtest */
+#define VIF_FLAG_MOCK_DEVICE      0x4000000
 
 /* vrouter capabilities mask (cannot be changed by agent) */
 #define VIF_VR_CAP_MASK (VIF_FLAG_TX_CSUM_OFFLOAD | \
