@@ -55,7 +55,7 @@ def test_mirror_v6_sandesh_conf(vrouter_test_fixture):
 
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_ENCAP
+    nh.nhr_type = vtconst.NH_TYPE_ENCAP
     nh.nhr_id = 21
     nh.nhr_encap_oif_id = 3
     nh.nhr_encap = vt_encap("de ad be ef 00 02 de ad be ef 00 01 08 00")
@@ -67,7 +67,7 @@ def test_mirror_v6_sandesh_conf(vrouter_test_fixture):
 
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_TUNNEL
+    nh.nhr_type = vtconst.NH_TYPE_TUNNEL
     nh.nhr_id = 14
     nh.nhr_encap_oif_id = 2
     nh.nhr_encap =  vt_encap("de ad be ef 00 02 de ad be ef 00 01 08 00")
@@ -97,7 +97,7 @@ def test_mirror_v6_sandesh_conf(vrouter_test_fixture):
 
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_RCV
+    nh.nhr_type = vtconst.NH_TYPE_RCV
     nh.nhr_id = 15
     nh.nhr_encap_oif_id = 1
     nh.nhr_vrf = 0
@@ -117,7 +117,7 @@ def test_mirror_v6_sandesh_conf(vrouter_test_fixture):
     vt.send_sandesh_req(route)
 
     flow = vr_flow_req()
-    flow.fr_op = vtconst.FLOW_SET
+    flow.fr_op = vtconst.FLOW_OPER_SET
     flow.fr_flow_sip_u, flow.fr_flow_sip_l = vt_ipv6("00DE:00AD:00BE:00EF:0000:0000:0000:0001")
     flow.fr_flow_dip_u, flow.fr_flow_dip_l =  vt_ipv6("00DE:00AD:00BE:00EF:0000:0000:0000:0002")
     flow.fr_family = 10

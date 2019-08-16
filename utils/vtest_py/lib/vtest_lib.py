@@ -17,10 +17,12 @@ from pysandesh.protocol.TXMLProtocol import *
 import xml.etree.ElementTree as ET
 from scapy.all import *
 import pytest
+import vtconst
+import inspect
 
 
 ############################################
-# Vrouter class
+# Utility functions
 ############################################
 def htonll(val):
     return (socket.htonl(val & 0xFFFFFFFF) << 32) + (socket.htonl(val >> 32))
@@ -45,12 +47,42 @@ def vt_mac(str):
 def vt_ipv4(str):
    return socket.htonl(int(ipaddress.IPv4Address(unicode(str))))
 
+def vt_ipv4_bytes(str):
+    ipv4_sp = str.split(".")
+    ipv4_dec = []
+    for i in range(len(ipv4_sp)):
+        ipv4_dec.append(int(ipv4_sp[i]))
+    return ipv4_dec
+
 def vt_ipv6(str):
     ip6_u = int(bin(netaddr.IPAddress(str) >> 64),2)
     ip6_l = int(bin(netaddr.IPAddress(str) & (1 << 64) - 1), 2)
     return htonll(ip6_u), htonll(ip6_l)
 
+# replace sandesh obj name in xml file generated 
+# as pysandesh uses the derived class name to write the req;
+# eg: vif instead of vr_interface_req as vif is derived from vr_interface_req
+def replace_sandesh_obj_name(obj, file):
+    subclass_name = obj.__class__.__name__
+    mro_tuple = inspect.getmro(obj.__class__)
+    mro_len = len(mro_tuple)
+    if (mro_len <= 2):
+        # there is no base class
+        print "Subclass is same as base class, ", subclass_name
+        return
+    baseclass_name = mro_tuple[mro_len-2].__name__
+    print "Replacing "+ subclass_name + " with " + baseclass_name
+    try:
+        subprocess.call("sed -i 's/" + subclass_name + "/" + baseclass_name + "/g' " + file,
+                        shell=True)
+    except Exception as e:
+        print "Failed to replace sandesh obj name = ", subclass_name
+        print e
 
+
+############################################
+# Vrouter class
+############################################
 class vrouter:
     """Class which abstracts DPDK Vrouter actions"""
 
@@ -169,6 +201,7 @@ class vtest:
                 print "Failed to write sandesh req file"
                 print e
         try:
+            replace_sandesh_obj_name(obj, filename)
             subprocess.call("xmllint --format " + filename +
                             " --output " + filename, shell=True)
         except Exception as e:
@@ -290,6 +323,190 @@ class vtest:
         # run the vtest cmd
         return self.run_command(self.VT_PKT_CMD, req_filename)
 
+
+############################################
+# Vif class
+############################################
+class VIF(vr_interface_req):
+    """Class to represent vif object"""
+
+    def __init__(self, idx, name, ip, mac, type=vtconst.VIF_TYPE_VIRTUAL, ip6_u=0, ip6_l=0):
+        super(VIF, self).__init__()
+        self.h_op = vtconst.SANDESH_OPER_ADD
+        self.vifr_type = type
+        self.vifr_idx = idx
+        self.vifr_name = name
+        self.vifr_transport = vtconst.VIF_TRANSPORT_PMD
+        self.vifr_vrf = 0
+        self.vifr_mac = mac
+        self.vifr_mtu = 1514
+        self.vifr_ip = ip
+        self.vifr_ip6_u = ip6_u
+        self.vifr_ip6_l = ip6_l
+
+
+############################################
+# Nexthop class
+############################################
+class NH(vr_nexthop_req):
+    """Class to represent nexthop object"""
+
+    def __init__(self, id, type, family, encap_oif, encap):
+        super(NH, self).__init__()
+        self.h_op = vtconst.SANDESH_OPER_ADD
+        self.nhr_id = id
+        self.nhr_family = family
+        self.nhr_type = type
+        self.nhr_vrf = 0
+        self.nhr_flags = vtconst.NH_FLAG_VALID
+        self.nhr_encap_oif_id = encap_oif
+        self.nhr_encap = encap
+
+
+############################################
+# Encap Nexthop class
+############################################
+class ENCAP_NH(NH):
+    """Class to represent encap nexthop object, derived from nh"""
+
+    def __init__(self, id, family, encap_oif, encap):
+        super(ENCAP_NH, self).__init__(id, vtconst.NH_TYPE_ENCAP, family, encap_oif, encap)
+
+
+############################################
+# Tunnel Nexthop class (IPv4)
+############################################
+class TUNNEL_NHV4(NH):
+    """Class to represent ipv4 tunnel nexthop object, derived from nh"""
+
+    def __init__(self, id, tun_sip, tun_dip, encap_oif, encap):
+        super(TUNNEL_NHV4, self).__init__(id, vtconst.NH_TYPE_TUNNEL, vtconst.AF_INET, encap_oif, encap)
+        self.nhr_tun_sip = tun_sip
+        self.nhr_tun_dip = tun_dip
+
+
+############################################
+# Tunnel Nexthop class (IPv6)
+############################################
+class TUNNEL_NHV6(NH):
+    """Class to represent ipv6 tunnel nexthop object, derived from nh"""
+
+    def __init__(self, id, tun_sip6, tun_dip6, encap_oif, encap):
+        super(TUNNEL_NHV6, self).__init__(id, vtconst.NH_TYPE_TUNNEL, vtconst.AF_INET6, encap_oif, encap)
+        self.nhr_tun_sip6 = tun_sip6
+        self.nhr_tun_dip6 = tun_dip6
+
+
+
+############################################
+# Route class
+############################################
+class RT(vr_route_req):
+    """Class to represent route object"""
+
+    def __init__(self, family, vrf, prefix=None, prefix_len=None, mac=None, nh_id=None):
+        super(RT, self).__init__()
+        self.h_op = vtconst.SANDESH_OPER_ADD
+        self.rtr_family = family
+        self.rtr_vrf_id = vrf
+        self.rtr_mac = mac
+        self.rtr_prefix = prefix
+        self.rtr_prefix_len = prefix_len
+        self.rtr_nh_id = nh_id
+
+
+############################################
+# Bridge Route class
+############################################
+class BRIDGE_RT(RT):
+    """Class to represent bridge route object"""
+
+    def __init__(self, vrf, mac, nh_id):
+        super(BRIDGE_RT, self).__init__(vtconst.AF_BRIDGE, vrf, None, None, mac, nh_id)
+
+
+############################################
+# Inet Route class
+############################################
+class INET_RT(RT):
+    """Class to represent inet route object"""
+
+    def __init__(self, vrf, prefix, prefix_len, nh_id):
+        super(INET_RT, self).__init__(vtconst.AF_INET, vrf, prefix, prefix_len, None, nh_id)
+
+
+############################################
+# Inet6 Route class
+############################################
+class INET6_RT(RT):
+    """Class to represent inet6 route object"""
+
+    def __init__(self, vrf, prefix, prefix_len, nh_id):
+        super(INET6_RT, self).__init__(vtconst.AF_INET6, vrf, prefix, prefix_len, None, nh_id)
+
+
+############################################
+# Flow class
+############################################
+class FLOW(vr_flow_req):
+    """Class to represent flow object"""
+
+    def __init__(self, idx, sip_l, sip_h, dip_l, dip_h, family, proto, sport, dport):
+        super(FLOW, self).__init__()
+        self.fr_op = vtconst.FLOW_OPER_SET
+        self.fr_index = idx
+        self.fr_rindex = -1
+        self.fr_flow_sip_l = sip_l
+        self.fr_flow_sip_h = sip_h
+        self.fr_flow_dip_l = dip_l
+        self.fr_flow_dip_h = dip_h
+        self.fr_family = family
+        self.fr_flow_proto = proto
+        self.fr_flow_sport = socket.htons(sport)
+        self.fr_flow_dport = socket.htons(dport)
+        self.fr_flags = vtconst.VR_FLOW_FLAG_ACTIVE
+        self.fr_ecmp_nh_index = -1
+        self.fr_action = vtconst.VR_FLOW_ACTION_FORWARD
+        self.fr_qos_id = -1
+        # set reverse flow params as mirror of forward flow by default
+        self.rflow_sip_u = self.fr_flow_dip_u
+        self.rflow_sip_l = self.fr_flow_dip_l
+        self.rflow_dip_u = self.fr_flow_sip_u
+        self.rflow_dip_l = self.fr_flow_sip_l
+        self.rflow_sport = self.fr_flow_dport
+        self.rflow_dport = self.fr_flow_sport
+
+
+############################################
+# Inet Flow class
+############################################
+class INET_FLOW(FLOW):
+    """Class to represent inet flow object"""
+
+    def __init__(self, idx, sip, dip, proto, sport, dport):
+        super(INET_FLOW, self).__init__(idx, sip, 0, dip, 0, vtconst.AF_INET, proto, sport, dport)
+
+
+############################################
+# Inet6 Flow class
+############################################
+class INET6_FLOW(FLOW):
+    """Class to represent inet6 flow object"""
+
+    def __init__(self, idx, sip6, dip6, proto, sport, dport):
+        super(INET6_FLOW).__init__(idx, sip6[0], sip6[1], dip6[0], dip6[1], \
+                         vtconst.AF_INET6, proto, sport, dport)
+
+
+############################################
+# Dropstats class
+############################################
+class DROPSTATS(vr_drop_stats_req):
+    """Class to represent dropstats object"""
+
+    def __init__(self):
+        super(DROPSTATS, self).__init__()
+        self.h_op = vtconst.SANDESH_OPER_GET
 
 
 ############################################
