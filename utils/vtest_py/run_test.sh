@@ -137,7 +137,14 @@ else
     pytest -s ./tests/$test_opt
 fi
 
+result=$?
 echo "Exiting venv"
 deactivate
 
+if [ $result -ne 0 ]; then
+   echo "Script execution failed"
+   exit 1
+else
+   exit 0
+fi
 
