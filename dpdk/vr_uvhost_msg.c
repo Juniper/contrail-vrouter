@@ -848,6 +848,7 @@ vr_uvh_cl_send_reply(int fd, vr_uvh_client_t *vru_cl)
         case VHOST_USER_GET_VRING_BASE:
         case VHOST_USER_GET_PROTOCOL_FEATURES:
         case VHOST_USER_GET_QUEUE_NUM:
+        case VHOST_USER_SET_LOG_BASE:
             /*
              * Send reply for these messages only.
              */
