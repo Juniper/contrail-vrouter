@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "fdfb906e_dfaea081",
+        "filename": "dpdk/vr_uvhost_msg.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2019-08-19T09:57:18Z",
+      "side": 1,
+      "message": "We need to add a UT case to test it no matter what the infra is.",
+      "parentUuid": "e705caff_ac530915",
+      "revId": "4daf48fc6a9d7516ce44db1660757941eec94dea",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4416f0dc_1e423f6b",
         "filename": "dpdk/vr_uvhost_msg.c",
         "patchSetId": 1
