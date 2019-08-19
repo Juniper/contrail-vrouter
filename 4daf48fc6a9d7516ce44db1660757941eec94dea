@@ -39,6 +39,30 @@
       "revId": "4daf48fc6a9d7516ce44db1660757941eec94dea",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "43e4c3c9_1b96bc67",
+        "filename": "dpdk/vr_uvhost_msg.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 851,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-08-19T08:15:54Z",
+      "side": 1,
+      "message": "We already have log enabled for all Vhost messages.\nI will check unhandled QEMU messages, Maybe will try to add log prints.",
+      "parentUuid": "4416f0dc_1e423f6b",
+      "range": {
+        "startLine": 851,
+        "startChar": 36,
+        "endLine": 851,
+        "endChar": 37
+      },
+      "revId": "4daf48fc6a9d7516ce44db1660757941eec94dea",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
