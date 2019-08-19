@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "e705caff_ac530915",
+        "filename": "dpdk/vr_uvhost_msg.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-08-19T08:40:31Z",
+      "side": 1,
+      "message": "This is not a python feature, but a native vtest feature.",
+      "parentUuid": "5b45eb87_21998c8f",
+      "revId": "4daf48fc6a9d7516ce44db1660757941eec94dea",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4416f0dc_1e423f6b",
         "filename": "dpdk/vr_uvhost_msg.c",
         "patchSetId": 1
@@ -54,6 +72,30 @@
       "side": 1,
       "message": "We already have log enabled for all Vhost messages.\nI will check unhandled QEMU messages, Maybe will try to add log prints.",
       "parentUuid": "4416f0dc_1e423f6b",
+      "range": {
+        "startLine": 851,
+        "startChar": 36,
+        "endLine": 851,
+        "endChar": 37
+      },
+      "revId": "4daf48fc6a9d7516ce44db1660757941eec94dea",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c4812efa_ab868b71",
+        "filename": "dpdk/vr_uvhost_msg.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 851,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-08-19T08:40:31Z",
+      "side": 1,
+      "message": "This is not the final change. More changes are needed to implement the full dirty page logging feature.\nAs part of this exercise, we are identifying other QEMU messages that need to be handled.",
+      "parentUuid": "43e4c3c9_1b96bc67",
       "range": {
         "startLine": 851,
         "startChar": 36,
