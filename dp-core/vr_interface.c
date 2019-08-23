@@ -451,6 +451,12 @@ agent_tx(struct vr_interface *vif, struct vr_packet *pkt,
     int ret;
     struct vr_interface_stats *stats = vif_get_stats(vif, pkt->vp_cpu);
 
+    if (vif->vif_flags & VIF_FLAG_MOCK_DEVICE) {
+        PKT_LOG(VP_DROP_INTERFACE_DROP, pkt, 0, VR_INTERFACE_C, __LINE__);
+        vr_pfree(pkt, VP_DROP_INTERFACE_DROP);
+        return 0;
+    }
+
     stats->vis_obytes += pkt_len(pkt);
     stats->vis_opackets++;
 
