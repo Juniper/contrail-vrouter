@@ -156,6 +156,7 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
             nla->nla_type = NL_ATTR_VR_MESSAGE_PROTOCOL;
 
             netlink_unicast(in_skb->sk, skb, netlink_id, MSG_DONTWAIT);
+            response->vr_message_buf = NULL;
         } else {
             // If there is no listener, we don't broadcast
             if (!netlink_has_listeners(in_skb->sk, vrouter_genl_family.mcgrp_offset)) {
@@ -179,7 +180,6 @@ netlink_trans_request(struct sk_buff *in_skb, struct genl_info *info)
             genlmsg_multicast(&vrouter_genl_family, skb, 0, 0, GFP_KERNEL);
         }
 next:
-        response->vr_message_buf = NULL;
         vr_message_free(response);
     }
 
