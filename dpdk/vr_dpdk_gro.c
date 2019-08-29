@@ -401,7 +401,8 @@ dpdk_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
     uint32_t *ts_ptr;
     int32_t ret;
     unsigned short csum;
-    unsigned short src_vif_idx = 0, nh_id = 0;
+    unsigned short src_vif_idx = 0;
+    uint32_t nh_id = 0;
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
     uint8_t is_ipv6 = 0, flush = 0;

@@ -2208,7 +2208,7 @@ vr_interface_change(struct vr_interface *vif, vr_interface_req *req)
     if (req->vifr_mtu)
         vif->vif_mtu = req->vifr_mtu;
 
-    vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
+    vif->vif_nh_id = req->vifr_nh_id;
     vif->vif_qos_map_index = req->vifr_qos_map_index;
     vif->vif_isid = req->vifr_isid;
     if (req->vifr_pbb_mac_size)
@@ -2344,7 +2344,7 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     if (req->vifr_os_idx == -1)
         vif->vif_os_idx = 0;
     vif->vif_rid = req->vifr_rid;
-    vif->vif_nh_id = (unsigned short)req->vifr_nh_id;
+    vif->vif_nh_id = req->vifr_nh_id;
     vif->vif_qos_map_index = req->vifr_qos_map_index;
     vif->vif_isid = req->vifr_isid;
     if (req->vifr_pbb_mac_size)

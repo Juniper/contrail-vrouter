@@ -189,7 +189,7 @@ vr_inet6_fill_rflow_from_req(struct vr_flow *flow_p, vr_flow_req *req)
 }
 
 void
-vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
+vr_inet6_fill_flow(struct vr_flow *flow_p, unsigned int nh_id,
         unsigned char *sip, unsigned char *dip,
         uint8_t proto, uint16_t sport, uint16_t dport,
         uint8_t valid_fkey_params)
@@ -235,8 +235,9 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
     uint8_t ip6_nxt;
     unsigned char *ip6_src, *ip6_dst, *ip6_addr;
     unsigned char ip6_src_flow[16], ip6_dst_flow[16];
-    unsigned short *t_hdr, sport, dport, port, nh_id,
+    unsigned short *t_hdr, sport, dport, port,
                    fat_flow_mask = VR_FAT_FLOW_NO_MASK;
+    unsigned int nh_id;
     struct vr_ip6_frag *v6_frag;
     struct vr_icmp *icmph;
 
@@ -346,7 +347,7 @@ vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
 {
     uint16_t sport, dport, port;
     unsigned char *ip6_src, *ip6_dst, *ip6_addr;
-    unsigned short nh_id;
+    unsigned int nh_id;
     struct vr_fragment *frag;
     struct vr_ip6_frag *v6_frag;
 

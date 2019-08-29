@@ -320,7 +320,7 @@ struct vr_interface {
      * each entry in the table is -1. negative value of table
      * entries is also vital for table_users calculation.
      */
-    unsigned short vif_nh_id;
+    unsigned int vif_nh_id;
     unsigned short vif_idx;
     unsigned short vif_vrf;
     unsigned short vif_mtu;

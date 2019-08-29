@@ -2111,7 +2111,8 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
 static rx_handler_result_t 
 pkt_gro_dev_rx_handler(struct sk_buff **pskb)
 {
-    unsigned short nh_id, vif_id, drop_reason;
+    unsigned short vif_id, drop_reason;
+    unsigned int nh_id;
 
     struct vrouter *router = vrouter_get(0);
     struct vr_gro *gro;
@@ -2131,6 +2132,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
         drop_reason = VP_DROP_INVALID_PACKET;
         goto drop;
     }
+    assert(0); // this should be dead code
 #else
     gro = (struct vr_gro *)skb_mac_header(skb);
     vif_id = gro->vg_vif_id;
@@ -2151,6 +2153,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
     }
 
     if (nh->nh_family == AF_BRIDGE) {
+        /* TODO: check this */
         if (!skb_push(skb, VR_ETHER_HLEN)) {
             drop_reason = VP_DROP_INVALID_PACKET;
             goto drop;
@@ -2222,6 +2225,7 @@ pkt_rps_dev_rx_handler(struct sk_buff **pskb)
 {
     struct sk_buff *skb = *pskb;
     struct vr_packet *pkt;
+    /* TODO: confirm nh_id is dead code */
     unsigned short nh_id;
     struct vr_nexthop *nh;
     struct vr_interface *vif;
