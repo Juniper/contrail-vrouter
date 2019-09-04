@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b66e686f_ba5f12af",
+        "filename": "dp-core/vr_stats.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 575
+      },
+      "writtenOn": "2019-09-04T06:37:55Z",
+      "side": 1,
+      "message": "Do we need logger infra to be tied with vr_stats.c at all? Its independent\nand should be invoked from elsewhere, I believe. Please check where the vr_stats_init\nis invoked from.",
+      "revId": "aaabac8bb93626ea677d6f564440e7cebbe0843e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
