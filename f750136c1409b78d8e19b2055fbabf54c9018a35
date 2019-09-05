@@ -2,6 +2,142 @@
   "comments": [
     {
       "key": {
+        "uuid": "94136f36_398d5a2f",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 2550,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "try to limit column size to 80",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "120c680f_6e0826a3",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 2554,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "Logic is a bit complicated. Same thing can be achieved using sprintf() in a much simpler way. Let\u0027s sync up..",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b4fbd982_0ba1a4a6",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "Did you validate if this setting works with all the supported NICs? (82599, X710, MLNX etc.)",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5c1405ed_7dd2d5cc",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 799,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "Remove these whitespaces",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1355760b_9dcf1bc3",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 851,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "should this be in \"else\" part?",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "33ebe637_157b6910",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 877,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "Check if this can be used rte_eth_link_get_nowait() to avoid potential indefinite wait",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "aaa856e2_55a1963f",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 892,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "Is it apt to rename this as VR_DPDK_MASTER",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d1ce2a31_1965b290",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 900,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T08:19:37Z",
+      "side": 1,
+      "message": "can you rename this to vr_dpdk_notify_bond_init()",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "18258d3c_82c87161",
         "filename": "include/vr_interface.h",
         "patchSetId": 8
