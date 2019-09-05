@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "18258d3c_82c87161",
+        "filename": "include/vr_interface.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-05T05:57:30Z",
+      "side": 1,
+      "message": "As discussed, this needs to be reverted",
+      "range": {
+        "startLine": 127,
+        "startChar": 37,
+        "endLine": 127,
+        "endChar": 38
+      },
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
