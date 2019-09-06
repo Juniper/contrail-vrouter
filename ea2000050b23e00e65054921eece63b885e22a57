@@ -16,6 +16,24 @@
       "revId": "ea2000050b23e00e65054921eece63b885e22a57",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "64e86b87_435655b6",
+        "filename": "linux/vr_genetlink.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-06T09:22:28Z",
+      "side": 1,
+      "message": "vtest can\u0027t be used to test linux platform.",
+      "parentUuid": "96ab0bd3_a88d0170",
+      "revId": "ea2000050b23e00e65054921eece63b885e22a57",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
