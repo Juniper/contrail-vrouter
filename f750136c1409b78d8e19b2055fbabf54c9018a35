@@ -36,6 +36,24 @@
     },
     {
       "key": {
+        "uuid": "2a05a8aa_c37951cc",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 2554,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-06T06:29:14Z",
+      "side": 1,
+      "message": "Updated the logic",
+      "parentUuid": "120c680f_6e0826a3",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b4fbd982_0ba1a4a6",
         "filename": "dpdk/vr_dpdk_ethdev.c",
         "patchSetId": 8
@@ -47,6 +65,24 @@
       "writtenOn": "2019-09-05T08:19:37Z",
       "side": 1,
       "message": "Did you validate if this setting works with all the supported NICs? (82599, X710, MLNX etc.)",
+      "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2d4eca6d_73ac2b43",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-06T06:29:14Z",
+      "side": 1,
+      "message": "I checked for 82599ES \u0026 X710 NICS and its working properly",
+      "parentUuid": "b4fbd982_0ba1a4a6",
       "revId": "f750136c1409b78d8e19b2055fbabf54c9018a35",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
