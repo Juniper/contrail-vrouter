@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9bdd8a78_b7eab74c",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2505,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-06T18:46:45Z",
+      "side": 1,
+      "message": "is this size good enough for 6 slaves?",
+      "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a93278a6_389ee147",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2528,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-06T18:46:45Z",
+      "side": 1,
+      "message": "have you tested this new logic?\nBetter to have snprintf()?",
+      "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e4e73132_e590263d",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2550,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-06T18:46:45Z",
+      "side": 1,
+      "message": "sizeof(uint8_t) is 1, so is it required?",
+      "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3454c1fa_e0fe718d",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 894,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-06T18:46:45Z",
+      "side": 1,
+      "message": "Sorry I meant VR_DPDK_BOND_MASTER",
+      "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
