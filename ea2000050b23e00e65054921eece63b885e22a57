@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "96ab0bd3_a88d0170",
+        "filename": "linux/vr_genetlink.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2019-09-06T06:32:21Z",
+      "side": 1,
+      "message": "Very nice catch :). Can you add a UT test case for the commit to master to ensure there is no leak?",
+      "revId": "ea2000050b23e00e65054921eece63b885e22a57",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
