@@ -34,6 +34,24 @@
       "revId": "ea2000050b23e00e65054921eece63b885e22a57",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2cd39517_b3a28e12",
+        "filename": "linux/vr_genetlink.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-07T04:27:50Z",
+      "side": 1,
+      "message": ".",
+      "parentUuid": "64e86b87_435655b6",
+      "revId": "ea2000050b23e00e65054921eece63b885e22a57",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
