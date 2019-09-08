@@ -36,6 +36,24 @@
     },
     {
       "key": {
+        "uuid": "17635504_397da2eb",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2528,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-08T10:50:01Z",
+      "side": 1,
+      "message": "tested with this new logic and it\u0027s working.",
+      "parentUuid": "a93278a6_389ee147",
+      "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e4e73132_e590263d",
         "filename": "dp-core/vr_interface.c",
         "patchSetId": 9
@@ -47,6 +65,24 @@
       "writtenOn": "2019-09-06T18:46:45Z",
       "side": 1,
       "message": "sizeof(uint8_t) is 1, so is it required?",
+      "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "819cf45f_18a68a26",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2550,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-08T10:50:01Z",
+      "side": 1,
+      "message": "Yeah.. For better readability",
+      "parentUuid": "e4e73132_e590263d",
       "revId": "f5e8f952131e1ab6706b93b7651cb6f8b68972ae",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
