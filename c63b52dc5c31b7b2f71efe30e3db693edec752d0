@@ -33,6 +33,24 @@
       "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6f6f163c_923136f1",
+        "filename": "utils/vif.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 546,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-09T09:44:24Z",
+      "side": 1,
+      "message": "I feel whatever we have is good. The output should not be too verbose.\nEg: \"Fwdcores: 6\" means 6 number of forwarding cores.",
+      "parentUuid": "ac00b78a_740c133d",
+      "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
