@@ -51,6 +51,24 @@
       "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "49b2a210_c3279de3",
+        "filename": "utils/vif.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 546,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T09:55:30Z",
+      "side": 1,
+      "message": "I feel it is not being too verbose. It may not be intuitive to someone who is just looking at it (without code background). Besides, I have seen more verbose output in vif output than this.",
+      "parentUuid": "6f6f163c_923136f1",
+      "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
