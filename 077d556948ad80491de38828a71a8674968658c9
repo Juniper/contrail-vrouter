@@ -1,0 +1,95 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7eafcc5b_a4b0bb39",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2733,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T11:33:54Z",
+      "side": 1,
+      "message": "strcpy is not considered safe. Lets use strncpy() instead.",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "25b77604_8fa085c9",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 894,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T11:33:54Z",
+      "side": 1,
+      "message": "Can you put this in a separate function say vr_dpdk_read_port_info() and call it from both vr_dpdk_bond_intf_callback() and vr_dpdk_notify_bond_init() ? Lets not duplicate the same logic in two places unless there is a specific reason for it.",
+      "range": {
+        "startLine": 880,
+        "startChar": 0,
+        "endLine": 894,
+        "endChar": 28
+      },
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "82d53182_2cb38275",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 916,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T11:33:54Z",
+      "side": 1,
+      "message": "Same as earlier comment. Lets not use strcpy(), use strncpy(). Please take care in other places as well.",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d0e948e7_78090cb2",
+        "filename": "include/vr_interface.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T11:33:54Z",
+      "side": 1,
+      "message": "Can we put this as part of \"vrouter --info\" output struct? This is global for the whole system, not interface specific.",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b48c8952_ca770fae",
+        "filename": "utils/vif.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 546,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T11:33:54Z",
+      "side": 1,
+      "message": "Same as earlier. See if this can be part of global vrouter info.",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
