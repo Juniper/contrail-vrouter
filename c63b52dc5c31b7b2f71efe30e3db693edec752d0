@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8966b4d6_4bf77316",
+        "filename": "include/vr_interface.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T09:32:35Z",
+      "side": 1,
+      "message": "Please follow the naming convention i.e vis_xxxx",
+      "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ac00b78a_740c133d",
+        "filename": "utils/vif.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 546,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T09:32:35Z",
+      "side": 1,
+      "message": "Can you print like this so that it is clear - \nprintf\" Num of FwdCores: %d\", req-\u003evifr_num_fwd_lcores",
+      "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
