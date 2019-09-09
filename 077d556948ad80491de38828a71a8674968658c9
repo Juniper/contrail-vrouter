@@ -154,6 +154,24 @@
     },
     {
       "key": {
+        "uuid": "3fdb9dc1_cfc3b1c5",
+        "filename": "include/vr_interface.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-09T14:31:42Z",
+      "side": 1,
+      "message": "We can display the number of forwarding cores only for DPDK case in \"vrouter --info\" output.\nI would suggest adding a separate section for showing DPDK specific global info.\nSure we can discuss this. Call me whenever you are discussing it.",
+      "parentUuid": "94a63367_5cdfd702",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b48c8952_ca770fae",
         "filename": "utils/vif.c",
         "patchSetId": 11
