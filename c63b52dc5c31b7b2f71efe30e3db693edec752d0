@@ -69,6 +69,24 @@
       "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e597ef37_636340da",
+        "filename": "utils/vif.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 546,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-09T14:10:05Z",
+      "side": 1,
+      "message": "Currently, we have vrf_id as vrf and NH id as NH.. In that way, specified \"Num of Fwdcores\" as Fwdcores.",
+      "parentUuid": "49b2a210_c3279de3",
+      "revId": "c63b52dc5c31b7b2f71efe30e3db693edec752d0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }

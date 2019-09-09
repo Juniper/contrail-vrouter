@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "551b382e_ca631ce8",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2733,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-09T14:10:05Z",
+      "side": 1,
+      "message": "Changed with snprintf function",
+      "parentUuid": "7eafcc5b_a4b0bb39",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "25b77604_8fa085c9",
         "filename": "dpdk/vr_dpdk_ethdev.c",
         "patchSetId": 11
@@ -30,6 +48,30 @@
       "writtenOn": "2019-09-09T11:33:54Z",
       "side": 1,
       "message": "Can you put this in a separate function say vr_dpdk_read_port_info() and call it from both vr_dpdk_bond_intf_callback() and vr_dpdk_notify_bond_init() ? Lets not duplicate the same logic in two places unless there is a specific reason for it.",
+      "range": {
+        "startLine": 880,
+        "startChar": 0,
+        "endLine": 894,
+        "endChar": 28
+      },
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a23bb419_d18498ee",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 894,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-09T14:10:05Z",
+      "side": 1,
+      "message": "Created a separate function called vr_dpdk_bond_send_port_info from init and callback function.",
+      "parentUuid": "25b77604_8fa085c9",
       "range": {
         "startLine": 880,
         "startChar": 0,
@@ -59,6 +101,24 @@
     },
     {
       "key": {
+        "uuid": "2ca1b817_850b9cfa",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 916,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-09T14:10:05Z",
+      "side": 1,
+      "message": "Changed with snprintf function",
+      "parentUuid": "82d53182_2cb38275",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d0e948e7_78090cb2",
         "filename": "include/vr_interface.h",
         "patchSetId": 11
@@ -76,6 +136,24 @@
     },
     {
       "key": {
+        "uuid": "94a63367_5cdfd702",
+        "filename": "include/vr_interface.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-09T14:10:05Z",
+      "side": 1,
+      "message": "We are displaying Fwdcores part of physical interface only for DPDK not for kernel module.\nWill discuss on this topic and take further action.",
+      "parentUuid": "d0e948e7_78090cb2",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b48c8952_ca770fae",
         "filename": "utils/vif.c",
         "patchSetId": 11
@@ -87,6 +165,24 @@
       "writtenOn": "2019-09-09T11:33:54Z",
       "side": 1,
       "message": "Same as earlier. See if this can be part of global vrouter info.",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e4f54b91_3099c8f1",
+        "filename": "utils/vif.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 546,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-09T14:10:05Z",
+      "side": 1,
+      "message": "Will discuss on this topic and will take action",
+      "parentUuid": "b48c8952_ca770fae",
       "revId": "077d556948ad80491de38828a71a8674968658c9",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
