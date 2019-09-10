@@ -172,6 +172,24 @@
     },
     {
       "key": {
+        "uuid": "6cbc1561_bbe747c9",
+        "filename": "include/vr_interface.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-10T10:12:33Z",
+      "side": 1,
+      "message": "Removed FwdCores in new patchset, Created a task CEM-8861 to display FwdCores as part of \"vrouter--info\" output.",
+      "parentUuid": "3fdb9dc1_cfc3b1c5",
+      "revId": "077d556948ad80491de38828a71a8674968658c9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b48c8952_ca770fae",
         "filename": "utils/vif.c",
         "patchSetId": 11
