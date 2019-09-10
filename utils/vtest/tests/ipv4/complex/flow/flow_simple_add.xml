@@ -59,7 +59,7 @@
             <h_op>Add</h_op>
             <rtr_family>2</rtr_family>
             <rtr_nh_id>12</rtr_nh_id>
-            <rtr_prefix>2.2.2.2</rtr_prefix>
+            <rtr_prefix>2:2:2:2</rtr_prefix>
             <rtr_prefix_len>32</rtr_prefix_len>
             <rtr_vrf_id>0</rtr_vrf_id>
         </vr_route_req>
