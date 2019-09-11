@@ -136,6 +136,14 @@ buffer sandesh vr_interface_req {
     82: list<u64>   vifr_fat_flow_dst_prefix_l;
     83: list<byte>  vifr_fat_flow_dst_prefix_mask;
     84: list<byte>  vifr_fat_flow_dst_aggregate_plen;
+    85: byte        vifr_intf_status;
+    86: list<byte>  vifr_fab_name;
+    87: list<byte>  vifr_fab_drv_name;
+    88: byte        vifr_num_bond_slave;
+    89: list<byte>  vifr_bond_slave_name;
+    90: list<byte>  vifr_bond_slave_drv_name;
+    91: u32         vifr_vlan_tag;
+    92: list<byte>  vifr_vlan_name;
 }
 
 buffer sandesh vr_vxlan_req {
