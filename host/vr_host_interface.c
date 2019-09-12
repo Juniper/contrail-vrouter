@@ -348,6 +348,8 @@ struct vr_host_interface_ops vr_lib_interface_ops = {
     .hif_del_tap        =   vr_lib_interface_del_tap,
     .hif_tx             =   vr_lib_interface_tx,
     .hif_rx             =   vr_lib_interface_rx,
+    .hif_get_bond_info  =   NULL,
+    .hif_get_vlan_info  =   NULL,
 };
 
 void

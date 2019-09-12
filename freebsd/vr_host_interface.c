@@ -357,6 +357,8 @@ struct vr_host_interface_ops vr_freebsd_interface_ops = {
 	.hif_tx			= freebsd_if_tx,
 	.hif_rx			= freebsd_if_rx,
 	.hif_get_settings	= freebsd_if_get_settings,
+        .hif_get_bond_info      = NULL,
+        .hif_get_vlan_info      = NULL,
 };
 
 void
