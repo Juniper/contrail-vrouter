@@ -439,46 +439,6 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
 }
 
 static void
-vr_interface_fabric_info(vr_interface_req *req)
-{
-
-    int i;
-    char *p_name, *p_drv_name ;
-    const char *fabric_link[] = {"DOWN", "UP"};
-
-    if(req->vifr_type != VIF_TYPE_PHYSICAL)
-        return;
-
-    vr_interface_print_head_space();
-    printf("Fabric Interface: %s  Status: %s  Driver: %s\n",
-            req->vifr_fab_name, fabric_link[(req->vifr_intf_status &
-                0x01)], req->vifr_fab_drv_name);
-
-    p_name = req->vifr_bond_slave_name;
-    p_drv_name = req->vifr_bond_slave_drv_name;
-
-    for(i = 0; i < req->vifr_num_bond_slave; i++) {
-        vr_interface_print_head_space();
-        printf("Slave Interface(%d): %s  Status: %s  Driver: %s\n",
-                i, p_name, fabric_link[(req->vifr_intf_status >>
-                    (i + 1)) & 0x01], p_drv_name);
-
-        p_name = strchr(p_name, '\0'); p_name++;
-        p_drv_name = strchr(p_drv_name, '\0'); p_drv_name++;
-    }
-}
-
-static void
-vr_interface_vlan_info(vr_interface_req *req)
-{
-    if(req->vifr_vlan_tag != 0 && req->vifr_vlan_name != NULL ) {
-        vr_interface_print_head_space();
-        printf("Vlan Id: %d  VLAN fwd Interface: %s\n",
-                req->vifr_vlan_tag, req->vifr_vlan_name);
-    }
-}
-
-static void
 list_get_print(vr_interface_req *req)
 {
     char ip6_addr[INET6_ADDRSTRLEN], ip_addr[INET_ADDRSTRLEN],
@@ -556,9 +516,6 @@ list_get_print(vr_interface_req *req)
     if (req->vifr_parent_vif_idx >= 0)
         printf(" Parent:vif0/%d", req->vifr_parent_vif_idx);
 
-    if (req->vifr_nh_id != 0)
-        printf(" NH: %d", req->vifr_nh_id);
-
     printf("\n");
 
     vr_interface_print_head_space();
@@ -598,8 +555,6 @@ list_get_print(vr_interface_req *req)
         vr_interface_e_per_lcore_counters_print("RX queue", print_zero,
                 req->vifr_queue_ierrors_to_lcore,
                 req->vifr_queue_ierrors_to_lcore_size);
-        vr_interface_fabric_info(req);
-        vr_interface_vlan_info(req);
     }
 
     vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,
