@@ -2377,6 +2377,8 @@ struct vr_host_interface_ops vr_linux_interface_ops = {
     .hif_tx             =       linux_if_tx,
     .hif_rx             =       linux_if_rx,
     .hif_get_settings   =       linux_if_get_settings,
+    .hif_get_bond_info  =       NULL,
+    .hif_get_vlan_info  =       NULL,
     .hif_get_mtu        =       linux_if_get_mtu,
     .hif_get_encap      =       linux_if_get_encap,
 };
