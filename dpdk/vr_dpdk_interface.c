@@ -842,7 +842,6 @@ dpdk_fabric_if_add(struct vr_interface *vif)
         return -EEXIST;
     }
     ethdev->ethdev_port_id = port_id;
-    ethdev->ethdev_vif_idx = vif->vif_idx;
 
     fabric_ethdev_conf = ethdev_conf;
     vr_ethdev_conf_update(&fabric_ethdev_conf);
@@ -2021,62 +2020,6 @@ dpdk_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 
     return 0;
 }
-static int
-dpdk_if_get_vlan_info(struct vr_interface *vif,
-        struct vr_interface_vlan_info *vlan_info)
-{
-    memset(vlan_info, 0, sizeof(*vlan_info));
-    if(vr_dpdk.vlan_tag != 0 && vr_dpdk.vlan_name != NULL) {
-        vlan_info->vlan_id = vr_dpdk.vlan_tag;
-        strcpy(vlan_info->vlan_name, vr_dpdk.vlan_name);
-    } else {
-        RTE_LOG(INFO, VROUTER, "VLAN info not available\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-static int
-dpdk_if_get_bond_info(struct vr_interface *vif,
-        struct vr_interface_bond_info *bond_info)
-{
-
-    uint8_t port_id = 0, i = 0;
-    struct vr_dpdk_ethdev *ethdev = ((struct vr_dpdk_ethdev*)(vif->vif_os));
-    uint32_t dev_flags = 0;
-    struct rte_eth_link link;
-
-    memset(bond_info, 0, sizeof(*bond_info));
-
-    dev_flags = rte_eth_devices[port_id].data->dev_flags;
-
-    /* To get fabric info */
-    bond_info->vif_fab_drv_name = rte_eth_devices[ethdev->ethdev_port_id].device->driver->name;
-    bond_info->vif_fab_name = rte_eth_devices[ethdev->ethdev_port_id].data->name;
-    rte_eth_link_get_nowait(ethdev->ethdev_port_id, &link);
-    bond_info->vif_intf_link_status = link.link_status;
-
-    /* Check bond slave is configured */
-    if (!(dev_flags & RTE_ETH_DEV_BONDED_SLAVE)) {
-        bond_info->vif_num_slave = 0;
-        return 0;
-    }
-
-    for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
-        port_id = ethdev->ethdev_slaves[i];
-
-        bond_info->vif_slave_drv_name[i] = rte_eth_devices[port_id].device->driver->name;
-        bond_info->vif_slave_name[i] = rte_eth_devices[port_id].data->name;
-
-        /* Get link status of bond slave ports */
-        rte_eth_link_get_nowait(port_id, &link);
-        bond_info->vif_intf_link_status |= (link.link_status << (i + 1));
-    }
-    bond_info->vif_num_slave = ethdev->ethdev_nb_slaves;
-
-    return 0;
-}
 
 static int
 dpdk_if_get_settings(struct vr_interface *vif,
@@ -2456,8 +2399,6 @@ struct vr_host_interface_ops dpdk_interface_ops = {
     .hif_get_mtu        =    dpdk_if_get_mtu,
     .hif_get_encap      =    dpdk_if_get_encap, /* always returns VIF_ENCAP_TYPE_ETHER */
     .hif_stats_update   =    dpdk_if_stats_update,
-    .hif_get_bond_info  =    dpdk_if_get_bond_info,
-    .hif_get_vlan_info  =    dpdk_if_get_vlan_info,
 };
 
 void
