@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "43c84449_5a44d02d",
+        "filename": "utils/vif.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 455,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-13T04:04:59Z",
+      "side": 1,
+      "message": "This would not print proper info in kernel mode?\nLets call this api only if we are in dpdk mode.",
+      "range": {
+        "startLine": 452,
+        "startChar": 1,
+        "endLine": 455,
+        "endChar": 48
+      },
+      "revId": "08b6a1843f6f9fde51fcf6bc51ddbf192c1daa63",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
