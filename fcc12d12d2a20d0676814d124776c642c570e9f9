@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ce872582_6b2f3df8",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2019-09-18T10:40:25Z",
+      "side": 1,
+      "message": "Do add the JIRA bug id in the description and also the details for the platforms it does not work in the JIRA bug.",
+      "revId": "fcc12d12d2a20d0676814d124776c642c570e9f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
