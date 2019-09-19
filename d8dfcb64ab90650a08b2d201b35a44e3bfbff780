@@ -1,0 +1,271 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a03fa91_1d2cf28a",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Add copyright info",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9c8eebd0_637f156f",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Can you rename this to GET_LOG_BUF_IDX().",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "775031a4_77c1f67d",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Can you rename this to GET_LOG_BUF()",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b41b7072_3e462069",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Fix the alignment",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fa6bbbc9_12f724e9",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 69,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Please fix the alignment in this function.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "01e4347c_64d01511",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Please remove this printf",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d3c5d815_e09444f8",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 206,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "set router-\u003evr_logger to NULL",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0050179f_cb6ef416",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 223,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "This might cause a problem when lets say 1 thread is writing to the buf and at the same time another thread tries to clear the buf due to user command. At that time, the 1st thread would end up writing onto freed buffer and crash. We need to synchronize between writing and clearing of the buffer. One option is to set an atomic flag in the buf struct when clear command is issued and then realloc the buf when next write is done. Reads should check the clear flag and return if it is set.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "db78c9cb_5dd307b6",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 226,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "If h_op !\u003d SANDESH_OP_GET you are sending the response, but shouldn\u0027t we return after that? Is it expected to execute the next stmts as well?",
+      "range": {
+        "startLine": 226,
+        "startChar": 4,
+        "endLine": 226,
+        "endChar": 58
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1a79e032_32af3058",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Instead of API, can you call it as Macro. Since these are macros. Same in other places.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ab67d1ae_67d0488b",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "To be consistent, please rename this Macro to IS_LOG_TO_CON.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1226268d_46438260",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Why are we doing this?",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1a05f092_a340373f",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 84,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "What will happen if vr_log-\u003evr_log_buf[mod].buf_idx reaches 0xFFFFFFFF ? Will it work correctly in rollover case?",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e26f7265_ac5d99d9",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 87,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "We can optimize this moving it as the first check. No need of incrementing log buffer index in this case. We can increment the log buffer index only if we are logging to buffer.",
+      "range": {
+        "startLine": 86,
+        "startChar": 9,
+        "endLine": 87,
+        "endChar": 44
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ed9106f5_bc9e8663",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 103,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-19T14:14:17Z",
+      "side": 1,
+      "message": "Can you list the elements vertically instead of horizontally? Same in other place.\nAlso name the elements as MODULE_FLOW , etc..",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
