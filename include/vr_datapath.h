@@ -11,7 +11,8 @@
 __attribute__packed__open__
 struct vr_gro {
     uint16_t vg_vif_id;
-    uint16_t vg_nh_id;
+    uint16_t pad;
+    uint32_t vg_nh_id;
 } __attribute__packed__close__;
 
 static inline bool

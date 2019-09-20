@@ -362,14 +362,15 @@ struct vr_dummy_flow_entry {
     uint16_t fe_tcp_flags;
     struct vr_flow_queue *fe_hold_list;
     unsigned int fe_tcp_seq;
-    unsigned short fe_action;
-    unsigned short fe_flags;
     int fe_rflow;
+    unsigned short fe_flags;
+    unsigned short fe_resvd_flags;
+    unsigned short fe_action;
     unsigned short fe_vrf;
     unsigned short fe_dvrf;
-    uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
     uint8_t fe_sec_mirror_id;
+    uint32_t fe_src_nh_index;
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
@@ -379,7 +380,10 @@ struct vr_dummy_flow_entry {
     struct vr_mirror_meta_entry *fe_mme;
 } __attribute__packed__close__;
 
-#define VR_FLOW_ENTRY_PACK (128 - sizeof(struct vr_dummy_flow_entry))
+/*
+ * Flow entry size must be cache line aligned and factor of 4MB page size
+ */
+#define VR_FLOW_ENTRY_PACK (256 - sizeof(struct vr_dummy_flow_entry))
 
 /* do not change. any field positions as it might lead to incompatibility */
 __attribute__packed__open__
@@ -392,14 +396,15 @@ struct vr_flow_entry {
     uint16_t fe_tcp_flags;
     struct vr_flow_queue *fe_hold_list;
     unsigned int fe_tcp_seq;
-    unsigned short fe_action;
-    unsigned short fe_flags;
     int fe_rflow;
+    unsigned short fe_flags;
+    unsigned short fe_resvd_flags;   /* Reserved for fe_flags expansion */
+    unsigned short fe_action;
     unsigned short fe_vrf;
     unsigned short fe_dvrf;
-    uint16_t fe_src_nh_index;
     uint8_t fe_mirror_id;
     uint8_t fe_sec_mirror_id;
+    uint32_t fe_src_nh_index;
     struct vr_flow_stats fe_stats;
     int8_t fe_ecmp_nh_index;
     uint8_t fe_drop_reason;
@@ -485,18 +490,18 @@ int vr_inet6_form_flow(struct vrouter *, unsigned short, struct vr_packet *,
 int vr_inet6_get_flow_key(struct vrouter *, unsigned short, struct vr_packet *,
         uint16_t, struct vr_flow *, uint8_t);
 
-extern unsigned short vr_inet_flow_nexthop(struct vr_packet *, unsigned short);
+extern unsigned int vr_inet_flow_nexthop(struct vr_packet *, unsigned short);
 extern flow_result_t vr_inet_flow_nat(struct vr_flow_entry *,
         struct vr_packet *, struct vr_forwarding_md *);
-extern void vr_inet_fill_flow(struct vr_flow *, unsigned short,
+extern void vr_inet_fill_flow(struct vr_flow *, unsigned int,
        uint32_t, uint32_t, uint8_t, uint16_t, uint16_t, uint8_t);
-extern void vr_inet6_fill_flow(struct vr_flow *, unsigned short,
+extern void vr_inet6_fill_flow(struct vr_flow *, unsigned int,
        unsigned char *, unsigned char *, uint8_t, uint16_t, uint16_t, uint8_t);
 extern void vr_inet6_fill_flow_from_req(struct vr_flow *,
         struct _vr_flow_req *);
 extern void vr_inet6_fill_rflow_from_req(struct vr_flow *,
         struct _vr_flow_req *);
-extern void vr_fill_flow_common(struct vr_flow *, unsigned short,
+extern void vr_fill_flow_common(struct vr_flow *, unsigned int,
                 uint8_t, uint16_t, uint16_t, uint8_t, uint8_t);
 extern bool vr_inet_flow_is_fat_flow(struct vrouter *, struct vr_packet *,
         struct vr_flow_entry *);

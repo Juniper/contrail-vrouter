@@ -68,7 +68,6 @@ def replace_sandesh_obj_name(obj, file):
     mro_len = len(mro_tuple)
     if (mro_len <= 2):
         # there is no base class
-        print "Subclass is same as base class, ", subclass_name
         return
     baseclass_name = mro_tuple[mro_len-2].__name__
     print "Replacing "+ subclass_name + " with " + baseclass_name
@@ -453,7 +452,7 @@ class FLOW(vr_flow_req):
 
     def __init__(self, idx, sip_l, sip_h, dip_l, dip_h, family, proto, sport, dport):
         super(FLOW, self).__init__()
-        self.fr_op = vtconst.FLOW_OPER_SET
+        self.fr_op = vtconst.FLOW_SET
         self.fr_index = idx
         self.fr_rindex = -1
         self.fr_flow_sip_l = sip_l

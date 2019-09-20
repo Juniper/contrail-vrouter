@@ -117,7 +117,7 @@ def test_mirror_v6_sandesh_conf(vrouter_test_fixture):
     vt.send_sandesh_req(route)
 
     flow = vr_flow_req()
-    flow.fr_op = vtconst.FLOW_OPER_SET
+    flow.fr_op = vtconst.FLOW_SET
     flow.fr_flow_sip_u, flow.fr_flow_sip_l = vt_ipv6("00DE:00AD:00BE:00EF:0000:0000:0000:0001")
     flow.fr_flow_dip_u, flow.fr_flow_dip_l =  vt_ipv6("00DE:00AD:00BE:00EF:0000:0000:0000:0002")
     flow.fr_family = 10

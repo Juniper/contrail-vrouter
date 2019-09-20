@@ -146,7 +146,7 @@ VRF_FLAG_VALID                     = 0x0001
 VRF_FLAG_HBF_L_VALID               = 0x0002
 VRF_FLAG_HBF_R_VALID               = 0x0004
 
-FLOW_OPER_SET                      = 0
+FLOW_SET                      = 0
 FLOW_OPER_LIST                     = 1
 FLOW_OPER_TABLE_GET                = 2
 

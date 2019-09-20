@@ -793,10 +793,10 @@ drop:
     return FLOW_CONSUMED;
 }
 
-unsigned short
+unsigned int
 vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 {
-    unsigned short nh_id;
+    unsigned int nh_id;
 
     if (vif_is_fabric(pkt->vp_if) && pkt->vp_nh) {
         /* this is more a requirement from agent */
@@ -816,7 +816,7 @@ vr_inet_flow_nexthop(struct vr_packet *pkt, unsigned short vlan)
 }
 
 void
-vr_inet_fill_flow(struct vr_flow *flow_p, unsigned short nh_id,
+vr_inet_fill_flow(struct vr_flow *flow_p, unsigned int nh_id,
         uint32_t sip, uint32_t dip, uint8_t proto, uint16_t sport,
         uint16_t dport, uint8_t valid_fkey_params)
 {
@@ -841,7 +841,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
         uint8_t valid_fkey_params, bool frag_calc)
 {
     uint16_t sport, dport;
-    unsigned short nh_id;
+    unsigned int nh_id;
 
     struct vr_fragment *frag;
     struct vr_ip *ip = (struct vr_ip *)pkt_network_header(pkt);
@@ -906,8 +906,8 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_flow *flow_p, uint8_t valid_fkey_params)
 {
     bool icmp_error_payload = false;
-    unsigned short *t_hdr, sport = 0, dport = 0, nh_id, fat_flow_mask, proto;
-    unsigned int saddr, daddr;
+    unsigned short *t_hdr, sport = 0, dport = 0, fat_flow_mask, proto;
+    unsigned int saddr, daddr, nh_id;
     int i, ret = 0;
     struct vr_icmp *icmph;
 

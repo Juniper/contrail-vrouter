@@ -5,6 +5,7 @@ import sys
 import ipaddress
 import socket
 sys.path.append(os.getcwd())
+sys.path.append(os.getcwd() + '/lib/')
 import vtconst
 from vtest_lib import *
 
@@ -186,7 +187,7 @@ def test_cem_7113(vrouter_test_fixture):
     # Add tenant vif Nexthop
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_ENCAP
+    nh.nhr_type = vtconst.NH_TYPE_ENCAP
     nh.nhr_id = 21
     nh.nhr_encap_oif_id = 3
     nh.nhr_encap = vt_encap("02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00")
@@ -200,7 +201,7 @@ def test_cem_7113(vrouter_test_fixture):
     # Add vhost0 vif Nexthop
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_ENCAP
+    nh.nhr_type = vtconst.NH_TYPE_ENCAP
     nh.nhr_id = 5
     nh.nhr_encap_oif_id = 1
     nh.nhr_encap = vt_encap("00 1b 21 bb f9 46 00 1b 21 bb f9 46 08 00")
@@ -214,7 +215,7 @@ def test_cem_7113(vrouter_test_fixture):
     # Add fabric vif Nexthop
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_ENCAP
+    nh.nhr_type = vtconst.NH_TYPE_ENCAP
     nh.nhr_id = 16 
     nh.nhr_encap_oif_id = 0
     nh.nhr_encap = vt_encap("90 e2 ba 84 48 88 00 1b 21 bb f9 46 08 00")
@@ -228,7 +229,7 @@ def test_cem_7113(vrouter_test_fixture):
     # Add receive Nexthop
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_RCV
+    nh.nhr_type = vtconst.NH_TYPE_RCV
     nh.nhr_id = 10 
     nh.nhr_encap_oif_id = 1
     nh.nhr_vrf = 1
