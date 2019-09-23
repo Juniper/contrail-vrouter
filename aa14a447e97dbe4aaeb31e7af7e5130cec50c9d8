@@ -70,6 +70,30 @@
       "revId": "aa14a447e97dbe4aaeb31e7af7e5130cec50c9d8",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "01e7d034_f646f646",
+        "filename": "utils/vtest_py/tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-23T11:23:15Z",
+      "side": 1,
+      "message": "Yes, I think I ran it standalone. Please add the /lib path to all the test cases.",
+      "parentUuid": "dff5e52a_158860ed",
+      "range": {
+        "startLine": 8,
+        "startChar": 0,
+        "endLine": 9,
+        "endChar": 23
+      },
+      "revId": "aa14a447e97dbe4aaeb31e7af7e5130cec50c9d8",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
