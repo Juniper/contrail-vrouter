@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e097b326_c74cba2f",
+        "filename": "utils/vtest_py/tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-23T07:42:26Z",
+      "side": 1,
+      "message": "For me it was cribbing that vtconst couldn\u0027t be found. The reason being it is under /lib\nand we have not appended the /lib path in sys.path. \nAfter I added this line \nsys.path.append(os.getcwd() + \u0027/lib/\u0027)\nit started worked.\nWondering why it didn\u0027t crib for you.\nCan you please check?\n\nSame for the other fabric test case file.",
+      "range": {
+        "startLine": 8,
+        "startChar": 0,
+        "endLine": 9,
+        "endChar": 23
+      },
+      "revId": "aa14a447e97dbe4aaeb31e7af7e5130cec50c9d8",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
