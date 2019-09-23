@@ -911,10 +911,11 @@ vr_dpdk_bond_intf_callback(uint16_t port_id, enum rte_eth_event_type type,
 static void
 vr_dpdk_bond_intf_cb_register(struct vr_dpdk_ethdev *ethdev)
 {
+
     int i = 0, ret = 0;
+
     /* Fetching port-id for master bond interface */
     uint8_t port_id = ethdev->ethdev_port_id;
-
 
     /* Registering callback notification for Master bond interface */
     ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC,
@@ -970,10 +971,10 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
     if (dpdk_find_port_id_by_drv_name() != VR_DPDK_INVALID_PORT_ID) {
 #endif
         dpdk_ethdev_bond_info_update(ethdev);
+
+        vr_dpdk_bond_intf_cb_register(ethdev);
     }
 
-    vr_dpdk_bond_intf_cb_register(ethdev);
-  
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
         return ret;

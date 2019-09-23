@@ -2724,22 +2724,24 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
             req->vifr_duplex = settings.vis_duplex;
         }
         if (hif_ops->hif_get_bond_info) {
-            hif_ops->hif_get_bond_info(intf, &bond_info);
-            ret = vr_interface_copy_bond_info(req, &bond_info);
-            if(ret != 0)
-                return -ENOMEM;
+            if(!hif_ops->hif_get_bond_info(intf, &bond_info)) {
+                ret = vr_interface_copy_bond_info(req, &bond_info);
+                if(ret != 0)
+                    return -ENOMEM;
+            }
         }
         if (hif_ops->hif_get_vlan_info) {
-            hif_ops->hif_get_vlan_info(intf, &vlan_info);
-            req->vifr_vlan_tag = vlan_info.vlan_id;
-            req->vifr_vlan_name_size = strlen(vlan_info.vlan_name);
-            req->vifr_vlan_name =
-                vr_zalloc(req->vifr_vlan_name_size * sizeof(uint8_t),
-                    VR_INTERFACE_OBJECT);
-            if(!req->vifr_vlan_name)
-                return -ENOMEM;
-            snprintf(req->vifr_vlan_name, req->vifr_vlan_name_size,
-                    vlan_info.vlan_name);
+            if(!hif_ops->hif_get_vlan_info(intf, &vlan_info)) {
+                req->vifr_vlan_tag = vlan_info.vlan_id;
+                req->vifr_vlan_name_size = strlen(vlan_info.vlan_name);
+                req->vifr_vlan_name =
+                    vr_zalloc(req->vifr_vlan_name_size * sizeof(uint8_t),
+                        VR_INTERFACE_OBJECT);
+                if(!req->vifr_vlan_name)
+                    return -ENOMEM;
+                snprintf(req->vifr_vlan_name, req->vifr_vlan_name_size,
+                        vlan_info.vlan_name);
+            }
         }
     }
 
