@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "0200ef1b_1b329689",
+        "filename": "include/vr_flow.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 367,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-23T04:52:50Z",
+      "side": 1,
+      "message": "Pl rename this to fe_flags1 (we are using this for hbf feature)",
+      "revId": "55a0d757ecb590f44dfc128aed1aa3473d583170",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
