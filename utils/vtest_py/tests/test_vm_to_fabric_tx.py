@@ -5,6 +5,7 @@ import sys
 import ipaddress
 import socket
 sys.path.append(os.getcwd())
+sys.path.append(os.getcwd() + '/lib')
 import vtconst
 from vtest_lib import *
 
@@ -174,7 +175,7 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
     # Add vif Nexthop
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_ENCAP
+    nh.nhr_type = vtconst.NH_TYPE_ENCAP
     nh.nhr_id = 38
     nh.nhr_encap_oif_id = 5
     nh.nhr_encap = vt_encap("02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00")
@@ -187,7 +188,7 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
     # Add tunnel NH
     nh = vr_nexthop_req()
     nh.h_op = vtconst.SANDESH_OPER_ADD
-    nh.nhr_type = vtconst.NH_TUNNEL
+    nh.nhr_type = vtconst.NH_TYPE_TUNNEL
     nh.nhr_id = 21
     nh.nhr_encap_oif_id = 0
     nh.nhr_encap = vt_encap("00 1b 21 bb f9 46 00 1b 21 bb f9 48 08 00")
@@ -216,7 +217,7 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
 
     #Add forward Flow
     flow = vr_flow_req()
-    flow.fr_op = vtconst.FLOW_SET
+    flow.fr_op = vtconst.FLOW_OPER_SET
     flow.fr_flow_sip_l = vt_ipv4("1.1.1.3")
     flow.fr_flow_sip_u = 0
     flow.fr_flow_dip_l = vt_ipv4("1.1.1.5")
@@ -248,7 +249,7 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
 
     #Add reverse Flow
     flow = vr_flow_req()
-    flow.fr_op = vtconst.FLOW_SET
+    flow.fr_op = vtconst.FLOW_OPER_SET
     flow.fr_flow_sip_l = vt_ipv4("1.1.1.5")
     flow.fr_flow_sip_u = 0
     flow.fr_flow_dip_l = vt_ipv4("1.1.1.3")
@@ -279,7 +280,7 @@ def test_vm_to_fabric_tx(vrouter_test_fixture):
 
     # Update forward flow
     flow = vr_flow_req()
-    flow.fr_op = vtconst.FLOW_SET
+    flow.fr_op = vtconst.FLOW_OPER_SET
     flow.fr_flow_sip_l = vt_ipv4("1.1.1.3")
     flow.fr_flow_sip_u = 0
     flow.fr_flow_dip_l = vt_ipv4("1.1.1.5")

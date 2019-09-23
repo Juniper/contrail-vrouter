@@ -438,6 +438,7 @@ vr_interface_e_per_lcore_counters_print(const char *title, bool print_always,
     printf("\n");
 }
 
+/* Display Fabric(Master) & bond Slave information only on DPDK platforms */
 static void
 vr_interface_fabric_info(vr_interface_req *req)
 {
@@ -468,10 +469,14 @@ vr_interface_fabric_info(vr_interface_req *req)
     }
 }
 
+/* Display VLAN ID & VLAN fwd interface only on DPDK platforms */
 static void
 vr_interface_vlan_info(vr_interface_req *req)
 {
-    if(req->vifr_vlan_tag != 0 && req->vifr_vlan_name != NULL ) {
+    if(req->vifr_type != VIF_TYPE_PHYSICAL)
+        return;
+
+    if(req->vifr_vlan_tag != VLAN_ID_INVALID && req->vifr_vlan_name != NULL ) {
         vr_interface_print_head_space();
         printf("Vlan Id: %d  VLAN fwd Interface: %s\n",
                 req->vifr_vlan_tag, req->vifr_vlan_name);
@@ -600,8 +605,11 @@ list_get_print(vr_interface_req *req)
         vr_interface_e_per_lcore_counters_print("RX queue", print_zero,
                 req->vifr_queue_ierrors_to_lcore,
                 req->vifr_queue_ierrors_to_lcore_size);
-        vr_interface_fabric_info(req);
-        vr_interface_vlan_info(req);
+        /* Bond Master(Fabric)/slave, VLAN info not valid on vtest platforms */
+        if(platform != VTEST_PLATFORM) {
+            vr_interface_fabric_info(req);
+            vr_interface_vlan_info(req);
+        }
     }
 
     vr_interface_pbem_counters_print("RX", true, req->vifr_ipackets,

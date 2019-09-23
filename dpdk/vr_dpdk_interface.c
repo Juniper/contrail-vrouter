@@ -2025,8 +2025,12 @@ static int
 dpdk_if_get_vlan_info(struct vr_interface *vif,
         struct vr_interface_vlan_info *vlan_info)
 {
+    if(vif->vif_flags & VIF_FLAG_MOCK_DEVICE) {
+        return -1;
+    }
+
     memset(vlan_info, 0, sizeof(*vlan_info));
-    if(vr_dpdk.vlan_tag != 0 && vr_dpdk.vlan_name != NULL) {
+    if(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vr_dpdk.vlan_name != NULL) {
         vlan_info->vlan_id = vr_dpdk.vlan_tag;
         strcpy(vlan_info->vlan_name, vr_dpdk.vlan_name);
     } else {
@@ -2046,6 +2050,10 @@ dpdk_if_get_bond_info(struct vr_interface *vif,
     struct vr_dpdk_ethdev *ethdev = ((struct vr_dpdk_ethdev*)(vif->vif_os));
     uint32_t dev_flags = 0;
     struct rte_eth_link link;
+
+    if(vif->vif_flags & VIF_FLAG_MOCK_DEVICE) {
+        return -1;
+    }
 
     memset(bond_info, 0, sizeof(*bond_info));
 
@@ -2086,7 +2094,7 @@ dpdk_if_get_settings(struct vr_interface *vif,
     struct rte_eth_link link;
 
     if(vif->vif_flags & VIF_FLAG_MOCK_DEVICE)
-        return 0;
+        return -1;
 
     port_id = ((struct vr_dpdk_ethdev*)(vif->vif_os))->ethdev_port_id;
     memset(&link, 0, sizeof(link));
