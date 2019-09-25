@@ -2731,6 +2731,8 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
             }
         }
         if (hif_ops->hif_get_vlan_info) {
+            /* Intialize vlan tag */
+            req->vifr_vlan_tag = VLAN_ID_INVALID;
             if(!hif_ops->hif_get_vlan_info(intf, &vlan_info)) {
                 req->vifr_vlan_tag = vlan_info.vlan_id;
                 req->vifr_vlan_name_size = strlen(vlan_info.vlan_name);

@@ -34,6 +34,7 @@
 
 extern int vr_rxd_sz, vr_txd_sz;
 extern unsigned int datapath_offloads;
+unsigned int vr_dpdk_master_port_id;
 
 struct rte_eth_conf ethdev_conf = {
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
@@ -904,6 +905,12 @@ vr_dpdk_bond_intf_callback(uint16_t port_id, enum rte_eth_event_type type,
      * for slave interfaces */
     uint8_t vif_idx = 0;
 
+    /* On few platforms, Master lsc(callback) is not called.
+     * Forcing here to send Master notification before
+     * sending child interface */
+    if(vr_dpdk_master_port_id != port_id)
+            vr_dpdk_bond_send_port_info(vr_dpdk_master_port_id, vif_idx);
+
     return vr_dpdk_bond_send_port_info(port_id, vif_idx);
 
 }
@@ -916,6 +923,7 @@ vr_dpdk_bond_intf_cb_register(struct vr_dpdk_ethdev *ethdev)
 
     /* Fetching port-id for master bond interface */
     uint8_t port_id = ethdev->ethdev_port_id;
+    vr_dpdk_master_port_id = port_id;
 
     /* Registering callback notification for Master bond interface */
     ret = rte_eth_dev_callback_register(port_id, RTE_ETH_EVENT_INTR_LSC,
@@ -924,8 +932,11 @@ vr_dpdk_bond_intf_cb_register(struct vr_dpdk_ethdev *ethdev)
     if(ret)
         RTE_LOG(ERR, VROUTER, "Failed to setup callback for event \
                 RTE_ETH_EVENT_INTR_LSC for portid: %d\n", port_id);
-    else
-        ret = vr_dpdk_bond_send_port_info(port_id, ethdev->ethdev_vif_idx);
+    else {
+        /* During system initialization, notify agent about the master
+         * and number of slaves */
+        vr_dpdk_bond_send_port_info(port_id, ethdev->ethdev_vif_idx);
+    }
 
     /* For slave interface*/
     for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
@@ -972,8 +983,9 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
 #endif
         dpdk_ethdev_bond_info_update(ethdev);
 
-        vr_dpdk_bond_intf_cb_register(ethdev);
     }
+
+    vr_dpdk_bond_intf_cb_register(ethdev);
 
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
