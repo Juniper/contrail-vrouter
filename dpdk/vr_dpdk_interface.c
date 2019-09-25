@@ -2033,10 +2033,8 @@ dpdk_if_get_vlan_info(struct vr_interface *vif,
     if(vr_dpdk.vlan_tag != VLAN_ID_INVALID && vr_dpdk.vlan_name != NULL) {
         vlan_info->vlan_id = vr_dpdk.vlan_tag;
         strcpy(vlan_info->vlan_name, vr_dpdk.vlan_name);
-    } else {
-        RTE_LOG(INFO, VROUTER, "VLAN info not available\n");
+    } else
         return -1;
-    }
 
     return 0;
 }
