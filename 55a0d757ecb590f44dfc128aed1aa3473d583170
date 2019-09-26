@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "6fe1ef62_f0a3630b",
+        "filename": "include/vr_flow.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 367,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T08:17:57Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0200ef1b_1b329689",
+      "revId": "55a0d757ecb590f44dfc128aed1aa3473d583170",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "caccfbf5_e1036e16",
         "filename": "include/vr_flow.h",
         "patchSetId": 2
@@ -30,6 +48,24 @@
       "writtenOn": "2019-09-25T11:23:43Z",
       "side": 1,
       "message": "what is this 4MB page size?",
+      "revId": "55a0d757ecb590f44dfc128aed1aa3473d583170",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "691a47c4_845a5bc8",
+        "filename": "include/vr_flow.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 384,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T08:17:57Z",
+      "side": 1,
+      "message": "Memory allocation in btable happens in multiples of 4MB page size. Hence the flow entry size should be a multiple of 4MB page size.",
+      "parentUuid": "caccfbf5_e1036e16",
       "revId": "55a0d757ecb590f44dfc128aed1aa3473d583170",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
