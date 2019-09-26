@@ -161,6 +161,120 @@
     },
     {
       "key": {
+        "uuid": "74ded50d_6c74e6ce",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T05:57:19Z",
+      "side": 1,
+      "message": "Module IDs should be in one place in a separate .h file, maybe vr_logger.h",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0aaaf085_f7a884ac",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T05:57:19Z",
+      "side": 1,
+      "message": "1) Need to handle mac address case.\n2) Since we program only a single prefix/mac at a time, this loop is not required.\n   Also use snprintf with max buffer size given by infra and print the IP/mac in dotted\n   notation.",
+      "range": {
+        "startLine": 20,
+        "startChar": 9,
+        "endLine": 24,
+        "endChar": 11
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6ab13405_ad77263b",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T05:57:19Z",
+      "side": 1,
+      "message": "Lets avoid using dynamic memory allocation for every log.\nInstead, you can allocate a local buffer on the stack and use snprintf to copy all the contents.\nIf the user log msg is \u003e than buffer size, it will get truncated by snprintf.\nLets make sure we allocate sufficient buffer size in infra.",
+      "range": {
+        "startLine": 26,
+        "startChar": 9,
+        "endLine": 29,
+        "endChar": 34
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0951fa99_24f65cb1",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 143,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T05:57:19Z",
+      "side": 1,
+      "message": "You can just do \"if (ret \u003d\u003d 0)\" and reduce one condition check",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "80c63f44_320e5397",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T05:57:19Z",
+      "side": 1,
+      "message": "Good to add rt_replace_plen also",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "33557ace_02052505",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 190,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-26T05:57:19Z",
+      "side": 1,
+      "message": "Good to add rt_replace_plen as well",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "1a79e032_32af3058",
         "filename": "include/vr_logger.h",
         "patchSetId": 4
