@@ -69,6 +69,23 @@
       "revId": "55a0d757ecb590f44dfc128aed1aa3473d583170",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cdf2921f_17793820",
+        "filename": "utils/vtest_py/tests/test_vm_to_fabric_tx.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-09-26T08:29:56Z",
+      "side": 1,
+      "message": "Pl don\u0027t change this file. I have renamed this and made the changes.",
+      "revId": "55a0d757ecb590f44dfc128aed1aa3473d583170",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
