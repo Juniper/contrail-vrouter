@@ -31,7 +31,7 @@ struct gro_entry {
     uint16_t        dst_vif_idx;
     uint32_t        src_vif_gen;
     uint32_t        dst_vif_gen; 
-    uint16_t        nh_id; /* TODO: Add nh gen id */
+    uint32_t        nh_id; /* TODO: Add nh gen id */
     uint16_t        mbuf_cnt;
     uint32_t        p_len;      /* IP header payload length. */
     uint32_t        ulp_csum;   /* TCP, etc. checksum. */

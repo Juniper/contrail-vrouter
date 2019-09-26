@@ -1,5 +1,7 @@
 import socket
 
+#TODO: This should be auto generated in future
+
 SANDESH_OPER_ADD                   = 0
 SANDESH_OPER_GET                   = 1
 SANDESH_OPER_DEL                   = 2
@@ -65,7 +67,7 @@ VIF_ENCAP_TYPE_ETHER               = 1
 VIF_ENCAP_TYPE_L3                  = 2
 VIF_ENCAP_TYPE_L3_DECRYPT          = 3
 
-VR_DEF_NEXTHOPS                    = 65536
+VR_DEF_NEXTHOPS                    = 524288
 NH_TABLE_ENTRIES                   = VR_DEF_NEXTHOPS
 VR_NEXTHOP_COMPONENT_DUMP_LIMIT    = 16
 NH_DISCARD_ID                      = 0

@@ -1895,7 +1895,7 @@ vr_flow_set_mirror(struct vrouter *router, vr_flow_req *req,
 }
 
 void
-vr_fill_flow_common(struct vr_flow *flowp, unsigned short nh_id,
+vr_fill_flow_common(struct vr_flow *flowp, unsigned int nh_id,
         uint8_t proto, uint16_t sport, uint16_t dport, uint8_t family,
         uint8_t valid_fkey_params)
 {
@@ -2009,7 +2009,7 @@ vr_flow_set_req_is_invalid(struct vrouter *router, vr_flow_req *req,
              */
             if((unsigned short)req->fr_flow_sport != fe->fe_key.flow_sport ||
                     (unsigned short)req->fr_flow_dport != fe->fe_key.flow_dport||
-                    (unsigned short)req->fr_flow_nh_id != fe->fe_key.flow_nh_id ||
+                    (uint32_t) req->fr_flow_nh_id != (uint32_t) fe->fe_key.flow_nh_id ||
                     (unsigned char)req->fr_flow_proto != fe->fe_key.flow_proto) {
                 error = -EFAULT;
                 goto invalid_req;
