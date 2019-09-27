@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "139699d1_31b77576",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2019-09-27T04:30:56Z",
+      "side": 1,
+      "message": "Is there a Unit test case added for this code?",
+      "revId": "764dac2c8aeb8ee6000db7d7dad1bc70d30105d6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
