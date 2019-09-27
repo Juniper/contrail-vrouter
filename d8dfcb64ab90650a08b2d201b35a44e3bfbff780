@@ -121,6 +121,23 @@
     },
     {
       "key": {
+        "uuid": "8372a122_d5b7b0cb",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 213,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "How is vrouter_set_log handled?",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "0050179f_cb6ef416",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 4
@@ -275,6 +292,80 @@
     },
     {
       "key": {
+        "uuid": "b1bcc7a2_1cab4327",
+        "filename": "dp-core/vr_stats.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 591,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "Instead of initing logger as part of stats init, lets add a new module definition under\nstatic struct vr_module modules[] \u003d { } in vrouter.c and register callback there.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2b27b04d_0e5cde0c",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "I think this is not required.\nLog enabling/disabling can be implicit and controlled via log level.\nIf log level \u003d none , logging is disabled for that module\nelse, logging is enabled for that module at the configured log level.\nWe can pick the default log level. Say, Error.",
+      "range": {
+        "startLine": 104,
+        "startChar": 0,
+        "endLine": 105,
+        "endChar": 28
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bcb270ec_ba661f3a",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "\"log-entries\" to be specific",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "efb6131c_6a095382",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "Rename to log_entries",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "1a79e032_32af3058",
         "filename": "include/vr_logger.h",
         "patchSetId": 4
@@ -303,6 +394,23 @@
       "writtenOn": "2019-09-19T14:14:17Z",
       "side": 1,
       "message": "To be consistent, please rename this Macro to IS_LOG_TO_CON.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a38f41a6_aea9f361",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "Can you rename this to SET_MOD_LOG_LEVEL()",
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -377,6 +485,57 @@
       "writtenOn": "2019-09-19T14:14:17Z",
       "side": 1,
       "message": "Can you list the elements vertically instead of horizontally? Same in other place.\nAlso name the elements as MODULE_FLOW , etc..",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f5fc3653_dce30577",
+        "filename": "linux/vrouter_mod.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "Same comment as DPDK file.",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e7eb9180_b8f4255c",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 478,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "We don\u0027t need \"\\n\" here?",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5436ccb1_299b3a06",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 780,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-09-27T06:05:16Z",
+      "side": 1,
+      "message": "Please add a comment on the string format you are parsing",
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
