@@ -16,6 +16,24 @@
       "revId": "764dac2c8aeb8ee6000db7d7dad1bc70d30105d6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8879d8d8_3437c210",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2019-09-27T04:36:47Z",
+      "side": 1,
+      "message": "Siva,\nThis is for bond monitoring feature, We discussed and decided that there are more hardware interactions involved and it can\u0027t be tested using vtest..",
+      "parentUuid": "139699d1_31b77576",
+      "revId": "764dac2c8aeb8ee6000db7d7dad1bc70d30105d6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
