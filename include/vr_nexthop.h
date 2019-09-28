@@ -15,11 +15,7 @@ extern "C" {
 #include "vr_os.h"
 #include "vr_types.h"
 
-/*
- * nexthop id is also part of the flow key and is only 16 bits. Hence, you
- * know where you are getting into if you want to increase this limit
- */
-#define VR_DEF_NEXTHOPS                 65536
+#define VR_DEF_NEXTHOPS                 524288
 #define NH_TABLE_ENTRIES                VR_DEF_NEXTHOPS
 
 #define VR_NEXTHOP_COMPONENT_DUMP_LIMIT 16

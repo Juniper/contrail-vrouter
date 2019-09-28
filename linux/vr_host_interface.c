@@ -2111,7 +2111,8 @@ lh_gro_process(struct vr_packet *pkt, struct vr_interface *vif, bool l2_pkt)
 static rx_handler_result_t 
 pkt_gro_dev_rx_handler(struct sk_buff **pskb)
 {
-    unsigned short nh_id, vif_id, drop_reason;
+    unsigned short vif_id, drop_reason;
+    unsigned int nh_id;
 
     struct vrouter *router = vrouter_get(0);
     struct vr_gro *gro;
@@ -2131,6 +2132,7 @@ pkt_gro_dev_rx_handler(struct sk_buff **pskb)
         drop_reason = VP_DROP_INVALID_PACKET;
         goto drop;
     }
+    assert(0); // this should not hit
 #else
     gro = (struct vr_gro *)skb_mac_header(skb);
     vif_id = gro->vg_vif_id;

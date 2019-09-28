@@ -834,6 +834,7 @@ vr_gro_input(struct vr_packet *pkt, struct vr_nexthop *nh)
     push_len += sizeof(*gro);
 
     gro->vg_vif_id = pkt->vp_if->vif_idx;
+    gro->pad = 0;
     gro->vg_nh_id = nh->nh_id;
 
     handled = vr_gro_process(pkt, nh->nh_dev, (nh->nh_family == AF_BRIDGE));
