@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "9dc18995_d984c200",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 29
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-03T14:49:21Z",
+      "side": 1,
+      "message": "Yes, all these are part of the testplan. Will forward you the testplan.",
+      "parentUuid": "b6494322_c6979041",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "2de0b476_1f8e6321",
         "filename": "dp-core/vr_flow.c",
         "patchSetId": 29
@@ -224,6 +242,24 @@
     },
     {
       "key": {
+        "uuid": "954eb0bb_9c69f936",
+        "filename": "dp-core/vr_message.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-03T14:49:21Z",
+      "side": 1,
+      "message": "this was part of some earlier private change. will remove it.",
+      "parentUuid": "8153e468_b1c1420b",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "3e294a3b_ffc5b877",
         "filename": "include/vr_vrf_table.h",
         "patchSetId": 29
@@ -252,6 +288,30 @@
       "writtenOn": "2019-10-03T09:01:58Z",
       "side": 1,
       "message": "Consider using VIF, NH, FLOW, RT objects to avoid code repetition",
+      "range": {
+        "startLine": 17,
+        "startChar": 4,
+        "endLine": 17,
+        "endChar": 28
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b4661439_de6cb197",
+        "filename": "utils/vtest_py/tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 29
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-03T14:49:21Z",
+      "side": 1,
+      "message": "We\u0027ll move all UTs to new infra which is being developed by Anish. That infra has more utilities and wrappers. Will change this as part of that effort.",
+      "parentUuid": "56ff0499_3b38e03d",
       "range": {
         "startLine": 17,
         "startChar": 4,
