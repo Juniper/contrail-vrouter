@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e754e049_53bcd121",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 28
+      },
+      "lineNbr": 225,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Should be fe-\u003efe_flags1 \u0026\u003d ~(VR_FLOW_FLAG1_HBS_LEFT | VR_FLOW_FLAG1_HBS_RIGHT);",
+      "range": {
+        "startLine": 224,
+        "startChar": 0,
+        "endLine": 225,
+        "endChar": 59
+      },
+      "revId": "daa8929b1bd56e298396960a17b7365057e7fa6f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ac93a104_35515503",
+        "filename": "include/vr_flow.h",
+        "patchSetId": 27
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "To be uniform with rest of code, please start using the bits from right to left.",
+      "revId": "5740dd2b6ac8c80978fad1e4519a4fa926d980d2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

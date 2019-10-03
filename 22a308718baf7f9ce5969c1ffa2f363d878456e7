@@ -1,0 +1,283 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b6494322_c6979041",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 29
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Lets make sure we test the following manually and/or with automation\n1. HBS with different forwarding modes - L2, L2 \u0026 L3 and L3 only\n2. HBS with mirror action \n3. HBS with service chain \n4. HBS with NAT",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2de0b476_1f8e6321",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 922,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "How do you get the hbf tenant\u0027s vrf in case of fabric to VMI case? \nIs that already set in fmd-\u003efmd_dvrf? If so, where is it done.\nIdeally I would expect one function to get the hbf vrf using incoming vrf.",
+      "range": {
+        "startLine": 922,
+        "startChar": 47,
+        "endLine": 922,
+        "endChar": 60
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c361565e_fce250cb",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 923,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "To speed up non hbf case, consider returning from this function early using\nif !(fe-\u003efe_flags1 \u0026 VR_FLOW_FLAG1_HBS_MASK)\n    return;\nThis will reduce one if check for default cases. Ofcourse it increases one if check for hbf case, but that should be ok.",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e8383a90_44226c8a",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 943,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Can you please define a struct vr_hbs_pkt_md with 2 fields flow_idx and magic. \nAnd use that struct to set the fields.",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5eefee99_afcffc98",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 948,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Please define a macro for magic value 0xCAF0",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d018b06a_56efc8d2",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 950,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "There won\u0027t be a scenario where pkt coming from Fabric would go into hbs-left interface, isn\u0027t it? In that case, we can replace this code with just an assert.",
+      "range": {
+        "startLine": 949,
+        "startChar": 12,
+        "endLine": 950,
+        "endChar": 64
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6949207a_83bddf33",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1003,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Same as earlier comment.",
+      "range": {
+        "startLine": 1002,
+        "startChar": 12,
+        "endLine": 1003,
+        "endChar": 51
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2508e447_abbd1990",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1008,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Please define a macro for magic value 0xC0D0",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0cd33987_e1fe0790",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1072,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "If (fe_flags \u0026 VR_FLOW_ACTION_DROP) is set, is there a point in sending the pkt to hbs?\nWe could as well drop these in the beginning itself.",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9e056fc4_15069af4",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1816,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Please define macro for this",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e980af1d_d9634889",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1852,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Add Macro",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8153e468_b1c1420b",
+        "filename": "dp-core/vr_message.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "What is this for?",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3e294a3b_ffc5b877",
+        "filename": "include/vr_vrf_table.h",
+        "patchSetId": 29
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Rename to hbs_l_vif. Grep globally and replace hbf with hbs to be consistent.",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "56ff0499_3b38e03d",
+        "filename": "utils/vtest_py/tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 29
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Consider using VIF, NH, FLOW, RT objects to avoid code repetition",
+      "range": {
+        "startLine": 17,
+        "startChar": 4,
+        "endLine": 17,
+        "endChar": 28
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6a310287_c3eefcf3",
+        "filename": "utils/vtest_py/tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 29
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-10-03T09:01:58Z",
+      "side": 1,
+      "message": "Maybe have testcases with different encaps.",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
