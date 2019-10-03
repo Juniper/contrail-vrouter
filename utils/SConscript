@@ -79,6 +79,9 @@ vrfstats = env.Program(target = 'vrfstats', source = vrfstats_sources)
 dropstats_sources = ['dropstats.c']
 dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
 
+dpdkutils_sources = ['dpdkinfo.c']
+dpdkutils = env.Program(target = 'dpdkinfo', source = dpdkutils_sources)
+
 vxlan_sources = ['vxlan.c']
 vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 
@@ -92,7 +95,7 @@ mirror_sources = ['mirror.c']
 mirror = env.Program(target = 'mirror', source = mirror_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
-binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, vxlan,
+binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, dpdkutils, vxlan,
              vrouter, vrmemstats, mirror]
 
 if not sys.platform.startswith('win'):

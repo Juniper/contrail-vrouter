@@ -28,6 +28,7 @@ FLOW = flow
 MIRROR = mirror
 VRFSTATS = vrfstats
 DROPSTATS = dropstats
+DPDKinfo = dpdkinfo
 VXLAN = vxlan
 
 SANDESH_OBJS = $(SRC_ROOT)/sandesh/gen-c/vr_types.o
@@ -38,7 +39,7 @@ SANDESH_OBJS = $(SRC_ROOT)/sandesh/gen-c/vr_types.o
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $^
 
-all: $(VIF) $(NH) $(RT) $(MPLS) $(FLOW) $(MIRROR) $(VRFSTATS) $(DROPSTATS) $(VXLAN)
+all: $(VIF) $(NH) $(RT) $(MPLS) $(FLOW) $(MIRROR) $(VRFSTATS) $(DROPSTATS) $(DPDKINFO) $(VXLAN)
 
 $(SANDESH_OBJS:%.o=%.c):
 	$(MAKE) -C $(SRC_ROOT)/sandesh
@@ -67,6 +68,9 @@ $(VRFSTATS): $(VRFSTATS).c $(SANDESH_OBJS) $(LIB_NAME)
 $(DROPSTATS): $(DROPSTATS).c $(SANDESH_OBJS) $(LIB_NAME)
 	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
 
+$(DPDKINFO): $(DPDKINFO).c $(SANDESH_OBJS) $(LIB_NAME)
+	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
+
 $(VXLAN): $(VXLAN).c $(SANDESH_OBJS) $(LIB_NAME)
 	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
 
@@ -76,4 +80,4 @@ $(LIB_NAME): $(LIBOBJS)
 clean:
 	$(MAKE) -C $(SRC_ROOT)/sandesh clean
 	$(RM) *.o *.lo $(LIB_NAME)
-	$(RM) $(VIF)  $(MPLS) $(NH) $(RT) $(FLOW) $(MIRROR) $(VRFSTATS) $(DROPSTATS) $(VXLAN)
+	$(RM) $(VIF)  $(MPLS) $(NH) $(RT) $(FLOW) $(MIRROR) $(VRFSTATS) $(DROPSTATS) $(DPDKINFO) $(VXLAN)

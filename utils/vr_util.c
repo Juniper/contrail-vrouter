@@ -880,6 +880,19 @@ vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
     return vr_sendmsg(cl, &req, "vr_drop_stats_req");
 }
 
+
+int
+vr_send_dpdkutils_get(struct nl_client *cl, unsigned int router_id,
+        short core)
+{
+    vr_util_info_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_GET;
+    req.vdu_rid = router_id;
+    return vr_sendmsg(cl, &req, "vr_util_info_req");
+}
+
 int
 vr_drop_stats_reset(struct nl_client *cl)
 {

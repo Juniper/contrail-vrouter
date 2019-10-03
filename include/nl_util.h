@@ -102,6 +102,7 @@ struct nl_sandesh_callbacks {
     void (*vr_vrf_assign_req_process)(void *);
     void (*vr_vrf_stats_req_process)(void *);
     void (*vr_pkt_drop_log_req_process)(void *);
+    void (*vr_util_info_req_process)(void *);
     void (*vr_drop_stats_req_process)(void *);
     void (*vr_vxlan_req_process)(void *);
     void (*vr_mem_stats_req_process)(void *);

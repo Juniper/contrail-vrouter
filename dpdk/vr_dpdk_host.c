@@ -1497,6 +1497,8 @@ struct host_os dpdk_host = {
     .hos_offload_flow_create        =    dpdk_offload_flow_create,
     .hos_offload_flow_destroy       =    dpdk_offload_flow_destroy,
     .hos_offload_prepare            =    dpdk_offload_prepare,
+
+    .hos_util_info_get              =    dpdk_info_get,
 };
 
 struct host_os *

@@ -1016,4 +1016,8 @@ void vr_dpdk_init_cpuid(struct vr_cpu_type_t *cpu);
  */
 uint8_t dpdk_find_port_id_by_drv_name(void);
 
+/* 
+ * Get DPDK info
+ */
+void dpdk_info_get(char *);
 #endif /*_VR_DPDK_H_ */

@@ -128,6 +128,7 @@ enum vr_malloc_objects_t {
     VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT,
     VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT,
     VR_VROUTER_MAX_OBJECT,
+    VR_UTIL_INFO_REQ_OBJECT,
 };
 
 extern int vr_perfr;
@@ -241,6 +242,7 @@ struct host_os {
     void (*hos_offload_prepare)(struct vr_packet *pkt, struct vr_forwarding_md *fmd);
     void (*hos_set_dump_packets)(int);
     int (*hos_get_dump_packets)(void);
+    void (*hos_util_info_get)(char *);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -299,6 +301,7 @@ struct host_os {
 #define vr_offload_prepare              vrouter_host->hos_offload_prepare
 #define vr_set_dump_packets             vrouter_host->hos_set_dump_packets
 #define vr_get_dump_packets             vrouter_host->hos_get_dump_packets
+#define vr_util_info_get                vrouter_host->hos_util_info_get
 
 extern struct host_os *vrouter_host;
 

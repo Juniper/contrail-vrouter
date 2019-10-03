@@ -712,3 +712,43 @@ vr_hugepage_config_process(void *s_req)
 
     return;
 }
+
+static void
+vr_util_make_response(uint8_t *buf)
+{
+    vr_util_info_req *response;
+    int len;
+    
+    response = vr_zalloc(sizeof(*response), VR_UTIL_INFO_REQ_OBJECT);          
+    if (!response) {                                                            
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, sizeof(*response));    
+        goto exit_get;                                                          
+    }
+    
+    response->vdu_proc_info_size = strlen(buf) + 1;
+    response->vdu_proc_info = vr_zalloc((response->vdu_proc_info_size * 
+                sizeof(uint8_t)), VR_UTIL_INFO_REQ_OBJECT);
+    memcpy(response->vdu_proc_info, buf, response->vdu_proc_info_size);
+
+        vr_message_response(VR_UTIL_INFO_OBJECT_ID, response, 0, false);           
+exit_get:                                                                       
+    if(response != NULL)                                                        
+        vr_free(response, VR_UTIL_INFO_REQ_OBJECT);                            
+    return; 
+
+}
+
+void                                                                            
+vr_util_info_req_process(void *s_req)                                          
+{                                                                               
+    int ret = 0;
+    char buffer[1024];
+    vr_util_info_req *req = (vr_util_info_req *)s_req;                        
+                                                                                
+    if (req->h_op != SANDESH_OP_GET)                                            
+        vr_send_response(ret);                                                  
+                                                                                
+    vr_util_info_get(buffer);
+    vr_util_make_response(buffer);
+
+} 

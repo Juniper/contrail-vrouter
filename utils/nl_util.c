@@ -145,6 +145,13 @@ vr_pkt_drop_log_req_process(void *s_req)
 }
 
 void
+vr_util_info_req_process(void *s_req)
+{
+   if (nl_cb.vr_util_info_req_process) {
+       nl_cb.vr_util_info_req_process(s_req);
+   }
+}
+void
 vr_drop_stats_req_process(void *s_req)
 {
     if (nl_cb.vr_drop_stats_req_process) {
