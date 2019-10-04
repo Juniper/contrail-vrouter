@@ -136,6 +136,24 @@
     },
     {
       "key": {
+        "uuid": "4eec74e8_241d099d",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 943,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T10:42:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e8383a90_44226c8a",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5eefee99_afcffc98",
         "filename": "dp-core/vr_flow.c",
         "patchSetId": 29
@@ -238,6 +256,30 @@
       "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a3382a85_b9999ecd",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1003,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T10:42:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "6949207a_83bddf33",
+      "range": {
+        "startLine": 1002,
+        "startChar": 12,
+        "endLine": 1003,
+        "endChar": 51
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -491,6 +533,24 @@
       "writtenOn": "2019-10-03T09:01:58Z",
       "side": 1,
       "message": "Maybe have testcases with different encaps.",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c34434ef_fac363b8",
+        "filename": "utils/vtest_py/tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 29
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T10:42:14Z",
+      "side": 1,
+      "message": "From code perspective, we don\u0027t have separate handling per encap. So it does not matter. But I can add a UT for vxlan in the new infra which is being developed by Anish.",
+      "parentUuid": "6a310287_c3eefcf3",
       "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
