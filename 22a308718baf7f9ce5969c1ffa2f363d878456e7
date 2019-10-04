@@ -60,6 +60,30 @@
     },
     {
       "key": {
+        "uuid": "4bf7ae11_e7b0f4e5",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 922,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Yes, it will be set in mpls_input/vxlan_input/gre_input. We don\u0027t need/use hbf vrf.",
+      "parentUuid": "2de0b476_1f8e6321",
+      "range": {
+        "startLine": 922,
+        "startChar": 47,
+        "endLine": 922,
+        "endChar": 60
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c361565e_fce250cb",
         "filename": "dp-core/vr_flow.c",
         "patchSetId": 29
@@ -74,6 +98,24 @@
       "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bd3bdb1e_0ec74d66",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 923,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c361565e_fce250cb",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -111,6 +153,24 @@
     },
     {
       "key": {
+        "uuid": "73e05ea0_294d54ef",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 948,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5eefee99_afcffc98",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "d018b06a_56efc8d2",
         "filename": "dp-core/vr_flow.c",
         "patchSetId": 29
@@ -131,6 +191,30 @@
       "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d7d86565_97dd6c99",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 950,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Ok, I will drop such packets.",
+      "parentUuid": "d018b06a_56efc8d2",
+      "range": {
+        "startLine": 949,
+        "startChar": 12,
+        "endLine": 950,
+        "endChar": 64
+      },
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -174,6 +258,24 @@
     },
     {
       "key": {
+        "uuid": "2aae9198_60040933",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1008,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "2508e447_abbd1990",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "0cd33987_e1fe0790",
         "filename": "dp-core/vr_flow.c",
         "patchSetId": 29
@@ -188,6 +290,24 @@
       "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7cdba14b_bef9776d",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1072,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0cd33987_e1fe0790",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -208,6 +328,24 @@
     },
     {
       "key": {
+        "uuid": "b043ffba_733c8548",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1816,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9e056fc4_15069af4",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "e980af1d_d9634889",
         "filename": "dp-core/vr_flow.c",
         "patchSetId": 29
@@ -222,6 +360,24 @@
       "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3628fce9_4e86ba67",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 29
+      },
+      "lineNbr": 1852,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-10-04T07:08:08Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e980af1d_d9634889",
+      "revId": "22a308718baf7f9ce5969c1ffa2f363d878456e7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
