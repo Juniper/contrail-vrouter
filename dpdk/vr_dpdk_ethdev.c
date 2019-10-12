@@ -960,9 +960,11 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
 {
     uint8_t port_id;
     int ret;
+    struct vr_interface *vif;
 
     port_id = ethdev->ethdev_port_id;
     ethdev->ethdev_ptr = &rte_eth_devices[port_id];
+    vif = __vrouter_get_interface(vrouter_get(0), ethdev->ethdev_vif_idx);
 
     dpdk_ethdev_info_update(ethdev);
 
@@ -985,7 +987,9 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
 
     }
 
-    vr_dpdk_bond_intf_cb_register(ethdev);
+    /* Register notifications only for fabric device */
+    if (vif_is_fabric(vif))
+        vr_dpdk_bond_intf_cb_register(ethdev);
 
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
