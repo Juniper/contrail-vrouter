@@ -629,6 +629,13 @@ dpdk_vlan_forwarding_if_add(void)
     return 0;
 }
 
+/* customize the ethdev_conf for af_packet devices */
+static void
+vr_af_ethdev_conf_update(struct rte_eth_conf *dev_conf)
+{
+    dev_conf->intr_conf.lsc = 0;
+}
+
 /*
  * Add af_packet virtual device to communicate with veth namespace devices.
  * The device is removed with dpdk_fabric_af_packet_if_del().
@@ -642,6 +649,7 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
     struct vr_dpdk_ethdev *ethdev;
     uint8_t port_id;
     int frame_size;
+    struct rte_eth_conf af_ethdev_conf;
 
     RTE_LOG(INFO, VROUTER,
             "Adding vif %u (gen. %u) af_packet device %s\n",
@@ -690,7 +698,9 @@ dpdk_af_packet_if_add(struct vr_interface *vif)
     }
     ethdev->ethdev_port_id = port_id;
 
-    ret = vr_dpdk_ethdev_init(ethdev, &ethdev_conf);
+    af_ethdev_conf = ethdev_conf;
+    vr_af_ethdev_conf_update(&af_ethdev_conf);
+    ret = vr_dpdk_ethdev_init(ethdev, &af_ethdev_conf);
     if (ret != 0)
         return ret;
 
