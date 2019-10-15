@@ -11,6 +11,12 @@
 #include "vr_mirror.h"
 #include "vr_offloads_dp.h"
 
+#define VR_LOG_MI(lev, fmt, ...) {\
+     char *log_fmt = vr_zalloc(VR_LOG_ENTRY_LEN, VR_LOG_REQ_OBJECT);\
+     int length = snprintf(log_fmt, VR_LOG_ENTRY_LEN, fmt, ##__VA_ARGS__);\
+     VR_LOG(MODULE_MIRROR, lev, log_fmt);\
+}
+
 struct vr_mirror_entry *
 vrouter_get_mirror(unsigned int rid, unsigned int index)
 {
@@ -130,7 +136,6 @@ vr_mirror_add(vr_mirror_req *req)
 
     if (old_nh)
         vrouter_put_nexthop(old_nh);
-
     /* if offload failed, release the newly added mirror entry.
      * vrouter_put_mirror() also drops the reference on the nhop.
      */
@@ -140,6 +145,13 @@ vr_mirror_add(vr_mirror_req *req)
 
 generate_resp:
     vr_send_response(ret);
+
+if(ret == 0) {
+    VR_LOG_MI(info, "OP: %d ind: %d nh: %d rid: %d vni: %d vlan: %d", req->h_op, req->mirr_index, nh, req->mirr_rid, req->mirr_vni, req->mirr_vlan);
+}
+else {
+    VR_LOG_MI(info, "OP: %d ind: %d nh: %d rid: %d vni: %d vlan: %d Err: %d", req->h_op, req->mirr_index, nh, req->mirr_rid, req->mirr_vni, req->mirr_vlan, ret);
+}
 
     return ret;
 }

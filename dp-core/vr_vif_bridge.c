@@ -129,6 +129,7 @@ int
 vif_bridge_add(struct vr_interface *pvif, struct vr_interface *vif,
         uint8_t *src_mac)
 {
+    vr_printf("%d\n", 123);
     struct vif_bridge_entry *be;
 
     if (!pvif->vif_btable)
