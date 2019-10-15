@@ -90,6 +90,7 @@ struct genl_ctrl_message {
 #define GENLMSG_DATA(buf)               ((char *)buf + GENL_HDRLEN)
 
 struct nl_sandesh_callbacks {
+    void (*vr_log_req_process)(void *);
     void (*vrouter_ops_process)(void *);
     void (*vr_flow_req_process)(void *);
     void (*vr_flow_response_process)(void *);
