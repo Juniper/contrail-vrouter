@@ -101,6 +101,10 @@ enum vr_opt_index {
     LCORES_OPT_INDEX,
 #define MEMORY_ALLOC_CHECKS_OPT "vr_memory_alloc_checks"
     MEMORY_ALLOC_CHECKS_OPT_INDEX,
+#define VR_LOG_ENABLE_OPT "vr_logger_en"
+    VR_LOG_ENABLE_OPT_INDEX,
+#define VR_LOG_MOD_ENTRIES_OPT "log_entries"
+    VR_LOG_MOD_ENTRIES_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -112,6 +116,8 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 extern unsigned int datapath_offloads;
 extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int log_st_entries;
+extern unsigned int vr_logger_en;
 
 static int no_daemon_set;
 static int no_gro_set = 0;
@@ -640,6 +646,10 @@ dpdk_argv_update(void)
                 vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "Maximum log buffer size:     %" PRIu32 "\n",
 		vr_pkt_droplog_bufsz);
+    RTE_LOG(INFO, VROUTER, "Module log size:             %" PRIu32 "\n",
+		log_st_entries);
+    RTE_LOG(INFO, VROUTER, "Log Enable:                  %" PRIu32 "\n",
+		vr_logger_en);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < RTE_DIM(dpdk_argv) - 1; i += 2) {
         if (dpdk_argv[i] == NULL)
@@ -986,6 +996,10 @@ static struct option long_options[] = {
 						    NULL,                   0},
     [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
                                                     NULL,                   0},
+    [VR_LOG_ENABLE_OPT_INDEX]       =   {VR_LOG_ENABLE_OPT, required_argument,
+						    NULL,                   0},
+    [VR_LOG_MOD_ENTRIES_OPT_INDEX]    =   {VR_LOG_MOD_ENTRIES_OPT, required_argument,
+						    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -1025,6 +1039,8 @@ Usage(void)
         "    --"DPDK_RXD_SIZE_OPT" NUM    DPDK PMD Rx Descriptor size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
 	"    --"PKT_DROP_LOG_BUFFER_SIZE_OPT" NUM Maximum debug log buffer size\n"
+        "    --"VR_LOG_ENABLE_OPT" Logging Status\n"
+	"    --"VR_LOG_MOD_ENTRIES_OPT" Module log entries\n"
         );
 
     exit(1);
@@ -1201,7 +1217,17 @@ parse_long_opts(int opt_flow_index, char *optarg)
         printf("Use datapath offloads\n");
         datapath_offloads = 1;
         break;
-
+    case VR_LOG_ENABLE_OPT_INDEX:
+	vr_logger_en = (unsigned int)strtoul(optarg, NULL, 0);
+	if(errno != 0) {
+	    vr_logger_en = 1;
+	}
+	break;
+    case VR_LOG_MOD_ENTRIES_OPT_INDEX:
+	if(errno != 0) {
+		log_st_entries = VR_LOG_ENTRIES;
+	}
+	break;
     case HELP_OPT_INDEX:
     default:
         Usage();
