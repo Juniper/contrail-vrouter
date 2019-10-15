@@ -1,0 +1,206 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{127F464E-61D0-4815-8D07-6600177A534C}</ProjectGuid>
+    <TemplateGuid>{8b1800b9-d017-4029-9785-13ef5e5b328e}</TemplateGuid>
+    <Keyword>Converted Driver Project</Keyword>
+    <RootNamespace>ndislwf.vcxproj</RootNamespace>
+    <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
+    <Configuration>Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">Win32</Platform>
+    <RootNamespace>vRouter</RootNamespace>
+    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="PropertySheets">
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>WDM</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <OutputName>ndislwf</OutputName>
+    <ApiValidator_Enable>false</ApiValidator_Enable>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <SandeshGeneratedDir>..\..\build\debug\vrouter\sandesh\gen-c</SandeshGeneratedDir>
+    <OutDir>..\..\build\debug\vrouter\extension\</OutDir>
+    <IntDir>..\..\build\debug\vrouter\extension\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <SandeshGeneratedDir>..\..\build\production\vrouter\sandesh\gen-c</SandeshGeneratedDir>
+    <OutDir>..\..\build\production\vrouter\extension\</OutDir>
+    <IntDir>..\..\build\production\vrouter\extension\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>..;.;..\..\src\contrail-common;..\..\src\contrail-common\sandesh\library\c;..\windows;..\include;.\ksync;$(SandeshGeneratedDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreProcessorDefinitions>NDIS_WDM=1;NDIS640=1;__KERNEL__;%(PreProcessorDefinitions)</PreProcessorDefinitions>
+      <DisableSpecificWarnings>%(DisableSpecificWarnings);4201;4214</DisableSpecificWarnings>
+      <PreCompiledHeader></PreCompiledHeader>
+      <Optimization Condition="'$(Configuration)'=='Release'">MaxSpeed</Optimization>
+      <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+      <OmitFramePointers Condition="'$(Configuration)'=='Release'">true</OmitFramePointers>
+    </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..;.;</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Link>
+      <AdditionalDependencies>ndis.lib;ntstrsafe.lib;Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration Condition="'$(Configuration)'=='Release'">UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\build\debug\vrouter\sandesh\gen-c\vr_types.h" />
+    <ClInclude Include="..\include\genetlink.h" />
+    <ClInclude Include="..\include\netlink.h" />
+    <ClInclude Include="..\include\vrouter.h" />
+    <ClInclude Include="..\include\vr_bitmap.h" />
+    <ClInclude Include="..\include\vr_bridge.h" />
+    <ClInclude Include="..\include\vr_btable.h" />
+    <ClInclude Include="..\include\windows_flow_ioctl.h" />
+    <ClInclude Include="..\include\windows_nbl.h" />
+    <ClInclude Include="..\include\windows_types.h" />
+    <ClInclude Include="..\include\vr_datapath.h" />
+    <ClInclude Include="..\include\vr_defs.h" />
+    <ClInclude Include="..\include\vr_flow.h" />
+    <ClInclude Include="..\include\vr_fragment.h" />
+    <ClInclude Include="..\include\vr_genetlink.h" />
+    <ClInclude Include="..\include\vr_hash.h" />
+    <ClInclude Include="..\include\vr_htable.h" />
+    <ClInclude Include="..\include\vr_index_table.h" />
+    <ClInclude Include="..\include\vr_interface.h" />
+    <ClInclude Include="..\include\vr_ip_mtrie.h" />
+    <ClInclude Include="..\include\windows_mem.h" />
+    <ClInclude Include="..\include\vr_message.h" />
+    <ClInclude Include="..\include\vr_mirror.h" />
+    <ClInclude Include="..\include\vr_mpls.h" />
+    <ClInclude Include="..\include\vr_nexthop.h" />
+    <ClInclude Include="..\include\vr_os.h" />
+    <ClInclude Include="..\include\vr_packet.h" />
+    <ClInclude Include="..\include\vr_qos.h" />
+    <ClInclude Include="..\include\vr_queue.h" />
+    <ClInclude Include="..\include\vr_response.h" />
+    <ClInclude Include="..\include\vr_route.h" />
+    <ClInclude Include="..\include\vr_sandesh.h" />
+    <ClInclude Include="..\include\vr_stats.h" />
+    <ClInclude Include="..\include\vr_vxlan.h" />
+    <ClInclude Include="..\include\vr_offloads.h" />
+    <ClInclude Include="..\include\vr_pkt_droplog.h" />
+    <ClInclude Include="..\include\vr_logger.h" />
+    <ClInclude Include="..\include\vr_windows.h" />
+    <ClInclude Include="..\include\windows_devices.h" />
+    <ClInclude Include="..\include\windows_builtins.h" />
+    <ClInclude Include="ksync\ksync_response.h" />
+    <ClInclude Include="ksync\ksync_device_context.h" />
+    <ClInclude Include="ksync\ksync_allocation.h" />
+    <ClInclude Include="vr_ksync_kernel.h" />
+    <ClInclude Include="vr_ksync_user.h" />
+    <ClInclude Include="win_packet.h" />
+    <ClInclude Include="win_csum.h" />
+    <ClInclude Include="win_packet_splitting.h" />
+    <ClInclude Include="win_interface.h" />
+    <ClInclude Include="win_packetdump.h" />
+    <ClInclude Include="win_tx_postprocess.h" />
+    <ClInclude Include="win_work_item.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\build\kbuild\sandesh\gen-c\vr_types.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_binary_protocol.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\protocol\thrift_protocol.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\sandesh.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_fake_transport.c" />
+    <ClCompile Include="..\..\build\kbuild\sandesh\library\c\transport\thrift_memory_buffer.c" />
+    <ClCompile Include="..\dp-core\vrouter.c" />
+    <ClCompile Include="..\dp-core\vr_bitmap.c" />
+    <ClCompile Include="..\dp-core\vr_bridge.c" />
+    <ClCompile Include="..\dp-core\vr_btable.c" />
+    <ClCompile Include="..\dp-core\vr_buildinfo.c" />
+    <ClCompile Include="..\dp-core\vr_datapath.c" />
+    <ClCompile Include="..\dp-core\vr_flow.c" />
+    <ClCompile Include="..\dp-core\vr_fragment.c" />
+    <ClCompile Include="..\dp-core\vr_htable.c" />
+    <ClCompile Include="..\dp-core\vr_index_table.c" />
+    <ClCompile Include="..\dp-core\vr_interface.c" />
+    <ClCompile Include="..\dp-core\vr_ip_mtrie.c" />
+    <ClCompile Include="..\dp-core\vr_message.c" />
+    <ClCompile Include="..\dp-core\vr_mirror.c" />
+    <ClCompile Include="..\dp-core\vr_mpls.c" />
+    <ClCompile Include="..\dp-core\vr_nexthop.c" />
+    <ClCompile Include="..\dp-core\vr_packet.c" />
+    <ClCompile Include="..\dp-core\vr_proto_ip.c" />
+    <ClCompile Include="..\dp-core\vr_proto_ip6.c" />
+    <ClCompile Include="..\dp-core\vr_qos.c" />
+    <ClCompile Include="..\dp-core\vr_queue.c" />
+    <ClCompile Include="..\dp-core\vr_response.c" />
+    <ClCompile Include="..\dp-core\vr_route.c" />
+    <ClCompile Include="..\dp-core\vr_sandesh.c" />
+    <ClCompile Include="..\dp-core\vr_stats.c" />
+    <ClCompile Include="..\dp-core\vr_vif_bridge.c" />
+    <ClCompile Include="..\dp-core\vr_vrf_assign.c" />
+    <ClCompile Include="..\dp-core\vr_vxlan.c" />
+    <ClCompile Include="..\dp-core\vr_offloads.c" />
+    <ClCompile Include="..\dp-core\vr_pkt_droplog.c" />
+    <ClCompile Include="..\dp-core\vr_logger.c" />
+    <ClCompile Include="ksync\ksync_device_context.c" />
+    <ClCompile Include="ksync\ksync_response.c" />
+    <ClCompile Include="ksync\ksync_allocation.c" />
+    <ClCompile Include="vr_devices.c" />
+    <ClCompile Include="vr_driver.c" />
+    <ClCompile Include="vr_shmem_devices.c" />
+    <ClCompile Include="vr_ksync.c" />
+    <ClCompile Include="vr_ksync_kernel.c" />
+    <ClCompile Include="vr_ksync_user.c" />
+    <ClCompile Include="vr_host_interface.c" />
+    <ClCompile Include="vr_shmem.c" />
+    <ClCompile Include="vr_nbl.c" />
+    <ClCompile Include="vr_oid.c" />
+    <ClCompile Include="vr_pkt0.c" />
+    <ClCompile Include="vr_win_transport.c" />
+    <ClCompile Include="windows_random.c" />
+    <ClCompile Include="vr_fragment_assembler.c" />
+    <ClCompile Include="vr_host.c" />
+    <ClCompile Include="win_packet.c" />
+    <ClCompile Include="win_packet_raw.c" />
+    <ClCompile Include="win_data_at_offset.c" />
+    <ClCompile Include="win_pclone.c" />
+    <ClCompile Include="win_pfree.c" />
+    <ClCompile Include="win_memory.c" />
+    <ClCompile Include="win_csum.c" />
+    <ClCompile Include="win_packet_splitting.c" />
+    <ClCompile Include="win_interface.c" />
+    <ClCompile Include="win_packetdump.c" />
+    <ClCompile Include="win_tx_postprocess.c" />
+    <ClCompile Include="win_work_item.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="vRouter.inf" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

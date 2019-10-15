@@ -11,6 +11,20 @@
 #include "vr_sandesh.h"
 #include "vr_offloads_dp.h"
 
+#define VR_LOG_RT(lev, fmt, ...) {\
+     char *log_fmt = vr_zalloc(VR_LOG_ENTRY_LEN, VR_LOG_REQ_OBJECT);\
+     int length = snprintf(log_fmt, VR_LOG_ENTRY_LEN, fmt, ##__VA_ARGS__);\
+     if(req->rtr_prefix_size) { \
+         int i=0, j=0, len; \
+         while(req->rtr_prefix[i] != NULL) {\
+             len = sprintf(log_fmt+length+j, "%d.", req->rtr_prefix[i]);\
+             j += len;\
+             i++;\
+         }\
+         VR_LOG(MODULE_ROUTE, lev, log_fmt);\
+     }\
+}
+
 unsigned int vr_vrfs = VR_DEF_VRFS;
 
 extern int mtrie_algo_init(struct vr_rtable *, struct rtable_fspec *);
@@ -120,6 +134,14 @@ vr_route_delete(vr_route_req *req)
         vr_offload_route_del(req);
 
 error:
+    if(ret == 0) {
+        VR_LOG_RT(info, "OP: %d family: %d rid: %d label: %d nh_id: %d rtr_replace_plen: %d prefix:",
+        req->h_op, req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id, req->rtr_replace_plen);
+    }
+    else{
+        VR_LOG_RT(info, "OP: %d family: %d rid: %d label: %d nh_id: %d Err code: %d prefix:",
+         req->h_op, req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id, ret);
+    }
     vr_send_response(ret);
     vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_DEL, ret);
 
@@ -158,6 +180,14 @@ vr_route_add(vr_route_req *req)
             fs->route_del(fs, &vr_req);
     }
 
+    if(ret != -ENOENT) {
+        VR_LOG_RT(info, "OP: %d family: %d rid: %d label: %d nh_id: %d rtr_replace_plen: %d prefix:", req->h_op,
+        req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id, req->rtr_replace_plen);
+    }
+    else {
+        VR_LOG_RT(info, "OP: %d family: %d rid: %d label: %d nh_id: %d Err code: %d prefix:",
+        req->h_op, req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id, ret);
+    }
     vr_send_response(ret);
     vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_ADD, ret);
 
