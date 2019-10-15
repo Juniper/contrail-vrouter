@@ -45,6 +45,12 @@ extern unsigned int vif_bridge_oentries;
 extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int vr_pkt_droplog_sysctl_en;
+extern int vr_log_max_sz;
+extern unsigned int vr_logger_en;
+extern unsigned int log_st_entries;
+/*
+ * To assign vr_logger_en value
+ */
 extern const char *ContrailBuildInfo;
 
 void vrouter_exit(bool);
@@ -331,6 +337,7 @@ vrouter_ops_get(void)
 void
 vrouter_ops_get_process(void *s_req)
 {
+    int i;
     int ret = 0;
     struct vrouter *router;
     vrouter_ops *req = (vrouter_ops *)s_req;
@@ -368,6 +375,13 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_pkt_droplog_bufsz = vr_pkt_droplog_bufsz;
     resp->vo_pkt_droplog_buf_en = vr_pkt_droplog_buf_en;
 
+    resp->vo_log_mod_level_size = sizeof(short)*VR_NUM_MODS;
+    resp->vo_log_mod_level = (short *) vr_zalloc(resp->vo_log_mod_level_size, VR_LOG_REQ_OBJECT);
+    resp->vo_log_mod_len_size = sizeof(int)*VR_NUM_MODS;
+    resp->vo_log_mod_len = (int *) vr_zalloc(resp->vo_log_mod_len_size, VR_LOG_REQ_OBJECT);
+    memcpy(resp->vo_log_mod_len, log_entries, resp->vo_log_mod_len_size);
+    memcpy(resp->vo_log_mod_level, level, resp->vo_log_mod_level_size);
+    resp->vo_logger_en = vr_logger_en;
     /* Runtime parameters adjustable via sysctl or the vrouter utility */
     resp->vo_perfr = vr_perfr;
     resp->vo_perfs = vr_perfs;
@@ -386,6 +400,8 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_packet_dump = 0;
     resp->vo_pkt_droplog_en = vr_pkt_droplog_sysctl_en;
     resp->vo_pkt_droplog_min_en = vr_pkt_droplog_min_sysctl_en;
+    resp->vo_log_buf_maxsz = vr_log_max_sz;
+
     if(vr_get_dump_packets != NULL) {
         resp->vo_packet_dump = vr_get_dump_packets();
     }
@@ -429,6 +445,20 @@ generate_response:
     return;
 }
 
+void resize_module_buf(int mod, int size, int old_size, int rid) {
+    struct vrouter *router = vrouter_get(rid);
+    char *new_log = vr_zalloc(size, VR_LOG_REQ_OBJECT);
+    char *old_log = router->vr_logger->vr_log_buf[mod].buf;
+    if(size <= old_size)
+        memcpy(new_log, old_log, size);
+    else
+        memcpy(new_log, old_log, old_size);
+    router->vr_logger->vr_log_buf[mod].buf = new_log;
+    router->vr_logger->vr_log_buf[mod].log_size = size;
+    old_log = NULL;
+    vr_free(old_log, VR_LOG_REQ_OBJECT);
+}
+
 /**
  * A handler for control messages.
  *
@@ -456,6 +486,23 @@ vrouter_ops_add_process(void *s_req)
         for (i = 0; i < req->vo_log_type_disable_size; ++i)
             vr_set_log_type(req->vo_log_type_disable[i], 0);
 
+    if(req->vo_log_mod_level != NULL && req->vo_log_mod_len != NULL) {
+         for(i=0;i<VR_NUM_MODS;i++) {
+             if(req->vo_log_mod_level[i] != -1) level[i] = req->vo_log_mod_level[i];
+             if(req->vo_resize_buf[i] == 1) {
+                 vr_printf("%d\n", req->vo_log_mod_len[i]);
+                 resize_module_buf(i, req->vo_log_mod_len[i], log_entries[i], req->vo_rid);
+             }
+             if(req->vo_log_mod_len[i] != -1) log_entries[i] = req->vo_log_mod_len[i];
+         }
+    }
+    else {
+        for(i=0;i<VR_NUM_MODS;i++) {
+            level[i] = none;
+            log_entries[i] = log_st_entries;
+        }
+    }
+    vr_logger_en = req->vo_logger_en;
     /* Runtime parameters */
     if (req->vo_packet_dump != -1 && vr_set_dump_packets != NULL)
         vr_set_dump_packets(req->vo_packet_dump);
