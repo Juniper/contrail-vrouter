@@ -18,6 +18,12 @@
 #include "vr_ip_mtrie.h"
 #include "vr_offloads_dp.h"
 
+#define VR_LOG_VIF(lev, fmt, ...) {\
+    char *log_fmt = vr_zalloc(VR_LOG_ENTRY_LEN, VR_LOG_REQ_OBJECT);\
+    int length = snprintf(log_fmt, VR_LOG_ENTRY_LEN, fmt, ##__VA_ARGS__);\
+    VR_LOG(MODULE_INTERFACE, lev, log_fmt);\
+}
+
 unsigned int vr_interfaces = VR_MAX_INTERFACES;
 
 volatile bool agent_alive = false;
@@ -1906,7 +1912,7 @@ vrouter_add_interface(struct vr_interface *vif, vr_interface_req *vifr)
     default:
         break;
     }
-
+    
     vrouter_set_rewrite(vif);
 
     return 0;
@@ -2338,7 +2344,6 @@ vr_interface_add(vr_interface_req *req, bool need_response)
     ret = vif_set_flags(vif, req);
     if (ret)
         goto error;
-
     vif->vif_vrf = req->vifr_vrf;
     vif->vif_mcast_vrf = req->vifr_mcast_vrf;
     vif->vif_vlan_id = VLAN_ID_INVALID;
@@ -2439,7 +2444,15 @@ error:
 generate_resp:
     if (need_response)
         vr_send_response(ret);
-
+    
+    if(ret == 0) {
+        VR_LOG_VIF(info, "vrf: %d mtu: %d transport: %d rid: %d nh_id: %d vif_name: %s mac: %d\n", req->vifr_vrf, req->vifr_mtu, req->vifr_transport, req->vifr_rid, 
+    req->vifr_nh_id, req->vifr_name, req->vifr_mac);
+    }
+    else {
+        VR_LOG_VIF(info, "vrf: %d mtu: %d transport: %d rid: %d nh_id: %d vif_name: %s mac: %d error: %d\n", req->vifr_vrf, req->vifr_mtu, req->vifr_transport, req->vifr_rid, 
+    req->vifr_nh_id, req->vifr_name, req->vifr_mac, ret);
+    } 
     return ret;
 }
 

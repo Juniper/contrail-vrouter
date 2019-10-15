@@ -215,6 +215,7 @@ vrouter_put_nexthop(struct vr_nexthop *nh)
 static int
 vrouter_add_nexthop(struct vr_nexthop *nh)
 {
+    vr_printf("%d\n", 987);
     struct vrouter *router = vrouter_get(nh->nh_rid);
 
     if (!router || nh->nh_id >= router->vr_max_nexthops)
