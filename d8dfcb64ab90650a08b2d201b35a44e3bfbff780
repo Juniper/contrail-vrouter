@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "f763e652_581fb7d4",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9a03fa91_1d2cf28a",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9c8eebd0_637f156f",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 4
@@ -33,6 +51,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3cf19fe2_d06d957f",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9c8eebd0_637f156f",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "35a08bd8_c1e8478b",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "775031a4_77c1f67d",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "b41b7072_3e462069",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 4
@@ -67,6 +121,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d07a6ec0_6612ef29",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "b41b7072_3e462069",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -87,6 +159,24 @@
     },
     {
       "key": {
+        "uuid": "c6114c11_127d8534",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 69,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "fa6bbbc9_12f724e9",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "01e4347c_64d01511",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 4
@@ -101,6 +191,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ee962e05_52c9dcb4",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "01e4347c_64d01511",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -121,6 +229,24 @@
     },
     {
       "key": {
+        "uuid": "de2afa75_7d58a7f1",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 206,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "d3c5d815_e09444f8",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "8372a122_d5b7b0cb",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 4
@@ -132,6 +258,24 @@
       "writtenOn": "2019-09-27T06:05:16Z",
       "side": 1,
       "message": "How is vrouter_set_log handled?",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "afd84484_95fc2248",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 213,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "It is handled through vrouter_ops sandesh request",
+      "parentUuid": "8372a122_d5b7b0cb",
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -152,6 +296,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e2fbcbde_b70f664f",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 223,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0050179f_cb6ef416",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -178,6 +340,30 @@
     },
     {
       "key": {
+        "uuid": "2ac6837c_c59ac50d",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 226,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "db78c9cb_5dd307b6",
+      "range": {
+        "startLine": 226,
+        "startChar": 4,
+        "endLine": 226,
+        "endChar": 58
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "e7cbc272_4010cdf4",
         "filename": "dp-core/vr_route.c",
         "patchSetId": 4
@@ -189,6 +375,24 @@
       "writtenOn": "2019-10-07T02:51:51Z",
       "side": 1,
       "message": "Can you add traces for few other key control plane modules as well as part of this?\nEg: vif, nh, vxlan, mirror,",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e4f9237b_c547495a",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Added logs in mirror module",
+      "parentUuid": "e7cbc272_4010cdf4",
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -212,6 +416,42 @@
     },
     {
       "key": {
+        "uuid": "dc6730e2_5745be24",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "74ded50d_6c74e6ce",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "0196aa34_1fea3ace",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "74ded50d_6c74e6ce",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "0aaaf085_f7a884ac",
         "filename": "dp-core/vr_route.c",
         "patchSetId": 4
@@ -223,6 +463,30 @@
       "writtenOn": "2019-09-26T05:57:19Z",
       "side": 1,
       "message": "1) Need to handle mac address case.\n2) Since we program only a single prefix/mac at a time, this loop is not required.\n   Also use snprintf with max buffer size given by infra and print the IP/mac in dotted\n   notation.",
+      "range": {
+        "startLine": 20,
+        "startChar": 9,
+        "endLine": 24,
+        "endChar": 11
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "07054804_5fd6fcbc",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "1) How to handle mac address case ?",
+      "parentUuid": "0aaaf085_f7a884ac",
       "range": {
         "startLine": 20,
         "startChar": 9,
@@ -258,6 +522,30 @@
     },
     {
       "key": {
+        "uuid": "7cd4e8ff_e2beee14",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "6ab13405_ad77263b",
+      "range": {
+        "startLine": 26,
+        "startChar": 9,
+        "endLine": 29,
+        "endChar": 34
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "0951fa99_24f65cb1",
         "filename": "dp-core/vr_route.c",
         "patchSetId": 4
@@ -272,6 +560,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d3fd6272_ff2f69e6",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 143,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0951fa99_24f65cb1",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -292,6 +598,24 @@
     },
     {
       "key": {
+        "uuid": "368f88c6_3bdc86e0",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "80c63f44_320e5397",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "33557ace_02052505",
         "filename": "dp-core/vr_route.c",
         "patchSetId": 4
@@ -306,6 +630,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2cf593bb_37460693",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 190,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "33557ace_02052505",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -366,6 +708,24 @@
     },
     {
       "key": {
+        "uuid": "7cc0feb2_51d37024",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "bcb270ec_ba661f3a",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "efb6131c_6a095382",
         "filename": "dpdk/dpdk_vrouter.c",
         "patchSetId": 4
@@ -380,6 +740,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1199931f_73343103",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "efb6131c_6a095382",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -400,6 +778,24 @@
     },
     {
       "key": {
+        "uuid": "4b5e982a_6a0fe45c",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1a79e032_32af3058",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ab67d1ae_67d0488b",
         "filename": "include/vr_logger.h",
         "patchSetId": 4
@@ -414,6 +810,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "89cd4ce3_0e2e54a3",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ab67d1ae_67d0488b",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -434,6 +848,24 @@
     },
     {
       "key": {
+        "uuid": "db6fcda2_12cb13d6",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "a38f41a6_aea9f361",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1226268d_46438260",
         "filename": "include/vr_logger.h",
         "patchSetId": 4
@@ -445,6 +877,24 @@
       "writtenOn": "2019-09-19T14:14:17Z",
       "side": 1,
       "message": "Why are we doing this?",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7a9dac50_58ac1e17",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "To get timestamp",
+      "parentUuid": "1226268d_46438260",
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -465,6 +915,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "951b9c05_53cb6397",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 84,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1a05f092_a340373f",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -491,6 +959,30 @@
     },
     {
       "key": {
+        "uuid": "514744d1_d6e5cd5b",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 87,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e26f7265_ac5d99d9",
+      "range": {
+        "startLine": 86,
+        "startChar": 9,
+        "endLine": 87,
+        "endChar": 44
+      },
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ed9106f5_bc9e8663",
         "filename": "include/vr_logger.h",
         "patchSetId": 4
@@ -505,6 +997,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b26fd8ab_8eb25f57",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 103,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ed9106f5_bc9e8663",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -525,6 +1035,24 @@
     },
     {
       "key": {
+        "uuid": "21d6e84b_1c24db47",
+        "filename": "linux/vrouter_mod.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "f5fc3653_dce30577",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "e7eb9180_b8f4255c",
         "filename": "utils/vrouter.c",
         "patchSetId": 4
@@ -542,6 +1070,24 @@
     },
     {
       "key": {
+        "uuid": "b22d11e3_de99d76c",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 478,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e7eb9180_b8f4255c",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5436ccb1_299b3a06",
         "filename": "utils/vrouter.c",
         "patchSetId": 4
@@ -556,6 +1102,24 @@
       "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "47c3917d_b0cac619",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 780,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-10-15T09:55:14Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5436ccb1_299b3a06",
+      "revId": "d8dfcb64ab90650a08b2d201b35a44e3bfbff780",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
