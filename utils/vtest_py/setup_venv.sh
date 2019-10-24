@@ -1,4 +1,5 @@
 #!/bin/sh
+set -x
 
 venv_dir=$1
 req_file_path=$2
