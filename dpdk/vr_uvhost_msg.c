@@ -259,6 +259,7 @@ uvhm_client_mmap(vr_uvh_client_t *vru_cl)
             }
 
             /* The file descriptor is no longer needed. */
+            vr_uvhost_log("%s: close FD %d\n", __func__, vru_cl->vruc_fds_sent[i]);
             close(vru_cl->vruc_fds_sent[i]);
             vru_cl->vruc_fds_sent[i] = -1;
             region->vrucmr_mmap_addr += vum_msg->regions[i].mmap_offset;
@@ -952,6 +953,8 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 
                    memcpy(vru_cl->vruc_fds_sent, CMSG_DATA(cmsg),
                           vru_cl->vruc_num_fds_sent*sizeof(int));
+                   for (i = 0; i < vru_cl->vruc_num_fds_sent; i++)
+                       vr_uvhost_log("Client %s: Got FD %d\n", uvhm_client_name(vru_cl), vru_cl->vruc_fds_sent[i]); 
             }
 
             vru_cl->vruc_msg_bytes_read = ret;
@@ -1049,10 +1052,13 @@ vr_uvh_cl_msg_handler(int fd, void *arg)
 
 cleanup:
     err = errno;
-    /* close all the FDs received */
+    /* close all the (unhandled) FDs received */
     for (i = 0; i < vru_cl->vruc_num_fds_sent; i++) {
-        if (vru_cl->vruc_fds_sent[i] > 0)
+        if (vru_cl->vruc_fds_sent[i] > 0) {
+            vr_uvhost_log("Client %s: closing FD %d for message %d\n",
+                    uvhm_client_name(vru_cl), vru_cl->vruc_fds_sent[i], vru_cl->vruc_msg.request);
             close(vru_cl->vruc_fds_sent[i]);
+        }
     }
     if (ret == -1) {
         /* Send netlink interface down message to agent */
@@ -1065,10 +1071,11 @@ cleanup:
              * reset the value to -1, so that new fd will be created
              */
             vru_cl->vruc_fd = -1;
+            /*
             if (vr_uvh_cl_timer_setup(vru_cl)) {
                 vr_uvhost_log("Client %s: timer creation failed\n",
                         uvhm_client_name(vru_cl));
-            }
+            }*/
         }
     }
     /* clear state for next message from this client. */
@@ -1133,6 +1140,7 @@ error:
 
     err = errno;
     if (s) {
+        vr_uvhost_log("%s: close FD %d\n", __func__, s);
         close(s);
     }
 
@@ -1222,8 +1230,10 @@ vr_uvh_cl_timer_setup(vr_uvh_client_t *vru_cl)
         }
     }
 
-    if (vru_cl->vruc_timer_fd == -1)
+    if (vru_cl->vruc_timer_fd == -1) {
         vru_cl->vruc_timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+        vr_uvhost_log("Creating timer FD %d\n", vru_cl->vruc_timer_fd);
+    }
 
     if (vru_cl->vruc_timer_fd == -1) {
         vr_uvhost_log("    timer create failed for uvhost socket FD %d:"
@@ -1462,6 +1472,7 @@ error:
 
     err = errno;
     if (s) {
+        vr_uvhost_log("%s: Close FD %d\n", __func__, s);
         close(s);
     }
 
