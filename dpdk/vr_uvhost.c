@@ -158,10 +158,12 @@ error:
 
     err = errno;
     if (s) {
+        vr_uvhost_log("%s: Close FD: %d\n", __func__, s);
         close(s);
         unlink(sun.sun_path);
     }
     if (vr_dpdk.uvhost_event_fd > 0) {
+        vr_uvhost_log("%s[1]: Close FD: %d\n", __func__, vr_dpdk.uvhost_event_fd);
         close(vr_dpdk.uvhost_event_fd);
         vr_dpdk.uvhost_event_fd = 0;
     }

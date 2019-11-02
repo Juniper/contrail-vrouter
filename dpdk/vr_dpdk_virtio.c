@@ -98,6 +98,8 @@ vr_dpdk_virtio_stop(unsigned int vif_idx)
              */
             vq->vdv_desc = NULL;
             if (vq->vdv_callfd) {
+                RTE_LOG_DP(ERR, VROUTER,
+                               "%s: Close FD %d\n", __func__, vq->vdv_callfd);
                 close(vq->vdv_callfd);
                 vq->vdv_callfd = 0;
             }
@@ -148,6 +150,8 @@ dpdk_virtio_writer_free(void *port)
 
     /* close FDs */
     if (tx_virtioq->vdv_callfd > 0) {
+        RTE_LOG_DP(ERR, VROUTER,
+                            "%s: Close FD %d\n", __func__, tx_virtioq->vdv_callfd);
         close(tx_virtioq->vdv_callfd);
     }
     if (tx_virtioq->vdv_kickfd > 0) {
@@ -229,6 +233,8 @@ dpdk_virtio_reader_free(void *port)
 
     /* close FDs */
     if (rx_virtioq->vdv_callfd > 0) {
+        RTE_LOG_DP(ERR, VROUTER,
+                             "%s: Close FD %d\n", __func__, rx_virtioq->vdv_callfd);
         close(rx_virtioq->vdv_callfd);
     }
     if (rx_virtioq->vdv_kickfd > 0) {
@@ -1911,6 +1917,8 @@ vr_dpdk_virtio_get_vring_base(unsigned int vif_idx, unsigned int vring_idx,
      */
     vq->vdv_desc = NULL;
     if (vq->vdv_callfd) {
+        RTE_LOG_DP(ERR, VROUTER,
+                          "%s: Close FD %d\n", __func__, vq->vdv_callfd);
         close(vq->vdv_callfd);
         vq->vdv_callfd = 0;
     }
@@ -2054,6 +2062,8 @@ vr_dpdk_set_ring_callfd(unsigned int vif_idx, unsigned int vring_idx,
     }
 
     if (vq->vdv_callfd > 0) {
+        RTE_LOG_DP(ERR, VROUTER,
+                              "%s: Close FD %d\n", __func__, vq->vdv_callfd);
         close(vq->vdv_callfd);
     }
     vq->vdv_callfd = callfd;
