@@ -32,7 +32,7 @@ vtest_py_ut_targets = ['vrouter-py-ut', 'vrouter-py-ut-pycodestyle', \
                        'vrouter-py-ut-flake']
 for target in vtest_py_ut_targets:
     if target in COMMAND_LINE_TARGETS:
-        vtest_py_dir = ['vtest_py']
+        vtest_py_dir = ['../../../../vrouter/vtest_py']
         for sdir in vtest_py_dir:
             env.SConscript(sdir + '/SConscript',
                            exports='VRutilsEnv',
