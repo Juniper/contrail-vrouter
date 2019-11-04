@@ -25,9 +25,9 @@ VTestPyEnv = env;
 
 src_root = Dir('#').srcnode().abspath
 build_root = Dir(env['TOP']).abspath
-vtest_py_venv_root = build_root + "/vrouter/utils/vtest_py_venv"
-vtest_py_src_root = src_root + "/vrouter/utils/vtest_py"
-vtest_py_venv_sock_dir = vtest_py_venv_root + "/var/run/vrouter"
+vtest_py_venv_root = build_root + "/vrouter/utils/vtest_py_venv/"
+vtest_py_src_root = src_root + "/vrouter/utils/vtest_py/"
+vtest_py_venv_sock_dir = vtest_py_venv_root + "/var/run/vrouter/"
 
 print "src_root %s" %(src_root)
 print "build_root %s" %(build_root)
@@ -71,7 +71,7 @@ copy_pysandesh = env.Command("copy_pysandesh", [],
 # copy test files to venv
 copy_test_files = env.Command("copy_test_files", [],
                               vtest_py_src_root + "/copy_dir.py "+
-                              vtest_py_src_root + "/tests " +
+                              vtest_py_src_root + "../../tests " +
                               vtest_py_venv_root + "/tests")
 
 # copy vtest lib to venv
@@ -123,14 +123,14 @@ env.Alias('vrouter-py-ut', vtest_py_ut)
 # commands for running pycodestyle
 vtest_py_ut_pycodestyle = env.Command("vtest_py_ut_pycodestyle", [], \
                               src_root + \
-                              "/vrouter/utils/vtest_py/run_test.sh --pycodestyle")
+                              "/vrouter/vtest_py/run_test.sh --pycodestyle")
 env.Depends(vtest_py_ut_pycodestyle, setup_venv)
 env.Requires(vtest_py_ut_pycodestyle, gen_py_sandesh)
 
 # commands for running flake
 vtest_py_ut_flake = env.Command("vtest_py_ut_flake", [], \
                                 src_root + \
-                                "/vrouter/utils/vtest_py/run_test.sh --flake")
+                                "/vrouter/vtest_py/run_test.sh --flake")
 env.Depends(vtest_py_ut_flake, setup_venv)
 env.Requires(vtest_py_ut_flake, gen_py_sandesh)
 

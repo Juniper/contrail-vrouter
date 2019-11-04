@@ -70,6 +70,7 @@ struct packet {
     char pcap_file[PATH_MAX];
     char pcap_ref_file[PATH_MAX];
     char pcap_dest_file[PATH_MAX];
+    char pcap_out_file[PATH_MAX];
     size_t rx_client_num;
 };
 

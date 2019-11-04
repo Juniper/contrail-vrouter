@@ -85,6 +85,11 @@ vt_packet(xmlNodePtr node, struct vtest *test)
                 }
             }
 
+        } else if (!strncmp(node->name, "pcap_output_file", strlen(node->name))) {
+            if (node->children && node->children->content) {
+                vt_fname_assign(test,
+                    test->packet.pcap_out_file, node->children->content);
+            }
         } else if (!strncmp(node->name, "pcap_expected_file", strlen(node->name))) {
             if (node->children && node->children->content) {
                 vt_fname_assign(test,
@@ -265,10 +270,14 @@ tx_rx_pcap_test(struct vtest *test) {
 
     char pcap_dest[PATH_MAX] = {0};
     bool send_only = false;
-
-    snprintf(pcap_dest, PATH_MAX, "/tmp/dest_%u.pcap", (unsigned)(time(NULL)));
-    strncpy(test->packet.pcap_dest_file, pcap_dest, strlen(pcap_dest));
-
+    if(strlen(test->packet.pcap_out_file)) {
+        snprintf(pcap_dest, PATH_MAX, "%s", test->packet.pcap_out_file);
+        strncpy(test->packet.pcap_dest_file, pcap_dest, strlen(pcap_dest));
+    }
+    else {
+        snprintf(pcap_dest, PATH_MAX, "/tmp/dest_%u.pcap", (unsigned)(time(NULL)));
+        strncpy(test->packet.pcap_dest_file, pcap_dest, strlen(pcap_dest));
+    }
     if (test->packet.pcap_ref_file[0] == '\0') {
         send_only = true;
     }
