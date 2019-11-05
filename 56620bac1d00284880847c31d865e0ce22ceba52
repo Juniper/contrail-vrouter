@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e2b0ca8a_9dbcf936",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 4200,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-11-05T09:14:25Z",
+      "side": 1,
+      "message": "nh-\u003enh_component_nh could also be NULL. Better to check for that as well.",
+      "revId": "56620bac1d00284880847c31d865e0ce22ceba52",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4e0e52f7_20d1e12d",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 4216,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-11-05T09:14:25Z",
+      "side": 1,
+      "message": "nh-\u003enh_component_nh could also be NULL. Better to check for that as well.",
+      "revId": "56620bac1d00284880847c31d865e0ce22ceba52",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
