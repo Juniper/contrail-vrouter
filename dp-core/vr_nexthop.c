@@ -4197,7 +4197,8 @@ vr_is_local_ecmp_nh (struct vr_nexthop *nh)
         return 0;
     }
     for (i = 0; i < nh->nh_component_cnt; i++) {
-         if (nh->nh_component_nh[i].cnh->nh_type != NH_ENCAP) {
+         if (nh->nh_component_nh && nh->nh_component_nh[i].cnh &&
+                 nh->nh_component_nh[i].cnh->nh_type != NH_ENCAP) {
              return 0;
          }
     }
@@ -4211,7 +4212,11 @@ vr_get_ecmp_first_member_dev (struct vr_nexthop *nh)
        (!(nh->nh_flags & NH_FLAG_COMPOSITE_ECMP))) {
         return NULL;
     }
-    return nh->nh_component_nh[0].cnh->nh_dev;
+
+    if (nh->nh_component_nh)
+        return nh->nh_component_nh[0].cnh? nh->nh_component_nh[0].cnh->nh_dev:NULL;
+    else
+        return NULL;
 }
 
 static void
