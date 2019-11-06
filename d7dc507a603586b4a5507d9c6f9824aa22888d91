@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fb49d973_608262c1",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 4200,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2019-11-06T06:10:41Z",
+      "side": 1,
+      "message": "Why can\u0027t we add a test case in UT for this scenario?",
+      "revId": "d7dc507a603586b4a5507d9c6f9824aa22888d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
