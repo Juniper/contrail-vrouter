@@ -16,6 +16,24 @@
       "revId": "d7dc507a603586b4a5507d9c6f9824aa22888d91",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "36f0e280_ae8ca51e",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 4200,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-06T06:14:55Z",
+      "side": 1,
+      "message": "Hard for UT to check race conditions. We need packets entering from multiple cores and config changes happening in parallel. The current UT does not do any parallel operation. It only does serial operations.",
+      "parentUuid": "fb49d973_608262c1",
+      "revId": "d7dc507a603586b4a5507d9c6f9824aa22888d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
