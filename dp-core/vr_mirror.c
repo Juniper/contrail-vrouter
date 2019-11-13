@@ -79,6 +79,13 @@ vr_mirror_del(vr_mirror_req *req)
     if (router)
         ret = __vr_mirror_del(router, req->mirr_index);
 
+    if(ret != 0) {
+        VR_LOG_GEN(MODULE_MIRROR, vr_error,
+                  "OP:%d ind:%d nh:%d rid:%d vni:%d vlan:%d Err:%d", req->h_op,
+                  req->mirr_index, req->mirr_nhid, req->mirr_rid, req->mirr_vni, 
+                  req->mirr_vlan, ret);
+    }
+
     vr_send_response(ret);
 
     return ret;
@@ -130,7 +137,6 @@ vr_mirror_add(vr_mirror_req *req)
 
     if (old_nh)
         vrouter_put_nexthop(old_nh);
-
     /* if offload failed, release the newly added mirror entry.
      * vrouter_put_mirror() also drops the reference on the nhop.
      */
@@ -140,6 +146,19 @@ vr_mirror_add(vr_mirror_req *req)
 
 generate_resp:
     vr_send_response(ret);
+
+    if(ret == 0) {
+        VR_LOG_GEN(MODULE_MIRROR, vr_info,
+                  "OP:%d ind:%d nh:%d rid:%d vni:%d vlan:%d", req->h_op,
+                  req->mirr_index, req->mirr_nhid, req->mirr_rid, req->mirr_vni,
+                  req->mirr_vlan);
+    }
+    else {
+        VR_LOG_GEN(MODULE_MIRROR, vr_error,
+                  "OP:%d ind:%d nh:%d rid:%d vni:%d vlan:%d Err:%d", req->h_op,
+                  req->mirr_index, req->mirr_nhid, req->mirr_rid, req->mirr_vni, 
+                  req->mirr_vlan, ret);
+}
 
     return ret;
 }
@@ -196,6 +215,12 @@ vr_mirror_dump(vr_mirror_req *r)
 generate_response:
     vr_message_dump_exit(dumper, ret);
 
+    if(ret != 0) {
+        VR_LOG_GEN(MODULE_MIRROR, vr_error,
+                  "OP:%d ind:%d nh:%d rid:%d vni:%d vlan:%d Err:%d", r->h_op,
+                  r->mirr_index, r->mirr_nhid, r->mirr_rid, r->mirr_vni, 
+                  r->mirr_vlan, ret);
+    }
     return 0;
 }
 
@@ -222,7 +247,12 @@ vr_mirror_get(vr_mirror_req *req)
         vr_offload_mirror_get(req);
     } else
         req = NULL;
-
+    if(ret != 0) {
+        VR_LOG_GEN(MODULE_MIRROR, vr_error,
+                  "OP:%d ind:%d nh:%d rid:%d vni:%d vlan:%d Err:%d", req->h_op,
+                  req->mirr_index, req->mirr_nhid, req->mirr_rid, req->mirr_vni, 
+                  req->mirr_vlan, ret);
+    }
     return vr_message_response(VR_MIRROR_OBJECT_ID, req, ret, false);
 }
 

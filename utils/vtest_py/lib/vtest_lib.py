@@ -508,6 +508,16 @@ class DROPSTATS(vr_drop_stats_req):
         super(DROPSTATS, self).__init__()
         self.h_op = vtconst.SANDESH_OPER_GET
 
+############################################
+# Vrouter_logging_Infra Class
+############################################
+class VR_LOGGER(vr_log_req):
+    """Class to represent vr_logger object"""
+    
+    def __init__(self):
+        super(VR_LOGGER, self).__init__()
+        self.h_op = vtconst.SANDESH_OPER_GET
+
 
 ############################################
 # Pytest fixtures

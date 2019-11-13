@@ -327,6 +327,13 @@ buffer sandesh vrouter_ops {
    43: byte         vo_pkt_droplog_buf_en;
    44: byte         vo_pkt_droplog_en;
    45: byte         vo_pkt_droplog_min_en;
+   46: i32          vo_log_buf_maxsz;
+   47: byte         vo_logger_en;
+   48: i32          vo_module;
+   49: i32          vo_level;
+   50: list<i16>    vo_log_mod_level;
+   51: list<i32>    vo_log_mod_len;
+   52: list<i32>    vo_resize_buf;
 }
 
 buffer sandesh vr_mem_stats_req {
@@ -542,4 +549,16 @@ buffer sandesh vr_hugepage_config {
     2: list<u64>    vhp_mem;
     3: list<u32>    vhp_msize;
     4: u32          vhp_resp;
+}
+
+buffer sandesh vr_log_req {
+    1: sandesh_op     h_op;
+    2: i16            vdl_rid;
+    3: i16            vdl_module;
+    4: i16            vdl_level;
+    5: i32            vdl_log_idx;
+    6: i32            vdl_cur_idx;
+    7: byte           vdl_clear_buf;
+    8: i16            vdl_log_buf_en;
+    9: list<byte>     vdl_vr_log;
 }
