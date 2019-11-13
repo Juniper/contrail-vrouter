@@ -1,0 +1,123 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "32952408_a43741f1",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "1) All python files in pep8 format\n2) no whitespaces",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6662c4a0_eb03c445",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "Is this usage correct one?",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dab7d2b1_d471fcbe",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "Can you add help string for all of these?",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0c61245e_905a2261",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "Can we have an option to run CLIs in the utils/ directory? To run the CLI, we have to goto the debug/utils directory and specify socket-dir. We can simplify this:\nEg: to run vif list, we can just run this:\n./run_test.py --cli vif --list\nThis should internally call /build/debug/vrouter/utils/vif --list --socket-dir \u003csock_dir\u003e\nIs such a thing possible?",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c82d6f16_1b9ef94e",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "Pl print the error before calling Usage()",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8698fe7e_91bd63d2",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "1) Pl make this taskset 0x6\n2) Have an option to specify log file using --log_file option\n3) Default can be /debug/vrouter/utils/vtest_py_venv/var/log",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b5e11634_24479ea2",
+        "filename": "tests/run_test.py",
+        "patchSetId": 4
+      },
+      "lineNbr": 108,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-13T07:56:40Z",
+      "side": 1,
+      "message": "You can use os.popen(). Example: https://github.com/Juniper/contrail-vrouter/blob/master/utils/vtest_py/tests/test_fd_leak.py#L17",
+      "revId": "704a361799369063b63997781ce23c7318a95d91",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
