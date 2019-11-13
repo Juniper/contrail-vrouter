@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "f95ee434_47dd2b08",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "in VR_LOG inline function",
+      "parentUuid": "dacdb1bc_1acc7999",
+      "range": {
+        "startLine": 16,
+        "startChar": 43,
+        "endLine": 16,
+        "endChar": 50
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a290d01_98ec9047",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 10
@@ -36,6 +60,24 @@
       "writtenOn": "2019-11-08T06:54:30Z",
       "side": 1,
       "message": "what is this function for?",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d40be00b_4985d755",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "It copies contents from log buffer to sandesh response buffer",
+      "parentUuid": "6a290d01_98ec9047",
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -122,6 +164,54 @@
     },
     {
       "key": {
+        "uuid": "83536255_b80ee7fe",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Removed this",
+      "parentUuid": "b76176fe_c23e88a4",
+      "range": {
+        "startLine": 29,
+        "startChar": 4,
+        "endLine": 29,
+        "endChar": 17
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "d467fc2a_cc220cb8",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Yes, But I have now removed this",
+      "parentUuid": "527e17cf_73fd665c",
+      "range": {
+        "startLine": 29,
+        "startChar": 20,
+        "endLine": 29,
+        "endChar": 30
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "dfa29f6c_fe751551",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 10
@@ -136,6 +226,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "aa95e1fd_b8867824",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "dfa29f6c_fe751551",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -162,6 +270,30 @@
     },
     {
       "key": {
+        "uuid": "3f0f8e80_f7248fb2",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Already there is another VR_NUM_MODS macro in dp-core/vrouter.c",
+      "parentUuid": "86004830_e7a08d63",
+      "range": {
+        "startLine": 32,
+        "startChar": 25,
+        "endLine": 32,
+        "endChar": 36
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6e19c260_ad85228c",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 10
@@ -173,6 +305,30 @@
       "writtenOn": "2019-11-08T06:54:30Z",
       "side": 1,
       "message": "what does \"st\" mean in this?.\nVR_LOG_ENTRIES can be renamed as VR_NUM_LOG_ENTRIES?",
+      "range": {
+        "startLine": 33,
+        "startChar": 13,
+        "endLine": 33,
+        "endChar": 27
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "105cce32_e06c49e1",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Removed this",
+      "parentUuid": "6e19c260_ad85228c",
       "range": {
         "startLine": 33,
         "startChar": 13,
@@ -219,6 +375,24 @@
     },
     {
       "key": {
+        "uuid": "e4c19ac4_48cf34ad",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3bc90765_d82659a4",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "89c326a1_c00af040",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 10
@@ -233,6 +407,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "53a05c18_ae687d18",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "89c326a1_c00af040",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -259,6 +451,30 @@
     },
     {
       "key": {
+        "uuid": "cc55e2ea_8ef45aba",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "545c15d1_0208fb54",
+      "range": {
+        "startLine": 55,
+        "startChar": 12,
+        "endLine": 55,
+        "endChar": 23
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "325c37e9_87b9ecb0",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 10
@@ -282,6 +498,30 @@
     },
     {
       "key": {
+        "uuid": "e9c1e386_c8fb9cec",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "325c37e9_87b9ecb0",
+      "range": {
+        "startLine": 101,
+        "startChar": 56,
+        "endLine": 101,
+        "endChar": 66
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "e64c34be_92cf2b55",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -296,6 +536,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bdbcc31e_892261e7",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Made it 100",
+      "parentUuid": "e64c34be_92cf2b55",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -316,6 +574,24 @@
     },
     {
       "key": {
+        "uuid": "c938d00e_531d665f",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "93cb2ef0_1621bd4a",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "b88ae785_21871602",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -330,6 +606,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c24ca4b7_cecbd45b",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "b88ae785_21871602",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -401,6 +695,24 @@
     },
     {
       "key": {
+        "uuid": "30bc8d15_a24b04f1",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "a9a7cf7a_ef13c02f",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "30f383d4_c58e9d2c",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -415,6 +727,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bfb4cc03_de91e809",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "30f383d4_c58e9d2c",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -435,6 +765,24 @@
     },
     {
       "key": {
+        "uuid": "e90c0b58_4f319243",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Removed this",
+      "parentUuid": "17adc19f_0228e67b",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "6310d050_0824c2aa",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -449,6 +797,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "42b58104_58614002",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "6310d050_0824c2aa",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -475,6 +841,30 @@
     },
     {
       "key": {
+        "uuid": "c819ff93_21203e71",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "removed this",
+      "parentUuid": "b4d0ee64_b41485c5",
+      "range": {
+        "startLine": 65,
+        "startChar": 8,
+        "endLine": 65,
+        "endChar": 22
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "f7ffd773_30ba8707",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -489,6 +879,24 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8c2d817e_11d77c92",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Made it inline function in vr_logger.c",
+      "parentUuid": "f7ffd773_30ba8707",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -538,6 +946,30 @@
     },
     {
       "key": {
+        "uuid": "8186942d_56daa4e1",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "606fba21_c56e8114",
+      "range": {
+        "startLine": 78,
+        "startChar": 5,
+        "endLine": 78,
+        "endChar": 7
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "c72ed60f_9248bf80",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -549,6 +981,30 @@
       "writtenOn": "2019-11-08T06:54:30Z",
       "side": 1,
       "message": "Why is the required?",
+      "range": {
+        "startLine": 87,
+        "startChar": 36,
+        "endLine": 87,
+        "endChar": 44
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "89d26c07_90edfbde",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 87,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "To make sure no thread is freeing the buffer while some other is writing to it.",
+      "parentUuid": "c72ed60f_9248bf80",
       "range": {
         "startLine": 87,
         "startChar": 36,
@@ -581,6 +1037,30 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "24bffede_92f80622",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "yes, index is character count in the buffer",
+      "parentUuid": "4be311ea_8e680aa0",
+      "range": {
+        "startLine": 88,
+        "startChar": 80,
+        "endLine": 88,
+        "endChar": 96
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -630,6 +1110,30 @@
     },
     {
       "key": {
+        "uuid": "b115f2f4_e92b63a7",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "871553d4_ad8a16cc",
+      "range": {
+        "startLine": 92,
+        "startChar": 18,
+        "endLine": 92,
+        "endChar": 26
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9f04c70b_0b22a58e",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -664,6 +1168,24 @@
     },
     {
       "key": {
+        "uuid": "f653c935_f13461fd",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9f233749_12e3e4aa",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9db4f189_ad9dd12b",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -675,6 +1197,24 @@
       "writtenOn": "2019-11-08T06:54:30Z",
       "side": 1,
       "message": "pl put all of these in a structure",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "64af36e4_15a90b0a",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Removed most of these global variables",
+      "parentUuid": "9db4f189_ad9dd12b",
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -704,6 +1244,30 @@
     },
     {
       "key": {
+        "uuid": "1a8fde1b_9eb8d69e",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "36195aba_9be0e6c7",
+      "range": {
+        "startLine": 127,
+        "startChar": 15,
+        "endLine": 127,
+        "endChar": 30
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "f7c30d76_ea60a9bb",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -727,6 +1291,30 @@
     },
     {
       "key": {
+        "uuid": "097f8ab4_cd23badd",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Removed this",
+      "parentUuid": "f7c30d76_ea60a9bb",
+      "range": {
+        "startLine": 131,
+        "startChar": 9,
+        "endLine": 131,
+        "endChar": 12
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "62d46720_464f10f1",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -747,6 +1335,30 @@
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a4df4f35_2a44ea35",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 140,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "62d46720_464f10f1",
+      "range": {
+        "startLine": 140,
+        "startChar": 17,
+        "endLine": 140,
+        "endChar": 25
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -790,6 +1402,30 @@
     },
     {
       "key": {
+        "uuid": "7aa579a2_83433c87",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 146,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "VR_NUM_MODS macro already defined in dp-core/vrouter.c",
+      "parentUuid": "349285d7_b2717c70",
+      "range": {
+        "startLine": 146,
+        "startChar": 33,
+        "endLine": 146,
+        "endChar": 44
+      },
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "660bbd75_4c23a3c0",
         "filename": "include/vr_logger.h",
         "patchSetId": 10
@@ -801,6 +1437,24 @@
       "writtenOn": "2019-11-08T06:54:30Z",
       "side": 1,
       "message": "why is this needed?",
+      "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "54f9b1a3_2c9db2d1",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 148,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-13T17:33:29Z",
+      "side": 1,
+      "message": "because we need to declare array of structs",
+      "parentUuid": "660bbd75_4c23a3c0",
       "revId": "752f18fcd9caadacad8c36e694e57f08022a74b6",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
