@@ -47,6 +47,14 @@ extern unsigned int vif_bridge_oentries;
 extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int datapath_offloads;
+extern unsigned int count;
+extern unsigned int log_entries_flow[VR_NUM_LEVELS];
+extern unsigned int log_entries_interface[VR_NUM_LEVELS];
+extern unsigned int log_entries_mirror[VR_NUM_LEVELS];
+extern unsigned int log_entries_nexthop[VR_NUM_LEVELS];
+extern unsigned int log_entries_qos[VR_NUM_LEVELS];
+extern unsigned int log_entries_route[VR_NUM_LEVELS];
+extern bool vr_logger_en;
 
 extern char *ContrailBuildInfo;
 
@@ -2506,6 +2514,55 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+	    .procname       = "vr_logger_en",
+	    .data           = &vr_logger_en,
+	    .maxlen         = sizeof(unsigned int),
+	    .mode           = 0644,
+	    .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "log_entries_flow",
+        .data           = log_entries_flow,
+        .maxlen         = sizeof(unsigned int) * (VR_NUM_LEVELS),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "log_entries_interface",
+        .data           = log_entries_interface,
+        .maxlen         = sizeof(unsigned int) * (VR_NUM_LEVELS),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "log_entries_mirror",
+        .data           = log_entries_mirror,
+        .maxlen         = sizeof(unsigned int) * (VR_NUM_LEVELS),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "log_entries_nexthop",
+        .data           = log_entries_nexthop,
+        .maxlen         = sizeof(unsigned int) * (VR_NUM_LEVELS),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "log_entries_qos",
+        .data           = log_entries_qos,
+        .maxlen         = sizeof(unsigned int) * (VR_NUM_LEVELS),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "log_entries_route",
+        .data           = log_entries_route,
+        .maxlen         = sizeof(unsigned int) * (VR_NUM_LEVELS),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 
@@ -2615,6 +2672,27 @@ MODULE_PARM_DESC(vr_pkt_droplog_sysctl_en, "Sysctl implementation for Enable/Dis
 
 module_param(vr_pkt_droplog_min_sysctl_en, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_pkt_droplog_min_sysctl_en, "Sysctl implementation for Enable/Disable minimum vrouter packet drop log support");
+
+module_param(vr_logger_en, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_logger_en, "Enable/Disable log infra at load time");
+
+module_param_array(log_entries_flow, uint, NULL, 0);
+MODULE_PARM_DESC(log_entries_flow, "Log entries for Flow module");
+
+module_param_array(log_entries_interface, uint, NULL, 0);
+MODULE_PARM_DESC(log_entries_interface, "Log entries for Interface module");
+
+module_param_array(log_entries_mirror, uint, NULL, 0);
+MODULE_PARM_DESC(log_entries_mirror, "Log entries for Mirror module");
+
+module_param_array(log_entries_nexthop, uint, NULL, 0);
+MODULE_PARM_DESC(log_entries_nexthop, "Log entries for Nexthop module");
+
+module_param_array(log_entries_qos, uint, NULL, 0);
+MODULE_PARM_DESC(log_entries_qos, "Log entries for Qos module");
+
+module_param_array(log_entries_route, uint, NULL, 0);
+MODULE_PARM_DESC(log_entries_route, "Log entries for Route module");
 
 module_param(vr_mpls_labels, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));

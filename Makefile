@@ -73,6 +73,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += dp-core/vr_bitmap.o dp-core/vr_qos.o
 	vrouter-y += dp-core/vr_offloads.o
 	vrouter-y += dp-core/vr_pkt_droplog.o
+        vrouter-y += dp-core/vr_logger.o
 
 	ccflags-y += -I$(src)/include -I$(SANDESH_HEADER_PATH)/sandesh/gen-c
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)
