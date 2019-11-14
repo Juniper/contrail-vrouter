@@ -1,0 +1,394 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "c2fc819e_dd489c53",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "Add paranthesis and spaces",
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "58ea3c17_6c91d93f",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "Pl put all the above in a structure, make it typedef and move it to header file.\nHere you can declare a structure variable from the typedef",
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ba16b438_6ef05628",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "make it multiple of 2, its easy to handle",
+      "range": {
+        "startLine": 21,
+        "startChar": 8,
+        "endLine": 21,
+        "endChar": 30
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "636f36d5_b2f711ca",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "where is this used?",
+      "range": {
+        "startLine": 22,
+        "startChar": 8,
+        "endLine": 22,
+        "endChar": 22
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2e37c22f_60c0947c",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "spaces, make this a multiple of 2 and you can use shift..\n2048 \u003d (1 \u003c\u003c 11)",
+      "range": {
+        "startLine": 24,
+        "startChar": 46,
+        "endLine": 24,
+        "endChar": 68
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6b67678b_6b631422",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "make this multiple of 2",
+      "range": {
+        "startLine": 29,
+        "startChar": 17,
+        "endLine": 29,
+        "endChar": 21
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "08fe45ed_49d5a23d",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "whitespace",
+      "range": {
+        "startLine": 29,
+        "startChar": 17,
+        "endLine": 29,
+        "endChar": 22
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "11eda9be_d3344901",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 34,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "what are the levels?\nmay be you can use \u0027|\u0027\nEg: DEBUG | INFO | ERROR",
+      "range": {
+        "startLine": 34,
+        "startChar": 8,
+        "endLine": 34,
+        "endChar": 22
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ad3355fd_fc1d1e0d",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "can this be used - (lev \u003c\u003d (log_ctrl[module].level \u0026 LOG_LEVEL_MASK))?\nAlso, pl avoid using shortforms at places.. you can use level instead of lev",
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0d449ae2_04f5ccd7",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "can u use - SET_MOULE_LOG_ENTRY()",
+      "range": {
+        "startLine": 52,
+        "startChar": 8,
+        "endLine": 52,
+        "endChar": 27
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "03d97d2d_4f0dc682",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "why do u want to set all levels?",
+      "range": {
+        "startLine": 62,
+        "startChar": 31,
+        "endLine": 62,
+        "endChar": 45
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c33a5bc3_dd7fa490",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "SET_MODULE_LOG_LEVEL()",
+      "range": {
+        "startLine": 66,
+        "startChar": 8,
+        "endLine": 66,
+        "endChar": 25
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "56d54802_69631776",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 68,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "Will this work?\nlog_ctrl[module].level \u0026\u003d (~LOG_LEVEL_MASK | level)",
+      "range": {
+        "startLine": 68,
+        "startChar": 54,
+        "endLine": 68,
+        "endChar": 55
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d7a5eb15_7ce6acfc",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "why do you need to do this?",
+      "range": {
+        "startLine": 71,
+        "startChar": 20,
+        "endLine": 71,
+        "endChar": 29
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "51058030_b5d5bd03",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "enum name to be in lowercase",
+      "range": {
+        "startLine": 82,
+        "startChar": 5,
+        "endLine": 82,
+        "endChar": 15
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "723daa63_88b0eaa5",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 95,
+        "startChar": 5,
+        "endLine": 95,
+        "endChar": 14
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b0446826_40579ff5",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 97,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "the elements of enum has to be in upper case",
+      "range": {
+        "startLine": 97,
+        "startChar": 4,
+        "endLine": 97,
+        "endChar": 11
+      },
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "70c1fb86_c6d23285",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 12
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-14T06:10:46Z",
+      "side": 1,
+      "message": "there are way too many structures here. Pl put all of them in one structure and declare it as typedef. lets discuss the datastructure in person..",
+      "revId": "06c058be73029e3162683029cea219bb756b0127",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
