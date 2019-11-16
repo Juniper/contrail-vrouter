@@ -18,10 +18,7 @@ libvrouter_sources = [
     'ulinux.c',
 ]
 
-if platform.system() == 'Windows':
-    libvrouter_sources += ['windows/vr_host_io.c']
-else:
-    libvrouter_sources += ['nix/vr_host_io.c']
+libvrouter_sources += ['nix/vr_host_io.c']
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh', '../dp-core'])
