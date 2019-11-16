@@ -32,7 +32,7 @@
 #endif
 
 #include <net/if.h>
-#if defined(__linux__) || defined(_WIN32)
+#if defined(__linux__)
 #include <netinet/ether.h>
 #endif
 
@@ -1961,10 +1961,6 @@ flow_process_response()
 static int
 flow_make_flow_req_perf(vr_flow_req *req)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for Windows
-    return -1;
-#else
     int ret, attr_len, error;
     struct nl_response *resp;
     static count = 0;
@@ -2035,7 +2031,6 @@ flow_make_flow_req_perf(vr_flow_req *req)
     cl->cl_buf_offset = 0;
 
     return ret;
-#endif
 }
 
 void

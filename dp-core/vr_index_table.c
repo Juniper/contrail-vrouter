@@ -4,7 +4,7 @@
 #include <vr_index_table.h>
 #include <vr_os.h>
 #include <vrouter.h>
-#if defined(__linux__) || defined(_WIN32)
+#if defined(__linux__)
 #include <stdarg.h>
 #elif defined(__FreeBSD__)
 #include <machine/stdarg.h>
@@ -46,13 +46,6 @@ static unsigned int
 get_page_shift(void)
 {
     return PAGE_SHIFT;
-}
-#elif defined(_WIN32)
-static unsigned int
-get_page_shift(void)
-{
-    // on Windows dwPageSize is equal to 0x1000 so 1 << 12
-    return 12;
 }
 #else
 static unsigned int
