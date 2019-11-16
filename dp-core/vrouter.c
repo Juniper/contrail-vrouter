@@ -145,9 +145,6 @@ int vr_perfs = 1;    /* segmentation in software */
 #elif defined(__FreeBSD__)
 int vr_perfr = 0;    /* GRO */
 int vr_perfs = 0;    /* segmentation in software */
-#elif defined(_WIN32)
-int vr_perfr = 0;    /* GRO */
-int vr_perfs = 0;    /* segmentation in software */
 #endif
 
 /*
@@ -163,9 +160,6 @@ int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
 int vr_to_vm_mss_adj = 1;   /* adjust TCP MSS on packet sent to VM */
 #elif defined(__FreeBSD__)
 int vr_from_vm_mss_adj = 0; /* adjust TCP MSS on packets from VM */
-int vr_to_vm_mss_adj = 0;   /* adjust TCP MSS on packet sent to VM */
-#elif defined(_WIN32)
-int vr_from_vm_mss_adj = 1; /* adjust TCP MSS on packets from VM */
 int vr_to_vm_mss_adj = 0;   /* adjust TCP MSS on packet sent to VM */
 #endif
 /*
@@ -220,11 +214,6 @@ int vr_use_linux_br = 1; /* Xen */
 #endif
 #endif
 #elif defined(__FreeBSD__)
-int vr_perfp = 0;
-#elif defined(_WIN32)
-int vr_perfr1 = 0;
-int vr_perfr2 = 0;
-int vr_perfr3 = 0;
 int vr_perfp = 0;
 #endif
 /*

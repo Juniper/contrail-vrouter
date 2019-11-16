@@ -7,7 +7,6 @@
 #ifndef __VR_OS_H__
 #define __VR_OS_H__
 
-#ifndef _WIN32
 #define __attribute__packed__open__                     /* do nothing */
 #define __attribute__packed__close__                    __attribute__((__packed__))
 #define __attribute__format__(...)                      __attribute__((format(__VA_ARGS__)))
@@ -38,10 +37,6 @@
 #define vr_ffs_32(a)                                    __builtin_ffs(a)
 #define vr_likely(a)                                    __builtin_expect(!!(a), 1)
 #define vr_unlikely(a)                                  __builtin_expect(!!(a), 0)
-#else
-#define vr_likely(a)                                    (a)
-#define vr_unlikely(a)                                  (a)
-#endif
 
 #if defined(__linux__)
 #ifdef __KERNEL__
@@ -124,24 +119,6 @@ typedef unsigned int __u32;
 #define ASSERT(x) assert((x));
 #endif
 #endif /* __FreeBSD__ */
-#if defined(_WIN32)
-#include "windows_types.h"
-#include "windows_builtins.h"
-#include "netlink.h"
-#include "genetlink.h"
-#ifdef __KERNEL__
-
-#pragma warning(disable : 4018)     // '<': signed/unsigned mismatch
-#pragma warning(disable : 4242)     // '=': conversion, possible loss of data
-#pragma warning(disable : 4244)     // same as above
-
-#else /* __KERNEL__ */
-
-#include <assert.h>
-#define ASSERT(x) assert(x)
-
-#endif
-#endif /* _WIN32 */
 
 extern int vrouter_dbg;
 

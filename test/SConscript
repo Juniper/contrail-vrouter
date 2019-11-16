@@ -7,20 +7,13 @@ import platform
 Import('VRouterEnv')
 env = VRouterEnv.Clone()
 
-if platform.system() == 'Windows':
-    env.SConscript('windows/SConscript', exports='VRouterEnv', duplicate=0)
-
-
 # Include paths
 env.Append(CPPPATH = env['TOP_INCLUDE'])
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['../host', '../sandesh', '../dp-core'])
 env.Replace(LIBS = ['dp_core', 'vrouter', 'dp_sandesh_c', 'vrouter', 'dp_core', 'dp_sandesh_c', 'dp_core', 'sandesh-c', 'cmocka'])
 
-if platform.system() == 'Windows':
-    env.Append(LIBS = ['Ws2_32', 'contrail-windows'])
-else:
-    env.Append(LIBS = ['urcu-bp'])
+env.Append(LIBS = ['urcu-bp'])
 
 test_dep_srcs = ['common_test.c']
 test_dep_objs = env.Object(test_dep_srcs)

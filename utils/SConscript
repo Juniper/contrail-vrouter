@@ -16,8 +16,7 @@ if system_header_path:
     env.Append(CPPPATH = system_header_path + '/include/')
 
 # CFLAGS
-if not sys.platform.startswith('win'):
-    env.Append(CCFLAGS = '-g')
+env.Append(CCFLAGS = '-g')
 
 if 'install' in COMMAND_LINE_TARGETS:
     VRutilsEnv.Append(SRC_INSTALL_TARGET = '/utils/')
@@ -43,19 +42,13 @@ libvrutil = 'vrutil'
 libvrutil_objs = [env.Object('nl_util.lo', 'nl_util.c'), env.Object('udp_util.lo', 'udp_util.c'),
                   env.Object('ini_parser.lo', 'ini_parser.c'), env.Object('vr_util.lo', 'vr_util.c')]
 
-if sys.platform.startswith('win'):
-    libvrutil_objs.append(env.Object('windows_util.lo', 'windows_util.c'))
-else:
-    libvrutil_objs.append(env.Object('unix_util.lo', 'unix_util.c'))
+libvrutil_objs.append(env.Object('unix_util.lo', 'unix_util.c'))
 
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../sandesh'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c'])
-
-if sys.platform.startswith('win'):
-    env.Append(LIBS = ['contrail-windows', 'ws2_32', 'Iphlpapi'])
 
 # Build individual utils
 vif_sources = ['vif.c']
@@ -95,23 +88,13 @@ mirror = env.Program(target = 'mirror', source = mirror_sources)
 binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, vxlan,
              vrouter, vrmemstats, mirror]
 
-if not sys.platform.startswith('win'):
-    # 'qosmap' utility hasn't been ported for Windows yet
-    qosmap_sources = ['qosmap.c']
-    qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
+qosmap_sources = ['qosmap.c']
+qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
 
-    binaries.append(qosmap)
+binaries.append(qosmap)
 
 scripts  = ['vifdump', 'dpdkvifstats.py']
 env.Default(binaries)
-
-if sys.platform.startswith('win'):
-    # Use WiX for MSI generation
-    utils_msi = env.WiX('utils.msi', ['windows/utils_msi.wxs'])
-
-    Import('vtest')
-    env.Depends(utils_msi, binaries + vtest)
-    env.Default(utils_msi)
 
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))
 # Local Variables:

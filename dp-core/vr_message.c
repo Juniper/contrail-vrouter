@@ -62,7 +62,7 @@ vr_message_request(struct vr_message *message)
         return -ENETRESET;
 
     if (vr_not_ready)
-#if defined(__FreeBSD__) || defined(_WIN32)
+#if defined(__FreeBSD__)
         return -EBADF;
 #else
         return -EBADFD;

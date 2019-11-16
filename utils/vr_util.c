@@ -342,10 +342,6 @@ vr_send_get_bridge_table_data(struct nl_client *cl)
 int
 vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_set_dcb_state_msg(cl, ifname, state);
@@ -363,16 +359,11 @@ vr_send_set_dcb_state(struct nl_client *cl, uint8_t *ifname, uint8_t state)
     }
 
     return 0;
-#endif
 }
 
 int
 vr_send_get_dcb_state(struct nl_client *cl, uint8_t *ifname)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_get_dcb_state_msg(cl, ifname);
@@ -380,16 +371,11 @@ vr_send_get_dcb_state(struct nl_client *cl, uint8_t *ifname)
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_GSTATE, NULL);
-#endif
 }
 
 int
 vr_send_set_dcbx(struct nl_client *cl, uint8_t *ifname, uint8_t dcbx)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_set_dcbx(cl, ifname, dcbx);
@@ -407,16 +393,11 @@ vr_send_set_dcbx(struct nl_client *cl, uint8_t *ifname, uint8_t dcbx)
     }
 
     return 0;
-#endif
 }
 
 int
 vr_send_get_dcbx(struct nl_client *cl, uint8_t *ifname)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_get_dcbx(cl, ifname);
@@ -424,17 +405,12 @@ vr_send_get_dcbx(struct nl_client *cl, uint8_t *ifname)
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_GDCBX, NULL);
-#endif
 }
 
 int
 vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_get_priority_config_msg(cl, ifname);
@@ -446,17 +422,12 @@ vr_send_get_priority_config(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return 0;
-#endif
 }
 
 int
 vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_set_priority_config_msg(cl, ifname, p);
@@ -468,16 +439,11 @@ vr_send_set_priority_config(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return 0;
-#endif
 }
 
 int
 vr_send_set_dcb_all(struct nl_client *cl, uint8_t *ifname)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_set_dcb_all(cl, ifname);
@@ -485,17 +451,12 @@ vr_send_set_dcb_all(struct nl_client *cl, uint8_t *ifname)
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_SET_ALL, NULL);
-#endif
 }
 
 int
 vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_get_ieee_ets(cl, ifname, p);
@@ -503,17 +464,12 @@ vr_send_get_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_IEEE_GET, p);
-#endif
 }
 
 int
 vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         struct priority *p)
 {
-#ifdef _WIN32
-    // TODO(Windows): Implement for windows
-    return -1;
-#else
     int ret;
 
     ret = nl_build_set_ieee_ets(cl, ifname, p);
@@ -521,7 +477,6 @@ vr_send_set_ieee_ets(struct nl_client *cl, uint8_t *ifname,
         return ret;
 
     return nl_dcb_sendmsg(cl, DCB_CMD_IEEE_SET, NULL);
-#endif
 }
 
 void
@@ -671,11 +626,7 @@ void vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i)
     ptr_time = localtime(&(pkt_log_utils[i].timestamp));
 
     printf("sl no: %d  ", pkt_log->vdl_log_idx+i);
-#ifdef _WIN32
-   printf("Epoch Time: %Id ", pkt_log_utils[i].timestamp);
-#else
     printf("Epoch Time: %ld ", pkt_log_utils[i].timestamp);
-#endif
     printf("Local Time: %s ", asctime(ptr_time));
     printf("Packet Type: %d  ", pkt_log_utils[i].vp_type);
     if(pkt_log_utils[i].drop_reason)
@@ -1327,20 +1278,6 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
     if (vif_type == VIF_TYPE_HOST) {
         req.vifr_cross_connect_idx = vif_xconnect_index;
     }
-
-#ifdef _WIN32
-    if (guid == NULL) {
-        NET_LUID system_luid;
-        GUID system_guid;
-        ConvertInterfaceNameToLuidA(req.vifr_name, &system_luid);
-        ConvertInterfaceLuidToGuid(&system_luid, &system_guid);
-        req.vifr_if_guid = (uint8_t*)&system_guid;
-        req.vifr_if_guid_size = sizeof(system_guid);
-    } else {
-        req.vifr_if_guid = (uint8_t*)guid;
-        req.vifr_if_guid_size = strlen(guid);
-    }
-#endif
 
     return vr_sendmsg(cl, &req, "vr_interface_req");
 }

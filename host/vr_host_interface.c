@@ -83,7 +83,6 @@ hif_udp_rx(void *arg)
 static unsigned int
 hif_udp_tx(struct vr_hinterface *hif, struct vr_hpacket *hpkt)
 {
-#ifndef _WIN32
     int i = 0;
     struct msghdr msg;
     struct vr_hpacket *hpkt_tmp = hpkt;
@@ -101,7 +100,6 @@ hif_udp_tx(struct vr_hinterface *hif, struct vr_hpacket *hpkt)
     msg.msg_iovlen = i;
     sendmsg(hif->hif_fd, &msg, 0);
     vr_hpacket_free(hpkt);
-#endif
     return 0;
 }
 

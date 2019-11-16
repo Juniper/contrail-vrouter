@@ -370,10 +370,6 @@ struct vr_interface {
 #elif defined(__FreeBSD__)
     struct mbuf;
     void (*saved_if_input) (struct ifnet *, struct mbuf *);
-#elif defined(_WIN32)
-    NDIS_SWITCH_PORT_ID vif_port;
-    NDIS_SWITCH_NIC_INDEX vif_nic;
-    GUID vif_guid;
 #endif
 #endif
     /* Big and less frequently used fields. */

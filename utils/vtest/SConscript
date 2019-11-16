@@ -18,12 +18,8 @@ if system_header_path:
     env.Append(CPPPATH = system_header_path + '/include/')
 
 env.Append(CPPPATH = ['./include', build_dir, build_root+'/../include'])
-if sys.platform.startswith('win'):
-    env.Append(CPPPATH = '#/build/include/libxml2')
-    env.Append(LINKFLAGS = '/STACK:"10000000"')
-else:
-    env.Append(CPPPATH = '/usr/include/libxml2')
-    env.Append(CCFLAGS = '-g -std=gnu99')
+env.Append(CPPPATH = '/usr/include/libxml2')
+env.Append(CCFLAGS = '-g -std=gnu99')
 
 if env['OPT'] == 'coverage':
     libvrutil = ['vrutil', 'gcov']
@@ -35,20 +31,14 @@ libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'),
                   env.Object('ini_parser.lo', '../ini_parser.c'),
                   env.Object('vr_util.lo', '../vr_util.c')]
 
-if sys.platform.startswith('win'):
-    libvrutil_objs.append(env.Object('windows_util.lo', '../windows_util.c'))
-else:
-    libvrutil_objs.append(env.Object('unix_util.lo', '../unix_util.c'))
+libvrutil_objs.append(env.Object('unix_util.lo', '../unix_util.c'))
 
 env.StaticLibrary(libvrutil, libvrutil_objs)
 
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh', './vhost/lib/'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'xml2'])
-if sys.platform.startswith('win'):
-    env.Append(LIBS = ['contrail-windows', 'ws2_32', 'Iphlpapi'])
-else:
-    env.Append(LIBS = ['jnprvnet', 'pcap', 'rt', 'nl-3', 'nl-genl-3'])
+env.Append(LIBS = ['jnprvnet', 'pcap', 'rt', 'nl-3', 'nl-genl-3'])
 
 sandesh_gen = env.Program('sandesh_gen.c')
 
@@ -67,11 +57,8 @@ vtest_src = [
                 'vt_process_xml.c',
             ]
 
-if sys.platform.startswith('win'):
-    vtest_src.append('windows/vt_packet.c')
-else:
-    vtest_src.append('vt_packet.c')
-    env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
+vtest_src.append('vt_packet.c')
+env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
 
 vtest = env.Program('vtest', vtest_src)
 Export('vtest')

@@ -31,9 +31,7 @@
 #include <vr_defs.h>
 #include <ini_parser.h>
 
-#ifndef _WIN32
 #include <vt_packet.h>
-#endif
 
 /* vTest command-line options. */
 enum vr_opt_index {
