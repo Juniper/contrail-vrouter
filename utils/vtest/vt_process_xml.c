@@ -17,9 +17,7 @@
 #include <net/if.h>
 #include <nl_util.h>
 
-#ifndef _WIN32
 #include <vt_packet.h>
-#endif
 
 extern struct vtest_module vt_modules[];
 #define SKIP_TEST_PFX "SKIP"
@@ -253,11 +251,9 @@ vt_post_process_node(xmlNodePtr node, struct vtest *test) {
 
     }
 
-#ifndef _WIN32
     if(!strncmp((char *) node->name, "packet", sizeof("packet"))) {
         ret = vt_post_process_packet(test);
     }
-#endif
 
     return ret;
 }

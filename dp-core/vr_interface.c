@@ -2022,16 +2022,12 @@ vr_interface_delete(vr_interface_req *req, bool need_response)
      * index
      */
     if (req->vifr_name) {
-#ifdef _WIN32
-        vif = vif_find(router, req->vifr_name);
-#else
         if (2 == sscanf(req->vifr_name, "vif%u/%u", &req->vifr_rid,
                     &req->vifr_idx))
             vif = __vrouter_get_interface(vrouter_get(req->vifr_rid),
                     req->vifr_idx);
         else
             vif = vif_find(router, req->vifr_name);
-#endif
     } else {
         vif = __vrouter_get_interface(router, req->vifr_idx);
     }

@@ -32,11 +32,7 @@ extern "C" {
 #define BRIDGE_TABLE_DEV            "/dev/vr_bridge"
 #define FLOW_TABLE_DEV              "/dev/flow"
 
-#ifdef _WIN32
-#define CLEAN_SCREEN_CMD        "cls"
-#else
 #define CLEAN_SCREEN_CMD        "clear"
-#endif
 
 struct nl_response {
     uint8_t *nl_data;
@@ -50,15 +46,11 @@ struct nl_client {
     /* length of the buffer in cl_buf */
     unsigned int cl_buf_len;
 
-#ifdef _WIN32
-    HANDLE cl_win_pipe;
-#else
     int cl_sock;
     int cl_socket_domain;
 
     struct sockaddr *cl_sa;
     uint32_t cl_sa_len;
-#endif
 
     unsigned int cl_genl_family_id;
 
@@ -309,13 +301,6 @@ extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
 extern void vr_print_drop_stats(vr_drop_stats_req *, int);
 
-#ifdef _WIN32
-extern int win_setup_nl_client(struct nl_client *, unsigned int);
-extern int win_nl_sendmsg(struct nl_client *);
-extern int win_nl_client_recvmsg(struct nl_client *, bool);
-
-extern const LPCTSTR KSYNC_PATH;
-#endif /* _WIN32 */
 
 #ifdef __cplusplus
 }
