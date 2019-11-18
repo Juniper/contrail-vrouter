@@ -120,6 +120,18 @@ vr_route_delete(vr_route_req *req)
         vr_offload_route_del(req);
 
 error:
+    if (ret == 0) {
+        vr_log(VR_MODULE_ROUTE, VR_INFO,
+            "OP:%d fam:%d rid:%d lab:%d nh:%d rtr_rep:%d prefix:", req->h_op,
+	    req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id,
+            req->rtr_replace_plen,
+	    prefix_to_string(req->rtr_prefix_size, req->rtr_prefix));
+    } else {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+	    "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s", req->h_op,
+	    req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id,
+            ret, prefix_to_string(req->rtr_prefix_size, req->rtr_prefix));
+    }
     vr_send_response(ret);
     vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_DEL, ret);
 
@@ -158,6 +170,18 @@ vr_route_add(vr_route_req *req)
             fs->route_del(fs, &vr_req);
     }
 
+    if (ret == 0) {
+        vr_log(VR_MODULE_ROUTE, VR_INFO,
+	    "OP:%d fam:%d rid:%d lab:%d nh:%d rtr_rep:%d prefix:", req->h_op,
+	    req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id,
+            req->rtr_replace_plen,
+	    prefix_to_string(req->rtr_prefix_size, req->rtr_prefix));
+    } else {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+            "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s\n", req->h_op,
+	    req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id,
+            ret, prefix_to_string(req->rtr_prefix_size, req->rtr_prefix));
+    }
     vr_send_response(ret);
     vr_send_broadcast(VR_ROUTE_OBJECT_ID, &vr_req, SANDESH_OP_ADD, ret);
 
@@ -222,6 +246,12 @@ generate_response:
         vr_req.rtr_req.rtr_mac = NULL;
     }
 
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+	    "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s\n", req->h_op,
+	    req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id,
+            ret, prefix_to_string(req->rtr_prefix_size, req->rtr_prefix));
+    }
     return ret;
 }
 
@@ -278,7 +308,12 @@ vr_route_dump(vr_route_req *req)
 
 generate_error:
     vr_send_response(ret);
-
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+	    "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s\n", req->h_op,
+	    req->rtr_family, req->rtr_rid, req->rtr_label, req->rtr_nh_id,
+            ret, prefix_to_string(req->rtr_prefix_size, req->rtr_prefix));
+    }
     return ret;
 }
 
@@ -328,6 +363,11 @@ vr_inet_vrf_stats_dump(struct vrouter *router, vr_vrf_stats_req *req)
 
 generate_error:
     vr_send_response(ret);
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+	    "OP:%d fam:%d rid:%d vrd:%d type:%d Err:%d",
+            req->h_op, req->vsr_family, req->vsr_rid, req->vsr_vrf, req->vsr_type, ret);
+    }
     return;
 }
 
@@ -353,6 +393,11 @@ vr_inet_vrf_stats_get(struct vrouter *router, vr_vrf_stats_req *req)
     ret = rtable->algo_stats_get(req, &response);
 generate_error:
     vr_message_response(VR_VRF_STATS_OBJECT_ID, ret ? NULL : &response, ret, false);
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+            "OP:%d fam:%d rid:%d vrd:%d type:%d Err:%d",
+            req->h_op, req->vsr_family, req->vsr_rid, req->vsr_vrf, req->vsr_type, ret);
+    }
     return;
 }
 
@@ -393,6 +438,11 @@ vr_vrf_stats_op(vr_vrf_stats_req *req)
 
 generate_error:
     vr_send_response(ret);
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+	    "OP:%d fam:%d rid:%d vrd:%d type:%d Err:%d",
+            req->h_op, req->vsr_family, req->vsr_rid, req->vsr_vrf, req->vsr_type, ret);
+    }
     return;
 }
 
@@ -420,27 +470,36 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
     unsigned char pmask, pmask_byte;
     struct vr_rtable *rtable;
     struct vrouter *router;
+    int ret = 0;
 
     router = vrouter_get(req->rtr_req.rtr_rid);
-    if (!router)
-        return -EINVAL;
+    if (!router) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     /* V4 and V6 only */
     if (req->rtr_req.rtr_family != AF_INET &&
-        req->rtr_req.rtr_family != AF_INET6)
-        return -EINVAL;
+        req->rtr_req.rtr_family != AF_INET6) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     /* There has to be some prefix to add */
-    if (!req->rtr_req.rtr_prefix_size)
-        return -EINVAL;
+    if (!req->rtr_req.rtr_prefix_size) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
 
     rtable = router->vr_inet_rtable;
     if (!rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) ||
             ((unsigned int)(req->rtr_req.rtr_prefix_len) >
-                            (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)))
-        return -EINVAL;
+                            (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8))) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     /* Zero the bits in prefix, which are set beyond the mask len */
     if (req->rtr_req.rtr_prefix) {
@@ -472,6 +531,15 @@ inet_route_add(struct rtable_fspec *fs, struct vr_route_req *req)
         } else {
         return -1;
     }
+error_log:
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+            "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s\n", req->rtr_req.h_op,
+	    req->rtr_req.rtr_family, req->rtr_req.rtr_rid, req->rtr_req.rtr_label,
+            req->rtr_req.rtr_nh_id, ret,
+	    prefix_to_string(req->rtr_req.rtr_prefix_size, req->rtr_req.rtr_prefix));
+    }
+    return ret;
 }
 
 int
@@ -479,22 +547,37 @@ inet_route_del(struct rtable_fspec *fs, struct vr_route_req *req)
 {
     struct vr_rtable *rtable;
     struct vrouter *router;
+    int ret = 0;
 
     if (((unsigned int)(req->rtr_req.rtr_prefix_len) >
                             (RT_IP_ADDR_SIZE(req->rtr_req.rtr_family)*8)) ||
-            (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs)
-        return -EINVAL;
+            (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs) {
+        ret =  -EINVAL;
+        goto error_log;
+    }
 
     router = vrouter_get(req->rtr_req.rtr_rid);
-    if (!router)
-        return -EINVAL;
+    if (!router) {
+        ret =  -EINVAL;
+        goto error_log;
+    }
 
     rtable = router->vr_inet_rtable;
     if (!rtable ||
-            (unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs)
-        return -EINVAL;
-
+            (unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) {
+        ret = -EINVAL;
+        goto error_log;
+    }
     return rtable->algo_del(rtable, req);
+error_log:
+    if(ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+            "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s\n", req->rtr_req.h_op,
+	    req->rtr_req.rtr_family, req->rtr_req.rtr_rid, req->rtr_req.rtr_label,
+            req->rtr_req.rtr_nh_id, ret,
+	    prefix_to_string(req->rtr_req.rtr_prefix_size, req->rtr_req.rtr_prefix));
+    }
+    return ret;
 }
 
 static void
@@ -538,43 +621,71 @@ int
 bridge_entry_add(struct rtable_fspec *fs, struct vr_route_req *req)
 {
     struct vrouter *router;
-
+    int ret = 0;
     if (!fs) {
         fs = vr_get_family(AF_BRIDGE);
-        if (!fs)
-            return -EINVAL;
+        if (!fs) {
+            ret = -EINVAL;
+            goto error_log;
+        }
     }
 
     router = vrouter_get(req->rtr_req.rtr_rid);
-    if (!router)
-        return -EINVAL;
+    if (!router) {
+        ret =  -EINVAL;
+        goto error_log;
+    }
 
     if (!router->vr_bridge_rtable ||
             ((unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) ||
-            ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN))
-        return -EINVAL;
+            ((unsigned int)(req->rtr_req.rtr_mac_size) != VR_ETHER_ALEN)) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     return router->vr_bridge_rtable->algo_add(router->vr_bridge_rtable, req);
+error_log:
+    if (ret != 0) {
+        vr_log(VR_MODULE_ROUTE, VR_ERROR,
+	    "OP:%d fam:%d rid:%d lab:%d nh:%d Err:%d prefix:%s\n",
+            req->rtr_req.h_op, req->rtr_req.rtr_family,
+	    req->rtr_req.rtr_rid, req->rtr_req.rtr_label,
+            req->rtr_req.rtr_nh_id, ret,
+	    prefix_to_string(req->rtr_req.rtr_prefix_size, req->rtr_req.rtr_prefix));
+    }
+    return ret;
 }
 
 int
 bridge_entry_del(struct rtable_fspec *fs, struct vr_route_req *req)
 {
     struct vrouter *router;
+    int ret = 0;
 
     if ((unsigned int)(req->rtr_req.rtr_mac_size) > 6 ||
-            (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs)
-        return -EINVAL;
+            (unsigned int)(req->rtr_req.rtr_vrf_id) >= fs->rtb_max_vrfs) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     router = vrouter_get(req->rtr_req.rtr_rid);
-    if (!router)
-        return -EINVAL;
+    if (!router) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     if (!router->vr_bridge_rtable ||
-            (unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs)
-        return -EINVAL;
+            (unsigned int)req->rtr_req.rtr_vrf_id >= fs->rtb_max_vrfs) {
+        ret = -EINVAL;
+        goto error_log;
+    }
 
     return router->vr_bridge_rtable->algo_del(router->vr_bridge_rtable, req);
+error_log:
+    if(ret != 0) {
+
+    }
+    return ret;
 }
 
 static int
