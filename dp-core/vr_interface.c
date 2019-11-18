@@ -2436,6 +2436,16 @@ generate_resp:
     if (need_response)
         vr_send_response(ret);
 
+    if(ret == 0) {
+        vr_log(VR_MODULE_INTERFACE, VR_INFO, "vrf:%d mtu:%d transp:%d rid:%d nh:%d vif:%s mac:%d\n",
+               req->vifr_vrf, req->vifr_mtu, req->vifr_transport, req->vifr_rid, req->vifr_nh_id,
+               req->vifr_name, req->vifr_mac);
+    }
+    else {
+        vr_log(VR_MODULE_INTERFACE, VR_ERROR, "vrf:%d mtu:%d transp:%d rid:%d nh:%d vif:%s mac:%d Err:%d\n",
+                req->vifr_vrf, req->vifr_mtu, req->vifr_transport, req->vifr_rid, req->vifr_nh_id,
+                req->vifr_name, req->vifr_mac, ret);
+    }
     return ret;
 }
 

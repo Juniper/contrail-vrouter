@@ -26,6 +26,7 @@ extern "C" {
 #include "vr_offloads.h"
 #include "vr_pkt_droplog.h"
 #include "vr_fragment.h"
+#include "vr_logger.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -130,6 +131,9 @@ enum vr_malloc_objects_t {
     VR_VRF_TABLE_ENTRY_OBJECT,
     VR_VRF_TABLE_OBJECT,
     VR_VROUTER_MAX_OBJECT,
+    VR_LOG_OBJECT,
+    VR_LOG_REQ_OBJECT,
+    VR_LOGGER_CONF_OBJECT,
 };
 
 extern int vr_perfr;
