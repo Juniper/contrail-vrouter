@@ -25,6 +25,7 @@
 #include <vr_vxlan.h>
 #include <vr_qos.h>
 #include <vr_offloads_dp.h>
+#include <vr_logger.h>
 
 static struct vrouter router;
 struct host_os *vrouter_host;
@@ -45,6 +46,9 @@ extern unsigned int vif_bridge_oentries;
 extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int vr_pkt_droplog_sysctl_en;
+extern struct vr_log vr_logger;
+extern bool vr_logger_en;
+
 extern const char *ContrailBuildInfo;
 
 void vrouter_exit(bool);
@@ -386,6 +390,7 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_packet_dump = 0;
     resp->vo_pkt_droplog_en = vr_pkt_droplog_sysctl_en;
     resp->vo_pkt_droplog_min_en = vr_pkt_droplog_min_sysctl_en;
+
     if(vr_get_dump_packets != NULL) {
         resp->vo_packet_dump = vr_get_dump_packets();
     }
@@ -421,12 +426,100 @@ vrouter_ops_get_process(void *s_req)
 generate_response:
     if (ret)
         req = NULL;
-
+ 
     vr_message_response(VR_VROUTER_OPS_OBJECT_ID, req, ret, false);
     if (resp)
         vrouter_ops_destroy(resp);
 
     return;
+}
+
+void
+vr_logger_conf_get_process(void *s_req)
+{
+    int ret = 0, i = 0, j = 0;
+    vr_logger_conf *req = (vr_logger_conf *)s_req;
+    vr_logger_conf *resp;
+    resp = vr_zalloc(sizeof(*resp), VR_LOGGER_CONF_OBJECT);
+    if(!resp) {
+        ret = -ENOMEM;
+        goto generate_response;
+    }
+
+    if (req->h_op != SANDESH_OP_GET) {
+        ret = -EOPNOTSUPP;
+        goto generate_response;
+    }
+
+    resp->vo_log_mod_level_size = sizeof(int)*VR_NUM_MODS;
+    resp->vo_log_mod_level = (int *) vr_zalloc(resp->vo_log_mod_level_size,
+                                                 VR_LOGGER_CONF_OBJECT);
+    resp->vo_log_mod_len_size = sizeof(int)*(VR_NUM_MODS*VR_NUM_LEVELS);
+    resp->vo_log_mod_len = (int *) vr_zalloc(resp->vo_log_mod_len_size,
+                                             VR_LOGGER_CONF_OBJECT);
+    for(i = 1;i < VR_NUM_MODS;i++) {
+        resp->vo_log_mod_level[i] = vr_logger.log_module[i].level;
+        resp->vo_log_mod_type = vr_logger.log_module[i].console;
+        for(j = 1;j < VR_NUM_LEVELS;j++) {
+            resp->vo_log_mod_len[i * VR_NUM_LEVELS + j] =
+            vr_logger.log_module[i].level_info[j].log_size;
+        }
+    }
+    resp->vo_logger_en = vr_logger_en;
+    req = resp;
+generate_response:
+    if (ret)
+        req = NULL;
+
+    ret = vr_message_response(VR_LOGGER_CONF_OBJECT_ID, resp, ret, false);
+    if(resp) {
+        vr_free(resp->vo_log_mod_level, VR_LOGGER_CONF_OBJECT);
+        vr_free(resp->vo_log_mod_len, VR_LOGGER_CONF_OBJECT);
+    }
+    return;
+}
+
+void resize_module_buf(int mod, int lev, int size) {
+    int old_size;
+    old_size = vr_logger.log_module[mod].level_info[lev].log_size;
+
+    char *new_log = vr_zalloc(size, VR_LOG_REQ_OBJECT);
+    char *old_log = vr_logger.log_module[mod].level_info[lev].buffer;
+    if(size <= old_size) {
+        memcpy(new_log, old_log, size);
+        vr_logger.log_module[mod].level_info[lev].buf_idx = 0;
+    }
+    else
+        memcpy(new_log, old_log, old_size);
+
+    vr_logger.log_module[mod].level_info[lev].buffer = new_log;
+    old_log = NULL;
+    vr_free(old_log, VR_LOG_REQ_OBJECT);
+}
+
+void
+vr_logger_conf_add_process(void *s_req)
+{
+    int module, level;
+    vr_logger_conf *req = (vr_logger_conf *)s_req;
+    module = req->vo_module;
+    if(req->vo_log_mod_level_size != 0) {
+        vr_logger.log_module[module].level = req->vo_log_mod_level[module];
+        vr_logger.log_module[module].console = req->vo_log_mod_type;
+    }
+
+    if(req->vo_log_mod_len_size != 0) {
+        level = req->vo_level;
+        if(req->vo_log_mod_len[module * VR_NUM_LEVELS+level] != vr_logger.log_module[module].level_info[level].log_size) {
+            resize_module_buf(module, level, req->vo_log_mod_len[module * VR_NUM_LEVELS + level]);
+        }
+        vr_logger.log_module[module].level_info[level].log_size = req->vo_log_mod_len[module * VR_NUM_LEVELS + level];
+        vr_logger.log_module[module].level_info[level].num_records =
+        req->vo_log_mod_len[module * VR_NUM_LEVELS + level]/VR_LOG_ENTRY_LEN;
+    }
+    vr_logger_en = req->vo_logger_en;
+    vr_logger.log_module[module].enable = 1;
+    vr_send_response(0);
 }
 
 /**
@@ -496,6 +589,7 @@ vrouter_ops_add_process(void *s_req)
      * response here for now. */
     vr_send_response(0);
 }
+
 
 void
 vrouter_exit(bool soft_reset)
@@ -605,6 +699,30 @@ vrouter_ops_process(void *s_req)
 
     case SANDESH_OP_ADD:
         vrouter_ops_add_process(s_req);
+        return;
+
+    default:
+        ret = -EOPNOTSUPP;
+    }
+
+    vr_send_response(ret);
+
+    return;
+}
+
+void
+vr_logger_conf_process(void *s_req)
+{
+    int ret;
+
+    vr_logger_conf *ops = (vr_logger_conf *)s_req;
+    switch(ops->h_op) {
+    case SANDESH_OP_GET:
+        vr_logger_conf_get_process(s_req);
+        return;
+
+    case SANDESH_OP_ADD:
+        vr_logger_conf_add_process(s_req);
         return;
 
     default:
