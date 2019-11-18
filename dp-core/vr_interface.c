@@ -18,6 +18,12 @@
 #include "vr_ip_mtrie.h"
 #include "vr_offloads_dp.h"
 
+#define VR_LOG_VIF(lev, fmt, ...) {\
+    char *log_fmt = vr_zalloc(VR_LOG_ENTRY_LEN, VR_LOG_REQ_OBJECT);\
+    int length = snprintf(log_fmt, VR_LOG_ENTRY_LEN, fmt, ##__VA_ARGS__);\
+    VR_LOG(MODULE_INTERFACE, lev, log_fmt);\
+}
+
 unsigned int vr_interfaces = VR_MAX_INTERFACES;
 
 volatile bool agent_alive = false;
@@ -2440,6 +2446,20 @@ generate_resp:
     if (need_response)
         vr_send_response(ret);
 
+    if(ret == 0) {
+        VR_LOG_VIF(VR_INFO,
+                   "vrf:%d mtu:%d transp:%d rid:%d nh:%d vif:%s mac:%d\n",
+                   req->vifr_vrf, req->vifr_mtu, req->vifr_transport,
+                   req->vifr_rid, req->vifr_nh_id, req->vifr_name,
+                   req->vifr_mac);
+    }
+    else {
+        VR_LOG_VIF(VR_ERROR,
+                "vrf:%d mtu:%d transp:%d rid:%d nh:%d vif:%s mac:%d Err:%d\n",
+                req->vifr_vrf, req->vifr_mtu, req->vifr_transport,
+                req->vifr_rid, req->vifr_nh_id, req->vifr_name, req->vifr_mac,
+                ret);
+    }
     return ret;
 }
 
