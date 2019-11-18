@@ -47,6 +47,10 @@ extern unsigned int vif_bridge_oentries;
 extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int datapath_offloads;
+extern unsigned int count;
+extern bool vr_log_enable;
+extern unsigned int vr_log_default_size;
+extern bool vr_logger_en;
 
 extern char *ContrailBuildInfo;
 
@@ -2506,6 +2510,20 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+	.procname       = "logger_enable",
+	.data           = &vr_logger_en,
+	.maxlen         = sizeof(bool),
+	.mode           = 0644,
+	.proc_handler   = proc_dointvec,
+    },
+    {
+        .procname       = "logger_default_size",
+        .data           = &vr_log_default_size,
+        .maxlen         = sizeof(unsigned int),
+        .mode           = 0644,
+        .proc_handler   = proc_dointvec,
+    },
     {}
 };
 
@@ -2615,6 +2633,11 @@ MODULE_PARM_DESC(vr_pkt_droplog_sysctl_en, "Sysctl implementation for Enable/Dis
 
 module_param(vr_pkt_droplog_min_sysctl_en, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_pkt_droplog_min_sysctl_en, "Sysctl implementation for Enable/Disable minimum vrouter packet drop log support");
+
+module_param(vr_logger_en, int, S_IRUGO);
+MODULE_PARM_DESC(vr_logger_en, "Enable/Disable log infra at load time");
+module_param(vr_log_default_size, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_log_default_size, "Specify common size of all modules");
 
 module_param(vr_mpls_labels, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_mpls_labels, "Number of entries in the MPLS table. Default is "__stringify(VR_DEF_LABELS));
