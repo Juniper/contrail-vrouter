@@ -232,6 +232,37 @@ hugepage_config_process(void *s) {
     memset(s, 0, sizeof(vr_hugepage_config));
 }
 
+static void
+log_req_process(void *s) {
+    void *buf = calloc(1, sizeof(vr_log_req));
+    if (!buf) {
+        fprintf(stderr, "Cannot alloc memory \n");
+        exit(ENOMEM);
+    }
+
+    received_msg.ptr_num++;
+    received_msg.mem_handles[received_msg.ptr_num].free_mem = vr_log_req_free;
+    received_msg.mem_handles[received_msg.ptr_num].mem =
+        (memcpy(buf, s, sizeof(vr_log_req)));
+    memset(s, 0, sizeof(vr_log_req));
+}
+
+static void
+vr_log_conf_process(void *s) {
+    void *buf = calloc(1, sizeof(vr_logger_conf));
+    if(!buf) {
+        fprintf(stderr, "Cannot alloc memort \n");
+        exit(ENOMEM);
+    }
+
+    received_msg.ptr_num++;
+    received_msg.mem_handles[received_msg.ptr_num].free_mem = vr_logger_conf_free;
+    received_msg.mem_handles[received_msg.ptr_num].mem =
+        (memcpy(buf, s, sizeof(vr_logger_conf)));
+    memset(s, 0, sizeof(vr_logger_conf));
+    
+}
+
 void
 vt_fill_nl_callbacks()
 {
@@ -250,4 +281,6 @@ vt_fill_nl_callbacks()
     nl_cb.vr_mirror_req_process = mirror_req_process;
     nl_cb.vr_mem_stats_req_process = mem_stats_req_process;
     nl_cb.vr_hugepage_config_process = hugepage_config_process;
+    nl_cb.vr_log_req_process = log_req_process;
+    nl_cb.vr_logger_conf_process = vr_log_conf_process;
 }
