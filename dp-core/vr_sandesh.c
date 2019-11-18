@@ -104,6 +104,16 @@ struct sandesh_object_md sandesh_md[] = {
         .obj_len                =       4 * sizeof(vr_vrf_req),
         .obj_type_string        =       "vr_vrf_req",
     },
+    [VR_LOG_OBJECT_ID] = {
+	.obj_len                =       (4 * sizeof(vr_log_req) +
+                                        4000),
+	.obj_type_string        =       "vr_log_req",
+    },
+    [VR_LOGGER_CONF_OBJECT_ID] = {
+        .obj_len                =       (4 * sizeof(vr_logger_conf) +
+                                        4000),
+        .obj_type_string        =       "vr_logger_conf",
+    },
 };
 
 static unsigned int

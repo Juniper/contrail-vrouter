@@ -338,6 +338,22 @@ buffer sandesh vrouter_ops {
    43: byte         vo_pkt_droplog_buf_en;
    44: byte         vo_pkt_droplog_en;
    45: byte         vo_pkt_droplog_min_en;
+   46: byte         vo_logger_en;
+   47: i32          vo_module;
+   48: i32          vo_level;
+   49: list<i16>    vo_log_mod_level;
+   50: list<i32>    vo_log_mod_len;
+   51: list<i32>    vo_resize_buf;
+}
+
+buffer sandesh vr_logger_conf {
+    1: sandesh_op   h_op;
+    2: byte         vlc_logger_en;
+    3: i32          vlc_module;
+    4: i32          vlc_level;
+    5: list<i32>    vlc_log_mod_level;
+    6: list<i32>    vlc_log_mod_len;
+    7: i32          vlc_log_mod_type;
 }
 
 buffer sandesh vr_mem_stats_req {
@@ -554,4 +570,16 @@ buffer sandesh vr_hugepage_config {
     2: list<u64>    vhp_mem;
     3: list<u32>    vhp_msize;
     4: u32          vhp_resp;
+}
+
+buffer sandesh vr_log_req {
+    1: sandesh_op     h_op;
+    2: i16            vdl_rid;
+    3: i16            vdl_module;
+    4: i16            vdl_level;
+    5: i32            vdl_log_idx;
+    6: i32            vdl_line_idx;
+    7: byte           vdl_clear_buf;
+    8: i16            vdl_log_buf_en;
+    9: list<byte>     vdl_vr_log;
 }
