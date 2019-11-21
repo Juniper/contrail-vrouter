@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "6edcd0f3_16092398",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "leaving it at 100 so that Sandesh response size is multiple of 100",
+      "parentUuid": "b469d99f_d6754d6a",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "2529044e_5309f09a",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -36,6 +54,24 @@
     },
     {
       "key": {
+        "uuid": "64daf3c2_99d2e0db",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "2529044e_5309f09a",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "36b5e073_3fa62cac",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -47,6 +83,30 @@
       "writtenOn": "2019-11-19T04:48:58Z",
       "side": 1,
       "message": "what is the default size?",
+      "range": {
+        "startLine": 26,
+        "startChar": 13,
+        "endLine": 26,
+        "endChar": 32
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9cdcf60a_6eeb10f3",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "100(each record) * 2000(num records)",
+      "parentUuid": "36b5e073_3fa62cac",
       "range": {
         "startLine": 26,
         "startChar": 13,
@@ -76,6 +136,24 @@
     },
     {
       "key": {
+        "uuid": "e3f5082b_0199dd5c",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "288ac807_42d2d7fe",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ad58c6b4_dd8592c0",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -96,6 +174,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d8489edf_f8f2df2b",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ad58c6b4_dd8592c0",
+      "range": {
+        "startLine": 52,
+        "startChar": 5,
+        "endLine": 52,
+        "endChar": 7
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -122,6 +224,30 @@
     },
     {
       "key": {
+        "uuid": "be7ecc79_f983ca4c",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "15312d79_744e6fce",
+      "range": {
+        "startLine": 53,
+        "startChar": 8,
+        "endLine": 53,
+        "endChar": 34
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3617aec9_007c489e",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -142,6 +268,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "da82fc99_32518da7",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3617aec9_007c489e",
+      "range": {
+        "startLine": 55,
+        "startChar": 41,
+        "endLine": 55,
+        "endChar": 49
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -168,6 +318,30 @@
     },
     {
       "key": {
+        "uuid": "8b616fa6_68d34ffa",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "24bc0993_17e1246a",
+      "range": {
+        "startLine": 56,
+        "startChar": 12,
+        "endLine": 56,
+        "endChar": 40
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "91552819_5b1ed801",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -188,6 +362,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "984121c8_2abdbf08",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "91552819_5b1ed801",
+      "range": {
+        "startLine": 59,
+        "startChar": 27,
+        "endLine": 59,
+        "endChar": 33
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -214,6 +412,30 @@
     },
     {
       "key": {
+        "uuid": "ca22716b_b8db7eb7",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "8466ed3d_988fc260",
+      "range": {
+        "startLine": 62,
+        "startChar": 65,
+        "endLine": 62,
+        "endChar": 69
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "fb706764_f9ef6b97",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -234,6 +456,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "39725e61_017c5e11",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "fb706764_f9ef6b97",
+      "range": {
+        "startLine": 65,
+        "startChar": 77,
+        "endLine": 65,
+        "endChar": 79
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -260,6 +506,30 @@
     },
     {
       "key": {
+        "uuid": "2fd06a18_199f57b9",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 216,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c56ae7ee_c0460f5d",
+      "range": {
+        "startLine": 216,
+        "startChar": 16,
+        "endLine": 216,
+        "endChar": 21
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "4371dd06_504e22dd",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -280,6 +550,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c25a0611_cd5b2734",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 220,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "4371dd06_504e22dd",
+      "range": {
+        "startLine": 220,
+        "startChar": 4,
+        "endLine": 220,
+        "endChar": 5
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -323,6 +617,24 @@
     },
     {
       "key": {
+        "uuid": "8d059d06_e6a15882",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 261,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "62208005_ff0cf0ae",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9f5fa597_45a52f68",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -337,6 +649,24 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2a34e60d_26e9442e",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 262,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9f5fa597_45a52f68",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -363,6 +693,30 @@
     },
     {
       "key": {
+        "uuid": "0e491b7c_12ea8cc5",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 263,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "505b533d_dc56a76c",
+      "range": {
+        "startLine": 263,
+        "startChar": 23,
+        "endLine": 263,
+        "endChar": 34
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "31d68b20_33d786d8",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -383,6 +737,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "78b44865_451f116f",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "31d68b20_33d786d8",
+      "range": {
+        "startLine": 264,
+        "startChar": 12,
+        "endLine": 264,
+        "endChar": 18
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -432,6 +810,30 @@
     },
     {
       "key": {
+        "uuid": "232d3010_8a4b3f41",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "7592a50d_815d6d41",
+      "range": {
+        "startLine": 14,
+        "startChar": 0,
+        "endLine": 26,
+        "endChar": 1
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3cb1fe8c_799d7203",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -452,6 +854,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b1a749e9_998f9b60",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3cb1fe8c_799d7203",
+      "range": {
+        "startLine": 23,
+        "startChar": 45,
+        "endLine": 23,
+        "endChar": 46
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -478,6 +904,30 @@
     },
     {
       "key": {
+        "uuid": "5139e76e_21d37f66",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "346ac32a_cdb4af17",
+      "range": {
+        "startLine": 30,
+        "startChar": 21,
+        "endLine": 30,
+        "endChar": 22
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "868b9ad7_c89f5837",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -492,6 +942,24 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f60449dd_dbf8eb83",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "868b9ad7_c89f5837",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -518,6 +986,30 @@
     },
     {
       "key": {
+        "uuid": "e7172a93_30403a66",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9fb4d654_3a932bdb",
+      "range": {
+        "startLine": 44,
+        "startChar": 8,
+        "endLine": 44,
+        "endChar": 31
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "519c49a5_2c62f384",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -538,6 +1030,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f9c3c1fa_a4196569",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "519c49a5_2c62f384",
+      "range": {
+        "startLine": 54,
+        "startChar": 40,
+        "endLine": 54,
+        "endChar": 41
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -564,6 +1080,30 @@
     },
     {
       "key": {
+        "uuid": "73bb6428_5e45fc2a",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "fc1a5cf6_6f62d092",
+      "range": {
+        "startLine": 59,
+        "startChar": 8,
+        "endLine": 59,
+        "endChar": 25
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "2a8edca7_9818a838",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -575,6 +1115,30 @@
       "writtenOn": "2019-11-19T04:48:58Z",
       "side": 1,
       "message": "Rename to SET_LOG_MOD_LEVEL_NONE.\nIf you make enable as 0, will it free the buffers?\nIdeally if you change the log level, buffers should not be freed.",
+      "range": {
+        "startLine": 63,
+        "startChar": 8,
+        "endLine": 63,
+        "endChar": 30
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f70488a5_29bcc638",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "It will not free the buffers. This is disabling logging for a specific module. This prevents further logs being populated in the buffer.",
+      "parentUuid": "2a8edca7_9818a838",
       "range": {
         "startLine": 63,
         "startChar": 8,
@@ -610,6 +1174,30 @@
     },
     {
       "key": {
+        "uuid": "f2ab4bdd_e84aa39d",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 67,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Removed",
+      "parentUuid": "a5aa1203_b318cf8c",
+      "range": {
+        "startLine": 67,
+        "startChar": 20,
+        "endLine": 67,
+        "endChar": 29
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e1342454_ed686d6b",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -633,6 +1221,30 @@
     },
     {
       "key": {
+        "uuid": "0ca619b9_4e4b23cc",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 69,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e1342454_ed686d6b",
+      "range": {
+        "startLine": 69,
+        "startChar": 4,
+        "endLine": 69,
+        "endChar": 10
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "56715f65_a4964456",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -644,6 +1256,24 @@
       "writtenOn": "2019-11-19T04:48:58Z",
       "side": 1,
       "message": "why these externs here?",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7fd31ca9_5c57296f",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Removed",
+      "parentUuid": "56715f65_a4964456",
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -673,6 +1303,30 @@
     },
     {
       "key": {
+        "uuid": "8cc1cf1c_34af8348",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "8abbaf61_31556fc9",
+      "range": {
+        "startLine": 79,
+        "startChar": 4,
+        "endLine": 79,
+        "endChar": 15
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "2ed0a855_bac41582",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -687,6 +1341,24 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "38622195_961ee4e7",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "2ed0a855_bac41582",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -713,6 +1385,30 @@
     },
     {
       "key": {
+        "uuid": "39096121_3d10ff1d",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 108,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "245c9d46_a73a45fb",
+      "range": {
+        "startLine": 108,
+        "startChar": 17,
+        "endLine": 108,
+        "endChar": 35
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3bfbf8e7_7bea72d4",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -733,6 +1429,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f8be9e3c_f940b2af",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3bfbf8e7_7bea72d4",
+      "range": {
+        "startLine": 114,
+        "startChar": 7,
+        "endLine": 114,
+        "endChar": 21
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -759,6 +1479,30 @@
     },
     {
       "key": {
+        "uuid": "5f630da2_379343a9",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 128,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c5d0a2af_add4c7cd",
+      "range": {
+        "startLine": 128,
+        "startChar": 21,
+        "endLine": 128,
+        "endChar": 27
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "b8300f29_3dc6a966",
         "filename": "include/vr_logger.h",
         "patchSetId": 14
@@ -779,6 +1523,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8b8ed5a2_689f318c",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-11-21T05:50:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "b8300f29_3dc6a966",
+      "range": {
+        "startLine": 133,
+        "startChar": 1,
+        "endLine": 133,
+        "endChar": 7
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
