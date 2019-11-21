@@ -16,6 +16,24 @@
       "revId": "24d6b254eea8b40a446cb297204b5aac1fb18a49",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "07369ed0_280554b9",
+        "filename": "include/vr_os.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 5
+      },
+      "writtenOn": "2019-11-21T17:59:38Z",
+      "side": 1,
+      "message": "never mind",
+      "parentUuid": "ed1b331f_db7123d1",
+      "revId": "24d6b254eea8b40a446cb297204b5aac1fb18a49",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
