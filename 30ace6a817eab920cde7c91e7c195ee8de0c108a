@@ -1,0 +1,636 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "987901ea_09b40350",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "we discussed idx to be line number instead of character number",
+      "range": {
+        "startLine": 17,
+        "startChar": 8,
+        "endLine": 17,
+        "endChar": 23
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bcd58e0e_5d45c53e",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "true instead 1",
+      "range": {
+        "startLine": 26,
+        "startChar": 20,
+        "endLine": 26,
+        "endChar": 21
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a53b1c48_ef92a661",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "what is this for?",
+      "range": {
+        "startLine": 33,
+        "startChar": 4,
+        "endLine": 33,
+        "endChar": 23
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ae4338ae_8f48163d",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "remove comment",
+      "range": {
+        "startLine": 35,
+        "startChar": 30,
+        "endLine": 35,
+        "endChar": 31
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "54722141_5260cb7a",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "on second thought, I dont see any global structures starting with vr_xxx..\ncan we think of another name? if nothing, we can retain \u0027logger\u0027",
+      "range": {
+        "startLine": 36,
+        "startChar": 14,
+        "endLine": 36,
+        "endChar": 23
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0d68fcff_d2128f94",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "indent comment to next level",
+      "range": {
+        "startLine": 45,
+        "startChar": 0,
+        "endLine": 47,
+        "endChar": 7
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0010cfbf_0c6bb5ee",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "spac after semi-colons",
+      "range": {
+        "startLine": 48,
+        "startChar": 17,
+        "endLine": 48,
+        "endChar": 18
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1c978312_d2a62aed",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "should it be vr_logger_en?",
+      "range": {
+        "startLine": 51,
+        "startChar": 45,
+        "endLine": 51,
+        "endChar": 46
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fe6e53dd_424a3851",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "space after semi-colons",
+      "range": {
+        "startLine": 52,
+        "startChar": 21,
+        "endLine": 52,
+        "endChar": 22
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1e37cd53_af7c846a",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "what is the use of this?",
+      "range": {
+        "startLine": 55,
+        "startChar": 16,
+        "endLine": 55,
+        "endChar": 24
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a4937ed9_8ed1f872",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "this can be derived from log_size / LOG_ENTRY_LEN\nalso, move this line after the buffer null check",
+      "range": {
+        "startLine": 58,
+        "startChar": 54,
+        "endLine": 58,
+        "endChar": 65
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "35a285d7_50c0ebeb",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "pl display more details in failure case.. module name, size, level etcl.",
+      "range": {
+        "startLine": 62,
+        "startChar": 20,
+        "endLine": 62,
+        "endChar": 59
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "04dfac7b_f11a5050",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "can we go through this function in person?",
+      "range": {
+        "startLine": 76,
+        "startChar": 5,
+        "endLine": 76,
+        "endChar": 15
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "af8941e5_7f0c2130",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 236,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "i dont see this kind of thing used anywhere.. ideally you need to use vr_defer()",
+      "range": {
+        "startLine": 236,
+        "startChar": 8,
+        "endLine": 236,
+        "endChar": 32
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9f88040b_7faab7e5",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 237,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "why should clear free the buffer and allocate it again? can you manipulate the indices to indicate that the buffer is cleared?",
+      "range": {
+        "startLine": 237,
+        "startChar": 8,
+        "endLine": 237,
+        "endChar": 86
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "19dc96d3_d3a2046d",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 263,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "what is this for?",
+      "range": {
+        "startLine": 251,
+        "startChar": 0,
+        "endLine": 263,
+        "endChar": 1
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "10a8b781_42e36c87",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 280,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "we discussed this is record number instead of idx",
+      "range": {
+        "startLine": 280,
+        "startChar": 14,
+        "endLine": 280,
+        "endChar": 39
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b7f447a8_835b364d",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 286,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "what if strlen of fmt is greater than 100?",
+      "range": {
+        "startLine": 285,
+        "startChar": 8,
+        "endLine": 286,
+        "endChar": 26
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0a3a9d64_f1c0f891",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "indentation is not correct..",
+      "range": {
+        "startLine": 125,
+        "startChar": 8,
+        "endLine": 126,
+        "endChar": 88
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6da439f1_62233426",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "Can we make it 3000?",
+      "range": {
+        "startLine": 21,
+        "startChar": 31,
+        "endLine": 21,
+        "endChar": 35
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e9ed75cb_5ed5db51",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "paranthesis\nShould you add vr_logger_en also here?",
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bea9a8fc_a3f4214e",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "Prefix this with VR_ to avoid namespace collision",
+      "range": {
+        "startLine": 76,
+        "startChar": 4,
+        "endLine": 82,
+        "endChar": 17
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "51f19437_58ecf3e0",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "why do we have num_records? can we derive it from log_size and VR_LOG_ENTRY_LEN?",
+      "range": {
+        "startLine": 106,
+        "startChar": 17,
+        "endLine": 106,
+        "endChar": 28
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8e451a01_33cb4595",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "is buf_idx pointing to the record number?",
+      "range": {
+        "startLine": 109,
+        "startChar": 8,
+        "endLine": 109,
+        "endChar": 15
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1e7d59be_c07d3f7a",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "maybe you have have level, enable and size here also so that you can compare old and new value",
+      "range": {
+        "startLine": 120,
+        "startChar": 14,
+        "endLine": 120,
+        "endChar": 15
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "95138aaf_39abba20",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 121,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "make it just \u0027module\u0027",
+      "range": {
+        "startLine": 121,
+        "startChar": 25,
+        "endLine": 121,
+        "endChar": 35
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2d0147f7_05e946db",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "there is a struct called vr_log and also a function called vr_log.\ncan we make them unique?",
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8287d61c_bfc36f7f",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 16
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "no need of extern keyword here",
+      "range": {
+        "startLine": 127,
+        "startChar": 0,
+        "endLine": 127,
+        "endChar": 6
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

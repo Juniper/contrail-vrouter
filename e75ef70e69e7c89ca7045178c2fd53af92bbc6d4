@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "f858b298_b926bf3e",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "I mean width of your code",
+      "parentUuid": "6edcd0f3_16092398",
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "2529044e_5309f09a",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 14
@@ -107,6 +125,30 @@
       "side": 1,
       "message": "100(each record) * 2000(num records)",
       "parentUuid": "36b5e073_3fa62cac",
+      "range": {
+        "startLine": 26,
+        "startChar": 13,
+        "endLine": 26,
+        "endChar": 32
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e3af0394_2f8e42c6",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "so this needs to be assigned with that value?",
+      "parentUuid": "9cdcf60a_6eeb10f3",
       "range": {
         "startLine": 26,
         "startChar": 13,
@@ -1148,6 +1190,30 @@
       "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f839b0f5_6e2c82a6",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-21T07:58:04Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "f70488a5_29bcc638",
+      "range": {
+        "startLine": 63,
+        "startChar": 8,
+        "endLine": 63,
+        "endChar": 30
+      },
+      "revId": "e75ef70e69e7c89ca7045178c2fd53af92bbc6d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
