@@ -1,0 +1,61 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "4589ac13_5ad755b0",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-22T10:03:41Z",
+      "side": 1,
+      "message": "pl include reference to contrail-vrouter-dpdk too",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7f95e17b_d004e6ab",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-22T10:03:41Z",
+      "side": 1,
+      "message": "i dont think we should expose contrail-vnc-private to others.. we should remove this.. more over, this is master branch.. so 4.1 is not relavant",
+      "range": {
+        "startLine": 23,
+        "startChar": 39,
+        "endLine": 23,
+        "endChar": 59
+      },
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "795e9523_bbe12b6a",
+        "filename": "tracing/README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-22T10:03:41Z",
+      "side": 1,
+      "message": "pl add sample outputs",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
