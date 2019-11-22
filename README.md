@@ -1,5 +1,4 @@
-contrail-vrouter
-================
+# contrail-vrouter
 
 Contrail Virtual Router
 
@@ -12,22 +11,27 @@ The implementation is split into a generic "dp-core" directory used by
 multiple operating systems and OS-specific glue. The "linux" directory
 contains the Linux specific code.
 
-The code has been tested with both 2.6.32 and 3.0 kernel series and
-with both KVM and Xen as hypervisors.
-
 The utils directory contains user space applications that can be used
 to created interfaces (utils/vif) or display the state of the kernel
 module.
 
-building vrouter.ko for a specific OS
-==================================
+# building vrouter.ko for a specific OS
 
-1. Initialize the repository
-$ repo init -u git@github.com:Juniper/contrail-vnc -m vrouter-manifest.xml
+### For contrail-version < 5.0
 
-2. Sync the repo. This will fetch vrouter, build and sandesh repositories.
-$ repo sync
+1. Initialize the respository from Juniper/contrail-vnc-private. The following example is to initialize repository for contrail-4.1 on redhat. 
+`$ repo init -u git@github.com:Juniper/contrail-vnc-private -R4.1/redhat70/manifest-newton.xml`
 
-3. Build vrouter
-$ scons vrouter
+2. Execute fetch_packages.py from contrail-webui-thirdparty, thirdparty, distro/thirdparty.
+> cd third_party/  
+`python fetch_packages.py`
+cd distro/third_party/  
+`python fetch_packages.py`
+cd contrail-webui-thirdparty/
+`python fetch_packages.py`
 
+4. Build vrouter
+`$ scons vrouter`
+
+### For contrail-version >= 5.0
+1. Contrail-dev-env container process can be followed to build a vrouter.ko module which can be found [here](https://github.com/Juniper/contrail-dev-env).
