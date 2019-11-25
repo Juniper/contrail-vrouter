@@ -27,7 +27,7 @@ Refer to test1.py and test2.py in tests/ directory for examples on how to use th
 ## Running the tests
 
 Run **scons vrouter** to build the dpdk and vtest binaries
-Run **scons vrouter-py-ut** in the top level directory of the SB to run all the unit test cases.
+Run **scons vrouter-py-ut:test** in the top level directory of the SB to run all the unit test cases.
 
 To run individual tests either use run_test.sh from the source directory (method1) or
 goto the virtual env and run the test (method2)
@@ -52,7 +52,7 @@ Method 2
 ## Workflow for adding new tests
 
  - Run **scons vrouter** to build the dpdk and vtest binaries
- - Run **"scons vrouter-py-ut"** once so that the basic virtual env is setup for you.
+ - Run **"scons vrouter-py-ut:test"** once so that the basic virtual env is setup for you.
  - Write the new test case file in **tests/** directory inside virtual env
  - Run the test case using either Method1 or Method2
  - Run **pycodestyle tests/test_file_name** to check for PEP errors and resolve them
