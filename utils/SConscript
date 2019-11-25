@@ -28,7 +28,7 @@ for sdir in  subdirs:
                     exports='VRutilsEnv',
                     duplicate = 0)
 
-vtest_py_ut_targets = ['vrouter-py-ut', 'vrouter-py-ut-pycodestyle', \
+vtest_py_ut_targets = ['vrouter-py-ut:test', 'vrouter-py-ut-pycodestyle', \
                        'vrouter-py-ut-flake']
 for target in vtest_py_ut_targets:
     if target in COMMAND_LINE_TARGETS:
