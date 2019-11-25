@@ -76,6 +76,7 @@ vr_message_request(struct vr_message *message)
     return 0;
 }
 
+uint32_t g_counter = 0;
 static int
 vr_message_queue_response(char *buf, int len, bool broadcast)
 {
