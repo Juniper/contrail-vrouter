@@ -1431,12 +1431,6 @@ dpdk_is_frag_limit_exceeded(void)
     return 0;
 }
 
-static void
-dpdk_register_nic(struct vr_interface* vif __attribute__((unused)),
-                  vr_interface_req* vifr __attribute__((unused)))
-{
-    // This callback is Windows-specific and does not need to be implemented on DPDK
-}
 
 struct host_os dpdk_host = {
     .hos_printf                     =    dpdk_printf,
@@ -1492,7 +1486,7 @@ struct host_os dpdk_host = {
     .hos_get_enabled_log_types      =    dpdk_get_enabled_log_types,
     .hos_soft_reset                 =    dpdk_soft_reset,
     .hos_is_frag_limit_exceeded     =    dpdk_is_frag_limit_exceeded,
-    .hos_register_nic               =    dpdk_register_nic, /* not used with DPDK */
+    .hos_register_nic               =    NULL, /* not necessary*/
     .hos_nl_broadcast_supported     =    false,
     .hos_offload_flow_create        =    dpdk_offload_flow_create,
     .hos_offload_flow_destroy       =    dpdk_offload_flow_destroy,
