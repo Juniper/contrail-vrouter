@@ -29,7 +29,7 @@
 #include <linux/if_ether.h>
 #endif
 
-#if defined(__linux__) || defined(_WIN32)
+#if defined(__linux__)
 #include <net/if.h>
 #include <net/ethernet.h>
 #include <netinet/ether.h>
@@ -39,10 +39,8 @@
 #include <net/ethernet.h>
 #endif
 
-#ifndef _WIN32
 #include <termios.h>
 #include <sys/select.h>
-#endif
 
 #include "vr_types.h"
 #include "vr_message.h"
@@ -97,9 +95,6 @@ static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set, dhc
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, drop_set;
 static int sock_dir_set;
-#ifdef _WIN32
-static int guid_set;
-#endif
 
 static unsigned int vr_op, vr_if_type;
 static bool dump_pending = false;
@@ -1062,11 +1057,6 @@ ending:
 
     if (s >=0)
         close(s);
-#elif defined(_WIN32)
-    /*  Interface used as vhost on Windows is automatically created when
-        Hyper-V switch is enabled. */
-    fprintf(stderr, "vhost_create: Not supported on Windows.\n");
-    return 0;
 #else
 #error "Unsupported platform"
 #endif
@@ -1106,20 +1096,8 @@ op_retry:
         if (vr_ifindex < 0)
             vr_ifindex = if_kindex;
 
-#ifdef _WIN32
-        if (!guid_set) {
-            ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
-                    if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac,
-                    vr_transport, NULL);
-        } else {
-            ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
-                    if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac,
-                    vr_transport, vr_if_guid);
-        }
-#else
         ret = vr_send_interface_add(cl, 0, if_name, if_kindex, vr_ifindex,
                 if_xconnect_kindex, vr_if_type, vrf, vr_ifflags, vr_ifmac, vr_transport, NULL);
-#endif
         break;
 
     case SANDESH_OP_DEL:
@@ -1199,9 +1177,6 @@ Usage()
     printf("\t   \t--xconnect <physical interface name>\n");
     printf("\t   \t--policy, --vhost-phys, --dhcp-enable]\n");
     printf("\t   \t--vif <vif ID> --id <intf_id> --pmd --pci]\n");
-#ifdef _WIN32
-    printf("\t   \t--guid <GUID>\n");
-#endif
     printf("\t   [--delete <intf_id>|<intf_name>]\n");
     printf("\t   [--get <intf_id>][--kernel][--core <core number>][--rate] [--get-drop-stats]\n");
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
@@ -1238,9 +1213,6 @@ enum if_opt_index {
     HELP_OPT_INDEX,
     VINDEX_OPT_INDEX,
     CORE_OPT_INDEX,
-#ifdef _WIN32
-    GUID_OPT_INDEX,
-#endif
     SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX
 };
@@ -1270,9 +1242,6 @@ static struct option long_options[] = {
     [HELP_OPT_INDEX]        =   {"help",        no_argument,        &help_set,          1},
     [VINDEX_OPT_INDEX]      =   {"id",          required_argument,  &vindex_set,        1},
     [CORE_OPT_INDEX]        =   {"core",        required_argument,  &core_set,          1},
-#ifdef _WIN32
-    [GUID_OPT_INDEX]        =   {"guid",        required_argument,  &guid_set,          1},
-#endif
     [SOCK_DIR_OPT_INDEX]    =   {"sock-dir",    required_argument,  &sock_dir_set,      1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
@@ -1470,11 +1439,6 @@ parse_long_opts(int option_index, char *opt_arg)
             vr_ifflags |= VIF_FLAG_VHOST_PHYS;
             break;
 
-#ifdef _WIN32
-        case GUID_OPT_INDEX:
-            strcpy_s(vr_if_guid, 256, opt_arg);
-            break;
-#endif
         case SOCK_DIR_OPT_INDEX:
             vr_socket_dir = opt_arg;
             break;
@@ -1705,9 +1669,6 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
             first_rate_iter = false;
         }
 
-#ifdef _WIN32
-        kb_input[0] = _getch();
-#else
         /*
          * We must get minimum 2 characters,
          * otherwise we will be in outer loop, always.
@@ -1715,7 +1676,6 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
         /* To suppress the warning return if EOF. */
         if (fgets(kb_input, 2, stdin) == NULL)
             return;
-#endif
 
         switch (tolower(kb_input[0])) {
             case 'q':
@@ -1743,9 +1703,6 @@ rate_stats(struct nl_client *cl, unsigned int vr_op)
 static int
 is_stdin_hit()
 {
-#ifdef _WIN32
-    return _kbhit();
-#else
     struct timeval tv;
     fd_set fds;
 
@@ -1756,7 +1713,6 @@ is_stdin_hit()
     FD_SET(STDIN_FILENO, &fds);
     select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
     return FD_ISSET(STDIN_FILENO, &fds);
-#endif
 }
 
 int
@@ -1765,9 +1721,7 @@ main(int argc, char *argv[])
     int ret, opt, option_index;
     unsigned int i = 0;
 
-#ifndef _WIN32
     static struct termios old_term_set, new_term_set;
-#endif
 
     /*
      * the proto of the socket changes based on whether we are creating an
@@ -1905,7 +1859,6 @@ main(int argc, char *argv[])
         vr_intf_op(cl, vr_op);
 
     } else {
-#ifndef _WIN32
         fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
         /*
          * tc[get/set]attr functions are for changing terminal behavior.
@@ -1919,9 +1872,6 @@ main(int argc, char *argv[])
 
         rate_stats(cl, vr_op);
         tcsetattr(STDIN_FILENO, TCSANOW, &old_term_set);
-#else
-        rate_stats(cl, vr_op);
-#endif
         for (i = 0; i < VR_MAX_INTERFACES; i++) {
             if (prev_req[i].vifr_queue_ierrors_to_lcore) {
                 free(prev_req[i].vifr_queue_ierrors_to_lcore);
