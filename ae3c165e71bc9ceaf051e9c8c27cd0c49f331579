@@ -107,6 +107,24 @@
     },
     {
       "key": {
+        "uuid": "5f64f427_0dd8e159",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-11-28T15:47:58Z",
+      "side": 1,
+      "message": "contrail-vnc-private is a \"private\" repo. It\u0027s not accessible to others. That\u0027s not the case with contrail-dev-env.",
+      "parentUuid": "0ff1f7c9_52bac1a8",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
