@@ -90,6 +90,23 @@
     },
     {
       "key": {
+        "uuid": "0ff1f7c9_52bac1a8",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-11-28T10:49:59Z",
+      "side": 1,
+      "message": "I see that contrail-dev-env is also a Juniper repo. In that case, we can as well retain the contrail-vnc-private example.",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
