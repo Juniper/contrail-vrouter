@@ -66,6 +66,40 @@
     },
     {
       "key": {
+        "uuid": "6a5466f8_480c8c65",
+        "filename": "tracing/README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-11-28T06:05:40Z",
+      "side": 1,
+      "message": "We need to mention the following things (maybe in a separate section):-\n1. This is a debug tool and shouldn\u0027t be used in production systems.\n2. There will be a performance impact on forwarding when this tool is being run.",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3916ee7d_f9d16dea",
+        "filename": "tracing/README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-11-28T06:05:40Z",
+      "side": 1,
+      "message": "Just checking, does this tool continue to work with python3? Good to try it out once.",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "795e9523_bbe12b6a",
         "filename": "tracing/README.md",
         "patchSetId": 2
