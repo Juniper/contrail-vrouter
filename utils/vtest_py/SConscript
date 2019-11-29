@@ -114,11 +114,15 @@ env.Depends(create_sock_dir, copy_vtest_lib)
 env.Depends(setup_venv, create_sock_dir)
 env.Depends(vtest_py_ut, setup_venv)
 
+build_vrouter = env.Command("build_vrouter", [], \
+                          "scons vrouter")
+
 gen_py_sandesh = env.Command("gen_py_sandesh", [], \
                              "scons sandesh/library/python:pysandesh")
 
+env.Requires(gen_py_sandesh, build_vrouter)
 env.Requires(vtest_py_ut, gen_py_sandesh)
-env.Alias('vrouter-py-ut', vtest_py_ut)
+env.Alias('vrouter-py-ut:test', vtest_py_ut)
 
 # commands for running pycodestyle
 vtest_py_ut_pycodestyle = env.Command("vtest_py_ut_pycodestyle", [], \
