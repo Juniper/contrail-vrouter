@@ -7,3 +7,4 @@ pytest
 pycodestyle
 flake8
 ipaddress
+future
