@@ -9,6 +9,7 @@ sys.path.append(os.getcwd() + '/lib/')
 import vtconst
 from vtest_lib import *
 
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_vm_to_vm_inter_vn(vrouter_test_fixture):
 
     vt = vtest("test_vm_to_vm_inter_vn")
