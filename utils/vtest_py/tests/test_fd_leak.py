@@ -9,6 +9,7 @@ sys.path.append(os.getcwd() + '/lib')
 import vtconst
 from vtest_lib import *
 
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_fd_leak(vrouter_test_fixture):
 
     vt = vtest("test_fd_leak")
