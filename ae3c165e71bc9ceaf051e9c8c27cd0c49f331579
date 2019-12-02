@@ -125,6 +125,24 @@
     },
     {
       "key": {
+        "uuid": "71a56aec_6ef8b92e",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-02T06:33:18Z",
+      "side": 1,
+      "message": "I see. We could put details about contrail-vnc repo instead I think.\nThat method is still valid and good to document it.\nReplace contrail-vnc-private with contrail-vnc.\nAgain this would be valid for branch \u003e\u003d 5.0.",
+      "parentUuid": "5f64f427_0dd8e159",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
