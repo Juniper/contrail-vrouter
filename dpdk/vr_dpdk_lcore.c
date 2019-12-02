@@ -916,6 +916,9 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
         /* burst RX */
         rte_prefetch0(rx_queue->q_queue_h);
+        if (!rx_queue->q_queue_h)
+            continue;
+
         nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->q_queue_h, pkts,
                 VR_DPDK_RX_BURST_SZ);
         if (likely(nb_pkts > 0)) {
