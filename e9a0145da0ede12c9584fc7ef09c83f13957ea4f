@@ -16,6 +16,24 @@
       "revId": "e9a0145da0ede12c9584fc7ef09c83f13957ea4f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e78a4bca_bc8c47f0",
+        "filename": "dpdk/vr_dpdk_lcore.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 919,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-03T05:46:34Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ede179b5_930c8f65",
+      "revId": "e9a0145da0ede12c9584fc7ef09c83f13957ea4f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
