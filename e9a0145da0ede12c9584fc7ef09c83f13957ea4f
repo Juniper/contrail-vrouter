@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ede179b5_930c8f65",
+        "filename": "dpdk/vr_dpdk_lcore.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 919,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-03T05:36:32Z",
+      "side": 1,
+      "message": "We need to do this check before rte_prefetch0(rx_queue-\u003eq_queue_h) in the previous line.",
+      "revId": "e9a0145da0ede12c9584fc7ef09c83f13957ea4f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
