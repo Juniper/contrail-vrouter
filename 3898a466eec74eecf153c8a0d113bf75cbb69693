@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "57eaf68d_1cd19c85",
+        "filename": "utils/vtest_py/tests/test_fd_leak.py",
+        "patchSetId": 11
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-05T11:11:51Z",
+      "side": 1,
+      "message": "is this UT also failing? can you check?",
+      "revId": "3898a466eec74eecf153c8a0d113bf75cbb69693",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
