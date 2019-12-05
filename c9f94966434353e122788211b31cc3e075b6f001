@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5400b786_d15b5f11",
+        "filename": "utils/vtest_py/tests/test_hbs_vm_to_vm_inter_vn.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-05T09:49:42Z",
+      "side": 1,
+      "message": "put a more meaningful message here.\ndid you test this?",
+      "range": {
+        "startLine": 12,
+        "startChar": 26,
+        "endLine": 12,
+        "endChar": 58
+      },
+      "revId": "c9f94966434353e122788211b31cc3e075b6f001",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
