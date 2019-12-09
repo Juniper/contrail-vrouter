@@ -1,0 +1,515 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "aa2b8a22_aa9baefe",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "#defines have to be in upper case",
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e30ae73c_10618058",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "Have a more descriptive comment",
+      "range": {
+        "startLine": 15,
+        "startChar": 3,
+        "endLine": 15,
+        "endChar": 21
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "af630e4b_fb6b173b",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "is this log_level? Did this code even compile?",
+      "range": {
+        "startLine": 18,
+        "startChar": 38,
+        "endLine": 18,
+        "endChar": 43
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6c5f2f9b_b8ca8508",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "SIZE_TO_LINES would be appropriate",
+      "range": {
+        "startLine": 19,
+        "startChar": 4,
+        "endLine": 19,
+        "endChar": 19
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2e0c7972_fd38f570",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "Have a more descriptive comment",
+      "range": {
+        "startLine": 22,
+        "startChar": 2,
+        "endLine": 22,
+        "endChar": 15
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eecaf8d7_5e45e673",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "this again needs to be log_level",
+      "range": {
+        "startLine": 25,
+        "startChar": 38,
+        "endLine": 25,
+        "endChar": 43
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ea17cb88_d2477ba7",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "have comments for each of this global variables",
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f3adf055_66ab25e3",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "where is this used?",
+      "range": {
+        "startLine": 30,
+        "startChar": 13,
+        "endLine": 30,
+        "endChar": 24
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d6c8c307_35463380",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "indent here",
+      "range": {
+        "startLine": 56,
+        "startChar": 16,
+        "endLine": 56,
+        "endChar": 17
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1d3b6bf7_35e2addc",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "let this be more descriptive. this message does not even tell its the memory related to log buffer. it does not have the requested size etc.",
+      "range": {
+        "startLine": 61,
+        "startChar": 31,
+        "endLine": 61,
+        "endChar": 54
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d6feb7d5_16d4c15e",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "better to pass line number instead of cur_index (byte index)",
+      "range": {
+        "startLine": 75,
+        "startChar": 72,
+        "endLine": 75,
+        "endChar": 81
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d21b16ad_3c27e832",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "the curly braces needs to be in next line",
+      "range": {
+        "startLine": 75,
+        "startChar": 83,
+        "endLine": 75,
+        "endChar": 84
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9e929900_f9eceede",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "pl rename to log_buf",
+      "range": {
+        "startLine": 76,
+        "startChar": 10,
+        "endLine": 76,
+        "endChar": 13
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "01d1d347_bd333752",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "avoid multiplication as far as possible",
+      "range": {
+        "startLine": 80,
+        "startChar": 54,
+        "endLine": 80,
+        "endChar": 56
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "332654ec_ca89d051",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 91,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "use boolean",
+      "range": {
+        "startLine": 91,
+        "startChar": 23,
+        "endLine": 91,
+        "endChar": 24
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c2ec60ba_42bc7444",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "Can you check how other utils like vif,flow are doing this? Do they know the sandesh size and copy on that much buffer? or is the size passed by the utility itself?",
+      "range": {
+        "startLine": 114,
+        "startChar": 16,
+        "endLine": 114,
+        "endChar": 95
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cbc9ef19_053645d6",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "space after \"if\"\nthe statement index \u003d 0 has to be in next line",
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8ae6aabd_36515f00",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 117,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "next line",
+      "range": {
+        "startLine": 117,
+        "startChar": 21,
+        "endLine": 117,
+        "endChar": 40
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cf053682_548cc4fe",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "space befoer and after \"+\"\ndo the same in other places too",
+      "range": {
+        "startLine": 124,
+        "startChar": 25,
+        "endLine": 124,
+        "endChar": 26
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "969aaa6e_4af709ba",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "pl use either one of these 2 styles throughout:\n\nif () {\n} else {\n}\n\nOR\n\nif ()\n{\n} \nelse\n{\n}\n\nI prefer the first one",
+      "range": {
+        "startLine": 131,
+        "startChar": 12,
+        "endLine": 131,
+        "endChar": 18
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "652d4e14_66c61b94",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 238,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "as we discussed, is there any way to not free the buffer? can you get to clear it by manipulating indices?",
+      "range": {
+        "startLine": 233,
+        "startChar": 0,
+        "endLine": 238,
+        "endChar": 33
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9e56e268_d9a30a4b",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 17
+      },
+      "lineNbr": 269,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "rename to log_buf",
+      "range": {
+        "startLine": 269,
+        "startChar": 10,
+        "endLine": 269,
+        "endChar": 13
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eca268ef_3509580e",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 17
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-09T04:22:49Z",
+      "side": 1,
+      "message": "make this 128 so that you can use bit operators.\nAvoid multiplication as far as possible in the datapath.\nuse bit operators instead",
+      "range": {
+        "startLine": 16,
+        "startChar": 8,
+        "endLine": 16,
+        "endChar": 24
+      },
+      "revId": "98413ea66103d89ab3908c025c6c2b65a264a64c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
