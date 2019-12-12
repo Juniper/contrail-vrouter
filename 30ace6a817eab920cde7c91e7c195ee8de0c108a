@@ -448,6 +448,30 @@
     },
     {
       "key": {
+        "uuid": "c0058c5c_e4324125",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-12T09:35:05Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "478c4a4f_3fad57b8",
+      "range": {
+        "startLine": 55,
+        "startChar": 16,
+        "endLine": 55,
+        "endChar": 24
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "a4937ed9_8ed1f872",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 16
@@ -561,6 +585,30 @@
       "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4661daff_d02de9f3",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 236,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-12T09:35:05Z",
+      "side": 1,
+      "message": "changed to vr_defer",
+      "parentUuid": "af8941e5_7f0c2130",
+      "range": {
+        "startLine": 236,
+        "startChar": 8,
+        "endLine": 236,
+        "endChar": 32
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -704,6 +752,30 @@
     },
     {
       "key": {
+        "uuid": "1701988f_e223caa2",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 286,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-12T09:35:05Z",
+      "side": 1,
+      "message": "It will take up the log till length 100 only",
+      "parentUuid": "b7f447a8_835b364d",
+      "range": {
+        "startLine": 285,
+        "startChar": 8,
+        "endLine": 286,
+        "endChar": 26
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "0a3a9d64_f1c0f891",
         "filename": "dp-core/vr_route.c",
         "patchSetId": 16
@@ -724,6 +796,30 @@
       "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2911ef6e_fe8ac257",
+        "filename": "dp-core/vr_route.c",
+        "patchSetId": 16
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-12T09:35:05Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0a3a9d64_f1c0f891",
+      "range": {
+        "startLine": 125,
+        "startChar": 8,
+        "endLine": 126,
+        "endChar": 88
+      },
+      "revId": "30ace6a817eab920cde7c91e7c195ee8de0c108a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
