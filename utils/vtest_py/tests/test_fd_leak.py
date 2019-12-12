@@ -7,6 +7,7 @@ import socket
 sys.path.append(os.getcwd())
 sys.path.append(os.getcwd() + '/lib')
 import vtconst
+import time
 from vtest_lib import *
 
 def test_fd_leak(vrouter_test_fixture):
@@ -18,6 +19,7 @@ def test_fd_leak(vrouter_test_fixture):
     print "pid = " + str(pid)
 
     fd_count_cmd = "ls -al /proc/" + str(pid).strip()+ "/fd | wc -l"
+
     print "fd_count_cmd = " + fd_count_cmd
     orig_fd_count = int(os.popen(fd_count_cmd).read())
     print "orig_fd_count=" + str(orig_fd_count)
@@ -48,7 +50,9 @@ def test_fd_leak(vrouter_test_fixture):
     # send packet
     vt.send_pkt(pkt, "tapc2234cd0-55")
 
+    #Wait for 3 sec
+    time.sleep(3)
+
     new_fd_count = int(os.popen(fd_count_cmd).read())
     print "new_fd_count=" + str(new_fd_count)
-
     assert (orig_fd_count == new_fd_count)
