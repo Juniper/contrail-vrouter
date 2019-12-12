@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b2d107a2_bba59f72",
+        "filename": "utils/vtest_py/tests/test_fd_leak.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-12T11:13:34Z",
+      "side": 1,
+      "message": "Can you add a comment why this sleep is required and how this fixes the problem?",
+      "revId": "c2353383455d25b76824c466ecfa0c3d8c3e31fa",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
