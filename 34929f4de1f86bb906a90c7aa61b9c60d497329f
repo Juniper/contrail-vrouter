@@ -1,0 +1,257 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a83bab2f_cc4b5a6c",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "Get the line number of the latest information logged",
+      "range": {
+        "startLine": 15,
+        "startChar": 3,
+        "endLine": 15,
+        "endChar": 35
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "99904d75_a47b3d86",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "you can have another macro to give the buffer pointer of the log from the line number",
+      "range": {
+        "startLine": 21,
+        "startChar": 1,
+        "endLine": 21,
+        "endChar": 2
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "26e3158b_bf83ad69",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 94,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "no multiply operator. You can use a macro here instead.",
+      "range": {
+        "startLine": 94,
+        "startChar": 27,
+        "endLine": 94,
+        "endChar": 28
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "57a3311e_0c46a0fb",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 104,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "indent of these comments should be changed",
+      "range": {
+        "startLine": 102,
+        "startChar": 0,
+        "endLine": 104,
+        "endChar": 3
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9a8acc79_48ada8e4",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "to make it more readable and less indents, you can handle the condition where logger_en is false here and return",
+      "range": {
+        "startLine": 105,
+        "startChar": 4,
+        "endLine": 105,
+        "endChar": 31
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3f2335c2_734711be",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 263,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "where is this used?",
+      "range": {
+        "startLine": 263,
+        "startChar": 8,
+        "endLine": 263,
+        "endChar": 45
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "04a92055_950a82cc",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 277,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "what is this function used for?",
+      "range": {
+        "startLine": 277,
+        "startChar": 6,
+        "endLine": 277,
+        "endChar": 22
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6902e01b_8257b074",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 310,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "Pl dont use multiply operator, Use bit operator and make VR_LOG_ENTRY_LEN a power of 2",
+      "range": {
+        "startLine": 310,
+        "startChar": 22,
+        "endLine": 310,
+        "endChar": 25
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7ebbc407_8d58f747",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 313,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "spaces",
+      "range": {
+        "startLine": 313,
+        "startChar": 55,
+        "endLine": 313,
+        "endChar": 56
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6f396bad_13cf2378",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 19
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "pl make this 128 as per my earlier review comments",
+      "range": {
+        "startLine": 16,
+        "startChar": 8,
+        "endLine": 16,
+        "endChar": 24
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9ad1ce9d_5418f133",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 19
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-13T03:08:01Z",
+      "side": 1,
+      "message": "as per my previous comment, did you find out how other CLIs are doing this? Are they hard-coding this number?",
+      "range": {
+        "startLine": 28,
+        "startChar": 8,
+        "endLine": 28,
+        "endChar": 23
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
