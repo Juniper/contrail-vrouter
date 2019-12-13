@@ -1435,7 +1435,6 @@ static void
 dpdk_register_nic(struct vr_interface* vif __attribute__((unused)),
                   vr_interface_req* vifr __attribute__((unused)))
 {
-    // This callback is Windows-specific and does not need to be implemented on DPDK
 }
 
 struct host_os dpdk_host = {
