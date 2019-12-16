@@ -233,6 +233,24 @@
     },
     {
       "key": {
+        "uuid": "955c9b62_1c165b5b",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-16T05:49:10Z",
+      "side": 1,
+      "message": "This procedure mandates use of specific libraries/versions on build servers. Eg: liburcu2 needs to be installed, openssl needs to be installed etc. In our build servers, all these are installed, so it works. With container appraoch, all these are self-contained. I would not publish these steps outside. devenv is the recommended way.",
+      "parentUuid": "b3bf02d9_0ed1cebd",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
