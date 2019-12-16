@@ -1064,6 +1064,10 @@ cleanup:
              * reset the value to -1, so that new fd will be created
              */
             vru_cl->vruc_fd = -1;
+            if (vr_uvh_cl_timer_setup(vru_cl)) {
+                vr_uvhost_log("Client %s: timer creation failed\n",
+                        uvhm_client_name(vru_cl));
+            }
         }
     }
     /* clear state for next message from this client. */
