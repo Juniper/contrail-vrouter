@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "f5ad05be_60bf8430",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "a83bab2f_cc4b5a6c",
+      "range": {
+        "startLine": 15,
+        "startChar": 3,
+        "endLine": 15,
+        "endChar": 35
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "99904d75_a47b3d86",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 19
@@ -45,6 +69,30 @@
       "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "59ed76bb_58d12b8a",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "99904d75_a47b3d86",
+      "range": {
+        "startLine": 21,
+        "startChar": 1,
+        "endLine": 21,
+        "endChar": 2
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -71,6 +119,30 @@
     },
     {
       "key": {
+        "uuid": "94f639b9_7faf49d4",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 94,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "26e3158b_bf83ad69",
+      "range": {
+        "startLine": 94,
+        "startChar": 27,
+        "endLine": 94,
+        "endChar": 28
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "57a3311e_0c46a0fb",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 19
@@ -91,6 +163,30 @@
       "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "11776b3f_1b5896ba",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 104,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "57a3311e_0c46a0fb",
+      "range": {
+        "startLine": 102,
+        "startChar": 0,
+        "endLine": 104,
+        "endChar": 3
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -117,6 +213,30 @@
     },
     {
       "key": {
+        "uuid": "be253bfd_4ebc52b1",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9a8acc79_48ada8e4",
+      "range": {
+        "startLine": 105,
+        "startChar": 4,
+        "endLine": 105,
+        "endChar": 31
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3f2335c2_734711be",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 19
@@ -140,6 +260,30 @@
     },
     {
       "key": {
+        "uuid": "08b1aa97_a35edc77",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 263,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "removed",
+      "parentUuid": "3f2335c2_734711be",
+      "range": {
+        "startLine": 263,
+        "startChar": 8,
+        "endLine": 263,
+        "endChar": 45
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "04a92055_950a82cc",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 19
@@ -151,6 +295,30 @@
       "writtenOn": "2019-12-13T03:08:01Z",
       "side": 1,
       "message": "what is this function used for?",
+      "range": {
+        "startLine": 277,
+        "startChar": 6,
+        "endLine": 277,
+        "endChar": 22
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dc262498_1a22d451",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 277,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "To convert prefixes in vr_route.c to ip dot notation strings",
+      "parentUuid": "04a92055_950a82cc",
       "range": {
         "startLine": 277,
         "startChar": 6,
@@ -186,6 +354,30 @@
     },
     {
       "key": {
+        "uuid": "7d6d2509_b7336a80",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 310,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "6902e01b_8257b074",
+      "range": {
+        "startLine": 310,
+        "startChar": 22,
+        "endLine": 310,
+        "endChar": 25
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7ebbc407_8d58f747",
         "filename": "dp-core/vr_logger.c",
         "patchSetId": 19
@@ -206,6 +398,30 @@
       "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "36194098_e8ba0221",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 19
+      },
+      "lineNbr": 313,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "7ebbc407_8d58f747",
+      "range": {
+        "startLine": 313,
+        "startChar": 55,
+        "endLine": 313,
+        "endChar": 56
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -232,6 +448,30 @@
     },
     {
       "key": {
+        "uuid": "27bee8bd_eee11150",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 19
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "6f396bad_13cf2378",
+      "range": {
+        "startLine": 16,
+        "startChar": 8,
+        "endLine": 16,
+        "endChar": 24
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9ad1ce9d_5418f133",
         "filename": "include/vr_logger.h",
         "patchSetId": 19
@@ -243,6 +483,30 @@
       "writtenOn": "2019-12-13T03:08:01Z",
       "side": 1,
       "message": "as per my previous comment, did you find out how other CLIs are doing this? Are they hard-coding this number?",
+      "range": {
+        "startLine": 28,
+        "startChar": 8,
+        "endLine": 28,
+        "endChar": 23
+      },
+      "revId": "34929f4de1f86bb906a90c7aa61b9c60d497329f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4112a42c_ca9ed17e",
+        "filename": "include/vr_logger.h",
+        "patchSetId": 19
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2019-12-16T05:42:39Z",
+      "side": 1,
+      "message": "I have seen haji\u0027s code, he used number of entries that can be sent in one sandesh request and kept it at 4KB",
+      "parentUuid": "9ad1ce9d_5418f133",
       "range": {
         "startLine": 28,
         "startChar": 8,
