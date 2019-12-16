@@ -215,6 +215,24 @@
     },
     {
       "key": {
+        "uuid": "b3bf02d9_0ed1cebd",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-16T05:14:35Z",
+      "side": 1,
+      "message": "I think it is still very much in use and not deprecated. Lot of people are using it including myself to build agent binary etc. Lets document it. Later we can change it if we see it is not working.",
+      "parentUuid": "15d12885_ed7ae52d",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
