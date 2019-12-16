@@ -251,6 +251,24 @@
     },
     {
       "key": {
+        "uuid": "87a5b80b_56294179",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-16T06:30:26Z",
+      "side": 1,
+      "message": "There are 2 things here. Internal Juniper users and external non-juniper users.\nFor Internal Juniper users we can mention both options, dev-env and contrail-vnc.\nFor external non-juniper users we need to actually point to https://github.com/tungstenfabric/tf-dev-env",
+      "parentUuid": "955c9b62_1c165b5b",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
