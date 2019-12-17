@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "762c92e3_d6923ed4",
+        "filename": "dp-core/vr_logger.c",
+        "patchSetId": 20
+      },
+      "lineNbr": 278,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-17T09:53:13Z",
+      "side": 1,
+      "message": "The recommended way is to use SANDESH_OP_DUMP. I have discussed with Haji about this. Can you pl get talk to him?",
+      "range": {
+        "startLine": 278,
+        "startChar": 8,
+        "endLine": 278,
+        "endChar": 35
+      },
+      "revId": "0493059a909244528fc845de1a7d9a74f63c09fe",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
