@@ -269,6 +269,24 @@
     },
     {
       "key": {
+        "uuid": "d0525d10_3628cbcc",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2019-12-17T04:43:36Z",
+      "side": 1,
+      "message": "devenv is the official and recommended way for both internal and external users. It is being worked on constantly. I would not approve the manual procedure being published since it becomes official once we do it.",
+      "parentUuid": "87a5b80b_56294179",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
