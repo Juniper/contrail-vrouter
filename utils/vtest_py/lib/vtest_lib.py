@@ -137,6 +137,8 @@ class vrouter:
         if (self.pid > 0):
             print "Stopping vrouter pid=" + str(self.pid)
             try:
+                os.kill(self.pid, signal.SIGTERM)
+                time.sleep(5)
                 os.kill(self.pid, signal.SIGKILL)
             except OSError as e:
                 print e
