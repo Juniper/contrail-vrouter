@@ -1,0 +1,61 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "08485cb6_e7616bec",
+        "filename": "utils/vtest_py/generate_vrouter_coverage.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-20T11:00:49Z",
+      "side": 1,
+      "message": "The flag name is not intuitive. Can you call it as CODE_COVERAGE_RUN or something like that?",
+      "revId": "1e06391b695d583a56c5fba2684d31b114835241",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "872f4482_15fc1149",
+        "filename": "utils/vtest_py/generate_vrouter_coverage.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-20T11:00:49Z",
+      "side": 1,
+      "message": "Why can\u0027t we do the tar also in the script and give the final output as the tar file?",
+      "revId": "1e06391b695d583a56c5fba2684d31b114835241",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d3a1d736_d617c5fd",
+        "filename": "utils/vtest_py/lib/vtest_lib.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-20T11:00:49Z",
+      "side": 1,
+      "message": "Instead of doing this always, can you have a flag which is passed to the infra and do this only if we are doing code coverage run?",
+      "range": {
+        "startLine": 140,
+        "startChar": 16,
+        "endLine": 141,
+        "endChar": 29
+      },
+      "revId": "1e06391b695d583a56c5fba2684d31b114835241",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
