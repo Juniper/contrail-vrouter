@@ -287,6 +287,24 @@
     },
     {
       "key": {
+        "uuid": "8be86909_4bebfdaf",
+        "filename": "README.md",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-20T06:20:53Z",
+      "side": 1,
+      "message": "For internal juniper users people are already aware of contrail-vnc and are using it including myself. Since you insist not to put it, I am fine with it. \n\nWe can do the following:-\nJuniper internal users -  Use contrail-dev-env\nExternal users - Use tf-dev-env",
+      "parentUuid": "d0525d10_3628cbcc",
+      "revId": "ae3c165e71bc9ceaf051e9c8c27cd0c49f331579",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6a5466f8_480c8c65",
         "filename": "tracing/README.md",
         "patchSetId": 2
