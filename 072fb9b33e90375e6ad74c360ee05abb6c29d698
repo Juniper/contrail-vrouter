@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "88d8989c_3992419e",
+        "filename": "utils/vtest_py/generate_vrouter_coverage.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 6,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-23T12:14:16Z",
+      "side": 1,
+      "message": "Can you update the comment as well?",
+      "revId": "072fb9b33e90375e6ad74c360ee05abb6c29d698",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "970a1d44_221f5d39",
+        "filename": "utils/vtest_py/generate_vrouter_coverage.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2019-12-23T12:14:16Z",
+      "side": 1,
+      "message": "No need of \"it\"",
+      "revId": "072fb9b33e90375e6ad74c360ee05abb6c29d698",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
