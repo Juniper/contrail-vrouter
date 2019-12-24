@@ -96,7 +96,7 @@ qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
 
 binaries.append(qosmap)
 
-scripts  = ['vifdump', 'dpdkvifstats.py']
+scripts  = ['vifdump', 'dpdkvifstats.py', 'pkt_droplog.py']
 env.Default(binaries)
 
 env.Alias('install', env.Install(env['INSTALL_BIN'], binaries + scripts))
