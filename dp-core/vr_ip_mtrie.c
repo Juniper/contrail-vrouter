@@ -531,7 +531,15 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
             return 0;
     }
 
-    mtrie_delete_bkt(ent, rt);
+    /*
+     * All bkt entries are same, but check if the req->plen matches
+     * with bkt entry; If not, the bkt should not be deleted as
+     * the bkt contains a different prefix
+     */
+    tmp_ent = index_to_entry(bkt, 0);
+    if (tmp_ent->entry_prefix_len == rt->rtr_req.rtr_prefix_len) {
+        mtrie_delete_bkt(ent, rt);
+    }
     return 0;
 }
 
