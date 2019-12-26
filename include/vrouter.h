@@ -57,6 +57,8 @@ enum vr_malloc_objects_t {
     VR_DEFER_OBJECT,
     VR_DROP_STATS_OBJECT,
     VR_DROP_STATS_REQ_OBJECT,
+    VR_DEBUG_STATS_OBJECT,
+    VR_DEBUG_STATS_REQ_OBJECT,
     VR_PKT_DROP_LOG_OBJECT,
     VR_PKT_DROP_LOG_REQ_OBJECT,
     VR_FLOW_QUEUE_OBJECT,
@@ -181,6 +183,7 @@ struct host_os {
     struct vr_packet *(*hos_palloc_head)(struct vr_packet *, unsigned int);
     struct vr_packet *(*hos_pexpand_head)(struct vr_packet *, unsigned int);
     void (*hos_pfree)(struct vr_packet *, unsigned short);
+    void (*hos_pfree_dbg_cntr)(struct vr_packet *, unsigned short);
     struct vr_packet *(*hos_pclone)(struct vr_packet *);
     void (*hos_preset)(struct vr_packet *);
     int (*hos_pcopy)(unsigned char *, struct vr_packet *, unsigned int,
@@ -256,6 +259,7 @@ struct host_os {
 #define vr_palloc_head                  vrouter_host->hos_palloc_head
 #define vr_pexpand_head                 vrouter_host->hos_pexpand_head
 #define vr_pfree                        vrouter_host->hos_pfree
+#define vr_pfree_dbg_cntr               vrouter_host->hos_pfree_dbg_cntr
 #define vr_pclone                       vrouter_host->hos_pclone
 #define vr_preset                       vrouter_host->hos_preset
 #define vr_pcopy                        vrouter_host->hos_pcopy
@@ -405,6 +409,7 @@ struct vrouter {
     struct vr_interface *vr_host_if;
     struct vr_interface *vr_eth_if;
     struct vr_pkt_drop_st *vr_pkt_drop;
+    uint64_t *vr_dbg_cntr_stats;
 };
 
 struct vr_defer_data {

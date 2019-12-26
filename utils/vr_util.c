@@ -534,8 +534,6 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_ttl_exceeded);
     printf("Mcast Clone Fail              %" PRIu64 "\n",
             stats->vds_mcast_clone_fail);
-    printf("Cloned Original               %" PRIu64 "\n",
-            stats->vds_cloned_original);
     printf("\n");
 
     printf("Invalid NH                    %" PRIu64 "\n",
@@ -777,7 +775,6 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_invalid_packet;
     sum += req->vds_cksum_err;
     sum += req->vds_no_fmd;
-    sum += req->vds_cloned_original;
     sum += req->vds_invalid_vnid;
     sum += req->vds_frag_err;
     sum += req->vds_invalid_source;

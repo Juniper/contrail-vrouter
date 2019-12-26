@@ -13,6 +13,8 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -24,6 +26,7 @@
 #include "vr_os.h"
 #include "ini_parser.h"
 #include "vrouter.h"
+#include "vr_packet.h"
 
 #define BUILD_VERSION_STRING    "\"build-version\":"
 #define BUILD_USER_STRING       "\"build-user\":"
@@ -57,6 +60,7 @@ enum opt_vrouter_index {
     SET_BURST_STEP_INDEX,
     SET_PRIORITY_TAGGING_INDEX,
     SET_PACKET_DUMP_INDEX,
+    GET_DEBUG_STATS_CNTR,
     MAX_OPT_INDEX
 };
 
@@ -374,6 +378,22 @@ print_log_level(vrouter_ops *req)
 }
 
 static void
+print_debug_stats_cntr(vrouter_ops *req)
+{
+    char vr_dbg_stats[][VR_DEBUG_STATS_STR_SZ] = {
+        DEBUG_STATS_MAP(string)
+    };
+    int size = 0,i;
+    
+    printf("Debug stats counter for vRouter module:\n");
+    size = sizeof(vr_dbg_stats)/sizeof(vr_dbg_stats[0]);
+    for (i = 0; i < size; i++) {
+        printf("\t%s\t %" PRIu64 "\n", vr_dbg_stats[i], req->vo_dbg_cntr_stats[i]);
+    }
+
+}
+
+static void
 print_enabled_log_types(vrouter_ops *req)
 {
     int i;
@@ -412,6 +432,9 @@ _vrouter_ops_process(void *s_req)
 
         if (opt[GET_ENABLED_LOGS_INDEX])
             print_enabled_log_types(req);
+
+        if (opt[GET_DEBUG_STATS_CNTR])
+            print_debug_stats_cntr(req);
     }
 
     return;
@@ -546,6 +569,9 @@ static struct option long_options[] = {
     [SET_PACKET_DUMP_INDEX] = {
         "packet-dump", required_argument, &opt[SET_PACKET_DUMP_INDEX], 1
     },
+    [GET_DEBUG_STATS_CNTR] = {
+        "debug_stats", no_argument, &opt[GET_DEBUG_STATS_CNTR], 1
+    },
     [MAX_OPT_INDEX] = {NULL, 0, 0, 0}
 };
 
@@ -576,6 +602,7 @@ Usage(void)
                "--burst_tokens <int> total burst tokens \n"
                "--burst_interval <int> timer interval of burst tokens in ms\n"
                "--burst_step <int> burst tokens to add at every interval\n"
+               "--debug_stats Print debug stats counter from vRouter module\n"
                "--help Prints this message\n\n"
                "<type> is one of:\n"
                "    vrouter\n"
@@ -621,6 +648,7 @@ Usage(void)
                "--burst_step <int> burst tokens to add at every interval\n"
                "--set-priority-tagging <1 | 0> priority tagging on the NIC\n"
                "--packet-dump <1 | 0> dumps packets\n"
+               "--debug_stats Print debug stats counter from vRouter module\n"
                "--help Prints this message\n"
                "\n");
         break;
@@ -921,6 +949,9 @@ parse_long_opts(int opt_index, char *opt_arg)
                     strerror(errno), errno);
             Usage();
         }
+        break;
+    case GET_DEBUG_STATS_CNTR:
+        vrouter_op = SANDESH_OP_GET;
         break;
 
     case HELP_OPT_INDEX:

@@ -177,7 +177,9 @@ static void
 vr_fragment_queue_element_free(struct vr_fragment_queue_element *vfqe,
         unsigned int drop_reason)
 {
-    if (vfqe->fqe_pnode.pl_packet) {
+    if (drop_reason == VP_DEBUG_CLONED_ORIGINAL)
+        vr_pfree_dbg_cntr(vfqe->fqe_pnode.pl_packet, drop_reason);
+    else if (vfqe->fqe_pnode.pl_packet) {
         vr_pfree(vfqe->fqe_pnode.pl_packet, drop_reason);
     }
 
@@ -301,7 +303,7 @@ vr_fragment_flush_queue_element(struct vr_fragment_queue_element *vfqe)
     vr_flow_flush_pnode(router, pnode, NULL, &fmd);
 
 exit_flush:
-    vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
+    vr_fragment_queue_element_free(vfqe, VP_DEBUG_CLONED_ORIGINAL);
     return;
 }
 
@@ -367,7 +369,7 @@ vr_fragment_assemble(struct vr_fragment **head_p,
 
     if (!found) {
         if (frag_head) {
-            drop_reason = VP_DROP_CLONED_ORIGINAL;
+            drop_reason = VP_DEBUG_CLONED_ORIGINAL;
             PKT_LOG(drop_reason, pkt, 0, VR_FRAGMENT_C, __LINE__);
             goto exit_assembly;
         }
@@ -416,8 +418,7 @@ vr_fragment_assemble(struct vr_fragment **head_p,
         }
     } else {
         frag->f_port_info_valid = true;
-        PKT_LOG(VP_DROP_CLONED_ORIGINAL, pkt, 0, VR_FRAGMENT_C, __LINE__);
-        vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
+        vr_fragment_queue_element_free(vfqe, VP_DEBUG_CLONED_ORIGINAL);
     }
 
 

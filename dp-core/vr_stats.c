@@ -16,6 +16,10 @@ int vr_stats_init(struct vrouter *);
 int vr_pkt_drop_log_init(struct vrouter *);
 void vr_pkt_drop_log_exit(struct vrouter *router);
 
+char vr_dbg_stats[][VR_DEBUG_STATS_STR_SZ] = {
+    DEBUG_STATS_MAP(string)
+};
+
 static void
 vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
 {
@@ -57,7 +61,6 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_invalid_packet += stats[VP_DROP_INVALID_PACKET];
     response->vds_cksum_err += stats[VP_DROP_CKSUM_ERR];
     response->vds_no_fmd += stats[VP_DROP_NO_FMD];
-    response->vds_cloned_original += stats[VP_DROP_CLONED_ORIGINAL];
     response->vds_invalid_vnid += stats[VP_DROP_INVALID_VNID];
     response->vds_frag_err += stats[VP_DROP_FRAGMENTS];
     response->vds_invalid_source += stats[VP_DROP_INVALID_SOURCE];
@@ -506,6 +509,9 @@ vr_pkt_drop_stats_exit(struct vrouter *router)
     vr_free(router->vr_pdrop_stats, VR_DROP_STATS_OBJECT);
     router->vr_pdrop_stats = NULL;
 
+    vr_free(router->vr_dbg_cntr_stats, VR_DEBUG_STATS_OBJECT);
+    router->vr_dbg_cntr_stats = NULL;
+
     vr_pkt_drop_log_exit(router);
 
     return;
@@ -518,7 +524,7 @@ vr_pkt_drop_stats_init(struct vrouter *router)
     unsigned int i = 0;
     unsigned int size = 0;
 
-    if (router->vr_pdrop_stats)
+    if (router->vr_pdrop_stats && router->vr_dbg_cntr_stats)
         return 0;
 
     size = sizeof(void *) * vr_num_cpus;
@@ -537,6 +543,14 @@ vr_pkt_drop_stats_init(struct vrouter *router)
                     __LINE__, i);
             goto cleanup;
         }
+    }
+
+    size = sizeof(vr_dbg_stats)/sizeof(vr_dbg_stats[0]);
+    router->vr_dbg_cntr_stats = vr_zalloc(size, VR_DEBUG_STATS_OBJECT);
+    if (!router->vr_dbg_cntr_stats) {
+        vr_module_error(-ENOMEM, __FUNCTION__,
+                __LINE__, size);
+        goto cleanup;
     }
 
     vr_pkt_drop_log_init(router);

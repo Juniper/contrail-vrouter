@@ -349,6 +349,23 @@ lh_pgso_size(struct vr_packet *pkt)
 }
 
 static void
+lh_pfree_dbg_cntr(struct vr_packet *pkt, unsigned short reason)
+{
+
+    struct sk_buff *skb;
+
+    if(reason)
+        pkt_dbg_cntr_stats(reason);
+
+    if (pkt) {
+        skb = vp_os_packet(pkt);
+        if (skb)
+            kfree_skb(skb);
+    }
+
+    return;
+}
+static void
 lh_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     struct sk_buff *skb;
@@ -2295,6 +2312,7 @@ struct host_os linux_host = {
 
     .hos_palloc                     =       lh_palloc,
     .hos_pfree                      =       lh_pfree,
+    .hos_pfree_dbg_cntr             =       lh_pfree_dbg_cntr,
     .hos_palloc_head                =       lh_palloc_head,
     .hos_pexpand_head               =       lh_pexpand_head,
     .hos_preset                     =       lh_preset,

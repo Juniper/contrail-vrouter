@@ -1255,7 +1255,7 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
         stats->vrf_l2_mcast_composites++;
 
     pkt_vrf = fmd->fmd_dvrf;
-    drop_reason = VP_DROP_CLONED_ORIGINAL;
+    drop_reason = VP_DEBUG_CLONED_ORIGINAL;
 
     if (!fmd) {
         drop_reason = VP_DROP_NO_FMD;
@@ -1508,7 +1508,10 @@ nh_composite_mcast(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* Original packet needs to be unconditionally dropped */
 drop:
-    vr_pfree(pkt, drop_reason);
+    if (drop_reason == VP_DEBUG_CLONED_ORIGINAL)
+        vr_pfree_dbg_cntr(pkt, drop_reason);
+    else
+        vr_pfree(pkt, drop_reason);
     return NH_PROCESSING_COMPLETE;
 }
 
@@ -1523,7 +1526,7 @@ nh_composite_encap(struct vr_packet *pkt, struct vr_nexthop *nh,
     unsigned short drop_reason;
     struct vr_packet *new_pkt;
 
-    drop_reason = VP_DROP_CLONED_ORIGINAL;
+    drop_reason = VP_DEBUG_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_encap_composites++;
@@ -1563,6 +1566,8 @@ nh_composite_encap(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* Original packet needs to be unconditionally dropped */
 drop:
+    if (drop_reason == VP_DEBUG_CLONED_ORIGINAL)
+        vr_pfree_dbg_cntr(pkt, drop_reason);
     vr_pfree(pkt, drop_reason);
     return NH_PROCESSING_COMPLETE;
 }
@@ -1577,7 +1582,7 @@ nh_composite_tor(struct vr_packet *pkt, struct vr_nexthop *nh,
     unsigned short drop_reason;
     struct vr_packet *new_pkt;
 
-    drop_reason = VP_DROP_CLONED_ORIGINAL;
+    drop_reason = VP_DEBUG_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_evpn_composites++;
@@ -1629,6 +1634,8 @@ nh_composite_tor(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* Original packet needs to be unconditionally dropped */
 drop:
+    if (drop_reason == VP_DEBUG_CLONED_ORIGINAL)
+        vr_pfree_dbg_cntr(pkt, drop_reason);
     vr_pfree(pkt, drop_reason);
     return NH_PROCESSING_COMPLETE;
 }
@@ -1645,7 +1652,7 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_packet *new_pkt;
     uint8_t eth_mac[VR_ETHER_ALEN];
 
-    drop_reason = VP_DROP_CLONED_ORIGINAL;
+    drop_reason = VP_DEBUG_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_evpn_composites++;
@@ -1715,6 +1722,8 @@ nh_composite_evpn(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* Original packet needs to be unconditionally dropped */
 drop:
+    if (drop_reason == VP_DEBUG_CLONED_ORIGINAL)
+        vr_pfree_dbg_cntr(pkt, drop_reason);
     vr_pfree(pkt, drop_reason);
     return NH_PROCESSING_COMPLETE;
 }
@@ -1732,7 +1741,7 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
     unsigned short drop_reason, pkt_vrf;
     struct vr_packet *new_pkt;
 
-    drop_reason = VP_DROP_CLONED_ORIGINAL;
+    drop_reason = VP_DEBUG_CLONED_ORIGINAL;
     stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     if (stats)
         stats->vrf_fabric_composites++;
@@ -1870,6 +1879,8 @@ nh_composite_fabric(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     /* Original packet needs to be unconditionally dropped */
 drop:
+    if (drop_reason == VP_DEBUG_CLONED_ORIGINAL)
+        vr_pfree_dbg_cntr(pkt, drop_reason);
     vr_pfree(pkt, drop_reason);
     return NH_PROCESSING_COMPLETE;
 }

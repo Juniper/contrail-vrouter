@@ -315,7 +315,7 @@ dpdk_knidev_writer_tx(void *port, struct rte_mbuf *pkt)
         struct vr_packet *vr_pkt = vr_dpdk_mbuf_to_pkt(pkt);
         pkt_copy = vr_dpdk_pktmbuf_copy(pkt, vr_dpdk.rss_mempool);
         /* The original mbuf is no longer needed. */
-        vr_dpdk_pfree(pkt, vr_pkt->vp_if, VP_DROP_CLONED_ORIGINAL);
+        vr_dpdk_pfree(pkt, vr_pkt->vp_if, VP_DEBUG_CLONED_ORIGINAL);
 
         if (unlikely(pkt_copy == NULL)) {
             DPDK_KNIDEV_WRITER_STATS_PKTS_DROP_ADD(p, 1);

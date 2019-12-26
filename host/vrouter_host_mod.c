@@ -174,6 +174,21 @@ vr_lib_preset(struct vr_packet *pkt)
 }
 
 static void
+vr_lib_pfree_dbg_cntr(struct vr_packet *pkt, unsigned short reason)
+{
+    struct vr_hpacket *hpkt;
+
+    if(reason) {
+        pkt_dbg_cntr_stats(reason);
+    } 
+    if (pkt) {
+        hpkt = VR_PACKET_TO_HPACKET(pkt);
+        vr_hpacket_free(hpkt);
+    }
+    return;
+}
+
+static void
 vr_lib_pfree(struct vr_packet *pkt, unsigned short reason)
 {
     struct vr_hpacket *hpkt;
@@ -250,6 +265,7 @@ struct host_os vr_lib_host = {
     .hos_palloc             =       vr_lib_palloc,
     .hos_palloc_head        =       vr_lib_palloc_head,
     .hos_pfree              =       vr_lib_pfree,
+    .hos_pfree_dbg_cntr     =       vr_lib_pfree_dbg_cntr,
     .hos_preset             =       vr_lib_preset,
     .hos_pclone             =       vr_lib_pclone,
     .hos_pcopy              =       vr_lib_pcopy,

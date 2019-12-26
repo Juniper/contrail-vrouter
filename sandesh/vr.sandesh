@@ -338,6 +338,7 @@ buffer sandesh vrouter_ops {
    43: byte         vo_pkt_droplog_buf_en;
    44: byte         vo_pkt_droplog_en;
    45: byte         vo_pkt_droplog_min_en;
+   46: list<u64>    vo_dbg_cntr_stats;
 }
 
 buffer sandesh vr_mem_stats_req {
@@ -468,22 +469,21 @@ buffer sandesh vr_drop_stats_req {
     36: i64             vds_invalid_packet;
     37: i64             vds_cksum_err;
     38: i64             vds_no_fmd;
-    39: i64             vds_cloned_original;
-    40: i64             vds_invalid_vnid;
-    41: i64             vds_frag_err;
-    42: i64             vds_invalid_source;
-    43: i64             vds_l2_no_route;
-    44: i64             vds_fragment_queue_fail;
-    45: i64             vds_vlan_fwd_tx;
-    46: i64             vds_vlan_fwd_enq;
-    47: i64             vds_drop_new_flow;
-    48: i64             vds_flow_evict;
-    49: i64             vds_trap_original;
-    50: i64             vds_leaf_to_leaf;
-    51: i64             vds_bmac_isid_mismatch;
-    52: i64             vds_pkt_loop;
-    53: i64             vds_no_crypt_path;
-    54: i64             vds_invalid_hbs_pkt;
+    39: i64             vds_invalid_vnid;
+    40: i64             vds_frag_err;
+    41: i64             vds_invalid_source;
+    42: i64             vds_l2_no_route;
+    43: i64             vds_fragment_queue_fail;
+    44: i64             vds_vlan_fwd_tx;
+    45: i64             vds_vlan_fwd_enq;
+    46: i64             vds_drop_new_flow;
+    47: i64             vds_flow_evict;
+    48: i64             vds_trap_original;
+    49: i64             vds_leaf_to_leaf;
+    50: i64             vds_bmac_isid_mismatch;
+    51: i64             vds_pkt_loop;
+    52: i64             vds_no_crypt_path;
+    53: i64             vds_invalid_hbs_pkt;
 }
 
 buffer sandesh vr_qos_map_req {

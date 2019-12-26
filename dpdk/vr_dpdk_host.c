@@ -195,6 +195,19 @@ dpdk_pexpand_head(struct vr_packet *pkt, unsigned int hspace)
     return pkt;
 }
 
+/* dpdk_pfree_dbg_cntr used for incrementing debug counters. In some cases, 
+ * would be used to just increment debug counters without dropping packets */
+static void
+dpdk_pfree_dbg_cntr(struct vr_packet *pkt, unsigned short reason)
+{
+    if (reason) {
+        pkt_dbg_cntr_stats(reason);
+    }
+    if (pkt) {
+        rte_pktmbuf_free(vr_dpdk_pkt_to_mbuf(pkt));
+    }
+}
+
 static void
 dpdk_pfree(struct vr_packet *pkt, unsigned short reason)
 {
@@ -211,7 +224,10 @@ vr_dpdk_pfree(struct rte_mbuf *mbuf, struct vr_interface *vif, unsigned short re
 {
     struct vr_packet *pkt = vr_dpdk_mbuf_to_pkt(mbuf);
     vr_dpdk_packet_get(mbuf, vif);
-    dpdk_pfree(pkt, reason);
+    if(reason == VP_DEBUG_CLONED_ORIGINAL)
+        dpdk_pfree_dbg_cntr(pkt, reason);
+    else
+        dpdk_pfree(pkt, reason);
 }
 
 
@@ -1451,6 +1467,7 @@ struct host_os dpdk_host = {
     .hos_palloc_head                =    dpdk_palloc_head, /* not implemented */
     .hos_pexpand_head               =    dpdk_pexpand_head, /* not implemented */
     .hos_pfree                      =    dpdk_pfree,
+    .hos_pfree_dbg_cntr             =    dpdk_pfree_dbg_cntr,
     .hos_preset                     =    dpdk_preset,
     .hos_pclone                     =    dpdk_pclone,
     .hos_pcopy                      =    dpdk_pcopy,

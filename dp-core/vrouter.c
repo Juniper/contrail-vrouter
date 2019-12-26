@@ -48,6 +48,7 @@ extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int vr_pkt_droplog_sysctl_en;
 extern const char *ContrailBuildInfo;
 
+
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
@@ -328,6 +329,9 @@ vrouter_ops_get_process(void *s_req)
     struct vrouter *router;
     vrouter_ops *req = (vrouter_ops *)s_req;
     vrouter_ops *resp = NULL;
+    char vr_dbg_stats[][VR_DEBUG_STATS_STR_SZ] = {
+        DEBUG_STATS_MAP(string)
+    };
 
     if (req->h_op != SANDESH_OP_GET) {
         ret = -EOPNOTSUPP;
@@ -409,6 +413,8 @@ vrouter_ops_get_process(void *s_req)
 
     resp->vo_memory_alloc_checks = vr_memory_alloc_checks;
     resp->vo_priority_tagging = vr_priority_tagging;
+    resp->vo_dbg_cntr_stats = router->vr_dbg_cntr_stats;
+    resp->vo_dbg_cntr_stats_size = sizeof(vr_dbg_stats)/sizeof(vr_dbg_stats[0]);  
 
     req = resp;
 generate_response:

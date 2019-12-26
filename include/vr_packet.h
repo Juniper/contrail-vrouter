@@ -173,24 +173,37 @@
 #define VP_DROP_INVALID_PACKET              31
 #define VP_DROP_CKSUM_ERR                   32
 #define VP_DROP_NO_FMD                      33
-#define VP_DROP_CLONED_ORIGINAL             34
-#define VP_DROP_INVALID_VNID                35
-#define VP_DROP_FRAGMENTS                   36
-#define VP_DROP_INVALID_SOURCE              37
-#define VP_DROP_L2_NO_ROUTE                 38
-#define VP_DROP_FRAGMENT_QUEUE_FAIL         39
-#define VP_DROP_VLAN_FWD_TX                 40
-#define VP_DROP_VLAN_FWD_ENQ                41
-#define VP_DROP_NEW_FLOWS                   42
-#define VP_DROP_FLOW_EVICT                  43
-#define VP_DROP_TRAP_ORIGINAL               44
-#define VP_DROP_LEAF_TO_LEAF                45
-#define VP_DROP_BMAC_ISID_MISMATCH          46
-#define VP_DROP_PKT_LOOP                    47
-#define VP_DROP_NO_CRYPT_PATH               48
-#define VP_DROP_INVALID_HBS_PKT             49
-#define VP_DROP_MAX                         50
+#define VP_DROP_INVALID_VNID                34
+#define VP_DROP_FRAGMENTS                   35
+#define VP_DROP_INVALID_SOURCE              36
+#define VP_DROP_L2_NO_ROUTE                 37
+#define VP_DROP_FRAGMENT_QUEUE_FAIL         38
+#define VP_DROP_VLAN_FWD_TX                 39
+#define VP_DROP_VLAN_FWD_ENQ                40
+#define VP_DROP_NEW_FLOWS                   41
+#define VP_DROP_FLOW_EVICT                  42
+#define VP_DROP_TRAP_ORIGINAL               43
+#define VP_DROP_LEAF_TO_LEAF                44
+#define VP_DROP_BMAC_ISID_MISMATCH          45
+#define VP_DROP_PKT_LOOP                    46
+#define VP_DROP_NO_CRYPT_PATH               47
+#define VP_DROP_INVALID_HBS_PKT             48
+#define VP_DROP_MAX                         49
 
+
+#define VR_DEBUG_STATS_STR_SZ 100
+
+#define DEBUG_STATS_MAP(X) \
+    X(VP_DEBUG_CLONED_ORIGINAL=0xFF00)
+
+#define dbg_stats(X) X,
+#define dbg_stats_str(X) #X,
+
+typedef enum {
+    DEBUG_STATS_MAP(dbg_stats)
+}dbg_stats_t;
+
+extern char vr_dbg_stats[][VR_DEBUG_STATS_STR_SZ];
 
 /*
  * NOTE: Please do not add any more fields without ensuring
@@ -1436,6 +1449,15 @@ pkt_init_fragment(struct vr_packet *dst, struct vr_packet *src)
     dst->vp_flags = src->vp_flags;
 
     return;
+}
+
+static inline void
+pkt_dbg_cntr_stats(unsigned short reason)
+{
+    struct vrouter *router = vrouter_get(0);
+
+    if (router)
+        ((uint64_t *)(router->vr_dbg_cntr_stats))[reason & 0xFF]++;
 }
 
 static inline void
