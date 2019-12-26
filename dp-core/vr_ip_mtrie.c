@@ -252,9 +252,10 @@ mtrie_free_bkt_defer(struct vrouter *router, struct ip_bucket *bkt)
 }
 
 static void
-mtrie_delete_bkt(struct ip_bucket_entry *ent, struct vr_route_req *rt)
+mtrie_delete_bkt(struct ip_bucket_entry *ent)
 {
     struct ip_bucket *bkt;
+    struct ip_bucket_entry *tmp_ent;
 
     if (ENTRY_IS_NEXTHOP(ent)) {
         vrouter_put_nexthop(ent->entry_nh_p);
@@ -263,13 +264,17 @@ mtrie_delete_bkt(struct ip_bucket_entry *ent, struct vr_route_req *rt)
     }
 
     bkt = entry_to_bucket(ent);
-    set_entry_to_nh(ent, rt->rtr_nh);
-    ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
-    ent->entry_label = rt->rtr_req.rtr_label;
-    ent->entry_bridge_index = rt->rtr_req.rtr_index;
+    /* copy the values from one of the bkt entries */
+    tmp_ent = index_to_entry(bkt, 0);
+
+    set_entry_to_nh(ent, tmp_ent->entry_nh_p);
+    ent->entry_prefix_len = tmp_ent->entry_prefix_len;
+    ent->entry_label_flags = tmp_ent->entry_label_flags;
+    ent->entry_label = tmp_ent->entry_label;
+    ent->entry_bridge_index = tmp_ent->entry_bridge_index;
 
     if (!vr_not_ready) {
-        if (!mtrie_free_bkt_defer(rt->rtr_nh->nh_router, bkt))
+        if (!mtrie_free_bkt_defer(tmp_ent->entry_nh_p->nh_router, bkt))
             return;
 
         vr_delay_op();
@@ -520,7 +525,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
             return 0;
     }
 
-    mtrie_delete_bkt(ent, rt);
+    mtrie_delete_bkt(ent);
     return 0;
 }
 
@@ -713,12 +718,14 @@ mtrie_delete(struct vr_rtable * _unused, struct vr_route_req *rt)
     struct vr_route_req lreq;
 
     rtable = vrfid_to_mtrie(vrf_id, rt->rtr_req.rtr_family);
-    if (!rtable)
+    if (!rtable) {
         return -ENOENT;
+    }
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-    if (!rt->rtr_nh)
+    if (!rt->rtr_nh) {
         return -ENOENT;
+    }
 
 
     rt->rtr_req.rtr_index = VR_BE_INVALID_INDEX;
@@ -1002,12 +1009,14 @@ mtrie_add(struct vr_rtable * _unused, struct vr_route_req *rt)
     struct vr_route_req tmp_req;
 
     mtrie = (mtrie ? : mtrie_alloc_vrf(vrf_id, rt->rtr_req.rtr_family));
-    if (!mtrie)
+    if (!mtrie) {
         return -ENOMEM;
+    }
 
     rt->rtr_nh = vrouter_get_nexthop(rt->rtr_req.rtr_rid, rt->rtr_req.rtr_nh_id);
-    if (!rt->rtr_nh)
+    if (!rt->rtr_nh) {
         return -ENOENT;
+    }
 
     if ((!(rt->rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG)) &&
                  (rt->rtr_nh->nh_type == NH_TUNNEL)) {
