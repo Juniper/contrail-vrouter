@@ -28,7 +28,7 @@ for sdir in  subdirs:
                     duplicate = 0)
 
 vtest_py_ut_targets = ['vrouter-py-ut:test', 'vrouter-py-ut-pycodestyle', \
-                       'vrouter-py-ut-flake']
+                       'vrouter-py-ut-flake', 'vrouter-py-ut:coverage']
 for target in vtest_py_ut_targets:
     if target in COMMAND_LINE_TARGETS:
         vtest_py_dir = ['vtest_py']
