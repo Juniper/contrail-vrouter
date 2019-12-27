@@ -1,7 +1,7 @@
 #!/bin/bash
 
-vrouter_path=$VROUTER_DPDK_PATH
-vtest_path=$VTEST_PATH
+vrouter_path=$(cut -d':' -f1 <<<$VROUTER_DPDK_PATH)
+vtest_path=$(cut -d':' -f1 <<<$VTEST_PATH)
 socket_path=$VROUTER_SOCKET_PATH
 vtest_py_venv_path=$VTEST_PY_VENV_PATH
 vtest_only_mode=$VTEST_ONLY_MODE
@@ -23,6 +23,9 @@ Usage() {
    echo
 }
 
+if [ -z "$code_coverage_run" ]; then
+   code_coverage_run=0
+fi
 if [ -z "$vrouter_path" ]; then
    echo -n "Using default vRouter path - "
    vrouter_path=$(realpath $sb_path/debug/vrouter/dpdk/contrail-vrouter-dpdk)
