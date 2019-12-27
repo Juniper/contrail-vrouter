@@ -5,6 +5,13 @@
 ## To run this script just run: scons vrouter
 ##
 
+## Excluding XML based test cases while generating coverage
+## report
+if [ $CODE_COVERAGE_RUN -eq 1 ]
+then
+     exit 0
+fi
+
 ## Taskset to run vRouter/DPDK.
 TASKSET="taskset 0x1"
 ## vRouter/DPDK binary name.
