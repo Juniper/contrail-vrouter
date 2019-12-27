@@ -28,6 +28,7 @@ Refer to test1.py and test2.py in tests/ directory for examples on how to use th
 
 Run **scons vrouter** to build the dpdk and vtest binaries
 Run **scons vrouter-py-ut:test** in the top level directory of the SB to run all the unit test cases.
+Run **scons vrouter-py-ut:coverage** in the top level directory of the SB to get the code coverage of vrouter.
 
 To run individual tests either use run_test.sh from the source directory (method1) or
 goto the virtual env and run the test (method2)
