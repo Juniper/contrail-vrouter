@@ -71,13 +71,13 @@ copy_pysandesh = env.Command("copy_pysandesh", [],
 # copy test files to venv
 copy_test_files = env.Command("copy_test_files", [],
                               vtest_py_src_root + "/copy_dir.py "+
-                              vtest_py_src_root + "/tests " +
+                              src_root + "/vrouter/tests " +
                               vtest_py_venv_root + "/tests")
 
 # copy vtest lib to venv
 copy_vtest_lib = env.Command("copy_vtest_lib", [],
                               vtest_py_src_root + "/copy_dir.py "+
-                              vtest_py_src_root + "/lib " +
+                              src_root + "/vrouter/utils/pylib " +
                               vtest_py_venv_root + "/lib")
 
 # create sock dir in venv for vrouter to run
@@ -101,7 +101,7 @@ env.AppendENVPath('VROUTER_SOCKET_PATH', \
                   vtest_py_venv_root + "/var/run/vrouter")
 env.AppendENVPath('VTEST_PY_VENV_PATH', vtest_py_venv_root)
 vtest_py_ut = env.Command("vtest_py_ut", [], \
-                          src_root+"/vrouter/utils/vtest_py/run_test.sh --all")
+                          src_root+"/vrouter/utils/vtest_py/run_test.py --all")
 
 env.Depends(copy_sandesh, create_venv_dir)
 env.Depends(replace_sandesh, copy_sandesh)
