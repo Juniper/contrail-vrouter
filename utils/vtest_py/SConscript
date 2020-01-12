@@ -71,13 +71,13 @@ copy_pysandesh = env.Command("copy_pysandesh", [],
 # copy test files to venv
 copy_test_files = env.Command("copy_test_files", [],
                               vtest_py_src_root + "/copy_dir.py "+
-                              vtest_py_src_root + "/tests " +
+                              src_root + "/vrouter/tests " +
                               vtest_py_venv_root + "/tests")
 
 # copy vtest lib to venv
 copy_vtest_lib = env.Command("copy_vtest_lib", [],
                               vtest_py_src_root + "/copy_dir.py "+
-                              vtest_py_src_root + "/lib " +
+                              src_root + "/vrouter/utils/pylib " +
                               vtest_py_venv_root + "/lib")
 
 # create sock dir in venv for vrouter to run
@@ -101,7 +101,11 @@ env.AppendENVPath('VROUTER_SOCKET_PATH', \
                   vtest_py_venv_root + "/var/run/vrouter")
 env.AppendENVPath('VTEST_PY_VENV_PATH', vtest_py_venv_root)
 vtest_py_ut = env.Command("vtest_py_ut", [], \
-                          src_root+"/vrouter/utils/vtest_py/run_test.sh --all")
+                          src_root+"/vrouter/tests/run_test.py --all")
+# commands for running pycodestyle
+vtest_py_ut_pycodestyle = env.Command("vtest_py_ut_pycodestyle", [], \
+                              src_root + \
+                              "/vrouter/tests/run_test.py --pycodestyle")
 
 env.Depends(copy_sandesh, create_venv_dir)
 env.Depends(replace_sandesh, copy_sandesh)
@@ -112,7 +116,8 @@ env.Depends(copy_test_files, copy_pysandesh)
 env.Depends(copy_vtest_lib, copy_test_files)
 env.Depends(create_sock_dir, copy_vtest_lib)
 env.Depends(setup_venv, create_sock_dir)
-env.Depends(vtest_py_ut, setup_venv)
+env.Depends(vtest_py_ut_pycodestyle, setup_venv)
+env.Depends(vtest_py_ut, vtest_py_ut_pycodestyle)
 
 build_vrouter = env.Command("build_vrouter", [], \
                           "scons vrouter")
@@ -129,17 +134,13 @@ vtest_py_ut_coverage = env.Command("vtest_py_ut_coverage", [], \
                                     src_root+"/vrouter/utils/vtest_py/generate_vrouter_coverage.sh")
 env.Alias('vrouter-py-ut:coverage', vtest_py_ut_coverage)
 
-# commands for running pycodestyle
-vtest_py_ut_pycodestyle = env.Command("vtest_py_ut_pycodestyle", [], \
-                              src_root + \
-                              "/vrouter/utils/vtest_py/run_test.sh --pycodestyle")
 env.Depends(vtest_py_ut_pycodestyle, setup_venv)
 env.Requires(vtest_py_ut_pycodestyle, gen_py_sandesh)
 
 # commands for running flake
 vtest_py_ut_flake = env.Command("vtest_py_ut_flake", [], \
                                 src_root + \
-                                "/vrouter/utils/vtest_py/run_test.sh --flake")
+                                "/vrouter/tests/run_test.py --flake")
 env.Depends(vtest_py_ut_flake, setup_venv)
 env.Requires(vtest_py_ut_flake, gen_py_sandesh)
 
