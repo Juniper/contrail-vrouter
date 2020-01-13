@@ -1,0 +1,359 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1e8bef15_929c6f20",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "empty line after this",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bbc75434_a281080e",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "can we move all these to some lib file so that each test case need not import all of these?",
+      "range": {
+        "startLine": 2,
+        "startChar": 0,
+        "endLine": 12,
+        "endChar": 15
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "63ec05a1_daf99a0c",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "add comments here as to what they do",
+      "range": {
+        "startLine": 25,
+        "startChar": 0,
+        "endLine": 26,
+        "endChar": 40
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5383afa6_c739d117",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "why not pass ipv6_str and do the conversion internally?",
+      "range": {
+        "startLine": 48,
+        "startChar": 25,
+        "endLine": 48,
+        "endChar": 76
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f85bb859_2116cb9b",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "is this the same as assertEquals()?",
+      "range": {
+        "startLine": 50,
+        "startChar": 13,
+        "endLine": 50,
+        "endChar": 21
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b3e4af52_f5878a49",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "can you implement syncAll() in one of these functions? This avoid sync of individual objects.\nyou can create all the objects and in the end, call self.syncAll()?",
+      "range": {
+        "startLine": 67,
+        "startChar": 0,
+        "endLine": 81,
+        "endChar": 49
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3b326b1b_064cf015",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "default prefix_len has to be 32, so even if its not specified, defaults are taken",
+      "range": {
+        "startLine": 110,
+        "startChar": 12,
+        "endLine": 110,
+        "endChar": 26
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "61142219_81ae9bcf",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "what is this used for?",
+      "range": {
+        "startLine": 115,
+        "startChar": 0,
+        "endLine": 116,
+        "endChar": 32
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bbb21539_a62d734e",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "why is this argument needed?",
+      "range": {
+        "startLine": 124,
+        "startChar": 19,
+        "endLine": 124,
+        "endChar": 37
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "552aad2a_cf7b97c8",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "need to check if reverse flow is created too",
+      "range": {
+        "startLine": 132,
+        "startChar": 50,
+        "endLine": 132,
+        "endChar": 51
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0e8eb610_05e4d962",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 151,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "Note: there can be dropstats per vif too. \nsomething like vmi.get_drop_stats().",
+      "range": {
+        "startLine": 151,
+        "startChar": 21,
+        "endLine": 151,
+        "endChar": 32
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7b091664_bf05000c",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 155,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "why is this commented?",
+      "range": {
+        "startLine": 155,
+        "startChar": 8,
+        "endLine": 155,
+        "endChar": 31
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5db97b13_79607cdc",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 175,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "also add a basic test case for sending and receiving packets",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "19290032_1b2c86f9",
+        "filename": "tests/test_packet.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "empty line here",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bd947d2f_7f745d0f",
+        "filename": "tests/test_packet.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 140,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "what about vxlan, vlan, ipv6 etc.",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "327f1a53_85708907",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "dont have magic numbers anywhere, define it..",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d2f5a8e6_9985e66f",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-13T01:26:26Z",
+      "side": 1,
+      "message": "this is a good example UT where having self.syncAll() would avoid repeated calls to xxx.sync()",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
