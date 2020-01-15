@@ -22,3 +22,5 @@ contrail-vrouter-dpdk binary, which can be found [here](https://github.com/Junip
 
 2. The process for tungsten fabric can be found in tf-dev-env repository, which can be found
 [here](https://github.com/tungstenfabric/tf-dev-env).
+
+This is for testing contrail-vrouter-project
