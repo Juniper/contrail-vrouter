@@ -271,9 +271,10 @@ mtrie_free_bkt_defer(struct vrouter *router, struct ip_bucket *bkt)
 }
 
 static void
-mtrie_delete_bkt(struct ip_bucket_entry *ent, struct vr_route_req *rt, int defer_delete, int data_is_nh)
+mtrie_delete_bkt(struct ip_bucket_entry *ent, int defer_delete, int data_is_nh)
 {
     struct ip_bucket *bkt;
+    struct ip_bucket_entry *tmp_ent;
 
     if (!ENTRY_IS_BUCKET(ent)) {
         if (ENTRY_IS_NEXTHOP(ent)) {
@@ -286,20 +287,23 @@ mtrie_delete_bkt(struct ip_bucket_entry *ent, struct vr_route_req *rt, int defer
     }
 
     bkt = entry_to_bucket(ent);
-    if (data_is_nh) {
-        set_entry_to_nh(ent, rt->rtr_nh);
-    } else {
-        set_entry_to_vdata(ent, (void *)rt->rtr_nh);
-    }
-    ent->entry_label_flags = rt->rtr_req.rtr_label_flags;
-    ent->entry_label = rt->rtr_req.rtr_label;
-    ent->entry_bridge_index = rt->rtr_req.rtr_index;
+    /* copy the values from one of the bkt entries */
+    tmp_ent = index_to_entry(bkt, 0);
 
+    if (data_is_nh) {
+        set_entry_to_nh(ent, tmp_ent->entry_nh_p);
+    } else {
+        set_entry_to_vdata(ent, tmp_ent->entry_vdata_p);
+    }
+    ent->entry_prefix_len = tmp_ent->entry_prefix_len;
+    ent->entry_label_flags = tmp_ent->entry_label_flags;
+    ent->entry_label = tmp_ent->entry_label;
+    ent->entry_bridge_index = tmp_ent->entry_bridge_index;
     if (defer_delete) {
         mtrie_free_bkt_defer(vrouter_get(0), bkt);
     } else {
         if (!vr_not_ready) {
-            if (!mtrie_free_bkt_defer(rt->rtr_nh->nh_router, bkt))
+            if (!mtrie_free_bkt_defer(tmp_ent->entry_nh_p->nh_router, bkt))
                 return;
 
             vr_delay_op();
@@ -607,7 +611,7 @@ __mtrie_delete(struct vr_route_req *rt, struct ip_bucket_entry *ent,
             return 0;
     }
 
-    mtrie_delete_bkt(ent, rt, defer_delete, data_is_nh);
+    mtrie_delete_bkt(ent, defer_delete, data_is_nh);
     return 0;
 }
 
