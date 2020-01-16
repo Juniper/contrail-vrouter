@@ -1,0 +1,101 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "622a0aeb_5d32bc96",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-16T08:40:45Z",
+      "side": 1,
+      "message": "Use set methods..\nsomething like:\nVTestObjectBase.set_auto_features(ALL)\nOR\nVTestObjectBase.set_auto_features(CLEANUP, NH_IDX, VIF_IDX)",
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0ada3204_38363bd0",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-16T08:40:45Z",
+      "side": 1,
+      "message": "Use idx everywhere instead of id",
+      "range": {
+        "startLine": 89,
+        "startChar": 28,
+        "endLine": 89,
+        "endChar": 30
+      },
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d00f5c52_e749098e",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-16T08:40:45Z",
+      "side": 1,
+      "message": "you can check for reverse flow index as well?",
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e468c5c5_c251a181",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 143,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-16T08:40:45Z",
+      "side": 1,
+      "message": "No magic numbers",
+      "range": {
+        "startLine": 143,
+        "startChar": 66,
+        "endLine": 143,
+        "endChar": 75
+      },
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "470cc86b_5bd1b1d5",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 166,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-16T08:40:45Z",
+      "side": 1,
+      "message": "have another test case - test_flow_and_link_nat_flow() which has sip/dip of reverse flow as different",
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
