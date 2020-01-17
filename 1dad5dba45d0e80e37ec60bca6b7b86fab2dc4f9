@@ -1,0 +1,452 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "79d2b765_132efaa7",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "why not remove all optional options in vif,nh classes",
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "542e6654_c5e624f8",
+        "filename": "utils/pylib/dropstats.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "will this not initialize vr_drop_stats_req object?",
+      "range": {
+        "startLine": 15,
+        "startChar": 0,
+        "endLine": 15,
+        "endChar": 56
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "293fe72a_995a30cd",
+        "filename": "utils/pylib/flow.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 97,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "why dont you do self.sync() again here?",
+      "range": {
+        "startLine": 97,
+        "startChar": 20,
+        "endLine": 97,
+        "endChar": 70
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8d950040_4d53c081",
+        "filename": "utils/pylib/flow.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "can we do self.get() here? Basically, we dont want any of the VtestBase functions to be called directly. We want to use the VtestObjectBase functions instead",
+      "range": {
+        "startLine": 98,
+        "startChar": 19,
+        "endLine": 98,
+        "endChar": 39
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7772b3dc_8db8c4e0",
+        "filename": "utils/pylib/flow.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 105,
+        "startChar": 25,
+        "endLine": 105,
+        "endChar": 41
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eafa6cc1_b8f283c9",
+        "filename": "utils/pylib/flow.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 154,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "sip6 and dip6 should be ipv6 strings",
+      "range": {
+        "startLine": 154,
+        "startChar": 23,
+        "endLine": 154,
+        "endChar": 27
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c6a7e840_a4419644",
+        "filename": "utils/pylib/mpls.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "mr_nhid can be optional in case of get()\neg: mpls.get(mr_lablel\u003d1000)\nalso mr_rid default is 0",
+      "range": {
+        "startLine": 13,
+        "startChar": 41,
+        "endLine": 13,
+        "endChar": 48
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "98c29917_6beba47c",
+        "filename": "utils/pylib/nexthop.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "some of these can be optional.. eg: family, flags",
+      "range": {
+        "startLine": 16,
+        "startChar": 17,
+        "endLine": 17,
+        "endChar": 69
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "97fb4299_5771fe6f",
+        "filename": "utils/pylib/nexthop.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "put a comment as TODO",
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1fd1258e_25cc85bc",
+        "filename": "utils/pylib/packet.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "is this applicable for vlan packet?",
+      "range": {
+        "startLine": 53,
+        "startChar": 12,
+        "endLine": 55,
+        "endChar": 20
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "488e60f7_3abb2208",
+        "filename": "utils/pylib/route.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 68,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "typo?",
+      "range": {
+        "startLine": 68,
+        "startChar": 12,
+        "endLine": 68,
+        "endChar": 18
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8f96eeef_39351857",
+        "filename": "utils/pylib/vif.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "why not make vtestobjectbase inhert both vtestcommon and vtestbase?",
+      "range": {
+        "startLine": 13,
+        "startChar": 27,
+        "endLine": 13,
+        "endChar": 38
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "28b10b6e_b1ecae38",
+        "filename": "utils/pylib/vif.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "is it possible to generate req_filename inside create_pcap_req",
+      "range": {
+        "startLine": 65,
+        "startChar": 8,
+        "endLine": 65,
+        "endChar": 20
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c7389dfb_777ed010",
+        "filename": "utils/pylib/vtest_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "comment",
+      "range": {
+        "startLine": 26,
+        "startChar": 4,
+        "endLine": 26,
+        "endChar": 16
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4e5825fe_f414bf79",
+        "filename": "utils/pylib/vtest_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 99,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "can we use logger() instead of prints everywhere?\nAlso, how to change the log level?",
+      "range": {
+        "startLine": 99,
+        "startChar": 12,
+        "endLine": 99,
+        "endChar": 17
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "928f93e2_5fe542ef",
+        "filename": "utils/pylib/vtest_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "Use os.popen() so that you can pass the whole command instead of splitting it..\nEg: https://github.com/Juniper/contrail-vrouter/blob/master/utils/vtest_py/tests/test_fd_leak.py#L19",
+      "range": {
+        "startLine": 104,
+        "startChar": 0,
+        "endLine": 107,
+        "endChar": 48
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4e3fbc06_7541f657",
+        "filename": "utils/pylib/vtest_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 219,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "typo?",
+      "range": {
+        "startLine": 219,
+        "startChar": 19,
+        "endLine": 219,
+        "endChar": 29
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ee12cfee_294927c3",
+        "filename": "utils/pylib/vtest_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 301,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "rename this to something meaningful",
+      "range": {
+        "startLine": 301,
+        "startChar": 44,
+        "endLine": 301,
+        "endChar": 54
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "13cce3cf_055ede19",
+        "filename": "utils/pylib/vtest_object_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "after this, should you remove the object from the list?",
+      "range": {
+        "startLine": 28,
+        "startChar": 16,
+        "endLine": 28,
+        "endChar": 28
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "09fb7a8b_4164b80d",
+        "filename": "utils/pylib/vtest_object_base.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-17T04:19:05Z",
+      "side": 1,
+      "message": "use idx everywhere instead of id",
+      "range": {
+        "startLine": 42,
+        "startChar": 20,
+        "endLine": 42,
+        "endChar": 22
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
