@@ -60,6 +60,30 @@
     },
     {
       "key": {
+        "uuid": "03e9ee65_83b34e7b",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-01-18T18:46:26Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0ada3204_38363bd0",
+      "range": {
+        "startLine": 89,
+        "startChar": 28,
+        "endLine": 89,
+        "endChar": 30
+      },
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "d00f5c52_e749098e",
         "filename": "tests/test_basic.py",
         "patchSetId": 9
@@ -71,6 +95,24 @@
       "writtenOn": "2020-01-16T08:40:45Z",
       "side": 1,
       "message": "you can check for reverse flow index as well?",
+      "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e5cccb29_43147962",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 9
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-01-18T18:46:26Z",
+      "side": 1,
+      "message": "So I tried to check reverse flow index and found out that the when we send a request with updated reverse flow index, in reponse file fresp_rid is always 0.\n\u003cfresp_rid type\u003d\"u16\" identifier\u003d\"2\"\u003e                                                       \n0                                                                                           \n\u003c/fresp_rid\u003e \nHave checked this without my changes also, fresp_rid is always 0. Hence I dont know how to check reverse flow index",
+      "parentUuid": "d00f5c52_e749098e",
       "revId": "b8d25c3b76eac2c96b6258c03194e995503dc417",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true

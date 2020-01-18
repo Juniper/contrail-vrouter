@@ -460,6 +460,30 @@
     },
     {
       "key": {
+        "uuid": "e2051560_7f54de93",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-01-18T18:46:26Z",
+      "side": 1,
+      "message": "So I tried to check reverse flow index and found out that the when we send a request with updated reverse flow index, in reponse file fresp_rid is always 0.\n\u003cfresp_rid type\u003d\"u16\" identifier\u003d\"2\"\u003e                                                       \n0                                                                                           \n\u003c/fresp_rid\u003e \nHave checked this without my changes also, fresp_rid is always 0. Hence I dont know how to check reverse flow index",
+      "parentUuid": "0a898a6b_af338004",
+      "range": {
+        "startLine": 132,
+        "startChar": 50,
+        "endLine": 132,
+        "endChar": 51
+      },
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "0e8eb610_05e4d962",
         "filename": "tests/test_basic.py",
         "patchSetId": 2
@@ -676,6 +700,24 @@
     },
     {
       "key": {
+        "uuid": "4e2425bf_fd358d5b",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-01-18T18:46:26Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "327f1a53_85708907",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "d2f5a8e6_9985e66f",
         "filename": "tests/test_vrf_table.py",
         "patchSetId": 2
@@ -690,6 +732,24 @@
       "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f307ae6b_fb904aad",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-01-18T18:46:26Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "d2f5a8e6_9985e66f",
+      "revId": "ae9cc4dd7239c88fddf0a9461039c0680c133a5f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
