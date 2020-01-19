@@ -131,6 +131,30 @@
     },
     {
       "key": {
+        "uuid": "36cfdb14_964de1b0",
+        "filename": "utils/pylib/flow.py",
+        "patchSetId": 10
+      },
+      "lineNbr": 97,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-19T18:13:51Z",
+      "side": 1,
+      "message": "You are not instantiating rite? You are just calling a object method. Maybe I didnt understand you properly. But my requirement here is not to call VtestBase APIs. Can you pl check if that is possible?",
+      "parentUuid": "35c94013_512e88e6",
+      "range": {
+        "startLine": 97,
+        "startChar": 20,
+        "endLine": 97,
+        "endChar": 70
+      },
+      "revId": "1dad5dba45d0e80e37ec60bca6b7b86fab2dc4f9",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8d950040_4d53c081",
         "filename": "utils/pylib/flow.py",
         "patchSetId": 10
