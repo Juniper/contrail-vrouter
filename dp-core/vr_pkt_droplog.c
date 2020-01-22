@@ -142,6 +142,7 @@ vr_pkt_drop_log_req_process(void *s_req)
 int vr_pkt_drop_log_init(struct vrouter *router)
 {
     unsigned int size = 0, i = 0;
+    struct vr_pkt_drop_st *vr_pkt_drop;
 
     if(vr_pkt_droplog_buf_en == 1)
     {
@@ -156,7 +157,7 @@ int vr_pkt_drop_log_init(struct vrouter *router)
             goto cleanup;
         }
 
-        struct vr_pkt_drop_st *vr_pkt_drop = router->vr_pkt_drop;
+        vr_pkt_drop = router->vr_pkt_drop;
 
         /* Create log buffer object for each core*/
         vr_pkt_drop->vr_pkt_drop_log = vr_zalloc(size, VR_PKT_DROP_LOG_OBJECT);
