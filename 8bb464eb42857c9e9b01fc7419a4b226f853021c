@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "797a2695_edd81ecb",
+        "filename": "utils/pylib/vrf.py",
+        "patchSetId": 16
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-22T15:14:11Z",
+      "side": 1,
+      "message": "rid is optional everywhere.. default is 0",
+      "range": {
+        "startLine": 19,
+        "startChar": 4,
+        "endLine": 19,
+        "endChar": 11
+      },
+      "revId": "8bb464eb42857c9e9b01fc7419a4b226f853021c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
