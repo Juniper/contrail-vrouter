@@ -478,7 +478,7 @@ bridge_table_map(vr_bridge_table_data *table)
         table->btable_size / sizeof(struct vr_bridge_entry);
 
     mmap_error_msg = vr_table_map(table->btable_dev, VR_MEM_BRIDGE_TABLE_OBJECT,
-        table->btable_file_path, table->btable_size, &vr_bridge_table.bt_entries);
+        table->btable_file_path, table->btable_size, (void **)vr_bridge_table.bt_entries);
 
     if (mmap_error_msg) {
         printf("%s\n", mmap_error_msg);

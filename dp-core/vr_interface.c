@@ -3863,7 +3863,7 @@ __vif_fat_flow_alloc_prefix_rule_data(vr_fat_flow_cfg_t *cfg)
        }
        vr_req.rtr_req.rtr_prefix = (int8_t *) prefix;
        vr_req.rtr_req.rtr_prefix_len = cfg->dst_prefix_mask;
-       vr_req.rtr_nh = (struct vr_nexthop *) cfg->dst_aggregate_plen;
+       vr_req.rtr_nh = (struct vr_nexthop *) (size_t) cfg->dst_aggregate_plen;
        /* Add the prefix into mtrie */
        ret = vdata_mtrie_add(port_data->second_prefix, &vr_req);
        if (ret != 0) {
@@ -3964,7 +3964,7 @@ __vif_fat_flow_update_prefix_rule_data(vr_fat_flow_prefix_rule_data_t *rdata,
        }
        vr_req.rtr_req.rtr_prefix = (int8_t *)prefix;
        vr_req.rtr_req.rtr_prefix_len = cfg->dst_prefix_mask;
-       vr_req.rtr_nh = (struct vr_nexthop *) cfg->dst_aggregate_plen;
+       vr_req.rtr_nh = (struct vr_nexthop *) (size_t) cfg->dst_aggregate_plen;
        /* Add the prefix into mtrie */
        ret = vdata_mtrie_add(port_data->second_prefix, &vr_req);
        if (ret != 0) {
@@ -4490,7 +4490,7 @@ __vif_fat_flow_ip_prefix_lookup(struct ip_mtrie *mtrie, unsigned int *ip,
     if (!ret || (vr_req.rtr_req.rtr_prefix_len == 0)) {
         return 0;
     }
-    *aggr_mask = (uint8_t) ret;
+    *aggr_mask = (uint8_t) (size_t) ret;
     return 1;
 }
 

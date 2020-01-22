@@ -1775,7 +1775,7 @@ flow_table_map(vr_flow_table_data *table)
     }
 
     mmap_error_msg = vr_table_map(table->ftable_dev, VR_MEM_FLOW_TABLE_OBJECT,
-        table->ftable_file_path, table->ftable_size, &ft->ft_entries);
+        table->ftable_file_path, table->ftable_size, (void **)ft->ft_entries);
 
     if (mmap_error_msg) {
         printf("%s\n", mmap_error_msg);
