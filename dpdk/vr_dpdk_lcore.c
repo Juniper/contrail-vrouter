@@ -1425,7 +1425,7 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
      * Other forwarding lcores will enqueue MPLSoGRE packets here.
      */
     lcore->lcore_rx_ring = vr_dpdk_ring_allocate(lcore_id, "lcore RX ring",
-            VR_DPDK_RX_RING_SZ, RING_F_SC_DEQ);
+            vr_dpdk_rx_ring_sz, RING_F_SC_DEQ);
     if (lcore->lcore_rx_ring == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u RX ring\n", lcore_id);
         rte_free(lcore);
@@ -1438,7 +1438,7 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
      */
     if (VR_DPDK_USE_IO_LCORES) {
         lcore->lcore_io_rx_ring = vr_dpdk_ring_allocate(lcore_id, "lcore IO RX ring",
-                VR_DPDK_RX_RING_SZ, RING_F_SC_DEQ | RING_F_SP_ENQ);
+                vr_dpdk_rx_ring_sz, RING_F_SC_DEQ | RING_F_SP_ENQ);
         if (lcore->lcore_io_rx_ring == NULL) {
             RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u IO RX ring\n", lcore_id);
             rte_free(lcore);
