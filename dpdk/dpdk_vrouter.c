@@ -38,7 +38,6 @@
 #include <rte_kni.h>
 #include <rte_timer.h>
 
-
 /* vRouter/DPDK command-line options. */
 enum vr_opt_index {
 #define NO_DAEMON_OPT           "no-daemon"
@@ -97,10 +96,18 @@ enum vr_opt_index {
     OFFLOADS_OPT_INDEX,
 #define PKT_DROP_LOG_BUFFER_SIZE_OPT "vr_dropstats_bufsz"
    PKT_DROP_LOG_BUFFER_SIZE_OPT_INDEX,
-#define LCORES_OPT              "lcores"
-    LCORES_OPT_INDEX,
 #define MEMORY_ALLOC_CHECKS_OPT "vr_memory_alloc_checks"
     MEMORY_ALLOC_CHECKS_OPT_INDEX,
+#define VR_DPDK_RX_RING_SZ_OPT      "vr_dpdk_rx_ring_sz"
+    VR_DPDK_RX_RING_SZ_OPT_INDEX,
+#define VR_DPDK_TX_RING_SZ_OPT      "vr_dpdk_tx_ring_sz"
+    VR_DPDK_TX_RING_SZ_OPT_INDEX,
+#define VR_DPDK_YIELD_OPT           "yield_option"
+    VR_DPDK_YIELD_OPT_INDEX,
+#define VR_SERVICE_CORE_MASK_OPT    "service_core_mask"
+    VR_SERVICE_CORE_MASK_OPT_INDEX,
+#define LCORES_OPT              "lcores"
+    LCORES_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -112,6 +119,12 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 extern unsigned int datapath_offloads;
 extern unsigned int vr_pkt_droplog_bufsz;
+
+unsigned int vr_dpdk_rx_ring_sz = VR_DPDK_RX_RING_SZ;
+unsigned int vr_dpdk_tx_ring_sz = VR_DPDK_TX_RING_SZ;
+unsigned int vr_service_core_mask = 0;
+int vr_dpdk_yield_option = 1;
+char *service_core_mask_str = NULL;
 
 static int no_daemon_set;
 static int no_gro_set = 0;
@@ -500,6 +513,44 @@ dpdk_argv_append(char *arg, char *val)
     return -1;
 }
 
+char *
+vr_service_core_util(unsigned int service_core_mask)
+{
+    service_core_mask_str = (char *) malloc(VR_DPDK_STR_BUF_SZ);
+    int i = 0, j = 0;
+    service_core_mask_str[j++] = '(';
+    while (service_core_mask != 0) {
+	if ((service_core_mask & 1) == 1) {
+            service_core_mask_str[j++] = (i + '0');
+	    service_core_mask_str[j++] = ',';
+	    CPU_SET(i, &dpdk_ctrl_thread_set);
+	}
+	service_core_mask >>= 1;
+	i++;
+    }
+    service_core_mask_str[--j] = ')';
+    return service_core_mask_str;
+}
+
+/*void
+vr_service_core_mask_parse(char *core_mask_str)
+{
+    int i, j;
+    for (i = 0; i < strlen(core_mask_str); i++) {
+        if (core_mask_str[i] >= '0' && core_mask_str[i] <= '9') {
+            CPU_SET(core_mask_str[i] - '0', &dpdk_ctrl_thread_set);
+	}
+	else if (core_mask_str[i] == '-') {
+            int a = (core_mask_str[i-1] - '0') + 1;
+	    int b = (core_mask_str[i+1] - '0');
+	    for (j = a; j <= b; j++) {
+                CPU_SET(j, &dpdk_ctrl_thread_set);
+	    }
+	    i += 2;
+	}
+    }
+}*/
+
 /*
  * dpdk_argv_update - update EAL command line options for rte_eal_init()
  * Returns number of arguments in dpdk_argv on success, < 0 otherwise.
@@ -593,12 +644,22 @@ dpdk_argv_update(void)
     if (fwd_core_mask_str == NULL)
         return -1;
 
+    if (vr_service_core_mask == 0) {
+	if (!service_core_mask_str) {
+	    service_core_mask_str = (char *) malloc(VR_DPDK_STR_BUF_SZ);
+            sprintf(service_core_mask_str, "(0-%ld)", (system_cpus_count - 1));
+	}
+    }
+    else {
+        service_core_mask_str = vr_service_core_util(vr_service_core_mask);
+    }
+
     /* lcores order: service, IO, lcores with TX queues, forwaridng lcores */
     if (snprintf(lcores_string, sizeof(lcores_string),
-        "(0-%d)@(0-%ld),%s(%d-%d)@(0-%ld),%s",
-        VR_DPDK_IO_LCORE_ID - 1, system_cpus_count - 1,
+        "(0-%d)@%s,%s(%d-%d)@%s,%s",
+        VR_DPDK_IO_LCORE_ID - 1, service_core_mask_str,
         io_core_mask_str,
-        VR_DPDK_PACKET_LCORE_ID, VR_DPDK_FWD_LCORE_ID - 1, system_cpus_count - 1,
+        VR_DPDK_PACKET_LCORE_ID, VR_DPDK_FWD_LCORE_ID - 1, service_core_mask_str,
         fwd_core_mask_str)
             >= sizeof(lcores_string)) {
         return -1;
@@ -640,6 +701,14 @@ dpdk_argv_update(void)
                 vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "Maximum log buffer size:     %" PRIu32 "\n",
 		vr_pkt_droplog_bufsz);
+    RTE_LOG(INFO, VROUTER, "VR_DPDK_RX_RING_SZ:          %" PRIu32 "\n",
+		vr_dpdk_rx_ring_sz);
+    RTE_LOG(INFO, VROUTER, "VR_DPDK_TX_RING_SZ:          %" PRIu32 "\n",
+		vr_dpdk_tx_ring_sz);
+    RTE_LOG(INFO, VROUTER, "VR_DPDK_YIELD_OPTION:        %" PRIu32 "\n",
+		vr_dpdk_yield_option);
+    RTE_LOG(INFO, VROUTER, "VR_SERVICE_CORE_MASK:        %x\n",
+		vr_service_core_mask);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < RTE_DIM(dpdk_argv) - 1; i += 2) {
         if (dpdk_argv[i] == NULL)
@@ -986,6 +1055,14 @@ static struct option long_options[] = {
 						    NULL,                   0},
     [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
                                                     NULL,                   0},
+    [VR_DPDK_RX_RING_SZ_OPT_INDEX]  =   {VR_DPDK_RX_RING_SZ_OPT, required_argument,
+	                                            NULL,                   0},
+    [VR_DPDK_TX_RING_SZ_OPT_INDEX]  =   {VR_DPDK_TX_RING_SZ_OPT, required_argument,
+	                                            NULL,                   0},
+    [VR_DPDK_YIELD_OPT_INDEX]       =   {VR_DPDK_YIELD_OPT, required_argument,
+	                                            NULL,                   0},
+    [VR_SERVICE_CORE_MASK_OPT_INDEX]=   {VR_SERVICE_CORE_MASK_OPT, required_argument,
+                                                    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -1025,6 +1102,10 @@ Usage(void)
         "    --"DPDK_RXD_SIZE_OPT" NUM    DPDK PMD Rx Descriptor size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
 	"    --"PKT_DROP_LOG_BUFFER_SIZE_OPT" NUM Maximum debug log buffer size\n"
+	"    --"VR_DPDK_RX_RING_SZ_OPT" NUM Configure vr_dpdk_rx_ring_sz value\n"
+	"    --"VR_DPDK_TX_RING_SZ_OPT" NUM Configure vr_dpd_tx_ring_sz value\n"
+	"    --"VR_DPDK_YIELD_OPT" NUM      Configurable parameter to disable yield\n"
+	"    --"VR_SERVICE_CORE_MASK_OPT" NUM Configurable parameter for service core mask\n"
         );
 
     exit(1);
@@ -1174,6 +1255,34 @@ parse_long_opts(int opt_flow_index, char *optarg)
             vr_pkt_droplog_bufsz = VR_PKT_DROP_LOG_MAX;
         }
         break;
+
+    case VR_DPDK_RX_RING_SZ_OPT_INDEX:
+	vr_dpdk_rx_ring_sz = (unsigned int) strtoul(optarg, NULL, 0);
+	if (errno != 0) {
+            vr_dpdk_rx_ring_sz = VR_DPDK_RX_RING_SZ;
+	}
+	break;
+
+    case VR_DPDK_TX_RING_SZ_OPT_INDEX:
+	vr_dpdk_tx_ring_sz = (unsigned int) strtoul(optarg, NULL, 0);
+	if (errno != 0) {
+            vr_dpdk_tx_ring_sz = VR_DPDK_TX_RING_SZ;
+	}
+	break;
+
+    case VR_DPDK_YIELD_OPT_INDEX:
+	vr_dpdk_yield_option = (int) strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_dpdk_yield_option = 1;
+	}
+	break;
+
+    case VR_SERVICE_CORE_MASK_OPT_INDEX:
+	vr_service_core_mask = (int) strtoul(optarg, NULL, 0);
+	if (vr_service_core_mask == 0) {
+           service_core_mask_str = optarg;
+	}
+	break;
 
     case SOCKET_DIR_OPT_INDEX:
         vr_socket_dir = optarg;
