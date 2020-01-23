@@ -174,7 +174,7 @@ vr_dpdk_ring_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
 
     /* allocate a ring on the host lcore (single-producer single-consumer) */
     tx_ring = vr_dpdk_ring_allocate(host_lcore_id, ring_name,
-            VR_DPDK_TX_RING_SZ, RING_F_SP_ENQ | RING_F_SC_DEQ);
+            vr_dpdk_tx_ring_sz, RING_F_SP_ENQ | RING_F_SC_DEQ);
     if (tx_ring == NULL)
         goto error;
 

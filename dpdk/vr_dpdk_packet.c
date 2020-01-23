@@ -121,7 +121,7 @@ dpdk_packet_socket_init(void)
         vr_dpdk.packet_ring = rte_ring_lookup("packet_tx");
         if (!vr_dpdk.packet_ring) {
             /* multi-producers single-consumer ring */
-            vr_dpdk.packet_ring = rte_ring_create("packet_tx", VR_DPDK_TX_RING_SZ,
+            vr_dpdk.packet_ring = rte_ring_create("packet_tx", vr_dpdk_tx_ring_sz,
                     SOCKET_ID_ANY, RING_F_SC_DEQ);
             if (!vr_dpdk.packet_ring) {
                 RTE_LOG(ERR, VROUTER, "    error creating packet ring\n");

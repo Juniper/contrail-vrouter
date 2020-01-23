@@ -199,7 +199,7 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_SLEEP_NO_QUEUES_US  10000
 /* Sleep (in US) or yield if no packets received (use 0 to disable) */
 #define VR_DPDK_SLEEP_NO_PACKETS_US 0
-#define VR_DPDK_YIELD_NO_PACKETS    1
+#define VR_DPDK_YIELD_NO_PACKETS    vr_dpdk_yield_option
 /* Sleep (in US) no packets received on any TAP devs (use 0 to disable) */
 #define VR_DPDK_TAPDEV_SLEEP_NO_PACKETS_US 500
 /* Timers handling periodicity in US */
@@ -961,6 +961,9 @@ void vr_dpdk_netlink_wakeup(void);
 void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
+
+extern unsigned int vr_dpdk_rx_ring_sz, vr_dpdk_tx_ring_sz;
+extern int vr_dpdk_yield_option;
 
 /*
  * vr_dpdk_ringdev.c
