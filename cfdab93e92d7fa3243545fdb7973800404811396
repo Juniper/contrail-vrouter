@@ -1,0 +1,464 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "db0fc687_a4601916",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "This has to be implicit",
+      "range": {
+        "startLine": 72,
+        "startChar": 16,
+        "endLine": 72,
+        "endChar": 39
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "85dbf2ce_5c2c92d9",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 34,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "These should be by default",
+      "range": {
+        "startLine": 32,
+        "startChar": 0,
+        "endLine": 34,
+        "endChar": 47
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1400f49c_8b311b2c",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "These should be by default",
+      "range": {
+        "startLine": 39,
+        "startChar": 29,
+        "endLine": 40,
+        "endChar": 69
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "aeb8005f_132c5c93",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "This should be by default",
+      "range": {
+        "startLine": 54,
+        "startChar": 0,
+        "endLine": 55,
+        "endChar": 52
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d0f1a2c0_9017028a",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "This should be by default if no flags is specified - constants.NH_FLAG_VALID | constants.NH_FLAG_POLICY_ENABLED | constants.NH_FLAG_ETREE_ROOT",
+      "range": {
+        "startLine": 63,
+        "startChar": 0,
+        "endLine": 64,
+        "endChar": 75
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "da074436_4e1948f3",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 74,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "This should be by default if no flags is specified - constants.NH_FLAG_VALID | constants.NH_FLAG_POLICY_ENABLED | constants.NH_FLAG_ETREE_ROOT",
+      "range": {
+        "startLine": 73,
+        "startChar": 0,
+        "endLine": 74,
+        "endChar": 75
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f07b50a8_0ee799ab",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "rename to nh_idx",
+      "range": {
+        "startLine": 88,
+        "startChar": 52,
+        "endLine": 88,
+        "endChar": 57
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "26584234_8e5e2c7d",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "this should be by added by default when object is created",
+      "range": {
+        "startLine": 109,
+        "startChar": 17,
+        "endLine": 109,
+        "endChar": 47
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "99ed52a5_e7118fa8",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "this should be by added by default when object is created",
+      "range": {
+        "startLine": 122,
+        "startChar": 17,
+        "endLine": 122,
+        "endChar": 46
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6da38e19_b4e94275",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "if we dont specifiy nh_flags, this should be set by default",
+      "range": {
+        "startLine": 57,
+        "startChar": 0,
+        "endLine": 59,
+        "endChar": 45
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d98a395a_d37b7932",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 69,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 67,
+        "startChar": 0,
+        "endLine": 69,
+        "endChar": 45
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4c5ee0c6_30e9dbb7",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 72,
+        "startChar": 52,
+        "endLine": 73,
+        "endChar": 67
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "edd05f62_74f275da",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 121,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "maybe check the sip and dip too",
+      "range": {
+        "startLine": 121,
+        "startChar": 8,
+        "endLine": 121,
+        "endChar": 43
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ab58edef_c63ca7d3",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "check sip and dip too",
+      "range": {
+        "startLine": 136,
+        "startChar": 8,
+        "endLine": 136,
+        "endChar": 43
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "146bc743_793bf108",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "can we do vif3.get_vif_idx()",
+      "range": {
+        "startLine": 57,
+        "startChar": 71,
+        "endLine": 57,
+        "endChar": 72
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3f2bba1d_1537d7d7",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 62,
+        "startChar": 71,
+        "endLine": 62,
+        "endChar": 72
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5722ff44_20fba402",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 69,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "can we reuse vrf2 object which is created above for this?\nmaybe you can write a set_flags method",
+      "range": {
+        "startLine": 67,
+        "startChar": 0,
+        "endLine": 69,
+        "endChar": 74
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b7e5cee0_6a266acd",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 73,
+        "startChar": 0,
+        "endLine": 76,
+        "endChar": 18
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d2bfc8e8_d70cd69f",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 85,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "this has to be vrf.sync()?",
+      "range": {
+        "startLine": 85,
+        "startChar": 0,
+        "endLine": 85,
+        "endChar": 20
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "639c279d_9b17d00a",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 21
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-01-31T05:08:23Z",
+      "side": 1,
+      "message": "you can write utility function in vrf .. say set_hbfl_vif_idx(), delete_hbfl_vif_idx(), set_hbfr_vif_idx(), delete_hbfr_vif_idx()",
+      "range": {
+        "startLine": 88,
+        "startChar": 0,
+        "endLine": 93,
+        "endChar": 32
+      },
+      "revId": "cfdab93e92d7fa3243545fdb7973800404811396",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
