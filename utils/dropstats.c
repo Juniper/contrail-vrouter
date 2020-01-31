@@ -29,7 +29,7 @@
 #include "vr_packet.h"
 
 static struct nl_client *cl;
-static int help_set, core_set, offload_set, log_set, clear_set, sock_dir_set;
+static int help_set, core_set, offload_set, log_set, clear_set, debug_set, sock_dir_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
 static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index);
@@ -167,6 +167,11 @@ drop_stats_req_process(void *s_req)
     else if (core != (unsigned)-1)
         printf("Statistics for core %u\n\n", core);
 
+    if(debug_set) {
+        vr_print_drop_dbg_stats(stats, core);
+        return;
+    }
+
     vr_print_drop_stats(stats, core);
     return;
 }
@@ -232,6 +237,7 @@ enum opt_index {
     LOG_OPT_INDEX,
     CLEAR_OPT_INDEX,
     SOCK_DIR_OPT_INDEX,
+    DEBUG_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -242,6 +248,7 @@ static struct option long_options[] = {
     [LOG_OPT_INDEX]     =   {"log",     required_argument,  &log_set,       1},
     [CLEAR_OPT_INDEX]   =   {"clear",   no_argument,        &clear_set,     1},
     [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
+    [DEBUG_OPT_INDEX]   =   {"debug",   no_argument,        &debug_set,     1}, 
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
@@ -261,6 +268,7 @@ Usage()
 		Core number starts from 1...n. If core number specified as zero, \
 		it will log for all cores \n");
     printf("--clear\t To clear stats counters on all cores\n");
+    printf("--debug\t To Display Debug counters\n");
     exit(-EINVAL);
 }
 
@@ -294,6 +302,7 @@ parse_long_opts(int opt_index, char *opt_arg)
 	}
 	break;
     case CLEAR_OPT_INDEX:
+    case DEBUG_OPT_INDEX:
         break;
     case SOCK_DIR_OPT_INDEX:
         vr_socket_dir = opt_arg;
