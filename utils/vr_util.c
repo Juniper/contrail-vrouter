@@ -534,8 +534,6 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_ttl_exceeded);
     printf("Mcast Clone Fail              %" PRIu64 "\n",
             stats->vds_mcast_clone_fail);
-    printf("Cloned Original               %" PRIu64 "\n",
-            stats->vds_cloned_original);
     printf("\n");
 
     printf("Invalid NH                    %" PRIu64 "\n",
@@ -607,6 +605,13 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
     return;
 }
 
+void
+vr_print_drop_dbg_stats(vr_drop_stats_req *stats, int core)
+{
+    printf("Cloned Original               %" PRIu64 "\n",
+            stats->vds_cloned_original);
+    return;
+}
 void vr_print_pkt_drop_log_data(vr_pkt_drop_log_req *pkt_log, int i)
 {
     int j = 0;
@@ -850,7 +855,7 @@ int vr_pkt_drop_log_request(struct nl_client *cl, unsigned int router_id,
     int ret = 0;
     vr_pkt_drop_log_req req;
 
-    memset(&req,0,sizeof(req));
+    memset(&req, 0, sizeof(req));
 
     req.vdl_pkt_droplog_arr = (char *)malloc(1);
 
