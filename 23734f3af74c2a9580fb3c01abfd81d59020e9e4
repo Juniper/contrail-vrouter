@@ -206,6 +206,29 @@
       "revId": "23734f3af74c2a9580fb3c01abfd81d59020e9e4",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a211992c_b8658b4e",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 23
+      },
+      "lineNbr": 104,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-03T06:06:57Z",
+      "side": 1,
+      "message": "can we do something like this here -\nrun_test.py --all --pycodestyle",
+      "range": {
+        "startLine": 104,
+        "startChar": 51,
+        "endLine": 104,
+        "endChar": 68
+      },
+      "revId": "23734f3af74c2a9580fb3c01abfd81d59020e9e4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
