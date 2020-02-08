@@ -497,10 +497,28 @@ class VxlanPacket(UdpPacket):
     -------------------
     inner_pkt : any other packet type
         Inner packet
+    flags : int
+        VXLAN flags
+    reserved1 : int
+        VXLAN reserved1
+    nxt_protocol :int
+        VXLAN nxt_protocol
     """
 
-    def __init__(self, vnid, sip, dip, smac, dmac, sport, dport,
-                 inner_pkt=None, **kwargs):
+    def __init__(
+            self,
+            vnid,
+            sip,
+            dip,
+            smac,
+            dmac,
+            sport,
+            dport,
+            flags=0x08,
+            reserved1=0x00,
+            nxt_protocol=0,
+            inner_pkt=None,
+            **kwargs):
         super(
             VxlanPacket,
             self).__init__(
@@ -511,9 +529,67 @@ class VxlanPacket(UdpPacket):
             smac,
             dmac,
             **kwargs)
-        self.vxlan = VXLAN(vni=vnid, **kwargs)
+        self.vxlan = VXLAN(
+            vni=vnid,
+            flags=flags,
+            reserved1=reserved1,
+            NextProtocol=nxt_protocol,
+            **kwargs)
         self.inner_pkt = inner_pkt
 
     def get_packet(self):
         pkt = self.eth / self.ip / self.udp / self.vxlan / self.inner_pkt
         return pkt
+
+
+class Udpv6Packet(Ipv6Packet):
+    """
+    Udpv6Packet class for creating Udp packet with Ipv6 packet
+
+    Mandatory Parameters:
+    --------------------
+    sport :
+        Source port address
+    dport:
+        Destination port address
+
+    Optional Parameters:
+    -------------------
+    sipv6 : str
+        Source IP address
+    dipv6 : str:
+        Destination IP address
+    smac : str
+       Source mac address
+    dmac : str
+        Destination mac address
+    nh : int
+        Next header
+    """
+
+    def __init__(
+            self,
+            sport,
+            dport,
+            sipv6=None,
+            dipv6=None,
+            smac=None,
+            dmac=None,
+            nh=0,
+            **kwargs):
+        super(
+            Udpv6Packet,
+            self).__init__(
+            sipv6,
+            dipv6,
+            smac,
+            dmac,
+            nh,
+            **kwargs)
+        self.udp = UDP(sport=sport, dport=dport)
+
+    def get_packet(self):
+        if self.eth:
+            return self.eth / self.ipv6 / self.udp
+        else:
+            return self.ipv6 / self.udp

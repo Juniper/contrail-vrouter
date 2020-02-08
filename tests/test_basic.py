@@ -68,7 +68,8 @@ class TestBasic(unittest.TestCase):
             encap="de ad be ef 00 02 de ad be ef 00 01 08 00",
             tun_sip="1.1.1.1",
             tun_dip="1.1.1.2",
-            nh_flags=constants.NH_FLAG_TUNNEL_VXLAN)
+            nh_flags=(
+                constants.NH_FLAG_VALID | constants.NH_FLAG_TUNNEL_VXLAN))
         ObjectBase.sync_all()
 
         # check if fabric vif and tunnel nh got added

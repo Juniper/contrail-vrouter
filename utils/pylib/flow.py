@@ -21,15 +21,18 @@ class Flow(ObjectBase, vr_flow_req):
             proto,
             family,
             idx=-1,
-            ridx=-1,
-            flags=0,
-            flow_nh_idx=0,
-            src_nh_idx=0,
-            qos_id=-1,
+            ridx=None,
+            flags=constants.VR_FLOW_FLAG_ACTIVE,
+            flow_nh_idx=None,
+            src_nh_idx=None,
+            qos_id=None,
             action=constants.VR_FLOW_ACTION_FORWARD,
-            ecmp_nh_index=-1,
-            flow_vrf=0,
+            ecmp_nh_index=None,
+            flow_vrf=None,
             rflow_nh_idx=0,
+            flags1=None,
+            mirr_idx=None,
+            extflags=None,
             **kwargs):
         super(Flow, self).__init__()
         vr_flow_req.__init__(self)
@@ -51,6 +54,9 @@ class Flow(ObjectBase, vr_flow_req):
         self.fr_ecmp_nh_index = ecmp_nh_index
         self.fr_action = action
         self.fr_qos_id = qos_id
+        self.fr_flags1 = flags1
+        self.fr_mir_id = mirr_idx
+        self.fr_extflags = extflags
         # set reverse flow params as mirror of forward flow by default
         self.rflow_sip_u = self.fr_flow_dip_u
         self.rflow_sip_l = self.fr_flow_dip_l
@@ -248,9 +254,19 @@ class Inet6Flow(Flow):
         Flow vrf
     rflow_nh_idx : int
         Reverse flow id
+    mirr_idx : int
+        Mirror Index
     """
 
-    def __init__(self, sip6_str, dip6_str, proto, sport, dport, **kwargs):
+    def __init__(
+            self,
+            sip6_str,
+            dip6_str,
+            proto,
+            sport,
+            dport,
+            mirr_idx=None,
+            **kwargs):
         sip6_u, sip6_l = self.vt_ipv6(sip6_str)
         dip6_u, dip6_l = self.vt_ipv6(dip6_str)
         super(Inet6Flow, self).__init__(
@@ -262,6 +278,7 @@ class Inet6Flow(Flow):
             dport,
             proto,
             constants.AF_INET6,
+            mirr_idx=mirr_idx,
             **kwargs)
 
 
