@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5bd7560d_3e22e7a9",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1853,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2020-02-08T09:50:16Z",
+      "side": 1,
+      "message": "Need a pytest UT for this case.",
+      "revId": "92e02d6ebda4fb86349b45cfcbabae085ce11ac6",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
