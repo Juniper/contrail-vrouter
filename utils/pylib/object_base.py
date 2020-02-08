@@ -54,6 +54,7 @@ class ObjectBase(Base, Common):
         Launches vtest with appropriate args viz send_sandesh_req
         If successful, set the __is_synced__ to True
         """
+        self.logger.info("\nSyncing object: {}".format(self))
         try:
             res_file = self.send_sandesh_req(self, resp_required)
             if resp_required:
@@ -97,5 +98,4 @@ class ObjectBase(Base, Common):
             # flow hence skip flow object
             if not obj.__is_synced__ and \
                     obj.sreq_class != vr_flow_req.__name__:
-                self.logger.info("\nSyncing object: {}".format(obj))
                 obj.sync()
