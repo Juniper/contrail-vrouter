@@ -22,6 +22,7 @@ class Vif(ObjectBase, vr_interface_req):
             ipv4_str,
             mac_str,
             ipv6_str,
+            h_op=None,
             **kwargs):
 
         super(Vif, self).__init__()
@@ -31,7 +32,10 @@ class Vif(ObjectBase, vr_interface_req):
             self.vifr_idx = Vif._auto_alloc_idx
         else:
             self.vifr_idx = idx
-        self.h_op = constants.SANDESH_OPER_ADD
+        if h_op:
+            self.h_op = h_op
+        else:
+            self.h_op = constants.SANDESH_OPER_ADD
         self.vifr_name = name
         if ipv4_str:
             self.vifr_ip = self.vt_ipv4(ipv4_str)
@@ -114,6 +118,13 @@ class Vif(ObjectBase, vr_interface_req):
         """
         return int(self.get('vifr_opackets'))
 
+    def get_vif_nh_id(self):
+        """
+        Queries vrouter and returns vif_opackets value from the response xml \
+        file
+        """
+        return int(self.get('vifr_nh_id'))
+
 
 class VirtualVif(Vif):
     """
@@ -144,6 +155,8 @@ class VirtualVif(Vif):
         MTU size
     flags : int
         Vif flags
+    h_op : int
+        Sandesh operation
     """
 
     def __init__(self,
@@ -152,15 +165,16 @@ class VirtualVif(Vif):
                  mac_str,
                  idx=0,
                  ipv6_str=None,
-                 nh_idx=0,
+                 nh_idx=None,
                  vrf=0,
-                 mcast_vrf=65535,
+                 mcast_vrf=None,
                  mtu=1514,
                  flags=(constants.VIF_FLAG_POLICY_ENABLED |
                         constants.VIF_FLAG_DHCP_ENABLED),
+                 h_op=None,
                  **kwargs):
         super(VirtualVif, self).__init__(idx, name, ipv4_str, mac_str,
-                                         ipv6_str, **kwargs)
+                                         ipv6_str, h_op, **kwargs)
         self.vifr_type = constants.VIF_TYPE_VIRTUAL
         self.vifr_nh_id = nh_idx
         self.vifr_transport = constants.VIF_TRANSPORT_PMD

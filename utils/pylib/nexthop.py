@@ -69,6 +69,18 @@ class NextHop(ObjectBase, vr_nexthop_req):
         """
         return int(self.get('nhr_tun_dip'))
 
+    def get_nh_family(self):
+        """
+        Queries vrouter and gets nhr_family value from the xml response file
+        """
+        return int(self.get('nhr_family'))
+
+    def get_nh_type(self):
+        """
+        Queries vrouter and gets nhr_type value from the xml response file
+        """
+        return int(self.get('nhr_type'))
+
 
 class EncapNextHop(NextHop):
     """
@@ -136,15 +148,17 @@ class TunnelNextHopV4(NextHop):
         Nexthop flags
     encap_family : int
         Encap family
+    nh_family : int
+        Nexthop family
     """
 
     def __init__(self, encap_oif_id, encap, tun_sip, tun_dip,
                  nh_idx=1, nh_vrf=0, nh_flags=constants.NH_FLAG_VALID,
-                 encap_family=None, **kwargs):
+                 encap_family=None, nh_family=constants.AF_INET, **kwargs):
         super(TunnelNextHopV4, self).__init__(
             constants.NH_TYPE_TUNNEL,
             nh_idx,
-            constants.AF_INET,
+            nh_family,
             nh_vrf,
             nh_flags,
             encap_oif_id,
