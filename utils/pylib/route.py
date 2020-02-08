@@ -11,10 +11,11 @@ class Route(ObjectBase, vr_route_req):
     """Base class for creating routes"""
 
     def __init__(self, family, vrf, prefix=None, prefix_len=None, mac=None,
-                 nh_idx=None, rtr_label_flags=None, **kwargs):
+                 nh_idx=None, h_op=constants.SANDESH_OPER_ADD,
+                 rtr_label_flags=None, rtr_label=None, **kwargs):
         super(Route, self).__init__()
         vr_route_req.__init__(self)
-        self.h_op = constants.SANDESH_OPER_ADD
+        self.h_op = h_op
         self.rtr_family = family
         self.rtr_vrf_id = vrf
         if mac is not None:
@@ -24,6 +25,7 @@ class Route(ObjectBase, vr_route_req):
         self.rtr_prefix_len = prefix_len
         self.rtr_nh_id = nh_idx
         self.rtr_label_flags = rtr_label_flags
+        self.rtr_label = rtr_label
         self.sreq_class = vr_route_req.__name__
 
     def __repr__(self):
@@ -88,9 +90,17 @@ class InetRoute(Route):
     -------------------
     prefix_len : int
         Prefix length
+    h_op : int
+        Sandesh operation
+    rtr_label_flags : int
+        Rtr label flags
+    rtr_label : int
+        Rtr label
     """
 
-    def __init__(self, vrf, prefix, nh_idx, prefix_len=32, **kwargs):
+    def __init__(self, vrf, prefix, nh_idx, prefix_len=32,
+                 h_op=constants.SANDESH_OPER_ADD, rtr_label_flags=None,
+                 rtr_label=None, **kwargs):
         super(InetRoute, self).__init__(
             constants.AF_INET,
             vrf,
@@ -98,6 +108,9 @@ class InetRoute(Route):
             prefix_len,
             None,
             nh_idx,
+            h_op,
+            rtr_label_flags,
+            rtr_label,
             **kwargs)
 
 

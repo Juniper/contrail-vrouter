@@ -34,12 +34,18 @@ class Vrf(ObjectBase, vr_vrf_req):
     def __init__(
             self,
             vrf_idx,
-            vrf_rid=0):
+            vrf_rid=0,
+            vrf_flags=None,
+            vrf_hbfl_vif_idx=None,
+            vrf_hbfr_vif_idx=None):
         vr_vrf_req.__init__(self)
         super(Vrf, self).__init__()
         self.h_op = constants.SANDESH_OPER_ADD
         self.vrf_rid = vrf_rid
         self.vrf_idx = vrf_idx
+        self.vrf_flags = vrf_flags
+        self.vrf_hbfl_vif_idx = vrf_hbfl_vif_idx
+        self.vrf_hbfr_vif_idx = vrf_hbfr_vif_idx
         self.sreq_class = vr_vrf_req.__name__
 
     # Display basic details of the vrf

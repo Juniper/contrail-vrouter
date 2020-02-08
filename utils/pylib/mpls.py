@@ -25,9 +25,9 @@ class Mpls(ObjectBase, vr_mpls_req):
         Mpls nexthop id
     """
 
-    def __init__(self, mr_label, mr_rid=0, mr_nhid=None):
+    def __init__(self, mr_label, mr_rid=None, mr_nhid=None):
         super(Mpls, self).__init__()
-        vr_mpls_req.__init__()
+        vr_mpls_req.__init__(self)
         self.h_op = constants.SANDESH_OPER_ADD
         self.mr_label = mr_label
         self.mr_rid = mr_rid
