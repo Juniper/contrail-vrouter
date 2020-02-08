@@ -1,0 +1,265 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "79d53f1d_f2ea0845",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "Revert back to previous change here. constants.NH_FLAG_VALID is set as default.",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fdc6c9ed_d6fc4f8b",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "use vif.idx() to assign to encap_oif_id",
+      "range": {
+        "startLine": 59,
+        "startChar": 12,
+        "endLine": 59,
+        "endChar": 24
+      },
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8e6b5d3b_a3906bce",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "nh_family is not required since you assigning default value.",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4e9e82e8_e446ea32",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "use vif.idx() to assign to encap_oif_id",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "83f435eb_d5969f01",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6e2d55d9_0e0a03dd",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 145,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "Revert this change. vrf , mcast_vrf and flags are set default value here",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7e296d0e_aa99d874",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "same as above, flags is set default value, hence no need",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b575ec49_c73b3dfd",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 167,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d469cfc6_31c05266",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 176,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "revert back",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0c16c45f_a68e0b05",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "revert back",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8b1f64ef_3b3785ac",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 196,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "revert back",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7f52b44a_f6aa223f",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 204,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "revert back",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3dfdd49a_3daabf18",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 225,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "revert back.",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "68f4231c_52425626",
+        "filename": "tests/test_cem_7113.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 238,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "revert back",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d93b9916_18ed2e1b",
+        "filename": "tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-08T19:47:21Z",
+      "side": 1,
+      "message": "uncomment this.",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
