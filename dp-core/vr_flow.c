@@ -942,19 +942,36 @@ vr_flow_action_hbs(struct vrouter *router, struct vr_flow_entry *fe,
 
         hbs_l = vrf_entry->hbs_l_vif;
         if (hbs_l) {
-            /* Packet entering vrouter from vmi and going to hbs-l,
-             * encode flow_id in src mac */
-            struct vr_eth_hbs_md *eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
-            eth_hbs->flow_id_smac = htonl(index);
-            /* Encode packet source in the header */
-            if (vif_is_virtual(pkt->vp_if))
-                eth_hbs->magic_smac = htons(VR_HBS_SMAC_MAGIC | VR_HBS_FROM_VMI);
-            else if (vif_is_fabric(pkt->vp_if)) {
-                /* There is no case where pkt enters fabric and goes to hbs-l.
-                 * Drop packet in this case
+            struct vr_eth_hbs_md *eth_hbs;
+
+            if (vif_is_virtual(pkt->vp_if)) {
+                /* Packet entering vrouter from vmi and going to hbs-l,
+                 * encode flow_id in src mac
                  */
-                PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
-                goto drop_pkt;
+                eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
+                eth_hbs->flow_id_smac = htonl(index);
+                eth_hbs->magic_smac = htons(VR_HBS_SMAC_MAGIC | VR_HBS_FROM_VMI);
+            } else if (vif_is_fabric(pkt->vp_if)) {
+                /* Packet entering vrouter from fabric and going to hbs-l
+                 * (service chaining case) encode flow_id in dst mac
+                 */
+
+                /* Add ethernet header if there is none */
+                if (pkt_data(pkt) == pkt_network_header(pkt)) {
+                    struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
+                    eth = (struct vr_eth *)pkt_push(pkt, VR_ETHER_HLEN);
+                    memcpy(eth->eth_dmac, hbs_l->vif_mac, VR_ETHER_ALEN);
+                    memcpy(eth->eth_smac, hbs_l->vif_mac, VR_ETHER_ALEN);
+                    if (pkt->vp_type == VP_TYPE_IP) {
+                        eth->eth_proto = htons(VR_ETH_PROTO_IP);
+                    } else if (pkt->vp_type == VP_TYPE_IP6) {
+                        eth->eth_proto = htons(VR_ETH_PROTO_IP6);
+                    }
+                }
+
+                eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
+                eth_hbs->flow_id_dmac = htonl(index);
+                eth_hbs->magic_dmac = htons(VR_HBS_DMAC_MAGIC | VR_HBS_FROM_FABRIC);
             }
             pkt->vp_if = hbs_l;
             /*
@@ -1814,20 +1831,31 @@ vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
 
     if (vif_is_hbs_right(pkt->vp_if)) {
         /* Pkt entering vrouter from hbs-r
-         *   - SMAC of the packet contains flow_index
-         *   - Restore actual SMAC from flow_index and continue
-         *     flow action
+         *   - If SMAC has magic, Restore actual SMAC from flow_index and continue
+         *   - If DMAC has magic, Restore actual DMAC from flow_index and continue
          */ 
-        struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
         struct vr_eth_hbs_md *eth_hbs = (struct vr_eth_hbs_md*)pkt_data(pkt);
-        uint16_t magic = ntohs(eth_hbs->magic_smac);
-        unsigned int flow_index = ntohl(eth_hbs->flow_id_smac);
+        struct vr_eth *eth = (struct vr_eth*)pkt_data(pkt);
+        uint16_t magic;
+        unsigned int flow_index;
         uint32_t nh_id;
         struct vr_flow_entry *fe = NULL;
-        if ((magic & VR_HBS_MAGIC_MASK) != VR_HBS_SMAC_MAGIC) {
+        unsigned char* mac;
+        if ((ntohs(eth_hbs->magic_smac) & VR_HBS_MAGIC_MASK) ==
+                                                    VR_HBS_SMAC_MAGIC) {
+            magic = VR_HBS_SMAC_MAGIC;
+            flow_index = ntohl(eth_hbs->flow_id_smac);
+            mac = eth->eth_smac;
+        } else if ((ntohs(eth_hbs->magic_dmac) & VR_HBS_MAGIC_MASK) ==
+                                                    VR_HBS_DMAC_MAGIC) {
+            magic = VR_HBS_DMAC_MAGIC;
+            flow_index = ntohl(eth_hbs->flow_id_dmac);
+            mac = eth->eth_dmac;
+        } else {
             PKT_LOG(VP_DROP_INVALID_HBS_PKT, pkt, 0, VR_FLOW_C, __LINE__);
             goto drop_pkt;
         }
+
         if (vr_htable_get_hentry_by_index(router->vr_flow_table, flow_index)) {
             struct vr_nexthop *nh;
             fe = CONTAINER_OF(
@@ -1840,7 +1868,7 @@ vr_flow_forward(struct vrouter *router, struct vr_packet *pkt,
             nh = vrouter_get_nexthop(0, nh_id);
             vr_reinit_forwarding_md(router, pkt, fe, flow_index, nh, fmd);
             pkt->vp_if = nh->nh_dev;
-            memcpy(eth->eth_smac, nh->nh_data, VR_ETHER_ALEN);
+            memcpy(mac, nh->nh_data, VR_ETHER_ALEN);
             result = vr_flow_action_default(router, fe, flow_index, pkt, fmd);
             return __vr_flow_forward(result, pkt, fmd);
         }
