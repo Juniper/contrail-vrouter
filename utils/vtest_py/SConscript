@@ -119,8 +119,16 @@ env.Depends(setup_venv, create_sock_dir)
 env.Depends(vtest_py_ut_pycodestyle, setup_venv)
 env.Depends(vtest_py_ut, vtest_py_ut_pycodestyle)
 
+arg_vt = ''
+for arg in sys.argv:
+     if arg == "vrouter-py-ut:test":
+        arg_vt += "vrouter"
+     else:
+        arg_vt += arg
+     arg_vt += ' '
+
 build_vrouter = env.Command("build_vrouter", [], \
-                          "scons vrouter")
+                          arg_vt)
 
 gen_py_sandesh = env.Command("gen_py_sandesh", [], \
                              "scons sandesh/library/python:pysandesh")
