@@ -22,6 +22,30 @@
       "revId": "186e0af9d6b063f02c7f1f877842edb94e230e92",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "88b9f94f_d74922cb",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 634,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2020-02-10T12:23:43Z",
+      "side": 1,
+      "message": "If we convert this to a character array then, we might have to use strcpy and strncmp for assigning strings",
+      "parentUuid": "f69989fa_ec71a499",
+      "range": {
+        "startLine": 634,
+        "startChar": 12,
+        "endLine": 634,
+        "endChar": 33
+      },
+      "revId": "186e0af9d6b063f02c7f1f877842edb94e230e92",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
