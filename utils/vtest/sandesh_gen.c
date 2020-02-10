@@ -35,8 +35,10 @@ static char includes[] = {"\
 #include <vtest.h>\n\n"
 };
 
+static char message_gen_foo[] = "#include <";
+
 static char message_gen[] = {"\
-#include <vt_gen_message_modules.h>\n\n\
+vt_gen_message_modules.h>\n\n\
 struct vt_message_module vt_message_modules[] = {\n\
 "};
 
@@ -233,6 +235,7 @@ gen(FILE *fp)
         perror("vt_message_modules.c");
         return errno;
     }
+    gen_write(fp_message, 0, message_gen_foo);
     gen_write(fp_message, 0, message_gen);
 
     fp_message_hdr = gen_open("vt_gen_message_modules.h", true);
