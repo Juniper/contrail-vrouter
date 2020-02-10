@@ -33,18 +33,19 @@ libvrutil_objs = [env.Object('nl_util.lo', '../nl_util.c'),
 
 libvrutil_objs.append(env.Object('unix_util.lo', '../unix_util.c'))
 
-env.StaticLibrary(libvrutil, libvrutil_objs)
-
 env.Replace(LIBPATH = env['TOP_LIB'])
 env.Append(LIBPATH = ['.', '../../sandesh', './vhost/lib/'])
 env.Replace(LIBS = [libvrutil, 'sandesh-c', 'dp_sandesh_c', 'xml2'])
-env.Append(LIBS = ['jnprvnet', 'pcap', 'rt', 'nl-3', 'nl-genl-3'])
+env.Append(LIBS = ['pcap', 'rt', 'nl-3', 'nl-genl-3'])
 
 sandesh_gen = env.Program('sandesh_gen.c')
 
-sandesh_gen_cmd = build_root + '/vrouter/utils/vtest/sandesh_gen' + ' ' + sandesh_file
-sandesh_gen_output = env.Command('sandesh_gen_output', sandesh_gen,
-        sandesh_gen_cmd, chdir=build_dir)
+env.Command(['vt_gen_sandesh.c', 'vt_gen_sandesh_expect.c', 'vt_gen_message_modules.c', 'vt_gen_message_modules.h'],
+    [sandesh_gen], 'cd %s && %s/vrouter/utils/vtest/sandesh_gen %s' % (build_dir, build_root, sandesh_file))
+
+env.Command('libjnprvnet.a', None, 'make -C %s/vrouter/utils/vtest/vhost' % (src_root))
+
+vrutil = env.StaticLibrary('libvrutil.a', libvrutil_objs)
 
 vtest_src = [
                 'vt_main.c',
@@ -55,14 +56,14 @@ vtest_src = [
                 'vt_gen_sandesh_expect.c',
                 'vt_sandesh_response.c',
                 'vt_process_xml.c',
+		'vt_packet.c'
             ]
 
-vtest_src.append('vt_packet.c')
-env.Command('libjnprvnet.a', None, 'make', chdir=src_root+'/vrouter/utils/vtest/vhost')
+vtest = env.Program('vtest', map(lambda s_: env.Object(s_), vtest_src), LIBS = env['LIBS'] + ['libjnprvnet.a'])
+env.Requires(vtest, 'libjnprvnet.a')
+env.Requires(vtest, vrutil)
 
-vtest = env.Program('vtest', vtest_src)
 Export('vtest')
-env.Requires(vtest, sandesh_gen_output)
 
 # Local Variables:
 # mode: python
