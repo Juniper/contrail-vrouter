@@ -1,0 +1,211 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "142aa33e_f76902c9",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "rename this to service_core_mask_str",
+      "range": {
+        "startLine": 131,
+        "startChar": 5,
+        "endLine": 131,
+        "endChar": 18
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a578cb30_a6244362",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "rename to dpdk_ctrl_thread_mask_str",
+      "range": {
+        "startLine": 132,
+        "startChar": 5,
+        "endLine": 132,
+        "endChar": 20
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7df3e8cd_04538001",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "rename to service_core_mask_ptr",
+      "range": {
+        "startLine": 133,
+        "startChar": 6,
+        "endLine": 133,
+        "endChar": 27
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "47aa9b14_500b8af1",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 134,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "rename to dpdk_ctrl_thread_mask_ptr",
+      "range": {
+        "startLine": 134,
+        "startChar": 6,
+        "endLine": 134,
+        "endChar": 31
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8c6b0169_a5d726e5",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 524,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "this can be \"char* mask\"",
+      "range": {
+        "startLine": 524,
+        "startChar": 42,
+        "endLine": 524,
+        "endChar": 53
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d1d7ed3c_6cc326cd",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 530,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "If i \u003e 9, will this work?",
+      "range": {
+        "startLine": 530,
+        "startChar": 0,
+        "endLine": 530,
+        "endChar": 33
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a111a684_cf51893a",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 555,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "else has to come in previous line to match the rest of the code..\nif () {\n} else {\n}\n\nPl do the above for the rest of the code..",
+      "range": {
+        "startLine": 555,
+        "startChar": 2,
+        "endLine": 555,
+        "endChar": 8
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c4b0e5c5_1fab86e9",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 659,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "this can be combined into one else if { }?",
+      "range": {
+        "startLine": 658,
+        "startChar": 3,
+        "endLine": 659,
+        "endChar": 10
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d5f0ef5a_37582246",
+        "filename": "include/vr_dpdk.h",
+        "patchSetId": 9
+      },
+      "lineNbr": 966,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-12T13:28:41Z",
+      "side": 1,
+      "message": "can this also be unsigned int?",
+      "range": {
+        "startLine": 966,
+        "startChar": 7,
+        "endLine": 966,
+        "endChar": 10
+      },
+      "revId": "b02e8de54ab73697d0836c312e92a2cc4d561817",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
