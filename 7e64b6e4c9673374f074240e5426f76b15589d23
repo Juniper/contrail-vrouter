@@ -1,0 +1,645 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2bb116e1_cbd4e298",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 112,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "This is not required since we are doing inet_rt7.get_rtr_nh_idx() below",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "37fc1d25_25818bd8",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "same as above.",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7aec26f8_7ab26c6a",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "inet_rt7.get_rtr_nh_idx() should retrun 38?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "88405481_efcd4d6e",
+        "filename": "tests/test_cem_11421.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "inet_rt6.get_rtr_nh_idx() should retrun 38?",
+      "range": {
+        "startLine": 126,
+        "startChar": 13,
+        "endLine": 126,
+        "endChar": 24
+      },
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ee0357b5_76611b78",
+        "filename": "tests/test_hbs_vmi_to_fabric.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "Can we use sync_all?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6a86749e_528b2cd3",
+        "filename": "tests/test_hbs_vmi_to_fabric.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 149,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "icmp_type is not required",
+      "range": {
+        "startLine": 149,
+        "startChar": 12,
+        "endLine": 149,
+        "endChar": 21
+      },
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "de1a3905_c7243091",
+        "filename": "tests/test_hbs_vmi_to_fabric.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 164,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "icmp_type is not required",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "82ae5ff6_accb0328",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "no need to pass mcast_vrf if it is null",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0ee75f50_0dbc85ee",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "no need to pass mcast_vrf if it is null",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1e177295_40a7c623",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif.idx()?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ee7cfa10_eece3f35",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif.idx()",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "221799a0_566d6b9a",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "Don\u0027t mention, let it take default value.",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a8ac46db_50201e92",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif.idx()",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d5570279_ef8c6381",
+        "filename": "tests/test_nh_32bit.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "This is not required. As vif_get.get_vif_nh_id() will take care of querying.",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "24446f51_4967408d",
+        "filename": "tests/test_nh_32bit.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "same as above comment.",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "98f3d743_c6dbeed3",
+        "filename": "tests/test_vm_to_fabric_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif.idx()",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0ea3d5e0_0f6b36c8",
+        "filename": "tests/test_vm_to_fabric_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "ObjectBase.sync_all()\nself.f_flow.sync_and_link_flow(self.r_flow)\nmove this to setup",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8f98e1b7_49d04820",
+        "filename": "tests/test_vm_to_fabric_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 180,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "Not required if we move this to setup_method",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f5668563_f1e0cc33",
+        "filename": "tests/test_vm_to_fabric_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "if self.f_flow.sync_and_link_flow(self.r_flow) is moved to setup then, here we can just update the flag and call f_flow.sync() r_flow.sync()",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2dc2060f_b26a624e",
+        "filename": "tests/test_vm_to_fabric_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 150,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "i think this is default?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2da0ee4b_47797b98",
+        "filename": "tests/test_vm_to_fabric_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 208,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "Passing default values for ecmp_nh_index, qos_id, ridx ? if yes then not required.",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "35e7699d_3c8bd9d3",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 3,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "revert this change",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "52294c34_662f03b6",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 99,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "No need to send default values for ecmp_nh_index, qos_id, ridx",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "11f21aed_4d77da8f",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "No need to send default values for ecmp_nh_index, qos_id, ridx",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c49708eb_b6892669",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "move above 2 lines to setup_method",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "247b7f07_50933cff",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 234,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "call sync_and_link_flow in setup_method. update the flags and call sync()",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c27bf260_e66092bc",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 205,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "Do we need to send deaults? ecmp_nh_index, qos_id, ridx. Check this for all the test files",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9cdfb408_d640ef80",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 219,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bd4d8006_0b551bde",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 236,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "move above to lines to setup_method",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9cfe50b9_9f32c9a6",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 312,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "428105ef_3f0c745e",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 321,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "icmp_type is default.",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d73592f5_857e3684",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 335,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "if possible can we make this define this in constant.py\nECHO_REQUEST \u003d 8\nECHO_REPLY \u003d 0 \nsomething like this?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a64feae4_29987fd7",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 386,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "move above to lines to setup_method",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3636d50d_22d5f74f",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif1.idx() ?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "508dd401_d1d4cb7a",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 68,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif2.idx()?",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "25e9d18d_11bb9458",
+        "filename": "utils/pylib/vif.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "this argument is not required. By default when we create an object h_op should be OPER_ADD",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e7569ced_65b8d8d7",
+        "filename": "utils/pylib/vif.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 158,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "7e64b6e4c9673374f074240e5426f76b15589d23",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

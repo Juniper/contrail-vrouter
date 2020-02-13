@@ -536,6 +536,126 @@
       "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "a8ca751e_4c229111",
+        "filename": "tests/test_fabric_to_vm_intra_vn.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif.idx()?",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "76b3bba3_844c7aa8",
+        "filename": "tests/test_fabric_to_vm_intra_vn.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "vif.idx()?",
+      "range": {
+        "startLine": 65,
+        "startChar": 12,
+        "endLine": 65,
+        "endChar": 24
+      },
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ab354910_e35ba534",
+        "filename": "tests/test_fd_leak.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "flags (constants.VIF_FLAG_POLICY_ENABLED | onstants.VIF_FLAG_DHCP_ENABLED) is default. no need to set",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "68ca6904_4d9f8394",
+        "filename": "tests/test_vrf_table.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "Revert back all the changes of this file.",
+      "range": {
+        "startLine": 28,
+        "startChar": 4,
+        "endLine": 28,
+        "endChar": 7
+      },
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5d4aeb7e_8221f907",
+        "filename": "utils/pylib/vif.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "This should set constants.SANDESH_OPER_AD by default. Are we providing any value other than add?",
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c3105af6_b024d5c6",
+        "filename": "utils/pylib/vif.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 174,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-13T04:16:56Z",
+      "side": 1,
+      "message": "i think we should not provide this argument",
+      "range": {
+        "startLine": 174,
+        "startChar": 0,
+        "endLine": 174,
+        "endChar": 17
+      },
+      "revId": "6183801b62fcd9c94ccb83230b2e9efbf5f49f87",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
