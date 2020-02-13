@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a27d9950_f21b7ed3",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 663,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-13T02:19:59Z",
+      "side": 1,
+      "message": "Maintain 80 char limit everywhere",
+      "range": {
+        "startLine": 663,
+        "startChar": 8,
+        "endLine": 663,
+        "endChar": 107
+      },
+      "revId": "7bd690a65dc87d9e731288b08a9b795634f60a98",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0d089bf2_71980c06",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 1126,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-13T02:19:59Z",
+      "side": 1,
+      "message": "80 char limit",
+      "range": {
+        "startLine": 1125,
+        "startChar": 12,
+        "endLine": 1126,
+        "endChar": 122
+      },
+      "revId": "7bd690a65dc87d9e731288b08a9b795634f60a98",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
