@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 #
 # Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
 #
@@ -22,7 +24,7 @@ python dpdkvifstats.py
   Show total CPU utilisation
 
 ```
-python dpdkvifstats.py --all_vifs
+./dpdkvifstats.py --all_vifs --cpu 6
 ------------------------------------------------------------------------
 |                                pps per Core                          |
 ------------------------------------------------------------------------
@@ -37,29 +39,24 @@ python dpdkvifstats.py --all_vifs
 ------------------------------------------------------------------------
 
 
+./dpdkvifstats.py  --time 60 --vif 3 --cpu 4
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|Core 1  | TX pps: 515172    | RX pps: 1176564   | TX bps: 30910358  | RX bps: 70593846  | TX error: 0         | RX error 0         | TX port error: 0         | RX queue error 20710     |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|Core 2  | TX pps: 542231    | RX pps: 0         | TX bps: 32533882  | RX bps: 17        | TX error: 0         | RX error 0         | TX port error: 0         | RX queue error 0         |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|Core 3  | TX pps: 510204    | RX pps: 1061097   | TX bps: 30612262  | RX bps: 63665858  | TX error: 0         | RX error 0         | TX port error: 0         | RX queue error 642       |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|Core 4  | TX pps: 511408    | RX pps: 1214288   | TX bps: 30684530  | RX bps: 72857280  | TX error: 0         | RX error 0         | TX port error: 0         | RX queue error 0         |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|Total   | TX pps: 2079015   | RX pps: 3451949   | TX bps: 997928256 | RX bps: 1656936008| TX error: 0         | RX error 0         | TX port error: 0         | RX queue error 21352     |
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-python dpdkvifstats.py --time 5 --cpu 6 --vif 0
--------------------------------------------------------------------------------------------------------------------------------------
-|Core 1  | TX pps: 283737    | RX pps: 236696    | TX bps: 423580648 | RX bps: 353133107 | TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
-|Core 2  | TX pps: 136609    | RX pps: 235524    | TX bps: 201346001 | RX bps: 351291254 | TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
-|Core 3  | TX pps: 238158    | RX pps: 236921    | TX bps: 359514034 | RX bps: 353319124 | TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
-|Core 4  | TX pps: 181262    | RX pps: 239014    | TX bps: 268611209 | RX bps: 356478849 | TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
-|Core 5  | TX pps: 266889    | RX pps: 219515    | TX bps: 397977590 | RX bps: 327308671 | TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
-|Core 6  | TX pps: 269471    | RX pps: 210458    | TX bps: 401873006 | RX bps: 313822642 | TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
-|Total   | TX pps: 1376126   | RX pps: 1378128   | TX bps: 2052902488| RX bps: 2055353647| TX error: 0         | RX error 0         |
--------------------------------------------------------------------------------------------------------------------------------------
 """
 
 
 
 
-#! /usr/bin/env python
 
 import operator
 import argparse
@@ -107,6 +104,20 @@ def get_cpu_load_all(vif, core_n, timer):
         list1_rx.append(int(out[6]))
         list1_tx.append(int(out[17]))
         list1_rx.append(int(out[8]))
+        cmd = 'vif --get '+ str(vif) + '| grep -i  \"RX queue errors to lcore\"'
+        output = subprocess.check_output(['bash','-c', cmd])
+        out = output.split()
+        try:
+            list1_rx.append(int(out[i+15]))
+        except IndexError as e:
+            list1_rx.append(0)
+        try:
+            cmd = 'vif --get '+ str(vif) + ' --core ' + str(i+10) + '| grep -i  \"TX port\"'
+            output = subprocess.check_output(['bash','-c', cmd])
+            out = output.replace(':', ' ').split()
+            list1_tx.append(int(out[7]))
+        except:
+            list1_tx.append(0)
     time.sleep(timer)
     for i in range(core_n):
         cmd = 'vif --get '+ str(vif) + ' --core ' + str(i+10) + '| grep -i  \"\(TX\|RX\) packets\"'
@@ -119,6 +130,20 @@ def get_cpu_load_all(vif, core_n, timer):
         list2_rx.append(int(out[6]))
         list2_tx.append(int(out[17]))
         list2_rx.append(int(out[8]))
+        cmd = 'vif --get '+ str(vif) + '| grep -i  \"RX queue errors to lcore\"'
+        output = subprocess.check_output(['bash','-c', cmd])
+        out = output.split()
+        try:
+            list2_rx.append(int(out[i+15]))
+        except IndexError as e:
+            list2_rx.append(0)
+        try:
+            cmd = 'vif --get '+ str(vif) + ' --core ' + str(i+10) + '| grep -i  \"TX port\"'
+            output = subprocess.check_output(['bash','-c', cmd])
+            out = output.replace(':', ' ').split()
+            list2_tx.append(int(out[7]))
+        except:
+            list2_tx.append(0)
     for i in map(operator.sub, list2_rx, list1_rx):
          rx.append(i/int(timer))
     for i in map(operator.sub, list2_tx, list1_tx):
@@ -155,10 +180,10 @@ if parsed_params.all_vifs == True :
     for j in out:
         tx,rx = get_cpu_load_all(j,core_n,timer)
         for i in range(core_n):
-           print "| VIF {:<3} |Core {:<3}| TX pps: {:<10}| RX pps: {:<10}| TX bps: {:<10}| RX bps: {:<10}| TX error: {:<10}| RX error {:<10}| " .format(j,i+1,tx[i*3],rx[i*3],tx[i*3+1]*8,rx[i*3+1]*8,tx[i*3+2],rx[i*3+2])
-           tran[i] = tran[i] + tx[i*3]
-           recv[i] = recv[i] + rx[i*3]
-           core[i] = core[i] + tx[i*3] + rx[i*3]
+           print "| VIF {:<3} |Core {:<3}| TX pps: {:<10}| RX pps: {:<10}| TX bps: {:<10}| RX bps: {:<10}| TX error: {:<10}| RX error {:<10}| TX port error: {:<10}| RX queue error {:<10}|" .format(j,i+1,tx[i*4],rx[i*4],tx[i*4+1]*8,rx[i*4+1]*8,tx[i*4+2],rx[i*4+2],tx[i*4+3],rx[i*4+3])
+           tran[i] = tran[i] + tx[i*4]
+           recv[i] = recv[i] + rx[i*4]
+           core[i] = core[i] + tx[i*4] + rx[i*4]
     print "------------------------------------------------------------------------"
     print "|                                pps per Core                          |"
     print "------------------------------------------------------------------------"
@@ -170,18 +195,20 @@ if parsed_params.all_vifs == True :
 
 else: 
     tx,rx = get_cpu_load_all(vif,core_n,timer)
-    total=[0,0,0,0,0,0]
-    print "-------------------------------------------------------------------------------------------------------------------------------------"
+    total=[0,0,0,0,0,0,0,0]
+    print "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
     for i in range(core_n):
-        total[0]+=tx[i*3]
-        total[1]+=rx[i*3]
-        total[2]+=tx[i*3+1]
-        total[3]+=rx[i*3+1]
-        total[4]+=tx[i*3+2]
-        total[5]+=rx[i*3+2]
-        print "|Core {:<3}| TX pps: {:<10}| RX pps: {:<10}| TX bps: {:<10}| RX bps: {:<10}| TX error: {:<10}| RX error {:<10}|" .format(i+1, tx[i*3], rx[i*3], tx[i*3+1], rx[i*3+1], tx[i*3+2], rx[i*3+2])
-        print "-------------------------------------------------------------------------------------------------------------------------------------"
-    print "|Total   | TX pps: {:<10}| RX pps: {:<10}| TX bps: {:<10}| RX bps: {:<10}| TX error: {:<10}| RX error {:<10}|" .format(total[0], total[1], total[2]*8, total[3]*8, total[4], total[5])
-    print "-------------------------------------------------------------------------------------------------------------------------------------"
+        total[0]+=tx[i*4]
+        total[1]+=rx[i*4]
+        total[2]+=tx[i*4+1]
+        total[3]+=rx[i*4+1]
+        total[4]+=tx[i*4+2]
+        total[5]+=rx[i*4+2]
+        total[6]+=tx[i*4+3]
+        total[7]+=rx[i*4+3]
+        print "|Core {:<3}| TX pps: {:<10}| RX pps: {:<10}| TX bps: {:<10}| RX bps: {:<10}| TX error: {:<10}| RX error {:<10}| TX port error: {:<10}| RX queue error {:<10}|" .format(i+1, tx[i*4], rx[i*4], tx[i*4+1], rx[i*4+1], tx[i*4+2], rx[i*4+2],tx[i*4+3], rx[i*4+3])
+        print "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
+    print "|Total   | TX pps: {:<10}| RX pps: {:<10}| TX bps: {:<10}| RX bps: {:<10}| TX error: {:<10}| RX error {:<10}| TX port error: {:<10}| RX queue error {:<10}|" .format(total[0], total[1], total[2]*8, total[3]*8, total[4], total[5], total[6], total[7])
+    print "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
 
 
