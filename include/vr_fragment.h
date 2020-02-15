@@ -7,11 +7,28 @@
 #ifndef __VR_FRAGMENT_H__
 #define __VR_FRAGMENT_H__
 
-#define VR_ASSEMBLER_TIMEOUT_TIME               5
+/* Number of buckets in assembler_table[][] */
 #define VR_LINUX_ASSEMBLER_BUCKETS              1024
+/* Number of fragments per assembler bucket */
 #define VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE    256
+/* Number of fragments per CPU queue */
 #define VR_MAX_FRAGMENTS_PER_CPU_QUEUE          256
+/* Number of enqueue attempts to assembler_table */
 #define VR_FRAG_ENQUEUE_ATTEMPTS                3
+/* Assembler timeout for fragment entries */
+#define VR_ASSEMBLER_TIMEOUT_SECS               2
+/* Fragment hash table timeout */
+#define VR_FRAG_HASH_TABLE_TIMEOUT_SECS         2
+/* Fragment hash table scanner interval */
+#define VR_FRAG_HASH_TABLE_SCANNER_INTERVAL_MSEC 100
+/* Number of entries to scan every time */
+#define VR_FRAG_HASH_TABLE_ENTRIES_PER_SCAN     2048
+/* Size of fragment hash table */
+#define VR_FRAG_HASH_TABLE_ENTRIES              8192
+/* Buckets per entry in fragment hash table */
+#define VR_FRAG_HASH_TABLE_BUCKETS              4
+/* Overflow entries of fragment hash table */
+#define VR_FRAG_HASH_OTABLE_ENTRIES             1024
 
 struct vr_fragment_key {
     uint64_t fk_sip_u;
@@ -45,6 +62,7 @@ struct vr_fragment {
     uint64_t f_time;
     uint16_t f_expected;
     uint16_t f_received;
+    /* does frag entry contain valid port */
     bool f_port_info_valid;
 } __attribute__((packed));
 
