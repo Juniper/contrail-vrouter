@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "00b18e7f_5d3c078c",
+        "filename": "tests/test_hbs_vmi_to_fabric.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-15T16:44:37Z",
+      "side": 1,
+      "message": "this file is not required since it has been combined?",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
