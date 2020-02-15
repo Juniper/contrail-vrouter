@@ -648,7 +648,7 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
     return fe;
 }
 
-#define ENTRIES_PER_SCAN    64
+#define ENTRIES_PER_SCAN  1024
 
 struct scanner_params {
     struct vrouter *sp_router;
@@ -717,7 +717,7 @@ fragment_table_scanner_init(struct vrouter *router)
 
     vtimer->vt_timer = fragment_table_scanner;
     vtimer->vt_vr_arg = scanner;
-    vtimer->vt_msecs = 1000;
+    vtimer->vt_msecs = 100;
     if (vr_create_timer(vtimer)) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
         goto fail_init;

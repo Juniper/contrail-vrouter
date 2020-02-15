@@ -819,7 +819,7 @@ vr_inet_fragment_flow(struct vrouter *router, unsigned short vrf,
 
     frag = vr_fragment_get(router, vrf, ip);
     if (!frag) {
-        return -1;
+        return VP_DROP_NO_FRAG_ENTRY;
     }
 
     sport = frag->f_sport;
@@ -899,7 +899,7 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
                 vr_inet_flow_swap(flow_p);
             } else {
                 /* for icmp error for icmp error, we will drop the packet */
-                return -1;
+                return VP_DROP_ICMP_ERROR;
             }
 
             return 0;
@@ -995,20 +995,23 @@ vr_inet_should_trap(struct vr_packet *pkt, struct vr_flow *flow_p)
 
 int
 vr_inet_get_flow_key(struct vrouter *router, struct vr_packet *pkt,
-        struct vr_forwarding_md *fmd, struct vr_flow *flow, uint8_t valid_fkey_params)
+                     struct vr_forwarding_md *fmd, struct vr_flow *flow,
+                     uint8_t valid_fkey_params, bool frag_calc)
 {
     int ret;
     struct vr_ip *ip;
 
     ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
-                                    flow, valid_fkey_params, false);
+                                    flow, valid_fkey_params, frag_calc);
     if (ret < 0)
         return ret;
 
     ip = (struct vr_ip *)pkt_network_header(pkt);
     if (vr_ip_fragment_head(ip)) {
-        vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow->flow4_sport,
+        ret = vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow->flow4_sport,
                 flow->flow4_dport);
+        if (ret < 0)
+            return VP_DROP_NO_MEMORY;
     }
 
     return 0;
@@ -1067,8 +1070,10 @@ vr_inet_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
 
 
     if (vr_ip_fragment_head(ip)) {
-        vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
+        ret = vr_v4_fragment_add(router, fmd->fmd_dvrf, ip, flow_p->flow4_sport,
                 flow_p->flow4_dport);
+        if (ret < 0)
+            return VP_DROP_NO_MEMORY;
         if (vr_enqueue_to_assembler) {
             pkt_c = vr_pclone(pkt);
             if (pkt_c) {
