@@ -995,13 +995,14 @@ vr_inet_should_trap(struct vr_packet *pkt, struct vr_flow *flow_p)
 
 int
 vr_inet_get_flow_key(struct vrouter *router, struct vr_packet *pkt,
-        struct vr_forwarding_md *fmd, struct vr_flow *flow, uint8_t valid_fkey_params)
+                     struct vr_forwarding_md *fmd, struct vr_flow *flow,
+                     uint8_t valid_fkey_params, bool frag_calc)
 {
     int ret;
     struct vr_ip *ip;
 
     ret = vr_inet_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
-                                    flow, valid_fkey_params, false);
+                                    flow, valid_fkey_params, frag_calc);
     if (ret < 0)
         return ret;
 

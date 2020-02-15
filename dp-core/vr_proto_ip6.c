@@ -394,14 +394,14 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
 int
 vr_inet6_get_flow_key(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p,
-        uint8_t valid_fkey_params)
+        uint8_t valid_fkey_params, bool frag_calc)
 {
     int ret;
     struct vr_ip6 *ip6;
 
     ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
     ret = vr_inet6_form_flow(router, vrf, pkt, vlan, ip6, flow_p,
-            valid_fkey_params, false);
+            valid_fkey_params, frag_calc);
     if (ret < 0)
         return ret;
 

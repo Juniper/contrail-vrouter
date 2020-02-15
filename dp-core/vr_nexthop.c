@@ -736,6 +736,9 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
     struct vr_flow_entry *fe = NULL;
     struct vr_nexthop *cnh = NULL;
     struct vr_component_nh *cnhp = nh->nh_component_nh;
+    struct vr_ip *ip;
+    struct vr_ip6 *ip6;
+    struct vr_packet *pkt_c;
 
     if (!nh || !fmd || (!nh->nh_component_cnt))
         return ret;
@@ -762,26 +765,65 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
     }
 
     if (!fe) {
-
         /*
          * If the flow entry does not exist, apply the configured
          * hash parameters to select candidate nexthop
          */
         hash = (nh->nh_ecmp_config_hash >> 8) & NH_ECMP_CONFIG_HASH_MASK;
         if (pkt->vp_type == VP_TYPE_IP) {
-            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp, hash);
-            if (ret < 0)
+            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp, hash, true);
+            ip = (struct vr_ip *)pkt_network_header(pkt);
+            if (ret < 0) {
+                /*
+                 * Handle non-head fragmented packets
+                 * - If the head fragment has not yet arrived, the fragment hash table
+                 *   will not have any entry for it. In such cases, we cannot form
+                 *   the flow key and get_flow_key() will fail. Such packets need to be
+                 *   enqueued to the assembler. Once head fragment arrives, these
+                 *   packets would be reinjected by the assembler.
+                 */
+                if (!vr_ip_transport_header_valid(ip) && vr_enqueue_to_assembler) {
+                    vr_enqueue_to_assembler(nh->nh_router, pkt, fmd);
+                    return NH_ECMP_PACKET_HELD;
+                }
                 return ret;
+            } else {
+                /*
+                 * Handle head fragmented packets
+                 * - If this is a head fragment, clone it and enqueue it to the assembler
+                 *   which would result in flushing of non-head fragments which
+                 *   were queued earlier. The addition of head fragment to the fragment
+                 *   hash table is taken care of in the get_flow_key().
+                 */
+                if (vr_ip_fragment_head(ip) && vr_enqueue_to_assembler) {
+                    pkt_c = vr_pclone(pkt);
+                    if (pkt_c) {
+                        vr_enqueue_to_assembler(nh->nh_router, pkt_c, fmd);
+                    }
+                }
+            }
         } else if (pkt->vp_type == VP_TYPE_IP6) {
             ret = vr_inet6_get_flow_key(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                     fmd->fmd_vlan, flowp, hash);
-            if (ret < 0)
+                                     fmd->fmd_vlan, flowp, hash, true);
+            ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+            if (ret < 0) {
+                if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
+                    vr_enqueue_to_assembler(nh->nh_router, pkt, fmd);
+                    return NH_ECMP_PACKET_HELD;
+                }
                 return ret;
+            } else {
+                if (vr_ip6_fragment_head(ip6) && vr_enqueue_to_assembler) {
+                    pkt_c = vr_pclone(pkt);
+                    if (pkt_c) {
+                        vr_enqueue_to_assembler(nh->nh_router, pkt_c, fmd);
+                    }
+                }
+            }
         } else {
             return ret;
         }
     }
-
 
     if (ecmp_index == -1) {
         hash = hash_ecmp = vr_hash(flowp, flowp->flow_key_len, 0);
@@ -832,6 +874,8 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (!member_nh) {
         ret = nh_composite_ecmp_select_nh(pkt, nh, fmd);
+        if (ret == NH_ECMP_PACKET_HELD)
+            return 0; /* packet was consumed */
         if (ret)
             goto drop;
 
@@ -1679,10 +1723,10 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (pkt->vp_type == VP_TYPE_IP) {
         ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd,
-                                     flowp, VR_FLOW_KEY_ALL);
+                                     flowp, VR_FLOW_KEY_ALL, false);
     } else if (pkt->vp_type == VP_TYPE_IP6) {
         ret = vr_inet6_get_flow_key(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                 fmd->fmd_vlan, flowp, VR_FLOW_KEY_ALL);
+                                 fmd->fmd_vlan, flowp, VR_FLOW_KEY_ALL, false);
     }
 
     if (!ret) {
