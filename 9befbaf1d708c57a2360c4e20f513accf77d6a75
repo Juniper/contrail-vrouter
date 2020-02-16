@@ -16,6 +16,24 @@
       "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0e2b31de_236ce396",
+        "filename": "tests/test_hbs_vmi_to_fabric.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-02-16T17:39:04Z",
+      "side": 1,
+      "message": "Could not merge test_hbs_vmi_to_fabric.py and test_vm_to_fabric_intra_vn.py due to difference in the IP values. So was asked to leave it as it is.",
+      "parentUuid": "00b18e7f_5d3c078c",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
