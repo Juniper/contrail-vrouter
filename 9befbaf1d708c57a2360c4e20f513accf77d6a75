@@ -2,6 +2,108 @@
   "comments": [
     {
       "key": {
+        "uuid": "73cf1e57_23308511",
+        "filename": "tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "Can you add a function like set_nh_flags() instead of directly setting the value",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e4498d40_de89a566",
+        "filename": "tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 191,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "43c9171c_db1e3d21",
+        "filename": "tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 196,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "daa23137_705cc370",
+        "filename": "tests/test_fabric_to_vm_intra_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "vif.idx()? Go though each file and fix this.",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0b59a35e_f86b88ec",
+        "filename": "tests/test_fabric_to_vm_intra_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "79e5e703_964c2758",
+        "filename": "tests/test_fabric_to_vm_intra_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 71,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "00b18e7f_5d3c078c",
         "filename": "tests/test_hbs_vmi_to_fabric.py",
         "patchSetId": 3
@@ -31,6 +133,176 @@
       "side": 1,
       "message": "Could not merge test_hbs_vmi_to_fabric.py and test_vm_to_fabric_intra_vn.py due to difference in the IP values. So was asked to leave it as it is.",
       "parentUuid": "00b18e7f_5d3c078c",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "12a33a54_8f33e228",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "2 is for? Can you specify constants name so that it is easier to understand",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fc6a2a2b_bb647e7d",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ce72ffdf_57e09a80",
+        "filename": "tests/test_mirror_v6_intf_phy.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 111,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ad1f1a01_5641414c",
+        "filename": "tests/test_nh_32bit.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "vif.idx(). please fix this in all files",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ed6083c5_d5cdfa67",
+        "filename": "tests/test_nh_32bit.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "I think it is already int in constants.py. No need to type cast.",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "12832359_4604aa4e",
+        "filename": "tests/test_nh_32bit.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "same as above",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "909fa194_9f52fe88",
+        "filename": "tests/test_vm_to_fabric_intra_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 168,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "vif.idx()",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "17f8cfdc_ff9e1abd",
+        "filename": "tests/test_vm_to_fabric_intra_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 203,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "default values still present? Please fix this in all files",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6b31e1aa_30ffb143",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 192,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "vif.idx()",
+      "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "04ac7c64_1a80bf11",
+        "filename": "tests/test_vm_to_vm_intra_vn.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-02-16T18:01:15Z",
+      "side": 1,
+      "message": "send_and_receive_packet returns 0th index hence checking ICMP in rec_pkt is sufficient. Please fix this in all files",
       "revId": "9befbaf1d708c57a2360c4e20f513accf77d6a75",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
