@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "79de0a60_d2ac9293",
+        "filename": "utils/vtest/SConscript",
+        "patchSetId": 3
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 437
+      },
+      "writtenOn": "2020-02-22T10:56:44Z",
+      "side": 1,
+      "message": "it looks like \u0027tabs\u0027 symbols.. \nafaik, spaces are used instead of tabs in such files?",
+      "range": {
+        "startLine": 59,
+        "startChar": 0,
+        "endLine": 59,
+        "endChar": 2
+      },
+      "revId": "2daea7886d2891b387614d575eab99a75cdf8598",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
