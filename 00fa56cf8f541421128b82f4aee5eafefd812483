@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "30a419df_b9627151",
+        "filename": "dp-core/vr_fragment.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 208,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-25T06:08:06Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "2168f79e_dd5c27a0",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "135d93ee_0fcd14a8",
         "filename": "dp-core/vr_fragment.c",
         "patchSetId": 4
@@ -33,6 +51,24 @@
       "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "509d0a95_0c8c0dc1",
+        "filename": "dp-core/vr_fragment.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 615,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-25T06:08:06Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "135d93ee_0fcd14a8",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "f2603ef3_c6199b96",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 787,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-25T06:08:06Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "5b891f71_5f72c5ef",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "fab92267_ad7b256f",
         "filename": "dp-core/vr_proto_ip.c",
         "patchSetId": 4
@@ -64,6 +118,24 @@
       "writtenOn": "2020-02-25T05:24:53Z",
       "side": 1,
       "message": "How are mirrored pkts handled? I had this concern initially when I wanted to set frag_calc to true.",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b265d54a_d3697c61",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 830,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-25T06:08:06Z",
+      "side": 1,
+      "message": "Mirror packets should still pass frag_calc as false. It will be true only for ECMP case.",
+      "parentUuid": "fab92267_ad7b256f",
       "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
@@ -84,6 +156,24 @@
       "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fabaa321_9d4ed722",
+        "filename": "include/vr_fragment.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-25T06:08:06Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "015beb5d_576146a7",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
