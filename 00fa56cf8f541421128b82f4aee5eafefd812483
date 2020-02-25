@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2168f79e_dd5c27a0",
+        "filename": "dp-core/vr_fragment.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 208,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T05:24:53Z",
+      "side": 1,
+      "message": "Thanks for adding all the comments.",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "135d93ee_0fcd14a8",
+        "filename": "dp-core/vr_fragment.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 615,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T05:24:53Z",
+      "side": 1,
+      "message": "Nit: Add fragment to the fragment hash table. Please take care at other places as well.",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5b891f71_5f72c5ef",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 787,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T05:24:53Z",
+      "side": 1,
+      "message": "Can you handle the case when pkt cloning fails? Return error and increment counter?\nSame for IPv6 case.",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fab92267_ad7b256f",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 830,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T05:24:53Z",
+      "side": 1,
+      "message": "How are mirrored pkts handled? I had this concern initially when I wanted to set frag_calc to true.",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "015beb5d_576146a7",
+        "filename": "include/vr_fragment.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T05:24:53Z",
+      "side": 1,
+      "message": "Hope you have tested this with kernel compute as well. If not, please make sure to test it.",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
