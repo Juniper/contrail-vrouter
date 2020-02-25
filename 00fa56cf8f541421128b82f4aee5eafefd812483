@@ -72,6 +72,23 @@
     },
     {
       "key": {
+        "uuid": "8b581239_b2853a54",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 775,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T06:22:52Z",
+      "side": 1,
+      "message": "What happens when this is called for mirrored pkts? Are you saying we don\u0027t go through ECMP NH for mirrored pkts?",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5b891f71_5f72c5ef",
         "filename": "dp-core/vr_nexthop.c",
         "patchSetId": 4
@@ -136,6 +153,24 @@
       "side": 1,
       "message": "Mirror packets should still pass frag_calc as false. It will be true only for ECMP case.",
       "parentUuid": "fab92267_ad7b256f",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0e306ef8_9d8d567e",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 830,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-02-25T06:22:52Z",
+      "side": 1,
+      "message": "My question was actually in context of ECMP nh. See my question in vr_nexthop.c.",
+      "parentUuid": "b265d54a_d3697c61",
       "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
