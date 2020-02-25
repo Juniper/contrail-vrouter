@@ -89,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "b29b9306_8a436d4e",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 775,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-02-25T08:00:22Z",
+      "side": 1,
+      "message": "I have asked JTAC to test that case.",
+      "parentUuid": "8b581239_b2853a54",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5b891f71_5f72c5ef",
         "filename": "dp-core/vr_nexthop.c",
         "patchSetId": 4
