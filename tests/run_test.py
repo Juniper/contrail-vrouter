@@ -7,6 +7,7 @@ import argparse
 import platform
 import subprocess
 import logging
+import xml.etree.ElementTree as ET
 
 logfile = None
 if os.environ.get('VTEST_PY_VENV_PATH'):
@@ -42,8 +43,8 @@ def parse(cmd):
                         help="run vRouter alone", action="store_true")
     parser.add_argument('-t', '--test', required=False,
                         help="test a specific file")
-    parser.add_argument('-gxml', '--xml', required=False,
-                        help="tpecify xml file")
+    parser.add_argument('-gxml', '--xml',
+                        help="tpecify xml file", action="store_true")
     parser.add_argument("-a", "--all",
                         help="run all tests", action="store_true")
     parser.add_argument("-p", "--pycodestyle",
@@ -77,7 +78,7 @@ def parse(cmd):
         vrouter_path = args['vrouter']
     if not path.exists(vrouter_path):
         logging.error("vRouter path not set")
-        return 1
+        exit(1)
     os.environ['VROUTER_DPDK_PATH'] = vrouter_path
 
     if args['vtest'] is None:
@@ -90,7 +91,7 @@ def parse(cmd):
         vtest_path = args['vtest']
     if not path.exists(vtest_path):
         logging.error("vtest path not set")
-        return 1
+        exit(1)
     os.environ['VTEST_PATH'] = vtest_path
 
     if args['socket'] is None:
@@ -103,7 +104,7 @@ def parse(cmd):
         socket_path = args['socket']
     if not path.exists(socket_path):
         logging.error("socket path not set")
-        return 1
+        exit(1)
     os.environ['VROUTER_SOCKET_PATH'] = socket_path
 
     if args['venv'] is None:
@@ -116,7 +117,7 @@ def parse(cmd):
         vtest_py_venv_path = args['venv']
     if not path.exists(vtest_py_venv_path):
         logging.error("venv path not set")
-        return 1
+        exit(1)
     os.environ['VTEST_PY_VENV_PATH'] = vtest_py_venv_path
 
     utilily_path = build_path + '/debug/vrouter/utils/'
@@ -191,12 +192,12 @@ def parse(cmd):
         if cmd_op:
             print(cmd_op)
             raise NameError('pycodestyle errors')
-        return
+        exit(0)
     elif args['flake']:
         logging.info("Running flake check ..")
         cmd = 'flake8 lib/*.py tests/test_*.py'
     else:
-        if(test_opt is not None):
+        if(test_opt):
             logging.info("Executing test file {} ..".format(test_opt))
             if(args['xml'] is not None):
                 cmd = 'pytest -s ./tests/{} --junitxml=result.xml'.format(
@@ -209,7 +210,7 @@ def parse(cmd):
     print('Logs path : {}'.format(logfile))
     if(result != 0):
         logging.error("Script execution failed")
-        return 1
+        exit(1)
 
 
 def run_command(cmd):
@@ -226,11 +227,18 @@ def run_command(cmd):
     else:
         return 0
 
+def parse_result():
+    tree = ET.parse('result.xml')
+    root = tree.getroot()
+    for child in root:
+        if child.attrib['failures'] != '0':
+            print "Script execution failed"
+            exit(1)
 
 def main():
     cmd = sys.argv
     parse(cmd)
-
+    parse_result()
 
 if __name__ == '__main__':
     main()

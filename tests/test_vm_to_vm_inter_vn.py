@@ -128,6 +128,7 @@ class TestVmToVmInterVn(unittest.TestCase):
             dip='1.1.1.4',
             smac='02:e7:03:ea:67:f1',
             dmac='00:00:5e:00:01:00',
+            icmp_type=0,
             id=1136)
         pkt = icmp.get_packet()
         pkt.show()
