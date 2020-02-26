@@ -99,3 +99,6 @@ class ObjectBase(Base, Common):
                     obj.sreq_class != vr_flow_req.__name__:
                 self.logger.info("\nSyncing object: {}".format(obj))
                 obj.sync()
+
+    def reload(self):
+        self.__resp_file__ = None
