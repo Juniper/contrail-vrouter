@@ -121,6 +121,8 @@ class TestVmToVmInterVn(unittest.TestCase):
         self.assertTrue(ICMP in rec_pkt)
         self.assertEqual('02:88:67:0c:2e:11', rec_pkt.src)
         self.assertEqual('00:00:5e:00:01:00', rec_pkt.dst)
+        self.assertEqual(1, vif3.get_vif_ipackets())
+        self.assertEqual(1, vif4.get_vif_opackets())
 
         # send ping request from vif4
         icmp = IcmpPacket(
@@ -128,6 +130,7 @@ class TestVmToVmInterVn(unittest.TestCase):
             dip='1.1.1.4',
             smac='02:e7:03:ea:67:f1',
             dmac='00:00:5e:00:01:00',
+            icmp_type=0,
             id=1136)
         pkt = icmp.get_packet()
         pkt.show()
@@ -140,8 +143,7 @@ class TestVmToVmInterVn(unittest.TestCase):
         self.assertEqual('00:00:5e:00:01:00', rec_pkt.dst)
 
         # Check if the packet was received at vif3 and vif4
+        vif3.reload()
         self.assertEqual(1, vif3.get_vif_opackets())
-        self.assertEqual(1, vif3.get_vif_ipackets())
-
-        self.assertEqual(1, vif4.get_vif_opackets())
+        vif4.reload()
         self.assertEqual(1, vif4.get_vif_ipackets())
