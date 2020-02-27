@@ -15,26 +15,30 @@ class ObjectBase(Base, Common):
     to/from vrouter
     """
     # Dict to store objects for sync all and auto cleanup
-    __obj_list__ = []
+    __obj_dict__ = {}
     auto_cleanup = False
     auto_vif_idx_alloc = False
     auto_nh_id_alloc = False
+    __obj_id__ = 0
 
     @classmethod
     def setUp(self, method):
         """Stores objects for sync all and auto cleanup"""
         super(ObjectBase, self).setUp(method)
-        self.__obj_list__ = []
+        ObjectBase.__obj_dict__ = {}
+        ObjectBase.__obj_id__ = 0
 
     @classmethod
     def tearDown(self):
         """Deletes objects in the reverse order from the list"""
         super(ObjectBase, self).tearDown()
         if ObjectBase.auto_cleanup:
-            while len(self.__obj_list__) > 0:
-                obj = self.__obj_list__.pop()
-                self.logger.info("\nDeleting object: {}".format(obj))
-                obj.delete()
+            for id in range(ObjectBase.__obj_id__, 0, -1):
+                if id in ObjectBase.__obj_dict__.keys():
+                    obj = ObjectBase.__obj_dict__[id]
+                    del ObjectBase.__obj_dict__[id]
+                    self.logger.info("\nDeleting object: {}".format(obj))
+                    obj.delete()
 
     @classmethod
     def set_auto_features(self, cleanup=False, vif_idx=False, nh_idx=False):
@@ -47,7 +51,8 @@ class ObjectBase(Base, Common):
         super(ObjectBase, self).__init__(*args, **kwargs)
         self.__resp_file__ = None
         self.__is_synced__ = False
-        ObjectBase.__obj_list__.append(self)
+        ObjectBase.__obj_id__ += 1
+        ObjectBase.__obj_dict__.update({self.__obj_id__: self})
 
     def sync(self, resp_required=False):
         """
@@ -70,6 +75,7 @@ class ObjectBase(Base, Common):
         try:
             self.h_op = constants.SANDESH_OPER_DEL
             self.send_sandesh_req(self)
+            del ObjectBase.__obj_dict__[self.__obj_id__]
         except Exception as err:
             self.logger.error("Error sending delete sandesh req")
 
@@ -93,9 +99,9 @@ class ObjectBase(Base, Common):
     @classmethod
     def sync_all(self):
         """This method can be used to sync all objects at once"""
-        for obj in self.__obj_list__:
+        for id in range(1, ObjectBase.__obj_id__+1):
             # flow has some different mechanism for sync because of reverse
             # flow hence skip flow object
-            if not obj.__is_synced__ and \
-                    obj.sreq_class != vr_flow_req.__name__:
-                obj.sync()
+            if not ObjectBase.__obj_dict__[id].__is_synced__ and \
+               ObjectBase.__obj_dict__[id].sreq_class != vr_flow_req.__name__:
+                ObjectBase.__obj_dict__[id].sync()

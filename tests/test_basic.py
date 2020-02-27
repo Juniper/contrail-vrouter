@@ -154,3 +154,82 @@ class TestBasic(unittest.TestCase):
         flow1.sync_and_link_flow(flow2)
         self.assertGreater(flow1.get_fr_index(), 0)
         self.assertGreater(flow2.get_fr_index(), 0)
+
+    def test_vxlan(self):
+        # Add vif
+        vif = VirtualVif(
+            name="1",
+            mac_str="de:ad:be:ef:00:02",
+            ipv4_str=None)
+
+        # Add nexthop
+        nh = EncapNextHop(
+            encap_oif_id=vif.idx(),
+            encap="de ad be ef 00 02 de ad be ef 00 01 08 00",
+            nh_family=constants.AF_BRIDGE)
+
+        # Add vxlan
+        vxlan = Vxlan(
+            vxlan_idx=4,
+            vxlan_nhid=nh.idx())
+
+        ObjectBase.sync_all()
+        self.assertEqual(vxlan.idx(), vxlan.get_vxlan_idx())
+
+        # Delete vxlan
+        vxlan.delete()
+        self.assertNotIn(vxlan.__obj_id__, ObjectBase.__obj_dict__)
+
+    def test_mirror(self):
+        # Add vif
+        vif = VirtualVif(
+            name="1",
+            mac_str="de:ad:be:ef:00:02",
+            ipv4_str=None)
+
+        # Add nexthop
+        nh = EncapNextHop(
+            encap_oif_id=vif.idx(),
+            encap="de ad be ef 00 02 de ad be ef 00 01 08 00",
+            nh_family=constants.AF_BRIDGE)
+
+        # Add mirror
+        mirr = Mirror(
+            idx=4,
+            nh_idx=nh.idx())
+        ObjectBase.sync_all()
+
+        self.assertEqual(mirr.idx(), mirr.get_mirr_idx())
+
+        # Delete mirror
+        mirr.delete()
+        self.assertNotIn(mirr, ObjectBase.__obj_dict__)
+
+    def test_mpls(self):
+        # Add vif
+        vif = VirtualVif(
+            name="1",
+            mac_str="de:ad:be:ef:00:02",
+            ipv4_str=None)
+
+        # Add nexthop
+        nh = EncapNextHop(
+            encap_oif_id=vif.idx(),
+            encap="de ad be ef 00 02 de ad be ef 00 01 08 00",
+            nh_family=constants.AF_BRIDGE)
+
+        # Add mpls
+        mpls = Mpls(
+            mr_label=4,
+            mr_nhid=nh.idx())
+
+        ObjectBase.sync_all()
+        self.assertEqual(mpls.label(), mpls.get_mr_label())
+
+        # Delete mpls
+        mpls.delete()
+        self.assertNotIn(mpls, ObjectBase.__obj_dict__)
+
+    def test_ip(self):
+        self.assertEqual(Common.vt_ipv4("1.1.2.2"), 33685761)
+        self.assertEqual(Common.vt_ipv4("2.2.1.1"), 16843266)

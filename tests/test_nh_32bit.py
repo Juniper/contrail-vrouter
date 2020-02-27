@@ -46,6 +46,7 @@ class TestNh32(unittest.TestCase):
             ipv4_str="1.1.1.10",
             mac_str="fe:ad:be:ef:00:02",
             idx=1,
+            flags=None,
             h_op=constants.SANDESH_OPER_GET)
         vif_get.sync()
 
