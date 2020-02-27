@@ -160,6 +160,46 @@ class IpPacket(EtherPacket):
             return self.ip
 
 
+class IpVlanPacket(VlanPacket):
+    """
+    IpPacket class for creating IPv4 packet
+
+    Mandatory Parameters:
+    --------------------
+    proto : str
+        IP protocol
+    sip : str
+        Source IP address
+    dip : str:
+        Destination IP address
+
+    Optional Parameters:
+    -------------------
+    smac : str
+       Source mac address
+    dmac : str
+        Destination mac address
+    ihl : int
+        Internet header length
+    id : int
+        Identification field
+    ttl : int
+        Time to live
+    """
+
+    def __init__(self, proto, sip, dip, smac=None, dmac=None,
+                 ihl=5, id=1, ttl=64, **kwargs):
+        super(IpVlanPacket, self).__init__(smac, dmac, 0x800, **kwargs)
+        self.ip = IP(version=4, ihl=ihl, id=id,
+                     ttl=ttl, proto=proto, dst=dip, src=sip)
+
+    def get_packet(self):
+        if self.eth:
+            return self.eth / self.vlan / self.ip
+        else:
+            return self.vlan / self.ip
+
+
 class Ipv6Packet(EtherPacket):
     """
     Ipv6Packet class for creating IPv6 packet
@@ -262,14 +302,62 @@ class UdpPacket(IpPacket):
        Source mac address
     dmac : str
         Destination mac address
+    jumbo : bool
+        Jumbo packet size
+    """
+
+    def __init__(self, sip, dip, sport, dport, smac=None,
+                 dmac=None, jumbo=False, **kwargs):
+        super(UdpPacket, self).__init__('udp', sip, dip, smac, dmac, **kwargs)
+        self.udp = UDP(sport=sport, dport=dport)
+        self.jumbo = jumbo
+
+    def get_packet(self):
+        if self.jumbo and self.eth:
+            payload = "x" * 9000
+            pkt = self.eth / self.ip / self.udp / payload
+        elif self.eth:
+            pkt = self.eth / self.ip / self.udp
+        else:
+            pkt = self.ip / self.udp
+        return pkt
+
+
+class UdpVlanPacket(IpVlanPacket):
+    """
+    UdpPacket class for creating udp packet
+
+    Mandatory Parameters:
+    --------------------
+    sip : str
+        Source IP address
+    dip : str:
+        Destination IP address
+    sport : int
+        Source port
+    dport : int
+        Destination port
+
+    Optional Parameters:
+    -------------------
+    smac : str
+       Source mac address
+    dmac : str
+        Destination mac address
+    jumbo : bool
+        Jumbo packet size
     """
 
     def __init__(self, sip, dip, sport, dport, smac=None, dmac=None, **kwargs):
-        super(UdpPacket, self).__init__('udp', sip, dip, smac, dmac, **kwargs)
+        super(UdpVlanPacket, self).__init__(
+            'udp', sip, dip, smac, dmac, **kwargs)
         self.udp = UDP(sport=sport, dport=dport)
 
     def get_packet(self):
-        pkt = self.eth / self.ip / self.udp
+        if self.eth:
+            pkt = self.eth / self.vlan / self.ip / self.udp
+        else:
+            pkt = self.vlan / self.ip / self.udp
         return pkt
 
 
@@ -348,6 +436,49 @@ class GrePacket(IpPacket):
         return pkt
 
 
+class GreVlanPacket(IpVlanPacket):
+    """
+    GrePacket class for creating gre packet
+
+    Mandatory Parameters:
+    --------------------
+    sip : str
+        Source IP address
+    dip : str:
+        Destination IP address
+    sport : int
+        Source port
+    dport : int
+        Destination port
+
+    Optional Parameters:
+    -------------------
+    smac : str
+       Source mac address
+    dmac : str
+        Destination mac address
+    gre_proto : int
+        Gre protocol
+    gre_version : int
+        Gre version
+    gre_flags : int
+        Gre flags
+    """
+
+    def __init__(self, sip, dip, smac=None, dmac=None,
+                 gre_proto=0x8847, gre_version=0, gre_flags=0, **kwargs):
+        super(GreVlanPacket, self).__init__(
+            'gre', sip, dip, smac, dmac, **kwargs)
+        self.gre = GRE(proto=gre_proto, version=gre_version, flags=gre_flags)
+
+    def get_packet(self):
+        if self.eth:
+            pkt = self.eth / self.vlan / self.ip / self.gre
+        else:
+            pkt = self.vlan / self.ip / self.gre
+        return pkt
+
+
 class MplsPacket(Packet):
     """
     MplsPacket class for creating mpls packet
@@ -415,7 +546,62 @@ class MplsoUdpPacket(UdpPacket):
         self.inner_pkt = inner_pkt
 
     def get_packet(self):
-        pkt = self.eth / self.ip / self.udp / self.mpls / self.inner_pkt
+        if self.inner_pkt:
+            pkt = self.eth / self.ip / self.udp / self.mpls / self.inner_pkt
+        else:
+            pkt = self.eth / self.ip / self.udp / self.mpls
+        return pkt
+
+
+class MplsoUdpoVlanPacket(UdpVlanPacket):
+    """
+    MplsoUdpPacket class for creating mpls over udp packet
+
+    Mandatory Parameters:
+    --------------------
+    label : int
+        Mpls label
+    sip : str
+        Source IP address
+    dip : str
+        Destination IP address
+    smac : str
+        Source MAC address
+    dmac : str
+        Destination MAC address
+    sport :
+        Source port address
+    dport:
+        Destination port address
+
+    Optional Parameters:
+    -------------------
+    inner_pkt : any other packet type
+        Inner packet
+    mpls_ttl : int
+        mpls ttl value
+    """
+
+    def __init__(self, label, sip, dip, smac, dmac, sport, dport,
+                 inner_pkt=None, mpls_ttl=64, **kwargs):
+        super(MplsoUdpoVlanPacket, self).__init__(
+            sip,
+            dip,
+            sport,
+            dport,
+            smac,
+            dmac,
+            **kwargs)
+        load_contrib("mpls")
+        self.mpls = MPLS(label=label, ttl=mpls_ttl)
+        self.inner_pkt = inner_pkt
+
+    def get_packet(self):
+        if self.inner_pkt:
+            pkt = self.eth / self.vlan / self.ip / self.udp / self.mpls \
+                / self.inner_pkt
+        else:
+            pkt = self.eth / self.vlan / self.ip / self.udp / self.mpls
         return pkt
 
 
@@ -435,10 +621,6 @@ class MplsoGrePacket(GrePacket):
         Source MAC address
     dmac : str
         Destination MAC address
-    sport : int
-        Source port address
-    dport: int
-        Destination port address
 
     Optional Parameters:
     -------------------
@@ -469,7 +651,64 @@ class MplsoGrePacket(GrePacket):
         self.inner_pkt = inner_pkt
 
     def get_packet(self):
-        pkt = self.eth / self.ip / self.gre / self.mpls / self.inner_pkt
+        if self.inner_pkt:
+            pkt = self.eth / self.ip / self.gre / self.mpls / self.inner_pkt
+        else:
+            pkt = self.eth / self.ip / self.gre / self.mpls
+        return pkt
+
+
+class MplsoGreoVlanPacket(GreVlanPacket):
+    """
+    MplsoGrePacket class for creating mpls over gre packet
+
+    Mandatory Parameters:
+    --------------------
+    label : int
+        Mpls label
+    sip : str
+        Source IP address
+    dip : str
+        Destination IP address
+    smac : str
+        Source MAC address
+    dmac : str
+        Destination MAC address
+
+    Optional Parameters:
+    -------------------
+    inner_pkt : any other packet type
+        Inner packet
+    mpls_ttl : int
+        mpls ttl value
+    """
+
+    def __init__(
+            self,
+            label,
+            sip,
+            dip,
+            smac,
+            dmac,
+            inner_pkt=None,
+            mpls_ttl=64,
+            **kwargs):
+        super(MplsoGreoVlanPacket, self).__init__(
+            sip=sip,
+            dip=sip,
+            smac=smac,
+            dmac=dmac,
+            **kwargs)
+        load_contrib("mpls")
+        self.mpls = MPLS(label=label, ttl=mpls_ttl)
+        self.inner_pkt = inner_pkt
+
+    def get_packet(self):
+        if self.inner_pkt:
+            pkt = self.eth / self.vlan / self.ip / self.gre / self.mpls \
+                / self.inner_pkt
+        else:
+            pkt = self.eth / self.vlan / self.ip / self.gre / self.mpls
         return pkt
 
 
