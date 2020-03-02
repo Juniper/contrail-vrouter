@@ -235,7 +235,7 @@ def parse_result():
     root = tree.getroot()
     for child in root:
         if child.attrib['failures'] != '0':
-            print "Script execution failed"
+            print("Script execution failed")
             exit(1)
 
 def main():

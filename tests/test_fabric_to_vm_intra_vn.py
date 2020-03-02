@@ -371,3 +371,89 @@ class TestFabricToVmIntraVn(unittest.TestCase):
         # and received at hbs-l (by vtest)
         self.assertEqual(1, hbs_r_vif.get_vif_opackets())
         self.assertEqual(1, hbs_l_vif.get_vif_ipackets())
+
+    def test_hbs_cem_11144(self):
+
+        # Add hbs-l vif
+        hbs_l_vif = VirtualVif(
+            name="tap1589a2b3-22",
+            ipv4_str="100.100.100.4",
+            mac_str="00:00:5e:00:01:00",
+            idx=3,
+            vrf=3,
+            flags=constants.VIF_FLAG_HBS_LEFT)
+        hbs_l_vif.sync()
+
+        # Add hbs-r vif
+        hbs_r_vif = VirtualVif(
+            name="tap8b05a86b-36",
+            ipv4_str="200.200.200.4",
+            mac_str="00:00:5e:00:01:00",
+            idx=4,
+            vrf=4,
+            flags=constants.VIF_FLAG_HBS_RIGHT)
+        hbs_r_vif.sync()
+
+        # Add Bridge Route
+        bridge_route = BridgeRoute(
+            vrf=5,
+            mac_str="02:c2:23:4c:d0:55",
+            nh_idx=44)
+        bridge_route.sync()
+
+        # Add hbs-l and hbs-r in the vrf table
+        vrf = Vrf(
+            vrf_rid=0,
+            vrf_idx=5,
+            vrf_flags=constants.VRF_FLAG_VALID |
+            constants.VRF_FLAG_HBS_L_VALID |
+            constants.VRF_FLAG_HBS_R_VALID,
+            vrf_hbfl_vif_idx=3,
+            vrf_hbfr_vif_idx=4)
+        vrf.sync()
+
+        self.f_flow.delete()
+        self.r_flow.delete()
+
+        # send mplsudp packet from fabric
+        # This creates a flow in hold state
+        icmp_inner = IcmpPacket(
+            sip='1.1.1.5',
+            dip='1.1.1.3',
+            smac='02:e7:03:ea:67:f1',
+            dmac='02:c2:23:4c:d0:55',
+            icmp_type=constants.ECHO_REPLY,
+            id=4145)
+        pkt = icmp_inner.get_packet()
+        pkt.show()
+        self.assertIsNotNone(pkt)
+        mpls = MplsoUdpPacket(
+            label=42,
+            sip='8.0.0.3',
+            dip='8.0.0.2',
+            smac='00:1b:21:bb:f9:46',
+            dmac='00:1b:21:bb:f9:48',
+            sport=53363,
+            dport=6635,
+            id=10,
+            inner_pkt=pkt)
+        pkt = mpls.get_packet()
+        pkt.show()
+        self.assertIsNotNone(pkt)
+
+        # Send the packet from fabric
+        rcv_pkt = self.fabric_interface.send_packet(
+            pkt)
+
+        # Flow is created but in Hold state
+        # Set forwarding action for rflow now
+        self.r_flow.fr_gen_id = self.r_flow.fr_gen_id + 1
+        self.r_flow.fr_flags = constants.VR_FLOW_FLAG_ACTIVE
+        self.r_flow.fr_flags1 = constants.VR_FLOW_FLAG1_HBS_RIGHT
+        self.r_flow.sync(resp_required=True)
+
+        # Wait for some time for the held packet to be flushed by vrouter
+        time.sleep(2)
+
+        # Check if the flushed packet was sent by vrouter on hbs-r
+        self.assertEqual(1, hbs_r_vif.get_vif_opackets())
