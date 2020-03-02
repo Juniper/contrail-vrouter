@@ -919,12 +919,15 @@ vr_flow_action_hbs(struct vrouter *router, struct vr_flow_entry *fe,
         struct vr_forwarding_md *fmd)
 {
     struct vr_vrf_table_entry *vrf_entry = NULL;
+    uint16_t dvrf;
+
+    dvrf = (fmd->fmd_dvrf == -1)? fe->fe_vrf: fmd->fmd_dvrf;
 
     /* If not HBS flow, return */
     if (!(fe->fe_flags1 & VR_FLOW_FLAG1_HBS_MASK))
             return FLOW_FORWARD;
 
-    vrf_entry = vrouter_get_vrf_table(router, fmd->fmd_dvrf);
+    vrf_entry = vrouter_get_vrf_table(router, dvrf);
 
     /* Packet entering vrouter and going to hbs-l or hbs-r 
      * for hbs-flows
