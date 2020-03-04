@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3feb30bf_48162bb4",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 7
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2020-03-04T11:15:42Z",
+      "side": 1,
+      "message": "How will the user know which test case has failed?",
+      "revId": "8f1520827d3b33dde5d23d716aa0363a14279021",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6550e8b1_f4d33cd0",
+        "filename": "tests/test_vm_to_vm_inter_vn.py",
+        "patchSetId": 7
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2020-03-04T11:15:42Z",
+      "side": 1,
+      "message": "This comment is unrelated to the diffs but important. Has the CI failure with pytest (due to moving to Jenkins) resolved? This commit should not be merged without that issue being resolved.",
+      "revId": "8f1520827d3b33dde5d23d716aa0363a14279021",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
