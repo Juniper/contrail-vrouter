@@ -8,6 +8,7 @@
 #ifndef __VR_UVHOST_MSG_H__
 #define __VR_UVHOST_MSG_H__
 
+#include <fcntl.h>
 #include "vr_dpdk_virtio.h"
 #include "vr_dpdk.h"
 /*
