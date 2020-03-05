@@ -63,6 +63,16 @@ vr_uvhost_del_client(vr_uvh_client_t *vru_cl)
     /* Remove both the socket we listen for and the socket we have accepted */
     vr_uvhost_del_fds_by_arg(vru_cl);
 
+    /* Check socket is closed or not before deleting vru_cl.
+     * When we stop VM, we create socket FD and timer FD and when VM started,
+     * del client message would be received and Timer FD is closed by
+     * above function (vr_uvhost_del_fds_by_arg), and closing socket FD below.
+     * */
+    if(fcntl(vru_cl->vruc_fd, F_GETFL) != -1 ){
+            vr_uvhost_log("Closing socket fd: %d \n", vru_cl->vruc_fd);
+            close(vru_cl->vruc_fd);
+    }
+
     vru_cl->vruc_fd = -1;
     if (vru_cl->vruc_vhostuser_mode == VRNU_VIF_MODE_CLIENT)
         unlink(vru_cl->vruc_path);
