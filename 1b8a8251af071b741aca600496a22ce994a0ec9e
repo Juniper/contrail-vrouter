@@ -1,0 +1,157 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "163307d4_602f57cc",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 181,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "I think this assert will not confirm that the object was deleted in vrouter also.",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dca7c6d1_d229600d",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 206,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "I think this assert will not confirm that the object was deleted in vrouter also.",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d803d615_097584e9",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 233,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "Not sure if this test-case is required. May be we can remove this?",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "879ba1d1_f3c2023a",
+        "filename": "tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "t thought we were keeping VIF_FLAG_L3_ENABLED as default?",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3dbb3fd8_3a5e7d20",
+        "filename": "tests/test_vm_to_vm_ipv6.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "can you change the name to TestVmToVmIPv6",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "40de27ff_3613ffbf",
+        "filename": "tests/test_vm_to_vm_ipv6.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "change name to test_vm_to_vm_ip6",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ccf97418_9f2c3c79",
+        "filename": "utils/pylib/mirror.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "vni default value should be 0 i guess?",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "139e4568_aa55f201",
+        "filename": "utils/pylib/object_base.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "can we do \nself.logger.info(\"\\nDeleting object: {}\".format(ObjectBase.__obj_dict__[id]))\nObjectBase.__obj_dict__[id].delete()\ndel ObjectBase.__obj_dict__[id]",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d6cf15eb_358adcd2",
+        "filename": "utils/pylib/object_base.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-05T16:15:03Z",
+      "side": 1,
+      "message": "not required if we do above suggested change.",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
