@@ -1166,7 +1166,11 @@ vr_uvh_cl_timer_handler(int fd, void *arg)
     if (ret == -1) {
         RTE_LOG_DP(DEBUG, UVHOST, "Error connecting uvhost socket FD %d to %s:"
                 " %s (%d)\n", vru_cl->vruc_fd, sun.sun_path, rte_strerror(errno), errno);
-        ret = vr_uvh_cl_timer_setup(vru_cl);
+        /* Check the interface is connected or not.
+         * Avoiding race condition where tap interface already connected */
+        if(errno != EISCONN)
+            ret = vr_uvh_cl_timer_setup(vru_cl);
+
     } else {
 
         vr_uvhost_log("    connected to %s for uvhost socket FD %d\n",
@@ -1176,7 +1180,6 @@ vr_uvh_cl_timer_handler(int fd, void *arg)
          */
         vr_uvhost_del_fd(vru_cl->vruc_timer_fd, UVH_FD_READ);
         vru_cl->vruc_timer_fd = -1;
-
         /*
          * socket connected
          * add to msg handler
@@ -1245,6 +1248,7 @@ vr_uvh_cl_timer_setup(vr_uvh_client_t *vru_cl)
                 close(vru_cl->vruc_timer_fd);
                 vru_cl->vruc_timer_fd = -1;
             }
+
         }
     }
 
