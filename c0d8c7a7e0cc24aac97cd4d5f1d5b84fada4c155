@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f5ec8548_ba961ade",
+        "filename": "dpdk/vr_uvhost_msg.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1171,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-05T06:53:38Z",
+      "side": 1,
+      "message": "should you delete timer_fd when EISCONN is hit?",
+      "range": {
+        "startLine": 1171,
+        "startChar": 20,
+        "endLine": 1171,
+        "endChar": 27
+      },
+      "revId": "c0d8c7a7e0cc24aac97cd4d5f1d5b84fada4c155",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
