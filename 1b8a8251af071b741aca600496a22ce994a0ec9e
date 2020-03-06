@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "99814488_1fbe23b3",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 181,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "Is there any particular assertion to check object got deleted in vrouter?",
+      "parentUuid": "163307d4_602f57cc",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "dca7c6d1_d229600d",
         "filename": "tests/test_basic.py",
         "patchSetId": 1
@@ -53,6 +71,24 @@
     },
     {
       "key": {
+        "uuid": "03522e5a_de76df8e",
+        "filename": "tests/test_basic.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 233,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "d803d615_097584e9",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "879ba1d1_f3c2023a",
         "filename": "tests/test_fabric_to_vm_inter_vn.py",
         "patchSetId": 1
@@ -67,6 +103,24 @@
       "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "12b8d8ae_8d2523d7",
+        "filename": "tests/test_fabric_to_vm_inter_vn.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "Previously default was 0. Now it\u0027s  VIF_FLAG_L3_ENABLED.",
+      "parentUuid": "879ba1d1_f3c2023a",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -87,6 +141,24 @@
     },
     {
       "key": {
+        "uuid": "c80fb93f_a12abc0d",
+        "filename": "tests/test_vm_to_vm_ipv6.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3dbb3fd8_3a5e7d20",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "40de27ff_3613ffbf",
         "filename": "tests/test_vm_to_vm_ipv6.py",
         "patchSetId": 1
@@ -104,6 +176,24 @@
     },
     {
       "key": {
+        "uuid": "79d2e7ab_fd3977e4",
+        "filename": "tests/test_vm_to_vm_ipv6.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "40de27ff_3613ffbf",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ccf97418_9f2c3c79",
         "filename": "utils/pylib/mirror.py",
         "patchSetId": 1
@@ -118,6 +208,24 @@
       "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "28246fa5_ce3f0e5c",
+        "filename": "utils/pylib/mirror.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ccf97418_9f2c3c79",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -149,6 +257,24 @@
       "writtenOn": "2020-03-05T16:15:03Z",
       "side": 1,
       "message": "not required if we do above suggested change.",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "762b1313_c9b24bdb",
+        "filename": "utils/pylib/object_base.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-03-06T05:51:38Z",
+      "side": 1,
+      "message": "But what if we specifically delete a particular object before teardown? Then that particular object won\u0027t get removed from the dictionary.",
+      "parentUuid": "d6cf15eb_358adcd2",
       "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
