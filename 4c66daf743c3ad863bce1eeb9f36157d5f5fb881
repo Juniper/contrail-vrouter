@@ -22,6 +22,30 @@
       "revId": "4c66daf743c3ad863bce1eeb9f36157d5f5fb881",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5a537614_a3dcf4e9",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-03-09T14:26:46Z",
+      "side": 1,
+      "message": "Updated with above path",
+      "parentUuid": "02df9af7_d1eaf995",
+      "range": {
+        "startLine": 30,
+        "startChar": 26,
+        "endLine": 30,
+        "endChar": 60
+      },
+      "revId": "4c66daf743c3ad863bce1eeb9f36157d5f5fb881",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
