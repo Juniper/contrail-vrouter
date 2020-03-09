@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "792908a2_c85bb636",
+        "filename": "utils/vtest_py/run_test.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-09T12:57:14Z",
+      "side": 0,
+      "message": "can we change this to /build/debug/vrouter/utils/vtest_py_venv/sock/",
+      "revId": "f519209ab6beebdb79819ad5ad6ce32e71b0c7bb",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

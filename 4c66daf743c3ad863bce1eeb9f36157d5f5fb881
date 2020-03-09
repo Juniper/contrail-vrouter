@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "02df9af7_d1eaf995",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 1
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-09T12:57:14Z",
+      "side": 1,
+      "message": "change this to /build/debug/vrouter/utils/vtest_py_venv/sock/",
+      "range": {
+        "startLine": 30,
+        "startChar": 26,
+        "endLine": 30,
+        "endChar": 60
+      },
+      "revId": "4c66daf743c3ad863bce1eeb9f36157d5f5fb881",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
