@@ -27,7 +27,7 @@ src_root = Dir('#').srcnode().abspath
 build_root = Dir(env['TOP']).abspath
 vtest_py_venv_root = build_root + "/vrouter/utils/vtest_py_venv"
 vtest_py_src_root = src_root + "/vrouter/utils/vtest_py"
-vtest_py_venv_sock_dir = vtest_py_venv_root + "/var/run/vrouter"
+vtest_py_venv_sock_dir = vtest_py_venv_root + "/sock/"
 
 print "src_root %s" %(src_root)
 print "build_root %s" %(build_root)
@@ -82,9 +82,7 @@ copy_vtest_lib = env.Command("copy_vtest_lib", [],
 
 # create sock dir in venv for vrouter to run
 create_sock_dir = env.Command("create_sock_dir", [],
-                              [Mkdir(vtest_py_venv_root + "/var"),
-                               Mkdir(vtest_py_venv_root + "/var/run"),
-                               Mkdir(vtest_py_venv_root + "/var/run/vrouter")])
+                              [Mkdir(vtest_py_venv_root + "/sock")])
 
 # setup venv
 setup_venv = env.Command("setup_venv", [],
@@ -97,8 +95,7 @@ setup_venv = env.Command("setup_venv", [],
 env.AppendENVPath('VROUTER_DPDK_PATH', \
                    build_root+"/vrouter/dpdk/contrail-vrouter-dpdk")
 env.AppendENVPath('VTEST_PATH', build_root+"/vrouter/utils/vtest/vtest")
-env.AppendENVPath('VROUTER_SOCKET_PATH', \
-                  vtest_py_venv_root + "/var/run/vrouter")
+env.AppendENVPath('VROUTER_SOCKET_PATH', vtest_py_venv_sock_dir)
 env.AppendENVPath('VTEST_PY_VENV_PATH', vtest_py_venv_root)
 vtest_py_ut = env.Command("vtest_py_ut", [], \
                           src_root+"/vrouter/tests/run_test.py --all")
