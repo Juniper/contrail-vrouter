@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "2ed9911d_a9d5b9f7",
+        "filename": "utils/vtest_py/SConscript",
+        "patchSetId": 2
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-09T16:11:05Z",
+      "side": 1,
+      "message": "should be -\nvtest_py_venv_root + \"/sock\"?",
+      "parentUuid": "43e89503_83647702",
+      "revId": "b82ac8acef44bb51d400da95d8ea712cf732fd83",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "abe0781a_fd1eacea",
         "filename": "utils/vtest_py/run_test.sh",
         "patchSetId": 2
