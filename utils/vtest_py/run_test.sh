@@ -48,7 +48,7 @@ if [ -z "$vtest_path" ]; then
 fi
 if [ -z "$socket_path" ]; then
    echo -n "Using default socket path - "
-   socket_path=$(realpath $sb_path/debug/vrouter/utils/vtest_py_venv/var/run/vrouter)
+   socket_path="/build/debug/vrouter/utils/vtest_py_venv/sock/"
    mkdir -p $socket_path
    echo $socket_path
    if [ ! -d $socket_path ];

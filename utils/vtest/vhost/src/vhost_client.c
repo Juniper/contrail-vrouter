@@ -107,8 +107,14 @@ vhost_client_set_mem_Vhost_Client(Vhost_Client *vhost_client) {
 
     for (size_t i = 0; i < vhost_cl->mem.nregions; i++) {
 
-        snprintf(fd_path_buff, UNIX_PATH_MAX, "%s.%d.shmem",
+        ret = snprintf(fd_path_buff, UNIX_PATH_MAX, "%s.%d.shmem",
             vhost_cl->client.sh_mem_path, (int)i);
+        if(ret > UNIX_PATH_MAX) {
+            fprintf(stderr, "Socket path is too long(%s.%d.shmem),\
+                    it should be less than %d\n",
+                     vhost_cl->client.sh_mem_path, (int)i, UNIX_PATH_MAX);
+            return E_CLIENT_ERR_ALLOC;
+        }
 
         ret = sh_mem_init_fd(fd_path_buff,
                 (vhost_cl->client.sh_mem_fds + i));
