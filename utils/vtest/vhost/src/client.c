@@ -78,8 +78,16 @@ client_init_path(Client *client, const char *path)
             __func__);
         return E_CLIENT_ERR_FARG;
     }
-   strncpy(client->socket_path, path, sizeof(client->socket_path));
-   strncpy(client->sh_mem_path, path, sizeof(client->sh_mem_path));
+
+    if(strlen(path) > (UNIX_PATH_MAX - 1)) {
+        fprintf(stderr, "Socket path is too long %s (%d), \
+                it should be less than %d\n",
+                path, strlen(path), UNIX_PATH_MAX);
+        return E_CLIENT_ERR_ALLOC;
+    }
+
+    strncpy(client->socket_path, path, sizeof(client->socket_path));
+    strncpy(client->sh_mem_path, path, sizeof(client->sh_mem_path));
 
    return E_CLIENT_OK;
 }
