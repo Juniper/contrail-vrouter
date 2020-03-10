@@ -181,7 +181,10 @@
 #define VP_DROP_FLOW_EVICT                  43
 #define VP_DROP_TRAP_ORIGINAL               44
 #define VP_DROP_PKT_LOOP                    45
-#define VP_DROP_MAX                         46
+#define VP_DROP_NO_FRAG_ENTRY               46
+#define VP_DROP_ICMP_ERROR                  47
+#define VP_DROP_CLONE_FAIL                  48
+#define VP_DROP_MAX                         49
 
 
 struct vr_drop_stats {
@@ -231,6 +234,8 @@ struct vr_drop_stats {
     uint64_t vds_flow_evict;
     uint64_t vds_trap_original;
     uint64_t vds_pkt_loop;
+    uint64_t vds_no_frag_entry;
+    uint64_t vds_icmp_error;
 };
 
 /*
