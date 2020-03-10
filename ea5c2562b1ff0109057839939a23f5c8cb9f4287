@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bc8543d5_4d506df4",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 786,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-10T14:09:03Z",
+      "side": 1,
+      "message": "Giving same comment as earlier. \nCan you handle the pkt clone failures? Also increment an error counter? Same for IPv6.",
+      "revId": "ea5c2562b1ff0109057839939a23f5c8cb9f4287",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
