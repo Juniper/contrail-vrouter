@@ -107,6 +107,24 @@
     },
     {
       "key": {
+        "uuid": "d16bd3a7_a334a0be",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 775,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-10T13:55:22Z",
+      "side": 1,
+      "message": "This will be handled in mainline. Customer does not need mirror support in R3.2",
+      "parentUuid": "b29b9306_8a436d4e",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5b891f71_5f72c5ef",
         "filename": "dp-core/vr_nexthop.c",
         "patchSetId": 4
@@ -136,6 +154,24 @@
       "side": 1,
       "message": "Ack",
       "parentUuid": "5b891f71_5f72c5ef",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "50828d9c_1ad6ca8e",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 787,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-10T13:55:22Z",
+      "side": 1,
+      "message": "I saw in other place and this is not handled anywhere",
+      "parentUuid": "f2603ef3_c6199b96",
       "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": false
@@ -189,6 +225,24 @@
       "side": 1,
       "message": "My question was actually in context of ECMP nh. See my question in vr_nexthop.c.",
       "parentUuid": "b265d54a_d3697c61",
+      "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a40764b0_3fabe108",
+        "filename": "dp-core/vr_proto_ip.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 830,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-10T13:55:22Z",
+      "side": 1,
+      "message": "Customer does not need this in R3.2. We will handle this in mainline.",
+      "parentUuid": "0e306ef8_9d8d567e",
       "revId": "00fa56cf8f541421128b82f4aee5eafefd812483",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
