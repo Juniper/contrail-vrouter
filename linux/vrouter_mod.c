@@ -727,7 +727,7 @@ lh_get_udp_src_port(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
              * dst port (which could result in fragments getting a different
              * outer UDP source port than non-fragments in the same flow).
              */
-            frag = vr_fragment_get(router, vrf, iph);
+            frag = vr_fragment_get(router, vrf, iph, 0);
             if (frag) {
                 sport = frag->f_sport;
                 dport = frag->f_dport;
