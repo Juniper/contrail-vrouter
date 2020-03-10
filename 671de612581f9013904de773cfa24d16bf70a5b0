@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "48123f7b_236d5987",
+        "filename": "dpdk/vr_uvhost_client.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-10T02:59:28Z",
+      "side": 1,
+      "message": "Pl change the comment as follows:\n\nIf a VIF is added but not connected, vru_cl-\u003evruc_fd is not added to the fd list even though it is created. This can happen when VM is stopped. In this case, vr_uvhost_del_fds_by_arg() would not close the fd. So, add the fcntl() call below to check if vruc_fd is closed or not.",
+      "range": {
+        "startLine": 65,
+        "startChar": 0,
+        "endLine": 70,
+        "endChar": 9
+      },
+      "revId": "671de612581f9013904de773cfa24d16bf70a5b0",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
