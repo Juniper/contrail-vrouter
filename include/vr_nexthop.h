@@ -83,6 +83,8 @@ enum nexthop_type {
 #define NH_ECMP_CONFIG_HASH_DST_IP          0x08
 #define NH_ECMP_CONFIG_HASH_DST_PORT        0x10
 
+#define NH_ECMP_PACKET_HELD                 (-2)
+
 struct vr_packet;
 
 struct vr_forwarding_md;

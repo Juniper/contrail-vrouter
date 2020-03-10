@@ -298,6 +298,8 @@ extern "C" {
     X(VP_DROP_BMAC_ISID_MISMATCH) \
     X(VP_DROP_PKT_LOOP) \
     X(VP_DROP_NO_CRYPT_PATH) \
+    X(VP_DROP_NO_FRAG_ENTRY) \
+    X(VP_DROP_ICMP_ERROR) \
     X(VP_DROP_MAX)
 
 #define enum_t(X) X,
