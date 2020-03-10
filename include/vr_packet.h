@@ -181,57 +181,10 @@
 #define VP_DROP_FLOW_EVICT                  43
 #define VP_DROP_TRAP_ORIGINAL               44
 #define VP_DROP_PKT_LOOP                    45
-#define VP_DROP_MAX                         46
-
-
-struct vr_drop_stats {
-    uint64_t vds_discard;
-    uint64_t vds_pull;
-    uint64_t vds_invalid_if;
-    uint64_t vds_invalid_arp;
-    uint64_t vds_trap_no_if;
-    uint64_t vds_nowhere_to_go;
-    uint64_t vds_flow_queue_limit_exceeded;
-    uint64_t vds_flow_no_memory;
-    uint64_t vds_flow_invalid_protocol;
-    uint64_t vds_flow_nat_no_rflow;
-    uint64_t vds_flow_action_drop;
-    uint64_t vds_flow_action_invalid;
-    uint64_t vds_flow_unusable;
-    uint64_t vds_flow_table_full;
-    uint64_t vds_interface_tx_discard;
-    uint64_t vds_interface_drop;
-    uint64_t vds_duplicated;
-    uint64_t vds_push;
-    uint64_t vds_ttl_exceeded;
-    uint64_t vds_invalid_nh;
-    uint64_t vds_invalid_label;
-    uint64_t vds_invalid_protocol;
-    uint64_t vds_interface_rx_discard;
-    uint64_t vds_invalid_mcast_source;
-    uint64_t vds_head_alloc_fail;
-    uint64_t vds_pcow_fail;
-    uint64_t vds_mcast_df_bit;
-    uint64_t vds_mcast_clone_fail;
-    uint64_t vds_no_memory;
-    uint64_t vds_rewrite_fail;
-    uint64_t vds_misc;
-    uint64_t vds_invalid_packet;
-    uint64_t vds_cksum_err;
-    uint64_t vds_no_fmd;
-    uint64_t vds_cloned_original;
-    uint64_t vds_invalid_vnid;
-    uint64_t vds_frag_err;
-    uint64_t vds_invalid_source;
-    uint64_t vds_l2_no_route;
-    uint64_t vds_fragment_queue_fail;
-    uint64_t vds_vlan_fwd_tx;
-    uint64_t vds_vlan_fwd_enq;
-    uint64_t vds_drop_new_flow;
-    uint64_t vds_flow_evict;
-    uint64_t vds_trap_original;
-    uint64_t vds_pkt_loop;
-};
+#define VP_DROP_NO_FRAG_ENTRY               46
+#define VP_DROP_ICMP_ERROR                  47
+#define VP_DROP_CLONE_FAIL                  48
+#define VP_DROP_MAX                         49
 
 /*
  * NOTE: Please do not add any more fields without ensuring
