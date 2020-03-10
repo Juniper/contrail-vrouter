@@ -640,6 +640,14 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_fragment_queue_fail);
     printf("No Encrypt Path Failures      %" PRIu64 "\n",
             stats->vds_no_crypt_path);
+    printf("Invalid HBS received packet   %" PRIu64 "\n",
+            stats->vds_invalid_hbs_pkt);
+    printf("No Fragment Entries           %" PRIu64 "\n",
+            stats->vds_no_frag_entry);
+    printf("ICMP errors                   %" PRIu64 "\n",
+            stats->vds_icmp_error);
+    printf("Clone Failures                %" PRIu64 "\n",
+            stats->vds_clone_fail);
     printf("\n");
     if (platform == DPDK_PLATFORM) {
         printf("VLAN fwd intf failed TX       %" PRIu64 "\n",
