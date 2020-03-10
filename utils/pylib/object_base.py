@@ -33,12 +33,10 @@ class ObjectBase(Base, Common):
         """Deletes objects in the reverse order from the list"""
         super(ObjectBase, self).tearDown()
         if ObjectBase.auto_cleanup:
-            for id in range(ObjectBase.__obj_id__, 0, -1):
-                if id in ObjectBase.__obj_dict__.keys():
-                    obj = ObjectBase.__obj_dict__[id]
-                    self.logger.info("\nDeleting object: {}".format(obj))
-                    del ObjectBase.__obj_dict__[id]
-                    obj.delete()
+            for id in ObjectBase.__obj_dict__.keys():
+                obj = ObjectBase.__obj_dict__[id]
+                self.logger.info("\nDeleting object: {}".format(obj))
+                obj.delete()
 
     @classmethod
     def set_auto_features(self, cleanup=False, vif_idx=False, nh_idx=False):
@@ -52,6 +50,7 @@ class ObjectBase(Base, Common):
         self.__resp_file__ = None
         self.__is_synced__ = False
         ObjectBase.__obj_id__ += 1
+        self.__obj_id__ = ObjectBase.__obj_id__
         ObjectBase.__obj_dict__.update({self.__obj_id__: self})
 
     def sync(self, resp_required=False):
@@ -90,6 +89,10 @@ class ObjectBase(Base, Common):
         except Exception as e:
             self.logger.error("Error %s" % e)
         return ret_val
+
+    def reload(self):
+        """Reload the object """
+        self.__resp_file__ = None
 
     @property
     def is_synced(self):

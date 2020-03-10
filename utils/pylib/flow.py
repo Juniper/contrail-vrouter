@@ -175,6 +175,8 @@ class Flow(ObjectBase, vr_flow_req):
         self.fr_gen_id = self.get_fr_gen_id()
         self.fr_flags = 0
         self.sync(resp_required=True)
+        self.logger.info("\nDeleting object: {}".format(self))
+        del ObjectBase.__obj_dict__[self.__obj_id__]
 
 
 class InetFlow(Flow):

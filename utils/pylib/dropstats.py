@@ -24,5 +24,11 @@ class DropStats(ObjectBase, vr_drop_stats_req):
         """
         return int(self.get("vds_invalid_arp"))
 
+    def get_vds_fragment_errors(self):
+        """
+        Queries vrouter and returns vds_invalid_arp value from response file
+        """
+        return int(self.get("vds_frag_err"))
+
     def delete(self):
         pass
