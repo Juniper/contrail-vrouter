@@ -485,6 +485,10 @@ buffer sandesh vr_drop_stats_req {
     51: i64             vds_bmac_isid_mismatch;
     52: i64             vds_pkt_loop;
     53: i64             vds_no_crypt_path;
+    54: i64             vds_invalid_hbs_pkt;
+    55: i64             vds_no_frag_entry;
+    56: i64             vds_icmp_error;
+    57: i64             vds_clone_fail;
 }
 
 buffer sandesh vr_qos_map_req {
