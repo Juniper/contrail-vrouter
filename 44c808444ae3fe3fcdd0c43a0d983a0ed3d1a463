@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6dfab5a7_5c1d319c",
+        "filename": "include/vr_packet.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 239,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-10T14:41:30Z",
+      "side": 1,
+      "message": "vds_drop_clone_fail?",
+      "revId": "44c808444ae3fe3fcdd0c43a0d983a0ed3d1a463",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
