@@ -139,7 +139,8 @@ dpdk_fragment_queue_exit(void)
  */
 
 /**
- * Enqueue a packet to the assembler.
+ * Enqueue a packet to per cpu queue and schedule work to
+ * enqueue/process it to assembler_table[]
  *
  * Executed only from the forwarding lcores.
  */
@@ -160,11 +161,13 @@ dpdk_fragment_assembler_enqueue(struct vrouter *router, struct vr_packet *pkt,
         return -EINVAL;
     }
 
+    /* Enqueue the packet to per CPU queue */
     ret = vr_fragment_enqueue(router,
             &per_cpu_queues[cpu - VR_DPDK_FWD_LCORE_ID].queue, pkt, fmd);
 
     if (!ret) {
         lcore = vr_dpdk.lcores[cpu];
+        /* Schedule work to enqueue/process by the assembler */
         vr_dpdk_lcore_schedule_assembler_work(lcore,
                 dpdk_fragment_assemble_queue,
                 &per_cpu_queues[cpu - VR_DPDK_FWD_LCORE_ID].queue);
@@ -195,6 +198,7 @@ dpdk_fragment_sync_assemble(struct vr_fragment_queue_element *vfqe)
 
 /**
  * A callback for timeouts.
+ * - Clean stale entries in assembler_table[][]
  *
  * Called on forwarding lcores only.
  */
