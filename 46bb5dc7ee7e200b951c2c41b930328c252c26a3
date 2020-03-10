@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3013a9d2_6ff85443",
+        "filename": "dpdk/vr_uvhost_msg.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1251,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-10T06:23:10Z",
+      "side": 1,
+      "message": "why this new line?",
+      "revId": "46bb5dc7ee7e200b951c2c41b930328c252c26a3",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
