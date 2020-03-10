@@ -292,11 +292,29 @@ class ReceiveNextHop(NextHop):
 
 
 class CompositeNextHop(NextHop):
-    def __init__():
-        # TODO
-        pass
+    def __init__(
+            self,
+            nh_idx=1,
+            nh_family=constants.AF_INET,
+            nh_vrf=0,
+            nh_flags=constants.NH_FLAG_VALID,
+            **kwargs):
+        super(CompositeNextHop, self).__init__(
+            constants.NH_TYPE_COMPOSITE,
+            nh_idx,
+            nh_family,
+            nh_vrf,
+            nh_flags,
+            encap_oif_id=None,
+            encap=None,
+            encap_family=None)
 
     # Add a nexthop to this composite nexthop
-    def add_nexthop(nexthop):
-        # TODO
-        pass
+    def add_nexthop(self, label, nexthop):
+        if self.nhr_nh_list is None:
+            self.nhr_nh_list = list()
+        self.nhr_nh_list.append(nexthop)
+
+        if self.nhr_label_list is None:
+            self.nhr_label_list = list()
+        self.nhr_label_list.append(label)

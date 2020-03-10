@@ -87,16 +87,12 @@
  * and flushed out of that entry, while still maintaining the metadata.
  */
 
-#define FRAG_TABLE_ENTRIES  4096
-#define FRAG_TABLE_BUCKETS  4
-#define FRAG_OTABLE_ENTRIES 512
-
 struct vr_timer *vr_assembler_table_scan_timer;
 
 static inline void
 __fragment_key(struct vr_fragment_key *key, unsigned short vrf,
         uint64_t sip_u, uint64_t sip_l, uint64_t dip_u, uint64_t dip_l,
-        uint32_t id)
+        uint32_t id, unsigned short custom)
 {
     key->fk_sip_u = sip_u;
     key->fk_sip_l = sip_l;
@@ -104,6 +100,7 @@ __fragment_key(struct vr_fragment_key *key, unsigned short vrf,
     key->fk_dip_l = dip_l;
     key->fk_id = id;
     key->fk_vrf = vrf;
+    key->fk_custom = custom;
 
     return;
 }
@@ -142,6 +139,7 @@ fragment_entry_set(struct vr_fragment *fe, struct vr_fragment_key *key,
     fe->f_dip_l = key->fk_dip_l;
     fe->f_id = key->fk_id;
     fe->f_vrf = key->fk_vrf;
+    fe->f_custom = key->fk_custom;
     fe->f_sport = sport;
     fe->f_dport = dport;
     vr_get_mono_time(&sec, &nsec);
@@ -206,6 +204,12 @@ fragment_unlink_frag(struct vr_fragment **prev, struct vr_fragment *frag)
     return;
 }
 
+/* Scan assembler_table[][] and free up stale entries
+ * Arguments:
+ * - head: Bucket entry in assembler_table[][] for the
+ *         forwarding core which executes it
+ *         It has all fragment entries which hash to that bucket
+ */
 unsigned int
 vr_assembler_table_scan(struct vr_fragment **head)
 {
@@ -218,7 +222,7 @@ vr_assembler_table_scan(struct vr_fragment **head)
         next = frag->f_next;
 
         vr_get_mono_time(&sec, &nsec);
-        dest = frag->f_time + VR_ASSEMBLER_TIMEOUT_TIME;
+        dest = frag->f_time + VR_ASSEMBLER_TIMEOUT_SECS;
         if (dest < frag->f_time) {
             if ((sec < frag->f_time) && (dest < sec)) {
                 fragment_unlink_frag(prev, frag);
@@ -254,6 +258,7 @@ vr_assembler_table_scan_exit(void)
     return;
 }
 
+/* Initialize scanning of assembler_table[][] */
 int
 vr_assembler_table_scan_init(void (*scanner)(void *))
 {
@@ -267,7 +272,7 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
     vtimer->vt_timer = scanner;
     vtimer->vt_vr_arg = NULL;
     vtimer->vt_msecs =
-        (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_ASSEMBLER_BUCKET_COUNT;
+        (VR_ASSEMBLER_TIMEOUT_SECS * 1000) / VR_ASSEMBLER_BUCKET_COUNT;
     if (vr_create_timer(vtimer)) {
         vr_free(vtimer, VR_TIMER_OBJECT);
         vr_assembler_table_scan_timer = NULL;
@@ -277,6 +282,7 @@ vr_assembler_table_scan_init(void (*scanner)(void *))
     return 0;
 }
 
+/* Flush a fragment queue entry and re-inject for packet processing */
 static void
 vr_fragment_flush_queue_element(struct vr_fragment_queue_element *vfqe)
 {
@@ -305,6 +311,18 @@ exit_flush:
     return;
 }
 
+/* Main assembler function to process fragments from per-cpu queue to
+ * assembler_table
+ * - Create a head fragment entry if head fragment arrives
+ * - If a non-head fragment arrives and a corresponding head-fragment entry
+ *   is already present, flush it
+ * - Flush non-head fragments which are already enqueued if their head fragment arrives
+ * - Enqueue non-head fragment if their head fragment has not yet arrived
+ *
+ * Arguments:
+ * - head_p: bucket entry in assembler_table
+ * - vfqe  : fragment present in the per-cpu queue
+ */
 int
 vr_fragment_assemble(struct vr_fragment **head_p,
         struct vr_fragment_queue_element *vfqe)
@@ -328,22 +346,30 @@ vr_fragment_assemble(struct vr_fragment **head_p,
 
     router = vfqe->fqe_router;
     pnode = &vfqe->fqe_pnode;
+
+    /* Is it head fragment? */
     if (pnode->pl_flags & PN_FLAG_FRAGMENT_HEAD)
         frag_head = true;
 
     pkt = pnode->pl_packet;
     ip = (struct vr_ip *)pkt_network_header(pkt);
+
+    /* Get hash of the fragment key */
     if (vr_ip_is_ip6(ip)) {
        ip6 = (struct vr_ip6 *)ip;
        v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
        v6_addr = (uint64_t *)(ip6->ip6_src);
         __fragment_key(&vfk, pnode->pl_vrf, *v6_addr, *(v6_addr + 1),
-                *(v6_addr +2 ), *(v6_addr + 3), v6_frag->ip6_frag_id);
+                *(v6_addr +2 ), *(v6_addr + 3), v6_frag->ip6_frag_id,
+                pnode->pl_custom);
     } else {
         __fragment_key(&vfk, pnode->pl_vrf, 0, pnode->pl_inner_src_ip,
-            0, pnode->pl_inner_dst_ip, ip->ip_id);
+            0, pnode->pl_inner_dst_ip, ip->ip_id, pnode->pl_custom);
     }
 
+    /* Check if the fragment with the same key is found
+     * in the assembler bucket
+     */
     frag = *head_p;
     prev = head_p;
     while (frag) {
@@ -357,27 +383,37 @@ vr_fragment_assemble(struct vr_fragment **head_p,
         frag = frag->f_next;
     }
 
+    /* If its a non-head fragment and the head fragment has
+     * already arrived, just flush (re-inject) it for regular
+     * packet processing
+     */
     if (!frag_head) {
-        frag_flow = vr_fragment_get(router, pnode->pl_vrf, ip);
+        frag_flow = vr_fragment_get(router, pnode->pl_vrf, ip, pnode->pl_custom);
         if (frag_flow) {
             vr_fragment_flush_queue_element(vfqe);
             return 0;
         }
     }
 
+    /* If fragment entry is not found */
     if (!found) {
+        /* If its a fragment head, it's a cloned packet
+         * Nothing to be done, just exit
+         */
         if (frag_head) {
             drop_reason = VP_DROP_CLONED_ORIGINAL;
             PKT_LOG(drop_reason, pkt, 0, VR_FRAGMENT_C, __LINE__);
             goto exit_assembly;
         }
 
+        /* Check if max length of assembler bucket is exceeded */
         if (list_length > VR_MAX_FRAGMENTS_PER_ASSEMBLER_QUEUE) {
             drop_reason = VP_DROP_FRAGMENT_QUEUE_FAIL;
             PKT_LOG(drop_reason, pkt, 0, VR_FRAGMENT_C, __LINE__);
             goto exit_assembly;
         }
 
+        /* If it's a non-head fragment, allocate a new entry */
         frag = vr_zalloc(sizeof(*frag), VR_FRAGMENT_OBJECT);
         if (!frag) {
             ret = -ENOMEM;
@@ -387,17 +423,29 @@ vr_fragment_assemble(struct vr_fragment **head_p,
         }
 
         memcpy(&frag->f_key, &vfk, sizeof(vfk));
+        /* This is a non-head fragment, so the port info
+         * is not valid since head fragment has not arrived
+         */
         frag->f_port_info_valid = false;
     }
 
+    /* Timestamp the fragment */
     vr_get_mono_time(&sec, &nsec);
     frag->f_time = sec;
+
+    /* If frag entry is not found, create a new entry
+     * at the head of the assembler bucket
+     */
     if (!found) {
         prev = head_p;
         frag->f_next = *head_p;
         *head_p = frag;
     }
 
+    /* If the packet is non a fragment head,
+     * append the packet to the end of the fragment
+     * queue entry of the assembler bucket
+     */
     if (!frag_head) {
         vfqe->fqe_next = NULL;
         fqe = frag->f_qe;
@@ -415,18 +463,27 @@ vr_fragment_assemble(struct vr_fragment **head_p,
             fqe->fqe_next = vfqe;
         }
     } else {
+        /* If the packet is a fragment head, make the port
+         * info as valid since it contains a valid transport
+         * header. Also, free the cloned head-fragment
+         */
         frag->f_port_info_valid = true;
         PKT_LOG(VP_DROP_CLONED_ORIGINAL, pkt, 0, VR_FRAGMENT_C, __LINE__);
         vr_fragment_queue_element_free(vfqe, VP_DROP_CLONED_ORIGINAL);
     }
 
-
+    /* If a head fragment arrives after the non-head
+     * fragments, it means that we have the valid port info.
+     * In this case, flush the non-head fragments and
+     * re-inject them for normal packet processing
+     */
     if (frag->f_port_info_valid) {
         while ((fqe = frag->f_qe)) {
             frag->f_qe = fqe->fqe_next;
             vr_fragment_flush_queue_element(fqe);
         }
 
+        /* After flushing, remove the fragment entries from assembler table */
         fragment_unlink_frag(prev, frag);
         fragment_free_frag(frag);
     }
@@ -478,11 +535,11 @@ vr_fragment_assemble_queue(struct vr_fragment_queue *vfq)
 
 uint32_t
 __vr_fragment_get_hash(unsigned int vrf, uint64_t sip_u, uint64_t sip_l,
-        uint64_t dip_u, uint64_t dip_l, uint32_t id)
+        uint64_t dip_u, uint64_t dip_l, uint32_t id, unsigned short custom)
 {
     struct vr_fragment_key vfk;
 
-    __fragment_key(&vfk, vrf, sip_u, sip_l, dip_u, dip_l, id);
+    __fragment_key(&vfk, vrf, sip_u, sip_l, dip_u, dip_l, id, custom);
 
     return vr_hash(&vfk, sizeof(vfk), 0);
 }
@@ -508,15 +565,17 @@ vr_fragment_get_hash(struct vr_packet_node *pnode)
         v6_addr = (uint64_t *)(ip6->ip6_src);
 
         return __vr_fragment_get_hash(pnode->pl_vrf, *v6_addr, *(v6_addr+ 1),
-                    *(v6_addr + 2), *(v6_addr + 3), v6_frag->ip6_frag_id);
+                    *(v6_addr + 2), *(v6_addr + 3), v6_frag->ip6_frag_id,
+                    pnode->pl_custom);
     } else if(vr_ip_is_ip4(ip)) {
         return __vr_fragment_get_hash(pnode->pl_vrf, 0, pnode->pl_inner_src_ip,
-                0, pnode->pl_inner_dst_ip, ip->ip_id);
+                0, pnode->pl_inner_dst_ip, ip->ip_id, pnode->pl_custom);
     }
 
     return (uint32_t)-1;
 }
 
+/* Enqueue fragment in per cpu queue */
 int
 vr_fragment_enqueue(struct vrouter *router,
         struct vr_fragment_queue *vfq,
@@ -536,7 +595,8 @@ vr_fragment_enqueue(struct vrouter *router,
             goto fail;
     }
 
-    /* Check if the total number of fragmented packets exceeded. */
+    /* Check if the total number of fragmented packets across
+     * all cores exceeded. */
     if (vrouter_host->hos_is_frag_limit_exceeded &&
             vrouter_host->hos_is_frag_limit_exceeded()) {
             goto fail;
@@ -592,6 +652,7 @@ fail:
 }
 
 
+/* Delete fragment from the fragment hash table */
 void
 vr_fragment_del(vr_htable_t table, struct vr_fragment *fe)
 {
@@ -602,7 +663,7 @@ vr_fragment_del(vr_htable_t table, struct vr_fragment *fe)
     return;
 }
 
-
+/* Add fragment from the fragment hash table */
 static int
 vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
         unsigned short sport, unsigned short dport, unsigned short len)
@@ -627,21 +688,26 @@ vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
     return 0;
 }
 
+/* Add v4 fragment from the fragment hash table */
 int
 vr_v4_fragment_add(struct vrouter *router, unsigned short vrf,
-        struct vr_ip *iph, unsigned short sport, unsigned short dport)
+        struct vr_ip *iph, unsigned short sport, unsigned short dport,
+        unsigned short custom)
 {
     struct vr_fragment_key key;
 
-    __fragment_key(&key, vrf, 0, iph->ip_saddr, 0, iph->ip_daddr, iph->ip_id);
+    __fragment_key(&key, vrf, 0, iph->ip_saddr, 0,
+            iph->ip_daddr, iph->ip_id, custom);
 
     return vr_fragment_add(router, &key, sport, dport,
                     (ntohs(iph->ip_len) - iph->ip_hl * 4));
 }
 
+/* Add v6 fragment from the fragment hash table */
 int
 vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
-        struct vr_ip6 *ip6, unsigned short sport, unsigned short dport)
+        struct vr_ip6 *ip6, unsigned short sport, unsigned short dport,
+        unsigned short custom)
 {
     uint64_t *v6_addr;
     struct vr_fragment_key key;
@@ -650,14 +716,16 @@ vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
     v6_addr = (uint64_t *)(ip6->ip6_src);
     v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
     __fragment_key(&key, vrf, *v6_addr, *(v6_addr + 1), *(v6_addr + 2),
-            *(v6_addr + 3), v6_frag->ip6_frag_id);
+            *(v6_addr + 3), v6_frag->ip6_frag_id, custom);
 
     return vr_fragment_add(router, &key, sport, dport,
             (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag)));
 }
 
+/* Check if fragment entry exists in the fragment hash table */
 struct vr_fragment *
-vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
+vr_fragment_get(struct vrouter *router, unsigned short vrf,
+        struct vr_ip *ip, unsigned short custom)
 {
     uint64_t sec, nsec;
     uint64_t *v6_addr;
@@ -674,10 +742,12 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
             v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
             v6_addr = (uint64_t *)(ip6->ip6_src);
             __fragment_key(&key, vrf, *v6_addr, *(v6_addr+ 1),
-                    *(v6_addr + 2), *(v6_addr+ 3), v6_frag->ip6_frag_id);
+                    *(v6_addr + 2), *(v6_addr+ 3), v6_frag->ip6_frag_id,
+                    custom);
         }
     } else if (vr_ip_is_ip4(ip)) {
-        __fragment_key(&key, vrf, 0, ip->ip_saddr, 0, ip->ip_daddr, ip->ip_id);
+        __fragment_key(&key, vrf, 0, ip->ip_saddr, 0, ip->ip_daddr,
+                ip->ip_id, custom);
     } else {
         return NULL;
     }
@@ -695,7 +765,6 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
     return fe;
 }
 
-#define ENTRIES_PER_SCAN    64
 
 struct scanner_params {
     struct vrouter *sp_router;
@@ -714,20 +783,23 @@ __fragment_reap(vr_htable_t table, vr_hentry_t *ent,
         return;
 
     vr_get_mono_time(&sec, &nsec);
-    if (sec > fe->f_time + 1) {
+    if (sec > fe->f_time + VR_FRAG_HASH_TABLE_TIMEOUT_SECS) {
         vr_fragment_del(table, fe);
     }
 
     return;
 }
 
+/* Reap/cleanup stale entries from fragment hash table */
 static int
 fragment_reap(vr_htable_t htable, int start)
 {
-    return vr_htable_trav_range(htable, start, ENTRIES_PER_SCAN,
+    return vr_htable_trav_range(htable, start,
+            VR_FRAG_HASH_TABLE_ENTRIES_PER_SCAN,
             __fragment_reap, NULL);
 }
 
+/* Scanner callback for fragment hash table */
 static void
 fragment_table_scanner(void *arg)
 {
@@ -742,6 +814,7 @@ fragment_table_scanner(void *arg)
     return;
 }
 
+/* Initialize scanner for fragment hash table */
 static struct vr_timer *
 fragment_table_scanner_init(struct vrouter *router)
 {
@@ -764,7 +837,7 @@ fragment_table_scanner_init(struct vrouter *router)
 
     vtimer->vt_timer = fragment_table_scanner;
     vtimer->vt_vr_arg = scanner;
-    vtimer->vt_msecs = 1000;
+    vtimer->vt_msecs = VR_FRAG_HASH_TABLE_SCANNER_INTERVAL_MSEC;
     if (vr_create_timer(vtimer)) {
         vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, 0);
         goto fail_init;
@@ -820,6 +893,7 @@ vr_fragment_table_exit(struct vrouter *router)
     return;
 }
 
+/* Initialize fragment hash table */
 int
 vr_fragment_table_init(struct vrouter *router)
 {
@@ -827,12 +901,12 @@ vr_fragment_table_init(struct vrouter *router)
 
     if (!router->vr_fragment_table) {
         router->vr_fragment_table = vr_htable_create(router,
-                FRAG_TABLE_ENTRIES, FRAG_OTABLE_ENTRIES,
+                VR_FRAG_HASH_TABLE_ENTRIES, VR_FRAG_HASH_OTABLE_ENTRIES,
                 sizeof(struct vr_fragment), sizeof(struct vr_fragment_key),
-                FRAG_TABLE_BUCKETS, vr_fragment_get_entry_key);
+                VR_FRAG_HASH_TABLE_BUCKETS, vr_fragment_get_entry_key);
         if (!router->vr_fragment_table) {
             return vr_module_error(-ENOMEM, __FUNCTION__, __LINE__,
-                    FRAG_TABLE_ENTRIES + FRAG_OTABLE_ENTRIES);
+                    VR_FRAG_HASH_TABLE_ENTRIES + VR_FRAG_HASH_OTABLE_ENTRIES);
         }
     }
 
