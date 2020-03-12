@@ -99,6 +99,8 @@ enum vr_opt_index {
    PKT_DROP_LOG_BUFFER_SIZE_OPT_INDEX,
 #define MEMORY_ALLOC_CHECKS_OPT "vr_memory_alloc_checks"
     MEMORY_ALLOC_CHECKS_OPT_INDEX,
+#define CLOSE_FLOW_ON_TCP_RST_OPT "vr_close_flow_on_tcp_rst"
+    CLOSE_FLOW_ON_TCP_RST_OPT_INDEX,
 #define VR_DPDK_RX_RING_SZ_OPT      "vr_dpdk_rx_ring_sz"
     VR_DPDK_RX_RING_SZ_OPT_INDEX,
 #define VR_DPDK_TX_RING_SZ_OPT      "vr_dpdk_tx_ring_sz"
@@ -122,6 +124,7 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 extern unsigned int datapath_offloads;
 extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int vr_close_flow_on_tcp_rst;
 
 unsigned int vr_dpdk_rx_ring_sz = VR_DPDK_RX_RING_SZ;
 unsigned int vr_dpdk_tx_ring_sz = VR_DPDK_TX_RING_SZ;
@@ -717,6 +720,8 @@ dpdk_argv_update(void)
                 vr_packet_sz);
     RTE_LOG(INFO, VROUTER, "Maximum log buffer size:     %" PRIu32 "\n",
 		vr_pkt_droplog_bufsz);
+    RTE_LOG(INFO, VROUTER, "vr_close_flow_on_tcp_rst:    %" PRIu32 "\n",
+		vr_close_flow_on_tcp_rst);
     RTE_LOG(INFO, VROUTER, "VR_DPDK_RX_RING_SZ:          %" PRIu32 "\n",
                 vr_dpdk_rx_ring_sz);
     RTE_LOG(INFO, VROUTER, "VR_DPDK_TX_RING_SZ:          %" PRIu32 "\n",
@@ -1073,6 +1078,8 @@ static struct option long_options[] = {
 						    NULL,                   0},
     [MEMORY_ALLOC_CHECKS_OPT_INDEX] =   {MEMORY_ALLOC_CHECKS_OPT, no_argument,
                                                     NULL,                   0},
+    [CLOSE_FLOW_ON_TCP_RST_OPT_INDEX] = {CLOSE_FLOW_ON_TCP_RST_OPT, required_argument,
+	                                            NULL,                   0},
     [VR_DPDK_RX_RING_SZ_OPT_INDEX]  =   {VR_DPDK_RX_RING_SZ_OPT, required_argument,
                                                     NULL,                   0},
     [VR_DPDK_TX_RING_SZ_OPT_INDEX]  =   {VR_DPDK_TX_RING_SZ_OPT, required_argument,
@@ -1122,6 +1129,8 @@ Usage(void)
         "    --"DPDK_RXD_SIZE_OPT" NUM    DPDK PMD Rx Descriptor size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
 	"    --"PKT_DROP_LOG_BUFFER_SIZE_OPT" NUM Maximum debug log buffer size\n"
+	"    --"CLOSE_FLOW_ON_TCP_RST_OPT" NUM Enable/Disable disconnection of "
+	                                  "flow on TCP RST\n"
         "    --"VR_DPDK_RX_RING_SZ_OPT" NUM Configure vr_dpdk_rx_ring_sz value\n"
         "    --"VR_DPDK_TX_RING_SZ_OPT" NUM Configure vr_dpd_tx_ring_sz value\n"
         "    --"VR_DPDK_YIELD_OPT" NUM      Configurable parameter to disable yield\n"
@@ -1280,6 +1289,13 @@ parse_long_opts(int opt_flow_index, char *optarg)
             vr_pkt_droplog_bufsz = VR_PKT_DROP_LOG_MAX;
         }
         break;
+
+    case CLOSE_FLOW_ON_TCP_RST_OPT_INDEX:
+	vr_close_flow_on_tcp_rst = (unsigned int) strtoul(optarg, NULL, 0);
+	if (errno != 0) {
+            vr_close_flow_on_tcp_rst = 0;
+	}
+	break;
 
     case VR_DPDK_RX_RING_SZ_OPT_INDEX:
         vr_dpdk_rx_ring_sz = (unsigned int) strtoul(optarg, NULL, 0);
