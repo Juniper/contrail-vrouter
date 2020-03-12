@@ -322,8 +322,14 @@ static int
 mem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
     struct vr_mem_object *vmo = (struct vr_mem_object *)vma->vm_private_data;
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
 static int
+mem_fault(struct vm_fault *vmf)
+{
+    struct vr_mem_object *vmo =
+        (struct vr_mem_object *)vmf->vma->vm_private_data;
+#else
+unsigned int
 mem_fault(struct vm_fault *vmf)
 {
     struct vr_mem_object *vmo =

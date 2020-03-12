@@ -33,6 +33,12 @@
 #include "vr_buildinfo.h"
 #include "vr_mem.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+#define TIMESTRUCT timeval
+#else
+#define TIMESTRUCT timespec64
+#endif
+
 unsigned int vr_num_cpus = 1;
 
 extern unsigned int vr_bridge_entries;
@@ -405,11 +411,16 @@ lh_phead_len(struct vr_packet *pkt)
 static void
 lh_get_time(uint64_t *sec, uint64_t *usec)
 {
-    struct timeval t;
+    struct TIMESTRUCT t;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
     do_gettimeofday(&t);
-    *sec = t.tv_sec;
     *usec = t.tv_usec;
+#else
+    ktime_get_real_ts64(&t);
+    *usec = t.tv_nsec;
+#endif
+    *sec = t.tv_sec;
 
     return;
 }
@@ -1107,7 +1118,11 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
     frag = &skb_shinfo(skb)->frags[0];
     frag_size = skb_frag_size(frag);
     va = vr_kmap_atomic(skb_frag_page(frag));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
     va += frag->page_offset;
+#else
+    va += frag->bv_offset;
+#endif
 
     pull_len = 0;
     if (pkt_headlen == 0) {
@@ -1144,7 +1159,11 @@ lh_pull_inner_headers_fast_udp(struct vr_packet *pkt, int
 
     memcpy(skb_tail_pointer(skb), va, pull_len);
     skb_frag_size_sub(frag, pull_len);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
     frag->page_offset += pull_len;
+#else
+    frag->bv_offset += pull_len;
+#endif
     skb->data_len -= pull_len;
     skb->tail += pull_len;
 
@@ -1352,7 +1371,11 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
     frag = &skb_shinfo(skb)->frags[0];
     frag_size = skb_frag_size(frag);
     va = vr_kmap_atomic(skb_frag_page(frag));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
     va += frag->page_offset;
+#else
+    va += frag->bv_offset;
+#endif
 
     pull_len = 0;
     if (pkt_headlen == 0) {
@@ -1414,7 +1437,11 @@ lh_pull_inner_headers_fast_gre(struct vr_packet *pkt, int
 
     memcpy(skb_tail_pointer(skb), va, pull_len);
     skb_frag_size_sub(frag, pull_len);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
     frag->page_offset += pull_len;
+#else
+    frag->bv_offset += pull_len;
+#endif
     skb->data_len -= pull_len;
     skb->tail += pull_len;
 
