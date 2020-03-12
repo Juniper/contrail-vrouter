@@ -22,14 +22,17 @@ class Flow(ObjectBase, vr_flow_req):
             family,
             idx=-1,
             ridx=-1,
-            flags=0,
-            flow_nh_idx=0,
-            src_nh_idx=0,
+            flags=constants.VR_FLOW_FLAG_ACTIVE,
+            flow_nh_idx=None,
+            src_nh_idx=None,
             qos_id=-1,
             action=constants.VR_FLOW_ACTION_FORWARD,
             ecmp_nh_index=-1,
-            flow_vrf=0,
+            flow_vrf=None,
             rflow_nh_idx=0,
+            flags1=None,
+            mirr_idx=None,
+            extflags=None,
             **kwargs):
         super(Flow, self).__init__()
         vr_flow_req.__init__(self)
@@ -51,6 +54,9 @@ class Flow(ObjectBase, vr_flow_req):
         self.fr_ecmp_nh_index = ecmp_nh_index
         self.fr_action = action
         self.fr_qos_id = qos_id
+        self.fr_flags1 = flags1
+        self.fr_mir_id = mirr_idx
+        self.fr_extflags = extflags
         # set reverse flow params as mirror of forward flow by default
         self.rflow_sip_u = self.fr_flow_dip_u
         self.rflow_sip_l = self.fr_flow_dip_l
@@ -138,6 +144,11 @@ class Flow(ObjectBase, vr_flow_req):
         self.fr_flags |= constants.VR_RFLOW_VALID
         self.sync()
 
+        # Update reverse flow
+        flow2.fr_index = flow2.get_fr_index()
+        flow2.fr_gen_id = flow2.get_fr_gen_id()
+        flow2.sync()
+
     def get(self, key):
         """
         Queries vrouter and return the key value from the response xml file
@@ -189,12 +200,6 @@ class InetFlow(Flow):
         Flow flags
     flow_nh_idx : int
         Flow nexthop id
-    qos_id : int
-        Qos id
-    action : int
-        Flow action
-    ecmp_nh_index : int
-        Ecmp nexthop index
     flow_vrf : int
         Flow vrf
     rflow_nh_idx : int
@@ -202,7 +207,8 @@ class InetFlow(Flow):
     """
 
     def __init__(self, sip, dip, sport, dport, proto,
-                 **kwargs):
+                 flow_nh_idx=None, flow_vrf=None, rflow_nh_idx=None,
+                 flags=constants.VR_FLOW_FLAG_ACTIVE, **kwargs):
         super(InetFlow, self).__init__(
             self.vt_ipv4(sip),
             0,
@@ -211,7 +217,11 @@ class InetFlow(Flow):
             sport,
             dport,
             proto,
+            flow_nh_idx=flow_nh_idx,
+            flow_vrf=flow_vrf,
+            rflow_nh_idx=rflow_nh_idx,
             family=constants.AF_INET,
+            flags=flags,
             **kwargs)
 
 
@@ -248,9 +258,19 @@ class Inet6Flow(Flow):
         Flow vrf
     rflow_nh_idx : int
         Reverse flow id
+    mirr_idx : int
+        Mirror Index
     """
 
-    def __init__(self, sip6_str, dip6_str, proto, sport, dport, **kwargs):
+    def __init__(
+            self,
+            sip6_str,
+            dip6_str,
+            proto,
+            sport,
+            dport,
+            mirr_idx=None,
+            **kwargs):
         sip6_u, sip6_l = self.vt_ipv6(sip6_str)
         dip6_u, dip6_l = self.vt_ipv6(dip6_str)
         super(Inet6Flow, self).__init__(
@@ -262,6 +282,7 @@ class Inet6Flow(Flow):
             dport,
             proto,
             constants.AF_INET6,
+            mirr_idx=mirr_idx,
             **kwargs)
 
 
