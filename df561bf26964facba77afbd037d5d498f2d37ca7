@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa2be217_697370f5",
+        "filename": "linux/vr_host_interface.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1231,
+      "author": {
+        "id": 932
+      },
+      "writtenOn": "2020-03-13T22:20:46Z",
+      "side": 1,
+      "message": "Possible typo ?\n\nDid you intend to use something like ?\n#define skb_vlan_tag_present(skb)",
+      "revId": "df561bf26964facba77afbd037d5d498f2d37ca7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8aa88267_5922e3be",
+        "filename": "linux/vr_mem.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 332,
+      "author": {
+        "id": 932
+      },
+      "writtenOn": "2020-03-13T22:20:46Z",
+      "side": 1,
+      "message": "Looks like \u0027static\u0027 is still appropriate.\n\nAnother, nit-pick, comment is that the original \"#else\" case\ncould itself have been split into another #if/#else and just selecting\non the return type since that is the only difference ?",
+      "revId": "df561bf26964facba77afbd037d5d498f2d37ca7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "695992ff_9643a6bf",
+        "filename": "linux/vrouter_mod.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 932
+      },
+      "writtenOn": "2020-03-13T22:20:46Z",
+      "side": 1,
+      "message": "Nit-pick: Not sure if we gain lots with \"TIMESTRUCT\u0027\nand it adds a level of obfuscation ?",
+      "revId": "df561bf26964facba77afbd037d5d498f2d37ca7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cfc62701_54ed81e6",
+        "filename": "linux/vrouter_mod.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 421,
+      "author": {
+        "id": 932
+      },
+      "writtenOn": "2020-03-13T22:20:46Z",
+      "side": 1,
+      "message": "Maybe we should convert nsec to usec.",
+      "revId": "df561bf26964facba77afbd037d5d498f2d37ca7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
