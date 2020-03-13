@@ -42,6 +42,7 @@ extern unsigned int vr_flow_hold_limit;
 extern unsigned int vr_interfaces;
 extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
+extern unsigned int vr_close_flow_on_tcp_rst;
 
 extern char *ContrailBuildInfo;
 
@@ -2415,6 +2416,13 @@ static struct ctl_table vrouter_table[] =
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
     },
+    {
+        .procname       = "close_flow_on_tcp_rst",
+	.data           = &vr_close_flow_on_tcp_rst,
+	.maxlen         = sizeof(unsigned int),
+	.mode           = 0644,
+	.proc_handler   = proc_dointvec,
+    },
     {}
 };
 
@@ -2520,6 +2528,8 @@ MODULE_PARM_DESC(vr_pkt_droplog_sysctl_en, "Sysctl implementation for Enable/Dis
 module_param(vr_pkt_droplog_min_sysctl_en, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_pkt_droplog_min_sysctl_en, "Sysctl implementation for Enable/Disable minimum vrouter packet drop log support");
 
+module_param(vr_close_flow_on_tcp_rst, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_close_flow_on_tcp_rst, "Enable or Disable disconnection of flow on TCP RST. Default value is 0");
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 module_param(vr_use_linux_br, int, 0);
 #endif
