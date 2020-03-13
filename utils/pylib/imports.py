@@ -12,3 +12,4 @@ from vif import *
 from vrf import *
 from mirror import *
 from mpls import *
+from vxlan import *
