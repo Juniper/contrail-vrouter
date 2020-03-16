@@ -1227,7 +1227,7 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
         if (iph)
             udph->udp_csum = dpdk_ipv4_udptcp_cksum(m, (struct ipv4_hdr *)iph, (uint8_t *)udph);
         else if (ip6h)
-            udph->udp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, udph);
+            udph->udp_csum = dpdk_ipv6_udptcp_cksum(m, (struct ipv6_hdr *)ip6h, (uint8_t *)udph);
     } else if (iph_proto == VR_IP_PROTO_TCP) {
         tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
         tcph->tcp_csum = 0;
