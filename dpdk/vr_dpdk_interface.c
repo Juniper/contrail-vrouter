@@ -1149,6 +1149,49 @@ dpdk_ipv4_sw_iphdr_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
     iph->ip_csum = vr_ip_csum(iph);
 }
 
+/*
+ * Process the IPv6 UDP or TCP checksum in a **chained** mbuf.
+ *
+ * Layer 4 checksum must be set to 0 in the packet by the caller.
+ *
+ * @param ipv6_hdr
+ *   The pointer to the contiguous IPv4 header.
+ * @param l4_hdr
+ *   The pointer to the beginning of the L4 header.
+ * @return
+ *   The complemented checksum to set in the IP packet.
+ */
+inline uint16_t
+dpdk_ipv6_udptcp_cksum(struct rte_mbuf *m, const struct ipv6_hdr *ipv6_hdr,
+		                                                    uint8_t *l4_hdr)
+{
+    uint32_t cksum = 0;
+    uint32_t l4_len;
+    uint32_t data_len = 0, rem_len = 0;
+    uint8_t *data_ptr = NULL;
+
+    l4_len = rte_be_to_cpu_16(ipv6_hdr->payload_len);
+
+    do {
+        data_ptr = likely(!!data_ptr)? rte_pktmbuf_mtod(m, uint8_t*):l4_hdr;
+        data_len = likely(!!data_len)? rte_pktmbuf_data_len(m):
+        rte_pktmbuf_mtod(m, uint8_t*) + rte_pktmbuf_data_len(m) - l4_hdr ;
+        if (rem_len + data_len > l4_len)
+            data_len = l4_len - rem_len;
+        cksum += rte_raw_cksum(data_ptr, data_len);
+        rem_len += data_len;
+        m = m->next;
+    } while (m && rem_len < l4_len);
+
+    cksum += rte_ipv6_phdr_cksum(ipv6_hdr, 0);
+    cksum = ((cksum & 0xffff0000) >> 16) + (cksum & 0xffff);
+    cksum = (~cksum) & 0xffff;
+    if (cksum == 0)
+        cksum = 0xffff;
+
+    return cksum;
+}
+
 /**
  * Process the IPv4 UDP or TCP checksum in a **chained** mbuf.
  *
@@ -1227,7 +1270,7 @@ dpdk_sw_checksum_at_offset(struct vr_packet *pkt, unsigned offset)
         if (iph)
             udph->udp_csum = dpdk_ipv4_udptcp_cksum(m, (struct ipv4_hdr *)iph, (uint8_t *)udph);
         else if (ip6h)
-            udph->udp_csum = rte_ipv6_udptcp_cksum((struct ipv6_hdr *)ip6h, udph);
+            udph->udp_csum = dpdk_ipv6_udptcp_cksum(m, (struct ipv6_hdr *)ip6h, (uint8_t *)udph);
     } else if (iph_proto == VR_IP_PROTO_TCP) {
         tcph = (struct vr_tcp *)pkt_data_at_offset(pkt, offset + iph_len);
         tcph->tcp_csum = 0;
