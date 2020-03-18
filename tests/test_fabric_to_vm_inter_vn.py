@@ -35,9 +35,7 @@ class TestFabricToVmiInterVn(unittest.TestCase):
             idx=1)
 
         # Add agent vif
-        self.agent_vif = AgentVif(
-            idx=2,
-            flags=constants.VIF_FLAG_L3_ENABLED)
+        self.agent_vif = AgentVif(idx=2)
 
         # Add tenant vif
         self.tenant_vif = VirtualVif(
@@ -54,13 +52,17 @@ class TestFabricToVmiInterVn(unittest.TestCase):
             encap_oif_id=self.tenant_vif.idx(),
             encap="02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00",
             nh_idx=38,
-            nh_vrf=5)
+            nh_vrf=5,
+            nh_flags=constants.NH_FLAG_POLICY_ENABLED |
+            constants.NH_FLAG_ETREE_ROOT)
 
         # Add underlay Receive NH
         self.underlay_rnh = ReceiveNextHop(
             encap_oif_id=self.vhost0_vif.idx(),
             nh_idx=10,
-            nh_vrf=1)
+            nh_vrf=1,
+            nh_flags=constants.NH_FLAG_RELAXED_POLICY |
+            constants.NH_FLAG_ETREE_ROOT)
 
         # Add underlay Route
         self.underlay_route = InetRoute(
@@ -75,7 +77,9 @@ class TestFabricToVmiInterVn(unittest.TestCase):
             encap="02 c2 23 4c d0 55 00 00 5e 00 01 00 08 00",
             nh_idx=44,
             nh_family=constants.AF_BRIDGE,
-            nh_vrf=5)
+            nh_vrf=5,
+            nh_flags=constants.NH_FLAG_POLICY_ENABLED |
+            constants.NH_FLAG_ETREE_ROOT)
 
         # Add Bridge Route
         self.bridge_route = BridgeRoute(
@@ -86,8 +90,7 @@ class TestFabricToVmiInterVn(unittest.TestCase):
         # Add MPLS entry for overlay
         self.mpls_entry = Mpls(
             mr_label=42,
-            mr_nhid=38,
-            mr_rid=0)
+            mr_nhid=38)
 
         # Add tunnel NH (for src validation)
         self.tunnel_nh = TunnelNextHopV4(
@@ -95,8 +98,9 @@ class TestFabricToVmiInterVn(unittest.TestCase):
             encap="00 1b 21 bb f9 46 00 1b 21 bb f9 48 08 00",
             tun_sip="8.0.0.2",
             tun_dip="8.0.0.3",
-            nh_idx=21)
-
+            nh_idx=21,
+            nh_flags=constants.NH_FLAG_TUNNEL_UDP_MPLS |
+            constants.NH_FLAG_ETREE_ROOT)
         ObjectBase.sync_all()
 
         # Add forward and reverse flow
@@ -182,22 +186,6 @@ class TestFabricToVmiInterVn(unittest.TestCase):
             vrf=4,
             flags=constants.VIF_FLAG_HBS_RIGHT)
         hbs_r_vif.sync()
-
-        self.vif_nh.set_nh_flags(
-            nh_flags=constants.NH_FLAG_POLICY_ENABLED)
-        self.vif_nh.sync()
-
-        self.underlay_rnh.set_nh_flags(
-            nh_flags=constants.NH_FLAG_RELAXED_POLICY)
-        self.underlay_rnh.sync()
-
-        self.l2_nh.set_nh_flags(
-            nh_flags=constants.NH_FLAG_POLICY_ENABLED)
-        self.l2_nh.sync()
-
-        self.tunnel_nh.set_nh_flags(
-            nh_flags=constants.NH_FLAG_TUNNEL_UDP_MPLS)
-        self.tunnel_nh.sync()
 
         # Add hbs-l and hbs-r in the vrf table
         vrf = Vrf(
