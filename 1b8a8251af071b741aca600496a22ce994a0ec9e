@@ -278,6 +278,24 @@
       "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "367b453d_38fcca2a",
+        "filename": "utils/pylib/object_base.py",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-03-18T16:17:36Z",
+      "side": 1,
+      "message": "Got it. You can close this then",
+      "parentUuid": "762b1313_c9b24bdb",
+      "revId": "1b8a8251af071b741aca600496a22ce994a0ec9e",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
