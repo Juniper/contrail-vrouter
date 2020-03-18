@@ -75,9 +75,7 @@ class TestMirrorV6SandeshConf(unittest.TestCase):
         # Add Mirror
         mirr = Mirror(
             idx=1,
-            nh_idx=14,
-            flags=0,
-            vni=50)
+            nh_idx=14)
 
         # Add MPLS label
         mpls = Mpls(

@@ -161,8 +161,9 @@ class TunnelNextHopV4(NextHop):
     """
 
     def __init__(self, encap_oif_id, encap, tun_sip, tun_dip,
-                 nh_idx=1, nh_vrf=0, nh_flags=constants.NH_FLAG_VALID,
-                 encap_family=None, nh_family=constants.AF_INET, **kwargs):
+                 tun_sport=None, tun_dport=None, nh_idx=1, nh_vrf=0,
+                 nh_flags=constants.NH_FLAG_VALID, encap_family=None,
+                 nh_family=constants.AF_INET, **kwargs):
         super(TunnelNextHopV4, self).__init__(
             constants.NH_TYPE_TUNNEL,
             nh_idx,
@@ -175,6 +176,8 @@ class TunnelNextHopV4(NextHop):
             **kwargs)
         self.nhr_tun_sip = self.vt_ipv4(tun_sip)
         self.nhr_tun_dip = self.vt_ipv4(tun_dip)
+        self.nhr_tun_sport = tun_sport
+        self.nhr_tun_dport = tun_dport
 
 
 class TunnelNextHopV6(NextHop):

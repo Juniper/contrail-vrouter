@@ -203,7 +203,7 @@ class AgentVif(Vif):
     """
 
     def __init__(self, idx=0, vrf=65535, mcast_vrf=65535, mtu=1514,
-                 flags=0, **kwargs):
+                 flags=constants.VIF_FLAG_L3_ENABLED, **kwargs):
         name = 'unix'
         super(AgentVif, self).__init__(idx, name, None, None, None,
                                        **kwargs)
