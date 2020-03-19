@@ -32,7 +32,7 @@ class TestBasic(unittest.TestCase):
         vif = VirtualVif(name="tap_1", ipv4_str="1.1.1.10",
                          mac_str="de:ad:be:ef:00:02")
 
-        vif.sync()
+        vif.sync()      
         self.assertEqual("tap_1", vif.get_vif_name())
 
     def test_vif_v6(self):
