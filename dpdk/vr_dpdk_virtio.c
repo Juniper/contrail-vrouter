@@ -1033,6 +1033,14 @@ dpdk_virtio_from_vm_rx(void *port, struct rte_mbuf **pkts, uint32_t max_pkts)
                     }
                 } else {
                     /* No chaining - Just append next descriptor(s) data. */
+                    /* The pkt_len is usually 1500. However, it is decided by VNF.
+                       There is no way to predict the exact value
+                       for the defensive check but 9000 is a safe upper limit.
+                       Values larger than 6 times the normal value could be
+                       viewed as memory corruption.
+                    */
+                    if (unlikely(pkt_len >= 9000)
+                        goto free_mbuf;
                     rte_memcpy(tail_addr, pkt_addr, pkt_len);
                 }
             } else {
