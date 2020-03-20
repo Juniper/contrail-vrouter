@@ -629,7 +629,8 @@ vr_hugepage_config_process(void *s_req)
     /* Invoke huge page configuration only if a segment exists */
     if (vr_huge_page_config) {
         ret = vr_huge_page_config(req->vhp_mem, req->vhp_mem_size,
-                                    req->vhp_msize, req->vhp_msize_size);
+                                  req->vhp_psize, req->vhp_psize_size,
+                                  req->vhp_mem_sz, req->vhp_mem_sz_size);
     }
 
     if (ret != -EEXIST) {
