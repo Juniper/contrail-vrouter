@@ -686,8 +686,11 @@ __vr_htable_create(struct vrouter *router, unsigned int entries,
     if (!entry_size || !entries || !get_entry_key)
         return NULL;
 
-    if (!bucket_size)
-        bucket_size = VR_HENTRIES_PER_BUCKET;
+    if ((bucket_size != 0) && (bucket_size != VR_HENTRIES_PER_BUCKET)) {
+        vr_printf("Err: Non default bucket size is not supported\n");
+        return NULL;
+    }
+    bucket_size = VR_HENTRIES_PER_BUCKET;
 
     /* Ceil to near upper number, which is dividable by bucket_size */
     entries = ((entries + bucket_size -1) / bucket_size) * bucket_size;
