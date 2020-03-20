@@ -52,7 +52,7 @@ vr_huge_mem_get(int size)
     /* Align it to be a multiple of 8 bytes */
     size = ((size + 7) / 8) * 8;
 
-    for (i = 0; i < VR_MAX_HUGE_PAGES; i++) {
+    for (i = 0; i < VR_MAX_HUGE_PAGE_CFG; i++) {
         if (!vr_hcfg[i].hcfg_mem)
             continue;
 
@@ -72,48 +72,26 @@ vr_huge_mem_get(int size)
     return NULL;
 }
 
+/*
+ * This api gets the kernel pages corresponding to the uspace huge pages
+ * and pins them. Since kernel doesn't gaurantee contiguous huge pages
+ * across huge pages, we use vmap to return kernel contiguous virtual
+ * memory for those pages.
+ */
 static struct vr_hpage_config *
-vr_huge_page_2M_get(void)
-{
-    int i;
-
-    if (!vr_hcfg)
-        return NULL;
-
-    for (i = 0; i < VR_MAX_HUGE_PAGES; i++) {
-
-        if (!vr_hcfg[i].hcfg_mem)
-            continue;
-
-        /* If not a 2M page, not bothered */
-        if (vr_hcfg[i].hcfg_tot_size != VR_MEM_2M)
-            continue;
-
-        /* Free size is used as marker to identify whether this has been
-         * used or not
-         */
-        if (vr_hcfg[i].hcfg_free_size != VR_MEM_2M)
-            continue;
-
-        return vr_hcfg + i;
-    }
-
-    return NULL;
-}
-
-static struct vr_hpage_config *
-__vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, struct page **pmem)
+__vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_size, struct page **pmem)
 {
     int i, size = 0, spages;
     struct vr_hpage_config *hcfg = NULL;
+    void *kmem = NULL;
 
-    for (i = 0; i < VR_MAX_HUGE_PAGES; i++) {
+    for (i = 0; i < VR_MAX_HUGE_PAGE_CFG; i++) {
         hcfg = vr_hcfg + i;
         if (!hcfg->hcfg_mem)
             break;
     }
 
-    if (i == VR_MAX_HUGE_PAGES)
+    if (i == VR_MAX_HUGE_PAGE_CFG)
         return NULL;
 
     if (!pmem) {
@@ -160,13 +138,30 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, struct page *
 
         return NULL;
     }
+ 
+    kmem = page_address(pmem[0]);
+    /*
+     * The hugepages got may not be contiguous, hence map them into
+     * kernel virtual memory contiguously if mem_size/hugepage_size > 1
+     * i.e more than 1 hugepages are involved
+     */
+    if ((mem_size/hugepage_size) > 1) {
+        kmem = vmap(pmem, npages, VM_MAP, PAGE_KERNEL);
+        if (!kmem) {
+            vr_printf("vmap failed\n");
+            return NULL;
+        }
+    }
 
     hcfg->hcfg_uspace_vmem = (void *)uspace_vmem;
-    hcfg->hcfg_mem = page_address(pmem[0]);
+    hcfg->hcfg_mem = kmem;
     hcfg->hcfg_npages = npages;
     hcfg->hcfg_free_size = mem_size;
     hcfg->hcfg_tot_size = mem_size;
     hcfg->hcfg_pages = pmem;
+
+    vr_printf("Pinned huge page uspace_vmem %p start_page_addr %p num 4k pages %d mem_size %d\n",
+               hcfg->hcfg_uspace_vmem, hcfg->hcfg_mem, hcfg->hcfg_npages, hcfg->hcfg_tot_size);
 
     return hcfg;
 }
@@ -176,67 +171,31 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, struct page *
  * Vrouter kernel module. It receives the n_hpages of huge pages and the
  * corresponding user space Virtual memory addresses in hpages.
  * hpage_size contains the size of every huge page.
- * As of now, two sizes of huge pages are going to be received - 2M and
- * 1G. The memory required to hold 1G huge page in terms of 4K size
- * pages is 2M. So the received 2M pages are used to hold 1G huge pages.
- * The intention behind doing this is to avoid a dynamic allocation of the
- * memroy every time 1G pages need to be configured.  If no 2M pages are
- * received, we create 2M of memory for every 1G huge page using
- * __get_free_pages(). The memory required to hold 2M page in terms of
- * 4K huge pages is 4Kb, which is exactly one page - and is unlikely
- * to fail - leading to lesser failures.
+ * hpage_mem_sz contains the size of huge page memory required.
+ * Both 2MB and 1GB hugepage sizes are supported.
  * As the huge page memory is in use for the complete life time of
  * Vrouter module, there is no 'put'/'free'/'delete' routines provided
  * for the release of the memory. These huge pages are de-referenced
  * only at the time of removal of the module.
  */
 int
-vr_huge_pages_config(uint64_t *hpages, int n_hpages, int *hpage_size)
+vr_huge_pages_config(uint64_t *hpages, int n_hpages, int *hpage_size, int *hpage_mem_sz)
 {
     int i, spages, succeeded_pages = 0;
-    struct page **pmem;
-    struct vr_hpage_config *temp, *hcfg;
 
     /* If memory is already inited, nothing to do further */
     if (vr_hpage_config_inited == true)
         return -EEXIST;
 
-    /* Initialise 2Mb pages first - this memory can be used later for 1G  */
-    spages =  1 + (VR_MEM_2M - 1) / PAGE_SIZE;
     for (i = 0; i < n_hpages; i++) {
 
-        if (hpage_size[i] != VR_MEM_2M)
-            continue;
+        spages =  1 + (hpage_mem_sz[i] - 1) / PAGE_SIZE;
 
-        if (__vr_huge_page_get(hpages[i], spages, hpage_size[i], NULL))
+        vr_printf("Config Hugepage vmem %p psize %d mem_sz %d\n", hpages[i],
+                  hpage_size[i], hpage_mem_sz[i]);
+
+        if (__vr_huge_page_get(hpages[i], spages, hpage_mem_sz[i], hpage_size[i], NULL))
             succeeded_pages++;
-    }
-
-    for (i = 0; i < n_hpages; i++) {
-
-        if (hpage_size[i] == VR_MEM_2M)
-            continue;
-
-        temp = NULL;
-        pmem = NULL;
-
-        spages =  1 + (hpage_size[i] - 1) / PAGE_SIZE;
-
-        /* if we can use 2M pages, try to find a free page */
-        if ((spages * sizeof(struct page *)) <= VR_MEM_2M) {
-            temp = vr_huge_page_2M_get();
-            if (temp)
-                pmem = (struct page **)temp->hcfg_mem;
-        }
-
-        hcfg = __vr_huge_page_get(hpages[i], spages, hpage_size[i], pmem);
-        if (hcfg) {
-            succeeded_pages++;
-            if (temp) {
-                temp->hcfg_free_size = 0;
-                hcfg->hcfg_mem_attached = 1;
-            }
-        }
     }
 
     if (!succeeded_pages)
@@ -254,38 +213,36 @@ vr_huge_pages_config(uint64_t *hpages, int n_hpages, int *hpage_size)
 void
 vr_huge_pages_exit(void)
 {
-    int i, j, iter;
+    int i, j;
     struct vr_hpage_config *hcfg;
 
     if (!vr_hcfg)
         return;
 
-    for (iter = 0; iter < 2; iter++) {
-        for (i = 0; i < VR_MAX_HUGE_PAGES; i++) {
-            hcfg = vr_hcfg + i;
-            if (!hcfg->hcfg_uspace_vmem)
-                continue;
+    for (i = 0; i < VR_MAX_HUGE_PAGE_CFG; i++) {
+        hcfg = vr_hcfg + i;
+        if (!hcfg->hcfg_uspace_vmem)
+            continue;
 
-            if (iter == 0) {
-                if (hcfg->hcfg_tot_size == VR_MEM_2M)
-                    continue;
-            }
-
-            /* Put back the pages after marking dirty */
-            for (j = 0; j < hcfg->hcfg_npages; j++) {
-                if (!PageReserved(hcfg->hcfg_pages[j]))
-                    SetPageDirty(hcfg->hcfg_pages[j]);
-                put_page(hcfg->hcfg_pages[j]);
-                hcfg->hcfg_pages[j] = NULL;
-            }
-
-            if (!hcfg->hcfg_mem_attached) {
-                free_pages((unsigned long)hcfg->hcfg_pages,
-                      get_order((hcfg->hcfg_npages * sizeof(struct page *))));
-            }
-
-            memset(hcfg, 0, sizeof(*hcfg));
+        /* If we vmapped the pages, release the vmapping first */
+        if (is_vmalloc_addr(hcfg->hcfg_mem)) {
+            vunmap(hcfg->hcfg_mem);
         }
+
+        /* Put back the pages after marking dirty */
+        for (j = 0; j < hcfg->hcfg_npages; j++) {
+             if (!PageReserved(hcfg->hcfg_pages[j]))
+                 SetPageDirty(hcfg->hcfg_pages[j]);
+             put_page(hcfg->hcfg_pages[j]);
+             hcfg->hcfg_pages[j] = NULL;
+        }
+
+        if (!hcfg->hcfg_mem_attached) {
+            free_pages((unsigned long)hcfg->hcfg_pages,
+                      get_order((hcfg->hcfg_npages * sizeof(struct page *))));
+        }
+
+        memset(hcfg, 0, sizeof(*hcfg));
     }
 
     kfree(vr_hcfg);
@@ -308,7 +265,7 @@ vr_huge_pages_init()
     int msize;
 
     if (!vr_hcfg) {
-        msize = sizeof(struct vr_hpage_config) * VR_MAX_HUGE_PAGES;
+        msize = sizeof(struct vr_hpage_config) * VR_MAX_HUGE_PAGE_CFG;
         vr_hcfg = (struct vr_hpage_config *) kzalloc(msize, GFP_ATOMIC);
         if (!vr_hcfg)
             return -ENOMEM;
@@ -349,7 +306,11 @@ mem_fault(struct vm_fault *vmf)
         return -EFAULT;
     }
 
-    page = virt_to_page(va);
+    if (is_vmalloc_addr(va)) {
+        page = vmalloc_to_page(va);
+    } else {
+        page = virt_to_page(va);
+    }
     get_page(page);
     vmf->page = page;
 

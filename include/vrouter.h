@@ -236,7 +236,7 @@ struct host_os {
     int (*hos_is_frag_limit_exceeded)(void);
     void (*hos_register_nic)(struct vr_interface* vif, vr_interface_req* vifr);
     bool hos_nl_broadcast_supported;
-    int (*hos_huge_page_config)(uint64_t *, int, int *, int);
+    int (*hos_huge_page_config)(uint64_t *, int, int *, int, int *, int);
     void *(*hos_huge_page_mem_get)(int);
     int (*hos_offload_flow_create)(struct vr_offload_flow *oflow);
     int (*hos_offload_flow_destroy)(struct vr_offload_flow *oflow);
