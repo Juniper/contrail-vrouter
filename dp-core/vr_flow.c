@@ -291,10 +291,19 @@ vr_flow_set_active(struct vr_flow_entry *fe)
             VR_FLOW_FLAG_ACTIVE | VR_FLOW_FLAG_NEW_FLOW);
 }
 
+/*
+ * This api is called to get flow table size
+ * NOTE: This api is also called from agent (via sandesh)
+ *       very early during init even before flow table is
+ *       initialized to calculate huge page table size.
+ *       Hence this api should not use vr_htable structures
+ */
 unsigned int
 vr_flow_table_size(struct vrouter *router)
 {
-    return vr_htable_size(router->vr_flow_table);
+    // set the overlflow flow table entries
+    vr_compute_size_oflow_table();
+    return (VR_FLOW_TABLE_SIZE + VR_OFLOW_TABLE_SIZE);
 }
 
 unsigned int

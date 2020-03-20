@@ -28,13 +28,13 @@ struct vr_mem_object {
 #define OBJECT_FROM_MINOR(minor)    ((minor) & 0x7F)
 
 
-#define VR_MAX_HUGE_PAGES   4
+#define VR_MAX_HUGE_PAGE_CFG   4
 #define VR_MEM_1G           (1024 * 1024 * 1024)
 #define VR_MEM_2M           (2 * 1024 * 1024)
 
 void vr_huge_pages_exit(void);
 int vr_huge_pages_init(void);
-int vr_huge_pages_config(uint64_t *, int, int*);
+int vr_huge_pages_config(uint64_t *, int, int*, int*);
 void *vr_huge_mem_get(int);
 
 
