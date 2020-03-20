@@ -24,7 +24,7 @@ class TestVxlan(unittest.TestCase):
         ObjectBase.setUp(method)
 
         self.vif1 = VirtualVif(
-            name="1",
+            name="tap_1",
             idx=1,
             ipv4_str=None,
             mac_str="de:ad:be:ef:00:02",
@@ -32,7 +32,7 @@ class TestVxlan(unittest.TestCase):
             flags=None)
 
         self.vif2 = VirtualVif(
-            name="2",
+            name="tap_2",
             idx=2,
             ipv4_str=None,
             mac_str="de:ad:be:ef:00:01",
@@ -53,7 +53,6 @@ class TestVxlan(unittest.TestCase):
             tun_dip="2.2.1.1",
             nh_idx=12,
             nh_flags=129)
-        nh_tunnel.sync()
 
         bridge_route = BridgeRoute(
             vrf=0,
@@ -61,7 +60,7 @@ class TestVxlan(unittest.TestCase):
             nh_idx=12,
             rtr_label=128,
             rtr_label_flags=3)
-        bridge_route.sync()
+        ObjectBase.sync_all()
 
         udp = UdpPacket(
             sip="1.1.1.1",
@@ -103,7 +102,6 @@ class TestVxlan(unittest.TestCase):
             tun_dport=-18398,
             nh_idx=12,
             nh_flags=129)
-        nh_tunnel.sync()
 
         inet_route = InetRoute(
             vrf=0,
@@ -111,19 +109,17 @@ class TestVxlan(unittest.TestCase):
             nh_idx=12,
             rtr_label=48,
             rtr_label_flags=1)
-        inet_route.sync()
 
         nh_l2rcv = ReceiveL2NextHop(
             nh_idx=13,
             nh_family=0)
-        nh_l2rcv.sync()
 
         bridge_route = BridgeRoute(
             vrf=0,
             mac_str="de:ad:be:ef:00:01",
             nh_idx=13,
             rtr_label_flags=0)
-        bridge_route.sync()
+        ObjectBase.sync_all()
 
         udp = UdpPacket(
             sip="1.1.1.1",

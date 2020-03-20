@@ -26,7 +26,7 @@ class TestVmCommJumboPackets(unittest.TestCase):
     def test_vm_comm_jumbo_packets(self):
 
         vif1 = VirtualVif(
-            name="1",
+            name="tap_1",
             idx=1,
             ipv4_str=None,
             mac_str="de:ad:be:ef:00:02",
@@ -34,7 +34,7 @@ class TestVmCommJumboPackets(unittest.TestCase):
             flags=None)
 
         vif2 = VirtualVif(
-            name="2",
+            name="tap_2",
             idx=2,
             ipv4_str=None,
             mac_str="de:ad:be:ef:00:01",
