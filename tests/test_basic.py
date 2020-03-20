@@ -158,7 +158,7 @@ class TestBasic(unittest.TestCase):
     def test_vxlan(self):
         # Add vif
         vif = VirtualVif(
-            name="1",
+            name="tap_6",
             mac_str="de:ad:be:ef:00:02",
             ipv4_str=None)
 
@@ -183,7 +183,7 @@ class TestBasic(unittest.TestCase):
     def test_mirror(self):
         # Add vif
         vif = VirtualVif(
-            name="1",
+            name="tap_7",
             mac_str="de:ad:be:ef:00:02",
             ipv4_str=None)
 
@@ -208,7 +208,7 @@ class TestBasic(unittest.TestCase):
     def test_mpls(self):
         # Add vif
         vif = VirtualVif(
-            name="1",
+            name="tap_8",
             mac_str="de:ad:be:ef:00:02",
             ipv4_str=None)
 
