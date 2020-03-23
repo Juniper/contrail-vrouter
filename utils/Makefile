@@ -30,6 +30,7 @@ VRFTABLE = vrftable
 VRFSTATS = vrfstats
 DROPSTATS = dropstats
 VXLAN = vxlan
+DPDKINFO = dpdkinfo
 
 SANDESH_OBJS = $(SRC_ROOT)/sandesh/gen-c/vr_types.o
 
@@ -39,7 +40,7 @@ SANDESH_OBJS = $(SRC_ROOT)/sandesh/gen-c/vr_types.o
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $^
 
-all: $(VIF) $(NH) $(RT) $(MPLS) $(FLOW) $(MIRROR) $(VRFTABLE) $(VRFSTATS) $(DROPSTATS) $(VXLAN)
+all: $(VIF) $(NH) $(RT) $(MPLS) $(FLOW) $(MIRROR) $(VRFTABLE) $(VRFSTATS) $(DROPSTATS) $(VXLAN) $(DPDKINFO)
 
 $(SANDESH_OBJS:%.o=%.c):
 	$(MAKE) -C $(SRC_ROOT)/sandesh
@@ -74,10 +75,13 @@ $(DROPSTATS): $(DROPSTATS).c $(SANDESH_OBJS) $(LIB_NAME)
 $(VXLAN): $(VXLAN).c $(SANDESH_OBJS) $(LIB_NAME)
 	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
 
+$(DPDKINFO): $(DPDKINFO).c $(SANDESH_OBJS) $(LIB_NAME)
+	$(CC) $< $(SANDESH_OBJS) $(CFLAGS) $(BIN_FLAGS) -o $@
+
 $(LIB_NAME): $(LIBOBJS)
 	$(AR) rcs $@ $^
 
 clean:
 	$(MAKE) -C $(SRC_ROOT)/sandesh clean
 	$(RM) *.o *.lo $(LIB_NAME)
-	$(RM) $(VIF)  $(MPLS) $(NH) $(RT) $(FLOW) $(MIRROR) $(VRFTABLE) $(VRFSTATS) $(DROPSTATS) $(VXLAN)
+	$(RM) $(VIF)  $(MPLS) $(NH) $(RT) $(FLOW) $(MIRROR) $(VRFTABLE) $(VRFSTATS) $(DROPSTATS) $(VXLAN) $(DPDKINFO)

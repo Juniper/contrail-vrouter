@@ -1019,4 +1019,10 @@ void vr_dpdk_init_cpuid(struct vr_cpu_type_t *cpu);
  */
 uint8_t dpdk_find_port_id_by_drv_name(void);
 
+/* 
+ * Get DPDK info
+ */
+int dpdk_info_get_bond(DPDK_INFO_ARGS);
+int vr_dpdk_info_callback_register(dpdkinfo_msginfo msginfo, vr_dpdkinfo_cb_fn cb_fn);
+int vr_dpdk_info_callback_unregister(dpdkinfo_msginfo msginfo, vr_dpdkinfo_cb_fn cb_fn);
 #endif /*_VR_DPDK_H_ */
