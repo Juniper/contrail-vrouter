@@ -991,6 +991,9 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
     if (vif_is_fabric(vif))
         vr_dpdk_bond_intf_cb_register(ethdev);
 
+    /* Register Callbacks for DPDKInfo messages */
+    dpdk_info_callback_register(INFO_BOND, vr_dpdk_info_get_bond);
+    
     ret = dpdk_ethdev_queues_setup(ethdev);
     if (ret < 0)
         return ret;

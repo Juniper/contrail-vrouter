@@ -26,6 +26,7 @@ extern "C" {
 #include "vr_offloads.h"
 #include "vr_pkt_droplog.h"
 #include "vr_fragment.h"
+#include "vr_message.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -129,6 +130,7 @@ enum vr_malloc_objects_t {
     VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT,
     VR_VRF_TABLE_ENTRY_OBJECT,
     VR_VRF_TABLE_OBJECT,
+    VR_DPDK_INFO_REQ_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 
@@ -167,6 +169,33 @@ struct vr_timer {
     unsigned int vt_stop_timer;
     unsigned int vt_msecs;
 };
+
+#define DPDK_INFO_ARGS char **inbuf, int *inbuf_len, char **outbuf, int *outbuf_len
+
+typedef enum vr_dpdkinfo_msginfo {
+    INFO_BOND = 1,
+    INFO_LACP,
+    INFO_MEM,
+    INFO_MAX,
+} dpdkinfo_msginfo;
+
+typedef struct vr_dpdk_info {
+    char *inbuf;
+    char *outbuf;
+    uint32_t outbuf_len;
+    uint32_t inbuf_len;
+} vr_dpdk_info_t;
+
+typedef int (*vr_dpdkinfo_cb_fn)(DPDK_INFO_ARGS);
+
+typedef struct vr_dpdk_info_callback {
+        uint16_t msginfo;
+        vr_dpdkinfo_cb_fn cb_fn;
+} dpdk_info_callback;
+
+#define VR_DPDK_INFO_FAILED         -1
+#define VR_DPDK_INFO_MSG_BUF_TABLE  64
+#define VR_DPDK_INFO_MAX_CALLBACK   256
 
 struct host_os {
     int (*hos_printf)(const char *, ...) __attribute__format__(printf, 1, 2);
@@ -243,6 +272,9 @@ struct host_os {
     void (*hos_offload_prepare)(struct vr_packet *pkt, struct vr_forwarding_md *fmd);
     void (*hos_set_dump_packets)(int);
     int (*hos_get_dump_packets)(void);
+    int (*hos_dpdk_info_get_bond)(DPDK_INFO_ARGS);
+    int (*hos_dpdk_info_callback_register)(dpdkinfo_msginfo msginfo,
+            vr_dpdkinfo_cb_fn cb_fn);
 };
 
 #define vr_printf                       vrouter_host->hos_printf
@@ -301,6 +333,8 @@ struct host_os {
 #define vr_offload_prepare              vrouter_host->hos_offload_prepare
 #define vr_set_dump_packets             vrouter_host->hos_set_dump_packets
 #define vr_get_dump_packets             vrouter_host->hos_get_dump_packets
+#define vr_dpdk_info_get_bond           vrouter_host->hos_dpdk_info_get_bond
+#define dpdk_info_callback_register     vrouter_host->hos_dpdk_info_callback_register
 
 extern struct host_os *vrouter_host;
 

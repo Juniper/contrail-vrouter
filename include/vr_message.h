@@ -38,6 +38,7 @@
 #define VR_HPAGE_CFG_OBJECT_ID          19
 #define VR_PKT_DROP_LOG_OBJECT_ID       20
 #define VR_VRF_TABLE_OBJECT_ID          21
+#define VR_DPDK_INFO_OBJECT_ID          22
 
 #define VR_MESSAGE_PAGE_SIZE            (4096 - 128)
 

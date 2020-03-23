@@ -48,6 +48,9 @@ extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int vr_pkt_droplog_sysctl_en;
 extern const char *ContrailBuildInfo;
 
+static char *vr_dpdkinfo_buff_table_p[VR_DPDK_INFO_MSG_BUF_TABLE];
+struct vr_dpdk_info_callback users_cb_reg[VR_DPDK_INFO_MAX_CALLBACK];
+
 void vrouter_exit(bool);
 
 volatile bool vr_not_ready = true;
@@ -702,6 +705,248 @@ vr_hugepage_config_process(void *s_req)
 
     vr_message_response(VR_HPAGE_CFG_OBJECT_ID, &hcfg_resp, ret,
                 false);
+
+    return;
+}
+
+/* Register callback using below function for vrdump.
+ * Arg: msginfo is unique identifier and for that callback would be registered.
+ * */
+int
+vr_dpdk_info_callback_register(dpdkinfo_msginfo msginfo,
+                                vr_dpdkinfo_cb_fn cb_fn)
+{
+    int i = 0;
+
+    if(!msginfo && !cb_fn) {
+        vr_printf("vrdump: Invalid value %d or Callback function %p\n",
+                msginfo, cb_fn);
+        return -EINVAL;
+    }
+
+    /* Check msginfo is valid */
+    if((msginfo <= 0) && (msginfo >= INFO_MAX)) {
+        vr_printf("vrdump: Invalid msginfo  value %d \n", msginfo);
+        return -EINVAL; 
+    }
+
+    /* Loop through callback table for registering the incoming callback
+     * function */
+    for(i = 0; i < VR_DPDK_INFO_MAX_CALLBACK; i++ ) {
+        /* Check if the message is already registered */
+        if(users_cb_reg[i].msginfo == msginfo) {
+            /* Notify user that overwriting callback function for the particular
+             * msginfo */
+            if(users_cb_reg[i].cb_fn != cb_fn) {
+                vr_printf("DPDK Info: Trying to overwrite callback info for %d \
+                        with %p\n", msginfo, cb_fn);
+            }
+            /* Msginfo already exist in the table*/
+            return -EEXIST;
+        }
+
+        /* Register callback function */
+        if(!users_cb_reg[i].msginfo) {
+            users_cb_reg[i].msginfo = msginfo;
+            users_cb_reg[i].cb_fn = cb_fn;
+            break;
+        }
+    }
+    return 0;
+}
+
+/* Unregister callback function for vrdump */
+int
+vr_dpdk_info_callback_unregister(dpdkinfo_msginfo msginfo,
+                                vr_dpdkinfo_cb_fn cb_fn)
+{
+    int i = 0;
+
+    if(!msginfo && !cb_fn) {
+        vr_printf("vrdump: Invalid value %d or Callback function %p\n",
+                msginfo, cb_fn);
+        return -EINVAL;
+    }
+    /* Check msginfo is valid */
+    if((msginfo <= 0) && (msginfo >= INFO_MAX)) {
+        vr_printf("vrdump: Invalid msginfo  value %d \n", msginfo);
+        return -EINVAL; 
+    }
+
+    /* Loop through callback table for registering the incoming callback
+     * function */
+    for(i = 0; i < VR_DPDK_INFO_MAX_CALLBACK; i++ ) {
+        /* Check if the msginfo exist */
+        if(users_cb_reg[i].msginfo == msginfo) {
+            if(users_cb_reg[i].cb_fn == cb_fn) {
+                users_cb_reg[i].msginfo = 0;
+                users_cb_reg[i].cb_fn = NULL;
+                break;
+            }
+        }
+        if(i == (VR_DPDK_INFO_MAX_CALLBACK - 1))
+            return -EINVAL;
+    }
+    return 0;
+}
+
+void
+vr_dpdk_info_req_process(void *s_req)
+{
+    int i, ret = 0, buff_sz = 0, max_buff_sz = 0;
+    vr_dpdk_info_t msg_req;
+    vr_dpdk_info_req *req = (vr_dpdk_info_req *)s_req;
+    vr_dpdk_info_req resp;
+    struct vr_message_dumper *dumper = NULL;
+    bool dpdk_info_last_buf = 0;
+
+    if (req->h_op != SANDESH_OP_DUMP)
+        goto generate_response;
+
+    resp = *req;
+
+    //resp.vdu_buff_table_id = req->vdu_buff_table_id;
+
+    /* Initialize the dumper buffer */
+    dumper = vr_message_dump_init(req);
+
+    /* When CLI request comes, call the registered callback function and store
+     * the address in msg_buff_table, If msginfo is more than 4K, split the
+     * data into 4k chunks and send it serially to client. The client will
+     * request back with vdu_buff_table_id and its index.
+     * */
+    if(!req->vdu_buff_table_id) {
+        /* Maximum supported Client by server is 64, so based on that message
+         * buffer table size is determined. */
+        for(i = 0; i < VR_DPDK_INFO_MSG_BUF_TABLE; i++) {
+            /* Iterate through message buffer table and find the free entry */
+            if(vr_dpdkinfo_buff_table_p[i] == NULL) {
+                memset(&msg_req, 0, sizeof(vr_dpdk_info_t));
+                /* Maximum number of callbacks supported is 256, so iterate
+                 * through the table and find its callback function. */
+                for(i = 0; i <= VR_DPDK_INFO_MAX_CALLBACK; i++ ) {
+                    /* Check requested msginfo from users_cb_reg table and 
+                     * call corresponding callback function */
+                    if(req->vdu_msginfo == users_cb_reg[i].msginfo) {
+                        ret = users_cb_reg[i].cb_fn(&msg_req.inbuf,
+                                &msg_req.inbuf_len, &msg_req.outbuf,
+                                &msg_req.outbuf_len);
+                        break;
+                    }
+                    /* Reached end of loop */
+                    if(i == VR_DPDK_INFO_MAX_CALLBACK) {
+                        vr_printf("DpdkInfo: Callback function is not registered \
+                                for msginfo %d", req->vdu_msginfo);
+                        goto generate_response;
+                    }
+                }
+                /* Callback function returned failure msg */
+                if(ret < 0) {
+                    vr_printf("Dpdkinfo: User callback function returned \
+                            failure for msg %d", req->vdu_msginfo);
+                    goto generate_response;
+                }
+                /* Copy buffer table id as part of response, so when
+                 * dump_pending is true, it will callback with same buf table id */
+                resp.vdu_buff_table_id = (i + 1);
+
+                /* Copy message buffer_ptr to buffer table */
+                vr_dpdkinfo_buff_table_p[i] = msg_req.outbuf;
+
+                if(!msg_req.outbuf_len)
+                    buff_sz = strlen(msg_req.outbuf);
+                else
+                    buff_sz = msg_req.outbuf_len;
+
+                req->vdu_marker = 0;
+                break;
+            }
+        }
+    }
+    else
+        buff_sz = strlen(vr_dpdkinfo_buff_table_p[resp.vdu_buff_table_id - 1]);
+
+    /* Sandesh has limitation of macro(VR_MESSAGE_PAGE_SIZE) size, so
+     * calculating max buffer size, and those much amount of data would be sent
+     * on each iteration */
+    max_buff_sz = VR_MESSAGE_PAGE_SIZE - (sizeof(resp) +
+            sizeof(struct vr_message_dumper));
+
+    /* Check if the buffer size is greater than max buffer, If so, have to send
+     * it through multiple iteration. */
+    if(buff_sz > max_buff_sz) {
+        /* To send whole buffer, (buff_sz/max_buff_sz + 1) => these many
+         * number of times have to send it to client CLI. */
+        while(req->vdu_marker <= (buff_sz/max_buff_sz)) {
+            /* To find the last iteration */
+            if( req->vdu_marker == buff_sz/max_buff_sz ) {
+                /* Calculate the number of remaining bytes to send it to
+                 * client CLI */
+                resp.vdu_proc_info_size = (buff_sz -
+                        (max_buff_sz * req->vdu_marker) + 1);
+                dpdk_info_last_buf = true;
+            }
+            else
+                resp.vdu_proc_info_size = max_buff_sz + 1;
+
+            /* Update the index value */
+            resp.vdu_index = (req->vdu_marker + 1);
+            resp.vdu_proc_info = vr_zalloc((resp.vdu_proc_info_size *
+                        sizeof(uint8_t)), VR_DPDK_INFO_REQ_OBJECT);
+            if(resp.vdu_proc_info == NULL)
+                goto exit_get;
+
+            /* Copy the message to "resp.vdu_proc_info" from 
+             * "vr_dpdkinfo_buff_table_p[id]+offset". Here offset is calculated
+             * from (max_buff_sz * req->vdu_marker) */
+            snprintf(resp.vdu_proc_info, (resp.vdu_proc_info_size),
+                    (vr_dpdkinfo_buff_table_p[resp.vdu_buff_table_id - 1] +
+                        (max_buff_sz * req->vdu_marker)));
+
+            /* If message buffer copy is not complete, it will return with -1.
+             * so it will send to client and client will request back. */
+            ret = vr_message_dump_object(dumper, VR_DPDK_INFO_OBJECT_ID, &resp);
+
+            if(resp.vdu_proc_info != NULL)
+                vr_free(resp.vdu_proc_info, VR_DPDK_INFO_REQ_OBJECT);
+            if(ret <= 0)
+                break;
+            if(dpdk_info_last_buf)
+                break;
+        }
+    }
+    else {
+        /* Total message buffer size is less than 4k, so it can send in
+         * one iteration. */
+        dpdk_info_last_buf = true;
+        resp.vdu_proc_info_size = buff_sz;
+
+        resp.vdu_proc_info = vr_zalloc((resp.vdu_proc_info_size *
+                    sizeof(uint8_t)), VR_DPDK_INFO_REQ_OBJECT);
+        if(resp.vdu_proc_info == NULL)
+            goto exit_get;
+
+        /* Copy message buffer */
+        snprintf(resp.vdu_proc_info, resp.vdu_proc_info_size, msg_req.outbuf);
+        vr_message_dump_object(dumper, VR_DPDK_INFO_OBJECT_ID, &resp);
+    }
+
+generate_response:
+    vr_message_dump_exit(dumper, ret);
+
+/* Once last buffer element has reached, clear all message buffers.
+ * Memory(malloc) is allocated by end users and infra will free the memory */
+exit_get:
+    if(dpdk_info_last_buf) {
+        if(vr_dpdkinfo_buff_table_p[resp.vdu_buff_table_id - 1] != NULL) {
+            vr_free(vr_dpdkinfo_buff_table_p[resp.vdu_buff_table_id - 1],
+                    VR_DPDK_INFO_REQ_OBJECT);
+            vr_dpdkinfo_buff_table_p[resp.vdu_buff_table_id - 1] = NULL;
+        }
+        else
+            vr_printf("Memory free failed for Dpdkinfo pointer instance %d\n",
+                    resp.vdu_buff_table_id);
+    }
 
     return;
 }
