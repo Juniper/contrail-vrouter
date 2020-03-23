@@ -16,6 +16,7 @@
 
 #include "vr_dpdk.h"
 #include "vr_dpdk_usocket.h"
+#include "vr_dpdk_info.h"
 
 #include <vr_mpls.h>
 

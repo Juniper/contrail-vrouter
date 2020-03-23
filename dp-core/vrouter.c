@@ -705,3 +705,4 @@ vr_hugepage_config_process(void *s_req)
 
     return;
 }
+

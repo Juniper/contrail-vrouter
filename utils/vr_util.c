@@ -838,6 +838,22 @@ vr_send_drop_stats_get(struct nl_client *cl, unsigned int router_id,
     return vr_sendmsg(cl, &req, "vr_drop_stats_req");
 }
 
+
+int
+vr_send_info_dump(struct nl_client *cl, unsigned int router_id,
+        int marker, int buff_table_id, vr_info_msg_en msginfo)
+{
+    vr_info_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_DUMP;
+    req.vdu_rid = router_id;
+    req.vdu_marker = marker;
+    req.vdu_buff_table_id = buff_table_id;
+    req.vdu_msginfo = msginfo;
+    return vr_sendmsg(cl, &req, "vr_info_req");
+}
+
 int
 vr_drop_stats_reset(struct nl_client *cl)
 {
