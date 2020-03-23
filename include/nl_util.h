@@ -14,6 +14,7 @@ extern "C" {
 #include <stdbool.h> /* For bool */
 #include "vr_utils.h"
 #include "vr_response.h"
+#include "vrouter.h"
 
 #define VR_DEF_NETLINK_PORT         20914
 #define VR_DEF_SOCKET_DIR           "/var/run/vrouter"
@@ -95,6 +96,7 @@ struct nl_sandesh_callbacks {
     void (*vr_vrf_assign_req_process)(void *);
     void (*vr_vrf_stats_req_process)(void *);
     void (*vr_pkt_drop_log_req_process)(void *);
+    void (*vr_info_req_process)(void *);
     void (*vr_drop_stats_req_process)(void *);
     void (*vr_vxlan_req_process)(void *);
     void (*vr_mem_stats_req_process)(void *);
@@ -302,6 +304,8 @@ extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
 extern void vr_print_drop_stats(vr_drop_stats_req *, int);
 
+extern int vr_send_info_dump(struct nl_client *cl, unsigned int router_id,
+        int marker, int inst_id, vr_info_msg_en msginfo);
 
 #ifdef __cplusplus
 }
