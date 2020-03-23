@@ -87,9 +87,15 @@ mirror = env.Program(target = 'mirror', source = mirror_sources)
 vrftable_sources = ['vrftable.c']
 vrftable = env.Program(target = 'vrftable', source = vrftable_sources)
 
+vrinfo_sources = ['vrinfo.c']
+vrinfo = env.Program(target = 'vrinfo', source = vrinfo_sources)
+
+dpdkinfo_sources = ['dpdkinfo.c']
+dpdkinfo = env.Program(target = 'dpdkinfo', source = dpdkinfo_sources)
+
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mpls, flow, vrfstats, dropstats, vxlan,
-             vrouter, vrmemstats, vrftable, mirror]
+             vrouter, vrmemstats, vrftable, mirror, vrinfo, dpdkinfo]
 
 qosmap_sources = ['qosmap.c']
 qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
