@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "757e615c_ca2c1001",
+        "filename": "dpdk/vr_dpdk_virtio.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1042,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-23T09:06:52Z",
+      "side": 1,
+      "message": "Hardcoding does not look good. The desc len enqueued by the VM should be 1500B (in mergeable and non-mergeable case). Can you check that?",
+      "range": {
+        "startLine": 1042,
+        "startChar": 44,
+        "endLine": 1042,
+        "endChar": 48
+      },
+      "revId": "cae133512c4498ab3d4f3b4e22ef194dad542fdc",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
