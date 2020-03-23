@@ -37,30 +37,12 @@ extern unsigned int datapath_offloads;
 unsigned int vr_dpdk_master_port_id;
 
 struct rte_eth_conf ethdev_conf = {
-#if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
     .link_speeds = ETH_LINK_SPEED_AUTONEG,
-#else
-    .link_speed = 0,    /* ETH_LINK_SPEED_10[0|00|000], or 0 for autonegotation */
-    .link_duplex = 0,   /* ETH_LINK_[HALF_DUPLEX|FULL_DUPLEX], or 0 for autonegotation */
-#endif
     .rxmode = { /* Port RX configuration. */
         /* The multi-queue packet distribution mode to be used, e.g. RSS. */
         .mq_mode            = ETH_MQ_RX_RSS,
         .max_rx_pkt_len     = VR_DEF_MAX_PACKET_SZ, /* Only used if jumbo_frame enabled */
-        .header_split       = 0, /* Disable Header Split */
-#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
-        .offloads           = DEV_RX_OFFLOAD_CHECKSUM | DEV_RX_OFFLOAD_JUMBO_FRAME |
-                              DEV_RX_OFFLOAD_CRC_STRIP,
-        .ignore_offload_bitfield = 1,
-#else
-        .hw_ip_checksum     = 1, /* Enable IP/UDP/TCP checksum offload */
-        .hw_vlan_filter     = 0, /* Disabel VLAN filter */
-        .hw_vlan_strip      = 0, /* Disable VLAN strip (might be enabled with --vlan argument) */
-        .hw_vlan_extend     = 0, /* Disable Extended VLAN */
-        .jumbo_frame        = 1, /* Enable Jumbo Frame Receipt */
-        .hw_strip_crc       = 1, /* Enable CRC stripping by hardware */
-        .enable_scatter     = 0, /* Disable scatter packets rx handler */
-#endif
+        .offloads           = DEV_RX_OFFLOAD_CHECKSUM | DEV_RX_OFFLOAD_JUMBO_FRAME,
     },
     .rx_adv_conf = {
         .rss_conf = { /* Port RSS configuration */
@@ -72,9 +54,7 @@ struct rte_eth_conf ethdev_conf = {
     },
     .txmode = { /* Port TX configuration. */
         .mq_mode            = ETH_MQ_TX_NONE, /* TX multi-queues mode */
-#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
         .offloads = DEV_TX_OFFLOAD_UDP_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM | DEV_TX_OFFLOAD_IPV4_CKSUM,
-#endif
         /* For i40e specifically */
         .pvid               = 0,
         .hw_vlan_reject_tagged      = 0, /* If set, reject sending out tagged pkts */
@@ -117,10 +97,7 @@ static const struct rte_eth_rxconf rx_queue_conf = {
     },
     /* Do not immediately free RX descriptors */
     .rx_free_thresh = VR_DPDK_RX_BURST_SZ,
-#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
-    .offloads           = DEV_RX_OFFLOAD_CHECKSUM | DEV_RX_OFFLOAD_JUMBO_FRAME |
-                          DEV_RX_OFFLOAD_CRC_STRIP,
-#endif
+    .offloads           = DEV_RX_OFFLOAD_CHECKSUM | DEV_RX_OFFLOAD_JUMBO_FRAME,
 };
 
 /*
@@ -135,12 +112,7 @@ static const struct rte_eth_txconf tx_queue_conf = {
         .hthresh = 0,   /* Ring host threshold */
         .wthresh = 0,   /* Ring writeback threshold */
     },
-#if (RTE_VERSION >= RTE_VERSION_NUM(18, 05, 0, 0))
     .offloads  = DEV_TX_OFFLOAD_UDP_CKSUM | DEV_TX_OFFLOAD_TCP_CKSUM | DEV_TX_OFFLOAD_IPV4_CKSUM,
-    .txq_flags = 0, /* Reverting to older API as newer api doesnt work ETH_TXQ_FLAGS_IGNORE, */
-#else
-    .txq_flags = 0,          /* Set flags for the Tx queue */
-#endif
     .tx_free_thresh = 32,
     .tx_rs_thresh = 32,      /* Use PMD default values */
 };

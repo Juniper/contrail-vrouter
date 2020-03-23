@@ -957,7 +957,7 @@ dpdk_fabric_af_packet_if_del(struct vr_interface *vif)
         rte_eth_dev_close(port_id);
 
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
-        rte_eth_dev_detach(port_id, name);
+        // rte_eth_dev_detach(port_id, name);
 #else
         rte_free(ethdev_ptr->data->dev_private);
         rte_free(ethdev_ptr->data);
