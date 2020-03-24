@@ -22,6 +22,30 @@
       "revId": "972f214dff855add3391f10ccc2b4a0079ff6f38",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9df77b6b_83a35e34",
+        "filename": "linux/vr_mem.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-24T12:02:24Z",
+      "side": 1,
+      "message": "It is same as earlier, except now hugepage mem size is one additional param since vrouter needs to know how many pages to pin.\nEg: 1. virtual mem address\n    2. hugepage size - 2MB/1GB\n    3. Total memory size",
+      "parentUuid": "5ec19397_c4bcfd3d",
+      "range": {
+        "startLine": 182,
+        "startChar": 0,
+        "endLine": 182,
+        "endChar": 88
+      },
+      "revId": "972f214dff855add3391f10ccc2b4a0079ff6f38",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
