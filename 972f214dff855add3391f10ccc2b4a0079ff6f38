@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5ec19397_c4bcfd3d",
+        "filename": "linux/vr_mem.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-24T11:51:30Z",
+      "side": 1,
+      "message": "What values does these parameters receive from the agent as per your new implementation?\nCan you give examples?",
+      "range": {
+        "startLine": 182,
+        "startChar": 0,
+        "endLine": 182,
+        "endChar": 88
+      },
+      "revId": "972f214dff855add3391f10ccc2b4a0079ff6f38",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
