@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "361baa2d_cef589c4",
+        "filename": "gdb/vr_btable.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-24T07:17:03Z",
+      "side": 1,
+      "message": "Can you add a file header to this describing the contents of the file in short?\nSame for other files",
+      "revId": "8fa85d3a8969fa1c92cadd067761bcc9b6266eed",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "25452d2f_047a3242",
+        "filename": "gdb/vr_btable.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-24T07:17:03Z",
+      "side": 1,
+      "message": "Instead of global variable, is it possible to take this as an argument and return it from function?",
+      "revId": "8fa85d3a8969fa1c92cadd067761bcc9b6266eed",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cf362cce_bc17df3e",
+        "filename": "gdb/vrouter.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 6,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-24T07:17:03Z",
+      "side": 1,
+      "message": "Can you have relative paths here instead of hardcoded onces?",
+      "revId": "8fa85d3a8969fa1c92cadd067761bcc9b6266eed",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
