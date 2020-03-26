@@ -350,6 +350,7 @@ vrouter_ops_get_process(void *s_req)
     resp->vo_mudp = vr_mudp;
     resp->vo_pkt_droplog_en = vr_pkt_droplog_sysctl_en;
     resp->vo_pkt_droplog_min_en = vr_pkt_droplog_min_sysctl_en;
+    resp->vo_close_flow_on_tcp_rst = vr_get_flow_on_tcp_rst();
 
     /* Build info */
     strncpy(resp->vo_build_info, ContrailBuildInfo,

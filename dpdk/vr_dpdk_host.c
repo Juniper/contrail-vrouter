@@ -44,6 +44,7 @@ extern void vr_free_stats(unsigned int);
 /* RCU callback */
 extern void vr_flow_defer_cb(struct vrouter *router, void *arg);
 
+extern unsigned int vr_close_flow_on_tcp_rst;
 
 static void *
 dpdk_page_alloc(unsigned int size)
@@ -1112,6 +1113,12 @@ dpdk_set_log_level(unsigned int log_level)
 }
 
 static unsigned int
+dpdk_get_flow_on_tcp_rst(void)
+{
+    return vr_close_flow_on_tcp_rst;
+}
+
+static unsigned int
 dpdk_get_log_level(void)
 {
     unsigned int level = rte_get_log_level();
@@ -1305,6 +1312,7 @@ struct host_os dpdk_host = {
     .hos_set_log_type               =    dpdk_set_log_type,
     .hos_get_log_level              =    dpdk_get_log_level,
     .hos_get_enabled_log_types      =    dpdk_get_enabled_log_types,
+    .hos_get_flow_on_tcp_rst        =    dpdk_get_flow_on_tcp_rst,
     .hos_soft_reset                 =    dpdk_soft_reset,
     .hos_is_frag_limit_exceeded     =    dpdk_is_frag_limit_exceeded,
 };

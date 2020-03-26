@@ -672,6 +672,12 @@ fh_get_enabled_log_types(int *size)
 	return NULL;
 }
 
+static unsigned int
+fh_get_flow_on_tcp_rst(void)
+{
+        return vr_close_flow_on_tcp_rst;
+}
+
 struct host_os freebsd_host = {
 	.hos_malloc			= fh_malloc,
 	.hos_zalloc			= fh_zalloc,
@@ -715,6 +721,7 @@ struct host_os freebsd_host = {
 	.hos_set_log_type               = fh_set_log_type,
 	.hos_get_log_level              = fh_get_log_level,
 	.hos_get_enabled_log_types      = fh_get_enabled_log_types,
+        .hos_get_flow_on_tcp_rst        = fh_get_flow_on_tcp_rst,
 };
 
 struct host_os *
