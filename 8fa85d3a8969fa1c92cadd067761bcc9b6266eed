@@ -36,6 +36,23 @@
     },
     {
       "key": {
+        "uuid": "07459fda_50ee9f78",
+        "filename": "gdb/vr_nexthop.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 60,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-26T06:13:44Z",
+      "side": 1,
+      "message": "Can you rename this to print_nh_type ? Same for other functions which print values",
+      "revId": "8fa85d3a8969fa1c92cadd067761bcc9b6266eed",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "cf362cce_bc17df3e",
         "filename": "gdb/vrouter.gdb",
         "patchSetId": 2
