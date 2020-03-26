@@ -44,7 +44,6 @@ extern void vr_free_stats(unsigned int);
 /* RCU callback */
 extern void vr_flow_defer_cb(struct vrouter *router, void *arg);
 
-
 static void *
 dpdk_page_alloc(unsigned int size)
 {

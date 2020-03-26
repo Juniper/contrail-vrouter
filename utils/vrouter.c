@@ -321,6 +321,7 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Used Over Flow bridge entries        %u\n"
 	"    Vrouter packet drop log enable       %u\n"
 	"    Vrouter Packet drop log minimum enable %u\n"
+	"    Enable/Disable closure of Flow on TCP RST    %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -330,7 +331,8 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_udp_coff, req->vo_flow_hold_limit, req->vo_mudp,
         req->vo_flow_used_entries, req->vo_flow_used_oentries,
         req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
-        req->vo_pkt_droplog_en, req->vo_pkt_droplog_min_en
+        req->vo_pkt_droplog_en, req->vo_pkt_droplog_min_en,
+	req->vo_close_flow_on_tcp_rst
     );
 
     return;
