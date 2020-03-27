@@ -22,6 +22,30 @@
       "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e3fba138_2361e570",
+        "filename": "sandesh/vr.sandesh",
+        "patchSetId": 2
+      },
+      "lineNbr": 557,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-27T17:52:42Z",
+      "side": 1,
+      "message": "This is not supported. The naming was changed to suit the new changes.",
+      "parentUuid": "c1270ac2_6ee21015",
+      "range": {
+        "startLine": 555,
+        "startChar": 0,
+        "endLine": 557,
+        "endChar": 29
+      },
+      "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
