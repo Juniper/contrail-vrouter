@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d8e02280_f2e687fb",
+        "filename": "dp-core/vrouter.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 353,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-27T07:19:03Z",
+      "side": 1,
+      "message": "Instead of calling platform specific api, can\u0027t you just access the global variable in the vr_get_flow_on_tcp_rst() api?",
+      "revId": "c483b5c20aded56148fc5e597e069a307caa094d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0b5c8d5b_6a0ff969",
+        "filename": "include/vrouter.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 213,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-27T07:19:03Z",
+      "side": 1,
+      "message": "This can be avoided I think.",
+      "revId": "c483b5c20aded56148fc5e597e069a307caa094d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6a7c4c61_ea19809f",
+        "filename": "linux/vrouter_mod.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 2539,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-27T07:19:03Z",
+      "side": 1,
+      "message": "For consistency, can you change disconnection to closure?",
+      "revId": "c483b5c20aded56148fc5e597e069a307caa094d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8bceddce_576b03d6",
+        "filename": "utils/vrouter.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 324,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-27T07:19:03Z",
+      "side": 1,
+      "message": "Can you please put the full form \"Enable/Disable\"?",
+      "revId": "c483b5c20aded56148fc5e597e069a307caa094d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
