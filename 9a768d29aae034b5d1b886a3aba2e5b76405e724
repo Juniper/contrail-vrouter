@@ -46,6 +46,30 @@
       "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e2ceed5a_f5f067bb",
+        "filename": "sandesh/vr.sandesh",
+        "patchSetId": 2
+      },
+      "lineNbr": 557,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-28T03:44:17Z",
+      "side": 1,
+      "message": "the problem is, you have changed serial # 4 from u32 to list\u003cu32\u003e. this can possibly cause crash with old agent. Can you swap serial # 4 and 5, this will ensure new fields are added at the bottom always.",
+      "parentUuid": "e3fba138_2361e570",
+      "range": {
+        "startLine": 555,
+        "startChar": 0,
+        "endLine": 557,
+        "endChar": 29
+      },
+      "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
