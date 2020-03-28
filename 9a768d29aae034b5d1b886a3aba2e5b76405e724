@@ -70,6 +70,30 @@
       "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1a25134c_0f36f6ad",
+        "filename": "sandesh/vr.sandesh",
+        "patchSetId": 2
+      },
+      "lineNbr": 557,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-03-28T06:51:38Z",
+      "side": 1,
+      "message": "But we don\u0027t support old and new combinations of agent \u0026 vrouter.\nAlways agent and vrouter need to use the same version.\nThen why this change is needed?",
+      "parentUuid": "e2ceed5a_f5f067bb",
+      "range": {
+        "startLine": 555,
+        "startChar": 0,
+        "endLine": 557,
+        "endChar": 29
+      },
+      "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
