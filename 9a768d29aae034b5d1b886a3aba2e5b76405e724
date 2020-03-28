@@ -94,6 +94,30 @@
       "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1ad34e16_2a8119d9",
+        "filename": "sandesh/vr.sandesh",
+        "patchSetId": 2
+      },
+      "lineNbr": 557,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-28T06:56:20Z",
+      "side": 1,
+      "message": "hot fixes, debug purposes, etc. we follow the same for schema too. in general, we should make sure we dont do edit of existing fields, we should only add towards the end.",
+      "parentUuid": "1a25134c_0f36f6ad",
+      "range": {
+        "startLine": 555,
+        "startChar": 0,
+        "endLine": 557,
+        "endChar": 29
+      },
+      "revId": "9a768d29aae034b5d1b886a3aba2e5b76405e724",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
