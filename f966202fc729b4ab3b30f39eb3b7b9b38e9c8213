@@ -22,6 +22,29 @@
       "revId": "f966202fc729b4ab3b30f39eb3b7b9b38e9c8213",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "41edbc02_f789c583",
+        "filename": "dp-core/vr_htable.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 692,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-03-29T18:05:13Z",
+      "side": 1,
+      "message": "why this change? was this causing any issue?",
+      "range": {
+        "startLine": 689,
+        "startChar": 4,
+        "endLine": 692,
+        "endChar": 5
+      },
+      "revId": "f966202fc729b4ab3b30f39eb3b7b9b38e9c8213",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
