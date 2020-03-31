@@ -55,10 +55,19 @@ vr_bridge_get_va(struct vrouter *router, uint64_t offset)
     return vr_htable_get_address(vn_rtable, offset);
 }
 
+/*
+ * This api is called to get bridge table size
+ * NOTE: This api is also called from agent (via sandesh)
+ *       very early during init even before bridge table is
+ *       initialized to calculate huge page table size.
+ *       Hence this api should not use vr_htable structures
+ */
 unsigned int
 vr_bridge_table_size(struct vrouter *router)
 {
-    return vr_htable_size(vn_rtable);
+    // set the overflow table size
+    vr_compute_size_bridge_otable();
+    return (VR_BRIDGE_TABLE_SIZE + VR_BRIDGE_OFLOW_TABLE_SIZE);
 }
 
 bool

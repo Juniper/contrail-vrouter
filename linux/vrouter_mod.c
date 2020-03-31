@@ -2253,17 +2253,23 @@ lh_register_nic(struct vr_interface* vif __attribute__((unused)),
  * n_hpages - Number of addresses present in the hpages argument
  * hpage_size - Array of size of each page that is present in hpages
  * nhpage_size - Number of members in hpage_size array
+ * hpage_mem_sz - Array of size of huge page memory requested for
+ *                each virtual memory address in hpages
+ * n_hpage_mem_sz - Number of elements in hpage_mem_sz
  */
 static int
 lh_huge_page_config(uint64_t *hpages, int n_hpages,
-                int *hpage_size, int n_hpage_sizes)
+                    int *hpage_size, int n_hpage_sizes,
+                    int *hpage_mem_sz, int n_hpage_mem_sz)
 {
     int i;
 
-    if (!hpages || !n_hpages || !hpage_size || !n_hpage_sizes)
+    if (!hpages || !n_hpages || !hpage_size || !n_hpage_sizes ||
+        !hpage_mem_sz || !n_hpage_mem_sz)
         return -EINVAL;
 
-    if ((n_hpages != n_hpage_sizes) || (n_hpages > VR_MAX_HUGE_PAGES))
+    if ((n_hpages != n_hpage_sizes) || (n_hpages != n_hpage_mem_sz) ||
+        (n_hpages > VR_MAX_HUGE_PAGE_CFG))
         return -EINVAL;
 
     for (i = 0; i < n_hpages; i++) {
@@ -2274,7 +2280,7 @@ lh_huge_page_config(uint64_t *hpages, int n_hpages,
             return -EINVAL;
     }
 
-    return vr_huge_pages_config(hpages, n_hpages, hpage_size);
+    return vr_huge_pages_config(hpages, n_hpages, hpage_size, hpage_mem_sz);
 }
 
 static void *
