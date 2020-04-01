@@ -16,6 +16,24 @@
       "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "09138200_794e9333",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-01T05:41:57Z",
+      "side": 1,
+      "message": "Yeah.. once its done, we will update these commands as part of log collection script.\nThanks for brought it up.",
+      "parentUuid": "3c51d020_7e7da0cc",
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
