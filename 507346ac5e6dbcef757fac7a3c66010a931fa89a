@@ -34,6 +34,24 @@
       "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e379f4e9_6d3f01e1",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2020-04-01T06:12:03Z",
+      "side": 1,
+      "message": "Can you do that change as a part of this diff itself and test it? It will make this tool complete.",
+      "parentUuid": "09138200_794e9333",
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
