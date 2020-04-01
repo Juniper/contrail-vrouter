@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3c51d020_7e7da0cc",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2020-04-01T05:35:01Z",
+      "side": 1,
+      "message": "Did you check if this should be also integrated with the log collection script developed by Manish?",
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
