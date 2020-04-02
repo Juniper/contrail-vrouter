@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3c2de511_ca58deea",
+        "filename": "gdb/vr_nexthop.gdb",
+        "patchSetId": 4
+      },
+      "lineNbr": 121,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-02T04:45:27Z",
+      "side": 1,
+      "message": "Can you get rid of such trailing whitespaces?",
+      "revId": "4892a77b9e18770961c6153be49e0c4ae4c9dade",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "937d5650_f3731759",
+        "filename": "gdb/vr_nexthop.gdb",
+        "patchSetId": 4
+      },
+      "lineNbr": 356,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-02T04:45:27Z",
+      "side": 1,
+      "message": "In some places, I see you are still using get_xxxx naming while in other places you are using print_xxxx naming. So you tell the reason for this? If no particular, you can name them consistently as print_xxxx",
+      "revId": "4892a77b9e18770961c6153be49e0c4ae4c9dade",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6d00ff60_e3d3db52",
+        "filename": "gdb/vr_vif.gdb",
+        "patchSetId": 4
+      },
+      "lineNbr": 443,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-02T04:45:27Z",
+      "side": 1,
+      "message": "can you see if you can make it less than 80 chars line? Same comment for lines in other files.",
+      "revId": "4892a77b9e18770961c6153be49e0c4ae4c9dade",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f285db79_3ea55746",
+        "filename": "gdb/vrouter.gdb",
+        "patchSetId": 4
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-02T04:45:27Z",
+      "side": 1,
+      "message": "Can you also add a README.md similar to https://github.com/Juniper/contrail-vrouter/blob/master/README.md ?",
+      "revId": "4892a77b9e18770961c6153be49e0c4ae4c9dade",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
