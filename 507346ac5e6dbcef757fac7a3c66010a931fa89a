@@ -188,6 +188,23 @@
     },
     {
       "key": {
+        "uuid": "4c414ee3_f6b5e172",
+        "filename": "dpdk/vr_dpdk_info.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-03T19:07:36Z",
+      "side": 1,
+      "message": "this file can be platform independent?",
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c958ce17_1fefd69b",
         "filename": "dpdk/vr_dpdk_info.h",
         "patchSetId": 6
