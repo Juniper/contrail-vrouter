@@ -96,6 +96,30 @@
     },
     {
       "key": {
+        "uuid": "a54bb8ba_08d83996",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "Will take care",
+      "parentUuid": "1b87a517_21927af3",
+      "range": {
+        "startLine": 83,
+        "startChar": 16,
+        "endLine": 83,
+        "endChar": 61
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "f88c0b74_7334703d",
         "filename": "dp-core/vr_info.c",
         "patchSetId": 6
@@ -107,6 +131,30 @@
       "writtenOn": "2020-04-03T18:58:13Z",
       "side": 1,
       "message": "is this inbuilt?",
+      "range": {
+        "startLine": 88,
+        "startChar": 41,
+        "endLine": 88,
+        "endChar": 50
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "19f31a02_59408697",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "we send the inbuf to callback function.. currently, not sending inbuf_len..",
+      "parentUuid": "f88c0b74_7334703d",
       "range": {
         "startLine": 88,
         "startChar": 41,
@@ -142,6 +190,30 @@
     },
     {
       "key": {
+        "uuid": "64fe9723_5ddbd42e",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "we calculate strlen, if callback function didn\u0027t provide the string length.",
+      "parentUuid": "4b87c0c1_427c9e6d",
+      "range": {
+        "startLine": 117,
+        "startChar": 0,
+        "endLine": 118,
+        "endChar": 53
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c64d6db4_f982e3df",
         "filename": "dp-core/vr_info.c",
         "patchSetId": 6
@@ -165,6 +237,30 @@
     },
     {
       "key": {
+        "uuid": "1727a3bb_62ddfe31",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 129,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "Will store length in separate field.\nok.. will take care..",
+      "parentUuid": "c64d6db4_f982e3df",
+      "range": {
+        "startLine": 129,
+        "startChar": 18,
+        "endLine": 129,
+        "endChar": 75
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "fbe1414e_de2a5939",
         "filename": "dp-core/vr_info.c",
         "patchSetId": 6
@@ -176,6 +272,30 @@
       "writtenOn": "2020-04-03T18:58:13Z",
       "side": 1,
       "message": "only 1 message is sent here rite? so why do we want a while loop?",
+      "range": {
+        "startLine": 142,
+        "startChar": 8,
+        "endLine": 142,
+        "endChar": 57
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "866a3731_36851a13",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 142,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "Will take care",
+      "parentUuid": "fbe1414e_de2a5939",
       "range": {
         "startLine": 142,
         "startChar": 8,
@@ -228,6 +348,30 @@
     },
     {
       "key": {
+        "uuid": "24d66a2d_a239727e",
+        "filename": "dpdk/vr_dpdk_info.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "c958ce17_1fefd69b",
+      "range": {
+        "startLine": 28,
+        "startChar": 4,
+        "endLine": 28,
+        "endChar": 35
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "89d53dfe_ad4452dd",
         "filename": "include/nl_util.h",
         "patchSetId": 6
@@ -239,6 +383,30 @@
       "writtenOn": "2020-04-03T18:58:13Z",
       "side": 1,
       "message": "why this?",
+      "range": {
+        "startLine": 17,
+        "startChar": 0,
+        "endLine": 17,
+        "endChar": 20
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f1037e12_08897c16",
+        "filename": "include/nl_util.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "its required to resolve the structure \"vr_info_msg_en\"",
+      "parentUuid": "89d53dfe_ad4452dd",
       "range": {
         "startLine": 17,
         "startChar": 0,
@@ -268,6 +436,24 @@
     },
     {
       "key": {
+        "uuid": "6809d8e3_45147066",
+        "filename": "include/vr_info.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "thanks",
+      "parentUuid": "1f0f1f11_92bb111f",
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "53e28681_13508158",
         "filename": "include/vr_info.h",
         "patchSetId": 6
@@ -279,6 +465,30 @@
       "writtenOn": "2020-04-03T18:58:13Z",
       "side": 1,
       "message": "why cant this be -\n#define VR_INFO_ARGS vr_info_t* vr_info",
+      "range": {
+        "startLine": 22,
+        "startChar": 8,
+        "endLine": 22,
+        "endChar": 20
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "13f8c3ff_0d50f35d",
+        "filename": "include/vr_info.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-07T11:50:58Z",
+      "side": 1,
+      "message": "Will change it to a structure",
+      "parentUuid": "53e28681_13508158",
       "range": {
         "startLine": 22,
         "startChar": 8,
