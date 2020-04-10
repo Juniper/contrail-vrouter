@@ -1,4 +1,4 @@
-gevent
+gevent==1.4.0
 bottle
 netaddr>=0.7.5
 fysom
