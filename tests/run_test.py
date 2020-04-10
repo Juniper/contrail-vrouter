@@ -95,7 +95,7 @@ def parse(cmd):
 
     if args['socket'] is None:
         if socket_path is None:
-            path_cmd = '{}/debug/vrouter/utils/vtest_py_venv/var/run/vrouter'.\
+            path_cmd = '{}/debug/vrouter/utils/vtest_py_venv/sock/'.\
                 format(build_path)
             socket_path = os.path.realpath(path_cmd)
         logging.info("Using default socket path - {}".format(vtest_path))
