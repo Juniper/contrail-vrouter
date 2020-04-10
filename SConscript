@@ -199,7 +199,6 @@ if sys.platform != 'darwin':
         'dp-core',
         'sandesh',
         'utils',
-        'test',
         'host',
         'linux',
         'uvrouter',
