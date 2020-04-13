@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da972bf2_4e91942c",
+        "filename": "dp-core/vr_fragment.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-13T17:14:13Z",
+      "side": 1,
+      "message": "What about UT automation for these changes?",
+      "revId": "55a9151292feb6011953e5df6f844e4cdeef87c2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c20c706f_bf516ef8",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 882,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-13T17:14:13Z",
+      "side": 1,
+      "message": "Can you define a macro for 0 here?",
+      "revId": "55a9151292feb6011953e5df6f844e4cdeef87c2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b4923e51_9dfe638b",
+        "filename": "dp-core/vr_nexthop.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 894,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-13T17:14:13Z",
+      "side": 1,
+      "message": "Can you handle the case when vr_pclone fails by incrementing an error counter and returning failure? Same for Ipv6.",
+      "revId": "55a9151292feb6011953e5df6f844e4cdeef87c2",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
