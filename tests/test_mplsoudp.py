@@ -74,37 +74,12 @@ class TestMplsoUdp(unittest.TestCase):
         pkt1.show()
         self.assertIsNotNone(pkt1)
 
-        mplsoudp = MplsoUdpPacket(
-            label=128,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="00:11:11:11:11:11",
-            dmac="00:22:22:22:22:22",
-            sport=59112,
-            dport=6635)
-        pkt2 = mplsoudp.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2)
 
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt2)
-
-        self.assertEqual(1, self.vif1.get_vif_ipackets())
-        self.assertEqual(1, self.vif2.get_vif_opackets())
-
-        # VLAN encapsulation test MPLSoUDP
-        mplsoudpovlan = MplsoUdpoVlanPacket(
-            label=128,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="00:11:11:11:11:11",
-            dmac="00:22:22:22:22:22",
-            sport=59112,
-            dport=6635)
-        pkt3 = mplsoudpovlan.get_packet()
-        pkt3.show()
-        self.assertIsNotNone(pkt3)
-
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt3)
+        self.assertIsNotNone(rec_pkt)
+        self.assertTrue((UDP in rec_pkt) and (rec_pkt.dport == 6635))
+        self.assertEqual("1.1.2.2", rec_pkt[IP].src)
+        self.assertEqual("2.2.1.1", rec_pkt[IP].dst)
 
         self.assertEqual(1, self.vif1.get_vif_ipackets())
         self.assertEqual(1, self.vif2.get_vif_opackets())
@@ -156,21 +131,12 @@ class TestMplsoUdp(unittest.TestCase):
             dport=7936)
         inner_pkt = udp_inner.get_packet()
 
-        mplsoudp = MplsoUdpPacket(
-            label=48,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="de:ad:be:ef:00:02",
-            dmac="de:ad:be:ef:00:01",
-            sport=7936,
-            dport=7936,
-            inner_pkt=inner_pkt,
-            mpls_ttl=63)
-        pkt2 = mplsoudp.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2)
 
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt2)
+        self.assertIsNotNone(rec_pkt)
+        self.assertTrue((UDP in rec_pkt) and (rec_pkt.dport == 6635))
+        self.assertEqual("1.1.2.2", rec_pkt[IP].src)
+        self.assertEqual("2.2.1.1", rec_pkt[IP].dst)
 
         self.assertEqual(1, self.vif1.get_vif_ipackets())
         self.assertEqual(1, self.vif2.get_vif_opackets())

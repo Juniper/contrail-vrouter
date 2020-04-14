@@ -171,7 +171,8 @@ class TestVmToVmIntraVn(unittest.TestCase):
             nh_idx=27,
             nh_vrf=2,
             nh_flags=constants.NH_FLAG_POLICY_ENABLED |
-            constants.NH_FLAG_ETREE_ROOT)
+            constants.NH_FLAG_ETREE_ROOT,
+            nh_family=constants.AF_BRIDGE)
 
         # Add vif4 Nexthop (bridge)
         self.vif4_nh_bridge = EncapNextHop(
@@ -180,7 +181,8 @@ class TestVmToVmIntraVn(unittest.TestCase):
             nh_idx=32,
             nh_vrf=2,
             nh_flags=constants.NH_FLAG_POLICY_ENABLED |
-            constants.NH_FLAG_ETREE_ROOT)
+            constants.NH_FLAG_ETREE_ROOT,
+            nh_family=constants.AF_BRIDGE)
 
         # Add bridge route
         self.bridge_route1 = BridgeRoute(
@@ -244,9 +246,13 @@ class TestVmToVmIntraVn(unittest.TestCase):
         pkt.show()
 
         # send packet
-        rec_pkt = self.vif3.send_and_receive_packet(pkt, self.vif4, pkt)
+        rec_pkt = self.vif3.send_and_receive_packet(pkt, self.vif4)
+
         # check if we got ICMP packet
+        self.assertIsNotNone(rec_pkt)
         self.assertTrue(ICMP in rec_pkt)
+        self.assertEqual("1.1.1.4", rec_pkt[IP].src)
+        self.assertEqual("1.1.1.5", rec_pkt[IP].dst)
 
         # send ping request from vif4
         icmp = IcmpPacket(
@@ -259,9 +265,13 @@ class TestVmToVmIntraVn(unittest.TestCase):
         pkt.show()
 
         # send packet
-        rec_pkt = self.vif4.send_and_receive_packet(pkt, self.vif3, pkt)
+        rec_pkt = self.vif4.send_and_receive_packet(pkt, self.vif3)
+
         # check if we got ICMP packet
+        self.assertIsNotNone(rec_pkt)
         self.assertTrue(ICMP in rec_pkt)
+        self.assertEqual("1.1.1.5", rec_pkt[IP].src)
+        self.assertEqual("1.1.1.4", rec_pkt[IP].dst)
 
         # Check if the packet was received at vif3 and vif4
         self.assertEqual(1, self.vif3.get_vif_opackets())
@@ -319,21 +329,15 @@ class TestVmToVmIntraVn(unittest.TestCase):
         pkt.show()
 
         # send packet and receive on hbs-l
-        rcv_pkt = self.vif3.send_and_receive_packet(pkt, hbs_l_vif, pkt)
+        hbsl_pkt = self.vif3.send_and_receive_packet(pkt, hbs_l_vif)
 
-        # send encoded packet from hbs-r and receive on tenant_vif4
-        icmp = IcmpPacket(
-            sip='1.1.1.4',
-            dip='1.1.1.5',
-            smac='ca:f1:00:02:40:08',
-            dmac='02:e7:03:ea:67:f1',
-            icmp_type=constants.ECHO_REPLY,
-            id=4145)
-        pkt = icmp.get_packet()
-        pkt.show()
-        self.assertIsNotNone(pkt)
+        # send the packet on hbs-r and receive in vif4
+        vif4_pkt = hbs_r_vif.send_and_receive_packet(hbsl_pkt, self.vif4)
 
-        rcv_pkt = hbs_r_vif.send_and_receive_packet(pkt, self.vif4, pkt)
+        self.assertIsNotNone(vif4_pkt)
+        self.assertTrue(ICMP in vif4_pkt)
+        self.assertEqual("1.1.1.4", vif4_pkt[IP].src)
+        self.assertEqual("1.1.1.5", vif4_pkt[IP].dst)
 
         # Check if the packet was sent on tenant_vif3 and received at
         # tenant_vif4
@@ -394,21 +398,15 @@ class TestVmToVmIntraVn(unittest.TestCase):
         pkt.show()
 
         # send packet and receive on hbs-r
-        rcv_pkt = self.vif4.send_and_receive_packet(pkt, hbs_r_vif, pkt)
+        hbsr_pkt = self.vif4.send_and_receive_packet(pkt, hbs_r_vif)
 
-        # send encoded packet from hbs-l and receive on vif3
-        icmp = IcmpPacket(
-            sip='1.1.1.5',
-            dip='1.1.1.4',
-            smac='02:e7:03:ea:67:f1',
-            dmac='c0:d1:00:03:a8:60',
-            icmp_type=constants.ECHO_REPLY,
-            id=1136)
-        pkt = icmp.get_packet()
-        pkt.show()
-        self.assertIsNotNone(pkt)
+        # send packet in hbsl and receive on vif3
+        vif3_pkt = hbs_l_vif.send_and_receive_packet(hbsr_pkt, self.vif3)
 
-        rcv_pkt = hbs_l_vif.send_and_receive_packet(pkt, self.vif3, pkt)
+        self.assertIsNotNone(vif3_pkt)
+        self.assertTrue(ICMP in vif3_pkt)
+        self.assertEqual("1.1.1.5", vif3_pkt[IP].src)
+        self.assertEqual("1.1.1.4", vif3_pkt[IP].dst)
 
         # Check if the packet was sent on vif4 and received at
         # vif3

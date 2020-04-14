@@ -188,23 +188,18 @@ class TestVmToFabricInterVn(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # send packet
-        rcv_pkt = self.tenant_vif.send_and_receive_packet(pkt, hbs_l_vif, pkt)
-
-        # Inject the packet from hbs-r to vrouter
-        # Encode the flow id in the src mac of the packet
-        icmp_pkt = IcmpPacket(
-            sip='1.1.1.3',
-            dip='2.2.2.3',
-            smac='ca:f1:00:03:b1:40',
-            dmac='00:00:5e:00:01:00',
-            id=1418)
-        pkt = icmp_pkt.get_packet()
-        pkt.show()
-        self.assertIsNotNone(pkt)
+        hbfl_pkt = self.tenant_vif.send_and_receive_packet(pkt, hbs_l_vif)
+        self.assertIsNotNone(hbfl_pkt)
+        hbfl_pkt.show()
 
         # Send it to hbs-r and expect response on fabric
-        rcv_pkt = hbs_r_vif.send_and_receive_packet(
-            pkt, self.fabric_interface, pkt)
+        fab_pkt = hbs_r_vif.send_and_receive_packet(
+            hbfl_pkt, self.fabric_interface)
+        self.assertIsNotNone(fab_pkt)
+        fab_pkt.show()
+
+        # Check if fabric got a MPLSoUDP packet
+        self.assertTrue((UDP in fab_pkt) and (fab_pkt[UDP].dport == 6635))
 
         # Check if the packet was sent to vrouter (by vtest) on tenant_vif
         # and received at fabric (by vtest)
