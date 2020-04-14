@@ -65,7 +65,11 @@ class TestVmToVmIPv6(unittest.TestCase):
         pkt.show()
         self.assertIsNotNone(pkt)
 
-        rec_pkt = vif1.send_and_receive_packet(pkt, vif2, pkt)
+        rec_pkt = vif1.send_and_receive_packet(pkt, vif2)
+
+        self.assertTrue(IPv6 in rec_pkt)
+        self.assertEqual('de:ad:be:ef::1', rec_pkt[IPv6].src)
+        self.assertEqual('de:ad:be:ef::2', rec_pkt[IPv6].dst)
 
         self.assertEqual(1, vif1.get_vif_ipackets())
         self.assertEqual(1, vif2.get_vif_opackets())

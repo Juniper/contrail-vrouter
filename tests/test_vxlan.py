@@ -73,21 +73,11 @@ class TestVxlan(unittest.TestCase):
         pkt1.show()
         self.assertIsNotNone(pkt1)
 
-        vxlan = VxlanPacket(
-            vnid=128,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="00:11:11:11:11:11",
-            dmac="00:22:22:22:22:22",
-            sport=59112,
-            dport=4789,
-            inner_pkt=pkt1)
-        pkt2 = vxlan.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2)
 
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt2)
-
+        self.assertTrue(VXLAN in rec_pkt)
+        self.assertEqual('1.1.2.2', rec_pkt[IP].src)
+        self.assertEqual('2.2.1.1', rec_pkt[IP].dst)
         self.assertEqual(1, self.vif1.get_vif_ipackets())
         self.assertEqual(1, self.vif2.get_vif_opackets())
 
@@ -132,18 +122,13 @@ class TestVxlan(unittest.TestCase):
         pkt1.show()
         self.assertIsNotNone(pkt1)
 
-        udp = UdpPacket(
-            sip="1.1.1.1",
-            dip="2.2.2.2",
-            smac="00:22:33:44:55:66",
-            dmac="00:11:22:33:44:55",
-            sport=7936,
-            dport=7936)
-        pkt2 = udp.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2)
 
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt2)
+        self.assertTrue(VXLAN in rec_pkt)
+        self.assertEqual('1.1.2.2', rec_pkt[IP].src)
+        self.assertEqual('2.2.1.1', rec_pkt[IP].dst)
+        self.assertEqual(1, self.vif1.get_vif_ipackets())
+        self.assertEqual(1, self.vif2.get_vif_opackets())
 
         self.assertEqual(1, self.vif1.get_vif_ipackets())
         self.assertEqual(1, self.vif2.get_vif_opackets())

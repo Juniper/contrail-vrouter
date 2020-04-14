@@ -254,7 +254,7 @@ class Base(object):
             return resp[0]
 
     def create_pcap_req(self, input_pkt_list, input_if_idx,
-                        output_pkt_list, output_if_idx):
+                        receive, output_if_idx):
         """Creates pcap reqest file"""
         req_file = self.get_req_file_name()
         # create the pcap files first
@@ -263,16 +263,15 @@ class Base(object):
         inp_pcap_filestr_list = self.input_pcap_file.split("/")
         inp_pcap_filestr = inp_pcap_filestr_list[len(
             inp_pcap_filestr_list) - 1]
-        if (output_pkt_list is not None):
+        if (receive == True):
             self.output_pcap_file = req_file + ".output.pcap"
-            wrpcap(self.output_pcap_file, output_pkt_list)
             out_pcap_filestr_list = self.output_pcap_file.split("/")
             out_pcap_filestr = \
                 out_pcap_filestr_list[len(out_pcap_filestr_list) - 1]
 
         # write the request file now
-        hdr = "<?xml version=\"1.0\"?><test><test_name> \
-               pkt test</test_name><packet>"
+        hdr = "<?xml version=\"1.0\"?><test><test_name>" +\
+               "pkt test</test_name><packet>"
         footer = "</packet></test>"
 
         with open(req_file, 'w') as fh:
@@ -280,12 +279,12 @@ class Base(object):
                 fh.write(hdr)
                 fh.write("<pcap_input_file>" + inp_pcap_filestr +
                          "</pcap_input_file>\n")
-                if (output_pkt_list is not None):
-                    fh.write("<pcap_expected_file>" + out_pcap_filestr
-                             + "</pcap_expected_file>\n")
+                if (receive == True):
+                    fh.write("<pcap_output_file>" + out_pcap_filestr
+                             + "</pcap_output_file>\n")
                 fh.write("<tx_interface> <vif_index>" + input_if_idx
                          + "</vif_index></tx_interface>\n")
-                if (output_pkt_list is not None):
+                if (receive == True):
                     fh.write("<rx_interface> <vif_index>" + output_if_idx +
                              "</vif_index> </rx_interface>\n")
                 fh.write(footer)

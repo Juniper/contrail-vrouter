@@ -65,6 +65,19 @@ class TestPacket(unittest.TestCase):
         print("\nICMP packet created")
         pkt.show()
 
+    def test_icmp_packet_with_custom_size(self):
+        icmp = IcmpPacket(
+            sip='1.1.1.4',
+            dip='2.2.2.4',
+            smac='02:88:67:0c:2e:11',
+            dmac='00:00:5e:00:01:00',
+            id=1136,
+            size=256)
+        pkt = icmp.get_packet()
+        self.assertIsNotNone(pkt)
+        print("\nICMP packet created with size 256 created")
+        pkt.show()
+
     def test_udp_packet(self):
         udp = UdpPacket(sip='1.1.1.4', dip='2.2.2.4',
                         smac="de:ad:be:ef:00:02", dmac="de:ad:be:ef:00:00",
