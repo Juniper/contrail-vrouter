@@ -157,8 +157,9 @@ class TestMirrorV6SandeshConf(unittest.TestCase):
         self.assertIsNotNone(exp_pkt)
 
         rcv_pkt = vif1.send_and_receive_packet(
-            pkt, vif2, exp_pkt)
-        # check if we got IPv6 packet
+            pkt, vif2)
+        # check if we got VXLAN and IPv6 packet
+        self.assertTrue(VXLAN in rcv_pkt)
         self.assertTrue(IPv6 in rcv_pkt)
 
         # Check if the packet was received at vif1

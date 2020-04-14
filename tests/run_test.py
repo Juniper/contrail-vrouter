@@ -171,8 +171,11 @@ def parse(cmd):
     extension = None
     if(test_opt is not None and test_opt.find('.py') != -1):
         extension = test_opt.split('.')[1]
+        if extension is not None:
+            extension = extension.split('::')[0]
     if(extension == 'py'):
-        cmd = "cp {} {}/tests".format(test_opt, vtest_py_venv_path)
+        cmd = "cp {} {}/tests".\
+          format(test_opt.split('::')[0], vtest_py_venv_path)
         logging.info("Running cmd {}".format(cmd))
         os.system(cmd)
 

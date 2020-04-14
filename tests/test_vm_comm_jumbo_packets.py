@@ -66,7 +66,7 @@ class TestVmCommJumboPackets(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # send packet
-        rec_pkt = vif1.send_and_receive_packet(pkt, vif2, pkt)
+        rec_pkt = vif1.send_and_receive_packet(pkt, vif2)
 
         # check if we got UDP packet
         self.assertTrue(UDP in rec_pkt)

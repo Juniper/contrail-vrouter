@@ -74,33 +74,10 @@ class TestMplsoGre(unittest.TestCase):
         pkt1.show()
         self.assertIsNotNone(pkt1)
 
-        mplsogre = MplsoGrePacket(
-            label=128,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="00:11:11:11:11:11",
-            dmac="00:22:22:22:22:22")
-        pkt2 = mplsogre.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2)
 
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt2)
-
-        self.assertEqual(1, self.vif1.get_vif_ipackets())
-        self.assertEqual(1, self.vif2.get_vif_opackets())
-
-        # VLAN encapsulation test MPLSoGRE
-        mplsogreovlan = MplsoGreoVlanPacket(
-            label=128,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="00:11:11:11:11:11",
-            dmac="00:22:22:22:22:22")
-        pkt3 = mplsogreovlan.get_packet()
-        pkt3.show()
-        self.assertIsNotNone(pkt3)
-
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt3)
+        # Check if the rcv pkt contains mplsogre header
+        self.assertTrue((GRE in rec_pkt) and (rec_pkt[GRE].proto == 34887))
 
         self.assertEqual(1, self.vif1.get_vif_ipackets())
         self.assertEqual(1, self.vif2.get_vif_opackets())
@@ -152,19 +129,10 @@ class TestMplsoGre(unittest.TestCase):
             dport=7936)
         inner_pkt = udp_inner.get_packet()
 
-        mplsogre = MplsoGrePacket(
-            label=48,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="de:ad:be:ef:00:02",
-            dmac="de:ad:be:ef:00:01",
-            inner_pkt=inner_pkt,
-            mpls_ttl=63)
-        pkt2 = mplsogre.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2)
 
-        rec_pkt = self.vif1.send_and_receive_packet(pkt1, self.vif2, pkt2)
+        # Check if the rcv pkt contains mplsogre header
+        self.assertTrue((GRE in rec_pkt) and (rec_pkt[GRE].proto == 34887))
 
         self.assertEqual(1, self.vif1.get_vif_ipackets())
         self.assertEqual(1, self.vif2.get_vif_opackets())
