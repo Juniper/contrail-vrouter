@@ -267,7 +267,11 @@ class TestFabricToVmIntraVn(unittest.TestCase):
 
         # send packet
         rcv_pkt = self.fabric_interface.send_and_receive_packet(
-            pkt, self.tenant_vif, pkt)
+            pkt, self.tenant_vif)
+        self.assertIsNotNone(rcv_pkt)
+        self.assertTrue(ICMP in rcv_pkt)
+        self.assertEqual("1.1.1.5", rcv_pkt[IP].src)
+        self.assertEqual("1.1.1.3", rcv_pkt[IP].dst)
 
         # Check if the packet was received at tenant vif
         self.assertEqual(1, self.tenant_vif.get_vif_opackets())
@@ -343,24 +347,19 @@ class TestFabricToVmIntraVn(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # Make sure the packet comes goes to hbs-r (tap8b05a86b-36)
-        rcv_pkt = self.fabric_interface.send_and_receive_packet(
-            pkt, hbs_r_vif, pkt)
-
-        # Inject the packet from hbs-l to vrouter
-        # Encode the flow id in the dst mac of the packet
-        icmp = IcmpPacket(
-            sip='1.0.0.5',
-            dip='1.0.0.3',
-            smac='02:e7:03:ea:67:f1',
-            dmac='c0:d2:00:06:44:7c',
-            icmp_type=constants.ECHO_REPLY,
-            id=4145)
-        pkt = icmp.get_packet()
-        pkt.show()
-        self.assertIsNotNone(pkt)
+        hbsr_pkt = self.fabric_interface.send_and_receive_packet(
+            pkt, hbs_r_vif)
 
         # Send it to hbs-l
-        rcv_pkt = hbs_l_vif.send_and_receive_packet(pkt, self.tenant_vif, pkt)
+        tenant_pkt = hbs_l_vif.send_and_receive_packet(
+              hbsr_pkt, self.tenant_vif)
+
+        self.assertIsNotNone(tenant_pkt)
+        self.assertTrue(ICMP in tenant_pkt)
+        self.assertEqual("1.1.1.5", tenant_pkt[IP].src)
+        self.assertEqual("1.1.1.3", tenant_pkt[IP].dst)
+        self.assertEqual("02:c2:23:4c:d0:55", tenant_pkt[Ether].dst)
+        self.assertEqual("02:e7:03:ea:67:f1", tenant_pkt[Ether].src)
 
         # Check if the packet was sent to vrouter (by vtest) on fabric
         # and received at tenant_vif (by vtest)

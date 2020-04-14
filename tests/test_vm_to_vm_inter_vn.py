@@ -133,11 +133,11 @@ class TestVmToVmInterVn(unittest.TestCase):
         pkt.show()
 
         # send packet
-        rec_pkt = self.vif3.send_and_receive_packet(pkt, self.vif4, pkt)
+        rec_pkt = self.vif3.send_and_receive_packet(pkt, self.vif4)
         # check if we got ICMP packet
         self.assertTrue(ICMP in rec_pkt)
-        self.assertEqual('02:88:67:0c:2e:11', rec_pkt.src)
-        self.assertEqual('00:00:5e:00:01:00', rec_pkt.dst)
+        self.assertEqual('1.1.1.4', rec_pkt[IP].src)
+        self.assertEqual('2.2.2.4', rec_pkt[IP].dst)
 
         # send ping request from vif4
         icmp = IcmpPacket(
@@ -151,11 +151,11 @@ class TestVmToVmInterVn(unittest.TestCase):
         pkt.show()
 
         # send packet
-        rec_pkt = self.vif4.send_and_receive_packet(pkt, self.vif3, pkt)
+        rec_pkt = self.vif4.send_and_receive_packet(pkt, self.vif3)
         # check if we got ICMP packet
         self.assertTrue(ICMP in rec_pkt)
-        self.assertEqual('02:e7:03:ea:67:f1', rec_pkt.src)
-        self.assertEqual('00:00:5e:00:01:00', rec_pkt.dst)
+        self.assertEqual('2.2.2.4', rec_pkt[IP].src)
+        self.assertEqual('1.1.1.4', rec_pkt[IP].dst)
 
         # Check if the packet was received at vif3 and vif4
         self.assertEqual(1, self.vif3.get_vif_opackets())
@@ -245,21 +245,14 @@ class TestVmToVmInterVn(unittest.TestCase):
         pkt.show()
 
         # send packet
-        rcv_pkt = self.vif3.send_and_receive_packet(pkt, hbs_l_vif, pkt)
+        hbsl_pkt = self.vif3.send_and_receive_packet(pkt, hbs_l_vif)
 
-        # send encoded packet from hbs-r and receive on tenant_vif4
-        icmp = IcmpPacket(
-            sip='1.1.1.4',
-            dip='2.2.2.4',
-            smac='ca:f1:00:00:a9:4c',
-            dmac='00:00:5e:00:01:00',
-            id=1136)
-        pkt = icmp.get_packet()
-        pkt.show()
-        self.assertIsNotNone(pkt)
-
-        # send packet
-        rcv_pkt = hbs_r_vif.send_and_receive_packet(pkt, self.vif4, pkt)
+        # send hbsl packet to hbs-r
+        vif4_pkt = hbs_r_vif.send_and_receive_packet(hbsl_pkt, self.vif4)
+        # check if we got ICMP packet
+        self.assertTrue(ICMP in vif4_pkt)
+        self.assertEqual('1.1.1.4', vif4_pkt[IP].src)
+        self.assertEqual('2.2.2.4', vif4_pkt[IP].dst)
 
         # send ping response from tenant_vif4 and receive in hbs-r
         icmp = IcmpPacket(
@@ -274,8 +267,11 @@ class TestVmToVmInterVn(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # send packet
-        rcv_pkt = self.vif4.send_and_receive_packet(pkt, hbs_r_vif, pkt)
+        hbsr_pkt = self.vif4.send_and_receive_packet(pkt, hbs_r_vif)
+        hbsr_pkt.show()
 
+        # TODO: Use hbsr_pkt instead of this
+        #
         # send ping response from hbs-r and receive in tenant_vif3
         icmp = IcmpPacket(
             sip='2.2.2.4',
@@ -289,7 +285,11 @@ class TestVmToVmInterVn(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # send packet
-        rcv_pkt = hbs_l_vif.send_and_receive_packet(pkt, self.vif3, pkt)
+        vif3_pkt = hbs_l_vif.send_and_receive_packet(pkt, self.vif3)
+        # check if we got ICMP packet
+        self.assertTrue(ICMP in vif4_pkt)
+        self.assertEqual('2.2.2.4', vif3_pkt[IP].src)
+        self.assertEqual('1.1.1.4', vif3_pkt[IP].dst)
 
         # Check if the packet was sent on tenant_vif3 and received at hbs-l
         self.assertEqual(1, self.vif3.get_vif_ipackets())
@@ -304,5 +304,5 @@ class TestVmToVmInterVn(unittest.TestCase):
         self.assertEqual(1, hbs_r_vif.get_vif_ipackets())
 
         # Check if the packet was sent to hbs-l and received from tenant_vif3
-        self.assertEqual(1, hbs_l_vif.get_vif_opackets())
-        self.assertEqual(1, self.vif3.get_vif_ipackets())
+        self.assertEqual(1, self.vif3.get_vif_opackets())
+        self.assertEqual(1, hbs_l_vif.get_vif_ipackets())

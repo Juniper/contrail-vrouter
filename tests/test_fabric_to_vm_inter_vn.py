@@ -158,7 +158,11 @@ class TestFabricToVmiInterVn(unittest.TestCase):
 
         # Make sure the packet comes goes to hbf-r (tap8b05a86b-36)
         rcv_pkt = self.fabric_interface.send_and_receive_packet(
-            pkt, self.tenant_vif, pkt)
+            pkt, self.tenant_vif)
+
+        # check if decapsulated packet is received at tenant vif
+        self.assertEqual('2.2.2.3', rcv_pkt[IP].src)
+        self.assertEqual('1.1.1.3', rcv_pkt[IP].dst)
 
         # Check if the packet was sent to vrouter (by vtest) on fabric
         # and received at tenant_vif (by vtest)
@@ -228,8 +232,10 @@ class TestFabricToVmiInterVn(unittest.TestCase):
 
         # Make sure the packet comes goes to hbs-r (tap8b05a86b-36)
         rcv_pkt = self.fabric_interface.send_and_receive_packet(
-            pkt, hbs_r_vif, pkt)
+            pkt, hbs_r_vif)
 
+        # TODO: Send the rcv_pkt to the next call instead of
+        #       forming a new packet
         # Inject the packet from hbs-l to vrouter
         # Encode the flow id in the dst mac of the packet
         icmp = IcmpPacket(
@@ -244,7 +250,7 @@ class TestFabricToVmiInterVn(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # Send it to hbs-l
-        rcv_pkt = hbs_l_vif.send_and_receive_packet(pkt, self.tenant_vif, pkt)
+        rcv_pkt = hbs_l_vif.send_and_receive_packet(pkt, self.tenant_vif)
 
         # Check if the packet was sent to vrouter (by vtest) on fabric
         # and received at tenant_vif (by vtest)

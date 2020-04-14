@@ -90,6 +90,11 @@ vt_packet(xmlNodePtr node, struct vtest *test)
                 vt_fname_assign(test,
                     test->packet.pcap_ref_file, node->children->content);
             }
+        } else if (!strncmp(node->name, "pcap_output_file", strlen(node->name))) {
+            if (node->children && node->children->content) {
+                vt_fname_assign(test,
+                    test->packet.pcap_dest_file, node->children->content);
+            }
         } else if (!strncmp(node->name, "tx_interface", strlen(node->name))) {
 
             l_node_interface = node;
@@ -266,11 +271,14 @@ tx_rx_pcap_test(struct vtest *test) {
     char pcap_dest[PATH_MAX] = {0};
     bool send_only = false;
 
-    snprintf(pcap_dest, PATH_MAX, "/tmp/dest_%u.pcap", (unsigned)(time(NULL)));
-    strncpy(test->packet.pcap_dest_file, pcap_dest, strlen(pcap_dest));
-
-    if (test->packet.pcap_ref_file[0] == '\0') {
+    if ((test->packet.pcap_ref_file[0] == '\0') &&
+            (test->packet.pcap_dest_file[0] == '\0')) {
         send_only = true;
+    }
+
+    if (!strlen(test->packet.pcap_dest_file)) {
+        snprintf(pcap_dest, PATH_MAX, "/tmp/dest_%u.pcap", (unsigned)(time(NULL)));
+        strncpy(test->packet.pcap_dest_file, pcap_dest, strlen(pcap_dest));
     }
 
     snprintf(src_vif_ctrl_sock, UNIX_PATH_MAX, "%s/uvh_vif_%s",
@@ -305,7 +313,8 @@ tx_rx_pcap_test(struct vtest *test) {
         return E_PACKET_PCAP_SETUP_TEST_ERR;
     }
 
-    tx_rx_handler.dumper = pcap_dump_open(tx_rx_handler.pd, pcap_dest);
+    tx_rx_handler.dumper = pcap_dump_open(tx_rx_handler.pd,
+                                                  test->packet.pcap_dest_file);
     if (!tx_rx_handler.dumper) {
         fprintf(stderr, "%s(): Error opening pcap dump: %s\n",
             __func__, pcap_geterr(tx_rx_handler.pd));

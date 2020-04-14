@@ -264,6 +264,7 @@ class IcmpPacket(IpPacket):
             dmac=None,
             icmp_type=constants.ECHO_REQUEST,
             id=1,
+            size=0,
             **kwargs):
         super(IcmpPacket, self).__init__(
             'icmp',
@@ -273,9 +274,13 @@ class IcmpPacket(IpPacket):
             dmac,
             **kwargs)
         self.icmp = ICMP(type=icmp_type, code=0, id=id)
+        self.size = size
 
     def get_packet(self):
-        if self.eth:
+        if self.size and self.eth:
+            payload = "x" * self.size
+            return self.eth / self.ip / self.icmp / payload
+        elif self.eth:
             return self.eth / self.ip / self.icmp
         else:
             return self.ip / self.icmp
