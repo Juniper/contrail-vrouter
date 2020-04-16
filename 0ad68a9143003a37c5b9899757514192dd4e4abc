@@ -16,6 +16,24 @@
       "revId": "0ad68a9143003a37c5b9899757514192dd4e4abc",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e7a939d2_a7d06a5d",
+        "filename": "utils/vtest_py/requirements.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-04-16T16:59:39Z",
+      "side": 1,
+      "message": "vrouter is using python2.7",
+      "parentUuid": "b257b9af_eb8dbc70",
+      "revId": "0ad68a9143003a37c5b9899757514192dd4e4abc",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
