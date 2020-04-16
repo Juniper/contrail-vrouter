@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b257b9af_eb8dbc70",
+        "filename": "utils/vtest_py/requirements.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 79
+      },
+      "writtenOn": "2020-04-16T14:32:55Z",
+      "side": 1,
+      "message": "This fails to install for python3, is it expected ?",
+      "revId": "0ad68a9143003a37c5b9899757514192dd4e4abc",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
