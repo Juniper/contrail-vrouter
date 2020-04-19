@@ -308,6 +308,30 @@
     },
     {
       "key": {
+        "uuid": "09c29f0f_52ee446e",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 142,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-19T16:23:38Z",
+      "side": 1,
+      "message": "While loop is required above, When the dumper_buffer becomes full, Sandesh will send it to client CLI by enabling flag dump_pending.",
+      "parentUuid": "866a3731_36851a13",
+      "range": {
+        "startLine": 142,
+        "startChar": 8,
+        "endLine": 142,
+        "endChar": 57
+      },
+      "revId": "507346ac5e6dbcef757fac7a3c66010a931fa89a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4c414ee3_f6b5e172",
         "filename": "dpdk/vr_dpdk_info.h",
         "patchSetId": 6
