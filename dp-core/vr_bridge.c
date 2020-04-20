@@ -653,8 +653,8 @@ bridge_table_init(struct vr_rtable *rtable, struct rtable_fspec *fs)
     vr_compute_size_bridge_otable();
 
     if (!vr_bridge_table && vr_huge_page_mem_get) {
-        vr_bridge_table = vr_huge_page_mem_get(VR_BRIDGE_TABLE_SIZE +
-                VR_BRIDGE_OFLOW_TABLE_SIZE);
+        vr_bridge_table = vr_huge_page_mem_get((VR_BRIDGE_TABLE_SIZE +
+                           VR_BRIDGE_OFLOW_TABLE_SIZE), &vr_bridge_table_path);
         if (vr_bridge_table)
             vr_bridge_otable = (unsigned char *)vr_bridge_table + VR_BRIDGE_TABLE_SIZE;
     }

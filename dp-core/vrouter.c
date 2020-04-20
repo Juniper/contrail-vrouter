@@ -630,7 +630,8 @@ vr_hugepage_config_process(void *s_req)
     if (vr_huge_page_config) {
         ret = vr_huge_page_config(req->vhp_mem, req->vhp_mem_size,
                                   req->vhp_psize, req->vhp_psize_size,
-                                  req->vhp_mem_sz, req->vhp_mem_sz_size);
+                                  req->vhp_mem_sz, req->vhp_mem_sz_size,
+                                  req->vhp_file_paths, req->vhp_file_path_sz);
     }
 
     if (ret != -EEXIST) {

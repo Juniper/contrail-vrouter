@@ -2842,8 +2842,9 @@ vr_flow_table_data_process(void *s_req)
 #if defined(__linux__) && defined(__KERNEL__)
     resp->ftable_dev = vr_flow_major;
 #endif
-    if (vr_flow_path)
+    if (vr_flow_path) {
         strncpy(resp->ftable_file_path, vr_flow_path, VR_UNIX_PATH_MAX - 1);
+    }
 
     if (!infop)
         goto send_response;
@@ -3033,7 +3034,7 @@ vr_flow_table_init(struct vrouter *router)
         if (!vr_flow_table && vr_huge_page_mem_get) {
 
             vr_flow_table = vr_huge_page_mem_get(VR_FLOW_TABLE_SIZE +
-                    VR_OFLOW_TABLE_SIZE);
+                    VR_OFLOW_TABLE_SIZE, &vr_flow_path);
             if (vr_flow_table)
                 vr_oflow_table = (char*)vr_flow_table + VR_FLOW_TABLE_SIZE;
         }
