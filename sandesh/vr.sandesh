@@ -555,4 +555,5 @@ buffer sandesh vr_hugepage_config {
     3: list<u32>    vhp_psize;
     4: u32          vhp_resp;
     5: list<u32>    vhp_mem_sz;
+    6: list<string> vhp_file_path;
 }

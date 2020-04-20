@@ -52,7 +52,7 @@ vr_table_map(int major, unsigned int table, const char *table_path, size_t size,
         return error_msg;
     }
 
-    if (platform != LINUX_PLATFORM) {
+    if (table_path) {
         path = table_path;
     } else {
         switch (table) {

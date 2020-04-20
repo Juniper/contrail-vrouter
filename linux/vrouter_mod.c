@@ -2256,19 +2256,24 @@ lh_register_nic(struct vr_interface* vif __attribute__((unused)),
  * hpage_mem_sz - Array of size of huge page memory requested for
  *                each virtual memory address in hpages
  * n_hpage_mem_sz - Number of elements in hpage_mem_sz
+ * hpage_file_path - filename path of the hugepage files
+ * n_hpage_file_path_size - Number of hpage_file_path elements
  */
 static int
 lh_huge_page_config(uint64_t *hpages, int n_hpages,
                     int *hpage_size, int n_hpage_sizes,
-                    int *hpage_mem_sz, int n_hpage_mem_sz)
+                    int *hpage_mem_sz, int n_hpage_mem_sz,
+                    char **hpage_file_path, int n_hpage_file_path_size)
 {
     int i;
 
     if (!hpages || !n_hpages || !hpage_size || !n_hpage_sizes ||
-        !hpage_mem_sz || !n_hpage_mem_sz)
+        !hpage_mem_sz || !n_hpage_mem_sz || !hpage_file_path ||
+        !n_hpage_file_path_size)
         return -EINVAL;
 
     if ((n_hpages != n_hpage_sizes) || (n_hpages != n_hpage_mem_sz) ||
+        (n_hpages != n_hpage_file_path_size) ||
         (n_hpages > VR_MAX_HUGE_PAGE_CFG))
         return -EINVAL;
 
@@ -2280,13 +2285,13 @@ lh_huge_page_config(uint64_t *hpages, int n_hpages,
             return -EINVAL;
     }
 
-    return vr_huge_pages_config(hpages, n_hpages, hpage_size, hpage_mem_sz);
+    return vr_huge_pages_config(hpages, n_hpages, hpage_size, hpage_mem_sz, hpage_file_path);
 }
 
 static void *
-lh_huge_mem_get(int size)
+lh_huge_mem_get(int size, unsigned char **file_path)
 {
-    return vr_huge_mem_get(size);
+    return vr_huge_mem_get(size, file_path);
 }
 
 struct host_os linux_host = {
