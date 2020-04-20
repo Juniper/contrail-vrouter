@@ -279,7 +279,7 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
 
                 vr_inet6_flow_swap(flow_p);
             } else {
-                return VP_DROP_ICMP_ERROR;
+                return -VP_DROP_ICMP_ERROR;
             }
 
             return 0;
@@ -344,7 +344,7 @@ vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
     frag = vr_fragment_get(router, vrf,
             (struct vr_ip *)(pkt_network_header(pkt)));
     if (!frag) {
-        return VP_DROP_NO_FRAG_ENTRY;
+        return -VP_DROP_NO_FRAG_ENTRY;
     }
 
     sport = frag->f_sport;
@@ -409,7 +409,7 @@ vr_inet6_get_flow_key(struct vrouter *router, unsigned short vrf,
         ret = vr_v6_fragment_add(router, vrf, ip6, flow_p->flow6_sport,
                 flow_p->flow6_dport);
         if (ret < 0)
-            return VP_DROP_NO_MEMORY;
+            return -VP_DROP_NO_MEMORY;
     }
 
     return ret;
@@ -463,7 +463,7 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         ret = vr_v6_fragment_add(router, fmd->fmd_dvrf, ip6, flow_p->flow6_sport,
                 flow_p->flow6_dport);
         if (ret < 0)
-            return VP_DROP_NO_MEMORY;
+            return -VP_DROP_NO_MEMORY;
         if (vr_enqueue_to_assembler){
             pkt_c = vr_pclone(pkt);
             if (pkt_c) {
