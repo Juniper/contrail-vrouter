@@ -285,7 +285,7 @@ class TestVmToFabricIntraVn(unittest.TestCase):
         pkt.show()
 
         # send packet and receive on hbs-l
-        rcv_pkt = self.tenant_vif.send_and_receive_packet(pkt, hbs_l_vif, pkt)
+        hbsl_pkt = self.tenant_vif.send_and_receive_packet(pkt, hbs_l_vif)
 
         # Inject the packet from hbs-r to vrouter
         # Encode the flow id in the src mac of the packet
@@ -300,7 +300,13 @@ class TestVmToFabricIntraVn(unittest.TestCase):
         self.assertIsNotNone(pkt)
 
         # Send it to hbs-r and expect response on fabric vif
-        rcv_pkt = hbs_r_vif.send_and_receive_packet(pkt, self.vif, pkt)
+        fabric_pkt = hbs_r_vif.send_and_receive_packet(hbsl_pkt, self.vif)
+
+        self.assertIsNotNone(fabric_pkt)
+        self.assertTrue(UDP in fabric_pkt)
+        self.assertEqual(6635, fabric_pkt[UDP].dport)
+        self.assertEqual("8.0.0.2", fabric_pkt[IP].src)
+        self.assertEqual("8.0.0.3", fabric_pkt[IP].dst)
 
         # Check if the packet was sent to vrouter (by vtest) on tenant_vif
         # and received at fabric (by test)

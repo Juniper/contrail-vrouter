@@ -71,17 +71,10 @@ class TestMplsoGREv6(unittest.TestCase):
         pkt1.show()
         self.assertIsNotNone(pkt1)
 
-        mplsogre = MplsoGrePacket(
-            label=128,
-            sip="1.1.2.2",
-            dip="2.2.1.1",
-            smac="00:11:11:11:11:11",
-            dmac="00:22:22:22:22:22")
-        pkt2 = mplsogre.get_packet()
-        pkt2.show()
-        self.assertIsNotNone(pkt2)
+        rec_pkt = vif1.send_and_receive_packet(pkt1, vif2)
 
-        rec_pkt = vif1.send_and_receive_packet(pkt1, vif2, pkt2)
+        # Check if the rcv pkt contains mplsogre header
+        self.assertTrue((GRE in rec_pkt) and (rec_pkt[GRE].proto == 34887))
 
         self.assertEqual(1, vif1.get_vif_ipackets())
         self.assertEqual(1, vif2.get_vif_opackets())

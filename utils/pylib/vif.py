@@ -54,22 +54,26 @@ class Vif(ObjectBase, vr_interface_req):
     def send_packet(self, tx_pkt_list):
         """Sends a packet in the vif"""
         req_file = self.create_pcap_req(tx_pkt_list, self.vifr_name,
-                                        None, None)
+                                        False, None)
         # run the vtest cmd
         self.run_vtest_command(True, req_file)
 
-    def send_and_receive_packet(self, tx_pkt_list, receive_vif, rx_pkt_list):
+    def send_and_receive_packet(self, tx_pkt_list, receive_vif):
         """Sends a packet and receive the reply packet"""
         req_file = self.create_pcap_req(tx_pkt_list, self.vifr_name,
-                                        rx_pkt_list, receive_vif.vifr_name)
+                                        True, receive_vif.vifr_name)
         output_pcap = self.get_output_pcap_file(req_file)
-        scapy_cap = None
+        scapy_obj = None
         if output_pcap:
-            scapy_cap = scapy.all.rdpcap(output_pcap)
-        if scapy_cap:
-            return scapy_cap[0]
-        else:
-            return None
+            scapy_obj = scapy.all.rdpcap(output_pcap)
+            if scapy_obj is not None:
+                if len(scapy_obj) == 0:
+                    return None
+                elif len(scapy_obj) == 1:
+                    return scapy_obj[0]
+                else:
+                    return scapy_obj
+            return scapy_obj
 
     def idx(self):
         """Returns vif index"""
