@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dc94f358_e68d9522",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 97,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-21T18:30:56Z",
+      "side": 1,
+      "message": "For simplicity, you can start users_cb_reg[] from index 1 instead of 0. Else, everywhere you have to do -1 business which is confusing, you can assume users_cb_reg[0] is unused.",
+      "range": {
+        "startLine": 97,
+        "startChar": 37,
+        "endLine": 97,
+        "endChar": 57
+      },
+      "revId": "b3daba88bf7682d6a7eb6e4b31f0f3bd73354147",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4a7b05b8_7eca052a",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-21T18:30:56Z",
+      "side": 1,
+      "message": "If msg_req.outbuf_len is 0, it is bailing out in the above if condition. Will this still get executed in that case?",
+      "range": {
+        "startLine": 133,
+        "startChar": 20,
+        "endLine": 133,
+        "endChar": 38
+      },
+      "revId": "b3daba88bf7682d6a7eb6e4b31f0f3bd73354147",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

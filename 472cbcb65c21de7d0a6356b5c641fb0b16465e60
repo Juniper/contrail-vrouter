@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "285e6f84_c69d674a",
+        "filename": "include/vr_dpdk.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 314,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-21T18:30:56Z",
+      "side": 1,
+      "message": "this backslash is needed?",
+      "range": {
+        "startLine": 314,
+        "startChar": 33,
+        "endLine": 314,
+        "endChar": 34
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
