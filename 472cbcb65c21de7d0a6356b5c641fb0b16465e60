@@ -2,6 +2,29 @@
   "comments": [
     {
       "key": {
+        "uuid": "2d173f1b_7483f466",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-21T18:46:58Z",
+      "side": 1,
+      "message": "What if 802.3ad is not configured, but round robin or balanced xor is configured?\nWe officially support all the bonding modes (lacp, balanced-xor, rr).. pl change this function to print parameters relevant to the mode.",
+      "range": {
+        "startLine": 118,
+        "startChar": 4,
+        "endLine": 118,
+        "endChar": 34
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "285e6f84_c69d674a",
         "filename": "include/vr_dpdk.h",
         "patchSetId": 10
