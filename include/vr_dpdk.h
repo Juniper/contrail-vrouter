@@ -280,6 +280,8 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_MGMTPATH 0
 #define VR_DPDK_DATAPATH 1
 
+#define VR_SOCKET_PATH_MAX 108
+
 /**
  * Macro to iterate over all enabled and ownerless dpdk ethdev ports.
  */

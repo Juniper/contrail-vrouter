@@ -38,7 +38,6 @@
 #include <rte_kni.h>
 #include <rte_timer.h>
 
-
 /* vRouter/DPDK command-line options. */
 enum vr_opt_index {
 #define NO_DAEMON_OPT           "no-daemon"
@@ -1326,7 +1325,18 @@ parse_long_opts(int opt_flow_index, char *optarg)
 	break;
 
     case SOCKET_DIR_OPT_INDEX:
-        vr_socket_dir = optarg;
+        if(strlen(optarg) > (VR_SOCKET_PATH_MAX - sizeof(VR_NETLINK_UNIX_NAME))){
+            RTE_LOG(WARNING, VROUTER,
+                "Warning : Socket path is too long %s/%s (%d),"
+                "it should be less than %d\n",
+                optarg, VR_NETLINK_UNIX_NAME,
+                (int)(strlen(optarg) + sizeof(VR_NETLINK_UNIX_NAME)),
+                VR_SOCKET_PATH_MAX);
+            RTE_LOG(WARNING, VROUTER,
+                    "Warning: vr_socket_dir path set to /tmp/sock/ directory\n");
+            vr_socket_dir = "/tmp/sock";
+        } else
+            vr_socket_dir = optarg;
         break;
 
     case NETLINK_PORT_OPT_INDEX:
