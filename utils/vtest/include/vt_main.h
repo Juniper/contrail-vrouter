@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #define vt_safe_free(ptr) safer_free((void**)&(ptr))
+#define VR_SOCKET_PATH_MAX 108
 
 static void
 safer_free(void **mem) {
