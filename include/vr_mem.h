@@ -34,8 +34,8 @@ struct vr_mem_object {
 
 void vr_huge_pages_exit(void);
 int vr_huge_pages_init(void);
-int vr_huge_pages_config(uint64_t *, int, int*, int*);
-void *vr_huge_mem_get(int);
+int vr_huge_pages_config(uint64_t *, int, int*, int*, char **);
+void *vr_huge_mem_get(int, unsigned char **);
 
 
 #ifdef __cplusplus

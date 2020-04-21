@@ -2256,16 +2256,21 @@ lh_register_nic(struct vr_interface* vif __attribute__((unused)),
  * hpage_mem_sz - Array of size of huge page memory requested for
  *                each virtual memory address in hpages
  * n_hpage_mem_sz - Number of elements in hpage_mem_sz
+ * hpage_file_paths - Buffer containing huge page file paths
+ * n_hpage_file_path_sz - Number of huge page file paths
  */
 static int
 lh_huge_page_config(uint64_t *hpages, int n_hpages,
                     int *hpage_size, int n_hpage_sizes,
-                    int *hpage_mem_sz, int n_hpage_mem_sz)
+                    int *hpage_mem_sz, int n_hpage_mem_sz,
+                    int8_t *hpage_file_paths, uint32_t *hpage_file_path_sz)
 {
-    int i;
+    int i, j, ret;
+    char **hpage_file_path = NULL;
 
     if (!hpages || !n_hpages || !hpage_size || !n_hpage_sizes ||
-        !hpage_mem_sz || !n_hpage_mem_sz)
+        !hpage_mem_sz || !n_hpage_mem_sz || !hpage_file_paths ||
+        !hpage_file_path_sz)
         return -EINVAL;
 
     if ((n_hpages != n_hpage_sizes) || (n_hpages != n_hpage_mem_sz) ||
@@ -2280,13 +2285,37 @@ lh_huge_page_config(uint64_t *hpages, int n_hpages,
             return -EINVAL;
     }
 
-    return vr_huge_pages_config(hpages, n_hpages, hpage_size, hpage_mem_sz);
+    hpage_file_path = (char **)kzalloc((n_hpages * sizeof(char *)), GFP_ATOMIC);
+    if (!hpage_file_path) {
+         return -ENOMEM;
+    }
+    for (i = 0, j = 0; i < n_hpages; i++) {
+         hpage_file_path[i] = (char *) kzalloc(hpage_file_path_sz[i], GFP_ATOMIC);
+         if (!hpage_file_path[i]) {
+              ret = -ENOMEM;
+              goto free_mem;
+         }
+         memcpy(hpage_file_path[i], &hpage_file_paths[j], hpage_file_path_sz[i]);
+         j += hpage_file_path_sz[i];
+    }
+
+    ret = vr_huge_pages_config(hpages, n_hpages, hpage_size, hpage_mem_sz, hpage_file_path);
+
+free_mem:
+    for (i = 0; i < n_hpages; i++) {
+         if (hpage_file_path[i]) {
+             kfree(hpage_file_path[i]);
+             hpage_file_path[i] = NULL;
+         }
+    }
+    kfree(hpage_file_path);
+    return ret;
 }
 
 static void *
-lh_huge_mem_get(int size)
+lh_huge_mem_get(int size, unsigned char **file_path)
 {
-    return vr_huge_mem_get(size);
+    return vr_huge_mem_get(size, file_path);
 }
 
 struct host_os linux_host = {

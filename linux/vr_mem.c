@@ -29,6 +29,7 @@ struct vr_hpage_config {
     unsigned int hcfg_free_size;
     unsigned int hcfg_tot_size;
     unsigned int hcfg_mem_attached;
+    char *hcfg_file_path;
 };
 
 short vr_flow_major = -1;
@@ -41,7 +42,7 @@ bool vr_hpage_config_inited = false;
 static struct vr_hpage_config *vr_hcfg;
 
 void *
-vr_huge_mem_get(int size)
+vr_huge_mem_get(int size, unsigned char **file_path)
 {
     int i, offset;
     void *mptr;
@@ -62,6 +63,9 @@ vr_huge_mem_get(int size)
         offset = vr_hcfg[i].hcfg_tot_size - vr_hcfg[i].hcfg_free_size;
         mptr = vr_hcfg[i].hcfg_mem + offset;
         vr_hcfg[i].hcfg_free_size -= size;
+        
+        /* return the huge page file path */
+        *file_path = (unsigned char *) vr_hcfg[i].hcfg_file_path;
 
         /* Zero the requested memory*/
         memset(mptr, 0, size);
@@ -79,11 +83,13 @@ vr_huge_mem_get(int size)
  * memory for those pages.
  */
 static struct vr_hpage_config *
-__vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_size, struct page **pmem)
+__vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_size, struct page **pmem,
+                   char *hpage_file_path)
 {
     int i, size = 0, spages;
     struct vr_hpage_config *hcfg = NULL;
     void *kmem = NULL;
+    char *file_path = NULL;
 
     for (i = 0; i < VR_MAX_HUGE_PAGE_CFG; i++) {
         hcfg = vr_hcfg + i;
@@ -101,6 +107,12 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_
         if (!pmem)
             return NULL;
     }
+
+    file_path = (char *) kzalloc((strlen(hpage_file_path) + 1), GFP_ATOMIC);
+    if (!file_path) {
+        return NULL;
+    }
+    memcpy(file_path, hpage_file_path, (strlen(hpage_file_path) + 1));
 
     /*
      * Get the kernel pages corresponding to the huge memory.
@@ -136,6 +148,7 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_
         if (size)
             free_pages((unsigned long)pmem, get_order(size));
 
+        kfree(file_path);
         return NULL;
     }
  
@@ -159,9 +172,10 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_
     hcfg->hcfg_free_size = mem_size;
     hcfg->hcfg_tot_size = mem_size;
     hcfg->hcfg_pages = pmem;
+    hcfg->hcfg_file_path = file_path;
 
-    vr_printf("Pinned huge page uspace_vmem %p start_page_addr %p num 4k pages %d mem_size %d\n",
-               hcfg->hcfg_uspace_vmem, hcfg->hcfg_mem, hcfg->hcfg_npages, hcfg->hcfg_tot_size);
+    vr_printf("Pinned huge page uspace_vmem %p start_page_addr %p num 4k pages %d mem_size %d file_path %s\n",
+               hcfg->hcfg_uspace_vmem, hcfg->hcfg_mem, hcfg->hcfg_npages, hcfg->hcfg_tot_size, hcfg->hcfg_file_path);
 
     return hcfg;
 }
@@ -179,7 +193,8 @@ __vr_huge_page_get(uint64_t uspace_vmem, int npages, int mem_size, int hugepage_
  * only at the time of removal of the module.
  */
 int
-vr_huge_pages_config(uint64_t *hpages, int n_hpages, int *hpage_size, int *hpage_mem_sz)
+vr_huge_pages_config(uint64_t *hpages, int n_hpages, int *hpage_size, int *hpage_mem_sz,
+                     char **hpage_file_path)
 {
     int i, spages, succeeded_pages = 0;
 
@@ -191,10 +206,10 @@ vr_huge_pages_config(uint64_t *hpages, int n_hpages, int *hpage_size, int *hpage
 
         spages =  1 + (hpage_mem_sz[i] - 1) / PAGE_SIZE;
 
-        vr_printf("Config Hugepage vmem %p psize %d mem_sz %d\n", (void *)hpages[i],
-                  hpage_size[i], hpage_mem_sz[i]);
+        vr_printf("Config Hugepage vmem %p psize %d mem_sz %d path %s\n", (void *)hpages[i],
+                  hpage_size[i], hpage_mem_sz[i], hpage_file_path[i]);
 
-        if (__vr_huge_page_get(hpages[i], spages, hpage_mem_sz[i], hpage_size[i], NULL))
+        if (__vr_huge_page_get(hpages[i], spages, hpage_mem_sz[i], hpage_size[i], NULL, hpage_file_path[i]))
             succeeded_pages++;
     }
 
@@ -240,6 +255,10 @@ vr_huge_pages_exit(void)
         if (!hcfg->hcfg_mem_attached) {
             free_pages((unsigned long)hcfg->hcfg_pages,
                       get_order((hcfg->hcfg_npages * sizeof(struct page *))));
+        }
+
+        if (hcfg->hcfg_file_path) {
+            kfree(hcfg->hcfg_file_path);
         }
 
         memset(hcfg, 0, sizeof(*hcfg));
