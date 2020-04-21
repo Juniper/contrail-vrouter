@@ -151,7 +151,17 @@ parse_long_opts(int opt_flow_index, char *optarg, vtest_cli_opt_t *cli_opt)
 
     switch (opt_flow_index) {
     case SOCKET_DIR_OPT_INDEX:
-        vr_socket_dir = optarg;
+        if(strlen(optarg) > (VR_SOCKET_PATH_MAX - sizeof(VR_NETLINK_UNIX_NAME))){
+            printf("Warning : Socket path is too long %s/%s (%d),"
+                "it should be less than %d\n",
+                optarg, VR_NETLINK_UNIX_NAME,
+                (int)(strlen(optarg) + sizeof(VR_NETLINK_UNIX_NAME)),
+                VR_SOCKET_PATH_MAX);
+            printf("Warning: vr_socket_dir path set to /tmp/sock/ directory\n");
+            vr_socket_dir = "/tmp/sock";
+        }
+        else
+            vr_socket_dir = optarg;
         break;
 
     case NETLINK_PORT_OPT_INDEX:
