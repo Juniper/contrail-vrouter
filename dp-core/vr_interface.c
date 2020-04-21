@@ -1287,12 +1287,15 @@ eth_set_rewrite(struct vr_interface *vif, struct vr_packet **pkt,
     /*
      * Retain the original headerof the HostOs if the packet is not
      * tunneled packet and not from Agent. Otherwise, apply the new
-     * rewrite data
+     * rewrite data.
+     * Apply rewrite data even when dmac of the pkt is vhost mac
+     * which implies pkt is routed through vrouter
      */
     if (((*pkt)->vp_if->vif_type == VIF_TYPE_HOST) &&
             (!((*pkt)->vp_flags & VP_FLAG_FROM_DP)) &&
             (fmd->fmd_ecmp_src_nh_index == -1) &&
-            (((*pkt)->vp_type == VP_TYPE_IP) || ((*pkt)->vp_type == VP_TYPE_IP6))) {
+            (((*pkt)->vp_type == VP_TYPE_IP) || ((*pkt)->vp_type == VP_TYPE_IP6)) &&
+            (memcmp((*pkt)->vp_if->vif_mac, (pkt_data(*pkt) - VR_ETHER_HLEN), VR_ETHER_ALEN) != 0)) {
         vr_preset(*pkt);
         return 0;
     }
