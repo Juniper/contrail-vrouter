@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d9a7f0ac_b989e463",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1339,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-22T05:44:37Z",
+      "side": 1,
+      "message": "Pl make sure formatting is uniform across the file -\nif () {\n} else {\n}",
+      "range": {
+        "startLine": 1338,
+        "startChar": 0,
+        "endLine": 1339,
+        "endChar": 12
+      },
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
