@@ -22,6 +22,30 @@
       "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "394302ab_00227dec",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1339,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-22T06:23:55Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "d9a7f0ac_b989e463",
+      "range": {
+        "startLine": 1338,
+        "startChar": 0,
+        "endLine": 1339,
+        "endChar": 12
+      },
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
