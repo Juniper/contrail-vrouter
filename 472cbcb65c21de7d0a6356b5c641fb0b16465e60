@@ -2,6 +2,52 @@
   "comments": [
     {
       "key": {
+        "uuid": "10b1249a_504cc856",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 167,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-22T05:42:32Z",
+      "side": 1,
+      "message": "This will never by hit as per your explanation. Rather, can we just make this\nwhile (1) {\n}",
+      "range": {
+        "startLine": 167,
+        "startChar": 14,
+        "endLine": 167,
+        "endChar": 53
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "aff842c2_642fde85",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 205,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-22T05:42:32Z",
+      "side": 1,
+      "message": "these can be combined?\nif ((ret \u003c\u003d0) || vr_info_last_buf)\n    break;",
+      "range": {
+        "startLine": 202,
+        "startChar": 12,
+        "endLine": 205,
+        "endChar": 22
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "2d173f1b_7483f466",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 10
