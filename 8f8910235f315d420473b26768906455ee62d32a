@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6aa1ce9e_9b13479a",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1339,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-22T16:46:03Z",
+      "side": 1,
+      "message": "You mentioned earlier that its created in some other place. does that not work?",
+      "range": {
+        "startLine": 1339,
+        "startChar": 12,
+        "endLine": 1339,
+        "endChar": 57
+      },
+      "revId": "8f8910235f315d420473b26768906455ee62d32a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
