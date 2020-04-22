@@ -135,6 +135,24 @@
       "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fda84bf6_9b3a8ca1",
+        "filename": "utils/vtest/vt_main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 161,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-22T14:35:38Z",
+      "side": 1,
+      "message": "But lets say I am using these commands in my script, then I won\u0027t have a way to know that the error is due to the long path. Will the vif command throw any error related to path being long?\nIf not, then we should do this change in the utilities as well.",
+      "parentUuid": "e26eb59e_2b54e014",
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
