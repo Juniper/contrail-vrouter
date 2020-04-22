@@ -81,6 +81,24 @@
       "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "76f86191_d9ac50d9",
+        "filename": "utils/vtest/vt_main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 161,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-22T08:29:49Z",
+      "side": 1,
+      "message": "Ok. I think you also need to set the path to \"/tmp/sock\" in the utilities like (vif, flow etc) ?",
+      "parentUuid": "9fab28e9_7ee34c0c",
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
