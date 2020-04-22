@@ -63,6 +63,24 @@
       "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9fab28e9_7ee34c0c",
+        "filename": "utils/vtest/vt_main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 161,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-22T07:59:05Z",
+      "side": 1,
+      "message": "\"/tmp/sock\" gets created in vrouter(link below), from vtest client, we try to connect to the socket.\nhttps://github.com/Juniper/contrail-vrouter/blob/77efed474bfb1303871aa9c2a4e82681d2b3f1b0/dpdk/vr_dpdk_usocket.c#L1135",
+      "parentUuid": "bf8f8c28_d9fe28da",
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
