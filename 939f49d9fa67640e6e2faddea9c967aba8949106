@@ -171,6 +171,24 @@
       "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c527a225_ec941262",
+        "filename": "utils/vtest/vt_main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 161,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-23T09:50:33Z",
+      "side": 1,
+      "message": "This could be my UT script or some manual execution where i am giving the long path.\nWill the user get a clue that the cmd failed due to long path and he needs to use \"/tmp/sock\"?\nWill vif throw error in this regard?",
+      "parentUuid": "443b9146_26cec1a5",
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
