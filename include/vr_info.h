@@ -12,12 +12,11 @@
 #define VR_INFO_REG(X) \
     X(INFO_VER,  info_get_version, KERNEL) \
     X(INFO_BOND, info_get_bond,    DPDK) \
+    X(INFO_LACP, info_get_lacp,    DPDK) \
+    X(INFO_MEMPOOL, info_get_mempool,    DPDK) \
 
 /* Deifne all supported platforms.
  * When a new platforms added, define like below.
- * By default, below macro will unmap all hardware dependent callback functions
- * whichever platform its running, only those callback would get registered in
- * thier platform dependent headers(include/vr_dpdk.h, include/vr_linux.h)
  * Eg: VR_INFO_HOST_MAP_<non-supported platform> */
 #define VR_INFO_HOST_MAP_KERNEL(MSG, CB)
 #define VR_INFO_HOST_MAP_DPDK(MSG, CB)
