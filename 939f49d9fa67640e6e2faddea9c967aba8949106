@@ -189,6 +189,24 @@
       "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b53ebefa_61f66f6f",
+        "filename": "utils/vtest/vt_main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 161,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-23T11:34:48Z",
+      "side": 1,
+      "message": "ok.. Instead of changing in *.c files, I will update the python script to change the vr_socket_dir path.",
+      "parentUuid": "c527a225_ec941262",
+      "revId": "939f49d9fa67640e6e2faddea9c967aba8949106",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
