@@ -299,7 +299,11 @@ mem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
     struct vr_mem_object *vmo = (struct vr_mem_object *)vma->vm_private_data;
 #else
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0))
 static int
+#else
+static vm_fault_t
+#endif /*KERNEL_4.18*/
 mem_fault(struct vm_fault *vmf)
 {
     struct vr_mem_object *vmo =
@@ -322,7 +326,11 @@ mem_fault(struct vm_fault *vmf)
         break;
 
     default:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,18,0))
         return -EFAULT;
+#else
+	return VM_FAULT_SIGBUS;
+#endif /*KERNEL_4.18*/
     }
 
     if (is_vmalloc_addr(va)) {
