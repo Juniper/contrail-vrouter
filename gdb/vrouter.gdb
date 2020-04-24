@@ -8,3 +8,5 @@ source ~/vrouter_gdb/vr_btable.gdb
 source ~/vrouter_gdb/vr_vif.gdb
 source ~/vrouter_gdb/vr_nexthop.gdb
 source ~/vrouter_gdb/vr_flow.gdb
+source ~/vrouter_gdb/vr_rtable.gdb
+source ~/vrouter_gdb/vr_bridge.gdb
