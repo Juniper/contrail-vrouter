@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "6f5ad4ed_705cc14e",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 167,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-24T10:19:45Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "10b1249a_504cc856",
+      "range": {
+        "startLine": 167,
+        "startChar": 14,
+        "endLine": 167,
+        "endChar": 53
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "aff842c2_642fde85",
         "filename": "dp-core/vr_info.c",
         "patchSetId": 10
@@ -48,6 +72,30 @@
     },
     {
       "key": {
+        "uuid": "a0d37039_ce1c6844",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 205,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-24T10:19:45Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "aff842c2_642fde85",
+      "range": {
+        "startLine": 202,
+        "startChar": 12,
+        "endLine": 205,
+        "endChar": 22
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "2d173f1b_7483f466",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 10
@@ -59,6 +107,30 @@
       "writtenOn": "2020-04-21T18:46:58Z",
       "side": 1,
       "message": "What if 802.3ad is not configured, but round robin or balanced xor is configured?\nWe officially support all the bonding modes (lacp, balanced-xor, rr).. pl change this function to print parameters relevant to the mode.",
+      "range": {
+        "startLine": 118,
+        "startChar": 4,
+        "endLine": 118,
+        "endChar": 34
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c99c1fa7_5e5d7646",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-24T10:19:45Z",
+      "side": 1,
+      "message": "Created a bug CEM-15040 to support different mode modes.\nok.. Will add check to display only for \"bond_mode \u003d\u003d BONDING_MODE_8023AD\"",
+      "parentUuid": "2d173f1b_7483f466",
       "range": {
         "startLine": 118,
         "startChar": 4,
