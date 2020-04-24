@@ -187,6 +187,30 @@
       "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f3f3ab00_859c81eb",
+        "filename": "include/vr_dpdk.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 314,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-24T11:09:37Z",
+      "side": 1,
+      "message": "This is not taken care of?",
+      "parentUuid": "348716ee_0f0e81e0",
+      "range": {
+        "startLine": 314,
+        "startChar": 33,
+        "endLine": 314,
+        "endChar": 34
+      },
+      "revId": "472cbcb65c21de7d0a6356b5c641fb0b16465e60",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }

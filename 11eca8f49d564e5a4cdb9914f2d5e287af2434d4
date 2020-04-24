@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "4b33a9f0_3b72c3a2",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 174,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-24T11:09:37Z",
+      "side": 1,
+      "message": "better coding practise is to have curly braces here also even though there is a one-liner statement below.\nPl take care of this here and other places in the file",
+      "range": {
+        "startLine": 172,
+        "startChar": 18,
+        "endLine": 174,
+        "endChar": 58
+      },
+      "revId": "11eca8f49d564e5a4cdb9914f2d5e287af2434d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fba4d522_28ca4aae",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 27,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-24T11:09:37Z",
+      "side": 1,
+      "message": "This is static int?",
+      "range": {
+        "startLine": 27,
+        "startChar": 0,
+        "endLine": 27,
+        "endChar": 3
+      },
+      "revId": "11eca8f49d564e5a4cdb9914f2d5e287af2434d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "32293fcf_8daa16d7",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-04-24T11:09:37Z",
+      "side": 1,
+      "message": "static int. Pl fix this in all the necessary functions in this file",
+      "range": {
+        "startLine": 57,
+        "startChar": 0,
+        "endLine": 58,
+        "endChar": 25
+      },
+      "revId": "11eca8f49d564e5a4cdb9914f2d5e287af2434d4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
