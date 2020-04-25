@@ -102,10 +102,10 @@ def parse(cmd):
         logging.info("Using default socket path - {}".format(vtest_path))
     else:
         socket_path = args['socket']
-    #VR_UNIX_PATH_MAX is set as 108
+    # VR_UNIX_PATH_MAX is set as 108
     if len(socket_path) > (108 - len('dpdk_netlink')):
-        logging.info("Socket path is too long {}, so setting it to /tmp/sock".\
-                format(socket_path))
+        logging.info("Socket path is too long {}, so setting it to /tmp/sock".
+                     format(socket_path))
         if not os.path.exists('/tmp/sock'):
             os.makedirs('/tmp/sock')
         socket_path = os.path.realpath('/tmp/sock')
@@ -182,8 +182,9 @@ def parse(cmd):
         if extension is not None:
             extension = extension.split('::')[0]
     if(extension == 'py'):
-        cmd = "cp {} {}/tests".\
-          format(test_opt.split('::')[0], vtest_py_venv_path)
+        file_name = test_opt.split('::')[0]
+        cmd = "cp {} {}/tests/{}".\
+            format(file_name, vtest_py_venv_path, file_name)
         logging.info("Running cmd {}".format(cmd))
         os.system(cmd)
 
@@ -238,6 +239,7 @@ def run_command(cmd):
     else:
         return 0
 
+
 def parse_result():
     if not path.exists('result.xml'):
         exit(0)
@@ -249,10 +251,12 @@ def parse_result():
             print("Script execution failed")
             exit(1)
 
+
 def main():
     cmd = sys.argv
     parse(cmd)
     parse_result()
+
 
 if __name__ == '__main__':
     main()
