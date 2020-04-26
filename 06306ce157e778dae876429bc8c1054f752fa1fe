@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "32e0bb36_b33033a3",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-26T16:45:38Z",
+      "side": 1,
+      "message": "We maintain two tables, one is callback_reg table and buff_table..\nI will update making vdu_buff_table_id[0] is invalid.",
+      "parentUuid": "5f96fa30_0dcf8a17",
+      "range": {
+        "startLine": 119,
+        "startChar": 16,
+        "endLine": 119,
+        "endChar": 49
+      },
+      "revId": "06306ce157e778dae876429bc8c1054f752fa1fe",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "f3be3735_9bcc6730",
         "filename": "dp-core/vr_info.c",
         "patchSetId": 12
@@ -82,6 +106,30 @@
       "writtenOn": "2020-04-24T13:35:41Z",
       "side": 1,
       "message": "is this req-\u003evdu_marker+1 or just req-\u003evdu_marker",
+      "range": {
+        "startLine": 181,
+        "startChar": 30,
+        "endLine": 181,
+        "endChar": 49
+      },
+      "revId": "06306ce157e778dae876429bc8c1054f752fa1fe",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "69c5dc6a_86309a77",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 181,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-04-26T16:45:38Z",
+      "side": 1,
+      "message": "Here, we are incrementing index to query for next iteration..",
+      "parentUuid": "07e8cb30_4996da79",
       "range": {
         "startLine": 181,
         "startChar": 30,
