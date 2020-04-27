@@ -22,6 +22,23 @@
       "revId": "cae133512c4498ab3d4f3b4e22ef194dad542fdc",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8272d060_6251e461",
+        "filename": "dpdk/vr_dpdk_virtio.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1043,
+      "author": {
+        "id": 299
+      },
+      "writtenOn": "2020-04-27T16:19:45Z",
+      "side": 1,
+      "message": "I agree it is 1500 but as per discussion we had decided there is no way to correctly guess the value. An alternative would be to simply log this as a warning.\nFor example we just put a warning message here that pkt_len is too large. \nThe core will have the value but this one will be more obvious to a non-developer who\ndoes not need to debug the core .",
+      "revId": "cae133512c4498ab3d4f3b4e22ef194dad542fdc",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
