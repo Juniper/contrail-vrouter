@@ -792,7 +792,7 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
                     }
                     break;
 
-                case VP_DROP_NO_FRAG_ENTRY:
+                case -VP_DROP_NO_FRAG_ENTRY:
                     /*
                      * Handle non-head fragmented packets
                      * - If the head fragment has not yet arrived, the fragment hash table
@@ -806,8 +806,8 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
                         return NH_ECMP_PACKET_HELD;
                     }
                     break;
-                case VP_DROP_ICMP_ERROR:
-                case VP_DROP_NO_MEMORY:
+                case -VP_DROP_ICMP_ERROR:
+                case -VP_DROP_NO_MEMORY:
                 default:
                     return ret;
 
@@ -828,14 +828,14 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
                     }
                     break;
 
-                case VP_DROP_NO_FRAG_ENTRY:
+                case -VP_DROP_NO_FRAG_ENTRY:
                     if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
                         vr_enqueue_to_assembler(nh->nh_router, pkt, fmd);
                         return NH_ECMP_PACKET_HELD;
                     }
                     break;
-                case VP_DROP_ICMP_ERROR:
-                case VP_DROP_NO_MEMORY:
+                case -VP_DROP_ICMP_ERROR:
+                case -VP_DROP_NO_MEMORY:
                 default:
                     return ret;
 
@@ -899,10 +899,10 @@ nh_composite_ecmp(struct vr_packet *pkt, struct vr_nexthop *nh,
                 break;
             case NH_ECMP_PACKET_HELD:
                 return 0; /* packet was consumed */
-            case VP_DROP_ICMP_ERROR:
-            case VP_DROP_NO_MEMORY:
-            case VP_DROP_NO_FRAG_ENTRY:
-                 drop_reason = ret;
+            case -VP_DROP_ICMP_ERROR:
+            case -VP_DROP_NO_MEMORY:
+            case -VP_DROP_NO_FRAG_ENTRY:
+                 drop_reason = -ret;
                  goto drop;
             default:
                  goto drop;
