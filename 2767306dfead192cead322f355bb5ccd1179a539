@@ -1,0 +1,78 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5cd53da7_734dd311",
+        "filename": "gdb/vr_bridge.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-29T08:39:54Z",
+      "side": 1,
+      "message": "You can implement this by calling dump_bridge_range \u003c0  last index of table\u003e",
+      "revId": "2767306dfead192cead322f355bb5ccd1179a539",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3f434684_8b9771df",
+        "filename": "gdb/vr_bridge.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 104,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-29T08:39:54Z",
+      "side": 1,
+      "message": "If we don\u0027t need these 2 lines, please delete it.",
+      "range": {
+        "startLine": 103,
+        "startChar": 0,
+        "endLine": 104,
+        "endChar": 55
+      },
+      "revId": "2767306dfead192cead322f355bb5ccd1179a539",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "68cfef51_04e29310",
+        "filename": "gdb/vr_rtable.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-29T08:39:54Z",
+      "side": 1,
+      "message": "Can you get rid of the trailing whitespaces?",
+      "revId": "2767306dfead192cead322f355bb5ccd1179a539",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "053c46a4_4e5b1547",
+        "filename": "gdb/vr_rtable.gdb",
+        "patchSetId": 2
+      },
+      "lineNbr": 84,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-04-29T08:39:54Z",
+      "side": 1,
+      "message": "Why does this start from 1?",
+      "revId": "2767306dfead192cead322f355bb5ccd1179a539",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
