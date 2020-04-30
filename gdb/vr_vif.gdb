@@ -43,11 +43,11 @@ define dump_vif_internal
             printf "GenNum:%u", $cur_vif.vif_gen
             printf "\n            Type:"
             print_vif_type (int)$cur_vif.vif_type
-            printf " VLanID:%u OVlanID:%u", $cur_vif.vif_vlan_id, $cur_vif.vif_ovlan_id
+            printf " VLanID:%hd OVlanID:%hd", $cur_vif.vif_vlan_id, $cur_vif.vif_ovlan_id
             printf " Router:%#x, Users:%u", $cur_vif.vif_router, $cur_vif.vif_users
             printf "\n            "
-            printf "Rid:%u NHid:%u ", $cur_vif.vif_rid, $cur_vif.vif_nh_id
-            printf "Vrf:%u Mcast Vrf:%u ", $cur_vif.vif_vrf, $cur_vif.vif_mcast_vrf
+            printf "Rid:%hu NHid:%d ", $cur_vif.vif_rid, $cur_vif.vif_nh_id
+            printf "Vrf:%hd Mcast Vrf:%hd ", $cur_vif.vif_vrf, $cur_vif.vif_mcast_vrf
             printf "MTU:%u Flags:", $cur_vif.vif_mtu
             print_vif_flags $cur_vif.vif_flags
             printf " OS_Id:%u\n", $cur_vif.vif_os_idx
@@ -165,15 +165,12 @@ define print_ipv6
     set $count = 0
     set $vif_ipv6 = $arg0
     while($count<16)
-        if($count == 8)
-            printf "\n                 "
-        end
-        if($count == 0 || $count == 8)
-            printf "%04x",$vif_ipv6[$count]
+        if($count == 0)
+            printf "%02x%02x",$vif_ipv6[$count], $vif_ipv6[$count+1]
         else
-            printf ":%04x",$vif_ipv6[$count]
+            printf ":%02x%02x",$vif_ipv6[$count], $vif_ipv6[$count+1]
         end
-        set $count = $count + 1
+        set $count = $count + 2
     end
     printf "\n"
 end
@@ -445,7 +442,7 @@ define get_fat_flow_config
         printf "\n                             IPAddr: "
         if ($cur_cfg.src_prefix_h)
             ipv6_hex_convert $cur_cfg.src_prefix_h
-            printf "\n                                     "
+            printf ":"
             ipv6_hex_convert $cur_cfg.src_prefix_l
         else
             set $s_ip = $cur_cfg.src_prefix_l
@@ -459,6 +456,7 @@ define get_fat_flow_config
         printf "\n                             IPAddr:"
         if ($cur_cfg.dst_prefix_h)
             ipv6_hex_convert $cur_cfg.dst_prefix_h
+            printf ":"
             ipv6_hex_convert $cur_cfg.dst_prefix_l
         else
             set $d_ip = $cur_cfg.dst_prefix_l
@@ -479,10 +477,10 @@ define ipv6_hex_convert
     set $flag = 0
     set $shift = 8
     while ($c1 <= 8)
-        if ($flag)
-            printf ":%04x", ($arg0 >> ($shift * $c1)) && 0xff
+        if ($flag && ($c1 & 1))
+            printf ":%02x", ($arg0 >> ($shift * $c1)) & 0xff
         else
-            printf "%04x", $arg0 & 0xff
+            printf "%02x", $arg0 & 0xff
             set $flag = 1
         end
         set $c1 = $c1 + 1
@@ -556,8 +554,8 @@ define get_fat_flow_exclude_list_ipv6
         while ($count < $arg0)
             printf "            "
             ipv6_hex_convert $arg2[$count]
-            printf "\n            "
-            ipv6_hex_convirt $arg3[$count]
+            printf ":"
+            ipv6_hex_convert $arg3[$count]
             printf "/%u\n", $arg1[$count++]
         end
     end
