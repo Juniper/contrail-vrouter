@@ -73,6 +73,8 @@ def parse(cmd):
             path_cmd = '{}/debug/vrouter/dpdk/contrail-vrouter-dpdk'.\
                 format(build_path)
             vrouter_path = os.path.realpath(path_cmd)
+	else:
+            vrouter_path = vrouter_path.split(':')[0]
         logging.info("Using default vrouter path - {}".format(vrouter_path))
     else:
         vrouter_path = args['vrouter']
@@ -86,6 +88,8 @@ def parse(cmd):
             path_cmd = '{}/debug/vrouter/utils/vtest/vtest'.format(
                 build_path)
             vtest_path = os.path.realpath(path_cmd)
+	else:
+            vtest_path = vtest_path.split(':')[0]
         logging.info("Using default vtest path - {}".format(vtest_path))
     else:
         vtest_path = args['vtest']
