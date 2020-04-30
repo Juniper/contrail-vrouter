@@ -2,8 +2,6 @@
 
 sb_path=$PWD
 
-## Set CODE_COVERAGE_RUN=1 to skip all XML based testcases
-export CODE_COVERAGE_RUN=1
 scons --opt=coverage vrouter-ut
 
 export VROUTER_DPDK_PATH=$(realpath $sb_path/build/coverage/vrouter/dpdk/contrail-vrouter-dpdk)
