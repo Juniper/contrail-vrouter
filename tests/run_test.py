@@ -57,6 +57,8 @@ def parse(cmd):
     parser.add_argument("-l", "--log_level", required=False,
                         help="set log level (ERROR/INFO/DEBUG)",
                         default='INFO')
+    parser.add_argument('-d_args', '--dpdk_args', required=False,
+                         help="run vRouter with required args")
 
     vrouter_path = os.environ.get('VROUTER_DPDK_PATH')
     vtest_path = os.environ.get('VTEST_PATH')
@@ -158,12 +160,22 @@ def parse(cmd):
 
     if args['vrouter_only']:
         os.environ["VROUTER_ONLY_MODE"] = "1"
-        exec_cmd = 'taskset 0x6 {} --no-daemon --no-huge --vr_packet_sz 2048 \
-                --vr_socket_dir {}'.format(vrouter_path, socket_path)
+        exec_cmd = 'taskset 0x6 {} --no-daemon --no-huge' \
+                    '--vr_packet_sz 2048 '.format(vrouter_path)
+        if args['dpdk_args'] is not None:
+            exec_cmd += args['dpdk_args']
+        exec_cmd += ' --vr_socket_dir {}'.format(socket_path)
         logging.info("Running cmd {}".format(exec_cmd))
-        os.execlp("taskset", "taskset", "0x6", vrouter_path,
-                  "--no-daemon", "--no-huge", "--vr_packet_sz",
-                  "2048", "--vr_socket_dir", socket_path)
+
+        exec_cmd_args = ["taskset", "0x6", vrouter_path, "--no-daemon",
+                        "--no-huge", "--vr_packet_sz", "2048"]
+        if args['dpdk_args'] is not None:
+                for dpdk_arg in args['dpdk_args'].split(' '):
+                    exec_cmd_args.append(dpdk_arg)
+        exec_cmd_args.extend(["--vr_socket_dir",
+                             socket_path])
+
+        os.execvp("taskset", exec_cmd_args)
         return 0
     else:
         os.environ["VROUTER_ONLY_MODE"] = "0"
