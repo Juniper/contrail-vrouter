@@ -75,7 +75,7 @@ class Base(object):
         return vr_args
 
     @classmethod
-    def launch_vrouter_instance(self):
+    def launch_vrouter_instance(self, dpdk_args=None):
         """Api to start vrouter instance"""
         # Add code to start vrouter
         if (self.vr_args['vtest_only']):
@@ -84,10 +84,15 @@ class Base(object):
             return
         cpid = os.fork()
         if cpid == 0:
-            os.execlp("taskset", "taskset", self.vr_args['taskset'],
-                      self.vr_args['vrouter_path'], "--no-daemon", "--no-huge",
-                      "--vr_packet_sz", "2048", "--vr_socket_dir",
-                      self.vr_args['socket_dir'])
+            vrouter_cmd_args = ["taskset", self.vr_args['taskset'],
+                                self.vr_args['vrouter_path'], "--no-daemon",
+                                "--no-huge", "--vr_packet_sz", "2048"]
+            if dpdk_args is not None:
+                for dpdk_arg in dpdk_args:
+                    vrouter_cmd_args.append(dpdk_arg)
+            vrouter_cmd_args.extend(["--vr_socket_dir",
+                                     self.vr_args['socket_dir']])
+            os.execvp("taskset", vrouter_cmd_args)
         else:
             self.logger.info(
                 "Running cmd - taskset %s %s --no-daemon --no-huge "
@@ -147,6 +152,22 @@ class Base(object):
             + "_" + str(self.get_sandesh_req_num())
         req_filename = filename + "_req.xml"
         return req_filename
+
+    @classmethod
+    def restart_vrouter_with_args(self, dpdk_args):
+        os.system('kill -9 $(pidof contrail-vrouter-dpdk)')
+        vtest_only = self.vr_args['vtest_only']
+        self.vr_args['vtest_only'] = 0
+        self.launch_vrouter_instance(dpdk_args)
+        self.vr_args['vtest_only'] = vtest_only
+
+    @classmethod
+    def get_cli_output(self, command):
+        utility_path = os.environ.get('PWD') + '/../'
+        socket_path = os.environ.get('VROUTER_SOCKET_PATH')
+        cmd = '{}{} --sock-dir {}'.format(utility_path, command,
+                                          socket_path)
+        return subprocess.check_output(cmd, shell=True)
 
     @classmethod
     def vtest_ut_init(self):
