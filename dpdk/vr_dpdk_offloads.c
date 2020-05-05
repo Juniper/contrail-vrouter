@@ -24,7 +24,9 @@ dpdk_offload_flow_destroy(struct vr_offload_flow *oflow)
             oflow->ip, oflow->tunnel_type, oflow->tunnel_tag, oflow->nh->nh_id);
 
     if (likely(oflow->flow_handle != NULL)) {
+        rte_spinlock_lock(&ethdev->ethdev_lock);
         ret = rte_flow_destroy(ethdev->ethdev_port_id, oflow->flow_handle, &error);
+        rte_spinlock_unlock(&ethdev->ethdev_lock);
         if (unlikely(ret != 0))
             RTE_LOG(ERR, VROUTER, "Failed to destroy flow - %s\n", error.message ?
                     error.message : "no error message");
@@ -367,8 +369,10 @@ dpdk_offload_flow_create(struct vr_offload_flow *oflow)
     }
 
     /* Create dpdk flow */
+    rte_spinlock_lock(&ethdev->ethdev_lock);
     oflow->flow_handle = rte_flow_create(ethdev->ethdev_port_id, &attr, pattern,
                                          actions, &error);
+    rte_spinlock_unlock(&ethdev->ethdev_lock);
     if (unlikely(oflow->flow_handle == NULL)) {
         RTE_LOG(ERR, VROUTER, "Failed to create flow - %s (%d)\n", error.message ?
                 error.message : "no error message", error.type);
