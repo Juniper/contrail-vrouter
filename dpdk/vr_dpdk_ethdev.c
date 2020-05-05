@@ -1003,6 +1003,8 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
     rte_eth_promiscuous_enable(port_id);
 #endif
 
+    rte_spinlock_init(&ethdev->ethdev_lock);
+
     return 0;
 }
 

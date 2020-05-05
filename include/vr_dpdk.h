@@ -33,6 +33,7 @@
 #include <rte_ip.h>
 #include <rte_port_ring.h>
 #include <rte_ethdev.h>
+#include <rte_spinlock.h>
 
 #ifdef PKT_RX_VLAN_PKT
 #define PKT_RX_VLAN PKT_RX_VLAN_PKT
@@ -599,6 +600,8 @@ struct vr_dpdk_ethdev {
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
     /* Vif interface Id */
     uint8_t ethdev_vif_idx;
+    /* Port lock. */
+    rte_spinlock_t ethdev_lock;
 };
 
 /* Tapdev configuration. */
