@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "0031a2ca_b49df65d",
+        "filename": "tests/test_tcp_rst_0.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2020-05-06T05:24:24Z",
+      "side": 1,
+      "message": "It is possible but we have to kill the dpdk process after first test case and launch a new one with flag enabled for the second test case",
+      "parentUuid": "23d536e5_fad2ae46",
+      "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "bec31b2e_8eb5a75c",
         "filename": "tests/test_tcp_rst_0.py",
         "patchSetId": 2
@@ -30,6 +48,24 @@
       "writtenOn": "2020-05-06T04:59:07Z",
       "side": 1,
       "message": "Can we avoid hardcoding the paths in the test case? Can you just do flow get using some flow api eg: flow_get(flow_index) ? If there is no such api, lets add one.",
+      "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "12335a40_cde933b7",
+        "filename": "tests/test_tcp_rst_0.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2020-05-06T05:24:24Z",
+      "side": 1,
+      "message": "As I found out from manish there is no api to get flow, which is why I did it this way. But I think it is possible to add one",
+      "parentUuid": "bec31b2e_8eb5a75c",
       "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
