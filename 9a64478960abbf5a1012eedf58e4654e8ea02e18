@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "23d536e5_fad2ae46",
+        "filename": "tests/test_tcp_rst_0.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-06T04:59:07Z",
+      "side": 1,
+      "message": "It seems just for setting or resetting the flag you are creating 2 test case files. Can you combine them into a single file and just set or reset the flag accordingly?",
+      "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bec31b2e_8eb5a75c",
+        "filename": "tests/test_tcp_rst_0.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-06T04:59:07Z",
+      "side": 1,
+      "message": "Can we avoid hardcoding the paths in the test case? Can you just do flow get using some flow api eg: flow_get(flow_index) ? If there is no such api, lets add one.",
+      "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
