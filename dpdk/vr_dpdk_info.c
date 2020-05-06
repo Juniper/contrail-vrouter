@@ -6,16 +6,21 @@
 #include <vr_os.h>
 #include <vr_types.h>
 #include <vr_packet.h>
+#include <string.h>
 #include "vr_message.h"
 #include "vr_btable.h"
 #include "vr_dpdk.h"
 #include "vrouter.h"
-
 #include <rte_eth_bond.h>
 #include <rte_ethdev.h>
 #include <rte_port_ethdev.h>
 #include <rte_eth_bond_8023ad.h>
 #include <rte_malloc.h>
+
+#include <rte_mempool.h>
+#include <rte_eal_memconfig.h>
+
+#include "rte_mempool.h"
 
 /* NOTE: Callback API's need to be registered in vrouter/include/vr_info.h
  * under VR_INFO_REG(X) macro.
@@ -24,6 +29,7 @@
  *              eg: X(INFO_BOND, info_get_bond)
  */
 
+/* dpdk_info_get_bond provide the bond master & slave information */
 static int
 dpdk_bond_mode_8023ad(VR_INFO_ARGS, int port_id)
 {
@@ -39,26 +45,26 @@ dpdk_bond_mode_8023ad(VR_INFO_ARGS, int port_id)
     ret = rte_eth_bond_8023ad_agg_selection_get(port_id);
     switch(ret) {
         case AGG_COUNT:
-            VI_PRINTF("Aggregator selection policy (ad_select): Count\n\n");
+            VI_PRINTF("Aggregator selection policy (ad_select): Count\n");
             break;
-        case AGG_BANDWIDTH:
-            VI_PRINTF("Aggregator selection policy (ad_select): Bandwidth\n\n");
+        case AGG_BANDWIDTH:   
+            VI_PRINTF("Aggregator selection policy (ad_select): Bandwidth\n");
             break;
         case AGG_STABLE:
-            VI_PRINTF("Aggregator selection policy (ad_select): Stable\n\n");
-            break;
+            VI_PRINTF("Aggregator selection policy (ad_select): Stable\n");
+            break; 
         default:
-            VI_PRINTF("Aggregator selection policy (ad_select): Null\n\n");
+            VI_PRINTF("Aggregator selection policy (ad_select): Null\n");
     }
-
-    return 0;
+    
+    return 0; 
 }
-
+    
 static int
 dpdk_bond_info_mii_status(VR_INFO_ARGS, int port_id, struct rte_eth_link *link)
-{
+{   
     VR_INFO_DEC();
-    char *status[] = {"DOWN", "UP"};
+    char *status[] = {"DOWN", "UP"}; 
 
     VI_PRINTF("MII status: %s\n", status[link->link_status]);
     VI_PRINTF("MII Link Speed: %d\n", link->link_speed);
@@ -68,21 +74,41 @@ dpdk_bond_info_mii_status(VR_INFO_ARGS, int port_id, struct rte_eth_link *link)
 }
 
 static int
-dpdk_bond_info_show_slave(VR_INFO_ARGS, struct vr_dpdk_ethdev *ethdev)
+dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id ,struct vr_dpdk_ethdev *ethdev)
 {
     VR_INFO_DEC();
-    int i, ret, port_id;
+    int i, ret, slave_id;
     char *lacp_rate[] = {"slow", "fast"};
     char *duplex[] = {"half", "full"};
     struct ether_addr mac_addr;
     struct rte_eth_link link;
     char name[VR_INTERFACE_NAME_LEN];
+    struct rte_eth_bond_8023ad_slave_info info;
+
+    slave_id = ethdev->ethdev_slaves[0];
+
+    ret = rte_eth_bond_8023ad_slave_info(port_id, slave_id, &info);
+    if (ret != 0)
+        RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+
+    VI_PRINTF("System priority: %d\n", info.actor.system_priority);
+    VI_PRINTF("System MAC address:" MAC_FORMAT "\n", MAC_VALUE(info.actor.system.addr_bytes));
+    VI_PRINTF("Active Aggregator Info: \n");
+    VI_PRINTF("\tAggregator ID: %d\n", info.agg_port_id);
+    VI_PRINTF("\tNumber of ports: %d \n", ethdev->ethdev_nb_slaves);
+    VI_PRINTF("\tActor Key: %d \n",  info.actor.key);
+    VI_PRINTF("\tPartner Key: %d \n",  info.partner.key );
+    VI_PRINTF("\tPartner Mac Address: "MAC_FORMAT "\n\n", MAC_VALUE(info.partner.system.addr_bytes));
 
     /* Display bond slave inforamtion */
     for(i = 0; i < ethdev->ethdev_nb_slaves; i++) {
-        port_id = ethdev->ethdev_slaves[i];
+        slave_id = ethdev->ethdev_slaves[i];
 
-        ret = rte_eth_dev_get_name_by_port(port_id, name);
+        ret = rte_eth_dev_get_name_by_port(slave_id, name);
+        if (ret != 0)
+            RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+
+        ret = rte_eth_bond_8023ad_slave_info(port_id, slave_id, &info);
         if (ret != 0)
             RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
 
@@ -95,6 +121,8 @@ dpdk_bond_info_show_slave(VR_INFO_ARGS, struct vr_dpdk_ethdev *ethdev)
         if(ret < 0) {
             return VR_INFO_FAILED;
         }
+        VI_PRINTF("Permanent HW addr:" MAC_FORMAT "\n", MAC_VALUE(info.actor.system.addr_bytes))
+        VI_PRINTF("Aggregator ID: %d\n", info.agg_port_id)
 
         VI_PRINTF("Duplex: %s\n", duplex[link.link_duplex]);
 
@@ -104,8 +132,24 @@ dpdk_bond_info_show_slave(VR_INFO_ARGS, struct vr_dpdk_ethdev *ethdev)
                 lacp_rate[rte_eth_bond_lacp_rate_get(port_id)]);
 
         rte_eth_macaddr_get(port_id, &mac_addr);
-        VI_PRINTF("Bond MAC addr:" MAC_FORMAT "\n\n", \
+        VI_PRINTF("Bond MAC addr:" MAC_FORMAT "\n", \
                 MAC_VALUE(mac_addr.addr_bytes));
+
+	VI_PRINTF("Details actor lacp pdu: \n");
+        VI_PRINTF("\tsystem priority: %d \n", info.actor.system_priority);
+        VI_PRINTF("\tsystem mac address:" MAC_FORMAT "\n", MAC_VALUE(info.actor.system.addr_bytes));
+        VI_PRINTF("\tport key: %d \n", info.actor.key);
+        VI_PRINTF("\tport priority: %d \n", info.actor.port_priority);
+        VI_PRINTF("\tport number: %d \n", info.actor.port_number );
+        VI_PRINTF("\tport state: %d \n",  info.actor_state);
+
+        VI_PRINTF("Details partner lacp pdu: \n");
+        VI_PRINTF("\tsystem priority: %d \n", info.partner.system_priority);
+        VI_PRINTF("\tsystem mac address:" MAC_FORMAT "\n", MAC_VALUE(info.partner.system.addr_bytes));
+        VI_PRINTF("\tport key: %d \n", info.partner.key);
+        VI_PRINTF("\tport priority: %d \n", info.partner.port_priority);
+        VI_PRINTF("\tport number: %d \n", info.partner.port_number );
+        VI_PRINTF("\tport state: %d \n\n",  info.partner_state);
     }
     return 0;
 }
@@ -172,7 +216,7 @@ dpdk_bond_info_show_master(VR_INFO_ARGS, int port_id,
 
     VI_PRINTF("Up Delay (ms): %d\n", \
             rte_eth_bond_link_up_prop_delay_get(port_id));
-    VI_PRINTF("Down Delay (ms): %d\n", \
+    VI_PRINTF("Down Delay (ms): %d\n\n", \
             rte_eth_bond_link_down_prop_delay_get(port_id));
 
     if(bond_mode == BONDING_MODE_8023AD) {
@@ -193,7 +237,7 @@ dpdk_info_get_bond(VR_INFO_ARGS)
     int ret;
 
     /* If output buffer size(--buffsz) is sent from CLI, then allocate with
-     * that size else allocate with default size */
+ *      * that size else allocate with default size */
     VR_INFO_BUF_INIT();
 
     /* Get the port_id for master, Incase of non-bond devices, it return here */
@@ -218,7 +262,7 @@ dpdk_info_get_bond(VR_INFO_ARGS)
         return VR_INFO_FAILED;
     }
 
-    ret = dpdk_bond_info_show_slave(VR_INFO_PASS_ARGS, ethdev);
+    ret = dpdk_bond_info_show_slave(VR_INFO_PASS_ARGS, port_id, ethdev);
     if(ret < 0) {
         return VR_INFO_FAILED;
     }
@@ -227,3 +271,334 @@ dpdk_info_get_bond(VR_INFO_ARGS)
  }
 
 
+int
+dpdk_info_get_lacp(VR_INFO_ARGS){
+
+    uint16_t port_id, slave_id;
+    struct vr_dpdk_ethdev *ethdev;
+    int i, ret;
+    char *lacp_rate[] = {"slow", "fast"};
+    char name[VR_INTERFACE_NAME_LEN];
+    struct rte_eth_bond_8023ad_conf conf;
+    struct rte_eth_bond_8023ad_slave_info info;
+
+    VR_INFO_BUF_INIT();
+
+    /* Get the port_id for master, Incase of non-bond devices, it return here. */
+    port_id = dpdk_find_port_id_by_drv_name();
+    if (port_id == VR_DPDK_INVALID_PORT_ID) {
+        RTE_LOG(ERR, VROUTER, "Port Id is invalid\n");
+        return -1;
+    }
+
+    /* Check LACP protocol is configured for the bond interface. */
+    VI_PRINTF("LACP Rate: %s\n\n", \
+                lacp_rate[rte_eth_bond_lacp_rate_get(port_id)]);
+
+    ret = rte_eth_bond_8023ad_conf_get(port_id, &conf);
+    
+    VI_PRINTF("Fast periodic (ms): %d\n" , conf.fast_periodic_ms);
+    VI_PRINTF("Slow periodic (ms): %d\n", conf.slow_periodic_ms);
+    VI_PRINTF("Short timeout (ms): %d\n", conf.short_timeout_ms);
+    VI_PRINTF("Long timeout (ms): %d\n", conf.long_timeout_ms);
+    VI_PRINTF("Aggregate wait timeout (ms): %d\n", conf.aggregate_wait_timeout_ms);
+    VI_PRINTF("Tx period (ms): %d\n", conf.tx_period_ms );
+    VI_PRINTF("Update timeout (ms): %d\n", conf.update_timeout_ms);
+    VI_PRINTF("Rx marker period (ms): %d\n\n", conf.rx_marker_period_ms);
+    
+    ethdev = &vr_dpdk.ethdevs[port_id];
+    if (ethdev->ethdev_ptr == NULL)
+        RTE_LOG(ERR, VROUTER, "Ethdev not available\n");
+
+    slave_id = ethdev->ethdev_slaves[0];
+
+    ret = rte_eth_bond_8023ad_slave_info(port_id, slave_id, &info);
+    if (ret != 0)
+        RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+    
+    /* Displaying bond slave inforamtion */
+    
+    for(i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+        slave_id = ethdev->ethdev_slaves[i];
+	
+	ret = rte_eth_dev_get_name_by_port(slave_id, name);
+        if (ret != 0)
+            RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+        
+	ret = rte_eth_bond_8023ad_slave_info(port_id, slave_id, &info);
+        if (ret != 0)
+            RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+
+        VI_PRINTF("Slave Interface(%d): %s \n", i, name);
+	VI_PRINTF("Details actor lacp pdu: \n");
+        VI_PRINTF("\tport state: %d \n",  info.actor_state);
+
+        VI_PRINTF("Details partner lacp pdu: \n");
+        VI_PRINTF("\tport state: %d \n\n",  info.partner_state);
+
+    }
+    return 0;
+}
+
+static void
+walk_cb(struct rte_mempool *mp, void *arg __rte_unused)
+{
+    vr_info_t *msg_req = (vr_info_t *)arg;
+    VR_INFO_DEC();
+
+#undef VR_INFO_FAILED
+#define VR_INFO_FAILED
+    VI_PRINTF("%-20s\t", mp->name);
+    VI_PRINTF("%d\t", mp->size);
+    VI_PRINTF("%d\t", rte_mempool_in_use_count(mp));
+    VI_PRINTF("%d\t\n", rte_mempool_avail_count(mp));
+
+#undef VR_INFO_FAILED
+#define VR_INFO_FAILED -1
+        return ;
+
+}
+
+
+
+int
+dpdk_info_get_mempool(VR_INFO_ARGS)
+{
+    VR_INFO_BUF_INIT();
+    int reqd_mempool = 1;
+    struct rte_mempool *mp = NULL;
+    struct rte_mempool_memhdr *memhdr;
+    unsigned common_count;
+    unsigned cache_count;
+    unsigned lcore_id;
+    unsigned count = 0;
+    size_t mem_len = 0;
+    char col_names[] = "Name\t\t\tSize\tUsed\tAvailable";
+    int col_size = (sizeof(col_names) / sizeof(col_names[0])) + 25;
+    char seperator[col_size + 10];
+
+    if (strcmp(msg_req->inbuf, "all") == 0) {
+	reqd_mempool = 0;
+    }
+    switch(reqd_mempool){
+        case 0:
+    	    memset(seperator , '-', col_size);
+            seperator[col_size]='\0';
+            VI_PRINTF("%s\n", seperator);
+            VI_PRINTF("%s\n", col_names);
+    	    VI_PRINTF("%s\n", seperator);
+           rte_mempool_walk(walk_cb, msg_req);
+           VI_PRINTF("\n\n");
+           break;
+        case 1:
+            mp = rte_mempool_lookup(msg_req->inbuf);
+	    if (mp == NULL)
+		 RTE_LOG(ERR, VROUTER, "Mempool name does not exists.\n");
+
+	    VI_PRINTF("%s\n", mp->name);
+	    VI_PRINTF("flags = %x\n", mp->flags);
+            VI_PRINTF("nb_mem_chunks = %u\n", mp->nb_mem_chunks);
+            VI_PRINTF("size = %"PRIu32"\n", mp->size);
+            VI_PRINTF("populated_size = %"PRIu32"\n", mp->populated_size);
+            VI_PRINTF("header_size = %"PRIu32"\n", mp->header_size);
+            VI_PRINTF("elt_size = %"PRIu32"\n", mp->elt_size);
+            VI_PRINTF("trailer_size = %"PRIu32"\n", mp->trailer_size);
+	    VI_PRINTF("total_obj_size = %"PRIu32"\n", mp->header_size + mp->elt_size + mp->trailer_size);
+	    VI_PRINTF("private_data_size = %"PRIu32"\n", mp->private_data_size);
+
+            STAILQ_FOREACH(memhdr, &mp->mem_list, next)
+                mem_len += memhdr->len;
+            if (mem_len != 0) {
+                VI_PRINTF("avg bytes/object = %#Lf\n",(long double)mem_len / mp->size);
+	    }
+
+
+            VI_PRINTF("Internal cache infos:\n");
+            VI_PRINTF("\tcache_size=%"PRIu32"\n", mp->cache_size);
+
+            if (mp->cache_size == 0)
+                count = 0;
+	    else{
+        	for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++) {
+                	cache_count = mp->local_cache[lcore_id].len;
+                if (cache_count != 0){
+                VI_PRINTF("\tcache_count[%u]=%"PRIu32"\n", lcore_id, cache_count);}
+                count += cache_count;
+            }
+            }
+            VI_PRINTF("total_cache_count=%u\n", count);
+            common_count = rte_mempool_ops_get_count(mp);
+            if ((cache_count + common_count) > mp->size)
+                  common_count = mp->size - cache_count;
+            VI_PRINTF("common_pool_count=%u\n\n", common_count);
+	    break;
+
+ }
+    return 0;
+}
+
+
+int
+display_eth_stats(VR_INFO_ARGS, struct rte_eth_stats eth_stats){
+    
+    VR_INFO_DEC();
+    int i, queue_size;
+    char seperator[100];
+
+    VI_PRINTF("RX Device Packets:%"PRId64", Bytes:%"PRId64", Errors:%"PRId64", Nombufs:%"PRId64"\n", eth_stats.ipackets, eth_stats.ibytes, eth_stats.ierrors, eth_stats.rx_nombuf);
+    VI_PRINTF("Dropped RX Packets:%"PRId64"\n", eth_stats.imissed);
+    VI_PRINTF("TX Device Packets:%"PRId64", Bytes:%"PRId64", Errors:%"PRId64"\n", eth_stats.opackets, eth_stats.obytes, eth_stats.oerrors);
+ 
+    queue_size =  sizeof(eth_stats.q_ipackets) / sizeof(eth_stats.q_ipackets[0]);
+    memset(seperator , '-', 60);
+    seperator[60]='\0';
+    
+    VI_PRINTF("%s", "Queue Rx:");
+    for(i = 0; i<queue_size; i++){
+        if(eth_stats.q_ipackets[i] != 0){
+		VI_PRINTF(" [%d]", i);
+		VI_PRINTF("%"PRId64" ", eth_stats.q_ipackets[i]);}
+    }
+    VI_PRINTF("\n");
+
+    VI_PRINTF("%s", "      Tx:");
+    for(i = 0; i<queue_size; i++){
+	if(eth_stats.q_opackets[i] != 0){
+		VI_PRINTF(" [%d]", i);
+		VI_PRINTF("%"PRId64" ", eth_stats.q_opackets[i]);}
+    }
+    VI_PRINTF("\n");
+
+    VI_PRINTF("%s", "      Rx Bytes:");
+    for(i = 0; i<queue_size; i++){
+	if(eth_stats.q_ibytes[i] != 0){
+		VI_PRINTF(" [%d]", i);
+     	   	VI_PRINTF("%"PRId64" ", eth_stats.q_ibytes[i]);}
+    }
+    VI_PRINTF("\n");
+
+    VI_PRINTF("%s", "      Tx Bytes:");
+    for(i = 0; i<queue_size; i++){
+        if(eth_stats.q_obytes[i] != 0){
+                VI_PRINTF(" [%d]", i);
+        	VI_PRINTF("%"PRId64" ", eth_stats.q_obytes[i]);}
+    }
+    VI_PRINTF("\n");
+
+    VI_PRINTF("%s", "      Errors:");
+    for(i = 0; i<queue_size; i++){
+    if(eth_stats.q_errors[i] != 0){
+                VI_PRINTF(" [%d]", i);
+		VI_PRINTF("%"PRId64" ", eth_stats.q_errors[i]);}
+    }
+    VI_PRINTF("\n");
+    VI_PRINTF("%s\n\n", seperator);
+    return 0;
+}
+
+int 
+display_xstats(VR_INFO_ARGS, uint16_t port_id){
+    
+    VR_INFO_DEC();
+    struct rte_eth_xstat_name *xstats_names;
+    uint64_t *values;
+    int xstats_count, ret, i;
+
+    xstats_count = rte_eth_xstats_get_names_by_id(port_id, NULL, 0, NULL);
+    if (xstats_count < 0) {
+	VI_PRINTF("Cannot get xstats count\n");
+	return -1;
+    }
+    values = malloc(sizeof(*values) * xstats_count);
+    if (values == NULL) {
+	VI_PRINTF("Cannot allocate memory for xstats\n");
+	return -1;
+    }
+
+    xstats_names = malloc(sizeof(struct rte_eth_xstat_name) * xstats_count);
+    if (xstats_names == NULL) {
+	VI_PRINTF("Cannot allocate memory for xstat names\n");
+	free(values);
+	return -1;
+    }
+    if (xstats_count != rte_eth_xstats_get_names_by_id(port_id, xstats_names, xstats_count, NULL)) {
+        VI_PRINTF("Cannot get xstat names\n");
+	goto err;
+	return -1;
+    }
+
+    ret = rte_eth_xstats_get_by_id(port_id, NULL, values, xstats_count);
+    if (ret < 0 || ret > xstats_count) {
+	VI_PRINTF("Cannot get xstats\n");
+	goto err;
+	return -1;
+    }
+
+    for(i = 0; i < xstats_count; i++){
+	if (values[i] != 0) 
+	    VI_PRINTF("%s: %"PRIu64"\n", xstats_names[i].name,values[i]);
+    }
+    VI_PRINTF("\n")
+
+err:
+    free(values);
+    free(xstats_names);
+
+    return 0;
+}
+
+int
+dpdk_info_get_stats(VR_INFO_ARGS){
+   
+    uint16_t port_id, slave_id;
+    int i, ret;
+    struct rte_eth_stats eth_stats;
+    struct vr_dpdk_ethdev *ethdev;
+    char name[VR_INTERFACE_NAME_LEN];
+
+    VR_INFO_BUF_INIT();
+
+    port_id = dpdk_find_port_id_by_drv_name();
+            if (port_id == VR_DPDK_INVALID_PORT_ID) {
+                 RTE_LOG(ERR, VROUTER, "Port Id is invalid\n");
+                 return -1;
+            }
+
+    /* Get the ethdev for master port. */
+    ethdev = &vr_dpdk.ethdevs[port_id];
+    if (ethdev->ethdev_ptr == NULL)
+            RTE_LOG(ERR, VROUTER, "Ethdev not available\n");
+ 
+    if (rte_eth_stats_get(port_id, &eth_stats) != 0)
+               return -1;
+    
+    VI_PRINTF("Master Info: \n");
+    if (strcmp(msg_req->inbuf, "eth") == 0)
+	 display_eth_stats(msg_req, eth_stats);
+    else if (strcmp(msg_req->inbuf, "xstats") == 0)
+	 display_xstats(msg_req, port_id);
+    else
+	return -1;
+    
+    /* Displaying slave stats */
+    for(i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+	slave_id = ethdev->ethdev_slaves[i];
+	ret = rte_eth_dev_get_name_by_port(slave_id, name);
+	if (ret != 0)
+		RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+
+	VI_PRINTF("Slave Info(%s): \n", name);
+	if (rte_eth_stats_get(slave_id, &eth_stats) != 0)
+	    return -1;
+	
+	if (strcmp(msg_req->inbuf, "eth") == 0)
+		display_eth_stats(msg_req, eth_stats);
+	else if (strcmp(msg_req->inbuf, "xstats") == 0)
+	 	display_xstats(msg_req, slave_id);
+	else
+		return -1;
+    }
+
+    return 0;
+}
+                                                                            
