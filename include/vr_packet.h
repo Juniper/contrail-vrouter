@@ -212,7 +212,8 @@ struct vr_packet {
     unsigned char vp_ttl;
     unsigned char vp_queue;
     unsigned char vp_priority:4,
-                  vp_notused:4;
+                  vp_send_thru_vrouter:1,
+                  vp_notused:3;
 };
 
 
