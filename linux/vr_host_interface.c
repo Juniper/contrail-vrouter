@@ -202,9 +202,6 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         goto exit_rx;
     }
 
-    (void)__sync_fetch_and_add(&dev->stats.rx_bytes, skb->len);
-    (void)__sync_fetch_and_add(&dev->stats.rx_packets, 1);
-
     /* this is only needed for mirroring */
     if ((pkt->vp_flags & VP_FLAG_FROM_DP) &&
             (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
@@ -225,7 +222,16 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 
     skb->protocol = eth_type_trans(skb, dev);
     skb->pkt_type = PACKET_HOST;
-    rc = netif_rx(skb);
+
+    if(pkt->vp_send_thru_vrouter) {
+        pkt->vp_send_thru_vrouter = false;
+        return RX_HANDLER_PASS;
+    } else {
+        // Check if this case needs to be supported
+        (void)__sync_fetch_and_add(&dev->stats.rx_bytes, skb->len);
+        (void)__sync_fetch_and_add(&dev->stats.rx_packets, 1);
+        rc = netif_rx(skb);
+    }
 
 exit_rx:
     return RX_HANDLER_CONSUMED;
@@ -1263,9 +1269,16 @@ linux_rx_handler(struct sk_buff **pskb)
         }
     }
 
+    pkt->vp_send_thru_vrouter = true;
     ret = vif->vif_rx(vif, pkt, vlan_id);
+
     if (!ret)
         ret = RX_HANDLER_CONSUMED;
+
+    if(ret && !pkt->vp_send_thru_vrouter) {
+        skb->dev = dev;
+        return RX_HANDLER_PASS;
+    }
 
     return ret;
 
