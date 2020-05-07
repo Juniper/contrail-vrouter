@@ -225,7 +225,13 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 
     skb->protocol = eth_type_trans(skb, dev);
     skb->pkt_type = PACKET_HOST;
-    rc = netif_rx(skb);
+
+    if(pkt->vp_send_thru_vrouter) {
+        return RX_HANDLER_PASS;
+    } else {
+        // Check if this case needs to be supported
+        rc = netif_rx(skb);
+    }
 
 exit_rx:
     return RX_HANDLER_CONSUMED;
@@ -334,6 +340,9 @@ static int
 linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
         unsigned short type)
 {
+    struct vr_packet *pkt = (struct vr_packet *)skb->cb;
+    pkt->vp_send_thru_vrouter = true;
+
     if (vif->vif_type == VIF_TYPE_VIRTUAL &&
             skb->ip_summed == CHECKSUM_NONE)
         skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -1263,8 +1272,12 @@ linux_rx_handler(struct sk_buff **pskb)
         }
     }
 
+    pkt->vp_send_thru_vrouter = true;
     ret = vif->vif_rx(vif, pkt, vlan_id);
-    if (!ret)
+
+    if (ret == RX_HANDLER_PASS) {
+        skb->dev = dev;
+    } else if (!ret)
         ret = RX_HANDLER_CONSUMED;
 
     return ret;
