@@ -202,15 +202,12 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
         goto exit_rx;
     }
 
-    (void)__sync_fetch_and_add(&dev->stats.rx_bytes, skb->len);
-    (void)__sync_fetch_and_add(&dev->stats.rx_packets, 1);
-
     /* this is only needed for mirroring */
     if ((pkt->vp_flags & VP_FLAG_FROM_DP) &&
             (pkt->vp_flags & VP_FLAG_CSUM_PARTIAL)) {
-    	network_off = pkt_get_network_header_off(pkt);
-    	ip = (struct vr_ip *)(pkt_data_at_offset(pkt, network_off));
-    	transport_off = network_off + (ip->ip_hl * 4);
+        network_off = pkt_get_network_header_off(pkt);
+        ip = (struct vr_ip *)(pkt_data_at_offset(pkt, network_off));
+        transport_off = network_off + (ip->ip_hl * 4);
 
         if (ip->ip_proto == VR_IP_PROTO_TCP)
             cksum_off = offsetof(struct vr_tcp, tcp_csum);
@@ -225,7 +222,16 @@ linux_if_rx(struct vr_interface *vif, struct vr_packet *pkt)
 
     skb->protocol = eth_type_trans(skb, dev);
     skb->pkt_type = PACKET_HOST;
-    rc = netif_rx(skb);
+
+    if(pkt->vp_send_thru_vrouter) {
+        pkt->vp_send_thru_vrouter = false;
+        return RX_HANDLER_PASS;
+    } else {
+        // Check if this case needs to be supported
+        (void)__sync_fetch_and_add(&dev->stats.rx_bytes, skb->len);
+        (void)__sync_fetch_and_add(&dev->stats.rx_packets, 1);
+        rc = netif_rx(skb);
+    }
 
 exit_rx:
     return RX_HANDLER_CONSUMED;
@@ -334,6 +340,9 @@ static int
 linux_xmit(struct vr_interface *vif, struct sk_buff *skb,
         unsigned short type)
 {
+    struct vr_packet *pkt = (struct vr_packet *)skb->cb;
+    pkt->vp_send_thru_vrouter = true;
+
     if (vif->vif_type == VIF_TYPE_VIRTUAL &&
             skb->ip_summed == CHECKSUM_NONE)
         skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -1263,9 +1272,15 @@ linux_rx_handler(struct sk_buff **pskb)
         }
     }
 
+    pkt->vp_send_thru_vrouter = true;
     ret = vif->vif_rx(vif, pkt, vlan_id);
-    if (!ret)
+
+    if (!pkt->vp_send_thru_vrouter) {
+        skb->dev = dev;
+        return RX_HANDLER_PASS;
+    } else if (!ret) {
         ret = RX_HANDLER_CONSUMED;
+    }
 
     return ret;
 
