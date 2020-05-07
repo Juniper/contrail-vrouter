@@ -60,6 +60,7 @@ extern int lh_enqueue_to_assembler(struct vrouter *, struct vr_packet *,
 extern void lh_fragment_sync_assemble(struct vr_fragment_queue_element *);
 extern int vr_assembler_init(void);
 extern void vr_assembler_exit(void);
+extern void vhost_phys_netdev_ops_exit(void);
 
 struct work_arg {
     struct work_struct wa_work;
@@ -2576,6 +2577,7 @@ vr_sysctl_init(void)
 static void
 vrouter_linux_exit(void)
 {
+    vhost_phys_netdev_ops_exit();
     vr_sysctl_exit();
     vr_message_exit();
     vr_assembler_exit();
