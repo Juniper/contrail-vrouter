@@ -27,7 +27,7 @@
  * interfaces which it should put in cross connect. Also, used in cases
  * when physical interface goes away from the system.
  */
-struct vhost_priv **vhost_priv_db;
+static struct vhost_priv *vhost_priv_db[VHOST_MAX_INTERFACES];
 unsigned int vhost_num_interfaces;
 
 extern struct vr_interface vr_reset_interface;
@@ -139,17 +139,102 @@ vhost_rx_handler(struct sk_buff **pskb)
     if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
         return RX_HANDLER_PASS;
 
-    skb->dev = vdev;
     *pskb = skb;
 
     (void)__sync_fetch_and_add(&vdev->stats.rx_bytes, skb->len);
     (void)__sync_fetch_and_add(&vdev->stats.rx_packets, 1);
 
-
-    return RX_HANDLER_ANOTHER;
+    return RX_HANDLER_PASS;
 }
 #endif
 
+static struct vhost_priv *
+vhost_get_priv_for_phys(struct net_device *dev)
+{
+    int i;
+    struct vhost_priv *vp;
+
+    for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
+        vp = vhost_priv_db[i];
+        if (vp)
+            if (vp->vp_phys_dev == dev)
+                return vp;
+    }
+
+    return NULL;
+}
+
+static int phys_start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+    int i;
+    struct vhost_priv *vp;
+    struct vr_interface *vifp;
+    struct vr_packet *pkt;
+
+    // Typically only one vhost interface, so loop terminates in one iteration.
+    for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
+        vp = vhost_priv_db[i];
+        if (vp && !strncmp(dev->name, vp->vp_phys_name, VR_INTERFACE_NAME_LEN)) {
+            vifp = vp->vp_vifp;
+            pkt = (struct vr_packet *)skb->cb;
+            if (!vifp || pkt->vp_send_thru_vrouter) {
+                return vp->orig_phys_dev_ops->ndo_start_xmit(skb, dev);
+            } else {
+                pkt->vp_send_thru_vrouter = true;
+                return linux_to_vr(vifp, skb);
+            }
+        }
+    }
+
+    kfree_skb(skb);
+    printk(KERN_WARNING "vp_phys_name not found: %s %d\n", __FUNCTION__, __LINE__);
+    return NETDEV_TX_OK;
+}
+
+static void set_phys_start_xmit(struct vhost_priv *vp, struct net_device *pdev)
+{
+    int (*custom_phys_start_xmit_ptr)(struct sk_buff *skb, struct net_device *dev) =
+         &phys_start_xmit;
+
+    // rtnl lock held
+
+    // Copy the original physical netdev_ops in vhost0 netdev priv context
+    memcpy(&vp->phys_dev_ops, pdev->netdev_ops, sizeof(vp->phys_dev_ops));
+
+    // Overwrite phys ndo_start_xmit() with a custom version that sends the packet
+    // thru. vrouter tx pipeline
+    vp->phys_dev_ops.ndo_start_xmit = custom_phys_start_xmit_ptr;
+
+    // Save the original netdev_ops
+    vp->orig_phys_dev_ops = (struct net_device_ops *)pdev->netdev_ops;
+
+    // Update the physical netdev_ops with the custom set
+    WRITE_ONCE(pdev->netdev_ops, &vp->phys_dev_ops);
+}
+
+static void reset_phys_start_xmit(struct vhost_priv *vp, struct net_device *pdev)
+{
+    // Recover the original netdev_ops
+    if (READ_ONCE(vp->orig_phys_dev_ops))
+        WRITE_ONCE(pdev->netdev_ops, vp->orig_phys_dev_ops);
+}
+
+void vhost_phys_netdev_ops_exit(void)
+{
+    int i;
+    struct vhost_priv *vp;
+
+    rtnl_lock();
+
+    for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
+        vp = vhost_priv_db[i];
+        if(vp && vp->vp_phys_dev && vp->orig_phys_dev_ops) {
+            WRITE_ONCE(vp->vp_phys_dev->netdev_ops, vp->orig_phys_dev_ops);
+        }
+    }
+
+    rtnl_unlock();
+}
 
 void
 vhost_del_tap_phys(struct net_device *pdev)
@@ -267,6 +352,7 @@ vhost_if_add(struct vr_interface *vif)
             if (i < VHOST_MAX_INTERFACES) {
                 vp->vp_db_index = i;
                 vhost_priv_db[i] = vp;
+                set_phys_start_xmit(vp, vp->vp_phys_dev);
             } else {
                 vr_printf("%s not added to vhost database. ",
                         vp->vp_dev->name);
@@ -284,9 +370,6 @@ vhost_attach_phys(struct net_device *dev)
     int i;
     struct vhost_priv *vp;
 
-    if (!vhost_priv_db)
-        return;
-
     for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
         vp = vhost_priv_db[i];
         if (vp) {
@@ -299,25 +382,6 @@ vhost_attach_phys(struct net_device *dev)
     }
 
     return;
-}
-
-static struct vhost_priv *
-vhost_get_priv_for_phys(struct net_device *dev)
-{
-    int i;
-    struct vhost_priv *vp;
-
-    if (!vhost_priv_db)
-        return NULL;
-
-    for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
-        vp = vhost_priv_db[i];
-        if (vp)
-            if (vp->vp_phys_dev == dev)
-                return vp;
-    }
-
-    return NULL;
 }
 
 struct net_device *
@@ -366,6 +430,7 @@ vhost_detach_phys(struct net_device *dev)
          * if vrouter was left uninited post reset and then the
          * physical interface went away, we need to detach the tap
          */
+        reset_phys_start_xmit(vp, vp->vp_phys_dev);
         vhost_del_tap_phys(vp->vp_phys_dev);
         vp->vp_phys_dev = NULL;
         return;
@@ -380,9 +445,6 @@ vhost_remove_xconnect(void)
     int i;
     struct vhost_priv *vp;
     struct vr_interface *bridge;
-
-    if (!vhost_priv_db)
-        return;
 
     for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
         vp = vhost_priv_db[i];
@@ -411,9 +473,6 @@ vhost_xconnect(void)
     struct vhost_priv *vp;
     struct vr_interface *bridge;
 
-    if (!vhost_priv_db)
-        return;
-
     for (i = 0; i < VHOST_MAX_INTERFACES; i++) {
         vp = vhost_priv_db[i];
         if (vp) {
@@ -434,6 +493,9 @@ vhost_dev_xmit(struct sk_buff *skb, struct net_device *dev)
     struct vhost_priv *vp;
     struct vr_interface *vifp;
     struct net_device *pdev;
+
+    struct vr_packet *pkt = (struct vr_packet *)skb->cb;
+    pkt->vp_send_thru_vrouter = true;
 
     vp = netdev_priv(dev);
     vifp = vp->vp_vifp;
@@ -520,12 +582,13 @@ vhost_dellink(struct net_device *dev, struct list_head *head)
 
     vp = netdev_priv(dev);
     if (vp) {
-        if (vhost_priv_db && vp->vp_db_index >= 0)
+        if (vp->vp_db_index >= 0)
             vhost_priv_db[vp->vp_db_index] = NULL;
 
         vp->vp_db_index = -1;
 
         if (vp->vp_phys_dev) {
+            reset_phys_start_xmit(vp, vp->vp_phys_dev);
             vhost_del_tap_phys(vp->vp_phys_dev);
             vp->vp_phys_dev = NULL;
         }
@@ -598,10 +661,6 @@ void
 vhost_exit(void)
 {
     vhost_netlink_exit();
-    if (vhost_priv_db) {
-        kfree(vhost_priv_db);
-        vhost_priv_db = NULL;
-    }
 
     return;
 }
@@ -609,13 +668,5 @@ vhost_exit(void)
 int
 vhost_init(void)
 {
-    if (!vhost_priv_db) {
-        vhost_priv_db =
-            kzalloc(sizeof(struct vhost_priv *) * VHOST_MAX_INTERFACES,
-                    GFP_KERNEL);
-        if (!vhost_priv_db)
-            return -ENOMEM;
-    }
-
     return vhost_netlink_init();
 }
