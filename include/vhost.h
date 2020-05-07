@@ -26,6 +26,8 @@ struct vhost_priv {
     struct net_device *vp_phys_dev;
     struct vrouter *vp_router;
     struct vr_interface *vp_vifp;
+    struct net_device_ops *orig_phys_dev_ops;
+    struct net_device_ops phys_dev_ops;
     int vp_db_index;
     char vp_phys_name[VR_INTERFACE_NAME_LEN];
 };
