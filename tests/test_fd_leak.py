@@ -26,11 +26,14 @@ class TestFdLeak(unittest.TestCase):
 
     def teardown_method(self, method):
         ObjectBase.tearDown()
+        new_fd_count = int(os.popen(fd_count_cmd).read())
+        print("new_fd_count=" + str(new_fd_count))
+        assert (orig_fd_count == new_fd_count)
 
-    @pytest.mark.skip(
-        reason="failing because of vr_uvh_cl_timer_setup() not setup")
     def test_fd_leak(self):
-
+        # Wait for 3 sec to calculate number of fd's after launching vrouter
+        time.sleep(3)
+        global fd_count_cmd, orig_fd_count
         pid_cmd = 'pidof contrail-vrouter-dpdk'
         pid = os.popen(pid_cmd).read()
         print("pid = " + str(pid))
@@ -68,12 +71,3 @@ class TestFdLeak(unittest.TestCase):
         # each call to this API will simulate VM start + VM stop
         for x in range(3):
             vif.send_packet(pkt)
-
-        # Wait for 3 sec for the packet processing to get complete(Open/Close
-        # fd's)
-        time.sleep(3)
-
-        new_fd_count = int(os.popen(fd_count_cmd).read())
-        print("new_fd_count=" + str(new_fd_count))
-        # Note: 2 additional fds are due to timer fd
-        assert (new_fd_count == orig_fd_count + 2)
