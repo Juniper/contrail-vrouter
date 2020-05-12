@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d474f7ef_1bde096f",
+        "filename": "utils/pylib/object_base.py",
+        "patchSetId": 6
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 705
+      },
+      "writtenOn": "2020-05-12T17:16:19Z",
+      "side": 1,
+      "message": "Can you check this with Yashika, it was like this before and then she changed it. I dont remember the exact reason.",
+      "revId": "c0918cddc2f8aa37c30364053273954debc887f7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
