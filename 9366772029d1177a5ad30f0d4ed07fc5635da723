@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "8e35fce6_7f6a6e69",
+        "filename": "tests/test_tcp_rst.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 173,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2020-05-13T20:33:39Z",
+      "side": 1,
+      "message": "moved this stuff in an api.",
+      "parentUuid": "d11e4305_84e0d2bd",
+      "range": {
+        "startLine": 168,
+        "startChar": 8,
+        "endLine": 173,
+        "endChar": 36
+      },
+      "revId": "9366772029d1177a5ad30f0d4ed07fc5635da723",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "ae0ad0e2_c1bbf575",
         "filename": "tests/test_tcp_rst.py",
         "patchSetId": 3
@@ -54,6 +78,24 @@
       "side": 1,
       "message": "Testcase execution happens in a lexicographic manner. So it happens in the same order everytime.",
       "parentUuid": "ae0ad0e2_c1bbf575",
+      "revId": "9366772029d1177a5ad30f0d4ed07fc5635da723",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "be4a559d_f063e9e5",
+        "filename": "tests/test_tcp_rst.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 176,
+      "author": {
+        "id": 744
+      },
+      "writtenOn": "2020-05-13T20:33:39Z",
+      "side": 1,
+      "message": "Doing it the way you described requires one extra vrouter instance launch",
+      "parentUuid": "d665f91c_ba132e5c",
       "revId": "9366772029d1177a5ad30f0d4ed07fc5635da723",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
