@@ -17,6 +17,10 @@
 /* For sched_getaffinity() */
 #define _GNU_SOURCE
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <stdint.h>
 #include <getopt.h>
 #include <signal.h>
@@ -617,7 +621,7 @@ dpdk_argv_update(void)
                 VR_MAX_CPUS - VR_DPDK_FWD_LCORE_ID);
         return -1;
     }
-    
+
 
     if (vr_dpdk.nb_io_lcores > 1
         && vr_dpdk.nb_fwd_lcores == VR_DPDK_FWD_LCORES_PER_IO*(vr_dpdk.nb_io_lcores - 1)) {
@@ -761,7 +765,7 @@ dpdk_check_rx_mrgbuf_disable(void)
 
 /*
  * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
- *               - Pin the lcore for SR-IOV vf I/O for eth devices. 
+ *               - Pin the lcore for SR-IOV vf I/O for eth devices.
  */
 static void
 dpdk_check_sriov_vf(void)
@@ -1398,6 +1402,14 @@ static cookie_io_functions_t timestamp_log_func = {
 int
 main(int argc, char *argv[])
 {
+    /*Sets the core dump filter for the dpdk process
+     *to avoid data loss during unexpected crash.*/
+    pid_t dpdk_pid;
+    char cd_filter_command[50];
+    dpdk_pid = getpid();
+    snprintf(cd_filter_command, 40, "echo 0x7f > /proc/%d/coredump_filter", dpdk_pid);
+    system(cd_filter_command);
+
     int ret, opt, option_index;
     unsigned int lcore_id;
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
