@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "df409cba_4b6a4a5f",
+        "filename": "tests/test_tcp_rst_0.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-13T06:31:04Z",
+      "side": 1,
+      "message": "Yes, lets see if this is possible. Maybe in the test case teardown, you could call an api to kill vrouter. Also can you make a base class and have the common steps in the test case performed in it? Then you can derive subclasses for your 2 test cases which would just do the extra job of setting/resetting the flag.",
+      "parentUuid": "0031a2ca_b49df65d",
+      "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "bec31b2e_8eb5a75c",
         "filename": "tests/test_tcp_rst_0.py",
         "patchSetId": 2
@@ -66,6 +84,24 @@
       "side": 1,
       "message": "As I found out from manish there is no api to get flow, which is why I did it this way. But I think it is possible to add one",
       "parentUuid": "bec31b2e_8eb5a75c",
+      "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8d404042_a6ad5542",
+        "filename": "tests/test_tcp_rst_0.py",
+        "patchSetId": 2
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-13T06:31:04Z",
+      "side": 1,
+      "message": "Yes, lets write one.",
+      "parentUuid": "12335a40_cde933b7",
       "revId": "9a64478960abbf5a1012eedf58e4654e8ea02e18",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
