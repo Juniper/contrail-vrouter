@@ -17,6 +17,10 @@
 /* For sched_getaffinity() */
 #define _GNU_SOURCE
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <stdint.h>
 #include <getopt.h>
 #include <signal.h>
@@ -617,7 +621,7 @@ dpdk_argv_update(void)
                 VR_MAX_CPUS - VR_DPDK_FWD_LCORE_ID);
         return -1;
     }
-    
+
 
     if (vr_dpdk.nb_io_lcores > 1
         && vr_dpdk.nb_fwd_lcores == VR_DPDK_FWD_LCORES_PER_IO*(vr_dpdk.nb_io_lcores - 1)) {
@@ -761,7 +765,7 @@ dpdk_check_rx_mrgbuf_disable(void)
 
 /*
  * dpdk_check_sriov_vf - check if any of eth devices is a virtual function.
- *               - Pin the lcore for SR-IOV vf I/O for eth devices. 
+ *               - Pin the lcore for SR-IOV vf I/O for eth devices.
  */
 static void
 dpdk_check_sriov_vf(void)
@@ -1400,6 +1404,17 @@ main(int argc, char *argv[])
 {
     int ret, opt, option_index;
     unsigned int lcore_id;
+
+    /*
+     *Set the core dump filter to include shared hugepages so that all the
+     *vrouter related data structures are available in the core file.
+     */
+    pid_t dpdk_pid;
+    char coredump_filter_cmd[50];
+    dpdk_pid = getpid();
+    snprintf(coredump_filter_cmd, 40, "echo 0x7f > /proc/%d/coredump_filter", dpdk_pid);
+    system(coredump_filter_cmd);
+
     vr_dpdk.vlan_tag = VLAN_ID_INVALID;
     strncpy(vr_dpdk.vlan_name, VR_DPDK_VLAN_FWD_DEF_NAME,
         sizeof(vr_dpdk.vlan_name) - 1);
