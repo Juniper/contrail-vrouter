@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d11e4305_84e0d2bd",
+        "filename": "tests/test_tcp_rst.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 173,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-13T15:45:39Z",
+      "side": 1,
+      "message": "This looks messy. Can\u0027t we just have an api in infra to restart vrouter with the required args?\nAlso lets not have any dependency on the order of execution of test cases.",
+      "range": {
+        "startLine": 168,
+        "startChar": 8,
+        "endLine": 173,
+        "endChar": 36
+      },
+      "revId": "9366772029d1177a5ad30f0d4ed07fc5635da723",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ae0ad0e2_c1bbf575",
+        "filename": "tests/test_tcp_rst.py",
+        "patchSetId": 3
+      },
+      "lineNbr": 176,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-13T15:45:39Z",
+      "side": 1,
+      "message": "How can you be sure that test_tcp_reset_0 is executed before this one?\nI think you should have the logic as follows:-\ntest_flow_with_tcp_flag_set \n    - In this testcase, we restart vrouter with tcp flag set\n    - Do remaining steps in your testcase\ntest_flow_without_tcp_flag_set\n    - In this testcase, we restart vrouter without tcp flag set\n    - Do remaining steps in your testcase\nIn this way, there is no dependency on test case execution order.",
+      "revId": "9366772029d1177a5ad30f0d4ed07fc5635da723",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
