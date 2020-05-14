@@ -102,6 +102,14 @@ def parse(cmd):
         logging.info("Using default socket path - {}".format(vtest_path))
     else:
         socket_path = args['socket']
+    #VR_UNIX_PATH_MAX is set as 108
+    if len(socket_path) > (108 - len('dpdk_netlink')):
+        logging.info("Socket path is too long {}, so setting it to /tmp/sock".\
+                format(socket_path))
+        if not os.path.exists('/tmp/sock'):
+            os.makedirs('/tmp/sock')
+        socket_path = os.path.realpath('/tmp/sock')
+
     if not path.exists(socket_path):
         logging.error("socket path not set")
         exit(1)
