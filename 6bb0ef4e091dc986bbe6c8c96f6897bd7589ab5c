@@ -1,0 +1,61 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a82d8601_d448dbe8",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1406,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-14T11:20:26Z",
+      "side": 1,
+      "message": "Can you use the below style for commenting?\n/*\n * your comment goes here\n */\nAlso can you rephrase it as - Set the core dump filter to include shared hugepages so that all the vrouter related data structures are available in the core file.",
+      "revId": "6bb0ef4e091dc986bbe6c8c96f6897bd7589ab5c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2358945e_c1cb6c5e",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1408,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-14T11:20:26Z",
+      "side": 1,
+      "message": "Instead of calling it as cd_filter_command, for better readability, can you call it as coredump_filter_cmd ?",
+      "revId": "6bb0ef4e091dc986bbe6c8c96f6897bd7589ab5c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8e68e82e_0585455e",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1411,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-05-14T11:20:26Z",
+      "side": 1,
+      "message": "Lets move these lines after the declaration of all the variables in this function instead of putting in middle.",
+      "range": {
+        "startLine": 1409,
+        "startChar": 4,
+        "endLine": 1411,
+        "endChar": 30
+      },
+      "revId": "6bb0ef4e091dc986bbe6c8c96f6897bd7589ab5c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
