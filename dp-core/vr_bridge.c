@@ -987,9 +987,11 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
                 vr_pfree(pkt, VP_DROP_L2_NO_ROUTE);
                 return 0;
             }
-            stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
-            if (stats)
-                stats->vrf_uuc_floods++;
+            if (vr_inet_vrf_stats) {
+                stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+                if (stats)
+                    stats->vrf_uuc_floods++;
+            }
 
             /* Treat this unknown unicast packet as multicast */
             pkt->vp_flags |= VP_FLAG_MULTICAST;
