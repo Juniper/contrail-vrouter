@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "23abfb9d_bc6541e0",
+        "filename": "dpdk/dpdk_vrouter.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1258,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2020-05-18T07:42:31Z",
+      "side": 1,
+      "message": "Use #define instead of magic constants.",
+      "revId": "e5af5f8f32662fd24ddb5ad6c255074a89ae3b53",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
