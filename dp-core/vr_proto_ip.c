@@ -274,6 +274,11 @@ vr_forward(struct vrouter *router, struct vr_packet *pkt,
     rt.rtr_req.rtr_marker_size = 0;
 
     nh = vr_inet_route_lookup(fmd->fmd_dvrf, &rt);
+    if (!nh) {
+        PKT_LOG(VP_DROP_INVALID_NH, pkt, 0, VR_PROTO_IP_C, __LINE__);
+        vr_pfree(pkt, VP_DROP_INVALID_NH);
+        return 0;
+    }
     if (rt.rtr_req.rtr_label_flags & VR_RT_LABEL_VALID_FLAG) {
         if (!fmd) {
             vr_init_forwarding_md(&rt_fmd);
@@ -1165,13 +1170,15 @@ vm_arp_request(struct vr_interface *vif, struct vr_packet *pkt,
     unsigned char mac[VR_ETHER_ALEN];
 
     struct vr_arp *sarp;
-    struct vr_vrf_stats *stats;
+    struct vr_vrf_stats *stats = NULL;
     struct vr_route_req rt;
 
     if (fmd->fmd_vlan != VLAN_ID_INVALID)
         return MR_FLOOD;
 
-    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    if (vr_inet_vrf_stats) {
+        stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    }
     /* here we will not check for stats, but will check before use */
 
     sarp = (struct vr_arp *)pkt_data(pkt);
