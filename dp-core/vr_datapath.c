@@ -25,13 +25,14 @@ vr_get_proxy_mac(struct vr_packet *pkt, struct vr_forwarding_md *fmd,
     unsigned char *resp_mac;
     struct vr_nexthop *nh = NULL, *l3_nh = NULL;
     struct vr_interface *vif = pkt->vp_if;
-    struct vr_vrf_stats *stats;
+    struct vr_vrf_stats *stats = NULL;
 
     over_lay = true;
     from_fabric = stitched = flood = hosted_vm = false;
     to_gateway = to_vcp = no_proxy = false;
 
-    stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
+    if (vr_inet_vrf_stats)
+        stats = vr_inet_vrf_stats(fmd->fmd_dvrf, pkt->vp_cpu);
     /* here we will not check for stats, but will check before use */
 
     if (vif->vif_flags & VIF_FLAG_MAC_PROXY) {
