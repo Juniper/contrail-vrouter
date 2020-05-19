@@ -921,11 +921,6 @@ dpdk_exit(void)
     if (pthread_mutex_destroy(&vr_dpdk.if_lock)) {
         RTE_LOG(ERR, VROUTER, "Error destroying interface lock\n");
     }
-
-    if (dpdk_log) {
-        fclose(dpdk_log);
-        dpdk_log = NULL;
-    }
 }
 
 /* Set stop flag for all lcores */
@@ -1509,4 +1504,9 @@ main(int argc, char *argv[])
     dpdk_exit();
 
     rte_exit(ret, "vRouter/DPDK is stopped.\n");
+
+    if (dpdk_log) {
+        fclose(dpdk_log);
+        dpdk_log = NULL;
+    }
 }
