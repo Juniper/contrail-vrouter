@@ -38,12 +38,13 @@ vr_info_callback_register(void)
 void
 vr_info_req_process(void *s_req)
 {
-    int i, ret = 0, buff_sz = 0, max_buff_sz = 0, len = 0;
+    int i, ret = 0, buff_sz = 0, max_buff_sz = 0;
     vr_info_t msg_req;
     vr_info_req *req = (vr_info_req *)s_req;
     vr_info_req resp;
     struct vr_message_dumper *dumper = NULL;
     bool vr_info_last_buf = 0;
+    char *trunc = "\n Message Truncated\n";
 
     if (req->h_op != SANDESH_OP_DUMP) {
         goto generate_response;
@@ -111,9 +112,12 @@ vr_info_req_process(void *s_req)
                             failure for msg %d", req->vdu_msginfo);
                     /* Suppose if message buffer is not completed, we append
                      * "Message Truncated" in the buffer and send to client */
-                    len = sizeof("Message Truncated\n");
-                    snprintf(((msg_req.outbuf + msg_req.outbuf_len) - len),
-                            VR_MESSAGE_PAGE_SIZE, "Message Truncated\n");
+                    if(ret == VR_INFO_MSG_TRUNC) {
+                        snprintf(((msg_req.outbuf + msg_req.outbuf_len) - strlen(trunc)),
+                                VR_MESSAGE_PAGE_SIZE, trunc);
+                    } else {
+                        goto generate_response;
+                    }
                 }
                 /* Copy buffer table id as part of response, so when
                  * dump_pending is true, will callback with same buf table id */

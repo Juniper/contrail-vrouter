@@ -33,11 +33,12 @@ static bool dump_pending = false;
 static int dump_marker = -1;
 /* For supporting multiple CLI clients, Message buffer table id is stored and
  * resend if dump_pending is true */
-/* Optional parameter: buffsz -> Send buffer size for the Output buffer(outbuf) 
+/* Optional parameter: buffsz -> Send buffer size for the Output buffer(outbuf)
  * */
 static int buff_table_id, buffsz;
 
-static int help_set, bond_set, lacp_set, sock_dir_set;
+static int help_set, bond_set, lacp_set, mempool_set, stats_set,
+    xstats_set, lcore_set, sock_dir_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
 /* For few  CLI, Inbuf has to send to vrouter for processing(i.e kind of filter
@@ -50,7 +51,11 @@ enum opt_index {
     HELP_OPT_INDEX,
     BOND_OPT_INDEX,
     LACP_OPT_INDEX,
+    MEMPOOL_OPT_INDEX,
+    STATS_OPT_INDEX,
+    XSTATS_OPT_INDEX,
     BUFFSZ_OPT_INDEX,
+    LCORE_OPT_INDEX,
     SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX,
 };
@@ -59,27 +64,42 @@ static struct option long_options[] = {
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
     [BOND_OPT_INDEX]    =   {"bond",    no_argument,        &bond_set,      1},
     [LACP_OPT_INDEX]    =   {"lacp",    required_argument,        &lacp_set,      1},
+    [MEMPOOL_OPT_INDEX] =   {"mempool", required_argument,        &mempool_set,      1},
+    [STATS_OPT_INDEX]    =   {"stats",    required_argument,        &stats_set,      1},
+    [XSTATS_OPT_INDEX]    =   {"xstats",  optional_argument,        &xstats_set,      1},
+    [LCORE_OPT_INDEX]    =   {"lcore",    no_argument,        &lcore_set,      1},
     [BUFFSZ_OPT_INDEX]  =   {"buffsz",  required_argument,  &buffsz,        1},
     [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
-    [MAX_OPT_INDEX]     =   {NULL,    0,                  0,              0},
+    [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
 static void
 Usage()
 {
     printf("Usage: dpdkinfo [--help]\n");
-    printf("                 --bond|-b                        Show Master/Slave bond information\n");
-    printf("                 --lacp|-l <conf/status/stat/all> Show LACP information from DPDK\n");
-    printf("       Optional: --buffsz  <value>                Send output buffer size\n");
+    printf("                 --bond|-b\
+                                                         Show Master/Slave bond information\n");
+    printf("                 --lacp|-l     <all/conf>\
+                                          Show LACP information from DPDK\n");
+    printf("                 --mempool|-m  <all/<mempool-name>>\
+                                Show Mempool information\n");
+    printf("                 --stats|-n    <eth>\
+                                               Show Stats information\n");
+    printf("                 --xstats|-x   < =all/ =0(Master)/ =1(Slave(0))/ =2(Slave(1))>\
+     Show Extended Stats information\n");
+    printf("                 --lcore|-c\
+                                                        Show Lcore information\n");
+    printf("       Optional: --buffsz      <value>\
+                                             Send output buffer size\n");
     exit(-EINVAL);
 }
 
 static void
 validate_options(void)
 {
-    if(!(bond_set || lacp_set)) {
+    if(!(bond_set || lacp_set || mempool_set ||
+        stats_set || xstats_set || lcore_set))
         Usage();
-    }
 
     return;
 }
@@ -131,7 +151,23 @@ parse_long_opts(int opt_index, char *opt_arg)
         msginfo = INFO_BOND;
         break;
     case LACP_OPT_INDEX:
-    //    msginfo = INFO_LACP;
+        msginfo = INFO_LACP;
+        vr_info_inbuf = opt_arg;
+        break;
+    case MEMPOOL_OPT_INDEX:
+        msginfo = INFO_MEMPOOL;
+        vr_info_inbuf = opt_arg;
+        break;
+    case STATS_OPT_INDEX:
+        msginfo = INFO_STATS;
+        vr_info_inbuf = opt_arg;
+        break;
+    case XSTATS_OPT_INDEX:
+        msginfo = INFO_XSTATS;
+        vr_info_inbuf = opt_arg;
+        break;
+    case LCORE_OPT_INDEX:
+        msginfo = INFO_LCORE;
         vr_info_inbuf = opt_arg;
         break;
     case SOCK_DIR_OPT_INDEX:
@@ -160,19 +196,16 @@ vr_get_dpdkinfo(struct nl_client *cl)
 op_retry:
     ret = vr_send_info_dump(cl, 0, dump_marker, buff_table_id, msginfo, buffsz,
             vr_info_inbuf);
-    if (ret < 0) {
+    if (ret < 0)
         return ret;
-    }
 
     ret = vr_recvmsg(cl, dump);
-    if (ret <= 0) {
+    if (ret <= 0)
         return ret;
-    }
 
     /* Will loop through till it reaches end of buffer */
-    if (dump_pending) {
+    if (dump_pending)
         goto op_retry;
-    }
     return 0;
 }
 
@@ -187,7 +220,7 @@ main(int argc, char *argv[])
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "h:b:l:s:",
+    while (((opt = getopt_long(argc, argv, "h:b:l:m:s:n:x:c:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 'b':
@@ -198,13 +231,37 @@ main(int argc, char *argv[])
 
         case 'l':
             lacp_set = 1;
-            //msginfo = INFO_LACP;
+            msginfo = INFO_LACP;
             parse_long_opts(LACP_OPT_INDEX, optarg);
+            break;
+
+        case 'm':
+            mempool_set = 1;
+            msginfo = INFO_MEMPOOL;
+            parse_long_opts(MEMPOOL_OPT_INDEX, optarg);
+            break;
+
+	case 'n':
+            stats_set = 1;
+            msginfo = INFO_STATS;
+            parse_long_opts(STATS_OPT_INDEX, optarg);
             break;
 
         case 's':
             sock_dir_set = 1;
             parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+            break;
+
+        case 'x':
+            xstats_set = 1;
+            msginfo = INFO_XSTATS;
+            parse_long_opts(XSTATS_OPT_INDEX, optarg);
+            break;
+
+        case 'c':
+            lcore_set = 1;
+            msginfo = INFO_LCORE;
+            parse_long_opts(LCORE_OPT_INDEX, optarg);
             break;
 
         case 0:
@@ -224,9 +281,8 @@ main(int argc, char *argv[])
     }
 
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
-    if (!cl) {
+    if (!cl)
         return -1;
-    }
 
     vr_get_dpdkinfo(cl);
 
