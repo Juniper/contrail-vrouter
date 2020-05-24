@@ -1,0 +1,345 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "324671bd_a44eebe6",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "rte_mempool is included twice here, Remove one and rte_eal_memconfig.h not required",
+      "range": {
+        "startLine": 24,
+        "startChar": 0,
+        "endLine": 24,
+        "endChar": 0
+      },
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "073a19fb_02ea4348",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Remove the empty highlighted spaces throughout the file",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9520fabb_789e4ec4",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "These information to be displayed as part of master. so keep it as part of dpdk_bond_info_show_master",
+      "range": {
+        "startLine": 94,
+        "startChar": 0,
+        "endLine": 101,
+        "endChar": 101
+      },
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "80d84e11_510a3c7d",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 240,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Take care of formatting.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0a13ecdb_a77c70ab",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 274,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Make it as static function and also take care in other places.\nFor functions, Keep the open braces on next line.\nstatic int \ndisplay_lacp_conf(VR_INFO_ARGS, uint16_t port_id)\n{",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e9ee8db5_d45873a9",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 321,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Take care of indentation throughout the file.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d2df0ded_0690e22c",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 323,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Why this line ?",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cd23e0c8_e682bf27",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 342,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Take care of indentation.",
+      "range": {
+        "startLine": 327,
+        "startChar": 0,
+        "endLine": 342,
+        "endChar": 57
+      },
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "91fdd083_93003dae",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 346,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Take care of formatting.\nif (condition) {\n      \u003ccode\u003e\n} else {\n      \u003ccode\u003e\n}",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "54da75da_a618aef9",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 358,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Give some comments, why Undef and def required.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "043cc5ff_1736cb41",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 377,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Remove empty liens, one line space is sufficient",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ba61f304_d5c7eb22",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 383,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Can you initialise read_mempool to 0 and if CLI requests \u0027all\u0027, then set it.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0d8b5df3_d4e38490",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 390,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Instead of using direct numeric value as 10, 25, use MACRO for better readability of code.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8b463c5c_8dd66528",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 420,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "column size should be 80, Please take care in other places too.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8000d653_9d10779e",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 444,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "Better to have open/close braces even for single line..",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "943d5b34_3e041542",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 519,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "You can get number of stats element in \"dpdk_info_get_xstats\" and pass as an argument here.\nyou can keep array size as \"xstats_count\".",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "436fbddd_f0421d30",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 521,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "have proper braces..\nmemset(rx_packets, -1, (90 * sizeof(rx_packets[0])));",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "200ab813_ffcade6f",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 698,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "if inbuf !\u003d \u0027all\u0027, then directly get the interface_id.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cb03b872_98c068c5",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 737,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-24T14:49:07Z",
+      "side": 1,
+      "message": "I feel no need to have multiple cases here, you can directly get the interface id.",
+      "revId": "1c9dc6245b3a1c875ca2d17eda25258b6216b852",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
