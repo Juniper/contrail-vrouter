@@ -135,7 +135,8 @@ class Base(object):
             self.logger.info("Stopping vrouter pid=" + str(self.pid))
         if (self.pid > 0):
             try:
-                os.kill(self.pid, signal.SIGKILL)
+                os.kill(self.pid, signal.SIGTERM)
+                time.sleep(1)
             except OSError as e:
                 self.logger.error(e)
 
