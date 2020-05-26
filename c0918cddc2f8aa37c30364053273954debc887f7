@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "b3318825_f13a2e97",
+        "filename": "tests/test_fragmentation.py",
+        "patchSetId": 6
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-05-26T16:35:55Z",
+      "side": 1,
+      "message": "There is already a mirror UT test_mirror_v6_intf_phy.py which will cover the newly added code. And basic mirror UT is in test_basic.py. Mirror + Fragmentation is not an issue. The ATT issue is Packet mode + ECMP + Mirror + Fragmentation.\n\nI think these kind of complex combination test cases should be not be part of UT and needs to be covered as part of sanity/automation which we will be doing.",
+      "parentUuid": "5cbe60c6_019b17e9",
+      "revId": "c0918cddc2f8aa37c30364053273954debc887f7",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d474f7ef_1bde096f",
         "filename": "utils/pylib/object_base.py",
         "patchSetId": 6
