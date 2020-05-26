@@ -1,0 +1,347 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3cc44bdf_c66939c1",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "rte_mempool.h is library function, so change it to \u003crte_mempool.h\u003e",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4779850e_cb519da6",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Keep spaces in-between",
+      "range": {
+        "startLine": 87,
+        "startChar": 0,
+        "endLine": 88,
+        "endChar": 37
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "512937ab_d3e6ee49",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "This slash(\u0027\\\u0027) required ?",
+      "range": {
+        "startLine": 137,
+        "startChar": 29,
+        "endLine": 137,
+        "endChar": 30
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fc3ebc91_31b55477",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 147,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "This slash(\u0027\\\u0027) required ?\nTake care in other places too..",
+      "range": {
+        "startLine": 147,
+        "startChar": 29,
+        "endLine": 147,
+        "endChar": 30
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "816c8763_8a186ef6",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Remove single space, take care in other places also",
+      "range": {
+        "startLine": 159,
+        "startChar": 34,
+        "endLine": 159,
+        "endChar": 35
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3141aa2d_a5b36ecd",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 516,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "this access is invalid, you can access from separator[0] till separator[SEPERATOR-1]\ntake care in other places.",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "599e9127_f7421a0a",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 629,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Instead of 6, Use this macro VR_DPDK_BOND_MAX_SLAVES.\ntake care of column size also in other places",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4dfa158b_cef208ff",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 635,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Instead of using malloc, you can use vr_zalloc or vr_malloc",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4e27d150_d846ffa4",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 644,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "if you are freeing here, put proper checks otherwise use \u0027goto err\u0027",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "147c49a2_4bf01d1d",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 649,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "This is wrong, once control goes to err, it will not return back.",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5efac28b_6d34ed58",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 685,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Instead of having two cases, you can have a single condition like below. Set \u0027is_all\u0027 when CLI requests for all.\nif (values[segment_lookup[RX_PACKETS][i]] !\u003d 0 || is_all) {\n            VI_PRINTF(\"\\t%s: %\"PRIu64 \"\\n\", xstats_names[segment_lookup[RX_PACKETS][i]].name, values[segment_lookup[RX_PACKETS][i]]);\n}",
+      "range": {
+        "startLine": 679,
+        "startChar": 0,
+        "endLine": 685,
+        "endChar": 118
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5aac5c79_bd8da7bb",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 750,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Check memory is accessible, before free.",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5f47e166_d0af46a9",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 772,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "Keep proper braces.\nInstead of 7, use VR_DPDK_BOND_MAX_SLAVES",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a15898d1_070e42ca",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 780,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "\u0026 is required ?",
+      "range": {
+        "startLine": 780,
+        "startChar": 16,
+        "endLine": 780,
+        "endChar": 19
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0a6fcb17_fcaae8fa",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 794,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "I feel instead of passing array, you can directly pass is_all",
+      "range": {
+        "startLine": 794,
+        "startChar": 59,
+        "endLine": 794,
+        "endChar": 73
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5c7d1df8_943b58d1",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 822,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "This is common code, you can put outside of the if condition",
+      "range": {
+        "startLine": 817,
+        "startChar": 16,
+        "endLine": 822,
+        "endChar": 79
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "df77fff8_e1789bf6",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 824,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-05-26T17:50:33Z",
+      "side": 1,
+      "message": "We already check in above code so this condition is not required.",
+      "range": {
+        "startLine": 824,
+        "startChar": 16,
+        "endLine": 824,
+        "endChar": 71
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
