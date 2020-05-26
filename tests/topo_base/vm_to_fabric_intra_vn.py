@@ -182,7 +182,8 @@ class VmToFabricIntraVn(unittest.TestCase):
             nh_idx=21,
             rtr_label_flags=constants.VR_RT_LABEL_VALID_FLAG |
             constants.VR_RT_ARP_PROXY_FLAG |
-            constants.VR_BE_FLOOD_DHCP_FLAG)
+            constants.VR_BE_FLOOD_DHCP_FLAG,
+            rtr_label=144)
 
         ObjectBase.sync_all()
 
