@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "e26dd432_2afdc4f0",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3cc44bdf_c66939c1",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "4779850e_cb519da6",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -39,6 +57,30 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d6107266_9166c29b",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 88,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "4779850e_cb519da6",
+      "range": {
+        "startLine": 87,
+        "startChar": 0,
+        "endLine": 88,
+        "endChar": 37
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -65,6 +107,30 @@
     },
     {
       "key": {
+        "uuid": "a4037e4b_f2e394ad",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "512937ab_d3e6ee49",
+      "range": {
+        "startLine": 137,
+        "startChar": 29,
+        "endLine": 137,
+        "endChar": 30
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "fc3ebc91_31b55477",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -85,6 +151,30 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "85069b1e_57597d19",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 147,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "fc3ebc91_31b55477",
+      "range": {
+        "startLine": 147,
+        "startChar": 29,
+        "endLine": 147,
+        "endChar": 30
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -111,6 +201,30 @@
     },
     {
       "key": {
+        "uuid": "cf719e76_79ef1c4c",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "816c8763_8a186ef6",
+      "range": {
+        "startLine": 159,
+        "startChar": 34,
+        "endLine": 159,
+        "endChar": 35
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3141aa2d_a5b36ecd",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -125,6 +239,24 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "51495a10_10584038",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 516,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3141aa2d_a5b36ecd",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -145,6 +277,24 @@
     },
     {
       "key": {
+        "uuid": "51ce2251_638e90c1",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 629,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "599e9127_f7421a0a",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "4dfa158b_cef208ff",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -159,6 +309,24 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4cce339d_d05259dd",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 635,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "4dfa158b_cef208ff",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -179,6 +347,24 @@
     },
     {
       "key": {
+        "uuid": "1e37b718_e75f3a37",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 644,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "4e27d150_d846ffa4",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "147c49a2_4bf01d1d",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -193,6 +379,24 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "40aac89d_7c165e22",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 649,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "147c49a2_4bf01d1d",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -219,6 +423,30 @@
     },
     {
       "key": {
+        "uuid": "7e0b9c52_275ecd77",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 685,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5efac28b_6d34ed58",
+      "range": {
+        "startLine": 679,
+        "startChar": 0,
+        "endLine": 685,
+        "endChar": 118
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5aac5c79_bd8da7bb",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -236,6 +464,24 @@
     },
     {
       "key": {
+        "uuid": "3cf7d4ea_c92fe734",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 750,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5aac5c79_bd8da7bb",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "5f47e166_d0af46a9",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -250,6 +496,24 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9e2f5f76_362a943c",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 772,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5f47e166_d0af46a9",
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -276,6 +540,30 @@
     },
     {
       "key": {
+        "uuid": "c6c0102d_84102827",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 780,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "a15898d1_070e42ca",
+      "range": {
+        "startLine": 780,
+        "startChar": 16,
+        "endLine": 780,
+        "endChar": 19
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "0a6fcb17_fcaae8fa",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -296,6 +584,30 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ae24662d_6aaa85c1",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 794,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0a6fcb17_fcaae8fa",
+      "range": {
+        "startLine": 794,
+        "startChar": 59,
+        "endLine": 794,
+        "endChar": 73
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     },
     {
       "key": {
@@ -322,6 +634,30 @@
     },
     {
       "key": {
+        "uuid": "16f41378_76e259b0",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 822,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5c7d1df8_943b58d1",
+      "range": {
+        "startLine": 817,
+        "startChar": 16,
+        "endLine": 822,
+        "endChar": 79
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "df77fff8_e1789bf6",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 7
@@ -342,6 +678,30 @@
       "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3dc1977b_9b282ae2",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 824,
+      "author": {
+        "id": 928
+      },
+      "writtenOn": "2020-05-27T07:26:13Z",
+      "side": 1,
+      "message": "This check caters to situations wherein if user asks for say slave id 4 but only 2 slaves exists. But in the check in above code ensures that the user is not able to give some completely invalid slave id say 500.",
+      "parentUuid": "df77fff8_e1789bf6",
+      "range": {
+        "startLine": 824,
+        "startChar": 16,
+        "endLine": 824,
+        "endChar": 71
+      },
+      "revId": "de8c364c0415ee11b2545968d808065d2af85a7f",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
