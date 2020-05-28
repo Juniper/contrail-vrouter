@@ -2,6 +2,52 @@
   "comments": [
     {
       "key": {
+        "uuid": "337f6a7b_c2d076e7",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 117,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-05-28T11:32:58Z",
+      "side": 1,
+      "message": "char *trunc \u003d \"\\n Message Truncated\\n\";\nsnprintf((msg_reg.outbuf + msg_req.outbuf_len) - strlen(trunc),\n          VR_MESSAGE_PAGE_SIZE, trunc);",
+      "range": {
+        "startLine": 115,
+        "startChar": 24,
+        "endLine": 117,
+        "endChar": 77
+      },
+      "revId": "df9d0409db16c660d06ffd36e8f6466634bb733c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ecab2cb1_81b8936b",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 708,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2020-05-28T11:32:58Z",
+      "side": 1,
+      "message": "these lines are more than 80 chars in length. pl fix this and others too..",
+      "range": {
+        "startLine": 708,
+        "startChar": 17,
+        "endLine": 708,
+        "endChar": 110
+      },
+      "revId": "df9d0409db16c660d06ffd36e8f6466634bb733c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "2897de43_5fe460fc",
         "filename": "dpdk/vr_dpdk_info.c",
         "patchSetId": 8
