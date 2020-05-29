@@ -12,6 +12,11 @@
 #define VR_INFO_REG(X) \
     X(INFO_VER,  info_get_version, KERNEL) \
     X(INFO_BOND, info_get_bond,    DPDK) \
+    X(INFO_LACP, info_get_lacp,    DPDK) \
+    X(INFO_MEMPOOL, info_get_mempool,    DPDK) \
+    X(INFO_STATS, info_get_stats, DPDK) \
+    X(INFO_XSTATS, info_get_xstats, DPDK) \
+    X(INFO_LCORE, info_get_lcore, DPDK) \
 
 /* Deifne all supported platforms.
  * When a new platforms added, define like below.
@@ -35,6 +40,7 @@
 #define VR_INFO_PASS_ARGS msg_req
 
 #define VR_INFO_FAILED         -1
+#define VR_INFO_MSG_TRUNC      -2
 
 /* VR_INFO_MSG_BUF_TABLE would used to support multiple clients.
  * vRouter(server) can able to process max. of 64 clients.
@@ -133,7 +139,7 @@ struct vr_info_buff_table {
     if (len > (msg_req->bufsz - msg_req->outbuf_len)) { \
             vr_printf("VrInfo: Message copy to buffer failed at %d\n", \
                     msg_req->outbuf_len); \
-            return VR_INFO_FAILED; \
+            return VR_INFO_MSG_TRUNC; \
     } \
     msg_req->outbuf_len += len; \
 }
