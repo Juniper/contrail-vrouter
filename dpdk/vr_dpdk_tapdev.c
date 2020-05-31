@@ -241,7 +241,7 @@ vr_dpdk_tapdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* Allocate RX ring if needed. */
     if (tapdev->tapdev_rx_ring == NULL) {
         tapdev->tapdev_rx_ring = vr_dpdk_ring_allocate(lcore_id,
-            "tapdev_rx_ring", VR_DPDK_RX_RING_SZ,
+            "tapdev_rx_ring", vr_dpdk_rx_ring_sz,
             RING_F_SP_ENQ | RING_F_SC_DEQ);
         if (tapdev->tapdev_rx_ring == NULL)
             goto error;
@@ -321,7 +321,7 @@ vr_dpdk_tapdev_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     /* Allocate TX ring if needed. */
     if (tapdev->tapdev_tx_rings[lcore_id] == NULL) {
         tapdev->tapdev_tx_rings[lcore_id] = vr_dpdk_ring_allocate(lcore_id,
-            "tapdev_tx_ring", VR_DPDK_TX_RING_SZ,
+            "tapdev_tx_ring", vr_dpdk_tx_ring_sz,
             RING_F_SP_ENQ | RING_F_SC_DEQ);
         if (tapdev->tapdev_tx_rings[lcore_id] == NULL)
             goto error;

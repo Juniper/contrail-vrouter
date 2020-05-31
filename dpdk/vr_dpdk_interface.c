@@ -615,7 +615,7 @@ dpdk_vlan_forwarding_if_add(void)
      * waiting to be send to the forwarding interface.
      */
     vr_dpdk.vlan_ring = vr_dpdk_ring_allocate(VR_DPDK_FWD_LCORE_ID,
-        vr_dpdk.vlan_name, VR_DPDK_TX_RING_SZ, RING_F_SC_DEQ);
+        vr_dpdk.vlan_name, vr_dpdk_tx_ring_sz, RING_F_SC_DEQ);
     if (!vr_dpdk.vlan_ring) {
         RTE_LOG(ERR, VROUTER, "Error allocating ring for VLAN forwarding interface\n");
         vr_dpdk.vlan_dev = NULL;

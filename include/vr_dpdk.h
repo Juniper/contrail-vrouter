@@ -962,6 +962,9 @@ void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
 
+extern unsigned int vr_dpdk_rx_ring_sz, vr_dpdk_tx_ring_sz;
+extern unsigned int vr_dpdk_yield_option;
+
 /*
  * vr_dpdk_ringdev.c
  */
