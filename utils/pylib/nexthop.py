@@ -245,6 +245,38 @@ class ReceiveL2NextHop(NextHop):
             encap_family=None)
 
 
+class TranslateNextHop(NextHop):
+    """
+    TranslateNextHop class to create vrf translate nexthops
+
+    Mandatory Parameters:
+    --------------------
+    nh_idx : int
+        Nexthop id
+
+    Optional Parameters:
+    -------------------
+    nh_family : int
+        Nexthop family
+    nh_vrf : int
+        Nexthop vrf id
+    nh_flags : int
+        Nexthop flags
+    """
+
+    def __init__(self, nh_idx, nh_family=constants.AF_INET, nh_vrf=0,
+                 nh_flags=constants.NH_FLAG_VALID, **kwargs):
+        super(TranslateNextHop, self).__init__(
+            constants.NH_TYPE_VRF_TRANSLATE,
+            nh_idx,
+            nh_family,
+            nh_vrf,
+            nh_flags,
+            encap_oif_id=None,
+            encap=None,
+            encap_family=None)
+
+
 class ReceiveNextHop(NextHop):
     """
     ReceiveNextHop class to create receive nexthops

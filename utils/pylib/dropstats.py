@@ -30,5 +30,8 @@ class DropStats(ObjectBase, vr_drop_stats_req):
         """
         return int(self.get("vds_frag_err"))
 
+    def get_vds_invalid_source(self):
+        return int(self.get("vds_invalid_source"))
+
     def delete(self):
         pass

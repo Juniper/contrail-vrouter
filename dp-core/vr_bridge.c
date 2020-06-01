@@ -1032,7 +1032,17 @@ vr_bridge_input(struct vrouter *router, struct vr_packet *pkt,
             }
             return 0;
         }
+
+        /* If a ucast packet is coming from fabric and going to fabric, drop it */
+        if (be && (mac_flags & MAC_UC_BIT_SET) && vif_is_fabric(pkt->vp_if) &&
+                (nh->nh_type == NH_TUNNEL) &&
+                (!(pkt->vp_if->vif_flags & VIF_FLAG_FAB_GW_MODE))) {
+            PKT_LOG(VP_DROP_INVALID_SOURCE, pkt, 0, VR_BRIDGE_C, __LINE__);
+            vr_pfree(pkt, VP_DROP_INVALID_SOURCE);
+            return 0;
+        }
     }
+
 
     if (pull_len && !pkt_push(pkt, pull_len)) {
         PKT_LOG(VP_DROP_PUSH, pkt, 0, VR_BRIDGE_C, __LINE__);
