@@ -879,7 +879,7 @@ vr_dpdk_bond_send_port_info(uint16_t port_id, uint8_t vif_idx)
 
     if(rte_eth_devices[port_id].device->driver->name != NULL)
         snprintf(member_info.intf_drv_name, (VR_INTERFACE_NAME_LEN - 1),
-                rte_eth_devices[port_id].device->driver->name);
+                "%s\n", rte_eth_devices[port_id].device->driver->name);
 
     RTE_LOG(INFO, VROUTER, "Port ID: %d Link Status: %s intf_name:%s \
             drv_name:%s \n\n", port_id, (link.link_status?str[0]:str[1]),
