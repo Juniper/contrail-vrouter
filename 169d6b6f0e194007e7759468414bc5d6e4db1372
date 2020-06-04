@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "37dcffd7_8646fdb8",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2514,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-06-04T08:10:05Z",
+      "side": 1,
+      "message": "Can you add NULL checks for memory allocation failure?\nAlso, I don\u0027t see the buffers being freed at the end.",
+      "range": {
+        "startLine": 2512,
+        "startChar": 4,
+        "endLine": 2514,
+        "endChar": 0
+      },
+      "revId": "169d6b6f0e194007e7759468414bc5d6e4db1372",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
