@@ -2506,8 +2506,19 @@ static int
 vr_interface_copy_bond_info(vr_interface_req *req,
         struct vr_interface_bond_info *bond_info)
 {
-    unsigned int i, len, sl_name_iter = 0, sl_drv_name_iter = 0;
-    char buffer[VR_INTERFACE_STR_BUF_LEN], buffer_drv[VR_INTERFACE_STR_BUF_LEN];
+    unsigned int i, len, ret = 0, el_name_iter = 0, sl_drv_name_iter = 0;
+    char *buffer = NULL, *buffer_drv = NULL;
+
+    buffer = vr_zalloc(VR_INTERFACE_STR_BUF_LEN, VR_INTERFACE_BOND_OBJECT);
+    if (!buffer) {
+        ret = -ENOMEM;
+        goto error_exit;
+    }
+    buffer_drv = vr_zalloc(VR_INTERFACE_STR_BUF_LEN, VR_INTERFACE_BOND_OBJECT);
+    if (!buffer_drv) {
+        ret = -ENOMEM;
+        goto error_exit;
+    }
 
     req->vifr_num_bond_slave = bond_info->vif_num_slave;
     req->vifr_intf_status = bond_info->vif_intf_link_status;
@@ -2516,16 +2527,20 @@ vr_interface_copy_bond_info(vr_interface_req *req,
     req->vifr_fab_name =
         vr_zalloc(req->vifr_fab_name_size * sizeof(uint8_t),
             VR_INTERFACE_BOND_OBJECT);
-    if(!req->vifr_fab_name)
-        return -ENOMEM;
+    if(!req->vifr_fab_name) {
+        ret = -ENOMEM;
+        goto error_exit;
+    }
     memcpy(req->vifr_fab_name, bond_info->vif_fab_name, len);
     len = strlen(bond_info->vif_fab_drv_name);
     req->vifr_fab_drv_name_size = (len + 1);
     req->vifr_fab_drv_name =
         vr_zalloc(req->vifr_fab_drv_name_size * sizeof(uint8_t),
                 VR_INTERFACE_BOND_OBJECT);
-    if(!req->vifr_fab_drv_name)
-        return -ENOMEM;
+    if(!req->vifr_fab_drv_name) {
+        ret = -ENOMEM;
+        goto error_exit;
+    }
     memcpy(req->vifr_fab_drv_name, bond_info->vif_fab_drv_name, len);
 
     if(bond_info->vif_num_slave) {
@@ -2533,9 +2548,11 @@ vr_interface_copy_bond_info(vr_interface_req *req,
             len = strlen(bond_info->vif_slave_name[i]);
             sl_name_iter += snprintf((buffer + sl_name_iter),
                     (VR_INTERFACE_STR_BUF_LEN - sl_name_iter - 1),
-                    bond_info->vif_slave_name[i]);
-            if(!sl_name_iter)
-                return -ENOMEM;
+                    "%s\n", bond_info->vif_slave_name[i]);
+            if(!sl_name_iter) {
+                ret = -ENOMEM;
+                goto error_exit;
+            }
             /* Concatenate with NULL terminated string because at
              * utils side delimiter used as '\0' and increment
              * iter by 1 */
@@ -2545,8 +2562,10 @@ vr_interface_copy_bond_info(vr_interface_req *req,
             sl_drv_name_iter += snprintf((buffer_drv + sl_drv_name_iter),
                     (VR_INTERFACE_STR_BUF_LEN - sl_drv_name_iter - 1),
                     bond_info->vif_slave_drv_name[i]);
-            if(!sl_drv_name_iter)
-                return -ENOMEM;
+            if(!sl_drv_name_iter) {
+                ret = -ENOMEM;
+                goto error_exit;
+            }
             sl_drv_name_iter += 1;
         }
 
@@ -2556,20 +2575,39 @@ vr_interface_copy_bond_info(vr_interface_req *req,
         req->vifr_bond_slave_name =
             vr_zalloc(req->vifr_bond_slave_name_size *
                     sizeof(uint8_t), VR_INTERFACE_BOND_OBJECT);
-        if(!req->vifr_bond_slave_name)
-            return -ENOMEM;
+        if(!req->vifr_bond_slave_name) {
+            ret = -ENOMEM;
+            goto error_exit;
+        }
         req->vifr_bond_slave_drv_name =
             vr_zalloc(req->vifr_bond_slave_drv_name_size *
                     sizeof(uint8_t), VR_INTERFACE_BOND_OBJECT);
-        if(!req->vifr_bond_slave_drv_name)
-            return -ENOMEM;
+        if(!req->vifr_bond_slave_drv_name) {
+            ret = -ENOMEM;
+            goto error_exit;
+        }
 
         memcpy(req->vifr_bond_slave_name, buffer,
                 req->vifr_bond_slave_name_size);
         memcpy(req->vifr_bond_slave_drv_name, buffer_drv,
                 req->vifr_bond_slave_drv_name_size);
     }
-    return 0;
+  
+error_exit:
+    if (buffer)
+        vr_free(buffer, VR_INTERFACE_BOND_OBJECT);
+    if (buffer_drv)
+        vr_free(buffer_drv, VR_INTERFACE_BOND_OBJECT); 
+    if (req->vifr_fab_name)
+        vr_free(req->vifr_fab_name, VR_INTERFACE_BOND_OBJECT);
+    if (req->vifr_fab_drv_name)
+        vr_free(req->vifr_fab_drv_name, VR_INTERFACE_BOND_OBJECT);
+    if (req->vifr_bond_slave_name)
+        vr_free(req->vifr_bond_slave_name, VR_INTERFACE_BOND_OBJECT);
+    if (req->vifr_bond_slave_drv_name)
+        vr_free(req->vifr_bond_slave_drv_name, VR_INTERFACE_BOND_OBJECT);
+    
+    return ret;
 }
 
 static int
@@ -2741,7 +2779,7 @@ __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
                 if(!req->vifr_vlan_name)
                     return -ENOMEM;
                 snprintf(req->vifr_vlan_name, req->vifr_vlan_name_size,
-                        vlan_info.vlan_name);
+                        "%s\n", vlan_info.vlan_name);
             }
         }
     }
