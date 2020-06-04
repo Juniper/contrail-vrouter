@@ -114,7 +114,7 @@ vr_info_req_process(void *s_req)
                      * "Message Truncated" in the buffer and send to client */
                     if(ret == VR_INFO_MSG_TRUNC) {
                         snprintf(((msg_req.outbuf + msg_req.outbuf_len) - strlen(trunc)),
-                                VR_MESSAGE_PAGE_SIZE, trunc);
+                                VR_MESSAGE_PAGE_SIZE, "%s\n", trunc);
                     } else {
                         goto generate_response;
                     }
@@ -196,7 +196,7 @@ vr_info_req_process(void *s_req)
              * "vr_info_buff_table_p[id]+offset". Here offset is calculated
              * from (max_buff_sz * req->vdu_marker) */
             snprintf(resp.vdu_proc_info, (resp.vdu_proc_info_size),
-                    (vr_info_buff_table_p[resp.vdu_buff_table_id].buff +
+                    "%s\n", (vr_info_buff_table_p[resp.vdu_buff_table_id].buff +
                         (max_buff_sz * req->vdu_marker)));
 
             /* If message buffer copy is not complete, it will return with -1.
@@ -223,7 +223,7 @@ vr_info_req_process(void *s_req)
         }
 
         /* Copy message buffer */
-        snprintf(resp.vdu_proc_info, resp.vdu_proc_info_size, msg_req.outbuf);
+        snprintf(resp.vdu_proc_info, resp.vdu_proc_info_size, "%s\n", msg_req.outbuf);
         vr_message_dump_object(dumper, VR_INFO_OBJECT_ID, &resp);
     }
 
