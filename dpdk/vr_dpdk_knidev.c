@@ -530,6 +530,7 @@ vr_dpdk_kni_tx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     return tx_queue;
 }
 
+#if 0
 /* Change KNI MTU size callback */
 static int
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0))
@@ -665,6 +666,7 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 
     return ret;
 }
+#endif
 
 /*
  * vr_dpdk_knidev_init - initializes Kernel Network Interface device using
@@ -675,6 +677,7 @@ dpdk_knidev_config_network_if(uint8_t port_id, uint8_t if_up)
 int
 vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
 {
+#if 0
     int i;
     struct rte_eth_dev_info dev_info;
     const struct rte_bus *bus;
@@ -783,8 +786,10 @@ vr_dpdk_knidev_init(uint8_t port_id, struct vr_interface *vif)
             break;
         }
     }
+#endif
 
-    return 0;
+    vr_dpdk.kni_state = -1;
+    return -ENOTSUP;
 }
 
 /*

@@ -356,21 +356,27 @@ struct vr_dpdk_bond_member_info {
 #define VR_DPDK_MAX_IO_LORES (VR_DPDK_LAST_IO_LCORE_ID - VR_DPDK_IO_LCORE_ID + 1)
 
 
-/*
- * As we cannot ensure re-usuage of these flags in an easy way, for now check that DPDK
- * used is below 18.05.2 version to ensure avoiding re-usage of same bit
- * Note: section below kicks in only if we are using DPDK from upstream
- */
-/* TODO(prabhjot) need to check if these flags can move more towards upstream code */
-#if !(RTE_VERSION > RTE_VERSION_NUM(18, 5, 2, 0))
 /* needs to have a place holder for RX flags, to allow usuage of dpdk from upstream */
 #ifndef PKT_RX_GSO_TCP4
-#define PKT_RX_GSO_TCP4      (1ULL << 21)  /**< RX packet with TCPv4 segment offload */
+#define PKT_RX_GSO_TCP4      (1ULL << 23)  /**< RX packet with TCPv4 segment offload */
 #endif /* PKT_RX_GSO_TCP4 */
 #ifndef PKT_RX_GSO_TCP6
-#define PKT_RX_GSO_TCP6      (1ULL << 22)  /**< RX packet with TCPv6 segment offload */
+#define PKT_RX_GSO_TCP6      (1ULL << 24)  /**< RX packet with TCPv6 segment offload */
 #endif /* PKT_RX_GSO_TCP6 */
-#endif /* RTE_VERSION check */
+
+#define IPV4_IHL_MULTIPLIER RTE_IPV4_IHL_MULTIPLIER
+#define ether_hdr rte_ether_hdr
+#define ether_addr rte_ether_addr
+#define vlan_hdr rte_vlan_hdr
+#define ipv4_hdr rte_ipv4_hdr
+#define ipv6_hdr rte_ipv6_hdr
+#define tcp_hdr rte_tcp_hdr
+#define TCP_FIN_FLAG RTE_TCP_FIN_FLAG
+#define TCP_PSH_FLAG RTE_TCP_PSH_FLAG
+#define RTE_MBUF_INDIRECT(mb)   RTE_MBUF_CLONED(mb)
+#define ETHER_ADDR_LEN RTE_ETHER_ADDR_LEN
+#define ETHER_MAX_LEN RTE_ETHER_MAX_LEN
+
 
 
 /*
@@ -862,7 +868,7 @@ dpdk_get_ether_header_len(const void *data)
 {
     struct ether_hdr *eth = (struct ether_hdr *)data;
 
-    if (eth->ether_type == rte_cpu_to_be_16(ETHER_TYPE_VLAN))
+    if (eth->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN))
         return sizeof(struct ether_hdr) + sizeof(struct vlan_hdr);
     else
         return sizeof(struct ether_hdr);

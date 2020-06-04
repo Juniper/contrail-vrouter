@@ -262,13 +262,15 @@ if sys.platform != 'darwin':
         else:
             rte_libs = ('-lrte_ethdev',)
 
-        year_matches = re.findall("define RTE_VER_YEAR .*", file_content)
-        month_matches = re.findall("define RTE_VER_MONTH .*", file_content)
-        year = int(year_matches[0].split(" ")[2])
-        month = int(month_matches[0].split(" ")[2])
+# year_matches = re.findall("define RTE_VER_YEAR .*", file_content)
+# month_matches = re.findall("define RTE_VER_MONTH .*", file_content)
+# year = int(year_matches[0].split(" ")[2])
+# month = int(month_matches[0].split(" ")[2])
 
-        if (year > 17) or (year == 17 and month >= 11):
-            rte_libs = rte_libs + ('-lrte_mempool_ring', '-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
+# if (year > 17) or (year == 17 and month >= 11):
+# rte_libs = rte_libs + ('-lrte_mempool_ring', '-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
+
+        rte_libs = rte_libs + ('-lrte_mempool_ring', '-lrte_bus_pci', '-lrte_pci', '-lrte_bus_vdev')
 
         #
         # DPDK libraries need to be linked as a whole archive, otherwise some
@@ -295,9 +297,11 @@ if sys.platform != 'darwin':
         #    '-lrte_power',
         #    '-lrte_acl',
         #    '-lrte_meter',
+            '-lrte_net',
             '-lrte_sched',
             '-lm',
             '-lrt',
+            '-lrte_cryptodev',
         #    '-lrte_vhost',
         #    '-lpcap',
         #    '-lfuse',
@@ -311,6 +315,7 @@ if sys.platform != 'darwin':
             '-lrte_ring',
             '-lrte_eal',
             '-lrte_cmdline',
+            "-lrte_eventdev",
         #    '-lrte_cfgfile',
             '-lrte_pmd_bond',
             '-lrte_pmd_bnxt',
@@ -340,8 +345,8 @@ if sys.platform != 'darwin':
         DPDK_LIBS.append('-Wl,--end-group')
         DPDK_LIBS.append('-Wl,--no-whole-archive')
 
-        if year_matches and month_matches:
-            DPDK_LIBS.append('-Wl,-lnuma')
+#if year_matches and month_matches:
+        DPDK_LIBS.append('-Wl,-lnuma')
 
         env.Append(CPPPATH = DPDK_INC_DIR);
         env.Append(LIBPATH = DPDK_LIB_DIR)
