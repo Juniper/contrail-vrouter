@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "63c27005_440b5bed",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 2572,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-06-05T06:24:01Z",
+      "side": 1,
+      "message": "Looks like there are other vifr_* objects which are not being freed on error as well.\nCan you fix them ? You need to add a label at the end of the function eg:\nerr:\n     if (buffer) \n         vr_free(buffer, ..)\n     if (req-\u003evifr_xxxx)\n         vr_free(req-\u003evifr_xxxx, ...)\n\nand goto the err label if some memory allocation fails.",
+      "revId": "6960e055b5c1de27ecba1e95aeb18a4adba408c3",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
