@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "27d8c087_443ee044",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 2585,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-06-09T10:20:18Z",
+      "side": 1,
+      "message": "This needs to be done in non-error case as well.",
+      "range": {
+        "startLine": 2582,
+        "startChar": 0,
+        "endLine": 2585,
+        "endChar": 55
+      },
+      "revId": "b938d8b9797d0e74ebc089e53148f5a896d04718",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
