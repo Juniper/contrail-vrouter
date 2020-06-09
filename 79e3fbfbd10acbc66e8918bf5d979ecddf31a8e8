@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "54ed4014_a9631dd6",
+        "filename": "dp-core/vr_interface.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 2609,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-06-09T14:05:03Z",
+      "side": 1,
+      "message": "This is not correct, since these will be freed even in success case.\nAs I mentioned earlier, in success case, we need to free only buffer and buffer_drv and return 0.\nIn error case, free all of the above and return error.",
+      "range": {
+        "startLine": 2601,
+        "startChar": 0,
+        "endLine": 2609,
+        "endChar": 4
+      },
+      "revId": "79e3fbfbd10acbc66e8918bf5d979ecddf31a8e8",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
