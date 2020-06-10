@@ -32,7 +32,6 @@ end
 #arg0:vif_idx, arg1:flag(0: dump all vifs and hide some details,
 #			 1: dump vif with vif_idx with all details)
 define dump_vif_internal
-    if ($arg0)
         if(router.vr_interfaces[$arg0])
             set $cur_vif = (router.vr_interfaces[$arg0])
             set $int_ip = $cur_vif.vif_ip
@@ -117,7 +116,6 @@ define dump_vif_internal
             end
             printf "\n"
         end
-    end
 end
 
 document dump_vif_internal
