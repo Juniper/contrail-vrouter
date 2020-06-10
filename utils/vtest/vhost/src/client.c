@@ -80,7 +80,7 @@ client_init_path(Client *client, const char *path)
     }
 
     if(strlen(path) > (UNIX_PATH_MAX - 1)) {
-        fprintf(stderr, "Socket path is too long %s (%d), \
+        fprintf(stderr, "Socket path is too long %s (%zu), \
                 it should be less than %d\n",
                 path, strlen(path), UNIX_PATH_MAX);
         return E_CLIENT_ERR_ALLOC;
