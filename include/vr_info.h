@@ -10,13 +10,14 @@
 /* Register vr_info msg and its corresponsding callback below.
  * */
 #define VR_INFO_REG(X) \
-    X(INFO_VER,  info_get_version, KERNEL) \
+    X(INFO_VER,  info_get_version, DPDK) \
     X(INFO_BOND, info_get_bond,    DPDK) \
     X(INFO_LACP, info_get_lacp,    DPDK) \
     X(INFO_MEMPOOL, info_get_mempool,    DPDK) \
     X(INFO_STATS, info_get_stats, DPDK) \
     X(INFO_XSTATS, info_get_xstats, DPDK) \
     X(INFO_LCORE, info_get_lcore, DPDK) \
+    X(INFO_APP, info_get_app, DPDK) \
 
 /* Deifne all supported platforms.
  * When a new platforms added, define like below.

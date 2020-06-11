@@ -18,6 +18,7 @@
 #include "vr_dpdk.h"
 #include "vrouter.h"
 #define SEPERATOR 70
+#define LINE 200
 
 enum segments {
     RX_PACKETS,
@@ -35,6 +36,15 @@ enum segments {
  *              eg: X(INFO_BOND, info_get_bond)
  */
 
+int
+dpdk_info_get_version(VR_INFO_ARGS)
+{
+    extern const char *ContrailBuildInfo;
+    VR_INFO_BUF_INIT();
+    VI_PRINTF("DPDK version: %s\n\n", ContrailBuildInfo);
+    return 0;
+}
+
 /* dpdk_info_get_bond provide the bond master & slave information */
 static int
 dpdk_bond_mode_8023ad(VR_INFO_ARGS, int port_id)
@@ -45,7 +55,7 @@ dpdk_bond_mode_8023ad(VR_INFO_ARGS, int port_id)
 
     VI_PRINTF("802.3ad info :\n");
 
-    VI_PRINTF("LACP Rate: %s\n", \
+    VI_PRINTF("LACP Rate: %s\n",
             lacp_rate[rte_eth_bond_lacp_rate_get(port_id)]);
 
     ret = rte_eth_bond_8023ad_agg_selection_get(port_id);
@@ -74,13 +84,14 @@ dpdk_bond_info_mii_status(VR_INFO_ARGS, int port_id, struct rte_eth_link *link)
 
     VI_PRINTF("MII status: %s\n", status[link->link_status]);
     VI_PRINTF("MII Link Speed: %d\n", link->link_speed);
-    VI_PRINTF("MII Polling Interval (ms): %d\n", \
+    VI_PRINTF("MII Polling Interval (ms): %d\n",
             rte_eth_bond_link_monitoring_get(port_id));
     return 0;
 }
 
 static int
-dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id, struct vr_dpdk_ethdev *ethdev)
+dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id,
+                               struct vr_dpdk_ethdev *ethdev)
 {
     VR_INFO_DEC();
     int i, ret, slave_id;
@@ -100,13 +111,13 @@ dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id, struct vr_dpdk_ethdev *ethd
             RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
         }
 
-        ret = rte_eth_bond_8023ad_slave_info(port_id, slave_id, & info);
+        ret = rte_eth_bond_8023ad_slave_info(port_id, slave_id, &info);
         if (ret != 0) {
             RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
         }
 
         VI_PRINTF("Slave Interface(%d): %s \n", i, name);
-        VI_PRINTF("Slave Interface Driver: %s\n", \
+        VI_PRINTF("Slave Interface Driver: %s\n",
             rte_eth_devices[port_id].device->driver->name);
 
         rte_eth_link_get_nowait(port_id, &link);
@@ -114,7 +125,7 @@ dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id, struct vr_dpdk_ethdev *ethd
         if (ret < 0) {
             return VR_INFO_FAILED;
         }
-        VI_PRINTF("Permanent HW addr:"MAC_FORMAT "\n", \
+        VI_PRINTF("Permanent HW addr:"MAC_FORMAT "\n",
             MAC_VALUE(info.actor.system.addr_bytes));
         VI_PRINTF("Aggregator ID: %d\n", info.agg_port_id);
 
@@ -122,16 +133,16 @@ dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id, struct vr_dpdk_ethdev *ethd
 
         VI_PRINTF("802.3ad info\n");
 
-        VI_PRINTF("LACP Rate: %s\n", \
+        VI_PRINTF("LACP Rate: %s\n",
             lacp_rate[rte_eth_bond_lacp_rate_get(port_id)]);
 
         rte_eth_macaddr_get(port_id, &mac_addr);
-        VI_PRINTF("Bond MAC addr:"MAC_FORMAT "\n", \
+        VI_PRINTF("Bond MAC addr:"MAC_FORMAT "\n",
             MAC_VALUE(mac_addr.addr_bytes));
 
         VI_PRINTF("Details actor lacp pdu: \n");
         VI_PRINTF("\tsystem priority: %d \n", info.actor.system_priority);
-        VI_PRINTF("\tsystem mac address:"MAC_FORMAT "\n", \
+        VI_PRINTF("\tsystem mac address:"MAC_FORMAT "\n",
             MAC_VALUE(info.actor.system.addr_bytes));
         VI_PRINTF("\tport key: %d \n", info.actor.key);
         VI_PRINTF("\tport priority: %d \n", info.actor.port_priority);
@@ -140,7 +151,7 @@ dpdk_bond_info_show_slave(VR_INFO_ARGS, int port_id, struct vr_dpdk_ethdev *ethd
 
         VI_PRINTF("Details partner lacp pdu: \n");
         VI_PRINTF("\tsystem priority: %d \n", info.partner.system_priority);
-        VI_PRINTF("\tsystem mac address:"MAC_FORMAT "\n", \
+        VI_PRINTF("\tsystem mac address:"MAC_FORMAT "\n",
             MAC_VALUE(info.partner.system.addr_bytes));
         VI_PRINTF("\tport key: %d \n", info.partner.key);
         VI_PRINTF("\tport priority: %d \n", info.partner.port_priority);
@@ -211,9 +222,9 @@ dpdk_bond_info_show_master(VR_INFO_ARGS, int port_id,
         return VR_INFO_FAILED;
     }
 
-    VI_PRINTF("Up Delay (ms): %d\n", \
+    VI_PRINTF("Up Delay (ms): %d\n",
         rte_eth_bond_link_up_prop_delay_get(port_id));
-    VI_PRINTF("Down Delay (ms): %d\n\n", \
+    VI_PRINTF("Down Delay (ms): %d\n\n",
         rte_eth_bond_link_down_prop_delay_get(port_id));
 
     if (bond_mode == BONDING_MODE_8023AD) {
@@ -231,14 +242,14 @@ dpdk_bond_info_show_master(VR_INFO_ARGS, int port_id,
     }
 
     VI_PRINTF("System priority: %d\n", info.actor.system_priority);
-    VI_PRINTF("System MAC address:"MAC_FORMAT "\n", \
+    VI_PRINTF("System MAC address:"MAC_FORMAT "\n",
         MAC_VALUE(info.actor.system.addr_bytes));
     VI_PRINTF("Active Aggregator Info: \n");
     VI_PRINTF("\tAggregator ID: %d\n", info.agg_port_id);
     VI_PRINTF("\tNumber of ports: %d \n", ethdev->ethdev_nb_slaves);
     VI_PRINTF("\tActor Key: %d \n", info.actor.key);
     VI_PRINTF("\tPartner Key: %d \n", info.partner.key);
-    VI_PRINTF("\tPartner Mac Address: "MAC_FORMAT "\n\n", \
+    VI_PRINTF("\tPartner Mac Address: "MAC_FORMAT "\n\n",
         MAC_VALUE(info.partner.system.addr_bytes));
     return 0;
 }
@@ -268,7 +279,7 @@ dpdk_info_get_bond(VR_INFO_ARGS)
         RTE_LOG(ERR, VROUTER, "Ethdev not available\n");
     }
 
-    VI_PRINTF("DPDK Version: %s\n", \
+    VI_PRINTF("DPDK Version: %s\n",
         rte_version());
     VI_PRINTF("No. of bond slaves: %d\n", ethdev->ethdev_nb_slaves);
 
@@ -294,7 +305,7 @@ display_lacp_conf(VR_INFO_ARGS, uint16_t port_id)
     struct rte_eth_bond_8023ad_conf conf;
 
     /* Check LACP protocol is configured for the bond interface. */
-    VI_PRINTF("LACP Rate: %s\n\n", \
+    VI_PRINTF("LACP Rate: %s\n\n",
         lacp_rate[rte_eth_bond_lacp_rate_get(port_id)]);
 
     rte_eth_bond_8023ad_conf_get(port_id, &conf);
@@ -303,7 +314,7 @@ display_lacp_conf(VR_INFO_ARGS, uint16_t port_id)
     VI_PRINTF("Slow periodic (ms): %d\n", conf.slow_periodic_ms);
     VI_PRINTF("Short timeout (ms): %d\n", conf.short_timeout_ms);
     VI_PRINTF("Long timeout (ms): %d\n", conf.long_timeout_ms);
-    VI_PRINTF("Aggregate wait timeout (ms): %d\n", \
+    VI_PRINTF("Aggregate wait timeout (ms): %d\n",
         conf.aggregate_wait_timeout_ms);
     VI_PRINTF("Tx period (ms): %d\n", conf.tx_period_ms);
     VI_PRINTF("Update timeout (ms): %d\n", conf.update_timeout_ms);
@@ -438,7 +449,7 @@ dpdk_info_get_mempool(VR_INFO_ARGS)
         VI_PRINTF("trailer_size = %"
             PRIu32 "\n", mp->trailer_size);
         VI_PRINTF("total_obj_size = %"
-            PRIu32 "\n", \
+            PRIu32 "\n",
             mp->header_size + mp->elt_size + mp->trailer_size);
         VI_PRINTF("private_data_size = %"
             PRIu32 "\n", mp->private_data_size);
@@ -500,7 +511,7 @@ display_eth_stats(VR_INFO_ARGS, struct rte_eth_stats eth_stats)
         PRId64 ", Bytes:%"
         PRId64 ", Errors:%"
         PRId64 ", Nombufs:%"
-        PRId64 "\n", eth_stats.ipackets, \
+        PRId64 "\n", eth_stats.ipackets,
         eth_stats.ibytes, eth_stats.ierrors, eth_stats.rx_nombuf);
     VI_PRINTF("Dropped RX Packets:%"
         PRId64 "\n", eth_stats.imissed);
@@ -589,7 +600,7 @@ dpdk_info_get_stats(VR_INFO_ARGS)
         RTE_LOG(ERR, VROUTER, "Ethdev not available\n");
     }
 
-    if (rte_eth_stats_get(port_id, & eth_stats) != 0) {
+    if (rte_eth_stats_get(port_id, &eth_stats) != 0) {
         return -1;
     }
     if (strcmp(msg_req->inbuf, "eth") == 0) {
@@ -638,7 +649,8 @@ display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all)
     }
 
     xstats_names = (struct rte_eth_xstat_name *)vr_zalloc(
-                       sizeof(struct rte_eth_xstat_name) * xstats_count, VR_INFO_REQ_OBJECT);
+                       sizeof(struct rte_eth_xstat_name) * xstats_count,
+                       VR_INFO_REQ_OBJECT);
     if (xstats_names == NULL) {
         RTE_LOG(ERR, VROUTER, "Cannot allocate memory for xstat names\n");
         goto err;
@@ -728,16 +740,16 @@ display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all)
     VI_PRINTF("%s\n\n", seperator);
     return 0;
 
-    err:
-        if (values){
-            vr_free(values, VR_INFO_REQ_OBJECT);
-            values = NULL;
-        }
-        if (xstats_names){
-            vr_free(xstats_names, VR_INFO_REQ_OBJECT);
-            xstats_names = NULL;
-        }
-        return -1;
+err:
+	if (values){
+		vr_free(values, VR_INFO_REQ_OBJECT);
+		values = NULL;
+	}
+	if (xstats_names){
+		vr_free(xstats_names, VR_INFO_REQ_OBJECT);
+		xstats_names = NULL;
+	}
+	return -1;
 }
 
 int
@@ -796,7 +808,8 @@ dpdk_info_get_xstats(VR_INFO_ARGS)
                 }
                 VI_PRINTF("Slave Info(%d):%s \n", i, name);
 
-                xstats_count = rte_eth_xstats_get_names_by_id(slave_id, NULL, 0, NULL);
+                xstats_count = rte_eth_xstats_get_names_by_id(slave_id, NULL,
+                                                                 0, NULL);
                 if (xstats_count < 0) {
                     RTE_LOG(ERR, VROUTER, "Cannot get xstats count\n");
                     return -1;
@@ -817,7 +830,8 @@ dpdk_info_get_xstats(VR_INFO_ARGS)
                     return -1;
                 }
                 VI_PRINTF("Slave Info(%d):%s \n", slave, name);
-                xstats_count = rte_eth_xstats_get_names_by_id(slave_id, NULL, 0, NULL);
+                xstats_count = rte_eth_xstats_get_names_by_id(slave_id, NULL,
+                                                                0, NULL);
                 if (xstats_count < 0) {
                     RTE_LOG(ERR, VROUTER, "Cannot get xstats count\n");
                     return -1;
@@ -835,7 +849,8 @@ dpdk_info_get_xstats(VR_INFO_ARGS)
             if (ethdev) {
                 port_id = ethdev->ethdev_port_id;
             }
-            xstats_count = rte_eth_xstats_get_names_by_id(port_id, NULL, 0, NULL);
+            xstats_count = rte_eth_xstats_get_names_by_id(port_id, NULL,
+                                                            0, NULL);
             if (xstats_count < 0) {
                 RTE_LOG(ERR, VROUTER, "Cannot get xstats count\n");
                 return -1;
@@ -885,5 +900,153 @@ dpdk_info_get_lcore(VR_INFO_ARGS)
         VI_PRINTF("\n");
     }
 
+    return 0;
+}
+
+int
+dpdk_info_get_app(VR_INFO_ARGS)
+{
+
+    uint16_t port_id;
+    FILE *intf = NULL, *bond_file = NULL;
+    char filepath[] = "var/run/vrouter/", nic_filepath[strlen(filepath)],
+        intf_name[LINE], intf_name_ncpy[LINE], bond_file_str[LINE],
+        bond_file_line1_cpy[LINE], *bond_file_line1, *slave_names;
+    struct vr_dpdk_ethdev *ethdev = NULL;
+    struct rte_eth_dev_info dev_info;
+    struct vr_dpdk_tapdev *tapdev = vr_dpdk.tapdevs;
+    size_t soff;
+    struct vrouter *router = vrouter_get(0);
+    int i, j = 0, k = 0, monitoring[router->vr_max_interfaces], m = 0;
+    struct vr_interface *vif;
+
+    VR_INFO_BUF_INIT();
+    VI_PRINTF("No. of cores: %d \n", vr_num_cpus);
+    VI_PRINTF("No. of forwarding lcores: %d \n", vr_dpdk.nb_fwd_lcores);
+
+    /* Get the port_id for master, Incase of non-bond devices,
+       port_id is VR_DPDK_INVALID_PORT_ID */
+    port_id = dpdk_find_port_id_by_drv_name();
+    if (port_id == VR_DPDK_INVALID_PORT_ID) {
+        RTE_LOG(ERR, VROUTER, "Port Id is invalid\n");
+    }
+    ethdev = &vr_dpdk.ethdevs[port_id];
+    if (ethdev->ethdev_ptr == NULL) {
+        RTE_LOG(ERR, VROUTER, "Ethdev not available\n");
+    }
+    strcpy(nic_filepath, filepath);
+    intf = fopen(strcat(nic_filepath, "nic"), "r");
+    if (intf == NULL){
+        RTE_LOG(ERR, VROUTER, "Nic file does not exits.\n");
+        return -1;
+    }
+    if (fgets (intf_name, sizeof(intf_name), intf)){
+        VI_PRINTF("Fabric interface: %s", intf_name);
+        if (strstr(intf_name, "bond")){
+            strncpy(intf_name_ncpy, intf_name, strlen(intf_name)-1);
+            intf_name_ncpy[strlen(intf_name)-1] = '\0';
+            strcat(intf_name_ncpy, "_bond");
+            bond_file = fopen(strcat(filepath, intf_name_ncpy), "r");
+            if (bond_file == NULL){
+                RTE_LOG(ERR, VROUTER, "Bond file does not exists.\n");
+                return -1;
+            }
+            fgets (bond_file_str, sizeof(bond_file_str), bond_file);
+            bond_file_line1 = strtok(bond_file_str, " ");
+            while(j < 2){
+                bond_file_line1 = strtok(NULL, " ");
+                j++;
+            }
+            strcpy(bond_file_line1_cpy, bond_file_line1);
+            bond_file_line1_cpy[strlen(bond_file_line1)] = '\0';
+            slave_names = strtok(bond_file_line1_cpy, ",");
+            for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                VI_PRINTF("Slave interface(%d): %s \n", i, slave_names);
+                slave_names = strtok(NULL, ",");
+            }
+        }
+    }
+    VI_PRINTF("Vlan name: %s \n", vr_dpdk.vlan_name);
+    VI_PRINTF("Vlan tag: %d \n", vr_dpdk.vlan_tag);
+    VI_PRINTF("Vlan vif: %s \n", vr_dpdk.vlan_vif->vif_name);
+
+    /* Display Ethdev information */
+    if (ethdev->ethdev_ptr) {
+        rte_eth_dev_info_get(port_id, &dev_info);
+        VI_PRINTF("Ethdev (Master):\n");
+        VI_PRINTF("\tMax rx queues: %"PRIu16"\n", dev_info.max_rx_queues);
+        VI_PRINTF("\tMax tx queues: %"PRIu16"\n", dev_info.max_tx_queues);
+        VI_PRINTF("\tEthdev nb rx queues: %"PRIu16"\n",
+                       ethdev->ethdev_nb_rx_queues);
+        VI_PRINTF("\tEthdev nb tx queues: %"PRIu16"\n",
+                       ethdev->ethdev_nb_tx_queues);
+        VI_PRINTF("\tEthdev nb rss queues: %"PRIu16"\n",
+                       ethdev->ethdev_nb_rss_queues);
+        VI_PRINTF("\tEthdev reta size: %"PRIu16"\n", ethdev->ethdev_reta_size);
+        VI_PRINTF("\tEthdev port id: %"PRIu16"\n", ethdev->ethdev_port_id);
+        VI_PRINTF("\tEthdev nb slaves: %d \n", ethdev->ethdev_nb_slaves);
+        VI_PRINTF("\tEthdev slaves: ");
+        for (i = 0; i<VR_DPDK_BOND_MAX_SLAVES; i++){
+            VI_PRINTF("%"PRIu16 " ", ethdev->ethdev_slaves[i]);
+        }
+        VI_PRINTF("\n\n");
+    }
+
+    for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+        VI_PRINTF("Ethdev (Slave %d): %s\n", i, rte_eth_devices[i].data->name);
+        VI_PRINTF("\tNb rx queues: %"PRIu16"\n",
+                       rte_eth_devices[i].data->nb_rx_queues);
+        VI_PRINTF("\tNb tx queues: %"PRIu16"\n",
+                       rte_eth_devices[i].data->nb_tx_queues);
+        VI_PRINTF("\tEthdev reta size: %"PRIu16"\n\n", dev_info.reta_size);
+    }
+    /* Display Tapdev information */
+    VI_PRINTF("Tapdev:\n");
+    while (tapdev[k].tapdev_fd){
+        VI_PRINTF("\tfd: %d", tapdev[k].tapdev_fd);
+        VI_PRINTF("\tvif name: %s \n", tapdev[k].tapdev_vif->vif_name);
+        k++;
+    }
+    VI_PRINTF("\n");
+
+    /* Display Monitoring interfaces */
+    for (i = 0; i < router->vr_max_interfaces; i++){
+         if (vr_dpdk.monitorings[i] != 0 &&
+                 vr_dpdk.monitorings[i] != VR_MAX_INTERFACES){
+             monitoring[m] = i;
+             m++;
+         }
+    }
+    if (m == 0){
+        RTE_LOG(ERR, VROUTER, "No monitoring interfaces.\n");
+    } else {
+        VI_PRINTF("Monitorings:\n");
+        for (i = 0; i < m; i++){
+            vif = router->vr_interfaces[monitoring[i]];
+            VI_PRINTF("\t%s\n", vif->vif_name);
+        }
+    }
+
+    /* Display SRIOV information */
+    VR_DPDK_RTE_ETH_FOREACH_DEV(i){
+         rte_eth_dev_info_get(i, &dev_info);
+         /* Check PMD name suffix to detect SR-IOV virtual function. */
+         soff = strlen(dev_info.driver_name) - sizeof(VR_DPDK_VF_PMD_SFX) + 1;
+         if (soff > 0 &&
+               strncmp(dev_info.driver_name + soff, VR_DPDK_VF_PMD_SFX,
+               sizeof(VR_DPDK_VF_PMD_SFX)) == 0){
+             if (dev_info.max_tx_queues < vr_dpdk.nb_fwd_lcores
+                    /* We also need 2 TX queues for Netlink and Packet lcores. */
+                    + VR_DPDK_FWD_LCORE_ID - VR_DPDK_PACKET_LCORE_ID) {
+                 VI_PRINTF("Sriov:\n");
+                 VI_PRINTF("\tLcore: %d", VR_DPDK_FWD_LCORE_ID);
+                 VI_PRINTF("\tEthdev port id: %d", i);
+                 VI_PRINTF("\tDriver Name: %s\n", dev_info.driver_name);
+                break;
+             }
+         }
+    }
+
+    VI_PRINTF("\n");
     return 0;
 }

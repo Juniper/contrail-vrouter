@@ -37,8 +37,8 @@ static int dump_marker = -1;
  * */
 static int buff_table_id, buffsz;
 
-static int help_set, bond_set, lacp_set, mempool_set, stats_set,
-    xstats_set, lcore_set, sock_dir_set;
+static int help_set, ver_set, bond_set, lacp_set, mempool_set, stats_set,
+             xstats_set, lcore_set, app_set, sock_dir_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
 /* For few  CLI, Inbuf has to send to vrouter for processing(i.e kind of filter
@@ -49,6 +49,7 @@ static vr_info_msg_en msginfo;
 
 enum opt_index {
     HELP_OPT_INDEX,
+    VER_OPT_INDEX,
     BOND_OPT_INDEX,
     LACP_OPT_INDEX,
     MEMPOOL_OPT_INDEX,
@@ -56,18 +57,21 @@ enum opt_index {
     XSTATS_OPT_INDEX,
     BUFFSZ_OPT_INDEX,
     LCORE_OPT_INDEX,
+    APP_OPT_INDEX,
     SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
 static struct option long_options[] = {
     [HELP_OPT_INDEX]    =   {"help",    no_argument,        &help_set,      1},
+    [VER_OPT_INDEX]    =   {"version",    no_argument,        &ver_set,      1},
     [BOND_OPT_INDEX]    =   {"bond",    no_argument,        &bond_set,      1},
     [LACP_OPT_INDEX]    =   {"lacp",    required_argument,        &lacp_set,      1},
     [MEMPOOL_OPT_INDEX] =   {"mempool", required_argument,        &mempool_set,      1},
     [STATS_OPT_INDEX]    =   {"stats",    required_argument,        &stats_set,      1},
     [XSTATS_OPT_INDEX]    =   {"xstats",  optional_argument,        &xstats_set,      1},
     [LCORE_OPT_INDEX]    =   {"lcore",    no_argument,        &lcore_set,      1},
+    [APP_OPT_INDEX]    =   {"app",    no_argument,        &app_set,      1},
     [BUFFSZ_OPT_INDEX]  =   {"buffsz",  required_argument,  &buffsz,        1},
     [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
@@ -77,6 +81,8 @@ static void
 Usage()
 {
     printf("Usage: dpdkinfo [--help]\n");
+    printf("                 --version|-v\
+                                                      Show DPDK Version\n");
     printf("                 --bond|-b\
                                                          Show Master/Slave bond information\n");
     printf("                 --lacp|-l     <all/conf>\
@@ -89,6 +95,8 @@ Usage()
      Show Extended Stats information\n");
     printf("                 --lcore|-c\
                                                         Show Lcore information\n");
+    printf("                 --app|-a\
+                                                          Show App information\n");
     printf("       Optional: --buffsz      <value>\
                                              Send output buffer size\n");
     exit(-EINVAL);
@@ -97,8 +105,8 @@ Usage()
 static void
 validate_options(void)
 {
-    if(!(bond_set || lacp_set || mempool_set ||
-        stats_set || xstats_set || lcore_set))
+    if(!(ver_set || bond_set || lacp_set || mempool_set ||
+        stats_set || xstats_set || lcore_set || app_set))
         Usage();
 
     return;
@@ -147,6 +155,10 @@ parse_long_opts(int opt_index, char *opt_arg)
     errno = 0;
 
     switch (opt_index) {
+    case VER_OPT_INDEX:
+        msginfo = INFO_VER;
+        vr_info_inbuf = opt_arg;
+        break;
     case BOND_OPT_INDEX:
         msginfo = INFO_BOND;
         break;
@@ -168,6 +180,10 @@ parse_long_opts(int opt_index, char *opt_arg)
         break;
     case LCORE_OPT_INDEX:
         msginfo = INFO_LCORE;
+        vr_info_inbuf = opt_arg;
+        break;
+    case APP_OPT_INDEX:
+        msginfo = INFO_APP;
         vr_info_inbuf = opt_arg;
         break;
     case SOCK_DIR_OPT_INDEX:
@@ -220,9 +236,15 @@ main(int argc, char *argv[])
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "h:b:l:m:s:n:x:c:",
+    while (((opt = getopt_long(argc, argv, "h:v:b:l:m:s:n:x:c:a:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
+        case 'v':
+            ver_set = 1;
+            msginfo = INFO_VER;
+            parse_long_opts(VER_OPT_INDEX, optarg);
+            break;
+
         case 'b':
             bond_set = 1;
             msginfo = INFO_BOND;
@@ -241,7 +263,7 @@ main(int argc, char *argv[])
             parse_long_opts(MEMPOOL_OPT_INDEX, optarg);
             break;
 
-	case 'n':
+	    case 'n':
             stats_set = 1;
             msginfo = INFO_STATS;
             parse_long_opts(STATS_OPT_INDEX, optarg);
@@ -262,6 +284,12 @@ main(int argc, char *argv[])
             lcore_set = 1;
             msginfo = INFO_LCORE;
             parse_long_opts(LCORE_OPT_INDEX, optarg);
+            break;
+
+        case 'a':
+            app_set = 1;
+            msginfo = INFO_APP;
+            parse_long_opts(APP_OPT_INDEX, optarg);
             break;
 
         case 0:
