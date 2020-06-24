@@ -1881,8 +1881,12 @@ fill_flow_req(vr_flow_req *req, unsigned long flow_index, char action)
         req->fr_flow_sip_l = fe->fe_key.flow4_sip;
         req->fr_flow_dip_l = fe->fe_key.flow4_dip;
     } else {
-        memcpy(&req->fr_flow_sip_l, fe->fe_key.flow_ip,
-              2 * VR_IP_ADDR_SIZE(fe->fe_type));
+        memcpy(&req->fr_flow_sip_u, fe->fe_key.flow6_sip, sizeof(uint64_t));
+        memcpy(&req->fr_flow_sip_l, (fe->fe_key.flow6_sip + sizeof(uint64_t)),
+               sizeof(uint64_t));
+        memcpy(&req->fr_flow_dip_u, fe->fe_key.flow6_dip, sizeof(uint64_t));
+        memcpy(&req->fr_flow_dip_l, (fe->fe_key.flow6_dip + sizeof(uint64_t)),
+               sizeof(uint64_t));
     }
 
     req->fr_flow_proto = fe->fe_key.flow_proto;
