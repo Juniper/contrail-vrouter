@@ -58,7 +58,7 @@ vr_htable_trav_range(vr_htable_t htable, unsigned int start,
         cb(htable, ent, hindex, data);
     }
 
-    return i;
+    return hindex;
 }
 
 void
