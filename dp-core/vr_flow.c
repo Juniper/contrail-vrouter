@@ -19,6 +19,7 @@
 #include "vr_hash.h"
 #include "vr_ip_mtrie.h"
 #include "vr_bridge.h"
+#include "vr_nexthop.h"
 
 #include "vr_offloads.h"
 
@@ -69,6 +70,7 @@ struct vr_flow_entry *vr_find_flow(struct vrouter *, struct vr_flow *,
 unsigned int vr_trap_flow(struct vrouter *, struct vr_flow_entry *,
         struct vr_packet *, unsigned int, struct vr_flow_stats *,
         struct vr_packet_node *);
+extern struct vr_nexthop *vr_inet_ip_lookup(unsigned short, uint32_t);
 
 void get_random_bytes(void *buf, int nbytes);
 
@@ -1690,6 +1692,7 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
     fmd->fmd_dotonep = pnode->pl_dotonep;
     fmd->fmd_vlan = pnode->pl_vlan;
     fmd->fmd_mirror_data = pnode->pl_mirror_vlan;
+    fmd->fmd_dvrf = pnode->pl_vrf;
 
     pnode->pl_packet = NULL;
     /*
@@ -1713,6 +1716,10 @@ vr_flow_flush_pnode(struct vrouter *router, struct vr_packet_node *pnode,
                 pkt->vp_nh = __vrouter_bridge_lookup(fmd->fmd_dvrf,
                                                         pkt_data(pkt));
             }
+        }
+        if(vif_is_vhost(vif) && !(vif->vif_flags & VIF_FLAG_POLICY_ENABLED)) {
+            ip = (struct vr_ip *)pkt_network_header(pkt);
+            pkt->vp_nh = vr_inet_ip_lookup(fmd->fmd_dvrf, ip->ip_daddr);
         }
     }
 
