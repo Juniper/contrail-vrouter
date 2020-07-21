@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2d52d101_0fac16a6",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 1722,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-07-21T17:55:41Z",
+      "side": 1,
+      "message": "what if the pkt is a IPv6 pkt? Can we handle that as well?",
+      "revId": "4981ae099f1b8fb190782d75096143c3f23b0092",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
