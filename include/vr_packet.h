@@ -1518,8 +1518,24 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
 
         if(pkt != NULL)
         {
+            /* Check if dropped packet is IPV6 */
+            if (pkt->vp_type == VP_TYPE_IP6)
+            {
+                ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
+                if(!ip6)
+                    return;
+                memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv6.s6_addr, ip6->ip6_src,
+			sizeof(ip6->ip6_src));
+                memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv6.s6_addr, ip6->ip6_dst,
+			sizeof(ip6->ip6_dst));
+
+                if(flow != NULL && flow->flow6_sport != 0) {
+                    vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow6_sport;
+                    vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow6_dport;
+                }
+            }
             /* Check if dropped packet is IPV4*/
-            if (pkt->vp_type == VP_TYPE_IP) {
+            else if (pkt->vp_type != VP_TYPE_NULL) {
                 ip = (struct vr_ip *)pkt_network_header(pkt);
                 if(!ip)
                     return;
@@ -1536,26 +1552,11 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
                     vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow4_dport;
                 }
             }
-            /* Check if dropped packet is IPV6 */
-            else if (pkt->vp_type == VP_TYPE_IP6)
-            {
-                ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
-                if(!ip6)
-                    return;
-                memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].src.ipv6.s6_addr, ip6->ip6_src,
-			sizeof(ip6->ip6_src));
-                memcpy(vr_pkt_drop_log_buffer[cpu][buf_idx].dst.ipv6.s6_addr, ip6->ip6_dst,
-			sizeof(ip6->ip6_dst));
+            PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
 
-                if(flow != NULL && flow->flow6_sport != 0) {
-                    vr_pkt_drop_log_buffer[cpu][buf_idx].sport = flow->flow6_sport;
-                    vr_pkt_drop_log_buffer[cpu][buf_idx].dport = flow->flow6_dport;
-                }
-            }
-        /* Log packet details into buffer, when drop least is diabled */
-        if(vr_pkt_droplog_min_sysctl_en != 1)
-        {
-                PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vp_type, pkt->vp_type)
+            /* Log packet details into buffer, when drop least is diabled */
+            if(vr_pkt_droplog_min_sysctl_en != 1)
+            {
                 if(pkt->vp_if != NULL) {
                     PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].vif_idx,
 			pkt->vp_if->vif_idx)
