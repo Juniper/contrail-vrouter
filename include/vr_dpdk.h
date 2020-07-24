@@ -33,6 +33,7 @@
 #include <rte_ip.h>
 #include <rte_port_ring.h>
 #include <rte_ethdev.h>
+#include <rte_spinlock.h>
 
 #ifdef PKT_RX_VLAN_PKT
 #define PKT_RX_VLAN PKT_RX_VLAN_PKT
@@ -82,6 +83,7 @@ extern unsigned vr_packet_sz;
                                         || vif->vif_type == VIF_TYPE_VIRTUAL)
  */
 
+#define VR_MAX_CPUS_DPDK            64
 /* Default lcore mask. Used only when sched_getaffinity() is failed */
 #define VR_DPDK_DEF_LCORE_MASK      0xf
 /* Default memory size to allocate at startup (in MBs) */
@@ -124,7 +126,7 @@ extern unsigned vr_packet_sz;
 #define VR_DPDK_MPLS_OFFSET         ((VR_ETHER_HLEN             \
                                     + sizeof(struct vr_ip)      \
                                     + sizeof(struct vr_udp))/2)
-/* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*VR_MAX_CPUS) */
+/* Maximum number of rings per lcore (maximum is VR_MAX_INTERFACES*VR_MAX_CPUS_DPDK) */
 #define VR_DPDK_MAX_RINGS           (VR_MAX_INTERFACES*2)
 /* Maximum number of bond interfaces per lcore */
 #define VR_DPDK_MAX_BONDS           2
@@ -264,7 +266,7 @@ extern unsigned vr_packet_sz;
 
 /* Maximum number of HOLD entries in flow table */
 #define VR_DPDK_MAX_FLOW_TABLE_HOLD_COUNT 1000
-/* Maximum number of mbufs in fragment assembler. */
+/* Maximum number of mbufs in per CPU queues */
 #define VR_DPDK_MAX_FRAGMENT_ELEMENTS     1024ULL
 /*
  * SR-IOV virtual function PMD name suffix.
@@ -293,6 +295,28 @@ extern unsigned vr_packet_sz;
 
 /* VHOST Default MTU size*/
 #define VR_DPDK_VHOST_DEFAULT_MTU_SIZE 1500
+
+/* vr_info - DPDK platform dependent Macro functions
+ * For vr_info, callback functions are registered in vr_info.h,
+ * those callbacks will be expanded below for function declaration and
+ * mapping those functions in vr_dpdk_host.c */
+
+/* Map only DPDK specific callback functions */
+#undef VR_INFO_HOST_MAP_DPDK
+#define VR_INFO_HOST_MAP_DPDK(MSG, CB) \
+    .hos_vr_##CB = dpdk_##CB,
+
+#define VR_INFO_HOST_MAP(MSG, CB, PLTFRM) \
+    VR_INFO_HOST_MAP_##PLTFRM(MSG, CB)
+
+#define FOREACH_VR_INFO_MAP() \
+    VR_INFO_REG(VR_INFO_HOST_MAP)
+
+#define VR_INFO_DECLARATION(MSG, CB, PLTFRM) \
+    int dpdk_##CB(VR_INFO_ARGS);
+
+#define FOREACH_VR_INFO_DECLARATION() \
+    VR_INFO_REG(VR_INFO_DECLARATION)
 
 /*
  * DPDK LCore IDs
@@ -391,6 +415,8 @@ struct vr_dpdk_queue {
     bool enabled;
     /* Pointer to vRouter interface */
     struct vr_interface *q_vif;
+    /* Incase of multiqueue, store vring queue_id */
+    uint16_t vring_queue_id;
 };
 
 /* We store the queue params in the separate structure to increase CPU
@@ -492,7 +518,7 @@ struct vr_dpdk_lcore {
     /* Number of lcores to distribute packets to */
     uint16_t lcore_nb_dst_lcores;
     /* List of forwarding lcore indexes based on VR_DPDK_FWD_LCORE_ID */
-    uint16_t lcore_dst_lcore_idxs[VR_MAX_CPUS];
+    uint16_t lcore_dst_lcore_idxs[VR_MAX_CPUS_DPDK];
     /* Table of RX queues */
     struct vr_dpdk_queue lcore_rx_queues[VR_MAX_INTERFACES];
     /* Table of TX queues */
@@ -577,6 +603,8 @@ struct vr_dpdk_ethdev {
     struct rte_mempool *ethdev_mempools[VR_DPDK_MAX_NB_RX_QUEUES];
     /* Vif interface Id */
     uint8_t ethdev_vif_idx;
+    /* Port lock. */
+    rte_spinlock_t ethdev_lock;
 };
 
 /* Tapdev configuration. */
@@ -622,7 +650,7 @@ struct vr_dpdk_global {
 
     /* Table of pointers to forwarding lcore
      * Must be at the end of the cache line 1 */
-    struct vr_dpdk_lcore *lcores[VR_MAX_CPUS];
+    struct vr_dpdk_lcore *lcores[VR_MAX_CPUS_DPDK];
 
     /**********************************************************************/
     /* Big and less frequently used fields */
@@ -917,7 +945,7 @@ void vr_dpdk_lcore_if_unschedule(struct vr_interface *vif);
 /* Schedule an MPLS label queue */
 int vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     unsigned mpls_label);
-/* Returns the least used lcore or VR_MAX_CPUS */
+/* Returns the least used lcore or VR_MAX_CPUS_DPDK */
 unsigned vr_dpdk_lcore_least_used_get(void);
 /* Flush TX queues */
 static inline void
@@ -961,6 +989,9 @@ void vr_dpdk_netlink_wakeup(void);
 void dpdk_netlink_exit(void);
 int dpdk_netlink_init(void);
 int dpdk_netlink_receive(void *usockp, char *nl_buf, unsigned int nl_len);
+
+extern unsigned int vr_dpdk_rx_ring_sz, vr_dpdk_tx_ring_sz;
+extern unsigned int vr_dpdk_yield_option;
 
 /*
  * vr_dpdk_ringdev.c
@@ -1015,5 +1046,12 @@ void vr_dpdk_init_cpuid(struct vr_cpu_type_t *cpu);
  * Get bond interface port id by drv_name
  */
 uint8_t dpdk_find_port_id_by_drv_name(void);
+
+/*
+ * Get DPDK info
+ */
+/* Below macro would be expanded for declaring the DPDK callback function
+ * used for vr_info */
+FOREACH_VR_INFO_DECLARATION()
 
 #endif /*_VR_DPDK_H_ */

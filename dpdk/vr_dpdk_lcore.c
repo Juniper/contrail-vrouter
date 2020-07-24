@@ -34,13 +34,13 @@
 
 extern unsigned int datapath_offloads;
 
-/* Returns the least used lcore or VR_MAX_CPUS */
+/* Returns the least used lcore or VR_MAX_CPUS_DPDK */
 unsigned
 vr_dpdk_lcore_least_used_get(void)
 {
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
-    unsigned least_used_id = VR_MAX_CPUS;
+    unsigned least_used_id = VR_MAX_CPUS_DPDK;
     uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
     unsigned int num_queues;
 
@@ -61,13 +61,13 @@ vr_dpdk_lcore_least_used_get(void)
     return least_used_id;
 }
 
-/* Returns the least used IO lcore or VR_MAX_CPUS */
+/* Returns the least used IO lcore or VR_MAX_CPUS_DPDK */
 unsigned
 dpdk_lcore_least_used_io_get(void)
 {
     unsigned lcore_id;
     struct vr_dpdk_lcore *lcore;
-    unsigned least_used_id = VR_MAX_CPUS;
+    unsigned least_used_id = VR_MAX_CPUS_DPDK;
     uint16_t least_used_nb_queues = 2 * VR_MAX_INTERFACES;
     unsigned int num_queues;
 
@@ -163,7 +163,7 @@ dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
         SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
             q_next);
         rx_queue->enabled = false;
-
+        rx_queue->vring_queue_id = 0;
         /* decrease the number of RX queues */
         lcore->lcore_nb_rx_queues--;
         RTE_VERIFY(lcore->lcore_nb_rx_queues <= VR_MAX_INTERFACES);
@@ -182,7 +182,7 @@ vr_dpdk_lcore_mpls_schedule(struct vr_interface *vif, unsigned dst_ip,
     struct vr_dpdk_queue *rx_queue;
     unsigned least_used_id = vr_dpdk_lcore_least_used_get();
 
-    if (least_used_id == VR_MAX_CPUS) {
+    if (least_used_id == VR_MAX_CPUS_DPDK) {
         RTE_LOG(ERR, VROUTER, "    error getting the least used lcore ID\n");
         return -EFAULT;
     }
@@ -380,7 +380,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
     struct vr_dpdk_queue *rx_queue;
     struct vr_dpdk_lcore *lcore;
 
-    if (least_used_id == VR_MAX_CPUS) {
+    if (least_used_id == VR_MAX_CPUS_DPDK) {
         RTE_LOG(ERR, VROUTER, "    error getting the least used lcore ID\n");
         return -EFAULT;
     }
@@ -402,7 +402,7 @@ vr_dpdk_lcore_if_schedule(struct vr_interface *vif, unsigned least_used_id,
         && vif_is_virtual(vif)) {
         /* assign RX queue to an IO lcore */
         lcore_id = dpdk_lcore_least_used_io_get();
-        if (lcore_id == VR_MAX_CPUS) {
+        if (lcore_id == VR_MAX_CPUS_DPDK) {
             RTE_LOG(ERR, VROUTER, "    error getting the least used IO lcore ID\n");
             return -EFAULT;
         }
@@ -602,7 +602,7 @@ dpdk_lcore_delay_us(unsigned us)
 #if VR_DPDK_SLEEP_NO_PACKETS_US > 0
     usleep(us);
 #endif
-#if VR_DPDK_YIELD_NO_PACKETS > 0
+    if (vr_dpdk_yield_option > 0)
     /*
      * Yielding specified time reduces TX side enqueue drops,
      * but also reduces PPS on RX side.
@@ -612,7 +612,6 @@ dpdk_lcore_delay_us(unsigned us)
 //    while ((rte_get_timer_cycles() - start) < ticks)
         sched_yield();
 
-#endif
     rcu_thread_online();
 }
 
@@ -915,6 +914,9 @@ dpdk_lcore_rxqs_vroute(struct vr_dpdk_lcore *lcore)
     /* for all hardware RX queues */
     SLIST_FOREACH(rx_queue, &lcore->lcore_rx_head, q_next) {
         /* burst RX */
+        if (!rx_queue->q_queue_h)
+            continue;
+
         rte_prefetch0(rx_queue->q_queue_h);
         nb_pkts = rx_queue->rxq_ops.f_rx(rx_queue->q_queue_h, pkts,
                 VR_DPDK_RX_BURST_SZ);
@@ -1173,9 +1175,8 @@ dpdk_lcore_io_rxtx(struct vr_dpdk_lcore *lcore)
 #if VR_DPDK_SLEEP_NO_PACKETS_US > 0
         usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
 #endif
-#if VR_DPDK_YIELD_NO_PACKETS > 0
-        sched_yield();
-#endif
+        if (vr_dpdk_yield_option > 0)
+            sched_yield();
         rcu_thread_online();
     }
 }
@@ -1251,9 +1252,8 @@ dpdk_lcore_sriov_rxtx(struct vr_dpdk_lcore *lcore)
 #if VR_DPDK_SLEEP_NO_PACKETS_US > 0
         usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
 #endif
-#if VR_DPDK_YIELD_NO_PACKETS > 0
-        sched_yield();
-#endif
+        if (vr_dpdk_yield_option > 0)
+            sched_yield();
         rcu_thread_online();
     }
 
@@ -1296,9 +1296,8 @@ dpdk_lcore_fwd_rxtx(struct vr_dpdk_lcore *lcore)
 #if VR_DPDK_SLEEP_NO_PACKETS_US > 0
         usleep(VR_DPDK_SLEEP_NO_PACKETS_US);
 #endif
-#if VR_DPDK_YIELD_NO_PACKETS > 0
-        sched_yield();
-#endif
+        if (vr_dpdk_yield_option > 0)
+            sched_yield();
         rcu_thread_online();
     }
 
@@ -1422,7 +1421,7 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
      * Other forwarding lcores will enqueue MPLSoGRE packets here.
      */
     lcore->lcore_rx_ring = vr_dpdk_ring_allocate(lcore_id, "lcore RX ring",
-            VR_DPDK_RX_RING_SZ, RING_F_SC_DEQ);
+            vr_dpdk_rx_ring_sz, RING_F_SC_DEQ);
     if (lcore->lcore_rx_ring == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u RX ring\n", lcore_id);
         rte_free(lcore);
@@ -1435,7 +1434,7 @@ dpdk_lcore_fwd_init(unsigned lcore_id, struct vr_dpdk_lcore *lcore)
      */
     if (VR_DPDK_USE_IO_LCORES) {
         lcore->lcore_io_rx_ring = vr_dpdk_ring_allocate(lcore_id, "lcore IO RX ring",
-                VR_DPDK_RX_RING_SZ, RING_F_SC_DEQ | RING_F_SP_ENQ);
+                vr_dpdk_rx_ring_sz, RING_F_SC_DEQ | RING_F_SP_ENQ);
         if (lcore->lcore_io_rx_ring == NULL) {
             RTE_LOG(CRIT, VROUTER, "Error allocating lcore %u IO RX ring\n", lcore_id);
             rte_free(lcore);
@@ -1691,7 +1690,7 @@ dpdk_lcore_fwd_loop(void)
         * VR_DPDK_BOND_TX_MS / MS_PER_S;
     /* timeout for IP fragment assembler */
     const uint64_t assembler_cycles = (rte_get_timer_hz() + MS_PER_S - 1)
-        * (VR_ASSEMBLER_TIMEOUT_TIME * 1000) / VR_ASSEMBLER_BUCKET_COUNT
+        * (VR_ASSEMBLER_TIMEOUT_SECS * 1000) / VR_ASSEMBLER_BUCKET_COUNT
         / MS_PER_S;
 #if VR_DPDK_USE_TIMER
     /* calculate timeouts in CPU cycles */

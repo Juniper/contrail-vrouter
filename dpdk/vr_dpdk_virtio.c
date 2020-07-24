@@ -365,7 +365,7 @@ vr_dpdk_virtio_rx_queue_init(unsigned int lcore_id, struct vr_interface *vif,
             PRIu16 "\n", vif->vif_name, queue_id);
         return NULL;
     }
-
+    rx_queue->vring_queue_id = queue_id;
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_virtio_rx_queue_release;
 
@@ -464,7 +464,7 @@ struct dpdk_virtio_tx_queue_set_params {
     unsigned int queue_id;
 };
 
-static unsigned int vif_lcore_tx_queue[VR_MAX_INTERFACES][VR_MAX_CPUS];
+static unsigned int vif_lcore_tx_queue[VR_MAX_INTERFACES][VR_MAX_CPUS_DPDK];
 static unsigned int vif_tx_queues_enabled[VR_MAX_INTERFACES];
 
 /*
@@ -675,6 +675,7 @@ vr_dpdk_virtio_rx_queue_set(void *arg)
         lcore_id = vif_rx_queue_lcore[p->vif_id][p->queue_id];
         lcore = vr_dpdk.lcores[lcore_id];
         rx_queue = &lcore->lcore_rx_queues[p->vif_id];
+        lcore->lcore_rx_queues[p->vif_id].vring_queue_id = p->queue_id;
         dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head, rx_queue);
 
     } else {

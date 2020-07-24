@@ -35,6 +35,7 @@
 extern int vr_rxd_sz, vr_txd_sz;
 extern unsigned int datapath_offloads;
 unsigned int vr_dpdk_master_port_id;
+extern bool vr_no_load_balance;
 
 struct rte_eth_conf ethdev_conf = {
 #if (RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 0))
@@ -262,6 +263,7 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
         return NULL;
     }
 
+    rx_queue->vring_queue_id = rx_queue_id;
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_ethdev_rx_queue_release;
     rx_queue_params->qp_ethdev.queue_id = rx_queue_id;
@@ -879,7 +881,7 @@ vr_dpdk_bond_send_port_info(uint16_t port_id, uint8_t vif_idx)
 
     if(rte_eth_devices[port_id].device->driver->name != NULL)
         snprintf(member_info.intf_drv_name, (VR_INTERFACE_NAME_LEN - 1),
-                rte_eth_devices[port_id].device->driver->name);
+                "%s", rte_eth_devices[port_id].device->driver->name);
 
     RTE_LOG(INFO, VROUTER, "Port ID: %d Link Status: %s intf_name:%s \
             drv_name:%s \n\n", port_id, (link.link_status?str[0]:str[1]),
@@ -1002,6 +1004,8 @@ vr_dpdk_ethdev_init(struct vr_dpdk_ethdev *ethdev, struct rte_eth_conf *dev_conf
 #if VR_DPDK_ENABLE_PROMISC
     rte_eth_promiscuous_enable(port_id);
 #endif
+
+    rte_spinlock_init(&ethdev->ethdev_lock);
 
     return 0;
 }
@@ -1347,16 +1351,17 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
         for (i = 0; i < *nb_pkts; i++)
             pkts[i]->ol_flags |= PKT_RX_IP_CKSUM_BAD;
 
-    /* no RSS needed for just one lcore */
-    if (unlikely(vr_dpdk.nb_fwd_lcores == 1))
-        return 0;
-
     offload_en = vif_is_fabric(vif) && datapath_offloads;
     /* parse packet headers and emulate RSS hash */
     for (i = 0; i < *nb_pkts; i++) {
+
         /* datapath offloads calculated the RSS for flow tagged packets */
         if (!(offload_en && (pkts[i]->ol_flags & PKT_RX_FDIR_ID))) {
             ret = dpdk_mbuf_parse_and_hash_packets(pkts[i]);
+
+            /* If software load-balancing is not required, continue */
+            if (vr_no_load_balance)
+                continue;
 
             /**
              * ret:
