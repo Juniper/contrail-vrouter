@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9c4f40e2_f0e087b8",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-07-24T18:21:01Z",
+      "side": 1,
+      "message": "why load balancing changed included ?",
+      "revId": "0d7b95a03b4cef07bd03de596cc0169d049997c4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5529a529_65a86b3f",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1008,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-07-24T18:21:01Z",
+      "side": 1,
+      "message": "why this change ?",
+      "revId": "0d7b95a03b4cef07bd03de596cc0169d049997c4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0547d382_fb6dca4e",
+        "filename": "dpdk/vr_dpdk_ethdev.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1362,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-07-24T18:21:01Z",
+      "side": 1,
+      "message": "These changes are not part of dpdkinfo tool.",
+      "revId": "0d7b95a03b4cef07bd03de596cc0169d049997c4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9af870d8_452509f8",
+        "filename": "dpdk/vr_dpdk_lcore.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 43,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-07-24T18:21:01Z",
+      "side": 1,
+      "message": "this change is not part of dpdkinfo.\nTake care in other places too",
+      "revId": "0d7b95a03b4cef07bd03de596cc0169d049997c4",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
