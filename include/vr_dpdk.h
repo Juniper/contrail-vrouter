@@ -294,6 +294,28 @@ extern unsigned vr_packet_sz;
 /* VHOST Default MTU size*/
 #define VR_DPDK_VHOST_DEFAULT_MTU_SIZE 1500
 
+/* vr_info - DPDK platform dependent Macro functions
+ * For vr_info, callback functions are registered in vr_info.h,
+ * those callbacks will be expanded below for function declaration and
+ * mapping those functions in vr_dpdk_host.c */
+
+/* Map only DPDK specific callback functions */
+#undef VR_INFO_HOST_MAP_DPDK
+#define VR_INFO_HOST_MAP_DPDK(MSG, CB) \
+    .hos_vr_##CB = dpdk_##CB,
+
+#define VR_INFO_HOST_MAP(MSG, CB, PLTFRM) \
+    VR_INFO_HOST_MAP_##PLTFRM(MSG, CB)
+
+#define FOREACH_VR_INFO_MAP() \
+    VR_INFO_REG(VR_INFO_HOST_MAP)
+
+#define VR_INFO_DECLARATION(MSG, CB, PLTFRM) \
+    int dpdk_##CB(VR_INFO_ARGS);
+
+#define FOREACH_VR_INFO_DECLARATION() \
+    VR_INFO_REG(VR_INFO_DECLARATION)
+
 /*
  * DPDK LCore IDs
  */
@@ -391,6 +413,8 @@ struct vr_dpdk_queue {
     bool enabled;
     /* Pointer to vRouter interface */
     struct vr_interface *q_vif;
+    /* Incase of multiqueue, store vring queue_id */
+    uint16_t vring_queue_id;
 };
 
 /* We store the queue params in the separate structure to increase CPU
@@ -1018,5 +1042,12 @@ void vr_dpdk_init_cpuid(struct vr_cpu_type_t *cpu);
  * Get bond interface port id by drv_name
  */
 uint8_t dpdk_find_port_id_by_drv_name(void);
+
+/*
+ * Get DPDK info
+ */
+/* Below macro would be expanded for declaring the DPDK callback function
+ * used for vr_info */
+FOREACH_VR_INFO_DECLARATION()
 
 #endif /*_VR_DPDK_H_ */

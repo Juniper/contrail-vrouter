@@ -2339,6 +2339,10 @@ struct host_os linux_host = {
     .hos_nl_broadcast_supported     =       true,
     .hos_huge_page_config           =       lh_huge_page_config,
     .hos_huge_page_mem_get          =       lh_huge_mem_get,
+    /* Below macro would be expanded for each callbacks registered in vr_info.h.
+     * this would map the actual kernel callback function with
+     * vrouter_host(.hos_<fn. name>) */
+    FOREACH_VR_INFO_MAP()
 };
 
 struct host_os *

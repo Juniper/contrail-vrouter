@@ -29,6 +29,8 @@ MIRROR = mirror
 VRFSTATS = vrfstats
 DROPSTATS = dropstats
 VXLAN = vxlan
+DPDKINFO = dpdkinfo
+VRINFO = vrinfo
 
 SANDESH_OBJS = $(SRC_ROOT)/sandesh/gen-c/vr_types.o
 
