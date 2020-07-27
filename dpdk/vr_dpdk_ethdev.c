@@ -262,6 +262,7 @@ vr_dpdk_ethdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
         return NULL;
     }
 
+    rx_queue->vring_queue_id = rx_queue_id;
     /* store queue params */
     rx_queue_params->qp_release_op = &dpdk_ethdev_rx_queue_release;
     rx_queue_params->qp_ethdev.queue_id = rx_queue_id;
