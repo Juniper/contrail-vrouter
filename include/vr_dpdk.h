@@ -391,6 +391,8 @@ struct vr_dpdk_queue {
     bool enabled;
     /* Pointer to vRouter interface */
     struct vr_interface *q_vif;
+    /* Incase of multiqueue, store vring queue_id */
+    uint16_t vring_queue_id;
 };
 
 /* We store the queue params in the separate structure to increase CPU

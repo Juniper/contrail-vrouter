@@ -256,6 +256,7 @@ vr_dpdk_tapdev_rx_queue_init(unsigned lcore_id, struct vr_interface *vif,
     if (rx_queue->q_queue_h == NULL)
         goto error;
 
+    rx_queue->vring_queue_id = queue_id;
     /* Store queue params. */
     rx_queue_params->qp_release_op = &dpdk_tapdev_rx_queue_release;
     rx_queue_params->qp_ring.ring_p = tapdev->tapdev_rx_ring;
