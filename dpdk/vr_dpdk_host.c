@@ -1497,6 +1497,10 @@ struct host_os dpdk_host = {
     .hos_offload_flow_create        =    dpdk_offload_flow_create,
     .hos_offload_flow_destroy       =    dpdk_offload_flow_destroy,
     .hos_offload_prepare            =    dpdk_offload_prepare,
+    /* Below macro would be expanded for each callbacks registered in vr_info.h.
+     * this would map the actual dpdk callback function with
+     * vrouter_host(.hos_<fn. name>) */
+    FOREACH_VR_INFO_MAP()
 };
 
 struct host_os *
