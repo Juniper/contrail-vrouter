@@ -248,7 +248,7 @@ dpdk_mempools_create(void)
     /* Create the mbuf pool used for IP fragmentation (indirect mbufs) */
     vr_dpdk.frag_indirect_mempool = rte_mempool_create("frag_indirect_mempool",
             frag_indirect_mempool_sz, VR_DPDK_FRAG_INDIRECT_MBUF_SZ,
-            VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, 0, NULL, NULL,
+            VR_DPDK_FRAG_INDIRECT_MEMPOOL_CACHE_SZ, 0, rte_pktmbuf_pool_init, NULL,
             rte_pktmbuf_init, NULL, rte_socket_id(), 0);
     if (vr_dpdk.frag_indirect_mempool == NULL) {
         RTE_LOG(CRIT, VROUTER, "Error creating FRAG_INDIRECT mempool: %s (%d)\n",
