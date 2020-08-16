@@ -1345,8 +1345,22 @@ vr_send_interface_add(struct nl_client *cl, int router_id, char *vif_name,
     return vr_sendmsg(cl, &req, "vr_interface_req");
 }
 
-/* interface end */
 
+int
+vr_send_vif_clear_stats(struct nl_client *cl, unsigned int router_id,
+        int vif_idx, int core)
+{
+    vr_interface_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_RESET;
+    req.vifr_rid = router_id;
+    req.vifr_idx = vif_idx;
+    req.vifr_core = core + 1;
+
+    return vr_sendmsg(cl, &req, "vr_interface_req");
+}
+/* interface end */
 
 int
 vr_send_mem_stats_get(struct nl_client *cl, unsigned int router_id)

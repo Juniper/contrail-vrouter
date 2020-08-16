@@ -2052,6 +2052,70 @@ dpdk_if_get_vlan_info(struct vr_interface *vif,
     return 0;
 }
 
+static void
+dpdk_if_clear_dev_stats(struct vr_interface *vif)
+{
+    uint16_t port_id;
+
+    if(vif->vif_os) {
+        port_id = ((struct vr_dpdk_ethdev *)(vif->vif_os))->ethdev_port_id;
+
+        /* This will internally reset for slave ports incase of bond */
+        rte_eth_stats_reset(port_id);
+    }
+
+    return;
+}
+
+static void
+dpdk_if_clear_port_stats(struct vr_interface *vif, uint16_t lcore_id)
+{
+    unsigned int i;
+
+    struct vr_dpdk_lcore *lcore;
+    struct vr_dpdk_queue *queue;
+    struct rte_port_in_stats rx_stats;
+    struct rte_port_out_stats tx_stats;
+
+    lcore = vr_dpdk.lcores[lcore_id];
+
+    if (lcore == NULL)
+        return;
+
+    /* RX queue */
+    queue = &lcore->lcore_rx_queues[vif->vif_idx];
+    if (queue->q_vif == vif) {
+        /* reset stats */
+        if (queue->rxq_ops.f_stats != NULL) {
+            queue->rxq_ops.f_stats(queue->q_queue_h, &rx_stats, 1);
+        }
+    }
+
+    /* TX queue */
+    for (i = 0; i < lcore->num_tx_queues_per_lcore[vif->vif_idx]; i++) {
+        queue = &lcore->lcore_tx_queues[vif->vif_idx][i];
+        if (queue && (queue->q_vif == vif)) {
+            /* reset stats */
+            if (queue->txq_ops.f_stats != NULL)
+                queue->txq_ops.f_stats(queue->q_queue_h, &tx_stats, 1);
+        }
+    }
+}
+
+static int
+dpdk_if_clear_stats(struct vr_interface *vif)
+{
+    uint16_t i;
+
+    dpdk_if_clear_dev_stats(vif);
+    for (i = 0; i < vr_num_cpus; i++)
+    {
+        dpdk_if_clear_port_stats(vif, i);
+    }
+    return 0;
+
+}
+
 static int
 dpdk_if_get_bond_info(struct vr_interface *vif,
         struct vr_interface_bond_info *bond_info)
@@ -2477,6 +2541,7 @@ struct vr_host_interface_ops dpdk_interface_ops = {
     .hif_stats_update   =    dpdk_if_stats_update,
     .hif_get_bond_info  =    dpdk_if_get_bond_info,
     .hif_get_vlan_info  =    dpdk_if_get_vlan_info,
+    .hif_clear_stats    =    dpdk_if_clear_stats,
 };
 
 void
