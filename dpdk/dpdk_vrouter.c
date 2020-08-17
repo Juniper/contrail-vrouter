@@ -610,8 +610,8 @@ dpdk_argv_update(void)
     }
 
     /* sanity checks */
-    if (vr_dpdk.nb_fwd_lcores == 0) {
-        RTE_LOG(ERR, VROUTER, "Error configuring lcores: no forwarding lcores defined\n");
+    if (vr_dpdk.nb_fwd_lcores <= 1) {
+        RTE_LOG(ERR, VROUTER, "Error configuring lcores: forwarding lcores should be more than 1\n");
         return -1;
     }
 

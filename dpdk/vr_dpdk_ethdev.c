@@ -1347,10 +1347,6 @@ vr_dpdk_ethdev_rx_emulate(struct vr_interface *vif,
         for (i = 0; i < *nb_pkts; i++)
             pkts[i]->ol_flags |= PKT_RX_IP_CKSUM_BAD;
 
-    /* no RSS needed for just one lcore */
-    if (unlikely(vr_dpdk.nb_fwd_lcores == 1))
-        return 0;
-
     offload_en = vif_is_fabric(vif) && datapath_offloads;
     /* parse packet headers and emulate RSS hash */
     for (i = 0; i < *nb_pkts; i++) {
