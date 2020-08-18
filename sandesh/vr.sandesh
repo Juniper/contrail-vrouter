@@ -327,6 +327,7 @@ buffer sandesh vrouter_ops {
    43: byte         vo_pkt_droplog_buf_en;
    44: byte         vo_pkt_droplog_en;
    45: byte         vo_pkt_droplog_min_en;
+   46: byte         vo_close_flow_on_tcp_rst;
 }
 
 buffer sandesh vr_mem_stats_req {

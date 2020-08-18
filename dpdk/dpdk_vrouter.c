@@ -113,6 +113,8 @@ enum vr_opt_index {
     VR_SERVICE_CORE_MASK_OPT_INDEX,
 #define VR_DPDK_CTRL_THREAD_MASK_OPT "dpdk_ctrl_thread_mask"
     VR_DPDK_CTRL_THREAD_MASK_OPT_INDEX,
+#define CLOSE_FLOW_ON_TCP_RST_OPT   "vr_close_flow_on_tcp_rst"
+    CLOSE_FLOW_ON_TCP_RST_OPT_INDEX,
 #define LCORES_OPT              "lcores"
     LCORES_OPT_INDEX,
     MAX_OPT_INDEX
@@ -126,6 +128,7 @@ extern unsigned int vr_nexthops;
 extern unsigned int vr_vrfs;
 extern unsigned int datapath_offloads;
 extern unsigned int vr_pkt_droplog_bufsz;
+extern unsigned int vr_close_flow_on_tcp_rst;
 
 unsigned int vr_dpdk_rx_ring_sz = VR_DPDK_RX_RING_SZ;
 unsigned int vr_dpdk_tx_ring_sz = VR_DPDK_TX_RING_SZ;
@@ -731,6 +734,8 @@ dpdk_argv_update(void)
                 vr_service_core_mask);
     RTE_LOG(INFO, VROUTER, "VR_DPDK_CTRL_THREAD_MASK:    0x%x\n",
 		vr_dpdk_ctrl_thread_mask);
+    RTE_LOG(INFO, VROUTER, "Close Flow on TCP RST:       %" PRIu32 "\n",
+            vr_close_flow_on_tcp_rst);
     RTE_LOG(INFO, VROUTER, "EAL arguments:\n");
     for (i = 1; i < RTE_DIM(dpdk_argv) - 1; i += 2) {
         if (dpdk_argv[i] == NULL)
@@ -1087,6 +1092,8 @@ static struct option long_options[] = {
                                                     NULL,                   0},
     [VR_DPDK_CTRL_THREAD_MASK_OPT_INDEX] = {VR_DPDK_CTRL_THREAD_MASK_OPT, required_argument,
                                                     NULL,                   0},
+    [CLOSE_FLOW_ON_TCP_RST_OPT_INDEX] = {CLOSE_FLOW_ON_TCP_RST_OPT, required_argument,
+                                                    NULL,                   0},
     [MAX_OPT_INDEX]                 =   {NULL,                  0,
                                                     NULL,                   0},
 };
@@ -1125,16 +1132,18 @@ Usage(void)
         "    --"DPDK_TXD_SIZE_OPT" NUM    DPDK PMD Tx Descriptor size\n"
         "    --"DPDK_RXD_SIZE_OPT" NUM    DPDK PMD Rx Descriptor size\n"
         "    --"PACKET_SIZE_OPT" NUM      Maximum packet size\n"
-	"    --"PKT_DROP_LOG_BUFFER_SIZE_OPT" NUM Maximum debug log buffer size\n"
+        "    --"PKT_DROP_LOG_BUFFER_SIZE_OPT" NUM Maximum debug log buffer size\n"
         "    --"VR_DPDK_RX_RING_SZ_OPT" NUM Configure vr_dpdk_rx_ring_sz value\n"
         "    --"VR_DPDK_TX_RING_SZ_OPT" NUM Configure vr_dpd_tx_ring_sz value\n"
         "    --"VR_DPDK_YIELD_OPT" NUM      Configurable parameter to disable yield\n"
         "    --"VR_SERVICE_CORE_MASK_OPT" NUM LIST OR HEXADECIMAL BITMASK "
-	                                 "Configurable parameter for service "
-					 "core mask\n"
-	"    --"VR_DPDK_CTRL_THREAD_MASK_OPT" NUM LIST OR HEXADECIMAL BITMASK "
-	                                     "Configurable parameter for dpdk "
-					     "control threads\n"
+                                         "Configurable parameter for service "
+                                         "core mask\n"
+        "    --"VR_DPDK_CTRL_THREAD_MASK_OPT" NUM LIST OR HEXADECIMAL BITMASK "
+                                             "Configurable parameter for dpdk "
+                                             "control threads\n"
+        "    --"CLOSE_FLOW_ON_TCP_RST_OPT" NUM Enable/Disable closure of Flow "
+                                          "on TCP RST\n"
         );
 
     exit(1);
@@ -1327,6 +1336,13 @@ parse_long_opts(int opt_flow_index, char *optarg)
 	    }
 	}
 	break;
+
+    case CLOSE_FLOW_ON_TCP_RST_OPT_INDEX:
+        vr_close_flow_on_tcp_rst = (unsigned int) strtoul(optarg, NULL, 0);
+        if (errno != 0) {
+            vr_close_flow_on_tcp_rst = 0;
+        }
+        break;
 
     case SOCKET_DIR_OPT_INDEX:
         vr_socket_dir = optarg;
