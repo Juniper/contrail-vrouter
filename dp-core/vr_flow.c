@@ -30,6 +30,7 @@
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = 0;
+unsigned int vr_close_flow_on_tcp_rst = 0;
 
 /*
  * host can provide its own memory . Point in case is the DPDK. In DPDK,
@@ -1254,8 +1255,9 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
          * time.
          */
         tcp_offset_flags = ntohs(tcph->tcp_offset_r_flags);
-        /* if we get a reset, session has to be closed */
-        if (tcp_offset_flags & VR_TCP_FLAG_RST) {
+        /* if we get a reset, TCP session will be closed if the
+         * vr_close_flow_on_tcp_rst flag is enabled*/
+        if ((vr_close_flow_on_tcp_rst) && (tcp_offset_flags & VR_TCP_FLAG_RST)) {
             (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags,
                     VR_FLOW_TCP_RST);
             if (flow_e->fe_flags & VR_RFLOW_VALID) {
