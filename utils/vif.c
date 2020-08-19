@@ -96,7 +96,7 @@ static int add_set, create_set, get_set, list_set;
 static int kindex_set, type_set, transport_set, help_set, set_set, vlan_set, dhcp_set;
 static int vrf_set, mac_set, delete_set, policy_set, pmd_set, vindex_set, pci_set;
 static int xconnect_set, vif_set, vhost_phys_set, core_set, rate_set, drop_set;
-static int sock_dir_set;
+static int sock_dir_set, clear_stats_set;
 #ifdef _WIN32
 static int guid_set;
 #endif
@@ -933,6 +933,26 @@ interface_req_process(void *s)
 {
     vr_interface_req *req = (vr_interface_req *)s;
 
+    if(req->h_op == SANDESH_OP_RESET) {
+        if(req->vifr_idx == -1) {
+            if(req->vifr_core != 0) {
+                printf("\nVif stats cleared successfully on core %d for all interfacess \n\n",
+                        req->vifr_core-1);
+            } else {
+                printf("\nVif stats cleared successfully on all cores for all interfaces \n\n");
+            }
+        } else {
+            if(req->vifr_core != 0) {
+                printf("\nVif stats cleared successfully for %s on core %d \n\n",
+                        req->vifr_name, req->vifr_core-1);
+            } else {
+                printf("\nVif stats cleared successfully for %s on all cores \n\n",
+                        req->vifr_name);
+            }
+        }
+        return;
+    }
+
     if (add_set)
         vr_ifindex = req->vifr_idx;
 
@@ -1155,6 +1175,10 @@ op_retry:
         dump = true;
         ret = vr_send_interface_dump(cl, 0, dump_marker, core + 1);
         break;
+
+    case SANDESH_OP_RESET:
+        ret = vr_send_vif_clear_stats(cl, 0, vif_index, core);
+        break;
     }
 
     if (ret < 0)
@@ -1205,6 +1229,7 @@ Usage()
     printf("\t   [--set <intf_id> --vlan <vlan_id> --vrf <vrf_id>]\n");
     printf("\t   [--list][--core <core number>][--rate]\n");
     printf("\t   [--sock-dir <sock dir>]\n");
+    printf("\t   [--clear][--id <intf_id>][--core <core_number>]\n");
     printf("\t   [--help]\n");
 
     exit(0);
@@ -1240,6 +1265,7 @@ enum if_opt_index {
     GUID_OPT_INDEX,
 #endif
     SOCK_DIR_OPT_INDEX,
+    CLEAR_STATS_OPT_INDEX,
     MAX_OPT_INDEX
 };
 
@@ -1272,6 +1298,7 @@ static struct option long_options[] = {
     [GUID_OPT_INDEX]        =   {"guid",        required_argument,  &guid_set,          1},
 #endif
     [SOCK_DIR_OPT_INDEX]    =   {"sock-dir",    required_argument,  &sock_dir_set,      1},
+    [CLEAR_STATS_OPT_INDEX] =   {"clear",       no_argument,        &clear_stats_set,   1},
     [MAX_OPT_INDEX]         =   { NULL,         0,                  NULL,               0},
 };
 
@@ -1476,6 +1503,12 @@ parse_long_opts(int option_index, char *opt_arg)
         case SOCK_DIR_OPT_INDEX:
             vr_socket_dir = opt_arg;
             break;
+
+        case CLEAR_STATS_OPT_INDEX:
+            clear_stats_set = 1;
+            vr_op = SANDESH_OP_RESET;
+            break;
+
         default:
             break;
     }
@@ -1564,6 +1597,10 @@ validate_options(void)
      * Statistics per CPU core could be requested as an additional parameter
      * to --list or --get.
      */
+    if(core_set){
+        if (clear_stats_set)
+            return;
+    }
     if (core_set) {
         if (!list_set || !get_set)
             Usage();

@@ -2576,6 +2576,16 @@ vr_interface_copy_bond_info(vr_interface_req *req,
     return 0;
 }
 
+static void
+vr_vif_stats_reset(struct vr_interface_stats *stats)
+{
+    memset(stats, 0, (sizeof(struct vr_interface_stats) -
+            sizeof(stats->vis_queue_ierrors_to_lcore)));
+    memset(stats->vis_queue_ierrors_to_lcore, 0, (vr_num_cpus *
+                sizeof(stats->vis_queue_ierrors_to_lcore)));
+    return;
+}
+
 static int
 __vr_interface_make_req(vr_interface_req *req, struct vr_interface *intf,
         unsigned int core)
@@ -3296,6 +3306,89 @@ generate_response:
     return 0;
 }
 
+static int
+vr_interface_stats_reset(struct vr_interface *vif, int core)
+{
+    int cpu = 0;
+
+    if (hif_ops->hif_stats_update)
+        hif_ops->hif_clear_stats(vif);
+
+    /* Clearing Tx/Rx packets on all cores */
+    if(core == -1) {
+        for (cpu = 0; cpu < vr_num_cpus; cpu++) {
+            vr_vif_stats_reset(&vif->vif_stats[cpu]);
+        }
+    } else {
+        if(core > (vr_num_cpus - 1)) {
+            vr_printf("vif clear stats: Invalid core id: %d\n", core);
+            return -1;
+        } else {
+            vr_vif_stats_reset(&vif->vif_stats[core]);
+        }
+    }
+    return 0;
+}
+
+static int
+vr_interface_clear_stats(vr_interface_req *r)
+{
+    int i, ret = 0;
+    struct vr_interface *vif;
+    struct vrouter *router = vrouter_get(0);
+    vr_interface_req *response = NULL;
+    int core = r->vifr_core - 1;
+
+    response = vr_zalloc(sizeof(*response), VR_INTERFACE_REQ_OBJECT);
+    if (!response && (ret = -ENOMEM))
+        goto exit_get;
+
+    if(r->vifr_idx == -1) {
+        for (i = 0; i < router->vr_max_interfaces; i++) {
+            vif = router->vr_interfaces[i];
+            if(vif) {
+                ret = vr_interface_stats_reset(vif, core);
+                if(ret < 0)
+                    goto exit_get;
+            }
+        }
+    } else {
+        vif = router->vr_interfaces[r->vifr_idx];
+        if (vif) {
+            ret = vr_interface_stats_reset(vif, core);
+            if(ret < 0)
+                goto exit_get;
+
+            response->vifr_name = vr_zalloc(VR_INTERFACE_NAME_LEN,
+                    VR_INTERFACE_REQ_NAME_OBJECT);
+            if (response->vifr_name) {
+                snprintf(response->vifr_name, (sizeof(vif->vif_name) - 1),
+                        "%s", vif->vif_name);
+            } else {
+                ret = -ENOMEM;
+                goto exit_get;
+            }
+
+        } else {
+            vr_printf("vif clear stats: Invalid vif id: %d\n", r->vifr_idx);
+            goto exit_get;
+        }
+    }
+    response->h_op = SANDESH_OP_RESET;
+    response->vifr_core = r->vifr_core;
+    response->vifr_idx = r->vifr_idx;
+
+exit_get:
+    vr_message_response(VR_INTERFACE_OBJECT_ID, ret ? NULL : response, ret, false);
+
+    if(response->vifr_name)
+        vr_free(response->vifr_name, VR_INTERFACE_REQ_NAME_OBJECT);
+    if (response != NULL)
+        vr_free(response, VR_INTERFACE_REQ_OBJECT);
+
+    return ret;
+}
+
 void
 vr_interface_req_process(void *s_req)
 {
@@ -3318,6 +3411,10 @@ vr_interface_req_process(void *s_req)
 
     case SANDESH_OP_DUMP:
         ret = vr_interface_dump(req);
+        break;
+
+    case SANDESH_OP_RESET:
+        ret = vr_interface_clear_stats(req);
         break;
 
     default:
