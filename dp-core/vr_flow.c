@@ -30,7 +30,18 @@
 
 unsigned int vr_flow_entries = VR_DEF_FLOW_ENTRIES;
 unsigned int vr_oflow_entries = 0;
-unsigned int vr_close_flow_on_tcp_rst = 0;
+/*
+ * Knob to unconditionally close flow on TCP RST;
+ * If this knob is set, the flow would be closed
+ * on receiving a TCP RST without doing any seqnum
+ * validation (for backward compatibility with older
+ * implementation);
+ * If this knob is off, TCP RST seqnum validation
+ * as per RFC 5961 sec 3.2 will be done. If the
+ * validation fails, the RST will be ignored.
+ * By default the knob is off;
+ */
+unsigned int vr_uncond_close_flow_on_tcp_rst = 0;
 
 /*
  * host can provide its own memory . Point in case is the DPDK. In DPDK,
@@ -1214,6 +1225,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
     struct vr_tcp *tcph;
     struct vr_ip6_frag *v6_frag;
     struct vr_flow_entry *rflow_e = NULL;
+    unsigned int rflow_ack;
 
     if (pkt->vp_type == VP_TYPE_IP) {
         iph = (struct vr_ip *)pkt_network_header(pkt);
@@ -1255,9 +1267,35 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
          * time.
          */
         tcp_offset_flags = ntohs(tcph->tcp_offset_r_flags);
-        /* if we get a reset, TCP session will be closed if the
-         * vr_close_flow_on_tcp_rst flag is enabled*/
-        if ((vr_close_flow_on_tcp_rst) && (tcp_offset_flags & VR_TCP_FLAG_RST)) {
+        /*
+         * If this is an ack, set the last acked seqnum
+         */
+        if (tcp_offset_flags & VR_TCP_FLAG_ACK) {
+            flow_e->fe_tcp_ack = ntohl(tcph->tcp_ack);
+        }
+
+        /*
+         * if we get a reset, TCP session will be closed if the
+         * vr_uncond_close_flow_on_tcp_rst flag is enabled or the TCP RST
+         * seqnum matches with the seqnum acked by the receiver
+         * - as per RFC 5961 sec 3.2
+         */
+        if (tcp_offset_flags & VR_TCP_FLAG_RST) {
+            if (!vr_uncond_close_flow_on_tcp_rst) {
+                /* get the reverse flow ack seq num if valid */
+                if (flow_e->fe_flags & VR_RFLOW_VALID) {
+                    rflow_e = vr_flow_get_entry(router, flow_e->fe_rflow);
+                }
+                if (rflow_e) {
+                    rflow_ack = rflow_e->fe_tcp_ack;
+                    if (ntohl(tcph->tcp_seq) != rflow_ack) {
+                        /* Ignore the RST */
+                        return;
+                    }
+                }
+                /* If Reverse flow not valid, go ahead and close this flow */
+            }
+
             (void)vr_sync_fetch_and_or_16u(&flow_e->fe_tcp_flags,
                     VR_FLOW_TCP_RST);
             if (flow_e->fe_flags & VR_RFLOW_VALID) {

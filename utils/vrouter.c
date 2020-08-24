@@ -339,7 +339,7 @@ print_vrouter_parameters(vrouter_ops *req)
         "    Packet dump                          %u\n"
         "    Vrouter packet drop log enable       %u\n"
         "    Vrouter Packet drop log minimum enable %u\n"
-        "    Enable/Disable closure of Flow on TCP RST   %u\n"
+        "    Unconditional closure of Flow on TCP RST   %u\n"
         "\n",
 
         req->vo_perfr, req->vo_perfs,
@@ -351,7 +351,7 @@ print_vrouter_parameters(vrouter_ops *req)
         req->vo_bridge_used_entries, req->vo_bridge_used_oentries,
         req->vo_burst_tokens, req->vo_burst_interval, req->vo_burst_step,
         req->vo_priority_tagging, req->vo_packet_dump, req->vo_pkt_droplog_en,
-        req->vo_pkt_droplog_min_en, req->vo_close_flow_on_tcp_rst
+        req->vo_pkt_droplog_min_en, req->vo_uncond_close_flow_on_tcp_rst
     );
 
     return;

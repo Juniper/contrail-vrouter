@@ -47,7 +47,7 @@ extern unsigned int vif_bridge_oentries;
 extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int datapath_offloads;
-extern unsigned int vr_close_flow_on_tcp_rst;
+extern unsigned int vr_uncond_close_flow_on_tcp_rst;
 
 extern char *ContrailBuildInfo;
 
@@ -2508,8 +2508,8 @@ static struct ctl_table vrouter_table[] =
         .proc_handler   = proc_dointvec,
     },
     {
-        .procname       = "close_flow_on_tcp_rst",
-        .data           = &vr_close_flow_on_tcp_rst,
+        .procname       = "uncond_close_flow_on_tcp_rst",
+        .data           = &vr_uncond_close_flow_on_tcp_rst,
         .maxlen         = sizeof(unsigned int),
         .mode           = 0644,
         .proc_handler   = proc_dointvec,
@@ -2635,8 +2635,8 @@ MODULE_PARM_DESC(vr_flow_hold_limit, "Maximum number of entries in the flow tabl
 module_param(vr_interfaces, uint, S_IRUGO);
 MODULE_PARM_DESC(vr_interfaces, "Number of entries in the interface table. Default is "__stringify(VR_MAX_INTERFACES));
 
-module_param(vr_close_flow_on_tcp_rst, uint, S_IRUGO);
-MODULE_PARM_DESC(vr_close_flow_on_tcp_rst, "Enable/Disable closue of flow on TCP RST, Default value is 0");
+module_param(vr_uncond_close_flow_on_tcp_rst, uint, S_IRUGO);
+MODULE_PARM_DESC(vr_uncond_close_flow_on_tcp_rst, "Enable/Disable unconditional closue of flow on TCP RST, Default value is 0");
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,32))
 module_param(vr_use_linux_br, int, 0);
 #endif
