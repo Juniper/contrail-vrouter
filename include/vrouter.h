@@ -26,6 +26,8 @@ extern "C" {
 #include "vr_offloads.h"
 #include "vr_pkt_droplog.h"
 #include "vr_fragment.h"
+#include "vr_message.h"
+#include "vr_info.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -127,6 +129,7 @@ enum vr_malloc_objects_t {
     VR_FC_OBJECT,
     VR_INTERFACE_FAT_FLOW_IPV4_EXCLUDE_LIST_OBJECT,
     VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT,
+    VR_INFO_REQ_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 
@@ -241,6 +244,8 @@ struct host_os {
     void (*hos_offload_prepare)(struct vr_packet *pkt, struct vr_forwarding_md *fmd);
     void (*hos_set_dump_packets)(int);
     int (*hos_get_dump_packets)(void);
+    /* Register vr_info callback functions. */
+    FOREACH_VR_INFO_CB_DECLARATION();
 };
 
 #define vr_printf                       vrouter_host->hos_printf
