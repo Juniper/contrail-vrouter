@@ -943,6 +943,10 @@ vr_inet_proto_flow(struct vrouter *router, unsigned short vrf,
                 if (proto != VR_IP_PROTO_ICMP) {
                     sport = flow_p->flow_dport;
                     dport = flow_p->flow_sport;
+                } else {
+                    /* inner pkt has ICMP, use the port info from flow key */
+                    sport = flow_p->flow_sport;
+                    dport = flow_p->flow_dport;
                 }
             } else {
                 /* for icmp error for icmp error, we will drop the packet */
