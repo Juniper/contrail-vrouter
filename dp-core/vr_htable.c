@@ -467,7 +467,7 @@ vr_htable_find_free_hentry(vr_htable_t htable, void *key, unsigned int key_size)
 
         /* Link the overflow entry at the start */
         do {
-            o_ent->hentry_next = ent->hentry_next;
+            o_ent->hentry_next = vr_sync_fetch_and_add_64u(&ent->hentry_next, 0);
 
             /* Update the next entry's index in o_ent */
             if (o_ent->hentry_next)
