@@ -237,7 +237,7 @@ vr_htable_hentry_scheduled_delete(void *arg)
     (void)vr_sync_sub_and_fetch_16u(&delete_data->hd_count, count);
 
     prev = head_ent;
-    ent = head_ent->hentry_next;
+    ent = vr_sync_fetch_and_add_64u(&head_ent->hentry_next, 0);
 
     while (count && ent) {
 
