@@ -1217,7 +1217,7 @@ vr_flow_tcp_rflow_set(struct vrouter *router, struct vr_flow_entry *fe,
 
 static void
 vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
-        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd, bool *is_vr_tcp_fin_set,bool *is_vr_tcp_rst_set, unsigned short *vr_tcp_d_port)
 {
     uint8_t proto = 0, hlen = 0;
     uint16_t tcp_offset_flags;
@@ -1270,6 +1270,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
          * time.
          */
         tcp_offset_flags = ntohs(tcph->tcp_offset_r_flags);
+        *vr_tcp_d_port = ntohs(tcph->tcp_dport);
         /*
          * If this is an ack, set the last acked seqnum
          */
@@ -1284,6 +1285,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
          * - as per RFC 5961 sec 3.2
          */
         if (tcp_offset_flags & VR_TCP_FLAG_RST) {
+            *is_vr_tcp_rst_set = true;
             if (!vr_uncond_close_flow_on_tcp_rst) {
                 /* get the reverse flow ack seq num if valid */
                 if (flow_e->fe_flags & VR_RFLOW_VALID) {
@@ -1331,6 +1333,8 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
                 }
             }
         } else if (tcp_offset_flags & VR_TCP_FLAG_FIN) {
+
+            *is_vr_tcp_fin_set = true;
             /*
              * when a FIN is received, update the sequence of the FIN and set
              * the flow FIN flag. It is possible that the FIN packet came with
@@ -1529,7 +1533,10 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     struct vr_flow_entry *flow_e;
     unsigned short drop_reason = 0;
     bool burst = false;
-
+    bool is_vr_tcp_fin_set = false;
+    bool is_vr_tcp_rst_set = false;
+    unsigned short vr_tcp_d_port = 0;
+    bool is_it_a_new_flow = false;
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
     if (!fmd->fmd_fe) {
@@ -1557,6 +1564,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
             flow_e->fe_vrf = fmd->fmd_dvrf;
             /* mark as hold */
             vr_flow_entry_set_hold(router, flow_e, burst);
+            is_it_a_new_flow = true;
         }
     } else {
         flow_e = fmd->fmd_fe;
@@ -1576,7 +1584,17 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
         flow_e->fe_src_info = pkt->vp_if->vif_idx;
 
     vr_flow_set_forwarding_md(router, flow_e, fe_index, fmd);
-    vr_flow_tcp_digest(router, flow_e, pkt, fmd);
+    vr_flow_tcp_digest(router, flow_e, pkt, fmd , &is_vr_tcp_fin_set, &is_vr_tcp_rst_set , &vr_tcp_d_port);
+
+    if (is_it_a_new_flow && (vr_tcp_d_port == 0xB3)) {
+       if (is_vr_tcp_fin_set || is_vr_tcp_rst_set){
+        /*
+         * Ignore the flow action if tcp FIN/RST flag is set for BGP
+         */
+           PKT_LOG(VP_DROP_FLOW_UNUSABLE, pkt, 0, VR_FLOW_C, __LINE__);
+           return FLOW_HELD;
+       }
+    }
 
     return vr_do_flow_action(router, flow_e, fe_index, pkt, fmd);
 }
