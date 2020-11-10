@@ -1217,7 +1217,7 @@ vr_flow_tcp_rflow_set(struct vrouter *router, struct vr_flow_entry *fe,
 
 static void
 vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
-        struct vr_packet *pkt, struct vr_forwarding_md *fmd)
+        struct vr_packet *pkt, struct vr_forwarding_md *fmd ,bool *is_vr_tcp_fin_set)
 {
     uint8_t proto = 0, hlen = 0;
     uint16_t tcp_offset_flags;
@@ -1331,6 +1331,8 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
                 }
             }
         } else if (tcp_offset_flags & VR_TCP_FLAG_FIN) {
+
+            *is_vr_tcp_fin_set = true;
             /*
              * when a FIN is received, update the sequence of the FIN and set
              * the flow FIN flag. It is possible that the FIN packet came with
@@ -1529,6 +1531,7 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     struct vr_flow_entry *flow_e;
     unsigned short drop_reason = 0;
     bool burst = false;
+    bool is_vr_tcp_fin_set = false;
 
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
@@ -1576,8 +1579,16 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
         flow_e->fe_src_info = pkt->vp_if->vif_idx;
 
     vr_flow_set_forwarding_md(router, flow_e, fe_index, fmd);
-    vr_flow_tcp_digest(router, flow_e, pkt, fmd);
+    vr_flow_tcp_digest(router, flow_e, pkt, fmd , &is_vr_tcp_fin_set);
 
+    if (is_vr_tcp_fin_set) {
+       /*
+        * Ignore the flow action if tcp FIN flag is set
+        */
+        PKT_LOG(VP_DROP_FLOW_UNUSABLE, pkt, 0, VR_FLOW_C, __LINE__);
+        vr_pfree(pkt, VP_DROP_FLOW_UNUSABLE);
+        return FLOW_DROP;
+    }
     return vr_do_flow_action(router, flow_e, fe_index, pkt, fmd);
 }
 
