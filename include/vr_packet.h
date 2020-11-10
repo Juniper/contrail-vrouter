@@ -755,6 +755,8 @@ vr_ip_transport_header_valid(struct vr_ip *iph)
 
 #define VR_TCP_OLEN_MSS         4
 
+#define VR_TCP_PORT_BGP         0xB3
+
 #define VR_TCP_OFFSET(field)    ((ntohs(field) & 0xF000) >> 12)
 #define VR_TCP_FLAGS(field)     (ntohs(field) & 0x01FF)
 
