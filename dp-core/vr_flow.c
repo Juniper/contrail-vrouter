@@ -1331,6 +1331,7 @@ vr_flow_tcp_digest(struct vrouter *router, struct vr_flow_entry *flow_e,
                 }
             }
         } else if (tcp_offset_flags & VR_TCP_FLAG_FIN) {
+
             /*
              * when a FIN is received, update the sequence of the FIN and set
              * the flow FIN flag. It is possible that the FIN packet came with
@@ -1488,7 +1489,14 @@ static inline bool
 vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
                        unsigned short *drop_reason, bool *burst)
 {
+    uint8_t proto = 0, hlen = 0;
+    uint16_t tcp_offset_flags;
+    struct vr_ip *iph;
+    struct vr_ip6 *ip6h;
+    struct vr_tcp *tcph;
+    struct vr_ip6_frag *v6_frag;
     unsigned int hold_count;
+
     struct vr_flow_table_info *infop = router->vr_flow_table_info;
 
 
@@ -1502,6 +1510,20 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
             *drop_reason = VP_DROP_FLOW_UNUSABLE;
             return false;
         }
+        iph = (struct vr_ip *)pkt_network_header(pkt);
+        proto = iph->ip_proto;
+
+        hlen = iph->ip_hl * 4;
+    } else if (pkt->vp_type == VP_TYPE_IP6) {
+        ip6h = (struct vr_ip6 *)pkt_network_header(pkt);
+        proto = ip6h->ip6_nxt;
+        hlen = sizeof(struct vr_ip6);
+        if (proto == VR_IP6_PROTO_FRAG) {
+            v6_frag = (struct vr_ip6_frag *)(ip6h + 1);
+            proto = v6_frag->ip6_frag_nxt;
+            hlen += sizeof(struct vr_ip6_frag);
+        }
+
     }
 
     if (vr_flow_hold_limit) {
@@ -1518,6 +1540,25 @@ vr_flow_allow_new_flow(struct vrouter *router, struct vr_packet *pkt,
         }
     }
 
+    if (proto == VR_IP_PROTO_TCP) {
+        tcph = (struct vr_tcp *)(pkt_network_header(pkt) + hlen);
+        if (tcph) {
+            tcp_offset_flags = ntohs(tcph->tcp_offset_r_flags);
+
+            if (ntohs(tcph->tcp_dport) == VR_TCP_PORT_BGP) {
+                if ((tcp_offset_flags & VR_TCP_FLAG_RST ) || (tcp_offset_flags & VR_TCP_FLAG_FIN)){
+                    /* Fix for CEM-20284 Ignore adding new flow whenever tcp FIN/RST flag is set
+                     * for BGP Port
+                     */
+                     PKT_LOG(VP_DROP_FLOW_UNUSABLE, pkt, 0, VR_FLOW_C, __LINE__);
+                     *drop_reason = VP_DROP_FLOW_UNUSABLE;
+                     return false;
+                }
+            }
+        }
+    }
+
+
     return vr_flow_vif_allow_new_flow(router, pkt, drop_reason);
 }
 
@@ -1529,7 +1570,6 @@ vr_flow_lookup(struct vrouter *router, struct vr_flow *key,
     struct vr_flow_entry *flow_e;
     unsigned short drop_reason = 0;
     bool burst = false;
-
     pkt->vp_flags |= VP_FLAG_FLOW_SET;
 
     if (!fmd->fmd_fe) {
