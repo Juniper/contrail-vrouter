@@ -33,6 +33,7 @@
 # add those files in RPM spec file and the rules file in the dkms package
 #
 
+TARGET_VER_SYMLINK_DIR := $(PWD)/../build/include/linux
 SANDESH_HEADER_PATH ?= $(src)/
 SANDESH_EXTRA_HEADER_PATH ?= $(src)/
 
@@ -85,6 +86,12 @@ else
 	PWD := $(shell pwd)
 
 default:
+ifeq ($(wildcard $(TARGET_VER_SYMLINK_DIR)),)
+	$(shell /bin/mkdir -p $(TARGET_VER_SYMLINK_DIR))
+	/bin/ln -sf $(KERNELDIR)/include/generated/uapi/linux/version.h $(TARGET_VER_SYMLINK_DIR)/version.h
+else ifeq ($(wildcard $(TARGET_VER_SYMLINK_DIR)/version.h),)
+	/bin/ln -sf $(KERNELDIR)/include/generated/uapi/linux/version.h $(TARGET_VER_SYMLINK_DIR)/version.h
+endif
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 clean:
