@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "867c249c_87b2fb7b",
+        "filename": "Makefile",
+        "patchSetId": 1
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2020-11-19T10:25:21Z",
+      "side": 1,
+      "message": "\"scons vrouter\" will fail for build system which uses native kernel headers.. Will get permission denied error.\nRequest you to move soft link to $(sb)/build/include linux folder",
+      "revId": "7ef1e347c69a5ec659ed91cdea1ad1e8e2941267",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
