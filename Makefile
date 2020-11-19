@@ -71,6 +71,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += dp-core/vr_bitmap.o dp-core/vr_qos.o
 	vrouter-y += dp-core/vr_pkt_droplog.o
 
+	ccflags-y += -Iinclude/
 	ccflags-y += -I$(src)/include -I$(SANDESH_HEADER_PATH)/sandesh/gen-c
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)
 	ccflags-y += -I$(SANDESH_EXTRA_HEADER_PATH)/sandesh/library/c
@@ -85,6 +86,9 @@ else
 	PWD := $(shell pwd)
 
 default:
+ifeq ($(wildcard $(KERNELDIR)/include/linux/version.h),)
+	/bin/ln -sf $(KERNELDIR)/include/generated/uapi/linux/version.h $(KERNELDIR)/include/linux/version.h
+endif
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
 
 clean:
