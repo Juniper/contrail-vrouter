@@ -174,8 +174,12 @@ usock_bind_usockets(struct vr_usocket *parent, struct vr_usocket *child)
 
     child->usock_parent = parent;
     parent->usock_cfds++;
-    if (parent->usock_cfds == USOCK_MAX_CHILD_FDS)
+    if (parent->usock_cfds >= USOCK_MAX_CHILD_FDS){
         parent->usock_state = LIMITED;
+	RTE_LOG(ERR, USOCK, "%s:[%lx] Netlink socket reached max connection %d\n",
+                __func__, pthread_self(), USOCK_MAX_CHILD_FDS);
+        RTE_LOG(ERR, USOCK, "Netlink state: %x\n", parent->usock_state);
+    }
 
     for (i = 1; i <= parent->usock_max_cfds; i++) {
         if (!parent->usock_children[i]) {
@@ -266,6 +270,9 @@ usock_unbind(struct vr_usocket *child)
 
     parent->usock_disconnects++;
     parent->usock_cfds--;
+    if((parent->usock_state == LIMITED) &&
+            (parent->usock_cfds < USOCK_MAX_CHILD_FDS))
+        parent->usock_state = LISTENING;
 
     child->usock_parent = NULL;
 
