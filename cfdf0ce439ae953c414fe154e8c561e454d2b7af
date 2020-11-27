@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "57b65b9c_004f1acc",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1595,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-11-27T10:19:54Z",
+      "side": 1,
+      "message": "The flow would get created as hold flow and we are returning here without cleaning it up. I think the FIN/RST check should be done before we create a flow.",
+      "revId": "cfdf0ce439ae953c414fe154e8c561e454d2b7af",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
