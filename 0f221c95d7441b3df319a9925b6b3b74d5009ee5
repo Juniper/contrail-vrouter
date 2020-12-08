@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a0c75079_25333da8",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1515,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-12-08T03:25:10Z",
+      "side": 1,
+      "message": "This is not required anymore.",
+      "range": {
+        "startLine": 1514,
+        "startChar": 8,
+        "endLine": 1515,
+        "endChar": 24
+      },
+      "revId": "0f221c95d7441b3df319a9925b6b3b74d5009ee5",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "41ab8181_92f88245",
+        "filename": "dp-core/vr_flow.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1522,
+      "author": {
+        "id": 631
+      },
+      "writtenOn": "2020-12-08T03:25:10Z",
+      "side": 1,
+      "message": "This is not required anymore. you can remove it.",
+      "range": {
+        "startLine": 1521,
+        "startChar": 8,
+        "endLine": 1522,
+        "endChar": 24
+      },
+      "revId": "0f221c95d7441b3df319a9925b6b3b74d5009ee5",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
