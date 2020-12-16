@@ -889,6 +889,13 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
             skb_reset_mac_len(skb);
         }
     }
+if (pkt->vp_if && vif_is_virtual(pkt->vp_if)) {
+       /* This is needed for checksum computation of certain
+        * NICs like Mellanox. It does not have any effect
+        * on other NIC drivers like Intel
+        */
+       skb->encapsulation = 1;
+    }
 
     linux_xmit_segment(vif, skb, pkt->vp_type,
             (pkt->vp_flags & VP_FLAG_DIAG));
