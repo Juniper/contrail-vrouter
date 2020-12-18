@@ -754,6 +754,12 @@ vr_flow_mark_evict(struct vrouter *router, struct vr_flow_entry *fe,
     /*
      * presence of rfe means that we might need to reset the evict bit
      * or at the minimum reset the modified bit under failure conditions
+     *
+     * CEM-18166: In case rfe has already been deleted, under special
+     * circumstances, fe might still have fe_rflow pointing to it.
+     * In this case (and other cases where rfe is not active anymore),
+     * evict_forward_flow will remain true, which makes sense because we still
+     * want to evict this flow, because of TCP FIN or RST.
      */
     if (evict_forward_flow) {
         if (__vr_flow_mark_evict(router, fe)) {
@@ -2213,11 +2219,19 @@ __vr_flow_schedule_transition(struct vrouter *router, struct vr_flow_entry *fe,
              * or both flows have EVICT_CANDIDATE flag set;
              * This is to avoid a race condition which can lead to non
              * eviction of one of the flows. See CEM-4275 for more details.
+             *
+             * CEM-18166: Handle a corner case for BGPaaS where two different
+             * flows are trapped to agent (due to NAT translation to the same
+             * port), combined with TCP RST/FIN pkts received on the forward
+             * flow. The sequence of events permits deletion of the FF, while
+             * reverse flow still pointing to it. When the controller tries to
+             * reset the connection, thus evict the flow, it will fail because
+             * rfe is NULL.
              */
             if ((fe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) {
                 if ((fe->fe_rflow < 0) ||
                     ((rfe = vr_flow_get_entry(router, fe->fe_rflow)) &&
-                     (rfe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE))) {
+                     (rfe->fe_flags & VR_FLOW_FLAG_EVICT_CANDIDATE)) || !rfe) {
                     ((struct vr_flow_defer_data *)defer->vdd_data)->vfdd_evict_flow =
                              true;
                 }
