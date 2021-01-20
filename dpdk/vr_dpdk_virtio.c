@@ -1162,9 +1162,10 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
     uint64_t vb_hdr_addr = 0;
     uint32_t seg_offset = 0;
     uint32_t vb_offset = 0;
-    uint32_t seg_avail;
-    uint32_t vb_avail;
-    uint32_t cpy_len, entry_len;
+    uint32_t seg_avail = 0;
+    uint32_t vb_avail = 0;
+    uint32_t cpy_len = 0;
+    uint32_t entry_len = 0;
 
     if (pkt == NULL)
         return 0;
@@ -1176,19 +1177,23 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
     /*
      * Convert from gpa to vva
      * (guest physical addr -> vhost virtual addr)
+     * we only check if buf_addr is tainted, there is no sanity check for
+     * buf_flags or buf_len
      */
     vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl,
                                                         buf_vec[vec_idx].buf_addr);
-    vb_hdr_addr = vb_addr;
+    if (likely(vb_addr != (uint64_t)NULL)) {
+        vb_hdr_addr = vb_addr;
 
-    /* Prefetch buffer address. */
-    rte_prefetch0((void *)(uintptr_t)vb_addr);
+        /* Prefetch buffer address. */
+        rte_prefetch0((void *)(uintptr_t)vb_addr);
 
-    RTE_LOG_DP(DEBUG, VROUTER, "%s RX: Num merge buffers %d\n",
-        __func__, virtio_hdr->num_buffers);
+        RTE_LOG_DP(DEBUG, VROUTER, "%s RX: Num merge buffers %d\n",
+            __func__, virtio_hdr->num_buffers);
 
-    rte_memcpy((void *)(uintptr_t)vb_hdr_addr,
-        (const void *)virtio_hdr, vq->vdv_hlen);
+        rte_memcpy((void *)(uintptr_t)vb_hdr_addr,
+            (const void *)virtio_hdr, vq->vdv_hlen);
+    }
 
     seg_avail = rte_pktmbuf_data_len(pkt);
     vb_offset = vq->vdv_hlen;
@@ -1216,9 +1221,10 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
         vec_idx++;
         vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl,
                                                           buf_vec[vec_idx].buf_addr);
-
-        /* Prefetch buffer address. */
-        rte_prefetch0((void *)(uintptr_t)vb_addr);
+        if (likely(vb_addr != (uint64_t)NULL)) {
+            /* Prefetch buffer address. */
+            rte_prefetch0((void *)(uintptr_t)vb_addr);
+        }
         vb_offset = 0;
         vb_avail = buf_vec[vec_idx].buf_len;
     }
@@ -1226,10 +1232,12 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
     cpy_len = RTE_MIN(vb_avail, seg_avail);
 
     while (cpy_len > 0) {
-        /* Copy mbuf data to vring buffer */
-        rte_memcpy((void *)(uintptr_t)(vb_addr + vb_offset),
-            rte_pktmbuf_mtod_offset(pkt, const void *, seg_offset),
-            cpy_len);
+        if (likely(vb_addr != (uint64_t)NULL)) {
+             /* Copy mbuf data to vring buffer */
+            rte_memcpy((void *)(uintptr_t)(vb_addr + vb_offset),
+                rte_pktmbuf_mtod_offset(pkt, const void *, seg_offset),
+                cpy_len);
+        }
 
         seg_offset += cpy_len;
         vb_offset += cpy_len;
@@ -1258,6 +1266,10 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
             vec_idx++;
             vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl,
                                                         buf_vec[vec_idx].buf_addr);
+            if (likely(vb_addr != (uint64_t)NULL)) {
+                /* Prefetch buffer address. */
+                rte_prefetch0((void *)(uintptr_t)vb_addr);
+            }
             vb_offset = 0;
             vb_avail = buf_vec[vec_idx].buf_len;
             cpy_len = RTE_MIN(vb_avail, seg_avail);
@@ -1301,6 +1313,10 @@ copy_from_mbuf_to_vring(vr_dpdk_virtioq_t *vq, vr_uvh_client_t *vru_cl, uint16_t
                     vec_idx++;
                     vb_addr = (uintptr_t)vr_dpdk_guest_phys_to_host_virt(vru_cl,
                                                     buf_vec[vec_idx].buf_addr);
+                    if (likely(vb_addr != (uint64_t)NULL)) {
+                        /* Prefetch buffer address. */
+                        rte_prefetch0((void *)(uintptr_t)vb_addr);
+                    }
                     vb_avail =
                         buf_vec[vec_idx].buf_len;
                     vb_offset = 0;
