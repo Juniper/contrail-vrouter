@@ -72,7 +72,6 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_no_frag_entry += stats[VP_DROP_NO_FRAG_ENTRY];
     response->vds_icmp_error += stats[VP_DROP_ICMP_ERROR];
     response->vds_clone_fail += stats[VP_DROP_CLONE_FAIL];
-
     return;
 }
 

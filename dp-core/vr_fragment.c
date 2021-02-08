@@ -92,7 +92,7 @@ struct vr_timer *vr_assembler_table_scan_timer;
 static inline void
 __fragment_key(struct vr_fragment_key *key, unsigned short vrf,
         uint64_t sip_u, uint64_t sip_l, uint64_t dip_u, uint64_t dip_l,
-        uint32_t id)
+        uint32_t id, unsigned short custom)
 {
     key->fk_sip_u = sip_u;
     key->fk_sip_l = sip_l;
@@ -100,6 +100,7 @@ __fragment_key(struct vr_fragment_key *key, unsigned short vrf,
     key->fk_dip_l = dip_l;
     key->fk_id = id;
     key->fk_vrf = vrf;
+    key->fk_custom = custom;
 
     return;
 }
@@ -138,6 +139,7 @@ fragment_entry_set(struct vr_fragment *fe, struct vr_fragment_key *key,
     fe->f_dip_l = key->fk_dip_l;
     fe->f_id = key->fk_id;
     fe->f_vrf = key->fk_vrf;
+    fe->f_custom = key->fk_custom;
     fe->f_sport = sport;
     fe->f_dport = dport;
     vr_get_mono_time(&sec, &nsec);
@@ -354,10 +356,10 @@ vr_fragment_assembler(struct vr_fragment **head_p,
        v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
        v6_addr = (uint64_t *)(ip6->ip6_src);
         __fragment_key(&vfk, pnode->pl_vrf, *v6_addr, *(v6_addr + 1),
-                *(v6_addr +2 ), *(v6_addr + 3), v6_frag->ip6_frag_id);
+                *(v6_addr +2 ), *(v6_addr + 3), v6_frag->ip6_frag_id, pnode->pl_custom);
     } else {
         __fragment_key(&vfk, pnode->pl_vrf, 0, pnode->pl_inner_src_ip,
-            0, pnode->pl_inner_dst_ip, ip->ip_id);
+            0, pnode->pl_inner_dst_ip, ip->ip_id, pnode->pl_custom);
     }
 
     /* Check if the fragment with the same key is found
@@ -381,7 +383,7 @@ vr_fragment_assembler(struct vr_fragment **head_p,
      * packet processing
      */
     if (!frag_head) {
-        frag_flow = vr_fragment_get(router, pnode->pl_vrf, ip);
+        frag_flow = vr_fragment_get(router, pnode->pl_vrf, ip, pnode->pl_custom);
         if (frag_flow) {
             vr_fragment_flush_queue_element(vfqe);
             return 0;
@@ -486,11 +488,11 @@ exit_assembly:
 
 uint32_t
 __vr_fragment_get_hash(unsigned int vrf, uint64_t sip_u, uint64_t sip_l,
-        uint64_t dip_u, uint64_t dip_l, uint32_t id)
+        uint64_t dip_u, uint64_t dip_l, uint32_t id, unsigned short custom)
 {
     struct vr_fragment_key vfk;
 
-    __fragment_key(&vfk, vrf, sip_u, sip_l, dip_u, dip_l, id);
+    __fragment_key(&vfk, vrf, sip_u, sip_l, dip_u, dip_l, id, custom);
 
     return vr_hash(&vfk, sizeof(vfk), 0);
 }
@@ -516,10 +518,10 @@ vr_fragment_get_hash(struct vr_packet_node *pnode)
         v6_addr = (uint64_t *)(ip6->ip6_src);
 
         return __vr_fragment_get_hash(pnode->pl_vrf, *v6_addr, *(v6_addr+ 1),
-                    *(v6_addr + 2), *(v6_addr + 3), v6_frag->ip6_frag_id);
+                    *(v6_addr + 2), *(v6_addr + 3), v6_frag->ip6_frag_id, pnode->pl_custom);
     } else if(vr_ip_is_ip4(ip)) {
         return __vr_fragment_get_hash(pnode->pl_vrf, 0, pnode->pl_inner_src_ip,
-                0, pnode->pl_inner_dst_ip, ip->ip_id);
+                0, pnode->pl_inner_dst_ip, ip->ip_id, pnode->pl_custom);
     }
 
     return (uint32_t)-1;
@@ -640,11 +642,11 @@ vr_fragment_add(struct vrouter *router, struct vr_fragment_key *key,
 /* Add v4 fragment to the fragment hash table */
 int
 vr_v4_fragment_add(struct vrouter *router, unsigned short vrf,
-        struct vr_ip *iph, unsigned short sport, unsigned short dport)
+        struct vr_ip *iph, unsigned short sport, unsigned short dport, unsigned short custom)
 {
     struct vr_fragment_key key;
 
-    __fragment_key(&key, vrf, 0, iph->ip_saddr, 0, iph->ip_daddr, iph->ip_id);
+    __fragment_key(&key, vrf, 0, iph->ip_saddr, 0, iph->ip_daddr, iph->ip_id, custom);
 
     return vr_fragment_add(router, &key, sport, dport,
                     (ntohs(iph->ip_len) - iph->ip_hl * 4));
@@ -653,7 +655,7 @@ vr_v4_fragment_add(struct vrouter *router, unsigned short vrf,
 /* Add v6 fragment to the fragment hash table */
 int
 vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
-        struct vr_ip6 *ip6, unsigned short sport, unsigned short dport)
+        struct vr_ip6 *ip6, unsigned short sport, unsigned short dport, unsigned short custom)
 {
     uint64_t *v6_addr;
     struct vr_fragment_key key;
@@ -662,7 +664,7 @@ vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
     v6_addr = (uint64_t *)(ip6->ip6_src);
     v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
     __fragment_key(&key, vrf, *v6_addr, *(v6_addr + 1), *(v6_addr + 2),
-            *(v6_addr + 3), v6_frag->ip6_frag_id);
+            *(v6_addr + 3), v6_frag->ip6_frag_id, custom);
 
     return vr_fragment_add(router, &key, sport, dport,
             (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag)));
@@ -670,7 +672,8 @@ vr_v6_fragment_add(struct vrouter *router, unsigned short vrf,
 
 /* Check if fragment entry exists in the fragment hash table */
 struct vr_fragment *
-vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
+vr_fragment_get(struct vrouter *router, unsigned short vrf,
+            struct vr_ip *ip, unsigned short custom)
 {
     unsigned int sec, nsec;
     uint64_t *v6_addr;
@@ -687,10 +690,10 @@ vr_fragment_get(struct vrouter *router, unsigned short vrf, struct vr_ip *ip)
             v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
             v6_addr = (uint64_t *)(ip6->ip6_src);
             __fragment_key(&key, vrf, *v6_addr, *(v6_addr+ 1),
-                    *(v6_addr + 2), *(v6_addr+ 3), v6_frag->ip6_frag_id);
+                    *(v6_addr + 2), *(v6_addr+ 3), v6_frag->ip6_frag_id, custom);
         }
     } else if (vr_ip_is_ip4(ip)) {
-        __fragment_key(&key, vrf, 0, ip->ip_saddr, 0, ip->ip_daddr, ip->ip_id);
+        __fragment_key(&key, vrf, 0, ip->ip_saddr, 0, ip->ip_daddr, ip->ip_id, custom);
     } else {
         return NULL;
     }
