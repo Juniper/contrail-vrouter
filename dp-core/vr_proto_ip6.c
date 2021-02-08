@@ -247,7 +247,7 @@ vr_inet6_flow_is_fat_flow(struct vrouter *router, struct vr_packet *pkt,
 static int
 vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
-        struct vr_flow *flow_p, uint8_t valid_fkey_params, bool frag_calc)
+        struct vr_flow *flow_p, uint8_t valid_fkey_params, unsigned short custom)
 {
     int ret = 0;
     uint8_t ip6_nxt;
@@ -273,7 +273,7 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
             if ((unsigned char *)ip6 == pkt_network_header(pkt)) {
                 ret = vr_inet6_form_flow(router, vrf, pkt, vlan,
                         (struct vr_ip6 *)(icmph + 1), flow_p,
-                        valid_fkey_params, frag_calc);
+                        valid_fkey_params, custom);
                 if (ret)
                     return ret;
 
@@ -334,7 +334,7 @@ vr_inet6_proto_flow(struct vrouter *router, unsigned short vrf,
 static int
 vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
-        struct vr_flow *flow_p, uint8_t valid_fkey_params, bool frag_calc)
+        struct vr_flow *flow_p, uint8_t valid_fkey_params, unsigned short custom)
 {
     uint16_t sport, dport;
     unsigned short nh_id;
@@ -342,7 +342,7 @@ vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
     struct vr_ip6_frag *v6_frag;
 
     frag = vr_fragment_get(router, vrf,
-            (struct vr_ip *)(pkt_network_header(pkt)));
+            (struct vr_ip *)(pkt_network_header(pkt)), custom);
     if (!frag) {
         return -VP_DROP_NO_FRAG_ENTRY;
     }
@@ -351,16 +351,15 @@ vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
     dport = frag->f_dport;
     v6_frag = (struct vr_ip6_frag *)(ip6 + 1);
 
-    if (frag_calc) {
-        frag->f_received += (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag));
-        if (vr_ip6_fragment_tail(ip6)) {
-            frag->f_expected = (((ntohs(v6_frag->ip6_frag_offset)) >>
-                              VR_IP6_FRAG_OFFSET_BITS) * 8) +
-                              ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag);
-        }
-        if (frag->f_received == frag->f_expected) {
-            vr_fragment_del(router->vr_fragment_table, frag);
-        }
+    frag->f_received += (ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag));
+    if (vr_ip6_fragment_tail(ip6)) {
+        frag->f_expected = (((ntohs(v6_frag->ip6_frag_offset)) >>
+                          VR_IP6_FRAG_OFFSET_BITS) * 8) +
+                          ntohs(ip6->ip6_plen) - sizeof(struct vr_ip6_frag);
+    }
+    if (frag->f_received == frag->f_expected) {
+        vr_fragment_del(router->vr_fragment_table, frag);
+
     }
 
 
@@ -375,16 +374,16 @@ vr_inet6_fragment_flow(struct vrouter *router, unsigned short vrf,
 int
 vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_ip6 *ip6,
-        struct vr_flow *flow_p, uint8_t valid_fkey_params, bool frag_calc)
+        struct vr_flow *flow_p, uint8_t valid_fkey_params, unsigned short custom)
 {
     int ret = 0;
 
     if (vr_ip6_transport_header_valid(ip6)) {
         ret = vr_inet6_proto_flow(router, vrf, pkt, vlan, ip6, flow_p,
-                valid_fkey_params, frag_calc);
+                valid_fkey_params, custom);
     } else {
         ret = vr_inet6_fragment_flow(router, vrf, pkt, vlan, ip6,
-                                        flow_p, valid_fkey_params, frag_calc);
+                                        flow_p, valid_fkey_params, custom);
     }
 
     return ret;
@@ -394,20 +393,20 @@ vr_inet6_form_flow(struct vrouter *router, unsigned short vrf,
 int
 vr_inet6_get_flow_key(struct vrouter *router, unsigned short vrf,
         struct vr_packet *pkt, uint16_t vlan, struct vr_flow *flow_p,
-        uint8_t valid_fkey_params, bool frag_calc)
+        uint8_t valid_fkey_params, unsigned short custom)
 {
     int ret;
     struct vr_ip6 *ip6;
 
     ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
     ret = vr_inet6_form_flow(router, vrf, pkt, vlan, ip6, flow_p,
-            valid_fkey_params, frag_calc);
+            valid_fkey_params, custom);
     if (ret < 0)
         return ret;
 
     if (vr_ip6_fragment_head(ip6)) {
         ret = vr_v6_fragment_add(router, vrf, ip6, flow_p->flow6_sport,
-                flow_p->flow6_dport);
+                flow_p->flow6_dport, custom);
         if (ret < 0)
             return -VP_DROP_NO_MEMORY;
     }
@@ -445,7 +444,7 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
         return FLOW_FORWARD;
 
     ret = vr_inet6_form_flow(router, fmd->fmd_dvrf, pkt, fmd->fmd_vlan,
-                                     ip6, flow_p, VR_FLOW_KEY_ALL, true);
+                                     ip6, flow_p, VR_FLOW_KEY_ALL, 0);
     if (ret < 0) {
         if (!vr_ip6_transport_header_valid(ip6) && vr_enqueue_to_assembler) {
             vr_enqueue_to_assembler(router, pkt, fmd);
@@ -461,7 +460,7 @@ vr_inet6_flow_lookup(struct vrouter *router, struct vr_packet *pkt,
 
     if (vr_ip6_fragment_head(ip6)) {
         ret = vr_v6_fragment_add(router, fmd->fmd_dvrf, ip6, flow_p->flow6_sport,
-                flow_p->flow6_dport);
+                flow_p->flow6_dport, 0);
         if (ret < 0)
             return -VP_DROP_NO_MEMORY;
         if (vr_enqueue_to_assembler){

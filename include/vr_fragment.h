@@ -37,6 +37,8 @@ struct vr_fragment_key {
     uint64_t fk_dip_l;
     uint32_t fk_id;
     unsigned short fk_vrf;
+     /* Custom data */
+    unsigned short fk_custom;
 } __attribute__((packed));
 
 struct vr_fragment_queue_element {
@@ -72,16 +74,17 @@ struct vr_fragment {
 #define f_dip_l f_key.fk_dip_l
 #define f_id  f_key.fk_id
 #define f_vrf f_key.fk_vrf
+#define f_custom f_key.fk_custom
 #define f_len f_key.fk_len
 
 int vr_fragment_table_init(struct vrouter *);
 void vr_fragment_table_exit(struct vrouter *);
 struct vr_fragment *vr_fragment_get(struct vrouter *, unsigned short,
-        struct vr_ip *);
+        struct vr_ip *, unsigned short);
 int vr_v4_fragment_add(struct vrouter *, unsigned short, struct vr_ip *,
-                unsigned short, unsigned short);
+                unsigned short, unsigned short, unsigned short);
 int vr_v6_fragment_add(struct vrouter *, unsigned short, struct vr_ip6 *,
-                unsigned short, unsigned short);
+                unsigned short, unsigned short, unsigned short);
 void vr_fragment_del(vr_htable_t, struct vr_fragment *);
 uint32_t vr_fragment_get_hash(struct vr_packet_node *);
 int vr_fragment_assembler(struct vr_fragment **,

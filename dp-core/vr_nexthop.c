@@ -772,7 +772,7 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         hash = (nh->nh_ecmp_config_hash >> 8) & NH_ECMP_CONFIG_HASH_MASK;
         if (pkt->vp_type == VP_TYPE_IP) {
             ip = (struct vr_ip *)pkt_network_header(pkt);
-            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp, hash, true);
+            ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd, flowp, hash, VR_FRAG_FLAG_NONE);
             switch (ret) {
                 case 0:
                     /*
@@ -815,7 +815,7 @@ nh_composite_ecmp_select_nh(struct vr_packet *pkt, struct vr_nexthop *nh,
         } else if (pkt->vp_type == VP_TYPE_IP6) {
             ip6 = (struct vr_ip6 *)pkt_network_header(pkt);
             ret = vr_inet6_get_flow_key(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                     fmd->fmd_vlan, flowp, hash, true);
+                                     fmd->fmd_vlan, flowp, hash, 0);
             switch (ret) {
                 case 0:
                     if (vr_ip6_fragment_head(ip6) && vr_enqueue_to_assembler) {
@@ -1752,10 +1752,10 @@ nh_udp_tunnel(struct vr_packet *pkt, struct vr_nexthop *nh,
 
     if (pkt->vp_type == VP_TYPE_IP) {
         ret = vr_inet_get_flow_key(nh->nh_router, pkt, fmd,
-                                     flowp, VR_FLOW_KEY_ALL, false);
+                                     flowp, VR_FLOW_KEY_ALL, VR_FRAG_FLAG_MIRROR);
     } else if (pkt->vp_type == VP_TYPE_IP6) {
         ret = vr_inet6_get_flow_key(nh->nh_router, fmd->fmd_dvrf, pkt,
-                                 fmd->fmd_vlan, flowp, VR_FLOW_KEY_ALL, false);
+                                 fmd->fmd_vlan, flowp, VR_FLOW_KEY_ALL, VR_FRAG_FLAG_MIRROR);
     }
 
     if (!ret) {
