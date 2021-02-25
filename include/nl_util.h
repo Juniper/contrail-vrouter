@@ -14,6 +14,7 @@ extern "C" {
 #include <stdbool.h> /* For bool */
 #include "vr_utils.h"
 #include "vr_response.h"
+#include "vr_info.h"
 
 #define VR_DEF_NETLINK_PORT         20914
 #define VR_DEF_SOCKET_DIR           "/var/run/vrouter"
@@ -65,6 +66,12 @@ struct nl_client {
     uint32_t cl_sa_len;
 };
 
+struct nl_sandesh_callbacks {
+void (*vr_response_process)(void *);
+void (*vr_info_req_process)(void *);
+};
+
+extern struct nl_sandesh_callbacks nl_cb;
 
 #define GENL_FAMILY_NAME_LEN            16
 
@@ -261,6 +268,9 @@ extern int vr_send_set_ieee_ets(struct nl_client *, uint8_t *,
 extern int vr_send_get_ieee_ets(struct nl_client *, uint8_t *,
         struct priority *);
 extern void vr_print_drop_stats(vr_drop_stats_req *, int);
+extern int vr_send_info_dump(struct nl_client *cl, unsigned int router_id,
+        int marker, int inst_id, vr_info_msg_en msginfo, int buffsz,
+        uint8_t *vr_info_inbuf);
 
 #ifdef __cplusplus
 }

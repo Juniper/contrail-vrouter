@@ -22,6 +22,7 @@
 static char value[BUF_LENGTH];
 static char *ini_data = NULL;
 static char ini_file[] = "/etc/contrail/contrail-vrouter-agent.conf";
+static bool platform_vtest = false;
 
 static void
 copy_line(char *buffer, const char *line, uint32_t *index)
@@ -39,6 +40,24 @@ copy_line(char *buffer, const char *line, uint32_t *index)
         buffer[(*index)++] = line[i++];
     }
     buffer[(*index)++] = '\n';
+}
+
+/*
+ * API to set plafform as vtest; Used in vtest UT executions
+ */
+void
+set_platform_vtest (void)
+{
+    platform_vtest = true;
+}
+
+/*
+ * API to check if platform is vtest
+ */
+bool
+platform_is_vtest (void)
+{
+    return platform_vtest;
 }
 
 static int
