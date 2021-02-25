@@ -359,6 +359,18 @@ buffer sandesh vr_mem_stats_req {
 
 /* any new addition needs update to vr_util.c & flow.c */
 
+buffer sandesh vr_info_req {
+    1:  sandesh_op      h_op;
+    2:  i16             vdu_rid;
+    3:  i16             vdu_index;
+    4:  i16             vdu_buff_table_id;
+    5:  i16             vdu_marker;
+    6:  i16             vdu_msginfo;
+    7:  i32             vdu_outbufsz;
+    8:  list <byte>     vdu_inbuf;
+    9:  list <byte>     vdu_proc_info;
+}
+
 buffer sandesh vr_pkt_drop_log_req {
     1:  sandesh_op      h_op;
     2:  i16             vdl_rid;
