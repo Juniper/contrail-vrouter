@@ -2249,6 +2249,10 @@ struct host_os linux_host = {
     .hos_get_log_level              =       lh_get_log_level,
     .hos_get_enabled_log_types      =       lh_get_enabled_log_types,
     .hos_soft_reset                 =       lh_soft_reset,
+    /* Below macro would be expanded for each callbacks registered in vr_info.h.
+     * this would map the actual kernel callback function with
+     * vrouter_host(.hos_<fn. name>) */
+    FOREACH_VR_INFO_MAP()
 };
     
 struct host_os *
