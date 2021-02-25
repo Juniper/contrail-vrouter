@@ -671,6 +671,7 @@ vr_dpdk_virtio_rx_queue_set(void *arg)
         lcore_id = vif_rx_queue_lcore[p->vif_id][p->queue_id];
         lcore = vr_dpdk.lcores[lcore_id];
         rx_queue = &lcore->lcore_rx_queues[p->vif_id];
+	lcore->lcore_rx_queues[p->vif_id].vring_queue_id = p->queue_id;
         dpdk_lcore_queue_add(lcore_id, &lcore->lcore_rx_head, rx_queue);
 
     } else {
