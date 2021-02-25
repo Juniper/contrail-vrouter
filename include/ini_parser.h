@@ -35,6 +35,8 @@ extern const char *get_platform_str(void);
 extern int get_protocol(void);
 
 extern int parse_ini_file(void);
+extern void set_platform_vtest(void);
+extern bool platform_is_vtest (void);
 
 #ifdef __cplusplus
 }

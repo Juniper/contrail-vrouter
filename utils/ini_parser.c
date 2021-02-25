@@ -41,6 +41,24 @@ copy_line(char *buffer, const char *line, uint32_t *index)
     buffer[(*index)++] = '\n';
 }
 
+/*
+ * API to set plafform as vtest; Used in vtest UT executions
+ */
+void
+set_platform_vtest (void)
+{
+    platform_vtest = true;
+}
+
+/*
+ * API to check if platform is vtest
+ */
+bool
+platform_is_vtest (void)
+{
+    return platform_vtest;
+}
+
 static int
 read_file_size(const char *file_path)
 {

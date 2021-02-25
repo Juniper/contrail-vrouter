@@ -55,6 +55,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += linux/vrouter_mod.o linux/vhost_dev.o
 	vrouter-y += linux/vr_host_interface.o linux/vr_genetlink.o
 	vrouter-y += linux/vr_mem.o linux/vr_fragment_assembler.o
+	vrouter-y += linux/vr_lh_info.o
 
 	vrouter-y += dp-core/vr_message.o dp-core/vr_sandesh.o
 	vrouter-y += dp-core/vr_queue.o dp-core/vr_index_table.o
@@ -72,6 +73,7 @@ ifneq ($(KERNELRELEASE), )
 	vrouter-y += dp-core/vr_proto_ip6.o dp-core/vr_buildinfo.o
 	vrouter-y += dp-core/vr_bitmap.o dp-core/vr_qos.o
 	vrouter-y += dp-core/vr_pkt_droplog.o
+	vrouter-y += dp-core/vr_info.o
 
 	ccflags-y += -I$(TARGET_VER_HEADER_PATH)
 	ccflags-y += -I$(src)/include -I$(SANDESH_HEADER_PATH)/sandesh/gen-c
