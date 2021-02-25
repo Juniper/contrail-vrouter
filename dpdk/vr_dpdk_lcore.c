@@ -159,6 +159,7 @@ dpdk_lcore_rx_queue_remove(struct vr_dpdk_lcore *lcore,
         SLIST_REMOVE(&lcore->lcore_rx_head, rx_queue, vr_dpdk_queue,
             q_next);
         rx_queue->enabled = false;
+        rx_queue->vring_queue_id = 0;
 
         /* decrease the number of RX queues */
         lcore->lcore_nb_rx_queues--;
