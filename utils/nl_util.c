@@ -33,6 +33,7 @@
 
 #define VROUTER_GENETLINK_FAMILY_NAME "vrouter"
 #define GENL_ID_VROUTER         (NLMSG_MIN_TYPE + 0x10)
+struct nl_sandesh_callbacks nl_cb;
 
 extern struct nl_response *nl_parse_gen(struct nl_client *);
 
@@ -157,6 +158,14 @@ void
 vr_qos_map_req_process(void *s_req)
 {
     return;
+}
+
+void
+vr_info_req_process(void *s_req)
+{
+   if (nl_cb.vr_info_req_process) {
+       nl_cb.vr_info_req_process(s_req);
+   }
 }
 
 void

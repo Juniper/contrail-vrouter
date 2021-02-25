@@ -63,6 +63,12 @@ dropstats = env.Program(target = 'dropstats', source = dropstats_sources)
 vxlan_sources = ['vxlan.c']
 vxlan = env.Program(target = 'vxlan', source = vxlan_sources)
 
+vrinfo_sources = ['vrinfo.c']
+vrinfo = env.Program(target = 'vrinfo', source = vrinfo_sources)
+
+dpdkinfo_sources = ['dpdkinfo.c']
+dpdkinfo = env.Program(target = 'dpdkinfo', source = dpdkinfo_sources)
+
 vrouter_sources = ['vrouter.c']
 vrouter = env.Program(target = 'vrouter', source = vrouter_sources)
 
@@ -74,7 +80,7 @@ qosmap = env.Program(target = 'qosmap', source = qosmap_sources)
 
 # to make sure that all are built when you do 'scons' @ the top level
 binaries  = [vif, rt, nh, mirror, mpls, flow, vrfstats, dropstats,
-             vxlan, vrouter, vrmemstats, qosmap]
+             vxlan, vrouter, vrmemstats, qosmap, vrinfo, dpdkinfo]
 
 scripts  = ['vifdump']
 env.Default(binaries)
