@@ -1,0 +1,140 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fffaac55_0395451c",
+        "filename": "Makefile",
+        "patchSetId": 5
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "I think, we have removed this file, please double check.",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2e41d22a_af3da62b",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "remove tab spacing",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7203f251_ba3e7bb6",
+        "filename": "include/ini_parser.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "this is not required for R3.2",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a4c40e65_433aec86",
+        "filename": "include/vr_info.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "Have you tested all dpdkinfo commands ?\n\nHere you have registered only bond, what about other CLI\u0027s like lace, mempool, stats etc.",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f763d1e3_05d24e82",
+        "filename": "include/vr_message.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "Use value as 19, instead of 22",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "310fd190_d58a50ce",
+        "filename": "utils/dpdkinfo.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "please include all relevant options.",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "66d71087_03fbc009",
+        "filename": "utils/ini_parser.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "I think, this change is not required for R3.2",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d953925f_6fd00e9b",
+        "filename": "utils/nl_util.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-02T07:02:42Z",
+      "side": 1,
+      "message": "please follow the existing method of R3.2 for registering callbacks",
+      "revId": "f8852ac07197fa8f833d098a8a78703a613ee20a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
