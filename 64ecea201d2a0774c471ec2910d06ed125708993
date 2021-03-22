@@ -1,0 +1,124 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "965ccbeb_399ba8f9",
+        "filename": "Makefile",
+        "patchSetId": 14
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-22T06:32:04Z",
+      "side": 1,
+      "message": "check, this has been moved",
+      "revId": "64ecea201d2a0774c471ec2910d06ed125708993",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6de43b6d_af770782",
+        "filename": "dp-core/vr_info.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-22T06:32:04Z",
+      "side": 1,
+      "message": "We have updated \"Message truncated\" as part of output, when there is a buffer overflow.\nRequest you to compare the code with latest code and ensure bugs are taken care",
+      "revId": "64ecea201d2a0774c471ec2910d06ed125708993",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "70a97806_e5500a84",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-22T06:32:04Z",
+      "side": 1,
+      "message": "remove tab spacing",
+      "revId": "64ecea201d2a0774c471ec2910d06ed125708993",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7440cf39_1ad6ce17",
+        "filename": "include/vr_info.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-22T06:32:04Z",
+      "side": 1,
+      "message": "we have changed the name from KERNEL to VR_COMMON.. check the latest code",
+      "range": {
+        "startLine": 13,
+        "startChar": 35,
+        "endLine": 13,
+        "endChar": 41
+      },
+      "revId": "64ecea201d2a0774c471ec2910d06ed125708993",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4210c45a_82f71c75",
+        "filename": "include/vr_linux.h",
+        "patchSetId": 14
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-22T06:32:04Z",
+      "side": 1,
+      "message": "these code have been moved to platform independent part. check latest code",
+      "range": {
+        "startLine": 17,
+        "startChar": 1,
+        "endLine": 42,
+        "endChar": 29
+      },
+      "revId": "64ecea201d2a0774c471ec2910d06ed125708993",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ec851dc2_f93b6225",
+        "filename": "linux/vr_lh_info.c",
+        "patchSetId": 14
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 643
+      },
+      "writtenOn": "2021-03-22T06:32:04Z",
+      "side": 1,
+      "message": "this file has been removed and moved to platform independent part",
+      "range": {
+        "startLine": 1,
+        "startChar": 0,
+        "endLine": 30,
+        "endChar": 0
+      },
+      "revId": "64ecea201d2a0774c471ec2910d06ed125708993",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
