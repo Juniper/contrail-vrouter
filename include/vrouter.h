@@ -22,6 +22,8 @@ extern "C" {
 #include "vr_mpls.h"
 #include "vr_index_table.h"
 #include "vr_pkt_droplog.h"
+#include "vr_message.h"
+#include "vr_info.h"
 
 #define VR_NATIVE_VRF       0
 #define VR_UNIX_PATH_MAX    108
@@ -114,6 +116,7 @@ enum vr_malloc_objects_t {
     VR_BITMAP_OBJECT,
     VR_QOS_MAP_OBJECT,
     VR_FC_OBJECT,
+    VR_INFO_REQ_OBJECT,
     VR_VROUTER_MAX_OBJECT,
 };
 
@@ -212,7 +215,19 @@ struct host_os {
     unsigned int *(*hos_get_enabled_log_types)(int *);
     void (*hos_soft_reset)(struct vrouter *);
     int (*hos_is_frag_limit_exceeded)(void);
+    /* Register vr_info callback functions. */
+    FOREACH_VR_INFO_CB_DECLARATION();
 };
+
+#define VR_INFO_DECLARATION_COMMON(MSG, CB, PLTFRM) \
+        int vr_##CB(VR_INFO_ARGS);
+
+#define FOREACH_VR_INFO_DECLARATION_COMMON() \
+    VR_INFO_REG(VR_INFO_DECLARATION_COMMON)
+
+/* Below macro would be expanded for declaring the kernel callback function
+ * used for vr_info */
+FOREACH_VR_INFO_DECLARATION_COMMON()
 
 #define vr_printf                       vrouter_host->hos_printf
 #define vr_malloc                       vrouter_host->hos_malloc
