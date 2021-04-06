@@ -272,8 +272,9 @@ vr_htable_hentry_scheduled_delete(void *arg)
             else
                 prev->hentry_next_index = VR_INVALID_HENTRY_INDEX;
 
-            ent->hentry_flags &= ~VR_HENTRY_FLAG_DELETE_MARKED;
-            ent->hentry_flags |= VR_HENTRY_FLAG_DELETE_PROCESSED;
+	    (void)vr_sync_and_and_fetch_8u(&ent->hentry_flags, ~VR_HENTRY_FLAG_DELETE_MARKED);
+	    (void)vr_sync_or_and_fetch_8u(&ent->hentry_flags, VR_HENTRY_FLAG_DELETE_PROCESSED);
+	    (void)vr_sync_and_and_fetch_8u(&ent->hentry_flags, ~VR_HENTRY_FLAG_VALID);
         }
 
         next = ent->hentry_next;
@@ -374,8 +375,8 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
 
     (void)vr_sync_sub_and_fetch_32u(&table->ht_used_entries, 1);
 
-    /* Mark it as Invalid */
-    ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID;
+    /* Mark it as Invalid, it is too early here before the actual scheduled delete
+    ent->hentry_flags &= ~VR_HENTRY_FLAG_VALID; */
 
     if (ent->hentry_index < table->ht_hentries)
         return;
@@ -383,7 +384,7 @@ vr_htable_release_hentry(vr_htable_t htable, vr_hentry_t *ent)
     if (vr_not_ready)
         return;
 
-    ent->hentry_flags |= VR_HENTRY_FLAG_DELETE_MARKED;
+    (void)vr_sync_or_and_fetch_8u(&ent->hentry_flags, VR_HENTRY_FLAG_DELETE_MARKED);
 
     head_ent = __vr_htable_get_hentry_by_index(htable, ent->hentry_bucket_index);
     delete_index = head_ent->hentry_index / table->ht_bucket_size;
