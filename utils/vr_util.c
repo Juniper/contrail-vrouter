@@ -576,8 +576,26 @@ vr_print_drop_stats(vr_drop_stats_req *stats, int core)
             stats->vds_no_fmd);
     printf("Invalid VNID                  %" PRIu64 "\n",
             stats->vds_invalid_vnid);
-    printf("Fragment errors               %" PRIu64 "\n",
-            stats->vds_frag_err);
+    printf("\n");
+
+    printf("Frag Stale entry drops        %" PRIu64 "\n",
+            stats->vds_frag_stale_err);
+    printf("Frag Non head pkt drops       %" PRIu64 "\n",
+            stats->vds_frag_non_head_err);
+    printf("Frag per cpu max errors       %" PRIu64 "\n",
+            stats->vds_frag_max_per_cpu_err);
+    printf("Frag all cpu core max errors  %" PRIu64 "\n",
+            stats->vds_frag_max_cpu_core_err);
+    printf("Frag mem alloc fail           %" PRIu64 "\n",
+            stats->vds_frag_mem_alloc_err);
+    printf("Frag Enqueue fail             %" PRIu64 "\n",
+            stats->vds_frag_enqueue_err);
+    printf("Frag DPDK CPU error           %" PRIu64 "\n",
+            stats->vds_frag_cpu_err);
+    printf("Frag wrong cpu select error   %" PRIu64 "\n",
+            stats->vds_frag_cpu_exceed_err);
+    printf("\n");
+
     printf("Invalid Source                %" PRIu64 "\n",
             stats->vds_invalid_source);
     printf("Jumbo Mcast Pkt with DF Bit   %" PRIu64 "\n",
@@ -782,7 +800,14 @@ vr_sum_drop_stats(vr_drop_stats_req *req)
     sum += req->vds_no_fmd;
     sum += req->vds_cloned_original;
     sum += req->vds_invalid_vnid;
-    sum += req->vds_frag_err;
+    sum += req->vds_frag_stale_err;
+    sum += req->vds_frag_non_head_err;
+    sum += req->vds_frag_max_per_cpu_err;
+    sum += req->vds_frag_max_cpu_core_err;
+    sum += req->vds_frag_mem_alloc_err;
+    sum += req->vds_frag_enqueue_err;
+    sum += req->vds_frag_cpu_err;
+    sum += req->vds_frag_cpu_exceed_err;
     sum += req->vds_invalid_source;
     sum += req->vds_l2_no_route;
     sum += req->vds_fragment_queue_fail;
