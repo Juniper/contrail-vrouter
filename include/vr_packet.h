@@ -171,20 +171,27 @@
 #define VP_DROP_NO_FMD                      33
 #define VP_DROP_CLONED_ORIGINAL             34
 #define VP_DROP_INVALID_VNID                35
-#define VP_DROP_FRAGMENTS                   36
-#define VP_DROP_INVALID_SOURCE              37
-#define VP_DROP_L2_NO_ROUTE                 38
-#define VP_DROP_FRAGMENT_QUEUE_FAIL         39
-#define VP_DROP_VLAN_FWD_TX                 40
-#define VP_DROP_VLAN_FWD_ENQ                41
-#define VP_DROP_NEW_FLOWS                   42
-#define VP_DROP_FLOW_EVICT                  43
-#define VP_DROP_TRAP_ORIGINAL               44
-#define VP_DROP_PKT_LOOP                    45
-#define VP_DROP_NO_FRAG_ENTRY               46
-#define VP_DROP_ICMP_ERROR                  47
-#define VP_DROP_CLONE_FAIL                  48
-#define VP_DROP_MAX                         49
+#define VP_DROP_FRAG_STALE                  36
+#define VP_DROP_FRAG_NON_HEAD               37
+#define VP_DROP_FRAG_MAX_PER_CPU            38
+#define VP_DROP_FRAG_MAX_ALLCPU_CORE        39
+#define VP_DROP_FRAG_MEM_ALLOC              40
+#define VP_DROP_FRAG_ENQUEUE_FAIL           41
+#define VP_DROP_FRAG_CPU                    42
+#define VP_DROP_FRAG_CPU_EXCEED             43
+#define VP_DROP_INVALID_SOURCE              44
+#define VP_DROP_L2_NO_ROUTE                 45
+#define VP_DROP_FRAGMENT_QUEUE_FAIL         46
+#define VP_DROP_VLAN_FWD_TX                 47
+#define VP_DROP_VLAN_FWD_ENQ                48
+#define VP_DROP_NEW_FLOWS                   49
+#define VP_DROP_FLOW_EVICT                  50
+#define VP_DROP_TRAP_ORIGINAL               51
+#define VP_DROP_PKT_LOOP                    52
+#define VP_DROP_NO_FRAG_ENTRY               53
+#define VP_DROP_ICMP_ERROR                  54
+#define VP_DROP_CLONE_FAIL                  55
+#define VP_DROP_MAX                         56
 
 /*
  * NOTE: Please do not add any more fields without ensuring
