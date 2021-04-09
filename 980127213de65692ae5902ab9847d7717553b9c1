@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1ed2865f_4462c6a1",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 581,
+      "author": {
+        "id": 984
+      },
+      "writtenOn": "2021-04-09T12:10:55Z",
+      "side": 1,
+      "message": "Change Frag to Fragment in all display lines.",
+      "revId": "980127213de65692ae5902ab9847d7717553b9c1",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
