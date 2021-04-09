@@ -424,19 +424,26 @@ buffer sandesh vr_drop_stats_req {
     38: i64             vds_no_fmd;
     39: i64             vds_cloned_original;
     40: i64             vds_invalid_vnid;
-    41: i64             vds_frag_err;
-    42: i64             vds_invalid_source;
-    43: i64             vds_l2_no_route;
-    44: i64             vds_fragment_queue_fail;
-    45: i64             vds_vlan_fwd_tx;
-    46: i64             vds_vlan_fwd_enq;
-    47: i64             vds_drop_new_flow;
-    48: i64             vds_flow_evict;
-    49: i64             vds_trap_original;
-    50: i64             vds_pkt_loop;
-    51: i64             vds_no_frag_entry;
-    52: i64             vds_icmp_error;
-    53: i64             vds_clone_fail;
+    41: i64             vds_frag_stale_err;
+    42: i64             vds_frag_non_head_err;
+    43: i64             vds_frag_max_per_cpu_err;
+    44: i64             vds_frag_max_cpu_core_err;
+    45: i64             vds_frag_mem_alloc_err;
+    46: i64             vds_frag_enqueue_err;
+    47: i64             vds_frag_cpu_err;
+    48: i64             vds_frag_cpu_exceed_err;
+    49: i64             vds_invalid_source;
+    50: i64             vds_l2_no_route;
+    51: i64             vds_fragment_queue_fail;
+    52: i64             vds_vlan_fwd_tx;
+    53: i64             vds_vlan_fwd_enq;
+    54: i64             vds_drop_new_flow;
+    55: i64             vds_flow_evict;
+    56: i64             vds_trap_original;
+    57: i64             vds_pkt_loop;
+    58: i64             vds_no_frag_entry;
+    59: i64             vds_icmp_error;
+    60: i64             vds_clone_fail;
 }
 
 buffer sandesh vr_qos_map_req {
