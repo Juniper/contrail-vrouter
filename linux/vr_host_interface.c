@@ -672,6 +672,8 @@ linux_enqueue_pkt_for_gro(struct sk_buff *skb, struct vr_interface *vif,
             gro_vif_stats->vis_obytes += skb->len;
         }
     }
+
+    skb->ip_summed = CHECKSUM_UNNECESSARY;
     skb_queue_tail(head, skb);
 
     /*
