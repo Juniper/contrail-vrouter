@@ -16,6 +16,24 @@
       "revId": "371d6970b8be19ee0df03115ef1eccb730d1e840",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2cd47614_64663178",
+        "filename": "linux/vr_host_interface.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 676,
+      "author": {
+        "id": 983
+      },
+      "writtenOn": "2021-05-04T05:47:43Z",
+      "side": 1,
+      "message": "Yes, It\u0027s enough.",
+      "parentUuid": "3a460632_84075e64",
+      "revId": "371d6970b8be19ee0df03115ef1eccb730d1e840",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": false
     }
   ]
 }
