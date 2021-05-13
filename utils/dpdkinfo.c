@@ -237,7 +237,7 @@ main(int argc, char *argv[])
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "h:v:b:l:m:s:n:x:c:a:",
+    while (((opt = getopt_long(argc, argv, "-:h:v:b:l:m:s:n:x:c:a:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 'v':
