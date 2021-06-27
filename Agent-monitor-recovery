@@ -1,0 +1,135 @@
+#!/bin/bash
+
+SLEEP_INTERVAL=1m
+COMMAND="contrail-status"
+CURRENT_TIME="date '+%b %d %H:%M:%S'"
+WAIT=$2
+Pause=$4
+#mkdir -p AGENT_MON
+#PATH_DIR="$(date +%Y_%m_%d_%H_%M_%S)"
+
+# agent_status_detection
+# monitors agent's status in duration of user defined
+# time * 60 seconds , if the agent is stuck in initializing state
+# this will trigger data collection , recovery code
+function agent_status_detection() {
+
+     fetch_contrail_status
+     vrouter_agent_status=`cat contrail_status_collected  | grep agent | tail -n1 |  awk  '{print $2}'`
+     if [ "$vrouter_agent_status" = "active" ] || [ "$vrouter_agent_status" = "inactive" ]
+     then
+        echo "************* contrail-vrouter-agent is $vrouter_agent_status [$(eval $CURRENT_TIME)] ************"
+        echo "************* S K I P P I N G *** T H E *** D A T A ******* C O L L E C T I O N **********"
+        rm -rf contrail_status_collected
+     elif [ "$vrouter_agent_status" = "initializing" ]
+     then
+        echo "************* contrail-vrouter-agent is $vrouter_agent_status************"
+
+        while [ $WAIT -gt 0 ]
+        do
+            sleep ${SLEEP_INTERVAL}
+            fetch_contrail_status
+            WAIT=$(( $WAIT - 1))
+         done
+            if [ "$vrouter_agent_status" = "initializing" ]
+            then
+              echo "************* S T A R T I N G ******* F A U L T ******** C O R R E C T I O N **********"
+              fault_correction
+            fi
+     fi
+}
+
+# stop_data_collection
+# Need to add functionality to stop the 
+# data collection if required . Empty method 
+# is added as to have a framework
+function stop_data_collection() {
+    echo "************* Stop data collection***********" 
+}
+
+# restart_data_collection
+# Need to add functionality to stop and start the 
+# data collection if required . Empty method 
+# is added as to have a framework
+function restart_data_collection() {
+    echo "************* RESTARTING DATA COLLETCION **********"
+    stop_data_collection
+    start_data_collection
+}
+
+function data_daemonize(){
+      while true; do
+         agent_status_detection 
+         duration=$((60 * Pause))
+         echo "*************  AGENT-MON auto-triggers after $duration seconds*************"
+         sleep ${duration}
+      done
+}
+# fetch_contil_status  
+# This function will call the contrail-status command , collects the output 
+ function fetch_contrail_status() {
+  echo "************* Check contrail-status *************"
+  touch contrail_status_collected
+
+  `$COMMAND > contrail_status_collected`
+  if [ $? -eq 0 ];
+  then
+     echo "$COMMAND executed successfully [$(eval $CURRENT_TIME)]"
+  else
+     echo "$COMMAND terminated unsuccessfully [$(eval $CURRENT_TIME)]"
+  fi
+}
+
+function fault_correction(){
+     fetch_contrail_status
+     vrouter_agent_status=`cat contrail_status_collected  | grep agent | tail -n1 |  awk  '{print $2}'`
+     echo "************* contrail-vrouter-agent is $vrouter_agent_status [$(eval $CURRENT_TIME)] ************"
+     if [ "$vrouter_agent_status" = "initializing" ]
+     then
+       echo "************* RECOVERING FROM INITIALIZED STATE *******"
+       DOCKER_UUID=`docker ps | grep contrail-vrouter-agent | awk  '{print $1}'`
+       if [ $DOCKER_UUID == 0 ];
+       then
+         echo "docker contrail-vrouter-agent is not present [$(eval $CURRENT_TIME)] "
+       else
+         echo "docker contrail-vrouter-agent is present [$(eval $CURRENT_TIME)]"
+       fi
+
+       result=`docker restart $DOCKER_UUID`
+       if [ $result == $DOCKER_UUID ];
+       then
+         echo "docker restart $DOCKER_UUID  successful [$(eval $CURRENT_TIME)]"
+       else
+         echo "docker restart $DOCKER_UUID  failed [$(eval $CURRENT_TIME)]"
+       fi
+      else
+        echo "docker is in $vrouter_agent_status state , restart is not required"
+        exit 1
+      fi
+     fetch_contrail_status
+     vrouter_agent_status=`cat contrail_status_collected  | grep agent | tail -n1 |  awk  '{print $2}'`
+     echo "************* AGENT MONITORING IS COMPLETE ********" 
+     echo "************* contrail-vrouter-agent  $vrouter_agent_status state ********"
+}
+if [ "$UID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+if [ $# -lt 1 ]
+then
+  echo "Usage : $0 start <time>  | stop|restart "
+  exit
+fi
+case "$1" in
+  start)  agent_status_detection start
+          #archive_monitored_data
+          ;;
+  stop)     stop_data_collection stop
+          ;;
+  daemon) data_daemonize daemon
+          ;;
+  restart)  restart_data_collection restart
+          ;;
+  *)      echo "Invalid command - Valid->start < wait_time > interval <pause_time> |stop|restart"
+          ;;
+esac
