@@ -1,0 +1,106 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "15e82a74_8d40c66e",
+        "filename": "CEM-22118-workaround",
+        "patchSetId": 5
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1004
+      },
+      "writtenOn": "2021-06-28T06:05:34Z",
+      "side": 1,
+      "message": "It is better to append a date/time stamp (preferably epoch) to the name of the temp_file. With this, multiple executions of this script will not overwrite the previous recordings.",
+      "revId": "fa99f8ff5760ae4eb1d0688d5d4ba272af31631c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8257c8bf_c78f8f29",
+        "filename": "CEM-22118-workaround",
+        "patchSetId": 5
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 1004
+      },
+      "writtenOn": "2021-06-28T06:05:34Z",
+      "side": 1,
+      "message": "Comment section should say \"stop and start\" instead of \"stop\"",
+      "revId": "fa99f8ff5760ae4eb1d0688d5d4ba272af31631c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "91c93926_812d8338",
+        "filename": "CEM-22118-workaround",
+        "patchSetId": 5
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 1004
+      },
+      "writtenOn": "2021-06-28T06:05:34Z",
+      "side": 1,
+      "message": "Generic Comment: It would be easier to take the formatted curl outputs by using xmllint. It is easier to read later.",
+      "revId": "fa99f8ff5760ae4eb1d0688d5d4ba272af31631c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9775c513_809f679c",
+        "filename": "CEM-22118-workaround",
+        "patchSetId": 5
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 1004
+      },
+      "writtenOn": "2021-06-28T06:05:34Z",
+      "side": 1,
+      "message": "the drop_stats filename under $PATH_DIR can have epoch timestamp for easier reading.",
+      "revId": "fa99f8ff5760ae4eb1d0688d5d4ba272af31631c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5ebc8c47_ec02d5d9",
+        "filename": "CEM-22118-workaround",
+        "patchSetId": 5
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 1004
+      },
+      "writtenOn": "2021-06-28T06:05:34Z",
+      "side": 1,
+      "message": "the flow_list filename under $PATH_DIR can have epoch timestamp for easier reading.",
+      "revId": "fa99f8ff5760ae4eb1d0688d5d4ba272af31631c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fd2af06b_347fc668",
+        "filename": "CEM-22118-workaround",
+        "patchSetId": 5
+      },
+      "lineNbr": 84,
+      "author": {
+        "id": 1004
+      },
+      "writtenOn": "2021-06-28T06:05:34Z",
+      "side": 1,
+      "message": "While moving the temp_file, it is better to use epoch time again. This is a generic comment as multiple executions should not overwrite it.",
+      "revId": "fa99f8ff5760ae4eb1d0688d5d4ba272af31631c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
