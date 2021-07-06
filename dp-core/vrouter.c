@@ -538,7 +538,7 @@ vrouter_init(void)
 {
     unsigned int i;
     int ret;
-
+    vr_printf("Test print");
     /* init CPU id struct*/
     if (vr_init_cpuid != NULL)
         vr_init_cpuid(&vr_cpu_type);
