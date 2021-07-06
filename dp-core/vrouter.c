@@ -712,6 +712,6 @@ vr_hugepage_config_process(void *s_req)
 
     vr_message_response(VR_HPAGE_CFG_OBJECT_ID, &hcfg_resp, ret,
                 false);
-
+    vr_printf("hii");
     return;
 }
