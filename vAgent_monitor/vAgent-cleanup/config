@@ -1,0 +1,17 @@
+#Config details for Clean old logs which are created by vAgent-monitor script.
+
+#Cleanup check interval time in minutes
+INTERVAL=1
+
+#Path where log files are stored
+LOG_PATH="/opt/Agent_Monit/AGENT_MON"
+
+#Keep number of log file.
+LOG_COUNT=5
+
+#Log file pattern
+LOG_PATTERN="*.gz"
+
+#Log directory threshold value in MB. If Log directory exceed this threshold value, Clean process will start 
+THRESHOLD=3072MB
+

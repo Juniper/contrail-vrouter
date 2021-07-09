@@ -1,0 +1,64 @@
+#!/bin/bash
+#set -e
+
+source ./config
+echo -e "\n=======Printing config values======\n"
+echo -e "$(cat ./config | grep -v "^#" | grep "=")\n"
+echo -e "\n===================================\n"
+
+THRESHOLD=$(echo $THRESHOLD | cut -dM -f1)
+
+function Clean_log() {
+        cur_size=$(du -s ${LOG_PATH} | awk '{print $1}')
+        cur_size=$(expr $cur_size / 1000)
+        echo -e "${LOG_PATH} size is ${cur_size}MB"
+
+        if [ $cur_size -gt $THRESHOLD ]; then
+                t_files=$(find ${LOG_PATH} -name ${LOG_PATTERN} | wc -l)
+
+                if [ $t_files -eq ${LOG_COUNT} ] || [ $t_files -lt ${LOG_COUNT} ]; then
+
+                        echo -e "Number of log files exist: ${t_files}\n"
+                        echo -e "Number of logs files to keep: ${LOG_COUNT} \n"
+                        echo -e "Since Number of log file exist is equal or lessthan to LOG_COUNT,So Nothing to clean up.\nPlease configure LOG_COUNT value less than ${t_file} and restart vAgent-cleanup service.\n"
+                else
+                	echo -e "Exceeded log threshold value ${THRESHOLD}MB...\nstart cleaning old logs...\n"
+
+                	echo -e "Number of log files exist: ${t_files}\n"
+
+                	h_n=$(expr $t_files - ${LOG_COUNT})
+
+                	echo -e "Number of logs files to remove: ${h_n} \n"
+
+                	echo -e "====List of log files to be cleaned up=====\n"
+
+                	ls -ltr ${LOG_PATH}/${LOG_PATTERN} | head -n $h_n | awk '{print $9}'
+
+                     	echo -e "\n===========================================\n"
+                	for log_f in $(ls -ltr ${LOG_PATH}/${LOG_PATTERN} | head -n $h_n | awk '{print $9}'); do
+
+                        	rm -rfv $log_f
+                	done
+                	echo -e "\n===========Log cleanup done=========\n"
+		fi
+
+        else
+                echo -e "Log Folder ${LOG_PATH} not exceeded the threshold value ${THRESHOLD}MB.\nCurrently nothing to clean...\n"
+
+        fi
+}
+function main() {
+        while true; do
+                echo -e "Log cleanup check started....\n"
+                Clean_log
+                echo -e "Log cleanup check stopped....\n"
+                echo -e "Log cleanup check will run after ${INTERVAL} minute"
+                echo -e "======================================="
+                secs=$((${INTERVAL} * 60))
+                sleep $secs
+
+        done
+}
+
+main
+
