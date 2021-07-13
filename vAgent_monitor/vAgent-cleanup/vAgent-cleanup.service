@@ -1,0 +1,11 @@
+[Unit]
+Description=Vrouter Agent logs cleanup
+
+[Service]
+User=root
+WorkingDirectory=/opt/Agent_Monit
+ExecStart=/bin/bash Cleanup
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
