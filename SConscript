@@ -97,7 +97,7 @@ env.Append(CPPPATH = ['#src/contrail-common/sandesh/library/c'])
 
 # Make Sandesh quiet for production
 if 'production' in env['OPT']:
-    DefaultEnvironment().Append(CPPDEFINES='SANDESH_QUIET')
+    DefaultEnvironment().Append(CPPDEFINES='-DSANDESH_QUIET')
 
 vr_root = './'
 makefile = vr_root + 'Makefile'
