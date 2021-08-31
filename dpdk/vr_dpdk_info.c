@@ -21,6 +21,16 @@
 #define LINE 200
 #define MAXBITS 8
 
+#define CNT_NO_CLEAR                     0
+#define CNT_CLEAR                        1
+
+#define LACP_TX                          0
+#define LACP_RX                          1
+#define LACP_TXRX                        2
+#define LACP_CB_HISTOGRAM_MAX_RANGE      5
+#define LACP_EAL_HISTOGRAM_MAX_RANGE     5
+#define LACP_TXRX_HISTOGRAM_MAX_RANGE    6
+
 enum segments {
     RX_PACKETS,
     RX_BYTES,
@@ -363,9 +373,15 @@ dpdk_info_get_lacp(VR_INFO_ARGS)
 
     uint16_t port_id, slave_id = 0;
     struct vr_dpdk_ethdev *ethdev;
-    int i, ret = 0;
+    int i, j, ret = 0;
     char name[VR_INTERFACE_NAME_LEN] = "";
     struct rte_eth_bond_8023ad_slave_info info;
+    uint64_t lacp_rx_cnt, lacp_tx_cnt, *periodic_cb_processing_time_histogram;
+    uint64_t *periodic_cb_call_histogram, *eal_interrupt_function_call_histogram;
+    uint64_t lacp_txrx_enqueue_fail_cnt[LACP_TXRX];
+    uint64_t bond_tx_burst_fail_cnt, lacp_alloc_fail_cnt;
+    uint64_t *lacp_pmd_txrx_cnt[LACP_TXRX][VR_DPDK_BOND_MAX_SLAVES];
+    uint64_t *lacp_timer_txrx_cnt[LACP_TXRX][VR_DPDK_BOND_MAX_SLAVES];
 
     VR_INFO_BUF_INIT();
 
@@ -406,8 +422,189 @@ dpdk_info_get_lacp(VR_INFO_ARGS)
             VI_PRINTF("Details partner lacp pdu: \n");
             get_port_states(msg_req, info.partner_state);
         }
+        VI_PRINTF("LACP Packet Statistics:\n");
+        VI_PRINTF("\t\t Tx \t Rx \tTx_Enq_fail\tRx_Enq_fail\tAlloc_fail\tPMDTx_fail\n");
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                slave_id = ethdev->ethdev_slaves[i];
+
+                ret = rte_eth_dev_get_name_by_port(slave_id, name);
+                if (ret != 0) {
+                    RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+                }
+
+            lacp_tx_cnt =
+                rte_eth_bond_8023ad_lacp_tx_count(slave_id, CNT_NO_CLEAR);
+                if (lacp_tx_cnt < 0)
+                   return VR_INFO_FAILED;
+
+            lacp_rx_cnt =
+                rte_eth_bond_8023ad_lacp_rx_count(slave_id, CNT_NO_CLEAR);
+                if (lacp_rx_cnt < 0)
+                    return VR_INFO_FAILED;
+
+            lacp_txrx_enqueue_fail_cnt[LACP_TX] =
+                rte_eth_bond_8023ad_lacp_txrx_ring_enqueue_fail_count(LACP_TX,
+                slave_id, CNT_NO_CLEAR);
+                if (lacp_txrx_enqueue_fail_cnt[0] < 0)
+                    return VR_INFO_FAILED;
+
+            lacp_txrx_enqueue_fail_cnt[LACP_RX] =
+                rte_eth_bond_8023ad_lacp_txrx_ring_enqueue_fail_count(LACP_RX,
+                slave_id, CNT_NO_CLEAR);
+                if (lacp_txrx_enqueue_fail_cnt[1] < 0)
+                    return VR_INFO_FAILED;
+
+            lacp_alloc_fail_cnt =
+                rte_eth_bond_8023ad_lacp_alloc_fail_count(slave_id, CNT_NO_CLEAR);
+                if (lacp_alloc_fail_cnt < 0)
+                    return VR_INFO_FAILED;
+
+            bond_tx_burst_fail_cnt =
+                rte_eth_bond_pmd_tx_burst_fail_count(slave_id, CNT_NO_CLEAR);
+                if (bond_tx_burst_fail_cnt < 0)
+                    return VR_INFO_FAILED;
+
+            VI_PRINTF("%s\t %"PRId64" \t%"PRId64"\t%-8"PRId64"\t%-8"PRId64"\t%-10"PRId64"\t%-10"PRId64"\n",
+                name, lacp_tx_cnt, lacp_rx_cnt, lacp_txrx_enqueue_fail_cnt[LACP_TX]
+                , lacp_txrx_enqueue_fail_cnt[LACP_RX], lacp_alloc_fail_cnt,
+                bond_tx_burst_fail_cnt);
+        }
+        VI_PRINTF("\n");
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+                slave_id = ethdev->ethdev_slaves[i];
+
+                ret = rte_eth_dev_get_name_by_port(slave_id, name);
+                if (ret != 0) {
+                    RTE_LOG(ERR, VROUTER, "Error getting bond interface name\n");
+                }
+
+                lacp_pmd_txrx_cnt[LACP_TX][slave_id] =
+                    rte_eth_bond_8023ad_lacp_pmd_txrx_count(LACP_TX, slave_id,
+                    CNT_NO_CLEAR);
+                lacp_pmd_txrx_cnt[LACP_RX][slave_id] =
+                    rte_eth_bond_8023ad_lacp_pmd_txrx_count(LACP_RX, slave_id,
+                    CNT_NO_CLEAR);
+                if ((lacp_pmd_txrx_cnt[LACP_TX][slave_id] == NULL) ||
+                    (lacp_pmd_txrx_cnt[LACP_RX][slave_id] == NULL))
+                   return VR_INFO_FAILED;
+
+                lacp_timer_txrx_cnt[LACP_TX][slave_id] =
+                    rte_eth_bond_8023ad_lacp_timer_txrx_count(LACP_TX, slave_id,
+                    CNT_NO_CLEAR);
+                lacp_timer_txrx_cnt[LACP_RX][slave_id] =
+                    rte_eth_bond_8023ad_lacp_timer_txrx_count(LACP_RX, slave_id,
+                    CNT_NO_CLEAR);
+                if ((lacp_timer_txrx_cnt[LACP_TX][slave_id] == NULL) ||
+                        (lacp_timer_txrx_cnt[LACP_RX][slave_id] == NULL))
+                    return VR_INFO_FAILED;
+
+            VI_PRINTF("Slave Interface(%d): %s \n", i, name);
+            VI_PRINTF("\tRange \tPMD_Tx\tPMD_Rx\tTimer_Tx\tTimer_Rx\n");
+            for (j = 0; j < LACP_TXRX_HISTOGRAM_MAX_RANGE; j++) {
+                if (j == 5) {
+                    VI_PRINTF("\t<=1s ");
+                } else if (j == 4) {
+                    VI_PRINTF("\t>1s  ");
+                } else
+                    VI_PRINTF("\t>=%0.1fs", (3 - (j * 0.5)));
+
+                VI_PRINTF("\t%-6"PRId64"\t%-6"PRId64"\t%-8"PRId64"\t%-8"PRId64"\n",
+                    lacp_pmd_txrx_cnt[LACP_TX][slave_id][j],
+                    lacp_pmd_txrx_cnt[LACP_RX][slave_id][j],
+                    lacp_timer_txrx_cnt[LACP_TX][slave_id][j],
+                    lacp_timer_txrx_cnt[LACP_RX][slave_id][j]);
+            }
+            VI_PRINTF("\n");
+        }
+        VI_PRINTF("\n");
+        periodic_cb_call_histogram =
+            rte_eth_bond_8023ad_periodic_cb_call_count(CNT_NO_CLEAR);
+        periodic_cb_processing_time_histogram =
+            rte_eth_bond_8023ad_periodic_cb_processing_time_count(CNT_NO_CLEAR);
+        VI_PRINTF("Periodic Callback histograms:\n");
+        VI_PRINTF("\tFuction Call        | Processing time \n");
+        VI_PRINTF("\t--------------------------------------\n");
+        VI_PRINTF("\tRange     Count     | Range     Count \n");
+        for (i = 0, j = 0; (i < LACP_CB_HISTOGRAM_MAX_RANGE) &&
+                (j < LACP_CB_HISTOGRAM_MAX_RANGE); i++, j++) {
+            if (j == 4) {
+                VI_PRINTF("\t>100ms    ");
+            } else if (j == 0) {
+                VI_PRINTF("\t>=1000ms  ");
+            } else {
+                VI_PRINTF("\t>=%dms   ", (1000 - (250 * j)));
+            }
+            VI_PRINTF("%-10"PRId64"", periodic_cb_call_histogram[j]);
+
+            if (i == 0) {
+                VI_PRINTF("| >=1000ms");
+            } else if (i == 4) {
+                VI_PRINTF("| >=20ms  ");
+            } else {
+                VI_PRINTF("| >=%dms ", (1000 - (250 * i)));
+            }
+            VI_PRINTF("  %-9"PRId64"\n", periodic_cb_processing_time_histogram[i]);
+        }
+        VI_PRINTF("\n");
+        eal_interrupt_function_call_histogram =
+            rte_eal_interrupts_call_count_fetch(CNT_NO_CLEAR);
+        VI_PRINTF("eal interrupt function histogram:\n");
+        VI_PRINTF("\tRange     Count     \n");
+        for (i = 0; i < LACP_EAL_HISTOGRAM_MAX_RANGE; i++) {
+            if (i == 4) {
+                VI_PRINTF("\t>100ms    ");
+            } else if (i == 0) {
+                VI_PRINTF("\t>=1000ms  ");
+            } else {
+                VI_PRINTF("\t>=%dms   ", (1000 - (250 * i)));
+            }
+            VI_PRINTF("%-10"PRId64"\n", eal_interrupt_function_call_histogram[i]);
+        }
+        VI_PRINTF("\n");
     } else if (strcmp(msg_req->inbuf, "conf") == 0) {
         display_lacp_conf(msg_req, port_id);
+    } else if (strcmp(msg_req->inbuf, "clear") == 0) {
+        ethdev = &vr_dpdk.ethdevs[port_id];
+        if (ethdev->ethdev_ptr == NULL) {
+            RTE_LOG(ERR, VROUTER, "Ethdev not available\n");
+        }
+        VI_PRINTF("Clearing all stats \n");
+        for (i = 0; i < ethdev->ethdev_nb_slaves; i++) {
+            slave_id = ethdev->ethdev_slaves[i];
+            VI_PRINTF("Slave Interface(%d)", i);
+            lacp_tx_cnt = rte_eth_bond_8023ad_lacp_tx_count(slave_id, CNT_CLEAR);
+            lacp_rx_cnt = rte_eth_bond_8023ad_lacp_rx_count(slave_id, CNT_CLEAR);
+            lacp_txrx_enqueue_fail_cnt[LACP_TX] =
+                rte_eth_bond_8023ad_lacp_txrx_ring_enqueue_fail_count(LACP_TX,
+                slave_id, CNT_CLEAR);
+            lacp_txrx_enqueue_fail_cnt[LACP_RX] =
+                rte_eth_bond_8023ad_lacp_txrx_ring_enqueue_fail_count(LACP_RX,
+                slave_id, CNT_CLEAR);
+            lacp_alloc_fail_cnt =
+                rte_eth_bond_8023ad_lacp_alloc_fail_count(slave_id, CNT_CLEAR);
+            bond_tx_burst_fail_cnt =
+                rte_eth_bond_pmd_tx_burst_fail_count(slave_id, CNT_CLEAR);
+            lacp_pmd_txrx_cnt[LACP_TX][slave_id] =
+                rte_eth_bond_8023ad_lacp_pmd_txrx_count(LACP_TX, slave_id,
+                CNT_CLEAR);
+            lacp_pmd_txrx_cnt[LACP_RX][slave_id] =
+                rte_eth_bond_8023ad_lacp_pmd_txrx_count(LACP_RX, slave_id,
+                CNT_CLEAR);
+            lacp_timer_txrx_cnt[LACP_TX][slave_id] =
+                rte_eth_bond_8023ad_lacp_timer_txrx_count(LACP_TX, slave_id,
+                CNT_CLEAR);
+            lacp_timer_txrx_cnt[LACP_RX][slave_id] =
+                rte_eth_bond_8023ad_lacp_timer_txrx_count(LACP_RX, slave_id,
+                CNT_CLEAR);
+            VI_PRINTF(" ...done\n");
+            VI_PRINTF("\n");
+        }
+        periodic_cb_processing_time_histogram =
+            rte_eth_bond_8023ad_periodic_cb_processing_time_count(CNT_CLEAR);
+        periodic_cb_call_histogram =
+            rte_eth_bond_8023ad_periodic_cb_call_count(CNT_CLEAR);
+        eal_interrupt_function_call_histogram =
+            rte_eal_interrupts_call_count_fetch(CNT_CLEAR);
     } else {
         RTE_LOG(ERR, VROUTER, "Invalid argument.\n");
         return -1;
