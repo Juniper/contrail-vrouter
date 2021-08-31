@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ae4af262_6b360ab5",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 511,
+      "author": {
+        "id": 484
+      },
+      "writtenOn": "2021-08-31T05:35:11Z",
+      "side": 1,
+      "message": "change to PRIu64",
+      "revId": "ef3df7fdb23e42d135939a870d7c33032e9f889c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b2f249d5_12f7b26d",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 537,
+      "author": {
+        "id": 484
+      },
+      "writtenOn": "2021-08-31T05:35:11Z",
+      "side": 1,
+      "message": "change it to PRIu64",
+      "revId": "ef3df7fdb23e42d135939a870d7c33032e9f889c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "627a34df_65ccf833",
+        "filename": "dpdk/vr_dpdk_info.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 561,
+      "author": {
+        "id": 484
+      },
+      "writtenOn": "2021-08-31T05:35:11Z",
+      "side": 1,
+      "message": "change it to PRIu64",
+      "revId": "ef3df7fdb23e42d135939a870d7c33032e9f889c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
