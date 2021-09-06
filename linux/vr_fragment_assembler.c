@@ -64,6 +64,7 @@ lh_enqueue_to_assembler(struct vrouter *router, struct vr_packet *pkt,
     cpu = vr_get_cpu();
     if (cpu >= vr_num_cpus) {
         printk("cpu is %u, but max cpu is only %u\n", cpu, vr_num_cpus);
+        PKT_LOG(VP_DROP_FRAGMENTS, pkt, 0, VR_FRAGMENT_ASSEMBLER_C, __LINE__);
         vr_pfree(pkt, VP_DROP_FRAGMENTS);
         return -EINVAL;
     }
