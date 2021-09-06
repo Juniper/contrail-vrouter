@@ -138,63 +138,6 @@
 #define PKT_ENCAP_VXLAN         0x02
 
 
-/* packet drop reasons */
-#define VP_DROP_DISCARD                     0
-#define VP_DROP_PULL                        1
-#define VP_DROP_INVALID_IF                  2
-#define VP_DROP_INVALID_ARP                 3
-#define VP_DROP_TRAP_NO_IF                  4
-#define VP_DROP_NOWHERE_TO_GO               5
-#define VP_DROP_FLOW_QUEUE_LIMIT_EXCEEDED   6
-#define VP_DROP_FLOW_NO_MEMORY              7
-#define VP_DROP_FLOW_INVALID_PROTOCOL       8
-#define VP_DROP_FLOW_NAT_NO_RFLOW           9
-#define VP_DROP_FLOW_ACTION_DROP            10
-#define VP_DROP_FLOW_ACTION_INVALID         11
-#define VP_DROP_FLOW_UNUSABLE               12
-#define VP_DROP_FLOW_TABLE_FULL             13
-#define VP_DROP_INTERFACE_TX_DISCARD        14
-#define VP_DROP_INTERFACE_DROP              15
-#define VP_DROP_DUPLICATED                  16
-#define VP_DROP_PUSH                        17
-#define VP_DROP_TTL_EXCEEDED                18
-#define VP_DROP_INVALID_NH                  19
-#define VP_DROP_INVALID_LABEL               20
-#define VP_DROP_INVALID_PROTOCOL            21
-#define VP_DROP_INTERFACE_RX_DISCARD        22
-#define VP_DROP_INVALID_MCAST_SOURCE        23
-#define VP_DROP_HEAD_ALLOC_FAIL             24
-#define VP_DROP_PCOW_FAIL                   25
-#define VP_DROP_MCAST_DF_BIT                26
-#define VP_DROP_MCAST_CLONE_FAIL            27
-#define VP_DROP_NO_MEMORY                   28
-#define VP_DROP_REWRITE_FAIL                29
-#define VP_DROP_MISC                        30
-#define VP_DROP_INVALID_PACKET              31
-#define VP_DROP_CKSUM_ERR                   32
-#define VP_DROP_NO_FMD                      33
-#define VP_DROP_CLONED_ORIGINAL             34
-#define VP_DROP_INVALID_VNID                35
-#define VP_DROP_FRAGMENTS                   36
-#define VP_DROP_INVALID_SOURCE              37
-#define VP_DROP_L2_NO_ROUTE                 38
-#define VP_DROP_FRAGMENT_QUEUE_FAIL         39
-#define VP_DROP_VLAN_FWD_TX                 40
-#define VP_DROP_VLAN_FWD_ENQ                41
-#define VP_DROP_NEW_FLOWS                   42
-#define VP_DROP_FLOW_EVICT                  43
-#define VP_DROP_TRAP_ORIGINAL               44
-#define VP_DROP_LEAF_TO_LEAF                45
-#define VP_DROP_BMAC_ISID_MISMATCH          46
-#define VP_DROP_PKT_LOOP                    47
-#define VP_DROP_NO_CRYPT_PATH               48
-#define VP_DROP_INVALID_HBS_PKT             49
-#define VP_DROP_NO_FRAG_ENTRY               50 
-#define VP_DROP_ICMP_ERROR                  51
-#define VP_DROP_CLONE_FAIL                  52
-#define VP_DROP_MAX                         53
-
-
 /*
  * NOTE: Please do not add any more fields without ensuring
  * that the size is <= 48 bytes in 64 bit systems.
@@ -1505,6 +1448,13 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
     int buf_idx = vr_pkt_drop->vr_pkt_drop_log_buffer_index[cpu];
     vr_pkt_drop_log_t **vr_pkt_drop_log_buffer = vr_pkt_drop->vr_pkt_drop_log;
 
+    /* if Drop type is already set then droping other drop reasons
+     */
+    if ((vr_pkt_droplog_type != VP_DROP_MAX) &&
+        (vr_pkt_droplog_type != drop_reason)) {
+        return;
+    }
+
     memset(vr_pkt_drop_log_buffer[cpu] + buf_idx, 0, sizeof(vr_pkt_drop_log_t));
 
     /* Check Packet drop log enabled at load time*/
@@ -1516,8 +1466,7 @@ static inline void vr_pkt_drop_log_func(unsigned short drop_reason, struct vr_pa
         /* Copying epoch time into timestamp structure */
         PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].timestamp, (unsigned int)m_sec)
 
-	/* Incremented drop_reason with 1, value 0 is invalid while displaying drop reason at utils side */
-        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_reason, drop_reason+1)
+        PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_reason, drop_reason)
 
         PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.file, file)
         PKT_LOG_FILL(vr_pkt_drop_log_buffer[cpu][buf_idx].drop_loc.line, line)
