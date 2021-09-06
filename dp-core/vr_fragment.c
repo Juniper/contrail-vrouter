@@ -176,7 +176,8 @@ vr_fragment_queue_element_free(struct vr_fragment_queue_element *vfqe,
         unsigned int drop_reason)
 {
     if (vfqe->fqe_pnode.pl_packet) {
-        vr_pfree(vfqe->fqe_pnode.pl_packet, drop_reason);
+        PKT_LOG(drop_reason, vfqe->fqe_pnode.pl_packet, 0, VR_FRAGMENT_C, __LINE__);
+	vr_pfree(vfqe->fqe_pnode.pl_packet, drop_reason);
     }
 
     vr_free(vfqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
