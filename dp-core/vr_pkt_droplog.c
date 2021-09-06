@@ -27,6 +27,9 @@ unsigned int vr_pkt_droplog_sysctl_en = 1;
  * It will log only timestamp, drop reason, file & line no */
 unsigned int vr_pkt_droplog_min_sysctl_en = 1;
 
+/* To set a specific drop type */
+unsigned int vr_pkt_droplog_type = VP_DROP_MAX;
+
 /* Function to return buffer size and its used by sandesh for memory allocation
  * */
 unsigned int vr_pkt_drop_log_req_get_size(void *object)
@@ -90,6 +93,7 @@ vr_pkt_drop_log_get(unsigned int rid, short core, int index)
             response->vdl_pkt_droplog_en = vr_pkt_droplog_buf_en;
             response->vdl_pkt_droplog_sysctl_en = vr_pkt_droplog_sysctl_en;
             response->vdl_pkt_droplog_max_bufsz = vr_pkt_droplog_bufsz;
+	    response->vdl_pkt_droplog_type      = vr_pkt_droplog_type;
 
             if(core == -1){
                 /* When the core is requested as 0, process for all cores*/
@@ -124,11 +128,50 @@ exit_get:
         vr_free(response,VR_PKT_DROP_LOG_REQ_OBJECT);
 }
 
+static void
+vr_pkt_droplog_config(vr_pkt_drop_log_req *req)
+{
+    vr_pkt_drop_log_req *response = NULL;
+
+    response = vr_zalloc(sizeof(*response), VR_PKT_DROP_LOG_REQ_OBJECT);
+    if (!response)
+    {
+        vr_module_error(-ENOMEM, __FUNCTION__, __LINE__, sizeof(*response));
+        goto exit_get;
+    }
+
+    if (req->vdl_pkt_droplog_config)
+    {
+        vr_pkt_droplog_type = req->vdl_pkt_droplog_type;
+        response->vdl_pkt_droplog_type = req->vdl_pkt_droplog_type;
+    } else {
+        vr_pkt_droplog_min_sysctl_en = req->vdl_pkt_droplog_min_sysctl_en;
+        response->vdl_pkt_droplog_min_sysctl_en = req->vdl_pkt_droplog_min_sysctl_en;
+    }
+
+    response->h_op = SANDESH_OP_ADD;
+    response->vdl_pkt_droplog_config = req->vdl_pkt_droplog_config;
+
+    vr_message_response(VR_PKT_DROP_LOG_OBJECT_ID, response, 0, false);
+exit_get:
+
+    if (response != NULL)
+        vr_free(response,VR_PKT_DROP_LOG_REQ_OBJECT);
+
+    return;
+}
+
 void
 vr_pkt_drop_log_req_process(void *s_req)
 {
     int ret=0,core=1,index=0;
     vr_pkt_drop_log_req *req = (vr_pkt_drop_log_req *)s_req;
+
+    if (req->h_op == SANDESH_OP_ADD)
+    {
+        vr_pkt_droplog_config(req);
+        return;
+    }
 
     if (req->h_op != SANDESH_OP_GET)
         vr_send_response(ret);

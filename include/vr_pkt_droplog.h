@@ -248,7 +248,7 @@ extern "C" {
 
 
 #define DROP_RSN_MAP(X) \
-    X(INVALID) \
+    X(VP_DROP_INVALID) \
     X(VP_DROP_DISCARD) \
     X(VP_DROP_PULL) \
     X(VP_DROP_INVALID_IF) \
@@ -298,10 +298,23 @@ extern "C" {
     X(VP_DROP_BMAC_ISID_MISMATCH) \
     X(VP_DROP_PKT_LOOP) \
     X(VP_DROP_NO_CRYPT_PATH) \
+    X(VP_DROP_INVALID_HBS_PKT) \
     X(VP_DROP_NO_FRAG_ENTRY) \
     X(VP_DROP_ICMP_ERROR) \
     X(VP_DROP_CLONE_FAIL) \
     X(VP_DROP_MAX)
+
+#define DROP_VP_TYPE_MAP(X) \
+    X(VP_TYPE_NULL) \
+    X(VP_TYPE_ARP) \
+    X(VP_TYPE_IP) \
+    X(VP_TYPE_IP6) \
+    X(VP_TYPE_IPOIP) \
+    X(VP_TYPE_IP6OIP) \
+    X(VP_TYPE_AGENT) \
+    X(VP_TYPE_PBB) \
+    X(VP_TYPE_UNKNOWN) \
+    X(VP_TYPE_MAX)
 
 #define enum_t(X) X,
 #define string(X) #X,
@@ -309,6 +322,14 @@ extern "C" {
 typedef enum {
     FILE_MAP(enum_t)
 } map_t;
+
+typedef enum {
+    DROP_RSN_MAP(enum_t)
+} drop_rsn_map_t;
+
+typedef enum {
+    DROP_VP_TYPE_MAP(enum_t)
+} drop_vp_type_map_t;
 
 /* VR_PKT_DROP_STATS_LOG_MAX macro denotes the number of entry for Packet log buffer on each core*/
 #define VR_PKT_DROP_LOG_MAX 200
@@ -329,6 +350,7 @@ extern unsigned int vr_pkt_droplog_bufsz;
 extern unsigned int vr_pkt_droplog_buf_en;
 extern unsigned int vr_pkt_droplog_sysctl_en;
 extern unsigned int vr_pkt_droplog_min_sysctl_en;
+extern unsigned int vr_pkt_droplog_type;
 unsigned int vr_pkt_drop_log_req_get_size(void *);
 struct vr_drop_loc
 {
