@@ -429,6 +429,9 @@ buffer sandesh vr_pkt_drop_log_req {
     7:  i16             vdl_pkt_droplog_en;
     8:  i16             vdl_pkt_droplog_sysctl_en;
     9:  list <byte>     vdl_pkt_droplog_arr;
+    10: byte            vdl_pkt_droplog_type;
+    11: byte            vdl_pkt_droplog_min_sysctl_en;
+    12: byte            vdl_pkt_droplog_config;
 }
 
 buffer sandesh vr_drop_stats_req {

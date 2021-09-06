@@ -32,12 +32,37 @@ static struct nl_client *cl;
 static int help_set, core_set, offload_set, log_set, clear_set, sock_dir_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
+static int log_type_set, log_type_show, min_log_set;
+static uint8_t pkt_drop_log_type  = VP_DROP_MAX;
+static uint8_t show_pkt_drop_type = VP_DROP_MAX;
+static uint8_t min_log = 0;
 static int vr_get_pkt_drop_log(struct nl_client *cl,int core,int stats_index);
 
 static void pkt_drop_log_req_process(void *s_req) {
 
     static int log_all_cores = 0, last_buffer_stats = 0, last_buffer_entry = 0;
     vr_pkt_drop_log_req *stats = (vr_pkt_drop_log_req *)s_req;
+
+    char vr_pkt_droplog_rsn[][50] = {
+        DROP_RSN_MAP(string)
+    };
+
+    if (log_type_set)
+    {
+        printf("\nDropstats log type set successfully %s\n\n",
+                    vr_pkt_droplog_rsn[pkt_drop_log_type]);
+        return;
+    }
+
+    if ((stats->vdl_pkt_droplog_type != show_pkt_drop_type) &&
+        (show_pkt_drop_type != VP_DROP_MAX) &&
+        ((stats->vdl_pkt_droplog_type > VP_DROP_INVALID) &&
+         (stats->vdl_pkt_droplog_type < VP_DROP_MAX)))
+    {
+        printf("Pkt drop type already set to %s \n",
+                vr_pkt_droplog_rsn[stats->vdl_pkt_droplog_type]);
+        return;
+    }
 
     /* Below check ensures that pkt drop log sysctl enabled during runtime*/
     if(stats->vdl_pkt_droplog_sysctl_en == 1)
@@ -46,7 +71,7 @@ static void pkt_drop_log_req_process(void *s_req) {
         if(stats->vdl_pkt_droplog_en == 1)
         {
             /* Print the drop stats log*/
-            vr_print_pkt_drop_log(stats);
+            vr_print_pkt_drop_log(stats, show_pkt_drop_type);
 
             /* Since sandesh message doesn't support passing data more than 4KB,
              * So the message request sent in serial manner.
@@ -225,6 +250,36 @@ vr_clear_drop_stats(struct nl_client *cl)
     return 0;
 }
 
+static int
+vr_set_pkt_drop_log_type(struct nl_client *cl, uint8_t pkt_log_type)
+{
+    int ret;
+    ret = vr_drop_type_set(cl, pkt_log_type);
+    if (ret < 0)
+        return ret;
+
+    ret = vr_recvmsg(cl, false);
+    if (ret <= 0)
+        return ret;
+
+    return 0;
+}
+
+static int
+min_log_config(struct nl_client *cl, bool min_log_enable)
+{
+    int ret;
+    ret = vr_min_log_enable(cl, min_log_enable);
+    if (ret < 0)
+        return ret;
+
+    ret = vr_recvmsg(cl, false);
+    if (ret <= 0)
+        return ret;
+
+    return 0;
+}
+
 enum opt_index {
     HELP_OPT_INDEX,
     CORE_OPT_INDEX,
@@ -232,6 +287,9 @@ enum opt_index {
     LOG_OPT_INDEX,
     CLEAR_OPT_INDEX,
     SOCK_DIR_OPT_INDEX,
+    DROP_LOG_TYPE_OPT_INDEX,
+    SHOW_LOG_TYPE_OPT_INDEX,
+    MIN_LOG_OPT_INDEX,
     MAX_OPT_INDEX,
 };
 
@@ -242,6 +300,9 @@ static struct option long_options[] = {
     [LOG_OPT_INDEX]     =   {"log",     required_argument,  &log_set,       1},
     [CLEAR_OPT_INDEX]   =   {"clear",   no_argument,        &clear_set,     1},
     [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
+    [DROP_LOG_TYPE_OPT_INDEX]   =   {"drop-type",  required_argument,  &log_type_set,   1},
+    [SHOW_LOG_TYPE_OPT_INDEX]   =   {"show",       required_argument,  &log_type_show,  1},
+    [MIN_LOG_OPT_INDEX]         =   {"min-log",    required_argument,  &min_log_set,    1},
     [MAX_OPT_INDEX]     =   {"NULL",    0,                  0,              0},
 };
 
@@ -257,11 +318,68 @@ Usage()
         printf("--offload\t\t Show statistics for pkts offloaded on NIC\n");
         printf("\t\t\t (offload stats included if no flags given)\n");
     }
-    printf("--log <core number>\t Show Packet drops log for a specified core.. \
+    printf("--log <core number> [--show <drop-type>]\t Show Packet drops log for a specified core.. \
 		Core number starts from 1...n. If core number specified as zero, \
 		it will log for all cores \n");
     printf("--clear\t To clear stats counters on all cores\n");
+    printf("--drop-type <drop log type|help>\t Log specific Packet drops type. \
+        Use VP_DROP_MAX to clear drop set type\n");
+    printf("--min-log <1(enable)/ 0<disable)\t To set min log\n");
     exit(-EINVAL);
+}
+
+void display_supported_drop_type()
+{
+    int i;
+    char vr_pkt_droplog_rsn[][50] = {
+           DROP_RSN_MAP(string)};
+
+    for(i=VP_DROP_DISCARD; i<VP_DROP_MAX; i++)
+        printf("%s\n", vr_pkt_droplog_rsn[i]);
+
+    exit(-EINVAL);
+}
+
+static int
+parse_log_type(char *opt_arg)
+{
+    int i;
+    char vr_pkt_droplog_rsn[][50] = {
+         DROP_RSN_MAP(string)};
+
+    for(i=VP_DROP_DISCARD; i<=VP_DROP_MAX; i++)
+        if (!strcmp (opt_arg, vr_pkt_droplog_rsn[i]))
+            return i;
+
+    printf("Invalid log type %s\n", opt_arg);
+    display_supported_drop_type();
+}
+
+/* Not using atoi and strtol as it returns 0
+ * for invalid argument
+ * ignoring -ve cases
+ */
+static int
+is_valid_num(char *opt_arg)
+{
+   int result_num = 0, i = 0;
+
+    while (opt_arg[i] == ' ')
+    {
+        i++;
+    }
+
+    for(; opt_arg[i] != '\0'; i++) {
+        if (opt_arg[i] >= '0' && opt_arg[i] <= '9')
+        {
+            result_num = 10 * result_num + (opt_arg[i] - '0');
+        } else {
+            printf("Invalid argument %s\n", opt_arg);
+            Usage();
+        }
+    }
+
+    return result_num;
 }
 
 static void
@@ -271,12 +389,7 @@ parse_long_opts(int opt_index, char *opt_arg)
 
     switch (opt_index) {
     case CORE_OPT_INDEX:
-        core = (unsigned)strtol(opt_arg, NULL, 0);
-        if (errno) {
-            printf("Error parsing core %s: %s (%d)\n", opt_arg,
-                    strerror(errno), errno);
-            Usage();
-        }
+	core = is_valid_num(opt_arg);
         break;
     case OFFL_OPT_INDEX:
         if (!get_offload_enabled()) {
@@ -286,14 +399,22 @@ parse_long_opts(int opt_index, char *opt_arg)
         core = -2;
         break;
     case LOG_OPT_INDEX:
-	core = (unsigned)strtol(opt_arg, NULL, 0);
-	if (errno) {
-		printf("Error parsing log %s: %s (%d)\n", opt_arg,
-			strerror(errno), errno);
-		Usage();
-	}
+	core = is_valid_num(opt_arg);
 	break;
     case CLEAR_OPT_INDEX:
+        break;
+    case DROP_LOG_TYPE_OPT_INDEX:
+        pkt_drop_log_type = parse_log_type(opt_arg);
+        break;
+    case SHOW_LOG_TYPE_OPT_INDEX:
+        show_pkt_drop_type = parse_log_type(opt_arg);
+        log_type_show =1;
+        break;
+    case MIN_LOG_OPT_INDEX:
+        min_log = is_valid_num(opt_arg);
+        /* min-log value either 0 or 1 */
+        if (min_log > 1)
+            Usage();
         break;
     case SOCK_DIR_OPT_INDEX:
         vr_socket_dir = opt_arg;
@@ -316,7 +437,7 @@ main(int argc, char *argv[])
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "h:c:o:l:s:",
+    while (((opt = getopt_long(argc, argv, "h:c:o:l:s:m:",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 'c':
@@ -332,6 +453,11 @@ main(int argc, char *argv[])
         case 'l':
             log_set = 1;
             parse_long_opts(LOG_OPT_INDEX, optarg);
+            break;
+
+	case 'm':
+            min_log_set = 1;
+            parse_long_opts(MIN_LOG_OPT_INDEX, optarg);
             break;
 
         case 's':
@@ -355,10 +481,28 @@ main(int argc, char *argv[])
     cl = vr_get_nl_client(VR_NETLINK_PROTO_DEFAULT);
     if (!cl)
         return -1;
-    
-    if ((option_index == LOG_OPT_INDEX) || (log_set == 1))
+
+    if ((option_index == SHOW_LOG_TYPE_OPT_INDEX) && (!log_set))
     {
-        log_core = atoi(argv[2]);
+         Usage();
+    }
+
+    if (log_type_set)
+    {
+        pkt_drop_log_nlutils_callbacks();
+        vr_set_pkt_drop_log_type(cl, pkt_drop_log_type);
+        return 0;
+    }
+
+    if (min_log_set)
+    {
+        min_log_config(cl, min_log == 1);
+        return 0;
+    }
+
+    if (log_set) 
+    {
+        log_core = is_valid_num(argv[2]);
 
         /* Register nl allback function for pkt drop log buffer*/
         pkt_drop_log_nlutils_callbacks();
