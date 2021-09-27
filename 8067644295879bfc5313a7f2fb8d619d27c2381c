@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "03f4087a_f8d2527b",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 539,
+      "author": {
+        "id": 998
+      },
+      "writtenOn": "2021-09-27T05:01:30Z",
+      "side": 1,
+      "message": "Please correct the indentation.\n\n(contrail-tools)[root@b7s3 /]$ dropstats\nFlow Action Drop                   233\nFlow Unusable (Eviction)                   2\nDiscards                   269752\nDuplicate                   6",
+      "revId": "8067644295879bfc5313a7f2fb8d619d27c2381c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "52dd3eda_69a41740",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 649,
+      "author": {
+        "id": 998
+      },
+      "writtenOn": "2021-09-27T05:01:30Z",
+      "side": 1,
+      "message": "Please add null check for ip address, and do not print if it is null.\n\nsl no: 199  Epoch Time: 1631688562 Local Time: Tue Sep 14 23:49:22 2021\n Packet Type: VP_TYPE_IP6  Drop reason: VP_DROP_DISCARD  Src IPv6:   Dst IPv6: ff02::16  file: VR_NEXTHOP_C  line no: 1886  Packet Length: 0",
+      "revId": "8067644295879bfc5313a7f2fb8d619d27c2381c",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
