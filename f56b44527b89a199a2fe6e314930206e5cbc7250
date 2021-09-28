@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8ffe7ea3_be5dd3a0",
+        "filename": "utils/vr_util.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 651,
+      "author": {
+        "id": 998
+      },
+      "writtenOn": "2021-09-28T12:10:15Z",
+      "side": 1,
+      "message": "please clear all whitespace and tabs",
+      "revId": "f56b44527b89a199a2fe6e314930206e5cbc7250",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ee36456d_019d0f7a",
+        "filename": "dp-core/vr_fragment.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 179,
+      "author": {
+        "id": 998
+      },
+      "writtenOn": "2021-09-28T12:10:15Z",
+      "side": 1,
+      "message": "please replace VP_DROP_FRAGMENTS with drop_reason",
+      "revId": "aef02d2ac7af88a67d4728600f41bf580dc8064d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
