@@ -476,6 +476,11 @@ vr_dpdk_lcore_cmd_wait(unsigned lcore_id)
     if (lcore == NULL)
         return;
 
+    if (lcore_id == rte_lcore_id()) {
+        vr_dpdk_lcore_cmd_handle(lcore);
+        return;
+    }
+
     while (lcore->lcore_cmd != VR_DPDK_LCORE_NO_CMD)
         rte_pause();
 }
@@ -506,6 +511,10 @@ vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg)
     if (lcore == NULL)
         return;
 
+    if (lcore_id == rte_lcore_id())
+        vr_dpdk_lcore_cmd_handle(lcore);
+
+    rcu_thread_offline();
     /* set the command is being published */
     while (rte_atomic16_cmpset(&lcore->lcore_cmd,
                 VR_DPDK_LCORE_NO_CMD, VR_DPDK_LCORE_IN_PROGRESS_CMD) == 0);
@@ -513,6 +522,7 @@ vr_dpdk_lcore_cmd_post(unsigned lcore_id, uint16_t cmd, uint64_t cmd_arg)
     /* publish the command */
     while (rte_atomic16_cmpset(&lcore->lcore_cmd,
                 VR_DPDK_LCORE_IN_PROGRESS_CMD, cmd) == 0);
+    rcu_thread_online();
 
     /* handle the command if it was posted to this lcore */
     if (lcore_id == rte_lcore_id())
