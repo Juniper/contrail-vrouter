@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dac8f03d_3d0701b4",
+        "filename": "dpdk/vr_dpdk_lcore.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 509,
+      "author": {
+        "id": 232
+      },
+      "writtenOn": "2021-12-26T17:11:16Z",
+      "side": 0,
+      "message": "If the uvhost thread posts an event to netlink at this point, again there will be deadlock. Right?",
+      "revId": "32335f0fda14dc3f64062da41d726a5d0d25ef9d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
