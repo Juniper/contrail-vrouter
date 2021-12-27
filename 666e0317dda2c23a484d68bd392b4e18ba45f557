@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "de0e9ed2_23db4ef7",
+        "filename": "dpdk/vr_dpdk_lcore.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 479,
+      "author": {
+        "id": 1053
+      },
+      "writtenOn": "2021-12-27T06:39:57Z",
+      "side": 1,
+      "message": "We should have comments for each condition to explain which deadlock scenario is handled by which case, so anyone can understand this easily. For example this check avoids deadlock where both netlink and uvhost threads may be waiting n while loops for NO_CMD to get set which will not happen. Also Better to add comment to highlight that all deadlock scenarios only happen when netlink wakeup api calls fails.",
+      "revId": "666e0317dda2c23a484d68bd392b4e18ba45f557",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}

@@ -16,6 +16,24 @@
       "revId": "32335f0fda14dc3f64062da41d726a5d0d25ef9d",
       "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3839e9d9_66a18024",
+        "filename": "dpdk/vr_dpdk_lcore.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 509,
+      "author": {
+        "id": 1053
+      },
+      "writtenOn": "2021-12-27T06:39:57Z",
+      "side": 0,
+      "message": "This is possible logically, if rcu_thread_offline takes long time this can be seen, else netlink thread will either be in process handle or no_cmd wait while loop as immediately after setting nocmd in cmd_handle we have while loop and there is no processing in between. We have not seen this during our any of our tests yet.",
+      "parentUuid": "dac8f03d_3d0701b4",
+      "revId": "32335f0fda14dc3f64062da41d726a5d0d25ef9d",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
     }
   ]
 }
