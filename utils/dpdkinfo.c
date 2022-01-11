@@ -87,7 +87,7 @@ Usage()
     printf("                 --bond|-b\
                                                          Show Master/Slave bond information\n");
     printf("                 --lacp|-l     <all/conf>\
-                                          Show LACP information\n");
+                                          Show LACP information from DPDK\n");
     printf("                 --mempool|-m  <all/<mempool-name>>\
                                 Show Mempool information\n");
     printf("                 --stats|-n    <eth>\
@@ -166,8 +166,7 @@ parse_long_opts(int opt_index, char *opt_arg)
 
     case LACP_OPT_INDEX:
         msginfo = INFO_LACP;
-        if (!strcmp(opt_arg, "all") || !strcmp(opt_arg, "conf") ||
-            !strcmp(opt_arg, "clear")){
+        if (!strcmp(opt_arg, "all") || !strcmp(opt_arg, "conf")){
             vr_info_inbuf = opt_arg;
         } else {
             Usage();
