@@ -403,6 +403,17 @@ buffer sandesh vr_mem_stats_req {
    70:  i64             vms_interface_req_bridge_id_object;
    71:  i64             vms_interface_fat_flow_ipv4_exclude_list_object;
    72:  i64             vms_interface_fat_flow_ipv6_exclude_list_object;
+   73:  i64             vms_bridge_table_data_object;
+   74:  i64             vms_pkt_drop_log_object;
+   75:  i64             vms_flow_defer_data_object;
+   76:  i64             vms_interface_bond_object;
+   77:  i64             vms_interface_req_lcore_errors_object;
+   78:  i64             vms_interface_to_lcore_error_object;
+   79:  i64             vms_mem_object;
+   80:  i64             vms_bitmap_object;
+   81:  i64             vms_info_req_object;
+   82:  i64             vms_pkt_drop_log_req_object;
+   83:  i64             vms_log_types_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */
