@@ -231,6 +231,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_ASSEMBLER_TABLE_OBJECT].ms_free);
         response->vms_bridge_mac_object += (stats_block[VR_BRIDGE_MAC_OBJECT].ms_alloc -
                 stats_block[VR_BRIDGE_MAC_OBJECT].ms_free);
+        response->vms_bridge_table_data_object += (stats_block[VR_BRIDGE_TABLE_DATA_OBJECT].ms_alloc -
+                stats_block[VR_BRIDGE_TABLE_DATA_OBJECT].ms_free);
         response->vms_btable_object += (stats_block[VR_BTABLE_OBJECT].ms_alloc -
                 stats_block[VR_BTABLE_OBJECT].ms_free);
         response->vms_build_info_object += (stats_block[VR_BUILD_INFO_OBJECT].ms_alloc -
@@ -241,6 +243,10 @@ vr_mem_stats_get(void)
                 stats_block[VR_DROP_STATS_OBJECT].ms_free);
         response->vms_drop_stats_req_object += (stats_block[VR_DROP_STATS_REQ_OBJECT].ms_alloc -
                 stats_block[VR_DROP_STATS_REQ_OBJECT].ms_free);
+        response->vms_pkt_drop_log_object += (stats_block[VR_PKT_DROP_LOG_OBJECT].ms_alloc -
+                stats_block[VR_PKT_DROP_LOG_OBJECT].ms_free);
+        response->vms_pkt_drop_log_req_object += (stats_block[VR_PKT_DROP_LOG_REQ_OBJECT].ms_alloc -
+                stats_block[VR_PKT_DROP_LOG_REQ_OBJECT].ms_free);
         response->vms_flow_queue_object += (stats_block[VR_FLOW_QUEUE_OBJECT].ms_alloc -
                 stats_block[VR_FLOW_QUEUE_OBJECT].ms_free);
         response->vms_flow_req_object += (stats_block[VR_FLOW_REQ_OBJECT].ms_alloc -
@@ -253,6 +259,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_FLOW_LINK_LOCAL_OBJECT].ms_free);
         response->vms_flow_metadata_object += (stats_block[VR_FLOW_METADATA_OBJECT].ms_alloc -
                 stats_block[VR_FLOW_METADATA_OBJECT].ms_free);
+        response->vms_flow_defer_data_object += (stats_block[VR_FLOW_DEFER_DATA_OBJECT].ms_alloc -
+                stats_block[VR_FLOW_DEFER_DATA_OBJECT].ms_free);
         response->vms_flow_table_data_object += (stats_block[VR_FLOW_TABLE_DATA_OBJECT].ms_alloc -
                 stats_block[VR_FLOW_TABLE_DATA_OBJECT].ms_free);
         response->vms_flow_table_info_object += (stats_block[VR_FLOW_TABLE_INFO_OBJECT].ms_alloc -
@@ -284,6 +292,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_INTERFACE_MAC_OBJECT].ms_free);
         response->vms_interface_queue_object += (stats_block[VR_INTERFACE_QUEUE_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_QUEUE_OBJECT].ms_free);
+        response->vms_interface_bond_object += (stats_block[VR_INTERFACE_BOND_OBJECT].ms_alloc -
+                stats_block[VR_INTERFACE_BOND_OBJECT].ms_free);
         response->vms_interface_req_object += (stats_block[VR_INTERFACE_REQ_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_REQ_OBJECT].ms_free);
         response->vms_interface_req_mac_object += (stats_block[VR_INTERFACE_REQ_MAC_OBJECT].ms_alloc -
@@ -293,10 +303,15 @@ vr_mem_stats_get(void)
         response->vms_interface_req_pbb_mac_object +=
             (stats_block[VR_INTERFACE_REQ_PBB_MAC_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_REQ_PBB_MAC_OBJECT].ms_free);
+        response->vms_interface_req_lcore_errors_object +=
+            (stats_block[VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT].ms_alloc -
+                stats_block[VR_INTERFACE_REQ_TO_LCORE_ERRORS_OBJECT].ms_free);
         response->vms_interface_stats_object += (stats_block[VR_INTERFACE_STATS_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_STATS_OBJECT].ms_free);
         response->vms_interface_table_object += (stats_block[VR_INTERFACE_TABLE_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_TABLE_OBJECT].ms_free);
+        response->vms_interface_to_lcore_error_object += (stats_block[VR_INTERFACE_TO_LCORE_ERRORS_OBJECT].ms_alloc -
+                stats_block[VR_INTERFACE_TO_LCORE_ERRORS_OBJECT].ms_free);
         response->vms_interface_vrf_table_object += (stats_block[VR_INTERFACE_VRF_TABLE_OBJECT].ms_alloc -
                 stats_block[VR_INTERFACE_VRF_TABLE_OBJECT].ms_free);
         response->vms_itable_object += (stats_block[VR_ITABLE_OBJECT].ms_alloc -
@@ -309,6 +324,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_MESSAGE_RESPONSE_OBJECT].ms_free);
         response->vms_message_dump_object += (stats_block[VR_MESSAGE_DUMP_OBJECT].ms_alloc -
                 stats_block[VR_MESSAGE_DUMP_OBJECT].ms_free);
+        response->vms_mem_object += (stats_block[VR_MEM_OBJECT].ms_alloc -
+                stats_block[VR_MEM_OBJECT].ms_free);
         response->vms_mem_stats_req_object += (stats_block[VR_MEM_STATS_REQ_OBJECT].ms_alloc -
                 stats_block[VR_MEM_STATS_REQ_OBJECT].ms_free);
         response->vms_mirror_object += (stats_block[VR_MIRROR_OBJECT].ms_alloc -
@@ -356,6 +373,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_USOCK_IOVEC_OBJECT].ms_free);
         response->vms_vrouter_req_object += (stats_block[VR_VROUTER_REQ_OBJECT].ms_alloc -
                 stats_block[VR_VROUTER_REQ_OBJECT].ms_free);
+        response->vms_bitmap_object += (stats_block[VR_BITMAP_OBJECT].ms_alloc -
+                stats_block[VR_BITMAP_OBJECT].ms_free);
         response->vms_qos_map_object += (stats_block[VR_QOS_MAP_OBJECT].ms_alloc -
                 stats_block[VR_QOS_MAP_OBJECT].ms_free);
         response->vms_fc_object += (stats_block[VR_FC_OBJECT].ms_alloc -
@@ -372,6 +391,8 @@ vr_mem_stats_get(void)
         response->vms_interface_fat_flow_ipv6_exclude_list_object +=
             (stats_block[VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT].ms_alloc -
              stats_block[VR_INTERFACE_FAT_FLOW_IPV6_EXCLUDE_LIST_OBJECT].ms_free);
+        response->vms_info_req_object += (stats_block[VR_INFO_REQ_OBJECT].ms_alloc -
+                stats_block[VR_INFO_REQ_OBJECT].ms_free);
         for (i = 0; i < VR_VROUTER_MAX_OBJECT; i++) {
             alloced += stats_block[i].ms_alloc;
             freed += stats_block[i].ms_free;

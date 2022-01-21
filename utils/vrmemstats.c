@@ -41,6 +41,8 @@ mem_stats_req_process(void *s_req)
             stats->vms_assembler_table_object);
     printf("Bridge MAC                      %" PRIu64 "\n",
             stats->vms_bridge_mac_object);
+    printf("Bridge Table Data               %" PRIu64 "\n",
+            stats->vms_bridge_table_data_object);
     printf("Btable                          %" PRIu64 "\n",
             stats->vms_btable_object);
     printf("Build Info                      %" PRIu64 "\n",
@@ -49,6 +51,10 @@ mem_stats_req_process(void *s_req)
             stats->vms_defer_object);
     printf("Drop Stats                      %" PRIu64 "\n",
             stats->vms_drop_stats_object);
+    printf("Pkt Drop Log                    %" PRIu64 "\n",
+            stats->vms_pkt_drop_log_object);
+    printf("Pkt Drop Log Request            %" PRIu64 "\n",
+            stats->vms_pkt_drop_log_req_object);
     printf("Drop Stats Request              %" PRIu64 "\n",
             stats->vms_drop_stats_req_object);
     printf("Flow queue                      %" PRIu64 "\n",
@@ -63,6 +69,8 @@ mem_stats_req_process(void *s_req)
             stats->vms_flow_link_local_object);
     printf("Flow Metadata                   %" PRIu64 "\n",
             stats->vms_flow_metadata_object);
+    printf("Flow Defer Data                 %" PRIu64 "\n",
+            stats->vms_flow_defer_data_object);
     printf("Flow Table Data                 %" PRIu64 "\n",
             stats->vms_flow_table_data_object);
     printf("Flow Table Info                 %" PRIu64 "\n",
@@ -95,18 +103,24 @@ mem_stats_req_process(void *s_req)
             stats->vms_interface_req_mac_object);
     printf("Interface Request PBB MAC       %" PRIu64 "\n",
             stats->vms_interface_req_pbb_mac_object);
-    printf("Interface Req Bridge ID         %" PRIu64 "\n",
+    printf("Interface Request Lcore Errors  %" PRIu64 "\n",
+            stats->vms_interface_req_lcore_errors_object);
+    printf("Interface Request Bridge ID     %" PRIu64 "\n",
             stats->vms_interface_req_bridge_id_object);
     printf("Interface Mirror Req Meta Objects   %" PRIu64 "\n",
             stats->vms_interface_req_mirror_meta_object);
     printf("Interface Queue                 %" PRIu64 "\n",
             stats->vms_interface_queue_object);
+    printf("Interface Bond                  %" PRIu64 "\n",
+            stats->vms_interface_bond_object);
     printf("Interface Request Name          %" PRIu64 "\n",
             stats->vms_interface_req_name_object);
     printf("Interface Stats                 %" PRIu64 "\n",
             stats->vms_interface_stats_object);
     printf("Interface Table                 %" PRIu64 "\n",
             stats->vms_interface_table_object);
+    printf("Interface Lcore Error           %" PRIu64 "\n",
+            stats->vms_interface_to_lcore_error_object);
     printf("VRF Table                       %" PRIu64 "\n",
             stats->vms_interface_vrf_table_object);
     printf("Index Table                     %" PRIu64 "\n",
@@ -119,6 +133,8 @@ mem_stats_req_process(void *s_req)
             stats->vms_message_response_object);
     printf("Message Dump                    %" PRIu64 "\n",
             stats->vms_message_dump_object);
+    printf("Memory                          %" PRIu64 "\n",
+            stats->vms_mem_object);
     printf("Memory Stats Request            %" PRIu64 "\n",
             stats->vms_mem_stats_req_object);
     printf("Mirror                          %" PRIu64 "\n",
@@ -165,6 +181,8 @@ mem_stats_req_process(void *s_req)
             stats->vms_usock_iovec_object);
     printf("Vrouter Request                 %" PRIu64 "\n",
             stats->vms_vrouter_req_object);
+    printf("Bitmap                          %" PRIu64 "\n",
+            stats->vms_bitmap_object);
     printf("QOS Map Objects                 %" PRIu64 "\n",
             stats->vms_qos_map_object);
     printf("Forwarding Class Objects        %" PRIu64 "\n",
@@ -173,6 +191,8 @@ mem_stats_req_process(void *s_req)
             stats->vms_interface_fat_flow_ipv4_exclude_list_object);
     printf("Fatflow v6 exclude list object  %" PRIu64 "\n",
             stats->vms_interface_fat_flow_ipv6_exclude_list_object);
+    printf("Info Req Object                 %" PRIu64 "\n",
+            stats->vms_info_req_object);
     return;
 }
 
