@@ -55,6 +55,8 @@ mem_stats_req_process(void *s_req)
             stats->vms_pkt_drop_log_object);
     printf("Pkt Drop Log Request            %" PRIu64 "\n",
             stats->vms_pkt_drop_log_req_object);
+    printf("Log Types Object                %" PRIu64 "\n",
+            stats->vms_log_types_object);
     printf("Drop Stats Request              %" PRIu64 "\n",
             stats->vms_drop_stats_req_object);
     printf("Flow queue                      %" PRIu64 "\n",

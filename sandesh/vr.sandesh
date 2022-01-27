@@ -413,6 +413,7 @@ buffer sandesh vr_mem_stats_req {
    80:  i64             vms_bitmap_object;
    81:  i64             vms_info_req_object;
    82:  i64             vms_pkt_drop_log_req_object;
+   83:  i64             vms_log_types_object;
 }
 
 /* any new addition needs update to vr_util.c & flow.c */

@@ -245,6 +245,8 @@ vr_mem_stats_get(void)
                 stats_block[VR_DROP_STATS_REQ_OBJECT].ms_free);
         response->vms_pkt_drop_log_object += (stats_block[VR_PKT_DROP_LOG_OBJECT].ms_alloc -
                 stats_block[VR_PKT_DROP_LOG_OBJECT].ms_free);
+        response->vms_log_types_object += (stats_block[VR_LOG_TYPES_OBJECT].ms_alloc -
+                stats_block[VR_LOG_TYPES_OBJECT].ms_free);
         response->vms_pkt_drop_log_req_object += (stats_block[VR_PKT_DROP_LOG_REQ_OBJECT].ms_alloc -
                 stats_block[VR_PKT_DROP_LOG_REQ_OBJECT].ms_free);
         response->vms_flow_queue_object += (stats_block[VR_FLOW_QUEUE_OBJECT].ms_alloc -
