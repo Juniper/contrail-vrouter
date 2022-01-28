@@ -305,6 +305,11 @@ vrouter_ops_destroy(vrouter_ops *req)
         req->vo_build_info = NULL;
     }
 
+    if (req->vo_log_type_enable) {
+        vr_free(req->vo_log_type_enable, VR_LOG_TYPES_OBJECT);
+        req->vo_log_type_enable = NULL;
+    }
+
     vr_free(req, VR_VROUTER_REQ_OBJECT);
 
     return;

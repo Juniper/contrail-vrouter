@@ -665,42 +665,27 @@ dpdk_info_get_stats(VR_INFO_ARGS)
 }
 
 static int
-display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all)
+__display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all,
+        uint64_t *values, struct rte_eth_xstat_name *xstats_names)
 {
 
     VR_INFO_DEC();
-    struct rte_eth_xstat_name *xstats_names = NULL;
-    uint64_t *values = NULL;
     int ret, i, segment_lookup[VR_DPDK_BOND_MAX_SLAVES][xstats_count],
         rpi = 0, rbi = 0, tpi = 0, tbi = 0, ei = 0, oth = 0;
     char seperator[SEPERATOR];
     memset(seperator, '-', SEPERATOR);
     seperator[SEPERATOR-1] = '\0';
 
-    values = (uint64_t *)vr_zalloc(
-                 sizeof( *values) * xstats_count, VR_INFO_REQ_OBJECT);
-    if (values == NULL) {
-        RTE_LOG(ERR, VROUTER, "Cannot allocate memory for xstats\n");
-        return -1;
-    }
-
-    xstats_names = (struct rte_eth_xstat_name *)vr_zalloc(
-                       sizeof(struct rte_eth_xstat_name) * xstats_count,
-                       VR_INFO_REQ_OBJECT);
-    if (xstats_names == NULL) {
-        RTE_LOG(ERR, VROUTER, "Cannot allocate memory for xstat names\n");
-        goto err;
-    }
     if (xstats_count != rte_eth_xstats_get_names_by_id(port_id, xstats_names,
         xstats_count, NULL)) {
         RTE_LOG(ERR, VROUTER, "Cannot get xstat names\n");
-        goto err;
+        return VR_INFO_FAILED;
     }
 
     ret = rte_eth_xstats_get_by_id(port_id, NULL, values, xstats_count);
     if (ret < 0 || ret > xstats_count) {
         RTE_LOG(ERR, VROUTER, "Cannot get xstats\n");
-        goto err;
+        return VR_INFO_FAILED;
     }
     /* Adding the indices of respective segments in segment_lookup array */
     for (i = 0; i < xstats_count; i++) {
@@ -775,17 +760,46 @@ display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all)
 
     VI_PRINTF("%s\n\n", seperator);
     return 0;
+}
 
-err:
-    if (values){
+static int
+display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all)
+{
+    struct rte_eth_xstat_name *xstats_names = NULL;
+    uint64_t *values = NULL;
+    int ret = 0;
+
+    values = (uint64_t *)vr_zalloc(
+            sizeof( *values) * xstats_count, VR_INFO_REQ_OBJECT);
+    if (values == NULL) {
+        RTE_LOG(ERR, VROUTER, "Cannot allocate memory for xstats\n");
+        ret = VR_INFO_FAILED;
+        goto exit;
+    }
+
+    xstats_names = (struct rte_eth_xstat_name *)vr_zalloc(
+            sizeof(struct rte_eth_xstat_name) * xstats_count, VR_INFO_REQ_OBJECT);
+    if (xstats_names == NULL) {
+        RTE_LOG(ERR, VROUTER, "Cannot allocate memory for xstat names\n");
+        ret = VR_INFO_FAILED;
+        goto exit;
+    }
+
+    ret = __display_xstats(msg_req, port_id, xstats_count, is_all, values,
+            xstats_names);
+
+exit:
+    if (values) {
         vr_free(values, VR_INFO_REQ_OBJECT);
         values = NULL;
     }
-    if (xstats_names){
+
+    if (xstats_names) {
         vr_free(xstats_names, VR_INFO_REQ_OBJECT);
         xstats_names = NULL;
     }
-    return -1;
+
+    return ret;
 }
 
 int
@@ -1004,6 +1018,17 @@ dpdk_info_get_app(VR_INFO_ARGS)
             }
         }
     }
+
+    /* closing file fds to avoid fd socket leaks */
+    if (intf) {
+        fclose(intf);
+        intf = NULL;
+    }
+    if (bond_file) {
+        fclose(bond_file);
+        bond_file = NULL;
+    }
+
     VI_PRINTF("Vlan name: %s \n", vr_dpdk.vlan_name);
     VI_PRINTF("Vlan tag: %d \n", vr_dpdk.vlan_tag);
     if (vr_dpdk.vlan_vif){
