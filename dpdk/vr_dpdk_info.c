@@ -774,14 +774,23 @@ display_xstats(VR_INFO_ARGS, uint16_t port_id, int xstats_count, bool is_all)
     }
 
     VI_PRINTF("%s\n\n", seperator);
-    return 0;
 
-err:
-    if (values){
+    if (values) {
         vr_free(values, VR_INFO_REQ_OBJECT);
         values = NULL;
     }
-    if (xstats_names){
+    if (xstats_names) {
+        vr_free(xstats_names, VR_INFO_REQ_OBJECT);
+        xstats_names = NULL;
+    }
+    return 0;
+
+err:
+    if (values) {
+        vr_free(values, VR_INFO_REQ_OBJECT);
+        values = NULL;
+    }
+    if (xstats_names) {
         vr_free(xstats_names, VR_INFO_REQ_OBJECT);
         xstats_names = NULL;
     }

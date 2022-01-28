@@ -225,6 +225,10 @@ vr_info_req_process(void *s_req)
         /* Copy message buffer */
         snprintf(resp.vdu_proc_info, resp.vdu_proc_info_size, "%s", msg_req.outbuf);
         vr_message_dump_object(dumper, VR_INFO_OBJECT_ID, &resp);
+
+        if(resp.vdu_proc_info != NULL) {
+            vr_free(resp.vdu_proc_info, VR_INFO_REQ_OBJECT);
+        }
     }
 
 generate_response:
