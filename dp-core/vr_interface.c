@@ -3206,8 +3206,6 @@ vr_interface_get(vr_interface_req *req)
         mm.vr_mm_object[obj_cnt] = drop_resp;
         obj_cnt++;
 
-        /* zero vifr_core means to sum up all the per-core stats */
-        vr_interface_make_req(vif_resp, vif, (unsigned)(req->vifr_core - 1));
         /* adds in stats for pkts which were offloaded on NIC and does debug
            comparison to check if matching entry is programmed on NIC */
         ret = vr_offload_interface_get(vif_resp);
