@@ -138,7 +138,7 @@ struct vr_info_buff_table {
                 msg_req->outbuf_len); \
         return VR_INFO_FAILED; \
     } \
-    if (len > (msg_req->bufsz - msg_req->outbuf_len)) { \
+    if (len >= (msg_req->bufsz - msg_req->outbuf_len)) { \
             vr_printf("VrInfo: Message copy to buffer failed at %d\n", \
                     msg_req->outbuf_len); \
             return VR_INFO_MSG_TRUNC; \
