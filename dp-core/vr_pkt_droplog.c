@@ -161,6 +161,43 @@ exit_get:
     return;
 }
 
+static void
+vr_pkt_drop_log_clear(vr_pkt_drop_log_req *req)
+{
+    int i = 0, size = 0, ret = 0;
+    struct vrouter *router = vrouter_get(0);
+    vr_pkt_drop_log_req *response = NULL;
+
+    response = vr_zalloc(sizeof(*response), VR_PKT_DROP_LOG_REQ_OBJECT);
+    if (!response) {
+        ret = -ENOMEM;
+        goto exit_get;
+    }
+
+    if (!router->vr_pkt_drop->vr_pkt_drop_log) {
+        return;
+    }
+
+    /* Calculate the MAX pkt log buffer*/
+    size = vr_pkt_droplog_bufsz * sizeof(vr_pkt_drop_log_t);;
+
+    for (i = 0; i < vr_num_cpus; i++) {
+     if(router->vr_pkt_drop->vr_pkt_drop_log[i]) {
+        memset(router->vr_pkt_drop->vr_pkt_drop_log[i], 0, size);
+     }
+    }
+    response->h_op = SANDESH_OP_RESET;
+
+exit_get:
+    vr_message_response(VR_PKT_DROP_LOG_OBJECT_ID, ret ? NULL : response, ret, false);
+
+    if (response != NULL) {
+        vr_free(response, VR_PKT_DROP_LOG_REQ_OBJECT);
+    }
+
+    return;
+}
+
 void
 vr_pkt_drop_log_req_process(void *s_req)
 {
@@ -170,6 +207,11 @@ vr_pkt_drop_log_req_process(void *s_req)
     if (req->h_op == SANDESH_OP_ADD)
     {
         vr_pkt_droplog_config(req);
+        return;
+    }
+
+     if(req->h_op == SANDESH_OP_RESET) {
+        vr_pkt_drop_log_clear(req);
         return;
     }
 
