@@ -882,6 +882,17 @@ vr_send_info_dump(struct nl_client *cl, unsigned int router_id,
 }
 
 int
+vr_pkt_drop_log_reset(struct nl_client *cl)
+{
+    vr_pkt_drop_log_req req;
+
+    memset(&req, 0, sizeof(req));
+    req.h_op = SANDESH_OP_RESET;
+
+    return vr_sendmsg(cl, &req, "vr_pkt_drop_log_req");
+}
+
+int
 vr_drop_stats_reset(struct nl_client *cl)
 {
     vr_drop_stats_req req;
