@@ -185,13 +185,13 @@ vr_fragment_queue_element_free(struct vr_fragment_queue_element *vfqe,
 }
 
 static void
-fragment_free_frag(struct vr_fragment *frag)
+fragment_free_frag(struct vr_fragment *frag, unsigned int drop_reason)
 {
     struct vr_fragment_queue_element *fqe;
 
     while ((fqe = frag->f_qe)) {
         frag->f_qe = fqe->fqe_next;
-        vr_fragment_queue_element_free(fqe, VP_DROP_FRAGMENTS);
+        vr_fragment_queue_element_free(fqe, drop_reason);
     }
 
     vr_free(frag, VR_FRAGMENT_OBJECT);
@@ -227,14 +227,14 @@ vr_assembler_table_scan(struct vr_fragment **head)
         if (dest < frag->f_time) {
             if ((sec < frag->f_time) && (dest < sec)) {
                 fragment_unlink_frag(prev, frag);
-                fragment_free_frag(frag);
+                fragment_free_frag(frag, VP_DROP_FRAG_STALE);
             } else {
                 prev = &frag->f_next;
             }
         } else {
             if ((sec > dest) || (sec < frag->f_time)) {
                 fragment_unlink_frag(prev, frag);
-                fragment_free_frag(frag);
+                fragment_free_frag(frag,VP_DROP_FRAG_STALE);
             } else {
                 prev = &frag->f_next;
             }
@@ -486,7 +486,7 @@ vr_fragment_assemble(struct vr_fragment **head_p,
 
         /* After flushing, remove the fragment entries from assembler table */
         fragment_unlink_frag(prev, frag);
-        fragment_free_frag(frag);
+        fragment_free_frag(frag, VP_DROP_FRAG_NON_HEAD);
     }
 
     return 0;
@@ -583,7 +583,7 @@ vr_fragment_enqueue(struct vrouter *router,
         struct vr_packet *pkt, struct vr_forwarding_md *fmd)
 {
     bool swapped = false;
-    unsigned int i;
+    unsigned int i, drop_reason;
 
     struct vr_packet_node *pnode;
     struct vr_fragment_queue_element *fqe = NULL, *tail, **tailp;
@@ -592,19 +592,23 @@ vr_fragment_enqueue(struct vrouter *router,
     if (*tailp == NULL) {
         vfq->vfq_length = 0;
     } else {
-        if ((vfq->vfq_length + 1) > VR_MAX_FRAGMENTS_PER_CPU_QUEUE)
+        if ((vfq->vfq_length + 1) > VR_MAX_FRAGMENTS_PER_CPU_QUEUE) {
+            drop_reason = VP_DROP_FRAG_MAX_PER_CPU;
             goto fail;
+        }
     }
 
     /* Check if the total number of fragmented packets across
      * all cores exceeded. */
     if (vrouter_host->hos_is_frag_limit_exceeded &&
             vrouter_host->hos_is_frag_limit_exceeded()) {
+            drop_reason = VP_DROP_FRAG_MAX_ALLCPU_CORE;
             goto fail;
     }
 
     fqe = vr_malloc(sizeof(*fqe), VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
     if (!fqe) {
+        drop_reason = VP_DROP_FRAG_MEM_ALLOC;
         goto fail;
     }
     fqe->fqe_router = router;
@@ -636,6 +640,7 @@ vr_fragment_enqueue(struct vrouter *router,
         } else {
             vfq->vfq_length--;
             if (i == (VR_FRAG_ENQUEUE_ATTEMPTS - 1)) {
+                drop_reason = VP_DROP_FRAG_ENQUEUE_FAIL;
                 goto fail;
             }
         }
@@ -647,8 +652,8 @@ fail:
     if (fqe)
         vr_free(fqe, VR_FRAGMENT_QUEUE_ELEMENT_OBJECT);
 
-    PKT_LOG(VP_DROP_FRAGMENTS, pkt, 0, VR_FRAGMENT_C, __LINE__);
-    vr_pfree(pkt, VP_DROP_FRAGMENTS);
+    PKT_LOG(drop_reason, pkt, 0, VR_FRAGMENT_C, __LINE__);
+    vr_pfree(pkt, drop_reason);
     return -1;
 }
 

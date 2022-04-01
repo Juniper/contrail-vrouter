@@ -59,7 +59,14 @@ vr_drop_stats_make_response(vr_drop_stats_req *response, uint64_t *stats)
     response->vds_no_fmd += stats[VP_DROP_NO_FMD];
     response->vds_cloned_original += stats[VP_DROP_CLONED_ORIGINAL];
     response->vds_invalid_vnid += stats[VP_DROP_INVALID_VNID];
-    response->vds_frag_err += stats[VP_DROP_FRAGMENTS];
+    response->vds_frag_stale_err += stats[VP_DROP_FRAG_STALE];
+    response->vds_frag_non_head_err += stats[VP_DROP_FRAG_NON_HEAD];
+    response->vds_frag_max_per_cpu_err += stats[VP_DROP_FRAG_MAX_PER_CPU];
+    response->vds_frag_max_cpu_core_err += stats[VP_DROP_FRAG_MAX_ALLCPU_CORE];
+    response->vds_frag_mem_alloc_err += stats[VP_DROP_FRAG_MEM_ALLOC];
+    response->vds_frag_enqueue_err += stats[VP_DROP_FRAG_ENQUEUE_FAIL];
+    response->vds_frag_cpu_err += stats[VP_DROP_FRAG_CPU];
+    response->vds_frag_cpu_exceed_err += stats[VP_DROP_FRAG_CPU_EXCEED];
     response->vds_invalid_source += stats[VP_DROP_INVALID_SOURCE];
     response->vds_l2_no_route += stats[VP_DROP_L2_NO_ROUTE];
     response->vds_fragment_queue_fail +=
