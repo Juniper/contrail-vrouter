@@ -157,8 +157,8 @@ dpdk_fragment_assembler_enqueue(struct vrouter *router, struct vr_packet *pkt,
         RTE_LOG(ERR, VROUTER, "%s:%d Enqueue to the assembler can only be "
                 "done on forwarding lcores, not on cpu %u\n",
                 __FUNCTION__, __LINE__, cpu);
-        PKT_LOG(VP_DROP_FRAGMENTS, pkt, 0, VR_DPDK_FRAGMENT_ASSEMBLER_C, __LINE__);
-        vr_pfree(pkt, VP_DROP_FRAGMENTS);
+        PKT_LOG(VP_DROP_FRAG_CPU, pkt, 0, VR_DPDK_FRAGMENT_ASSEMBLER_C, __LINE__);
+        vr_pfree(pkt, VP_DROP_FRAG_CPU);
         return -EINVAL;
     }
 

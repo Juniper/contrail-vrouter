@@ -325,7 +325,7 @@ Usage()
     printf("Usage: dropstats [--core|-c] <core number> %s\n\n",
             get_offload_enabled()?"[--offload|-o]":"");
     printf("--core <core number>\t Show statistics for a specified CPU core\n");
-    printf("--sock-dir <netlink socket dir>\n");
+    /* printf("--sock-dir <netlink socket dir>\n"); */
     if (get_offload_enabled()) {
         printf("--offload\t\t Show statistics for pkts offloaded on NIC\n");
         printf("\t\t\t (offload stats included if no flags given)\n");
