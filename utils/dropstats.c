@@ -296,7 +296,7 @@ enum opt_index {
     OFFL_OPT_INDEX,
     LOG_OPT_INDEX,
     CLEAR_OPT_INDEX,
-    SOCK_DIR_OPT_INDEX,
+/*  SOCK_DIR_OPT_INDEX, */
     DROP_LOG_TYPE_OPT_INDEX,
     SHOW_LOG_TYPE_OPT_INDEX,
     CLEAR_DROP_LOG_OPT_INDEX,
@@ -310,7 +310,7 @@ static struct option long_options[] = {
     [OFFL_OPT_INDEX]    =   {"offload", no_argument,        &offload_set,   1},
     [LOG_OPT_INDEX]     =   {"log",     required_argument,  &log_set,       1},
     [CLEAR_OPT_INDEX]   =   {"clear",   no_argument,        &clear_set,     1},
-    [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
+/*  [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1}, */
     [DROP_LOG_TYPE_OPT_INDEX]   =   {"drop-type",  required_argument,  &log_type_set,   1},
     [SHOW_LOG_TYPE_OPT_INDEX]   =   {"show",       required_argument,  &log_type_show,  1},
     [CLEAR_DROP_LOG_OPT_INDEX]   =   {"clear-drop-log",   no_argument, &clear_drop_log_set, 1},
@@ -430,9 +430,10 @@ parse_long_opts(int opt_index, char *opt_arg)
         if (min_log > 1)
             Usage();
         break;
-    case SOCK_DIR_OPT_INDEX:
-        vr_socket_dir = opt_arg;
-        break;
+ /* case SOCK_DIR_OPT_INDEX:
+  *     vr_socket_dir = opt_arg;
+  *     break;
+  */
     case HELP_OPT_INDEX:
     default:
         Usage();
@@ -474,10 +475,11 @@ main(int argc, char *argv[])
             parse_long_opts(MIN_LOG_OPT_INDEX, optarg);
             break;
 
-        case 's':
-            sock_dir_set = 1;
-            parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
-            break;
+    /* case 's':
+     *      sock_dir_set = 1;
+     *      parse_long_opts(SOCK_DIR_OPT_INDEX, optarg);
+     *      break;
+     */
 
         case 0:
             parse_long_opts(option_index, optarg);
