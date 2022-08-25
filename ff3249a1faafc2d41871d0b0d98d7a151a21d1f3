@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "033a34e6_edaaf0e6",
+        "filename": "utils/dropstats.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 483,
+      "author": {
+        "id": 641
+      },
+      "writtenOn": "2022-08-25T04:03:09Z",
+      "side": 1,
+      "message": "The description of the review does not say why this code is being removed. That needs to be addressed first.\n\nSecond of all if the code needs to be removed why it is being commented out instead of being removed?",
+      "revId": "ff3249a1faafc2d41871d0b0d98d7a151a21d1f3",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
