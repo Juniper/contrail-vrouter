@@ -39,7 +39,7 @@ static int dump_marker = -1;
 static int buff_table_id, buffsz;
 
 static int help_set, ver_set, bond_set, lacp_set, mempool_set, stats_set,
-             xstats_set, lcore_set, app_set, sock_dir_set;
+             xstats_set, lcore_set, app_set, sock_dir_set, virtio_set;
 static unsigned int core = (unsigned)-1;
 static unsigned int stats_index = 0;
 /* For few  CLI, Inbuf has to send to vrouter for processing(i.e kind of filter
@@ -61,6 +61,7 @@ enum opt_index {
     APP_OPT_INDEX,
     SOCK_DIR_OPT_INDEX,
     MAX_OPT_INDEX,
+    VIRTIO_OPT_INDEX,
 };
 
 static struct option long_options[] = {
@@ -76,6 +77,7 @@ static struct option long_options[] = {
     [BUFFSZ_OPT_INDEX]  =   {"buffsz",  required_argument,  &buffsz,        1},
     [SOCK_DIR_OPT_INDEX]  = {"sock-dir", required_argument, &sock_dir_set,  1},
     [MAX_OPT_INDEX]     =   {NULL,    0,                  0,              0},
+    [VIRTIO_OPT_INDEX] = {"virtio", required_argument, &virtio_set, 1},
 };
 
 static void
@@ -100,6 +102,8 @@ Usage()
                                                           Show App information\n");
     printf("       Optional: --buffsz      <value>\
                                              Send output buffer size (less than 1000Mb)\n");
+    printf("                 --virtio|-q    <vrif>\
+                                             Show Virtio information\n");
     exit(-EINVAL);
 }
 
@@ -107,7 +111,7 @@ static void
 validate_options(void)
 {
     if(!(ver_set || bond_set || lacp_set || mempool_set ||
-        stats_set || xstats_set || lcore_set || app_set))
+        stats_set || xstats_set || lcore_set || app_set || virtio_set))
         Usage();
 
     return;
@@ -201,6 +205,15 @@ parse_long_opts(int opt_index, char *opt_arg)
         }
         break;
 
+    case VIRTIO_OPT_INDEX:
+	msginfo = INFO_VIRTIO;
+        if ( (atoi(opt_arg) >= 0)  && (atoi(opt_arg) < VR_MAX_INTERFACES ) ){
+	    vr_info_inbuf = opt_arg;
+	} else {
+	    Usage();
+	}
+	break;
+
     case LCORE_OPT_INDEX:
         msginfo = INFO_LCORE;
         break;
@@ -265,7 +278,7 @@ main(int argc, char *argv[])
 
     parse_ini_file();
 
-    while (((opt = getopt_long(argc, argv, "-:hvbl:m:sn:cax::",
+    while (((opt = getopt_long(argc, argv, "-:hvblq:m:sn:cax::",
                         long_options, &option_index)) >= 0)) {
         switch (opt) {
         case 'v':
@@ -316,6 +329,12 @@ main(int argc, char *argv[])
             app_set = 1;
             msginfo = INFO_APP;
             break;
+
+	case 'q':
+	    virtio_set = 1;
+	    msginfo = INFO_VIRTIO;
+            parse_long_opts(VIRTIO_OPT_INDEX, optarg);
+	    break;
 
         case 0:
             parse_long_opts(option_index, optarg);

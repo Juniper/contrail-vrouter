@@ -44,6 +44,7 @@ extern int dpdk_vlan_forwarding_if_add(void);
 extern unsigned int vr_flow_hold_limit;
 extern int no_huge_set;
 extern unsigned vr_packet_sz;
+extern int dpdk_virtio_int( unsigned int vif_idx, VR_INFO_ARGS );
 
 /*
  * Use RTE_LOG_DEBUG to enable debug logs.

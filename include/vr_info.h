@@ -19,6 +19,7 @@
     X(INFO_XSTATS, info_get_xstats, DPDK) \
     X(INFO_LCORE, info_get_lcore, DPDK) \
     X(INFO_APP, info_get_app, DPDK) \
+    X(INFO_VIRTIO, info_get_virto, DPDK) \
 
 /* Deifne all supported platforms.
  * When a new platforms added, define like below.
@@ -113,6 +114,8 @@ struct vr_info_buff_table {
     int buf_len;
 };
 
+#define VR_INFO_DEF_VIRTIO_BUF_SIZE (12*1024)
+
 #define VR_INFO_DEC() \
     int len = 0;
 
@@ -123,6 +126,19 @@ struct vr_info_buff_table {
     } else { \
         msg_req->outbuf = vr_zalloc(VR_INFO_DEF_BUF_SIZE, VR_INFO_REQ_OBJECT); \
         msg_req->bufsz = VR_INFO_DEF_BUF_SIZE; \
+    } \
+    if(msg_req->outbuf == NULL) { \
+        vr_printf("Buffer allocation failed\n"); \
+        return VR_INFO_FAILED; \
+    }
+
+#define VR_INFO_BUF_VIRTIO_INIT() \
+    int len = 0; \
+    if(msg_req->bufsz) { \
+        msg_req->outbuf = vr_zalloc(msg_req->bufsz, VR_INFO_REQ_OBJECT); \
+    } else { \
+        msg_req->outbuf = vr_zalloc(VR_INFO_DEF_VIRTIO_BUF_SIZE, VR_INFO_REQ_OBJECT); \
+        msg_req->bufsz = VR_INFO_DEF_VIRTIO_BUF_SIZE; \
     } \
     if(msg_req->outbuf == NULL) { \
         vr_printf("Buffer allocation failed\n"); \

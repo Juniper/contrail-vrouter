@@ -17,6 +17,9 @@
 #include "vr_btable.h"
 #include "vr_dpdk.h"
 #include "vrouter.h"
+#include "vr_dpdk_virtio.h"
+#include "vr_uvhost_client.h"
+#include <linux/virtio_net.h>
 #define SEPERATOR 70
 #define LINE 200
 #define MAXBITS 8
@@ -801,6 +804,138 @@ exit:
 
     return ret;
 }
+
+int dpdk_dump_virtio_info ( vr_dpdk_virtioq_t *virtioq_dump,
+                    uint16_t vring_idx, uint8_t txrx_flag, VR_INFO_ARGS)
+{
+   uint16_t idx;
+   char seperator[SEPERATOR];
+   memset(seperator, '-', SEPERATOR);
+   seperator[SEPERATOR-1] = '\0';
+
+   VR_INFO_DEC();
+   if ( ( virtioq_dump == NULL ) || ( virtioq_dump->vdv_desc == NULL ) ||
+      ( virtioq_dump->vdv_avail == NULL ) || ( virtioq_dump->vdv_used == NULL ) ) {
+      return -1;
+   }
+
+   if ( txrx_flag == 1 ) {
+      VI_PRINTF("tx_queue %d\n", vring_idx);
+   } else {
+      VI_PRINTF("rx_queue %d\n", vring_idx);
+   }
+
+   VI_PRINTF("vdv_desc.addr vdv_desc.len vdv_desc.flags vdv_desc.next\n");
+   VI_PRINTF("%" PRId64 "\t  %d\t\t %d\t\t %d\n",
+              (uint64_t)virtioq_dump->vdv_desc->addr, virtioq_dump->vdv_desc->len,
+              virtioq_dump->vdv_desc->flags, virtioq_dump->vdv_desc->next);
+
+
+   VI_PRINTF("vdv_avail flag \t vdv_avail.idx \n");
+   VI_PRINTF("%d \t\t\t %d\n", virtioq_dump->vdv_avail->flags, virtioq_dump->vdv_avail->idx);
+
+   VI_PRINTF("vdv_avail ring \n");
+   for ( idx = 0; idx <=  vring_idx; idx++ )
+      VI_PRINTF("%hu  ", virtioq_dump->vdv_avail->ring[idx]);
+
+   VI_PRINTF("\n");
+
+   VI_PRINTF("vdv_used.flags \t vdv_used.idx\n");
+   VI_PRINTF("%d \t\t\t %d\n", virtioq_dump->vdv_used->flags, virtioq_dump->vdv_used->idx);
+
+   VI_PRINTF("vdv_used start of desc_idx \t length of desc\n");
+   for ( idx = 0; idx <=  vring_idx; idx++ )
+       VI_PRINTF("%d \t\t\t\t\t %d\n", virtioq_dump->vdv_used->ring[vring_idx].id,
+                                 virtioq_dump->vdv_used->ring[idx].len);
+
+   VI_PRINTF("vdv_size   vdv_hlen\n");
+   VI_PRINTF("%d\t\t\t%d\n", virtioq_dump->vdv_size, virtioq_dump->vdv_hlen);
+
+   VI_PRINTF("vdv_last_used_idx  vdv_last_used_idx_res  vdv_ready_state vdv_vif_idx\t"
+             "vdv_callfd  vdv_kickfd \n");
+   VI_PRINTF("%d\t\t\t%d\t\t\t%d\t\t%d\t %d\t\t%d\n", virtioq_dump->vdv_last_used_idx,
+             virtioq_dump->vdv_last_used_idx_res, virtioq_dump->vdv_ready_state,
+	     virtioq_dump->vdv_vif_idx, virtioq_dump->vdv_callfd, virtioq_dump->vdv_kickfd);
+
+   VI_PRINTF("%s\n\n", seperator);
+   return 0;
+}
+
+int dpdk_virtio_int( unsigned int vif_idx, VR_INFO_ARGS )
+{
+   VR_INFO_BUF_VIRTIO_INIT();
+   vr_dpdk_virtioq_t *vq;
+   uint16_t vring_idx ;
+   uint16_t retVal = 0;
+   bool isVirtioQueue = false;
+   char seperator[SEPERATOR];
+   memset(seperator, '-', SEPERATOR);
+   seperator[SEPERATOR-1] = '\0';
+
+   if ( (vif_idx >= VR_MAX_INTERFACES) ) {
+      return -1;
+   }
+   VI_PRINTF("virtio queue stats \n");
+
+   for ( vring_idx = 0; vring_idx < VR_DPDK_VIRTIO_MAX_QUEUES; vring_idx++ ) {
+         vq = &vr_dpdk_virtio_txqs[vif_idx][vring_idx];
+         retVal = dpdk_dump_virtio_info(vq, vring_idx, 1, msg_req);
+         if ( retVal == 0 ) {
+            isVirtioQueue = true;
+         } else {
+              break; /* No more queue present */
+	 }
+
+   }
+
+   VI_PRINTF("%s\n\n", seperator);
+   for ( vring_idx = 0; vring_idx < VR_DPDK_VIRTIO_MAX_QUEUES; vring_idx++ ) {
+         vq = &vr_dpdk_virtio_rxqs[vif_idx][vring_idx];
+         retVal = dpdk_dump_virtio_info(vq, vring_idx, 0, msg_req);
+         if ( retVal == 0 ) {
+            isVirtioQueue = true;
+         } else {
+	      break; /* No more queue present */
+	 }
+   }
+   /*
+    * If isVirtioQueue is true then interface is virtio ring else
+    * it is non virtio interface.
+    */
+   if ( isVirtioQueue == false  )
+      VI_PRINTF("Interface %d is not Virtio link\n", vif_idx);
+
+   VI_PRINTF("%s\n\n", seperator);
+   return 0;
+}
+
+int
+dpdk_info_get_virto(VR_INFO_ARGS)
+{
+   uint16_t interface_num = 0;
+   uint16_t retVal = 0;
+
+   interface_num = atoi(msg_req->inbuf);
+
+   if ( ( msg_req->inbuf != NULL ) ) {
+      interface_num = atoi(msg_req->inbuf);
+
+      if ( interface_num >= 0 && interface_num < VR_MAX_INTERFACES ) {
+	 retVal = dpdk_virtio_int( interface_num, msg_req );
+      }
+      else {
+         RTE_LOG(ERR, VROUTER, "Vrouter interface is not within range \n");
+      }
+   }
+   else {
+      RTE_LOG(ERR, VROUTER, "Vrouter interface is not mentioned \n");
+   }
+   if ( retVal != 0 ) {
+      RTE_LOG(ERR, VROUTER, "dpdk queue info error \n");
+   }
+   return 0;
+}
+
 
 int
 dpdk_info_get_xstats(VR_INFO_ARGS)
