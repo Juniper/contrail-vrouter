@@ -879,6 +879,13 @@ linux_if_tx(struct vr_interface *vif, struct vr_packet *pkt)
                 }
 
                 if (vif->vif_type == VIF_TYPE_PHYSICAL) {
+			if (pkt->vp_if && vif_is_virtual(pkt->vp_if)){
+				/* This is needed for checksum computation of certain
+                                 * NICs like Mellanox. It does not have any effect
+                                 * on other NIC drivers like Intel 
+				 */
+				skb->encapsulation = 1;
+			}
                     linux_gso_xmit(vif, skb, pkt->vp_type);
                     return 0;
                 }
