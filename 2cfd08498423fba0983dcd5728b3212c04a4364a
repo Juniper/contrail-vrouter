@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "596ca9e6_142e3918",
+        "filename": "linux/vr_host_interface.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 902,
+      "author": {
+        "id": 1064
+      },
+      "writtenOn": "2023-03-21T04:20:08Z",
+      "side": 1,
+      "message": "Please remove this block of code, This check is handled twice here",
+      "revId": "2cfd08498423fba0983dcd5728b3212c04a4364a",
+      "serverId": "c72cd27d-1743-4a55-84a4-cd13b8400c52",
+      "unresolved": true
+    }
+  ]
+}
