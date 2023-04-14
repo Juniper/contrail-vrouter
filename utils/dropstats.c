@@ -257,9 +257,9 @@ Usage()
         printf("--offload\t\t Show statistics for pkts offloaded on NIC\n");
         printf("\t\t\t (offload stats included if no flags given)\n");
     }
-    printf("--log <core number>\t Show Packet drops log for a specified core.. \
-		Core number starts from 1...n. If core number specified as zero, \
-		it will log for all cores \n");
+    printf("--log < core number>\t Shows Packet drops log for all the cores  \
+		If core number specified as zero or any number  \
+	        it will log for all cores \n");
     printf("--clear\t To clear stats counters on all cores\n");
     exit(-EINVAL);
 }
@@ -360,6 +360,10 @@ main(int argc, char *argv[])
     {
         log_core = atoi(argv[2]);
 
+           if ((log_set == 1) && (log_core != 0)) {
+               printf (" Using log core  %d is not recommended , displaying the drops from core  0\n", log_core);
+               log_core = 0;
+        }
         /* Register nl allback function for pkt drop log buffer*/
         pkt_drop_log_nlutils_callbacks();
 
